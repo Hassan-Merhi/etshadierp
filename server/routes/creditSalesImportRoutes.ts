@@ -405,7 +405,7 @@ export function registerCreditSalesImportRoutes(app: Express) {
             const safeDate = (_voucherDate ?? _saleDate).replace(/[^0-9-]/g, "");
             const fileName =
               `${_custName} Invoice ${_locName} ${safeDate}`
-                .replace(/[^\w\s.()\-]/g, "_")
+                .replace(/[^\w\s.()-]/g, "_")
                 .replace(/\s+/g, " ")
                 .trim() + ".pdf";
             const invResult = await sendWhatsAppFileByUploadPos(_chatId, pdfBuffer, fileName, "");
@@ -441,7 +441,7 @@ export function registerCreditSalesImportRoutes(app: Express) {
                 hour: "2-digit",
                 minute: "2-digit",
               });
-              const stockName = `${_locName} STK ${companyName} ${_dateStr}`.replace(/[^\w\s.()\-]/g, "_").trim();
+              const stockName = `${_locName} STK ${companyName} ${_dateStr}`.replace(/[^\w\s.()-]/g, "_").trim();
               const stockRes = await sendWhatsAppFileToChatIdPos(
                 _chatId,
                 stockBuf,

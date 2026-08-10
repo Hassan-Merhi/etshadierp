@@ -99,14 +99,18 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
     try {
       const saved = localStorage.getItem(`otw_col_vis_${user.id}`);
       if (saved) setColVis({ ...DEFAULT_OTW_COL_VIS, ...JSON.parse(saved) });
-    } catch {}
+    } catch {
+      // Storage is unavailable in private mode and can throw on quota; the value is a convenience, not state we need.
+    }
   }, [user?.id]);
   function toggleOtwCol(id: OtwColId) {
     setColVis((prev) => {
       const next = { ...prev, [id]: !prev[id] };
       try {
         if (user?.id) localStorage.setItem(`otw_col_vis_${user.id}`, JSON.stringify(next));
-      } catch {}
+      } catch {
+        // Storage is unavailable in private mode and can throw on quota; the value is a convenience, not state we need.
+      }
       return next;
     });
   }
@@ -116,28 +120,27 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
   const effectiveRole = user?.currentRole ?? user?.role ?? "";
   const isAllowed = allowedRoles.includes(effectiveRole);
 
-  const { data, isLoading, isError, error, refetch, loadContainerDetail } =
-    usePaginatedGITContainers({
-      companyIdentity: allCompanies ? `all:${user?.id ?? "unknown"}` : selectedCompany?.id ?? "no-company",
-      allCompanies,
-      page,
-      pageSize: CONTAINER_PAGE_SIZE,
-      companyFilter,
-      containerFilters,
-      supplierFilters,
-      transporterFilters,
-      agentFilters,
-      truckFilters,
-      locationFilters,
-      docsFilter,
-      delayedFilter,
-      freightFilter,
-      etaFilter,
-      notesFilter,
-      sortOrder,
-      search,
-      enabled: !!isAllowed && !!selectedCompany,
-    });
+  const { data, isLoading, isError, error, refetch, loadContainerDetail } = usePaginatedGITContainers({
+    companyIdentity: allCompanies ? `all:${user?.id ?? "unknown"}` : (selectedCompany?.id ?? "no-company"),
+    allCompanies,
+    page,
+    pageSize: CONTAINER_PAGE_SIZE,
+    companyFilter,
+    containerFilters,
+    supplierFilters,
+    transporterFilters,
+    agentFilters,
+    truckFilters,
+    locationFilters,
+    docsFilter,
+    delayedFilter,
+    freightFilter,
+    etaFilter,
+    notesFilter,
+    sortOrder,
+    search,
+    enabled: !!isAllowed && !!selectedCompany,
+  });
 
   const allContainers = data?.containers ?? [];
 
@@ -156,7 +159,6 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
 
   const filteredContainers = allContainers;
 
-
   const localSummary = useContainerSummaryStats({ filteredContainers });
   const atSea = data?.summary?.atSea ?? localSummary.atSea;
   const atPort = data?.summary?.atPort ?? localSummary.atPort;
@@ -171,13 +173,23 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
     : localSummary.totalTransportDuty;
 
   const companies = data?.facets?.companies ?? [...new Set(allContainers.map((c) => c.companyName))].sort();
-  const containerNumbers = data?.facets?.containerNumbers ?? [...new Set(allContainers.map((c) => c.containerNumber))].sort();
-  const suppliers = data?.facets?.suppliers ?? ([...new Set(allContainers.map((c) => c.supplierCode).filter(Boolean))].sort() as string[]);
-  const transporters = data?.facets?.transporters ?? ([...new Set(allContainers.map((c) => c.transporter).filter(Boolean))].sort() as string[]);
-  const agents = data?.facets?.agents ?? ([...new Set(allContainers.map((c) => c.agent).filter(Boolean))].sort() as string[]);
-  const trucks = data?.facets?.trucks ?? ([...new Set(allContainers.map((c) => c.numberPlate).filter(Boolean))].sort() as string[]);
-  const locations = data?.facets?.locations ?? ([...new Set(allContainers.map((c) => c.trackingLocation).filter(Boolean))].sort() as string[]);
-  const allEtaDates = data?.facets?.etaDates ?? ([...new Set(allContainers.map((c) => c.eta).filter(Boolean))].sort() as string[]);
+  const containerNumbers =
+    data?.facets?.containerNumbers ?? [...new Set(allContainers.map((c) => c.containerNumber))].sort();
+  const suppliers =
+    data?.facets?.suppliers ??
+    ([...new Set(allContainers.map((c) => c.supplierCode).filter(Boolean))].sort() as string[]);
+  const transporters =
+    data?.facets?.transporters ??
+    ([...new Set(allContainers.map((c) => c.transporter).filter(Boolean))].sort() as string[]);
+  const agents =
+    data?.facets?.agents ?? ([...new Set(allContainers.map((c) => c.agent).filter(Boolean))].sort() as string[]);
+  const trucks =
+    data?.facets?.trucks ?? ([...new Set(allContainers.map((c) => c.numberPlate).filter(Boolean))].sort() as string[]);
+  const locations =
+    data?.facets?.locations ??
+    ([...new Set(allContainers.map((c) => c.trackingLocation).filter(Boolean))].sort() as string[]);
+  const allEtaDates =
+    data?.facets?.etaDates ?? ([...new Set(allContainers.map((c) => c.eta).filter(Boolean))].sort() as string[]);
   const hasContainersWithNoEta = data?.facets?.hasContainersWithNoEta ?? allContainers.some((c) => !c.eta);
 
   async function openDrawer(c: EnrichedContainerRow) {
@@ -190,7 +202,6 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
       toast({ title: "Failed to load container details", description: detailError.message, variant: "destructive" });
     }
   }
-
 
   useEffect(() => {
     setPage(1);
@@ -287,9 +298,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
           <div className="text-center space-y-2">
             <AlertTriangle className="h-8 w-8 text-red-500 mx-auto" />
             <p className="text-sm font-medium">Failed to load containers</p>
-            <p className="text-xs text-muted-foreground">
-              {error instanceof Error ? error.message : "Unknown error"}
-            </p>
+            <p className="text-xs text-muted-foreground">{error instanceof Error ? error.message : "Unknown error"}</p>
             <Button variant="outline" size="sm" onClick={() => void refetch()} data-testid="button-containers-retry">
               Try again
             </Button>

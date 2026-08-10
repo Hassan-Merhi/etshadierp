@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
@@ -18,7 +18,7 @@ import { firstRow } from "../../../lib/queryResult";
 export function registerDispatchTruckRideRoutes(app: Express) {
   // ── POST /api/factory/dispatch-batches/:id/truck-rides ────────────────────
   // Add a new truck ride to a batch
-  app.post("/api/factory/dispatch-batches/:id/truck-rides", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/dispatch-batches/:id/truck-rides", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -76,7 +76,7 @@ export function registerDispatchTruckRideRoutes(app: Express) {
 
   // ── PATCH /api/factory/dispatch-truck-rides/:id ───────────────────────────
   // Update ride info (plate, driver, notes)
-  app.patch("/api/factory/dispatch-truck-rides/:id", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/dispatch-truck-rides/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });

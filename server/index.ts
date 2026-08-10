@@ -8,6 +8,8 @@ import path from "path";
 import fs from "fs";
 import { randomBytes } from "crypto";
 import { registerRoutes } from "./routes";
+import { markStartupMigrationsComplete, recordStartupMigrationFailures } from "./startupMigrationReport";
+import { registerDbHealthRoute } from "./health/dbHealthRoute";
 import { blockViewOnlyWrites } from "./auth";
 import { setupWS } from "./wsServer";
 import { startScheduler, checkAndRecoverDailyExport } from "./services/scheduler";
@@ -391,14 +393,7 @@ let migrationsDone = false;
 (async () => {
   const migrations = startupMigrations;
 
-  // /api/health/db — reports migration status but does NOT block deployment.
-  // The deployment health check uses /api/health (always 200) so Render never times out.
-  app.get("/api/health/db", (_req, res) => {
-    res.json({
-      status: migrationsDone ? "ok" : "starting",
-      message: migrationsDone ? "Database ready" : "Running startup migrations, please wait...",
-    });
-  });
+  registerDbHealthRoute(app, () => migrationsDone);
 
   // Build info endpoint for frontend version checking (must be before registerRoutes)
   app.get("/api/build-info", (_req, res) => {
@@ -612,6 +607,8 @@ END $mig$`;
           }
         }
       }
+
+      recordStartupMigrationFailures(failedMigrations); // published to /api/health/db
 
       if (failedMigrations.length > 0) {
         logger.error(`✗ ${failedMigrations.length} migration(s) failed at startup:`);
@@ -1299,6 +1296,7 @@ END $mig$`;
     } finally {
       await migrationClient.end();
       migrationsDone = true;
+      markStartupMigrationsComplete();
     }
   };
 
@@ -1457,7 +1455,9 @@ END $mig$`;
       try {
         const { execSync } = require("child_process");
         execSync(`fuser -k ${port}/tcp`, { stdio: "ignore" });
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
       setTimeout(() => {
         server.removeAllListeners("error");
         server.on("error", (e: any) => {
@@ -1496,6 +1496,7 @@ END $mig$`;
   if (!migrationsEnabled) {
     logger.info("⚠ Startup migrations DISABLED via RUN_STARTUP_MIGRATIONS=false");
     migrationsDone = true;
+    markStartupMigrationsComplete({ skipped: true });
   }
 
   warmupDb()
@@ -1702,6 +1703,7 @@ END $mig$`;
             error: getErrorMessage(err) ?? err,
           });
           migrationsDone = true;
+          markStartupMigrationsComplete();
         }
       }
     })

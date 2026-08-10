@@ -1,6 +1,6 @@
 import { parseId } from "../lib/parseId";
 import { getErrorMessage } from "../lib/httpHandlers";
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { eq, and, inArray, gte, lte } from "drizzle-orm";
 import PDFDocument from "pdfkit";
 import { factoryAttendance, factoryWorkers } from "@shared/schema";
@@ -12,7 +12,7 @@ function getFactoryCompanyId(req: any): number | undefined {
 export function registerFactoryAttendanceRoutes(app: Express, requireAuth: any, db: any) {
   // GET /api/factory/attendance?date=YYYY-MM-DD&shift=
   // Returns active workers + merged attendance for that date
-  app.get("/api/factory/attendance", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/attendance", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company" });
@@ -60,7 +60,7 @@ export function registerFactoryAttendanceRoutes(app: Express, requireAuth: any, 
 
   // POST /api/factory/attendance/bulk
   // Upsert attendance records
-  app.post("/api/factory/attendance/bulk", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/attendance/bulk", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company" });
@@ -113,7 +113,7 @@ export function registerFactoryAttendanceRoutes(app: Express, requireAuth: any, 
 
   // GET /api/factory/attendance/worker/:workerId?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
   // Returns all attendance records for a single worker across a date range.
-  app.get("/api/factory/attendance/worker/:workerId", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/attendance/worker/:workerId", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company" });
@@ -147,7 +147,7 @@ export function registerFactoryAttendanceRoutes(app: Express, requireAuth: any, 
 
   // GET /api/factory/attendance/range?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
   // Returns all workers + all attendance records for a date range (for range export)
-  app.get("/api/factory/attendance/range", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/attendance/range", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company" });
@@ -195,7 +195,7 @@ export function registerFactoryAttendanceRoutes(app: Express, requireAuth: any, 
   });
 
   // GET /api/factory/attendance/pdf?date=YYYY-MM-DD&shift=
-  app.get("/api/factory/attendance/pdf", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/attendance/pdf", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company" });
@@ -254,7 +254,9 @@ export function registerFactoryAttendanceRoutes(app: Express, requireAuth: any, 
         try {
           doc.image(attLogoPath, (doc.page.width - 220) / 2, doc.y, { width: 220 });
           doc.moveDown(0.4);
-        } catch {}
+        } catch {
+          // Failure here is non-fatal and the surrounding flow continues deliberately.
+        }
       }
       doc.fontSize(18).font("Helvetica-Bold").text("Attendance Report", { align: "center" });
       doc.moveDown(0.3);

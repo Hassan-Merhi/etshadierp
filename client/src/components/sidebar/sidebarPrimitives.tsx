@@ -209,7 +209,8 @@ export function useOpenSections(visibleSections: NavSection[], options: { defaul
   const toggleSection = (label: string) =>
     setOpenSections((prev) => {
       const next = new Set(prev);
-      if (next.has(label)) next.delete(label); else next.add(label);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
       return next;
     });
 
@@ -235,7 +236,9 @@ export function usePinnedOrder(storageKey: string, defaults: NavItem[]) {
     setPinnedOrder(next);
     try {
       localStorage.setItem(storageKey, JSON.stringify(next));
-    } catch {}
+    } catch {
+      // Storage is unavailable in private mode and can throw on quota; the value is a convenience, not state we need.
+    }
   };
 
   const reorder = (fromUrl: string, targetUrl: string) => {
@@ -389,7 +392,9 @@ export function ModuleFooter({ user, avatarClassName, accent }: ModuleFooterProp
   const handleLogout = async () => {
     try {
       await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-    } catch {}
+    } catch {
+      // Best-effort side request; the user-visible flow does not depend on it completing.
+    }
     window.location.href = "/login";
   };
 

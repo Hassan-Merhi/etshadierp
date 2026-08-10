@@ -77,7 +77,9 @@ async function processIdbItem(item: SyncQueueItem): Promise<"ok" | "failed" | "c
     let errMsg = errText;
     try {
       errMsg = JSON.parse(errText)?.message || errText;
-    } catch {}
+    } catch {
+      // Malformed or absent payload — fall through to the default rather than surface a parse error.
+    }
 
     const action = classifyStatus(res.status);
 
@@ -155,7 +157,9 @@ async function processLegacyItem(item: ReturnType<typeof getQueue>[0]): Promise<
     let errMsg = errText;
     try {
       errMsg = JSON.parse(errText)?.message || errText;
-    } catch {}
+    } catch {
+      // Malformed or absent payload — fall through to the default rather than surface a parse error.
+    }
     updateLegacyStatus(item.id, "failed", errMsg);
     return "failed";
   } catch {

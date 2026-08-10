@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { requireAuth, requireRole } from "../../auth";
@@ -10,7 +10,7 @@ import { getSpSupplierVoucherLinkGapCount, repairSpSupplierVoucherLinks } from "
 // ── Setup ─────────────────────────────────────────────────────────────────
 
 export function registerSpSetupRoutes(app: Express) {
-  app.post("/api/sp/setup", requireAuth, requireRole("Admin"), async (req: any, res: any) => {
+  app.post("/api/sp/setup", requireAuth, requireRole("Admin"), async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
@@ -70,7 +70,7 @@ export function registerSpSetupRoutes(app: Express) {
     }
   });
 
-  app.get("/api/sp/setup/status", requireAuth, async (req: any, res: any) => {
+  app.get("/api/sp/setup/status", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;

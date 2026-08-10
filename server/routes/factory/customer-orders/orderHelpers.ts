@@ -145,7 +145,9 @@ export async function buildOrderExcelBuffer(
       const logoId = workbook.addImage({ buffer: toArrayBuffer(logoBuf), extension: "jpeg" });
       sheet.addImage(logoId, { tl: { col: 0, row: 0 }, ext: { width: 180, height: 110 } });
     }
-  } catch {}
+  } catch {
+    // Failure here is non-fatal and the surrounding flow continues deliberately.
+  }
 
   const r1 = sheet.addRow(["HMD INTERNATIONAL GROUP"]);
   r1.height = 26;

@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { db } from "../../../db";
@@ -19,7 +19,7 @@ export function registerAccountMigrationRoutes(app: Express) {
     "/api/admin/account-migration/companies",
     requireAuth,
     requireRole("Admin", "Developer"),
-    async (req: any, res: any) => {
+    async (req: Request, res: Response) => {
       try {
         const all = await storage.getAllCompanies();
         res.json(all);
@@ -34,7 +34,7 @@ export function registerAccountMigrationRoutes(app: Express) {
     "/api/admin/account-migration/accounts/:companyId",
     requireAuth,
     requireRole("Admin", "Developer"),
-    async (req: any, res: any) => {
+    async (req: Request, res: Response) => {
       try {
         const companyId = parseInt(req.params.companyId);
         if (isNaN(companyId)) return res.status(400).json({ message: "Invalid companyId" });
@@ -51,7 +51,7 @@ export function registerAccountMigrationRoutes(app: Express) {
     "/api/admin/account-migration/preview",
     requireAuth,
     requireRole("Admin", "Developer"),
-    async (req: any, res: any) => {
+    async (req: Request, res: Response) => {
       try {
         const { accountIds, srcCompanyId, destCompanyId } = req.body;
         if (!Array.isArray(accountIds) || accountIds.length === 0 || !srcCompanyId || !destCompanyId)
@@ -154,7 +154,7 @@ export function registerAccountMigrationRoutes(app: Express) {
     "/api/admin/account-migration/execute",
     requireAuth,
     requireRole("Admin", "Developer"),
-    async (req: any, res: any) => {
+    async (req: Request, res: Response) => {
       try {
         const { accountIds, srcCompanyId, destCompanyId } = req.body;
         if (!Array.isArray(accountIds) || accountIds.length === 0 || !srcCompanyId || !destCompanyId)
@@ -282,7 +282,7 @@ export function registerAccountMigrationRoutes(app: Express) {
     "/api/admin/account-migration/undo",
     requireAuth,
     requireRole("Admin", "Developer"),
-    async (req: any, res: any) => {
+    async (req: Request, res: Response) => {
       try {
         const { accounts, movedVoucherIds, srcCompanyId, destCompanyId } = req.body;
         // accounts = [{ accountId, originalCode }]

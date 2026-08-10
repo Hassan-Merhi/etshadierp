@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { db, pool } from "../../../db";
@@ -24,52 +24,56 @@ import { parseListPagination, setListPaginationHeaders } from "../../../lib/list
 export function registerShippingContainerRowRoutes(app: Express) {
   // ── GET available-invoices for dropdown ──────────────────────────────────────
   // Must be registered BEFORE /:id routes so Express doesn't treat "available-invoices" as an id.
-  app.get("/api/factory/shipping-container-rows/available-invoices", requireAuth, async (req: any, res: any) => {
-    try {
-      const companyId = getCompanyId(req);
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
+  app.get(
+    "/api/factory/shipping-container-rows/available-invoices",
+    requireAuth,
+    async (req: Request, res: Response) => {
+      try {
+        const companyId = getCompanyId(req);
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const rows = await db
-        .select({
-          id: customerOrders.id,
-          invoiceNumber: customerOrders.invoiceNumber,
-          customerName: customers.legalName,
-          customerPhone: customers.phone,
-          status: customerOrders.status,
-          orderDate: customerOrders.orderDate,
-          loadingDate: customerOrders.loadingStartedAt,
-          finalizedDate: customerOrders.loadingFinalizedAt,
-          containerNumber: customerOrders.containerNumber,
-          shippingCompany: customerOrders.shippingCompany,
-          destination: customerOrders.destination,
-          grandTotal: customerOrders.grandTotal,
-          alreadyHasRow: sql<boolean>`EXISTS (
+        const rows = await db
+          .select({
+            id: customerOrders.id,
+            invoiceNumber: customerOrders.invoiceNumber,
+            customerName: customers.legalName,
+            customerPhone: customers.phone,
+            status: customerOrders.status,
+            orderDate: customerOrders.orderDate,
+            loadingDate: customerOrders.loadingStartedAt,
+            finalizedDate: customerOrders.loadingFinalizedAt,
+            containerNumber: customerOrders.containerNumber,
+            shippingCompany: customerOrders.shippingCompany,
+            destination: customerOrders.destination,
+            grandTotal: customerOrders.grandTotal,
+            alreadyHasRow: sql<boolean>`EXISTS (
             SELECT 1 FROM factory_shipping_container_rows fscr
             WHERE fscr.customer_order_id = ${customerOrders.id}
               AND fscr.company_id = ${companyId}
           )`,
-        })
-        .from(customerOrders)
-        .leftJoin(customers, eq(customerOrders.customerId, customers.id))
-        .where(
-          and(
-            eq(customerOrders.companyId, companyId),
-            isNull(customerOrders.deletedAt),
-            sql`${customerOrders.status} = ANY(ARRAY['LOADING','PENDING_VERIFICATION','VERIFIED','FINALIZED'])`
+          })
+          .from(customerOrders)
+          .leftJoin(customers, eq(customerOrders.customerId, customers.id))
+          .where(
+            and(
+              eq(customerOrders.companyId, companyId),
+              isNull(customerOrders.deletedAt),
+              sql`${customerOrders.status} = ANY(ARRAY['LOADING','PENDING_VERIFICATION','VERIFIED','FINALIZED'])`
+            )
           )
-        )
-        .orderBy(desc(customerOrders.createdAt));
+          .orderBy(desc(customerOrders.createdAt));
 
-      res.json(rows);
-    } catch (error: unknown) {
-      logger.error("Error fetching available invoices:", { error: error });
-      res.status(500).json({ message: getErrorMessage(error) });
+        res.json(rows);
+      } catch (error: unknown) {
+        logger.error("Error fetching available invoices:", { error: error });
+        res.status(500).json({ message: getErrorMessage(error) });
+      }
     }
-  });
+  );
 
   // ── POST sync: auto-create backing rows for all active orders ────────────────
   // Called on page load — idempotent, uses unique constraint to skip duplicates.
-  app.post("/api/factory/shipping-container-rows/sync", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/shipping-container-rows/sync", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -110,7 +114,7 @@ export function registerShippingContainerRowRoutes(app: Express) {
   });
 
   // ── GET list all shipping container rows ─────────────────────────────────────
-  app.get("/api/factory/shipping-container-rows", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/shipping-container-rows", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -211,7 +215,7 @@ export function registerShippingContainerRowRoutes(app: Express) {
   });
 
   // ── POST create row ───────────────────────────────────────────────────────────
-  app.post("/api/factory/shipping-container-rows", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/shipping-container-rows", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -271,7 +275,7 @@ export function registerShippingContainerRowRoutes(app: Express) {
   });
 
   // ── PATCH update row-only fields (arrived date, note) ────────────────────────
-  app.patch("/api/factory/shipping-container-rows/:id", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/shipping-container-rows/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -307,7 +311,7 @@ export function registerShippingContainerRowRoutes(app: Express) {
   });
 
   // ── PATCH sync editable fields to customer_orders ────────────────────────────
-  app.patch("/api/factory/shipping-container-rows/:id/sync-order", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/shipping-container-rows/:id/sync-order", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -340,7 +344,7 @@ export function registerShippingContainerRowRoutes(app: Express) {
   });
 
   // ── POST mark as done ─────────────────────────────────────────────────────────
-  app.post("/api/factory/shipping-container-rows/:id/done", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/shipping-container-rows/:id/done", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -375,7 +379,7 @@ export function registerShippingContainerRowRoutes(app: Express) {
   });
 
   // ── POST restore ──────────────────────────────────────────────────────────────
-  app.post("/api/factory/shipping-container-rows/:id/restore", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/shipping-container-rows/:id/restore", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -403,7 +407,7 @@ export function registerShippingContainerRowRoutes(app: Express) {
   });
 
   // ── DELETE a row (hard delete — also removes its documents) ──────────────────
-  app.delete("/api/factory/shipping-container-rows/:id", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/shipping-container-rows/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });

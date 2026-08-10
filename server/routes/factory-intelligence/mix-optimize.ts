@@ -4,14 +4,14 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { eq, and, sql } from "drizzle-orm";
 import { factorySettings, factoryBales, factoryMixBatches, factoryMixBatchSources } from "@shared/schema";
 
 export function registerFactoryMixOptimizeRoutes(app: Express, requireAuth: any, db: any) {
-  app.post("/api/factory/mix/optimize", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/mix/optimize", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId =
         req.body.companyId || (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;

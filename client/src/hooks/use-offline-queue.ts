@@ -136,7 +136,7 @@ export function useOfflineQueue() {
       }
 
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to process queued sale:", error);
       return false;
     }

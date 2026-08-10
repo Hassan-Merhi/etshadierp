@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -23,7 +23,7 @@ import { resultRows, firstRow } from "../../lib/queryResult";
 // ── Parent Company Agents + Offload ──────────────────────────────────────────
 
 export function registerSpOffloadRoutes(app: Express) {
-  app.get("/api/sp/parent-agents", requireAuth, async (req: any, res: any) => {
+  app.get("/api/sp/parent-agents", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
@@ -50,7 +50,7 @@ export function registerSpOffloadRoutes(app: Express) {
 
   // ── Offload ───────────────────────────────────────────────────────────────
 
-  app.post("/api/sp/offload", requireAuth, async (req: any, res: any) => {
+  app.post("/api/sp/offload", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;

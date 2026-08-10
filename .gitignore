@@ -40,6 +40,9 @@ ts-errors*.txt
 artifacts/responsive-smoke/
 artifacts/bandwidth-smoke/
 
+# ESLint machine report written by scripts/run-lint.mjs (regenerated on demand)
+artifacts/lint/
+
 # User-uploaded content (runtime data, not source)
 uploads/
 

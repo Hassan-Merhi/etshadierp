@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
@@ -23,7 +23,7 @@ import { firstRow, resultRows } from "../../../lib/queryResult";
 export function registerDispatchBaleScanRoutes(app: Express) {
   // ── POST /api/factory/dispatch-truck-rides/:id/scan-bale ──────────────────
   // Scan a bale barcode into a truck ride
-  app.post("/api/factory/dispatch-truck-rides/:id/scan-bale", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/dispatch-truck-rides/:id/scan-bale", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -207,7 +207,7 @@ export function registerDispatchBaleScanRoutes(app: Express) {
 
   // ── DELETE /api/factory/dispatch-bale-scans/:id ───────────────────────────
   // Remove a bale scan (soft delete — marks removedAt, returns bale to IN_STOCK)
-  app.delete("/api/factory/dispatch-bale-scans/:id", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/dispatch-bale-scans/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });

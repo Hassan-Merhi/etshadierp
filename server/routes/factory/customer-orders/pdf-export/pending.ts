@@ -5,7 +5,7 @@ import { toArrayBuffer } from "../../../../lib/bufferCompatibility";
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../../lib/httpHandlers";
 import { logger } from "../../../../lib/logger";
 import { contentDisposition } from "../../../../lib/contentDisposition";
@@ -20,7 +20,7 @@ import fs from "fs";
 import { buildExportFilename } from "../orderHelpers";
 
 export function registerOrderPendingExportRoutes(app: Express) {
-  app.get("/api/factory/customer-orders/:id/pending-export", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/customer-orders/:id/pending-export", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -73,7 +73,9 @@ export function registerOrderPendingExportRoutes(app: Express) {
           ldRow.height = 90;
           sheet.addImage(ldId, { tl: { col: 2.4, row: 0 }, ext: { width: 300, height: 90 } });
         }
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
       const ldTitle = sheet.addRow([`Loading List — ${customerName}`]);
       ldTitle.getCell(1).font = { bold: true, size: 13 };
       ldTitle.getCell(1).alignment = { horizontal: "center" };

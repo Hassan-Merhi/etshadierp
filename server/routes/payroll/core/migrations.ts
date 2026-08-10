@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { db } from "../../../db";
@@ -23,7 +23,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
   // POST /api/factory/payroll/migrate-city-split
   // One-time migration: splits historical "Factory Worker Payroll" expense entries by city,
   // and creates missing accounting entries for paid worker bonuses.
-  app.post("/api/factory/payroll/migrate-city-split", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/payroll/migrate-city-split", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -229,7 +229,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
   // Migration: replaces city-based expense entries in PAYROLL-GEN-* vouchers with
   // per-worker named entries ("Salary Expense - Ahmad Hassan" instead of "Salary Expense - Beirut").
   // Safe to run multiple times (idempotent per voucher).
-  app.post("/api/factory/payroll/migrate-worker-names", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/payroll/migrate-worker-names", requireAuth, async (req: Request, res: Response) => {
     try {
       if (req.body?.confirm !== true) {
         return res.status(400).json({ message: PAYROLL_MIGRATION_CONFIRMATION_REQUIRED });
@@ -402,7 +402,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
   // Creates "Salary Expense - Workers" and "Bonus Expense - Workers" group header accounts,
   // then re-parents every matching individual worker account under them so the chart of accounts
   // shows an expandable group row instead of a flat list.  Safe to run multiple times.
-  app.post("/api/factory/payroll/migrate-salary-groups", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/payroll/migrate-salary-groups", requireAuth, async (req: Request, res: Response) => {
     try {
       if (req.body?.confirm !== true) {
         return res.status(400).json({ message: PAYROLL_MIGRATION_CONFIRMATION_REQUIRED });

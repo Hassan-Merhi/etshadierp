@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -10,7 +10,7 @@ import { resultRows } from "../../lib/queryResult";
 // ── Reports + Profit Splits ───────────────────────────────────────────────────
 
 export function registerSpReportRoutes(app: Express) {
-  app.get("/api/sp/report/payable", requireAuth, async (req: any, res: any) => {
+  app.get("/api/sp/report/payable", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
@@ -50,7 +50,7 @@ export function registerSpReportRoutes(app: Express) {
     }
   });
 
-  app.get("/api/sp/report/profit", requireAuth, async (req: any, res: any) => {
+  app.get("/api/sp/report/profit", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
@@ -139,7 +139,7 @@ export function registerSpReportRoutes(app: Express) {
     }
   });
 
-  app.get("/api/sp/report/stock", requireAuth, async (req: any, res: any) => {
+  app.get("/api/sp/report/stock", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
@@ -189,7 +189,7 @@ export function registerSpReportRoutes(app: Express) {
 
   // ── Sales Detail Report ───────────────────────────────────────────────────
 
-  app.get("/api/sp/report/sales-detail", requireAuth, async (req: any, res: any) => {
+  app.get("/api/sp/report/sales-detail", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
@@ -277,7 +277,7 @@ export function registerSpReportRoutes(app: Express) {
 
   // ── Profit Splits ─────────────────────────────────────────────────────────
 
-  app.get("/api/sp/profit-splits", requireAuth, async (req: any, res: any) => {
+  app.get("/api/sp/profit-splits", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
@@ -294,7 +294,7 @@ export function registerSpReportRoutes(app: Express) {
     }
   });
 
-  app.post("/api/sp/profit-splits", requireAuth, async (req: any, res: any) => {
+  app.post("/api/sp/profit-splits", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;

@@ -257,7 +257,7 @@ export function registerContainerDocumentsRoutes(app: Express) {
           }
         }
 
-        const sheetName = container.containerNumber.replace(/[\\/*?:\[\]]/g, "_").substring(0, 31);
+        const sheetName = container.containerNumber.replace(/[\\/*?:[\]]/g, "_").substring(0, 31);
         aoaToSheet(workbook, sheetData, sheetName);
       }
 

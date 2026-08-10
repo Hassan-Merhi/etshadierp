@@ -4,7 +4,7 @@
  * Production-bonus proposals must be decided before any single/bulk payment
  * route can move payroll to PAID.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { getClientDate } from "../../../lib/dateUtils";
@@ -57,7 +57,7 @@ async function ensureNoPendingProductionBonuses(companyId: number, payrollIds: n
 }
 
 export function registerPayrollMarkPaidRoutes(app: Express) {
-  app.get("/api/factory/payrolls/:id/detail", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/payrolls/:id/detail", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -89,7 +89,7 @@ export function registerPayrollMarkPaidRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/factory/payrolls/:id/mark-paid", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/payrolls/:id/mark-paid", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -166,7 +166,7 @@ export function registerPayrollMarkPaidRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/factory/payrolls/:id/fix-accounting", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/payrolls/:id/fix-accounting", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -230,7 +230,7 @@ export function registerPayrollMarkPaidRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/payrolls/mark-paid-bulk", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/payrolls/mark-paid-bulk", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });

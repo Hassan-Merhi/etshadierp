@@ -119,6 +119,12 @@ jobs:
           name: Lint
           command: npm run lint
       - run:
+          name: Lint warning ratchet
+          # Per-rule half of the gate the Lint step enforces in total. Reads the
+          # report that run wrote, so it adds no second lint pass.
+          when: always
+          command: npm run audit:lint-ratchet
+      - run:
           name: TypeScript
           command: npm run check
       - run:

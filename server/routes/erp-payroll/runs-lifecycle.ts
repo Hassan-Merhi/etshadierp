@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { eq, and, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "../../db";
@@ -14,7 +14,7 @@ import { erpPayrollRunItems, erpPayrollRuns, salaryAdvanceDeductions, salaryAdva
 
 export function registerPayrollRunLifecycleRoutes(app: Express) {
   // Delete a DRAFT payroll run
-  app.delete("/api/payroll/runs/:id", requireAuth, requireNonPOS, async (req: any, res: any) => {
+  app.delete("/api/payroll/runs/:id", requireAuth, requireNonPOS, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -34,7 +34,7 @@ export function registerPayrollRunLifecycleRoutes(app: Express) {
   });
 
   // ── Undo a PAID payroll run ───────────────────────────────────────────────
-  app.post("/api/payroll/runs/:id/undo", requireAuth, requireNonPOS, async (req: any, res: any) => {
+  app.post("/api/payroll/runs/:id/undo", requireAuth, requireNonPOS, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -117,7 +117,7 @@ export function registerPayrollRunLifecycleRoutes(app: Express) {
   });
 
   // ── Diagnostic: what does the server see for paid payroll runs? ──
-  app.get("/api/payroll/runs/diagnostic", requireAuth, async (req: any, res: any) => {
+  app.get("/api/payroll/runs/diagnostic", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

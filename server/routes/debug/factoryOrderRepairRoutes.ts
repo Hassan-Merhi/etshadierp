@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { requireAuth, requireRole } from "../../auth";
 import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
@@ -12,7 +12,7 @@ export function registerFactoryOrderRepairRoutes(app: Express) {
     "/api/admin/recalculate-factory-order-totals",
     requireAuth,
     requireRole("Admin", "Developer"),
-    async (req: any, res: any) => {
+    async (req: Request, res: Response) => {
       try {
         const statuses = ["LOADING", "PENDING_VERIFICATION", "VERIFIED", "FINALIZED"];
         const orders = await db

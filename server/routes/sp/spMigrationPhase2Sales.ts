@@ -1,3 +1,4 @@
+import type { Request, Response } from "express";
 import { sql } from "drizzle-orm";
 import { db } from "../../db";
 import { logger } from "../../lib/logger";
@@ -17,7 +18,7 @@ import {
 } from "./spMigrationPhase2Common";
 import { resultRows, firstRow } from "../../lib/queryResult";
 
-export async function importHistoricalSales(req: any, res: any): Promise<any> {
+export async function importHistoricalSales(req: Request, res: Response): Promise<any> {
   const pair = await validateMigrationPair(req, res, true);
   if (!pair) return;
   const dependencyError = await requireCompletedAction(pair.sourceId, pair.targetId, "gc_sales_readonly");

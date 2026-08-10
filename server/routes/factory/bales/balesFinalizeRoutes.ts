@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { getClientDate } from "../../../lib/dateUtils";
@@ -32,7 +32,7 @@ export function registerBalesFinalizeRoutes(app: Express) {
   // 9. Factory Finalize
   // ───────────────────────────────────────────────
 
-  app.post("/api/factory/finalize", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/finalize", requireAuth, async (req: Request, res: Response) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
@@ -325,7 +325,7 @@ export function registerBalesFinalizeRoutes(app: Express) {
   });
 
   // Backfill historical bale costs from raw stock source prices
-  app.post("/api/factory/bales/backfill-costs", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/bales/backfill-costs", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

@@ -1,4 +1,5 @@
 import { Express } from "express";
+import type { Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
@@ -12,7 +13,7 @@ export function registerProductionPlannerRoutes(app: Express) {
     (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId || null;
 
   // ── GET plan for a date ──────────────────────────────────────────────────────
-  app.get("/api/factory/production-planner/:date", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/production-planner/:date", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -116,7 +117,7 @@ export function registerProductionPlannerRoutes(app: Express) {
   });
 
   // ── POST — upsert plan for a date ───────────────────────────────────────────
-  app.post("/api/factory/production-planner/:date", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/production-planner/:date", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -163,7 +164,7 @@ export function registerProductionPlannerRoutes(app: Express) {
   });
 
   // ── GET — copy previous day's plan entries ──────────────────────────────────
-  app.get("/api/factory/production-planner/:date/copy-previous", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/production-planner/:date/copy-previous", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -211,7 +212,7 @@ export function registerProductionPlannerRoutes(app: Express) {
   });
 
   // ── GET — worker plan map for a date (used by StockEntryHistory) ─────────────
-  app.get("/api/factory/production-planner/:date/worker-targets", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/production-planner/:date/worker-targets", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -247,7 +248,7 @@ export function registerProductionPlannerRoutes(app: Express) {
   });
 
   // ── DELETE plan for a date ──────────────────────────────────────────────────
-  app.delete("/api/factory/production-planner/:date", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/production-planner/:date", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });

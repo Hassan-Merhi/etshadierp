@@ -5,12 +5,7 @@ import {
   type AuthorizationDomain,
 } from "./authorizationPolicy";
 
-export const PROTECTED_ASSET_KINDS = [
-  "attachment",
-  "uploaded-file",
-  "generated-export",
-  "report-export",
-] as const;
+export const PROTECTED_ASSET_KINDS = ["attachment", "uploaded-file", "generated-export", "report-export"] as const;
 
 export type ProtectedAssetKind = (typeof PROTECTED_ASSET_KINDS)[number];
 export type ProtectedAssetAction = "read" | "download" | "delete" | "generate";
@@ -28,10 +23,7 @@ export interface ProtectedAssetRecord {
 }
 
 export interface ProtectedAssetLookup {
-  loadAsset(
-    assetId: string | number,
-    kind: ProtectedAssetKind,
-  ): Promise<ProtectedAssetRecord | null>;
+  loadAsset(assetId: string | number, kind: ProtectedAssetKind): Promise<ProtectedAssetRecord | null>;
 }
 
 export interface ProtectedAssetAccessRequest {
@@ -60,10 +52,7 @@ export class ProtectedAssetAccessError extends Error {
     | "ASSET_FILE_NAME_INVALID"
     | "ASSET_SIZE_INVALID";
 
-  constructor(
-    code: ProtectedAssetAccessError["code"],
-    publicMessage: "Not found" | "Forbidden" = "Not found",
-  ) {
+  constructor(code: ProtectedAssetAccessError["code"], publicMessage: "Not found" | "Forbidden" = "Not found") {
     super(publicMessage);
     this.name = "ProtectedAssetAccessError";
     this.code = code;
@@ -77,10 +66,7 @@ function validIdentifier(value: unknown): boolean {
   );
 }
 
-function sameIdentity(
-  left: string | number | null | undefined,
-  right: string | number | null | undefined,
-): boolean {
+function sameIdentity(left: string | number | null | undefined, right: string | number | null | undefined): boolean {
   return left != null && right != null && String(left) === String(right);
 }
 
@@ -92,6 +78,7 @@ export function sanitizeDownloadFileName(value: unknown): string | null {
 
   const normalized = value
     .normalize("NFKC")
+    // eslint-disable-next-line no-control-regex -- stripping control characters is the first step of asset-path normalisation — matching them is exactly what this replace is for
     .replace(/[\u0000-\u001f\u007f]/g, "")
     .replace(/[\\/]+/g, "-")
     .replace(/\.\.+/g, ".")
@@ -123,7 +110,7 @@ export function validateStorageKey(value: unknown): string {
 
 export async function authorizeProtectedAssetAccess(
   lookup: ProtectedAssetLookup,
-  request: ProtectedAssetAccessRequest,
+  request: ProtectedAssetAccessRequest
 ): Promise<ProtectedAssetAccessDecision> {
   if (!validIdentifier(request.assetId)) {
     throw new ProtectedAssetAccessError("ASSET_ID_INVALID");
@@ -152,17 +139,13 @@ export async function authorizeProtectedAssetAccess(
     });
   }
 
-  if (
-    asset.byteSize != null &&
-    (!Number.isSafeInteger(asset.byteSize) || asset.byteSize < 0)
-  ) {
+  if (asset.byteSize != null && (!Number.isSafeInteger(asset.byteSize) || asset.byteSize < 0)) {
     throw new ProtectedAssetAccessError("ASSET_SIZE_INVALID");
   }
 
   if (request.action !== "generate") validateStorageKey(asset.storageKey);
   const safeFileName = sanitizeDownloadFileName(asset.fileName);
-  const ownerAllowed =
-    request.allowOwnerAccess === true && sameIdentity(actor.userId, asset.ownerUserId);
+  const ownerAllowed = request.allowOwnerAccess === true && sameIdentity(actor.userId, asset.ownerUserId);
   const configuredRoles = ownerAllowed ? [actor.role] : (request.allowedRoles ?? []);
   const roleAllowed = configuredRoles.includes(actor.role);
   const permissionAllowed = actor.permissions?.includes(request.requiredPermission) === true;
@@ -187,10 +170,7 @@ export async function authorizeProtectedAssetAccess(
   };
 }
 
-export function assertExportCompanyScope(
-  sessionCompanyId: number,
-  requestedCompanyId: unknown,
-): number {
+export function assertExportCompanyScope(sessionCompanyId: number, requestedCompanyId: unknown): number {
   if (!Number.isSafeInteger(sessionCompanyId) || sessionCompanyId <= 0) {
     throw new ProtectedAssetAccessError("ASSET_COMPANY_INVALID", "Forbidden");
   }

@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
@@ -17,7 +17,7 @@ import { resultRows } from "../../../lib/queryResult";
 export function registerDispatchBaleSearchRoutes(app: Express) {
   // ── GET /api/factory/bale-search ──────────────────────────────────────────
   // Search bale by reference number — returns status + dispatch/invoice info
-  app.get("/api/factory/bale-search", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/bale-search", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });

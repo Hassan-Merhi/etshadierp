@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
@@ -22,7 +22,7 @@ import { eq, and, sql, inArray } from "drizzle-orm";
 
 export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
   /* Single proforma by ID — used by EditProformaV5Drawer and lazy detail readers. */
-  app.get("/api/factory/customer-proformas/:id", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/customer-proformas/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -86,7 +86,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/customer-proformas", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/customer-proformas", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -260,7 +260,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/customer-proformas", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/customer-proformas", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -292,7 +292,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
     }
   });
 
-  app.put("/api/factory/customer-proformas/:id", requireAuth, async (req: any, res: any) => {
+  app.put("/api/factory/customer-proformas/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -338,7 +338,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/factory/customer-proformas/:id", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/customer-proformas/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

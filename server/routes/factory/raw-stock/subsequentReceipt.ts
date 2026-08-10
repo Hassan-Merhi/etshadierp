@@ -67,7 +67,6 @@ export async function applySubsequentReceipt(
     idempotencyKey,
     userId,
   } = ctx;
-  let rawStock: typeof factoryRawStock.$inferSelect;
 
   // ── Concurrency-safe continuation receipt ─────────────────────────────
   // Lock container + raw-stock FOR UPDATE so two simultaneous receipts for
@@ -146,7 +145,10 @@ export async function applySubsequentReceipt(
     .update(factoryRawStock)
     .set({ receivedKg: dNewCumulativeKg.toDecimalPlaces(3).toFixed(3) })
     .where(eq(factoryRawStock.id, lockedRawStock.id));
-  rawStock = { ...lockedRawStock, receivedKg: dNewCumulativeKg.toDecimalPlaces(3).toFixed(3) };
+  const rawStock: typeof factoryRawStock.$inferSelect = {
+    ...lockedRawStock,
+    receivedKg: dNewCumulativeKg.toDecimalPlaces(3).toFixed(3),
+  };
 
   // 2. Mix-batch sources — supplier-backed allocations must be priced at the
   //    post-receipt supplier moving-average rate (newLockedRate), not the

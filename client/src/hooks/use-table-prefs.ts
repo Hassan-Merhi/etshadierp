@@ -25,7 +25,9 @@ export function useTablePrefs(pageKey: string) {
         const next = typeof update === "function" ? update(prev) : { ...prev, ...update };
         try {
           localStorage.setItem(storageKey, JSON.stringify(next));
-        } catch {}
+        } catch {
+          // Storage is unavailable in private mode and can throw on quota; the value is a convenience, not state we need.
+        }
         return next;
       });
     },
@@ -35,7 +37,9 @@ export function useTablePrefs(pageKey: string) {
   const clearPrefs = useCallback(() => {
     try {
       localStorage.removeItem(storageKey);
-    } catch {}
+    } catch {
+      // Storage is unavailable in private mode and can throw on quota; the value is a convenience, not state we need.
+    }
     setPrefsState({});
   }, [storageKey]);
 

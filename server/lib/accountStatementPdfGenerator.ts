@@ -385,7 +385,9 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
     convertArabic = reshaperMod.convertArabic;
     const bidiFactory = require("bidi-js") as () => typeof bidiInst;
     bidiInst = (bidiFactory as any)();
-  } catch {}
+  } catch {
+    // Failure here is non-fatal and the surrounding flow continues deliberately.
+  }
 
   const containsArabic = (text: string): boolean => /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text);
   const shapeArabic = (text: string): string => {
@@ -450,7 +452,9 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
       try {
         doc.image(logoPath, LM, headerY, { height: 44, fit: [70, 44] });
         logoWidth = 80;
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
     }
   }
   // Fallback: try hmd-logo.png
@@ -460,7 +464,9 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
       try {
         doc.image(fallbackLogo, LM, headerY, { height: 44, fit: [70, 44] });
         logoWidth = 80;
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
     }
   }
 

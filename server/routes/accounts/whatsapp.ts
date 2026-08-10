@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -19,7 +19,7 @@ import { logger } from "../../lib/logger";
 export function registerAccountWhatsappRoutes(app: Express) {
   // ERP-mode WhatsApp rule GET — mirrors /api/factory/accounts/:id/whatsapp-rule
   // without the factory-company middleware guard.
-  app.get("/api/accounts/:accountId/whatsapp-rule", requireAuth, async (req: any, res: any) => {
+  app.get("/api/accounts/:accountId/whatsapp-rule", requireAuth, async (req: Request, res: Response) => {
     try {
       const accountId = parseId(req.params.accountId);
       if (accountId === null) return res.status(400).json({ message: "Invalid id" });
@@ -55,7 +55,7 @@ export function registerAccountWhatsappRoutes(app: Express) {
   });
 
   // ERP-mode WhatsApp rule PUT (upsert) — mirrors /api/factory/accounts/:id/whatsapp-rule.
-  app.put("/api/accounts/:accountId/whatsapp-rule", requireAuth, async (req: any, res: any) => {
+  app.put("/api/accounts/:accountId/whatsapp-rule", requireAuth, async (req: Request, res: Response) => {
     try {
       const accountId = parseId(req.params.accountId);
       if (accountId === null) return res.status(400).json({ message: "Invalid id" });
@@ -104,7 +104,7 @@ export function registerAccountWhatsappRoutes(app: Express) {
 
   // ERP-mode WhatsApp statement send — identical logic to the factory-prefixed
   // route but without the factory-company middleware guard, so ERP users can use it.
-  app.post("/api/accounts/:accountId/send-statement-whatsapp", requireAuth, async (req: any, res: any) => {
+  app.post("/api/accounts/:accountId/send-statement-whatsapp", requireAuth, async (req: Request, res: Response) => {
     const _t = Date.now();
     const _uid = req.session?.userId;
     const _cid = req.session?.currentCompanyId;
@@ -146,7 +146,7 @@ export function registerAccountWhatsappRoutes(app: Express) {
         endDate = format(endOfMonth(now), "yyyy-MM-dd");
       }
 
-      const safeAccName = acct.name.replace(/[^\w\s.()\-]/g, "_");
+      const safeAccName = acct.name.replace(/[^\w\s.()-]/g, "_");
       const monthLabel = month ?? format(new Date(), "yyyy-MM");
       const fileName = `${safeAccName} Statement ${monthLabel}.pdf`;
       const caption = `${acct.name} — Statement ${monthLabel}`;

@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { parseId, parseOptionalId } from "../../lib/parseId";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -23,7 +23,7 @@ import { computeMonthlyPay, computeMonthlyPayFromAttendance, getFactoryCompanyId
 
 export function registerFactoryWorkerBaleSettleRoutes(app: Express, requireAuth: any, db: any) {
   // GET /api/factory/workers/:id/bales - Get bales associated with worker
-  app.get("/api/factory/workers/:id/bales", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/workers/:id/bales", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -56,7 +56,7 @@ export function registerFactoryWorkerBaleSettleRoutes(app: Express, requireAuth:
   });
 
   // POST /api/factory/workers/:id/settle-and-end - Settlement calculation + end contract
-  app.post("/api/factory/workers/:id/settle-and-end", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/workers/:id/settle-and-end", requireAuth, async (req: Request, res: Response) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;
       const companyId = req.body.companyId || getFactoryCompanyId(req);

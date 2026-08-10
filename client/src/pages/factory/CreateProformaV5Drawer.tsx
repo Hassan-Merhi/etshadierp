@@ -193,7 +193,9 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
               body: JSON.stringify(priceLines),
             });
             qc.invalidateQueries({ queryKey: ["/api/factory/customer-price-lists", customerId] });
-          } catch {}
+          } catch {
+            // Cache invalidation is best-effort; the next fetch corrects it and a failure here is not worth surfacing.
+          }
         }
       }
       clearDraft();

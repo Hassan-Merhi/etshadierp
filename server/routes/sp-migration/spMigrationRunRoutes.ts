@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { requireAuth, requireRole } from "../../auth";
@@ -16,7 +16,7 @@ export function registerSpMigrationRunRoutes(app: Express) {
   // Legacy alias — kept only for backward compatibility. Returns the exact same
   // shape as /gc-preview (see buildGcMigrationPreview) so no two preview
   // endpoints ever disagree on field names again.
-  app.get("/api/sp/migration/preview", requireAuth, requireRole("Developer"), async (req: any, res: any) => {
+  app.get("/api/sp/migration/preview", requireAuth, requireRole("Developer"), async (req: Request, res: Response) => {
     try {
       const sourceId = parseInt(String(req.query.sourceCompanyId ?? ""), 10);
       const targetId = parseInt(String(req.query.targetCompanyId ?? ""), 10);
@@ -72,7 +72,7 @@ export function registerSpMigrationRunRoutes(app: Express) {
   // ── POST /api/sp/migration/rollback ─────────────────────────────────────
   // Removes ONLY rows created by a specific rehearsal run.
   // Never touches source (ERP) company.
-  app.post("/api/sp/migration/rollback", requireAuth, requireRole("Developer"), async (req: any, res: any) => {
+  app.post("/api/sp/migration/rollback", requireAuth, requireRole("Developer"), async (req: Request, res: Response) => {
     const { runId } = req.body ?? {};
     if (!runId) return res.status(400).json({ message: "runId is required" });
 

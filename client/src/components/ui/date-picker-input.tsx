@@ -55,7 +55,9 @@ export function DatePickerInput({
           onChange(format(parsed, "yyyy-MM-dd"));
           return;
         }
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
     }
   };
 

@@ -70,7 +70,7 @@ function parseDate(raw: string | null | undefined): string | null {
   const s = raw.trim();
   if (!s || s === "-" || s === "—" || s.toLowerCase() === "n/a") return null;
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-  const ddMonYYYY = s.match(/^(\d{1,2})[-\/\s]([A-Za-z]{3})[-\/\s](\d{4})/);
+  const ddMonYYYY = s.match(/^(\d{1,2})[-/\s]([A-Za-z]{3})[-/\s](\d{4})/);
   if (ddMonYYYY) {
     const months: Record<string, string> = {
       jan: "01",
@@ -400,7 +400,7 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
           for (const cell of cells) {
             if (
               !bestEta &&
-              (/\d{1,2}[-\/\s][A-Za-z]{3}[-\/\s]\d{4}/.test(cell) ||
+              (/\d{1,2}[-/\s][A-Za-z]{3}[-/\s]\d{4}/.test(cell) ||
                 /\d{4}-\d{2}-\d{2}/.test(cell) ||
                 /[A-Za-z]{3}\s+\d{1,2}[,\s]+\d{4}/.test(cell) ||
                 /\d{2}\/\d{2}\/\d{4}/.test(cell))
@@ -436,7 +436,7 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
         // Full-body text scan
         if (!bestEta) {
           const etaMatch = bodyText.match(
-            /ETA[:\s]*([A-Za-z]{3}[\s\-\/]\d{1,2}[\s\-\/,\s]*\d{4}|\d{4}-\d{2}-\d{2}|\d{1,2}[\s\-\/][A-Za-z]{3}[\s\-\/]\d{4}|\d{2}\/\d{2}\/\d{4})/i
+            /ETA[:\s]*([A-Za-z]{3}[\s\-/]\d{1,2}[\s\-/,\s]*\d{4}|\d{4}-\d{2}-\d{2}|\d{1,2}[\s\-/][A-Za-z]{3}[\s\-/]\d{4}|\d{2}\/\d{2}\/\d{4})/i
           );
           if (etaMatch) bestEta = etaMatch[1];
         }

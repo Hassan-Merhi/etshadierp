@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { and, eq, sql } from "drizzle-orm";
 import { spContainers, spOffloadCharges, spStockMovements, voucherEntries, vouchers } from "@shared/schema";
 import { requireAuth, requireRole } from "../../auth";
@@ -123,7 +123,7 @@ export function registerSpOffloadLifecycleRoutes(app: Express): void {
     });
   });
 
-  app.post("/api/sp/offloads/:id/reverse", requireAuth, requireRole("Admin"), async (req: any, res: any) => {
+  app.post("/api/sp/offloads/:id/reverse", requireAuth, requireRole("Admin"), async (req: Request, res: Response) => {
     try {
       await ensureSpOffloadReversalStorage();
       const companyId = await requireSpCompany(req, res);
@@ -357,7 +357,7 @@ export function registerSpOffloadLifecycleRoutes(app: Express): void {
     }
   });
 
-  app.get("/api/sp/reconciliation/offloads", requireAuth, requireRole("Admin"), async (req: any, res: any) => {
+  app.get("/api/sp/reconciliation/offloads", requireAuth, requireRole("Admin"), async (req: Request, res: Response) => {
     try {
       await ensureSpOffloadReversalStorage();
       const companyId = await requireSpCompany(req, res);

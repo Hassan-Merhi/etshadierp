@@ -1,5 +1,5 @@
 import { toArrayBuffer } from "../../lib/bufferCompatibility";
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { logAudit } from "../helpers/auditHelpers";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -34,7 +34,7 @@ async function auditExport(req: any, companyId: number, type: "PDF" | "Excel", s
 }
 
 export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: any, db: any) {
-  app.post("/api/factory/payroll/export-pdf", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/payroll/export-pdf", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = Number(req.body?.companyId);
       const startDate = String(req.body?.startDate ?? "");
@@ -78,7 +78,9 @@ export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: an
         try {
           doc.image(hmdLogoPath, (doc.page.width - 220) / 2, doc.y, { width: 220 });
           doc.moveDown(0.5);
-        } catch {}
+        } catch {
+          // Failure here is non-fatal and the surrounding flow continues deliberately.
+        }
       }
       doc
         .fontSize(12)
@@ -205,7 +207,7 @@ export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: an
     }
   });
 
-  app.post("/api/factory/payroll/export-excel", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/payroll/export-excel", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = Number(req.body?.companyId);
       const startDate = String(req.body?.startDate ?? "");
@@ -241,7 +243,9 @@ export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: an
           const buffer = fs.readFileSync(logoPath);
           logoId = workbook.addImage({ buffer: toArrayBuffer(buffer), extension: "jpeg" });
         }
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
 
       function addSheetHeader(sheet: ExcelJS.Worksheet, title: string, numCols: number, logoCenterCol = 0) {
         const logoRow = sheet.addRow([]);

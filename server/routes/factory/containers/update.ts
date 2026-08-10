@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { parseId } from "../../../lib/parseId";
 import { getClientDate } from "../../../lib/dateUtils";
@@ -23,7 +23,7 @@ import { eq, and, or, ilike } from "drizzle-orm";
 import { normFactoryEntry } from "./_helpers";
 
 export function registerFactoryContainerUpdateRoutes(app: Express) {
-  app.patch("/api/factory/containers/:id", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/containers/:id", requireAuth, async (req: Request, res: Response) => {
     const _t = Date.now();
     const _uid = (req.session as any).userId;
     const _cid = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;

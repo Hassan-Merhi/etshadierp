@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { db } from "../../../db";
@@ -19,7 +19,7 @@ export function registerV5CancelledContainerRoutes(app: Express) {
   // Returns V5 containers (proforma_id_used IS NOT NULL) that were cancelled
   // within the last 30 days. Used by the "Restore Cancelled Container" UI.
   // Read-only — does not modify any data.
-  app.get("/api/factory/v5/recently-cancelled-containers", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/v5/recently-cancelled-containers", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -71,7 +71,7 @@ export function registerV5CancelledContainerRoutes(app: Express) {
   // If it had no loadingStartedAt → restore to DRAFT.
   // Note: bale links that were deleted during cancellation are NOT restored
   // (bales are back in stock and can be re-scanned).
-  app.post("/api/factory/v5/containers/:id/restore", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/v5/containers/:id/restore", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

@@ -384,7 +384,9 @@ export default function Daybook({ user }: { user?: any } = {}) {
             const d = await res.json();
             results[entry.id] = d.balance?.toString() || "0";
           }
-        } catch {}
+        } catch {
+          // Failure here is non-fatal and the surrounding flow continues deliberately.
+        }
       })
     ).then(() => setEntryBalances(results));
   }, [viewDialogOpen, selectedVoucher, viewVoucherEntries, balanceRefreshKey]);

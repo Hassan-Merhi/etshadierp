@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
@@ -18,7 +18,7 @@ import { getFactoryCompanyId, workerUpload, writeDaybookEntry } from "./_helpers
 
 export function registerFactoryWorkerImportExportRoutes(app: Express, requireAuth: any, db: any) {
   // GET /api/factory/workers/template.xlsx - Download Excel import template
-  app.get("/api/factory/workers/template.xlsx", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/workers/template.xlsx", requireAuth, async (req: Request, res: Response) => {
     try {
       const wb = new ExcelJS.Workbook();
       const sheet = wb.addWorksheet("Workers");
@@ -182,7 +182,7 @@ export function registerFactoryWorkerImportExportRoutes(app: Express, requireAut
     "/api/factory/workers/import-excel",
     requireAuth,
     workerUpload.single("file"),
-    async (req: any, res: any) => {
+    async (req: Request, res: Response) => {
       try {
         // Always use the session's current company; never trust client-provided companyId
         const companyId = getFactoryCompanyId(req);
@@ -363,7 +363,7 @@ export function registerFactoryWorkerImportExportRoutes(app: Express, requireAut
   );
 
   // POST /api/factory/workers/reassign-codes - Bulk reassign HMD001, HMD002... codes
-  app.post("/api/factory/workers/reassign-codes", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/workers/reassign-codes", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });

@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { parseId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
@@ -19,7 +19,7 @@ import { factoryWorkers, factoryPayrolls, factoryWorkerAdvances, companies, comp
 import { getFactoryCompanyId } from "./_helpers";
 
 export function registerWorkerStatementReadRoutes(app: Express) {
-  app.get("/api/factory/workers/:id/statement", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/workers/:id/statement", requireAuth, async (req: Request, res: Response) => {
     try {
       const workerId = parseId(req.params.id);
       if (workerId === null) return res.status(400).json({ message: "Invalid id" });
@@ -108,7 +108,7 @@ export function registerWorkerStatementReadRoutes(app: Express) {
   });
 
   // ── Factory Worker Statement PDF ──────────────────────────────────────────
-  app.get("/api/factory/workers/:id/statement-pdf", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/workers/:id/statement-pdf", requireAuth, async (req: Request, res: Response) => {
     try {
       const workerId = parseId(req.params.id);
       if (workerId === null) return res.status(400).json({ message: "Invalid id" });
@@ -239,7 +239,9 @@ export function registerWorkerStatementReadRoutes(app: Express) {
         wConvertArabic = reshaperMod.convertArabic;
         const bidiFactory = require("bidi-js") as () => typeof wBidiInst;
         wBidiInst = (bidiFactory as any)();
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
 
       const wContainsArabic = (text: string) => /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text);
       const wShapeText = (text: string): string => {
@@ -270,7 +272,9 @@ export function registerWorkerStatementReadRoutes(app: Express) {
       if (fs.existsSync(wHmdLogoPath)) {
         try {
           doc.image(wHmdLogoPath, (doc.page.width - 220) / 2, 20, { width: 220 });
-        } catch {}
+        } catch {
+          // Failure here is non-fatal and the surrounding flow continues deliberately.
+        }
       }
       const wNameHasAr = hasArabicFont && wContainsArabic(workerName);
       doc

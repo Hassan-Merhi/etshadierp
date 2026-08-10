@@ -1,7 +1,7 @@
 import { parseId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { sqlArray } from "../../../lib/sqlArray";
@@ -24,7 +24,7 @@ import { isSupplierPaidFreight } from "./_supplierStatementHelpers";
 import { buildLinkedSupplierGroups } from "./linkedSupplierGroups";
 
 export function registerSupplierStatementRoutes(app: Express) {
-  app.get("/api/factory/suppliers/:id/statement", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/suppliers/:id/statement", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

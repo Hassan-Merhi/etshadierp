@@ -91,7 +91,7 @@ export function RemoteKeyboardControlTarget({
 
     eventSource.addEventListener("command", (event) => {
       if (closed) return;
-      let command: RemoteKeyboardCommandView | null = null;
+      let command: RemoteKeyboardCommandView | null;
       try {
         command = parseCommand(JSON.parse((event as MessageEvent<string>).data));
       } catch {

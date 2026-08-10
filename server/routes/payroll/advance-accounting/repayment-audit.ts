@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { parseOptionalId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
@@ -24,7 +24,7 @@ import { getFactoryCompanyId } from "./_helpers";
 
 export function registerAdvanceRepaymentAuditRoutes(app: Express) {
   // GET /api/factory/advances/repayment-audit — find salary deduction advances missing cash vouchers
-  app.get("/api/factory/advances/repayment-audit", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/advances/repayment-audit", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -141,7 +141,7 @@ export function registerAdvanceRepaymentAuditRoutes(app: Express) {
   });
 
   // POST /api/factory/advances/post-repayment-vouchers — fix missing repayment accounting
-  app.post("/api/factory/advances/post-repayment-vouchers", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/advances/post-repayment-vouchers", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });

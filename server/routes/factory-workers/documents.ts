@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { parseId } from "../../lib/parseId";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -27,58 +27,63 @@ export function registerFactoryWorkerDocumentRoutes(app: Express, requireAuth: a
   });
 
   // POST /api/factory/workers/:id/documents - Upload document
-  app.post("/api/factory/workers/:id/documents", requireAuth, docUpload.single("file"), async (req: any, res: any) => {
-    try {
-      const companyId = getFactoryCompanyId(req);
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const workerId = parseId(req.params.id);
-      if (workerId === null) return res.status(400).json({ message: "Invalid id" });
-      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
-
-      // Generate a stable filename (same format as before so existing URLs keep working)
-      const ext = path.extname(req.file.originalname);
-      const generatedFilename = `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
-      const fileUrl = `/api/factory/uploads/workers/docs/${generatedFilename}`;
-
-      // Store base64 content directly from the in-memory buffer — guaranteed
-      // to succeed regardless of disk availability.
-      const fileData = req.file.buffer.toString("base64");
-
-      // Optionally write to disk as a fast-path cache for subsequent serves.
+  app.post(
+    "/api/factory/workers/:id/documents",
+    requireAuth,
+    docUpload.single("file"),
+    async (req: Request, res: Response) => {
       try {
-        const dir = path.join(process.cwd(), "uploads", "workers", "docs");
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-        fs.writeFileSync(path.join(dir, generatedFilename), req.file.buffer);
-      } catch (cacheErr) {
-        // Non-fatal — DB is the source of truth; disk is just a cache.
-        logger.warn("Worker doc disk cache write failed (non-fatal):", { error: cacheErr });
-      }
+        const companyId = getFactoryCompanyId(req);
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        const workerId = parseId(req.params.id);
+        if (workerId === null) return res.status(400).json({ message: "Invalid id" });
+        if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
-      const [doc] = await db
-        .insert(factoryWorkerDocuments)
-        .values({
-          companyId,
-          workerId,
-          fileName: generatedFilename,
-          originalName: req.file.originalname,
-          fileUrl,
-          fileType: req.file.mimetype,
-          fileSize: req.file.size,
-          fileData,
-        })
-        .returning();
-      res.json(doc);
-    } catch (error: unknown) {
-      logger.error("Error uploading worker document:", { error: error });
-      res.status(400).json({ message: getErrorMessage(error) });
+        // Generate a stable filename (same format as before so existing URLs keep working)
+        const ext = path.extname(req.file.originalname);
+        const generatedFilename = `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
+        const fileUrl = `/api/factory/uploads/workers/docs/${generatedFilename}`;
+
+        // Store base64 content directly from the in-memory buffer — guaranteed
+        // to succeed regardless of disk availability.
+        const fileData = req.file.buffer.toString("base64");
+
+        // Optionally write to disk as a fast-path cache for subsequent serves.
+        try {
+          const dir = path.join(process.cwd(), "uploads", "workers", "docs");
+          if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+          fs.writeFileSync(path.join(dir, generatedFilename), req.file.buffer);
+        } catch (cacheErr) {
+          // Non-fatal — DB is the source of truth; disk is just a cache.
+          logger.warn("Worker doc disk cache write failed (non-fatal):", { error: cacheErr });
+        }
+
+        const [doc] = await db
+          .insert(factoryWorkerDocuments)
+          .values({
+            companyId,
+            workerId,
+            fileName: generatedFilename,
+            originalName: req.file.originalname,
+            fileUrl,
+            fileType: req.file.mimetype,
+            fileSize: req.file.size,
+            fileData,
+          })
+          .returning();
+        res.json(doc);
+      } catch (error: unknown) {
+        logger.error("Error uploading worker document:", { error: error });
+        res.status(400).json({ message: getErrorMessage(error) });
+      }
     }
-  });
+  );
 
   // GET /api/factory/workers/:id/documents - List documents
   // Note: file_data is intentionally excluded — it's a (potentially large)
   // base64 blob and the listing UI only needs metadata. The actual bytes
   // are streamed from /api/factory/uploads/workers/docs/:filename.
-  app.get("/api/factory/workers/:id/documents", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/workers/:id/documents", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -106,7 +111,7 @@ export function registerFactoryWorkerDocumentRoutes(app: Express, requireAuth: a
   });
 
   // DELETE /api/factory/workers/:id/documents/:docId - Delete document
-  app.delete("/api/factory/workers/:id/documents/:docId", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/workers/:id/documents/:docId", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -139,7 +144,7 @@ export function registerFactoryWorkerDocumentRoutes(app: Express, requireAuth: a
   //   1. Local disk cache (fast, used right after upload).
   //   2. Database fallback (file_data column) — needed because Render and
   //      Replit have ephemeral disks that get wiped on every redeploy.
-  app.get("/api/factory/uploads/workers/docs/:filename", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/uploads/workers/docs/:filename", requireAuth, async (req: Request, res: Response) => {
     try {
       const filename = req.params.filename;
       const base = path.resolve(process.cwd(), "uploads", "workers", "docs");
