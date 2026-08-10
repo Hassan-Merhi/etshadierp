@@ -106,6 +106,7 @@ async function activateSkipNavigation(page) {
       return false;
     }
     link.focus();
+    link.click();
     return true;
   });
 
@@ -113,7 +114,6 @@ async function activateSkipNavigation(page) {
     return { available: false, activeElementId: "", hash: await page.evaluate(() => window.location.hash) };
   }
 
-  await page.keyboard.press("Enter");
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
   return page.evaluate(() => ({
     available: true,
