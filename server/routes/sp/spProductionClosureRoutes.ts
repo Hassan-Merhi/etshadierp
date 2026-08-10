@@ -96,7 +96,7 @@ export async function buildSpProductionClosureStatus(companyId: number): Promise
   `);
   const migrationSuspenseEntryCount = Number(firstRow(suspense)?.count ?? 0);
 
-  const failures: any[] = checks.filter((check: any) => check.status !== "PASS");
+  const failures = checks.filter((check: any) => check.status !== "PASS");
   if (sourceWriteCount > 0) {
     failures.push({ type: "source_write_lock_database", status: "FAIL", sourceWriteCount });
   }
