@@ -257,11 +257,7 @@ export default function ProductionComparison() {
 
     for (const row of map.values()) {
       const t = workerTally.get(row.articleCode);
-      row.workers = t
-        ? [...t.entries()]
-            .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-            .map(([n]) => n)
-        : [];
+      row.workers = t ? [...t.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([n]) => n) : [];
     }
     return [...map.values()];
   }, [qA.data, qB.data]);
