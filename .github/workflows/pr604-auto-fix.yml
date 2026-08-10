@@ -79,8 +79,6 @@ jobs:
               s = s.replace("baleRows.map((b: any) =>", "baleRows.map((b) =>")
               p.write_text(s)
 
-          # finalize.ts uses an existing broadly typed transaction, so retain the
-          # ratchet improvement with narrow row shapes rather than implicit/explicit any.
           p = Path("server/routes/factory/customer-orders/finalize-loading/finalize.ts")
           s = p.read_text()
           s = s.replace(
@@ -112,6 +110,13 @@ jobs:
           data["scan"]["baseline"]["server/routes/factory/customer-orders/finalize-loading/finalize.ts"] = [9, 5, 0]
           data["totals"]["typeEscapeCeiling"] = 11441
           p.write_text(json.dumps(data, indent=2) + "\n")
+
+          p = Path("docs/system-quality-program.md")
+          s = p.read_text().replace(
+              "| Type escapes (AST) | 11,442 total | `npm run audit:type-escapes` |",
+              "| Type escapes (AST) | 11,441 total | `npm run audit:type-escapes` |",
+          )
+          p.write_text(s)
 
           for filename in [
               "tests/factory-phase3-query-efficiency.test.ts",
