@@ -14,7 +14,7 @@ import { db } from "../../../../db";
 import { requireAuth } from "../../../../auth";
 import { writeDaybookEntry } from "../../_helpers";
 import { factoryBales, customerOrders, customerOrderBales, customers, factoryDaybookEntries } from "@shared/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 
 export function registerOrderLoadingRoutes(app: Express) {
   app.post("/api/factory/customer-orders-loading", requireAuth, async (req: Request, res: Response) => {
@@ -77,82 +77,95 @@ export function registerOrderLoadingRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseId(req.params.id);
-
       if (orderId === null) return res.status(400).json({ message: "Invalid id" });
-      const [order] = await db
-        .select()
-        .from(customerOrders)
-        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
-      if (!order) return res.status(404).json({ message: "Order not found" });
-      if (order.status !== "LOADING")
-        return res.status(400).json({ message: "Only LOADING orders can be finalized for loading" });
 
-      const bales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
-      if (bales.length === 0) return res.status(400).json({ message: "Order has no bales scanned" });
+      const finalized = await db.transaction(async (tx) => {
+        const [order] = await tx
+          .select()
+          .from(customerOrders)
+          .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+        if (!order) throw new Error("Order not found");
+        if (order.status !== "LOADING") throw new Error("Only LOADING orders can be finalized for loading");
 
-      const [updated] = await db
-        .update(customerOrders)
-        .set({
-          status: "VERIFIED",
-          loadingFinalizedAt: new Date(),
-          verifiedAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(customerOrders.id, orderId))
-        .returning();
+        const bales = await tx.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
+        if (bales.length === 0) throw new Error("Order has no bales scanned");
 
-      // V5 guard: proformaIdUsed IS NOT NULL
-      // Move all linked bales to SOLD when a V5 order reaches VERIFIED.
-      // This is idempotent — bales already SOLD are unaffected by the update.
-      // Legacy V2/V3 orders keep bales in RESERVED_FOR_ORDER until FINALIZED.
-      if (order.proformaIdUsed) {
-        for (const b of bales) {
-          await db
-            .update(factoryBales)
-            .set({ status: "SOLD", updatedAt: new Date() })
-            .where(eq(factoryBales.id, b.baleId));
+        const now = new Date();
+        const [updated] = await tx
+          .update(customerOrders)
+          .set({
+            status: "VERIFIED",
+            loadingFinalizedAt: now,
+            verifiedAt: now,
+            updatedAt: now,
+          })
+          .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)))
+          .returning();
+
+        // V5 guard: proformaIdUsed IS NOT NULL.
+        // The previous implementation issued one UPDATE per scanned bale, so a
+        // 700-bale loading generated ~700 database calls. Set the exact same SOLD
+        // state in one company-scoped statement instead.
+        if (order.proformaIdUsed) {
+          const baleIds = [
+            ...new Set(bales.map((b) => Number(b.baleId)).filter((id: number) => Number.isSafeInteger(id) && id > 0)),
+          ];
+          if (baleIds.length > 0) {
+            await tx
+              .update(factoryBales)
+              .set({ status: "SOLD", updatedAt: now })
+              .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, baleIds)));
+          }
         }
-      }
 
-      const [lsCustomer] = await db
-        .select({ legalName: customers.legalName })
-        .from(customers)
-        .where(eq(customers.id, order.customerId));
-      const lsToday = req.body?.txDate || getClientDate(req);
-      const lsTotalValue = bales.reduce((s: number, b: any) => s + parseFloat(b.priceUsed || "0"), 0);
-      await writeDaybookEntry(db, {
-        companyId,
-        txDate: lsToday,
-        txType: "LOADING_SUBMITTED",
-        referenceId: orderId,
-        referenceTable: "customer_orders",
-        description: `Loading submitted: ${lsCustomer?.legalName || "Customer"}, ${bales.length} bale${bales.length !== 1 ? "s" : ""} scanned`,
-        amountCurrency: lsTotalValue,
-        amountUsd: lsTotalValue,
-      });
-      // Also write ORDER_VERIFIED immediately since we skip the Pending step
-      const verifyTotalValue = parseFloat(updated?.grandTotal || "0") || lsTotalValue;
-      await db
-        .delete(factoryDaybookEntries)
-        .where(
-          and(
-            eq(factoryDaybookEntries.companyId, companyId),
-            eq(factoryDaybookEntries.txType, "ORDER_VERIFIED"),
-            eq(factoryDaybookEntries.referenceId, orderId)
-          )
-        );
-      await writeDaybookEntry(db, {
-        companyId,
-        txDate: lsToday,
-        txType: "ORDER_VERIFIED",
-        referenceId: orderId,
-        referenceTable: "customer_orders",
-        description: `Order verified for customer: ${lsCustomer?.legalName || "Customer"}`,
-        amountCurrency: verifyTotalValue,
-        amountUsd: verifyTotalValue,
+        const [loadingCustomer] = await tx
+          .select({ legalName: customers.legalName })
+          .from(customers)
+          .where(eq(customers.id, order.customerId));
+        const txDate = req.body?.txDate || getClientDate(req);
+        const totalValue = bales.reduce((sum: number, b: any) => sum + parseFloat(b.priceUsed || "0"), 0);
+
+        await writeDaybookEntry(tx, {
+          companyId,
+          txDate,
+          txType: "LOADING_SUBMITTED",
+          referenceId: orderId,
+          referenceTable: "customer_orders",
+          description: `Loading submitted: ${loadingCustomer?.legalName || "Customer"}, ${bales.length} bale${bales.length !== 1 ? "s" : ""} scanned`,
+          amountCurrency: totalValue,
+          amountUsd: totalValue,
+        });
+
+        // Also write ORDER_VERIFIED immediately since we skip the Pending step.
+        const verifyTotalValue = parseFloat(updated?.grandTotal || "0") || totalValue;
+        await tx
+          .delete(factoryDaybookEntries)
+          .where(
+            and(
+              eq(factoryDaybookEntries.companyId, companyId),
+              eq(factoryDaybookEntries.txType, "ORDER_VERIFIED"),
+              eq(factoryDaybookEntries.referenceId, orderId)
+            )
+          );
+        await writeDaybookEntry(tx, {
+          companyId,
+          txDate,
+          txType: "ORDER_VERIFIED",
+          referenceId: orderId,
+          referenceTable: "customer_orders",
+          description: `Order verified for customer: ${loadingCustomer?.legalName || "Customer"}`,
+          amountCurrency: verifyTotalValue,
+          amountUsd: verifyTotalValue,
+        });
+
+        return {
+          updated,
+          customerName: loadingCustomer?.legalName || "customer",
+          baleCount: bales.length,
+        };
       });
 
-      const lsMsg = `${bales.length} bale${bales.length !== 1 ? "s" : ""} verified for ${lsCustomer?.legalName || "customer"}`;
+      const lsMsg = `${finalized.baleCount} bale${finalized.baleCount !== 1 ? "s" : ""} verified for ${finalized.customerName}`;
       dispatchNotification({
         eventType: "LOADING_FINALIZED",
         title: "Loading Finalized",
@@ -163,7 +176,7 @@ export function registerOrderLoadingRoutes(app: Express) {
         companyId,
       }).catch(() => {});
 
-      res.json(updated);
+      res.json(finalized.updated);
     } catch (error: unknown) {
       logger.error("Error finalizing loading:", { error: error });
       res.status(400).json({ message: getErrorMessage(error) });

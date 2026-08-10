@@ -8,8 +8,10 @@ import { requireActionAccess } from "../../lib/permissionMiddleware";
 import { writeAuditEvent } from "../../services/audit/auditService";
 import {
   applyFactoryBilingualSnapshotBackfill,
+  applyFactoryBilingualSnapshotBackfillForScope,
   buildFactoryBilingualSnapshotPlan,
   propagateFactoryArabicCatalogChange,
+  type FactoryBilingualSnapshotScope,
 } from "../../services/factoryBilingualSnapshotService";
 import { registerFactoryBilingualDocumentRoutes } from "./factoryBilingualDocumentRoutes";
 import { registerFactoryBilingualSurfaceRoutes } from "./factoryBilingualSurfaceRoutes";
@@ -29,28 +31,84 @@ function booleanValue(value: unknown): boolean {
   return value === true || value === "true" || value === 1 || value === "1";
 }
 
+function positiveId(value: unknown): number | null {
+  const id = Number(value);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+/**
+ * Metadata-only writes do not create or rename product snapshots. Running a
+ * full-company snapshot backfill after these requests used to turn a one-row
+ * edit (for example loading-note) into dozens of schema probes and UPDATEs.
+ */
+function isSnapshotNeutralWrite(req: Request): boolean {
+  return /^\/customer-orders\/\d+\/(?:loading-note|hidden|date|assign-container)$/.test(req.path);
+}
+
 function shouldPopulateAfterWrite(req: Request): boolean {
   if (!["POST", "PATCH", "PUT"].includes(req.method)) return false;
   if (req.path.startsWith("/bilingual-snapshots/")) return false;
   if (req.path.includes("/arabic-import/")) return false;
-  return /^\/(bales|bale-products|customer-proformas|customer-orders|invoice-loading|invoice-loading-sessions|dispatch|factory-pos|bale-recode)/.test(
+  if (isSnapshotNeutralWrite(req)) return false;
+  return /^\/(bales|bale-products|customer-proformas|customer-orders|customer-orders-loading|invoice-loading|invoice-loading-sessions|dispatch|factory-pos|bale-recode)/.test(
     req.path
   );
 }
 
-async function populateAfterSuccessfulWrite(req: Request): Promise<void> {
+function scopeFromRequest(req: Request, payload: unknown): FactoryBilingualSnapshotScope | null {
+  const responseId =
+    payload && typeof payload === "object" && !Array.isArray(payload)
+      ? positiveId((payload as Record<string, unknown>).id)
+      : null;
+
+  const pathRules: Array<{ pattern: RegExp; key: keyof FactoryBilingualSnapshotScope }> = [
+    { pattern: /^\/customer-orders\/(\d+)(?:\/|$)/, key: "orderId" },
+    { pattern: /^\/customer-proformas\/(\d+)(?:\/|$)/, key: "proformaId" },
+    { pattern: /^\/bales\/(\d+)(?:\/|$)/, key: "baleId" },
+    { pattern: /^\/factory-pos\/sales\/(\d+)(?:\/|$)/, key: "posSaleId" },
+    { pattern: /^\/invoice-loading(?:-sessions)?\/(\d+)(?:\/|$)/, key: "invoiceLoadingId" },
+    { pattern: /^\/dispatch(?:-batches)?\/(\d+)(?:\/|$)/, key: "dispatchBatchId" },
+    { pattern: /^\/bale-recode(?:-sessions)?\/(\d+)(?:\/|$)/, key: "recodeSessionId" },
+  ];
+
+  for (const rule of pathRules) {
+    const match = req.path.match(rule.pattern);
+    const id = positiveId(match?.[1]);
+    if (id) return { [rule.key]: id } as FactoryBilingualSnapshotScope;
+  }
+
+  // Creation endpoints expose the newly-created resource id in their response.
+  if (responseId) {
+    if (req.path === "/customer-orders" || req.path === "/customer-orders-loading") return { orderId: responseId };
+    if (req.path === "/customer-proformas") return { proformaId: responseId };
+    if (req.path === "/bales") return { baleId: responseId };
+  }
+
+  return null;
+}
+
+async function populateAfterSuccessfulWrite(req: Request, payload: unknown): Promise<void> {
   const companyId = getFactoryCompanyId(req);
   if (!companyId) return;
 
   const productMatch = req.path.match(/^\/bale-products\/(\d+)/);
   if (productMatch) {
-    const productId = Number(productMatch[1]);
-    if (Number.isSafeInteger(productId) && productId > 0) {
+    const productId = positiveId(productMatch[1]);
+    if (productId) {
       await propagateFactoryArabicCatalogChange(companyId, productId);
       return;
     }
   }
 
+  const scope = scopeFromRequest(req, payload);
+  if (scope) {
+    await applyFactoryBilingualSnapshotBackfillForScope(companyId, scope);
+    return;
+  }
+
+  // Preserve legacy behavior for genuinely bulk/ambiguous writes where a single
+  // affected entity cannot be identified. Explicit admin backfills also continue
+  // to use the full-company path below.
   await applyFactoryBilingualSnapshotBackfill(companyId, {
     includeFinalized: false,
     overwrite: false,
@@ -66,7 +124,7 @@ function factoryBilingualSnapshotWriteMiddleware(req: Request, res: Response, ne
   const originalJson = res.json.bind(res);
   res.json = ((payload: unknown) => {
     if (res.statusCode < 200 || res.statusCode >= 300) return originalJson(payload);
-    void populateAfterSuccessfulWrite(req)
+    void populateAfterSuccessfulWrite(req, payload)
       .then(() => originalJson(payload))
       .catch((error) => {
         logger.error("Failed to populate Factory bilingual snapshots after write", {
