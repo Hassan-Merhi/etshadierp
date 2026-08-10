@@ -1,14 +1,16 @@
-import type { ScreenFeedCursor, ScreenFrame } from "../screenFeedStore";
+import type { ScreenFeedCursor, ScreenFeedFailureInfo, ScreenFrame } from "../screenFeedStore";
 
 type StatusListener = () => void;
 type FrameListener = (frame: ScreenFrame) => void;
 type CursorListener = (cursor: ScreenFeedCursor) => void;
+type FailureListener = (failure: ScreenFeedFailureInfo) => void;
 type DisconnectListener = () => void;
 
 export class ScreenFeedLiveHub {
   private readonly statusListeners = new Map<string, Set<StatusListener>>();
   private readonly frameListeners = new Map<string, Set<FrameListener>>();
   private readonly cursorListeners = new Map<string, Set<CursorListener>>();
+  private readonly failureListeners = new Map<string, Set<FailureListener>>();
   private readonly disconnectListeners = new Set<DisconnectListener>();
 
   subscribeStatus(userId: string, listener: StatusListener): () => void {
@@ -43,6 +45,17 @@ export class ScreenFeedLiveHub {
     return () => {
       listeners.delete(listener);
       if (listeners.size === 0) this.cursorListeners.delete(userId);
+    };
+  }
+
+  subscribeFailures(userId: string, listener: FailureListener): () => void {
+    const listeners = this.failureListeners.get(userId) ?? new Set<FailureListener>();
+    listeners.add(listener);
+    this.failureListeners.set(userId, listeners);
+
+    return () => {
+      listeners.delete(listener);
+      if (listeners.size === 0) this.failureListeners.delete(userId);
     };
   }
 
@@ -87,6 +100,22 @@ export class ScreenFeedLiveHub {
     return delivered;
   }
 
+  publishFailure(userId: string, failure: ScreenFeedFailureInfo): number {
+    const listeners = this.failureListeners.get(userId);
+    if (!listeners?.size) return 0;
+
+    let delivered = 0;
+    for (const listener of listeners) {
+      try {
+        listener(failure);
+        delivered += 1;
+      } catch {
+        // A broken stream is cleaned up by its request close handler.
+      }
+    }
+    return delivered;
+  }
+
   notifyStatus(userId: string): void {
     const listeners = this.statusListeners.get(userId);
     if (!listeners?.size) return;
@@ -114,6 +143,7 @@ export class ScreenFeedLiveHub {
     this.disconnectAll();
     this.frameListeners.clear();
     this.cursorListeners.clear();
+    this.failureListeners.clear();
     this.statusListeners.clear();
     this.disconnectListeners.clear();
   }
