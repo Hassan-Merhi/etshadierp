@@ -39,7 +39,7 @@ function accessSummary(user: any): { label: string; variant: "default" | "second
 function pagesSummary(user: any): string {
   const privileged = ["admin", "owner", "developer"].includes(user.role?.toLowerCase());
   if (privileged || !user.pageAccess || user.pageAccess.length === 0) return "Full access";
-  const factoryKeys = new Set(FACTORY_NAV_PAGES.map((p: any) => p.key));
+  const factoryKeys = new Set(FACTORY_NAV_PAGES.map((p) => p.key));
   const erpKeys = new Set<string>(FEATURE_KEYS);
   const fCount = user.pageAccess.filter((k: string) => factoryKeys.has(k)).length;
   const eCount = user.pageAccess.filter((k: string) => erpKeys.has(k)).length;
@@ -79,7 +79,7 @@ export function UserListTable({ users, isLoading, selectedUserId, onSelectUser }
 
   return (
     <div className="space-y-1.5">
-      {users.map((user: any) => {
+      {users.map((user) => {
         const privileged = ["admin", "owner", "developer"].includes(user.role?.toLowerCase());
         const access = accessSummary(user);
         const pages = pagesSummary(user);

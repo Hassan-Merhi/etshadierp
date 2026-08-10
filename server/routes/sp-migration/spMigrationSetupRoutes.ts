@@ -116,7 +116,7 @@ export function registerSpMigrationSetupRoutes(app: Express) {
           AND sub_type = ANY(${sqlArray(ALL_ACCOUNT_DEFS.map((a) => a.subType))})
       `)
         ).rows as any[];
-        const existingBySubType = new Map(existingRows.map((r: any) => [r.sub_type, r]));
+        const existingBySubType = new Map(existingRows.map((r) => [r.sub_type, r]));
 
         const accounts = ALL_ACCOUNT_DEFS.map((a) => {
           const existing = existingBySubType.get(a.subType);

@@ -57,11 +57,7 @@ export function AccountCombobox({
   const parsed = parseAccountValue(value);
   const selectedAccount = parsed?.type === "ledger" ? accounts.find((a) => a.id === parsed.id) : null;
   const selectedSupplier = parsed?.type === "supplier" ? (suppliers || []).find((s) => s.id === parsed.id) : null;
-  const displayLabel = selectedSupplier
-    ? selectedSupplier.name
-    : selectedAccount
-      ? selectedAccount.name
-      : placeholder;
+  const displayLabel = selectedSupplier ? selectedSupplier.name : selectedAccount ? selectedAccount.name : placeholder;
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -122,10 +118,7 @@ export function AccountCombobox({
                     data-testid={`option-factory-supplier-${s.id}`}
                   >
                     <Check
-                      className={cn(
-                        "mr-2 h-4 w-4 shrink-0",
-                        value === `SUP:${s.id}` ? "opacity-100" : "opacity-0"
-                      )}
+                      className={cn("mr-2 h-4 w-4 shrink-0", value === `SUP:${s.id}` ? "opacity-100" : "opacity-0")}
                     />
                     <span className="truncate">{s.name}</span>
                   </CommandItem>
@@ -195,7 +188,7 @@ export function AdjustmentsHistoryCard({ onDeleteRequest }: { onDeleteRequest: (
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {adjustments.map((adj: any) => (
+                {adjustments.map((adj) => (
                   <TableRow key={adj.id} data-testid={`row-adjustment-${adj.id}`}>
                     <TableCell className="text-sm text-muted-foreground">{formatDisplayDate(adj.date)}</TableCell>
                     <TableCell>

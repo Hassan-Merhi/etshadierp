@@ -83,7 +83,7 @@ export function registerFactoryCustomerStatementExcelRoutes(app: Express) {
           _fromVoucher: true,
         });
       }
-      const allRowsXlsx = [...balanceRows.map((r: any) => ({ ...r, _fromVoucher: false })), ...voucherRowsXlsx].sort(
+      const allRowsXlsx = [...balanceRows.map((r) => ({ ...r, _fromVoucher: false })), ...voucherRowsXlsx].sort(
         (a, b) => {
           const da = (a.transactionDate || "").toString(),
             db2 = (b.transactionDate || "").toString();
@@ -95,9 +95,7 @@ export function registerFactoryCustomerStatementExcelRoutes(app: Express) {
       // Build destination map for Excel
       const xlsxInvoiceRefIds = [
         ...new Set(
-          allRowsXlsx
-            .filter((r: any) => r.referenceType === "INVOICE" && r.referenceId)
-            .map((r: any) => r.referenceId as number)
+          allRowsXlsx.filter((r) => r.referenceType === "INVOICE" && r.referenceId).map((r) => r.referenceId as number)
         ),
       ];
       const destinationMapXlsx = new Map<number, string>();
@@ -121,7 +119,7 @@ export function registerFactoryCustomerStatementExcelRoutes(app: Express) {
       const destFilterXlsx = ((req.query.destination as string) || "").trim().toLowerCase();
 
       // First pass: enrich ALL rows with running balance (needed before filtering)
-      const allEnrichedXlsx = allRowsXlsx.map((row: any) => {
+      const allEnrichedXlsx = allRowsXlsx.map((row) => {
         const debit = parseFloat(row.debitAmount || "0");
         const credit = parseFloat(row.creditAmount || "0");
         runningBalance += debit - credit;
@@ -141,7 +139,7 @@ export function registerFactoryCustomerStatementExcelRoutes(app: Express) {
       }
 
       // Apply filters (mirrors frontend filteredHistory logic)
-      const rows = allEnrichedXlsx.filter((row: any) => {
+      const rows = allEnrichedXlsx.filter((row) => {
         if (destFilterXlsx) {
           if (!(row.destination || "").toLowerCase().includes(destFilterXlsx)) return false;
         }
@@ -292,7 +290,7 @@ export function registerFactoryCustomerStatementExcelRoutes(app: Express) {
       }
 
       // Data rows
-      rows.forEach((row: any, idx: number) => {
+      rows.forEach((row, idx: number) => {
         const dr = row.debit > 0 ? row.debit : null;
         const cr = row.credit > 0 ? row.credit : null;
         const dateVal = row.transactionDate ? new Date(row.transactionDate + "T00:00:00") : "";

@@ -1,19 +1,37 @@
-import {useState, Fragment} from "react";
-import {useMutation, useQuery} from "@tanstack/react-query";
-import {PlusCircle, Plus, X, Info, Pencil, Trash2, AlertTriangle, RotateCcw, ChevronDown, ChevronUp} from "lucide-react";
-import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
-import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter} from "@/components/ui/dialog";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {useToast} from "@/hooks/use-toast";
-import {factoryApiRequest} from "@/lib/factoryApi";
-import {formatNumber} from "@/lib/formatNumber";
-import {useAdminOverride} from "@/hooks/use-admin-override";
+import { useState, Fragment } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  PlusCircle,
+  Plus,
+  X,
+  Info,
+  Pencil,
+  Trash2,
+  AlertTriangle,
+  RotateCcw,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { factoryApiRequest } from "@/lib/factoryApi";
+import { formatNumber } from "@/lib/formatNumber";
+import { useAdminOverride } from "@/hooks/use-admin-override";
 
-import type {HistoryRow, MutationResult, PostOffloadCharge, PostOffloadDialogProps} from "./postoffloaddialog/types";
-import {invalidateChargeQueries} from "./postoffloaddialog/utils";
-import {RateCell} from "./postoffloaddialog/components/RateCell";
-import {MutationResultPanel} from "./postoffloaddialog/components/MutationResultPanel";
+import type { HistoryRow, MutationResult, PostOffloadCharge, PostOffloadDialogProps } from "./postoffloaddialog/types";
+import { invalidateChargeQueries } from "./postoffloaddialog/utils";
+import { RateCell } from "./postoffloaddialog/components/RateCell";
+import { MutationResultPanel } from "./postoffloaddialog/components/MutationResultPanel";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOffloadDialogProps) {
@@ -470,7 +488,7 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="">None</SelectItem>
-                          {ledgerAccounts.map((a: any) => (
+                          {ledgerAccounts.map((a) => (
                             <SelectItem key={a.id} value={String(a.id)}>
                               {a.code ? `${a.code} - ${a.name}` : a.name}
                             </SelectItem>
@@ -781,7 +799,7 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                                   <SelectValue placeholder="Select account (optional)" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {ledgerAccounts.map((a: any) => (
+                                  {ledgerAccounts.map((a) => (
                                     <SelectItem key={a.id} value={String(a.id)}>
                                       {a.code ? `${a.code} - ${a.name}` : a.name}
                                     </SelectItem>

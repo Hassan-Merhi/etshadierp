@@ -82,7 +82,7 @@ export function registerLedgerAccountReadRoutes(app: Express) {
         .from(voucherEntries)
         .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
         .where(and(isNotNull(voucherEntries.ledgerAccountId), eq(vouchers.companyId, companyId)));
-      const usedIds = new Set(usedInEntries.map((r: any) => r.accountId));
+      const usedIds = new Set(usedInEntries.map((r) => r.accountId));
 
       // Accounts that are parents to other accounts
       const parentIds = new Set(allAccounts.filter((a) => a.parentId !== null).map((a) => a.parentId as number));

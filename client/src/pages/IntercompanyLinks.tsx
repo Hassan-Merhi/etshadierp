@@ -155,7 +155,7 @@ export default function IntercompanyLinks() {
   // Seed recipientForm once the query resolves for the open dialog
   useEffect(() => {
     if (recipientsDialogLink && recipientsData.length >= 0) {
-      setRecipientForm(recipientsData.map((r: any) => r.userId));
+      setRecipientForm(recipientsData.map((r) => r.userId));
     }
   }, [recipientsData, recipientsDialogLink?.id]);
 

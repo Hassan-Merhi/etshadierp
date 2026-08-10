@@ -177,7 +177,7 @@ export function registerStatsReportsRoutes(app: Express) {
       if (allCompanies === "true") {
         const isDeveloper = (req.user as any)?.role === "Developer";
         const companyIds = isDeveloper
-          ? (await storage.getAllCompanies()).map((company: any) => company.id)
+          ? (await storage.getAllCompanies()).map((company) => company.id)
           : (await storage.getUserCompaniesWithRoles(req.user!.id)).map((membership) => membership.companyId);
         companyCondition =
           companyIds.length > 0 ? inArray(containers.companyId, companyIds) : eq(containers.companyId, companyId);

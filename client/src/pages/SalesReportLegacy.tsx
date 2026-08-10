@@ -117,7 +117,7 @@ export default function SalesReport() {
 
   // Resolve selected group names (for multi-company query)
   const selectedStockGroupNames = useMemo(
-    () => stockGroups.filter((g: any) => selectedStockGroups.includes(String(g.id))).map((g: any) => g.name as string),
+    () => stockGroups.filter((g) => selectedStockGroups.includes(String(g.id))).map((g) => g.name as string),
     [stockGroups, selectedStockGroups]
   );
 
@@ -165,8 +165,8 @@ export default function SalesReport() {
     if (selectedStockGroups.length === 0) return null;
     return new Set(
       stockItems
-        .filter((item: any) => selectedStockGroups.includes(String(item.stockGroupId)))
-        .map((item: any) => item.id as number)
+        .filter((item) => selectedStockGroups.includes(String(item.stockGroupId)))
+        .map((item) => item.id as number)
     );
   }, [selectedStockGroups, stockItems]);
 
@@ -700,7 +700,7 @@ export default function SalesReport() {
                 <span className="text-sm font-medium">All Locations</span>
               </div>
               <div className="border-t my-1" />
-              {locations.map((loc: any) => (
+              {locations.map((loc) => (
                 <div
                   key={loc.id}
                   className="flex items-center gap-2 px-2 py-1.5 rounded hover-elevate cursor-pointer"
@@ -741,7 +741,7 @@ export default function SalesReport() {
                 <span className="text-sm font-medium">All Groups</span>
               </div>
               <div className="border-t my-1" />
-              {stockGroups.map((g: any) => (
+              {stockGroups.map((g) => (
                 <div
                   key={g.id}
                   className="flex items-center gap-2 px-2 py-1.5 rounded hover-elevate cursor-pointer"

@@ -65,7 +65,7 @@ export function registerRawStockZeroCostSourceRoutes(app: Express) {
           return res.status(400).json({ message: "sourceIds must be a non-empty array" });
         }
         const parsedIds = sourceIds
-          .map((id: any) => parseInt(id))
+          .map((id) => parseInt(id))
           .filter((id: number) => !isNaN(id))
           .sort((a: number, b: number) => a - b);
         if (parsedIds.length === 0) {

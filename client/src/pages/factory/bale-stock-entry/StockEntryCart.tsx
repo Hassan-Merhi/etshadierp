@@ -193,7 +193,7 @@ export function StockEntryCart({
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">Unassigned</SelectItem>
-                          {filteredWorkers.map((w: any) => (
+                          {filteredWorkers.map((w) => (
                             <SelectItem key={w.id} value={String(w.id)}>
                               {w.fullName || w.name}
                             </SelectItem>
@@ -329,7 +329,7 @@ export function StockEntryCart({
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">Unassigned</SelectItem>
-                          {filteredWorkers.map((w: any) => (
+                          {filteredWorkers.map((w) => (
                             <SelectItem key={w.id} value={String(w.id)}>
                               {w.fullName || w.name}
                             </SelectItem>

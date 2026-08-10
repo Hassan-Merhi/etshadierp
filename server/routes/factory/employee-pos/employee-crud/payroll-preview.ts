@@ -37,7 +37,7 @@ export function registerFactoryEmployeePayrollPreviewRoutes(app: Express) {
 
       if (emps.length === 0) return res.json({ preview: [] });
 
-      const empIds = emps.map((e: any) => e.id);
+      const empIds = emps.map((e) => e.id);
       const attResult = await db.execute(sql`
         SELECT employee_id, status, COUNT(*) as count
         FROM employee_attendance
@@ -73,7 +73,7 @@ export function registerFactoryEmployeePayrollPreviewRoutes(app: Express) {
       const monthStart = new Date(startDate + "T00:00:00");
       const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
 
-      const preview = emps.map((emp: any) => {
+      const preview = emps.map((emp) => {
         const eid = emp.id;
         const a = attMap[eid] || {};
         const present = (a.present || 0) + (a.late || 0) + (a.leave || 0);

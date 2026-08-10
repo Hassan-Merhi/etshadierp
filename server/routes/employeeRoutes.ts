@@ -48,7 +48,7 @@ export function registerEmployeeRoutes(app: Express) {
         return res.status(400).json({ message: "Invalid employee ID" });
       }
       const employees = await storage.getAllEmployees(req.session.currentCompanyId);
-      const employee = employees.find((e: any) => e.id === employeeId);
+      const employee = employees.find((e) => e.id === employeeId);
       if (!employee) {
         return res.status(404).json({ message: "Employee not found" });
       }
@@ -135,8 +135,8 @@ export function registerEmployeeRoutes(app: Express) {
       const { rates } = req.body;
       if (!Array.isArray(rates)) return res.status(400).json({ message: "rates must be an array" });
       const valid = rates
-        .filter((r: any) => r.locationId && parseFloat(r.rate) > 0)
-        .map((r: any) => ({
+        .filter((r) => r.locationId && parseFloat(r.rate) > 0)
+        .map((r) => ({
           locationId: parseInt(r.locationId),
           rate: String(parseFloat(r.rate)),
           sourceCompanyId: r.sourceCompanyId ? parseInt(r.sourceCompanyId) : null,
@@ -168,8 +168,8 @@ export function registerEmployeeRoutes(app: Express) {
       const { rates } = req.body;
       if (!Array.isArray(rates)) return res.status(400).json({ message: "rates must be an array" });
       const valid = rates
-        .filter((r: any) => r.locationId && parseFloat(r.pct) > 0)
-        .map((r: any) => ({
+        .filter((r) => r.locationId && parseFloat(r.pct) > 0)
+        .map((r) => ({
           locationId: parseInt(r.locationId),
           pct: String(parseFloat(r.pct)),
           sourceCompanyId: r.sourceCompanyId ? parseInt(r.sourceCompanyId) : null,

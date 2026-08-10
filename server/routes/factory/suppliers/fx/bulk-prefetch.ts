@@ -45,7 +45,7 @@ export function registerSupplierBulkFxPrefetchRoutes(app: Express) {
         );
       if (linkedSuppliers.length === 0) return res.json({ suppliers: [] });
 
-      const linkedIds = linkedSuppliers.map((s: any) => s.id);
+      const linkedIds = linkedSuppliers.map((s) => s.id);
 
       const allContainers = (
         await db
@@ -115,7 +115,7 @@ export function registerSupplierBulkFxPrefetchRoutes(app: Express) {
         newestDate: string | null;
       }> = [];
       for (const sup of linkedSuppliers) {
-        const supContainers = allContainers.filter((c: any) => c.supplierId === sup.id);
+        const supContainers = allContainers.filter((c) => c.supplierId === sup.id);
         const totalValue = supContainers.reduce((s: number, c: any) => {
           const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
           const rate = parseFloat(c.ratePerKg || "0");
@@ -127,7 +127,7 @@ export function registerSupplierBulkFxPrefetchRoutes(app: Express) {
           return s + (kg * rate + (freightCc === currency ? freight : 0) + (commCc === currency ? commAmt : 0));
         }, 0);
         const available = Math.max(0, totalValue - (paymentsBySupplier[sup.id] || 0) - (fxOutBySupplier[sup.id] || 0));
-        const dates = supContainers.map((c: any) => c.arrivalDate || c.createdAt).filter(Boolean) as string[];
+        const dates = supContainers.map((c) => c.arrivalDate || c.createdAt).filter(Boolean) as string[];
         const oldestDate = dates.length ? dates.reduce((a, b) => (new Date(a) < new Date(b) ? a : b)) : null;
         const newestDate = dates.length ? dates.reduce((a, b) => (new Date(a) > new Date(b) ? a : b)) : null;
         if (available > 0.001) result.push({ id: sup.id, name: sup.name, available, oldestDate, newestDate });

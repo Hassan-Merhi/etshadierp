@@ -201,7 +201,7 @@ export function registerStockPriceListImportRoutes(app: Express) {
           offloadMap.set(Number(r.stockItemId), String(r.offloadingCost ?? "0"));
         }
 
-        rows = rows.map((row: any) => ({
+        rows = rows.map((row) => ({
           ...row,
           costPrice: dubaiMap.get(row.stockItemId) ?? null,
           offloadingCost: offloadMap.get(row.stockItemId) ?? null,
@@ -499,13 +499,13 @@ export function registerStockPriceListImportRoutes(app: Express) {
         .select({ id: stockItems.id, code: stockItems.code })
         .from(stockItems)
         .where(and(eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)));
-      const itemByCode = new Map(allItems.map((i: any) => [i.code.toLowerCase().trim(), i.id]));
+      const itemByCode = new Map(allItems.map((i) => [i.code.toLowerCase().trim(), i.id]));
 
       const allCats = await db
         .select({ id: stockCategories.id, name: stockCategories.name })
         .from(stockCategories)
         .where(eq(stockCategories.companyId, companyId));
-      const catByName = new Map(allCats.map((c: any) => [c.name.toLowerCase().trim(), c.id]));
+      const catByName = new Map(allCats.map((c) => [c.name.toLowerCase().trim(), c.id]));
 
       let updated = 0;
       let notFound = 0;

@@ -25,7 +25,7 @@ export function registerFactoryEmployeeBulkPayrollRoutes(app: Express) {
       if (!date) return res.status(400).json({ message: "Date is required" });
 
       // Validate: at least amount or deduction must be > 0
-      const validDeposits = deposits.filter((d: any) => {
+      const validDeposits = deposits.filter((d) => {
         const a = parseFloat(d.amount) || 0;
         const ded = parseFloat(d.deduction) || 0;
         return d.employeeId && (a > 0 || ded > 0);

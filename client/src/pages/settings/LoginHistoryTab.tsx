@@ -37,7 +37,7 @@ export function LoginHistoryTab() {
   const [filterUser, setFilterUser] = useState("");
 
   const filteredHistory =
-    history?.filter((entry: any) => {
+    history?.filter((entry) => {
       if (!filterUser) return true;
       return entry.username.toLowerCase().includes(filterUser.toLowerCase());
     }) || [];
@@ -86,7 +86,7 @@ export function LoginHistoryTab() {
                 </tr>
               </thead>
               <tbody>
-                {filteredHistory.map((entry: any) => {
+                {filteredHistory.map((entry) => {
                   const loginDate = new Date(entry.loginAt);
                   const locationParts = [entry.city, entry.country].filter(Boolean);
                   const locationStr = locationParts.length > 0 ? locationParts.join(", ") : "Unknown";

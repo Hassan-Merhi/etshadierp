@@ -59,7 +59,7 @@ export default function FactoryBrokerVisualStatement() {
     }
     return ids;
   }, [suppliers]);
-  const brokers = useMemo(() => (suppliers as any[]).filter((s: any) => parentIds.has(s.id)), [suppliers, parentIds]);
+  const brokers = useMemo(() => (suppliers as any[]).filter((s) => parentIds.has(s.id)), [suppliers, parentIds]);
 
   // Visual statement data
   const queryParams = useMemo(() => {
@@ -158,7 +158,7 @@ export default function FactoryBrokerVisualStatement() {
                   <SelectValue placeholder={brokers.length === 0 ? "No brokers found" : "Select broker…"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {brokers.map((b: any) => (
+                  {brokers.map((b) => (
                     <SelectItem key={b.id} value={String(b.id)}>
                       {b.name}
                     </SelectItem>
@@ -280,7 +280,7 @@ export default function FactoryBrokerVisualStatement() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(statement.containers as any[]).map((c: any) => {
+                    {(statement.containers as any[]).map((c) => {
                       const grandTotal = containerGrandTotal(c);
                       return (
                         <TableRow key={c.id} className="text-xs" data-testid={`row-container-${c.id}`}>
@@ -408,7 +408,7 @@ export default function FactoryBrokerVisualStatement() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(statement.payments as any[]).map((p: any) => {
+                    {(statement.payments as any[]).map((p) => {
                       const isNeg = p.fromAmount < 0 || p.usdAmount < 0;
                       const typeLabel: Record<string, string> = {
                         payment: "Payment",

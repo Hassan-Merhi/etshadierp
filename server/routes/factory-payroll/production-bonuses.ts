@@ -114,7 +114,7 @@ export function registerFactoryProductionBonusRoutes(app: Express, requireAuth: 
           FROM factory_production_bonus_allocations
           WHERE payroll_id = ${id}
         `);
-        const linked = rows(linkedResult).map((row: any) => ({
+        const linked = rows(linkedResult).map((row) => ({
           runId: Number(row.runId),
           workerId: Number(row.workerId),
         }));

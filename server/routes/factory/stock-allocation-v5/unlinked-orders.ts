@@ -41,7 +41,7 @@ export function registerV5UnlinkedLoadingOrderRoutes(app: Express) {
             ORDER BY co.created_at DESC`
       );
 
-      const orders = raw.rows.map((r: any) => ({
+      const orders = raw.rows.map((r) => ({
         id: Number(r.id),
         containerNumber: r.containerNumber ?? `Order #${r.id}`,
         status: r.status,

@@ -370,7 +370,7 @@ export function BonusDialog({
                   <Select
                     value={row.locationId}
                     onValueChange={(v) => {
-                      const otherLoc = allCompanyLocations.find((l: any) => l.id === parseInt(v));
+                      const otherLoc = allCompanyLocations.find((l) => l.id === parseInt(v));
                       setBalesRows((prev) =>
                         prev.map((r, i) =>
                           i === idx
@@ -502,8 +502,8 @@ export function BonusDialog({
                     const r = parseFloat(row.rate || "0");
                     const rowTotal = q * r;
                     const loc =
-                      locations.find((l: any) => l.id === parseInt(row.locationId)) ??
-                      allCompanyLocations.find((l: any) => l.id === parseInt(row.locationId));
+                      locations.find((l) => l.id === parseInt(row.locationId)) ??
+                      allCompanyLocations.find((l) => l.id === parseInt(row.locationId));
                     return (
                       <div key={i} className="space-y-1">
                         <div className="flex justify-between">

@@ -113,7 +113,7 @@ export function ParentCreditAccountSelect({ company }: { company: any }) {
   });
 
   const currentAccountId = companySettings?.parentCreditAccountId;
-  const currentAccount = ledgerAccounts.find((acc: any) => acc.id === currentAccountId);
+  const currentAccount = ledgerAccounts.find((acc) => acc.id === currentAccountId);
 
   if (isCreating) {
     return (
@@ -171,7 +171,7 @@ export function ParentCreditAccountSelect({ company }: { company: any }) {
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="none">Not Set</SelectItem>
-        {liabilityAccounts.map((acc: any) => (
+        {liabilityAccounts.map((acc) => (
           <SelectItem key={acc.id} value={acc.id.toString()}>
             {acc.name}
           </SelectItem>

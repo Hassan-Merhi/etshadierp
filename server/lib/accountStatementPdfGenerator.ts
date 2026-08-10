@@ -192,7 +192,7 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
     obSide = "Cr";
   } else if (accountType === "customer") {
     const customerStmt = await storage.getCustomerStatement(accountId, companyId, startDate, endDate);
-    rawEntries = customerStmt.map((row: any) => ({
+    rawEntries = customerStmt.map((row) => ({
       voucherId: row.referenceId ?? row.id,
       voucherNumber: row.referenceType ? `${row.referenceType}-${row.referenceId}` : `CB-${row.id}`,
       voucherType: row.transactionType,

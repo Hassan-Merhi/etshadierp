@@ -45,7 +45,7 @@ async function prepareCorrectedReoffload(req: Request, res: Response, next: Next
         ORDER BY r.id
         FOR UPDATE OF o
       `);
-      const reversedOffloadIds = (resultRows(reversedRows) ?? []).map((row: any) => Number(row.offload_id));
+      const reversedOffloadIds = (resultRows(reversedRows) ?? []).map((row) => Number(row.offload_id));
       if (reversedOffloadIds.length === 0) return;
 
       await tx.execute(sql`

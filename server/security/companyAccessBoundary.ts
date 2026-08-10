@@ -61,7 +61,7 @@ export async function getAccessibleCompanyIds(userId: string): Promise<Set<numbe
   // on the user record itself. set-company accepts the account-level role and
   // fabricates a company role for it, so the boundary must honour the same source
   // of truth — otherwise the selected company is unreachable for every data route.
-  let isDeveloper = roles.some((entry: any) => entry.role === "Developer");
+  let isDeveloper = roles.some((entry) => entry.role === "Developer");
   if (!isDeveloper) {
     const user = await storage.getUser(userId);
     isDeveloper = (user as any)?.role === "Developer";
@@ -71,14 +71,14 @@ export async function getAccessibleCompanyIds(userId: string): Promise<Set<numbe
     const companies = await storage.getAllCompanies();
     return new Set(
       companies
-        .map((company: any) => Number(company.id))
+        .map((company) => Number(company.id))
         .filter((companyId: number) => Number.isInteger(companyId) && companyId > 0)
     );
   }
 
   return new Set(
     roles
-      .map((entry: any) => Number(entry.companyId))
+      .map((entry) => Number(entry.companyId))
       .filter((companyId: number) => Number.isInteger(companyId) && companyId > 0)
   );
 }

@@ -649,7 +649,7 @@ export function StockItemDetailsDialog({
                   <div className="text-center py-4 text-muted-foreground">No location prices added yet</div>
                 ) : (
                   <div className="space-y-2">
-                    {locationPrices.map((price: any) => (
+                    {locationPrices.map((price) => (
                       <Card key={price.id} className="p-3 flex items-center justify-between">
                         {editingLocationPriceId === price.id ? (
                           <>

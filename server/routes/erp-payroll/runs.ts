@@ -39,7 +39,7 @@ export function registerPayrollRunRoutes(app: Express) {
         .values({ companyId, status: "DRAFT", date, notes: notes || null, createdAt })
         .returning();
       await db.insert(erpPayrollRunItems).values(
-        items.map((it: any) => ({
+        items.map((it) => ({
           runId: run.id,
           employeeId: it.employeeId,
           employeeName: it.employeeName,
@@ -155,7 +155,7 @@ export function registerPayrollRunRoutes(app: Express) {
                 .substring(0, 25)}`;
           const expName = isDefault ? "Salary Expense" : `Salary Expense - ${grp}`;
 
-          let expAccount = allAccounts.find((a: any) => a.code === expCode);
+          let expAccount = allAccounts.find((a) => a.code === expCode);
           if (!expAccount) {
             expAccount = await storage.createLedgerAccount({
               companyId,
@@ -258,7 +258,7 @@ export function registerPayrollRunRoutes(app: Express) {
         if (Array.isArray(items) && items.length > 0) {
           await db.delete(erpPayrollRunItems).where(eq(erpPayrollRunItems.runId, runId));
           await db.insert(erpPayrollRunItems).values(
-            items.map((it: any) => ({
+            items.map((it) => ({
               runId,
               employeeId: it.employeeId,
               employeeName: it.employeeName,

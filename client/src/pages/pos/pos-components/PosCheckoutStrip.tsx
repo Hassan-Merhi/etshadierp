@@ -146,12 +146,12 @@ export function PosCheckoutStrip({
             </SelectTrigger>
             <SelectContent>
               {paymentAccountType === "bank"
-                ? (Array.isArray(bankAccounts) ? bankAccounts : []).map((acc: any) => (
+                ? (Array.isArray(bankAccounts) ? bankAccounts : []).map((acc) => (
                     <SelectItem key={acc.id} value={String(acc.id)}>
                       {acc.name} ({acc.code})
                     </SelectItem>
                   ))
-                : cashLedgerAccounts.map((acc: any) => (
+                : cashLedgerAccounts.map((acc) => (
                     <SelectItem key={acc.id} value={String(acc.id)}>
                       {acc.name}
                     </SelectItem>
@@ -182,7 +182,7 @@ export function PosCheckoutStrip({
               <User className="h-4 w-4 text-muted-foreground" />
               <span className="truncate max-w-[140px]">
                 {selectedCustomerId
-                  ? customerAccounts.find((a: any) => String(a.id) === selectedCustomerId)?.name || "Customer"
+                  ? customerAccounts.find((a) => String(a.id) === selectedCustomerId)?.name || "Customer"
                   : "Select customer…"}
               </span>
               <ChevronDown className="h-4 w-4 opacity-50" />
@@ -194,7 +194,7 @@ export function PosCheckoutStrip({
               <CommandList>
                 <CommandEmpty>No customer found.</CommandEmpty>
                 <CommandGroup>
-                  {customerAccounts.map((acc: any) => (
+                  {customerAccounts.map((acc) => (
                     <CommandItem
                       key={acc.id}
                       value={acc.name}

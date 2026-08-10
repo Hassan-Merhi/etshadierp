@@ -331,7 +331,7 @@ export function registerSpOffloadRoutes(app: Express) {
           await tx.insert(spOffloadCharges).values(
             charges
               .filter((c) => parseNum(c.amountUsd) > 0)
-              .map((c: any) => ({
+              .map((c) => ({
                 offloadId: offload.id,
                 companyId,
                 chargeType: c.chargeType,

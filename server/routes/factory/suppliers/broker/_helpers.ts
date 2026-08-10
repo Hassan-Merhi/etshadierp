@@ -37,7 +37,7 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
     .where(and(eq(factorySuppliers.parentId, brokerId), eq(factorySuppliers.companyId, companyId)));
 
   const allSuppliers = [broker, ...linkedRaw];
-  const allSupplierIds = allSuppliers.map((s: any) => s.id);
+  const allSupplierIds = allSuppliers.map((s) => s.id);
   const supplierNameMap: Record<number, string> = {};
   for (const s of allSuppliers) supplierNameMap[(s as any).id] = (s as any).name;
 
@@ -63,7 +63,7 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
           .orderBy(factoryContainers.arrivalDate, factoryContainers.createdAt)
       : [];
   // Build a Set of the filtered container IDs so charge queries can be scoped to the same set.
-  const filteredContainerIdSet = new Set((allContainers as any[]).map((c: any) => c.id as number));
+  const filteredContainerIdSet = new Set((allContainers as any[]).map((c) => c.id as number));
 
   // Payments (direct)
   const allPayments =

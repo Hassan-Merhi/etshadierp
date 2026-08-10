@@ -171,7 +171,7 @@ export function registerOrderCrudRoutes(app: Express) {
       // customer_order_bales and customer_order_charges both have newer columns
       // added via migrations that may be absent in production — use raw SQL.
       const rawBalesRes = await db.execute(sql`SELECT * FROM customer_order_bales WHERE order_id = ${id} ORDER BY id`);
-      const bales = resultRows(rawBalesRes).map((b: any) => ({
+      const bales = resultRows(rawBalesRes).map((b) => ({
         id: b.id,
         orderId: b.order_id,
         baleId: b.bale_id,
@@ -186,7 +186,7 @@ export function registerOrderCrudRoutes(app: Express) {
       const rawChargesRes = await db.execute(
         sql`SELECT * FROM customer_order_charges WHERE order_id = ${id} ORDER BY id`
       );
-      const charges = resultRows(rawChargesRes).map((c: any) => ({
+      const charges = resultRows(rawChargesRes).map((c) => ({
         id: c.id,
         orderId: c.order_id,
         name: c.name ?? "",
@@ -246,7 +246,7 @@ export function registerOrderCrudRoutes(app: Express) {
       if (!order) return res.status(404).json({ message: "Order not found" });
 
       const lines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, id));
-      const articleCodes = lines.map((l: any) => l.articleCode).filter(Boolean);
+      const articleCodes = lines.map((l) => l.articleCode).filter(Boolean);
 
       const products =
         articleCodes.length > 0
@@ -274,7 +274,7 @@ export function registerOrderCrudRoutes(app: Express) {
       let totalCost = 0;
       let totalCostKnown = true;
 
-      const profitLines = lines.map((line: any) => {
+      const profitLines = lines.map((line) => {
         const qty = Number(line.qty || 0);
         const selling = parseFloat(line.totalPrice || "0");
         const product = line.articleCode ? productMap[line.articleCode] : null;

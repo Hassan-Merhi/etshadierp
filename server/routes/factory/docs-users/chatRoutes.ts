@@ -87,7 +87,7 @@ export function registerFactoryChatRoutes(app: Express) {
         .from(users)
         .where(eq(users.active, true));
 
-      const filtered = allUsers.filter((u: any) => u.id !== currentUserId);
+      const filtered = allUsers.filter((u) => u.id !== currentUserId);
 
       // Fetch all presence records in one query
       const presenceRecords = await db.select().from(userPresence);
@@ -116,7 +116,7 @@ export function registerFactoryChatRoutes(app: Express) {
             );
 
           // Find most recent presence record for this user
-          const userPresenceRecords = presenceRecords.filter((p: any) => p.userId === u.id);
+          const userPresenceRecords = presenceRecords.filter((p) => p.userId === u.id);
           const latestPresence = userPresenceRecords.sort(
             (a: any, b: any) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime()
           )[0];

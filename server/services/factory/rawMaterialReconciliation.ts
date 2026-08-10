@@ -212,10 +212,7 @@ export async function getRawMaterialReconciliation(companyId: number): Promise<R
   }
 
   const allContainersById = new Map<number, any>(
-    (await db.select().from(factoryContainers).where(eq(factoryContainers.companyId, companyId))).map((c: any) => [
-      c.id,
-      c,
-    ])
+    (await db.select().from(factoryContainers).where(eq(factoryContainers.companyId, companyId))).map((c) => [c.id, c])
   );
 
   const nonUsdCharges = await db

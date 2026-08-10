@@ -137,7 +137,7 @@ export function StockEntryTab() {
 
   useEffect(() => {
     if (workerCategoryGroups.length > 0 && !workerCategoryFilterManual) {
-      const pressing = workerCategoryGroups.find((c: any) => (c.name as string)?.toLowerCase().includes("pressing"));
+      const pressing = workerCategoryGroups.find((c) => (c.name as string)?.toLowerCase().includes("pressing"));
       if (pressing) {
         setWorkerCategoryFilter(String(pressing.id));
       }
@@ -146,12 +146,12 @@ export function StockEntryTab() {
 
   const filteredWorkers =
     workerCategoryFilter === "all"
-      ? (workers as any[]).filter((w: any) => w.active !== false)
+      ? (workers as any[]).filter((w) => w.active !== false)
       : (() => {
-          const cat = workerCategoryGroups.find((c: any) => String(c.id) === workerCategoryFilter);
-          if (!cat) return (workers as any[]).filter((w: any) => w.active !== false);
+          const cat = workerCategoryGroups.find((c) => String(c.id) === workerCategoryFilter);
+          if (!cat) return (workers as any[]).filter((w) => w.active !== false);
           const ids = Array.isArray(cat.workerIds) ? (cat.workerIds as number[]) : [];
-          return (workers as any[]).filter((w: any) => w.active !== false && ids.includes(w.id));
+          return (workers as any[]).filter((w) => w.active !== false && ids.includes(w.id));
         })();
 
   // Keep attribution valid when the entry date, membership configuration, cart,
@@ -524,7 +524,7 @@ export function StockEntryTab() {
                         | undefined;
                       if (draftData?.cart) {
                         const restored = draftData.cart
-                          .map((i: any) => {
+                          .map((i) => {
                             const p = baleProducts?.find((bp) => bp.id === i.productId);
                             return {
                               ...i,
@@ -533,7 +533,7 @@ export function StockEntryTab() {
                               product: p,
                             };
                           })
-                          .filter((i: any) => i.product);
+                          .filter((i) => i.product);
                         setCart(restored);
                       }
                       if (draftData?.productionPositionByProduct) {

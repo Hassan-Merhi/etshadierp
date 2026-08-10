@@ -472,19 +472,19 @@ export function registerContainerFreightWriteRoutes(app: Express) {
               // Standard: all entries to newLocalVoucherTotal (no embedded freight)
               // If switching away from embedded freight, remove freight entries first
               const freightEntryIds = existingEntries
-                .filter((e: any) => {
+                .filter((e) => {
                   const acct = e.ledgerAccountId;
                   return (
                     acct === ((existingPO as any).freightOwnAccountId ?? -1) ||
                     acct === ((existingPO as any).freightParentAccountId ?? -1)
                   );
                 })
-                .map((e: any) => e.id);
+                .map((e) => e.id);
               if (freightEntryIds.length > 0) {
                 await tx.delete(voucherEntries).where(inArray(voucherEntries.id, freightEntryIds));
               }
               // Also remove the matching freight DR entries (identified by narration)
-              const remainingEntries = existingEntries.filter((e: any) => !freightEntryIds.includes(e.id));
+              const remainingEntries = existingEntries.filter((e) => !freightEntryIds.includes(e.id));
               for (const entry of remainingEntries) {
                 if (parseFloat(entry.debitAmount || "0") > 0) {
                   await tx
@@ -508,7 +508,7 @@ export function registerContainerFreightWriteRoutes(app: Express) {
           if (container) {
             // Get all POs for this container and recalculate totals
             const allPOs = await storage.getAllPurchaseOrders(existingPO.companyId);
-            const containerPOs = allPOs.filter((po: any) => po.containerId === existingPO.containerId);
+            const containerPOs = allPOs.filter((po) => po.containerId === existingPO.containerId);
             let totalItemsCost = 0;
             let totalCharges = 0;
 
@@ -603,7 +603,7 @@ export function registerContainerFreightWriteRoutes(app: Express) {
                 .from(voucherEntries)
                 .where(eq(voucherEntries.voucherId, existingPO.voucherId));
               purchasesAcctId =
-                (svEntries.find((e: any) => parseFloat(e.debitAmount || "0") > 0) as any)?.ledgerAccountId ?? null;
+                (svEntries.find((e) => parseFloat(e.debitAmount || "0") > 0) as any)?.ledgerAccountId ?? null;
             }
             const [existingFV] = await tx
               .select()

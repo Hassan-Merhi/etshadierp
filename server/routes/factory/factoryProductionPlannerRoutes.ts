@@ -42,7 +42,7 @@ export function registerProductionPlannerRoutes(app: Express) {
       `);
       const entries: any[] = Array.isArray(entryResult) ? entryResult : resultRows(entryResult);
 
-      const workerIds = entries.map((e: any) => Number(e.workerId));
+      const workerIds = entries.map((e) => Number(e.workerId));
       let categoryIds: number[] = [];
       try {
         const parsed = JSON.parse(plan.category_ids || "[]");
@@ -62,7 +62,7 @@ export function registerProductionPlannerRoutes(app: Express) {
               AND id = ANY(${sqlArray(categoryIds)})
           `);
           const wcRows: any[] = Array.isArray(wcResult) ? wcResult : resultRows(wcResult);
-          const teamWorkerIds = wcRows.flatMap((r: any) => {
+          const teamWorkerIds = wcRows.flatMap((r) => {
             const ids = r.worker_ids;
             if (Array.isArray(ids)) return ids.map(Number);
             try {

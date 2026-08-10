@@ -984,7 +984,7 @@ export default function FactoryPayrollPage() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredWorkers.map((worker: any) => (
+                      filteredWorkers.map((worker) => (
                         <TableRow
                           key={worker.id}
                           className="cursor-pointer hover-elevate"

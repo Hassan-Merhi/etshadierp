@@ -358,7 +358,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
       const orphanRows = orphanedAccounts.rows as any[];
       if (orphanRows.length > 0) {
         // Use inArray (drizzle) instead of raw ANY() to avoid parameterization issues
-        const orphanIds = orphanRows.map((r: any) => r.id as number);
+        const orphanIds = orphanRows.map((r) => r.id as number);
         await db.delete(ledgerAccounts).where(inArray(ledgerAccounts.id, orphanIds));
         accountsDeleted = orphanIds.length;
       }

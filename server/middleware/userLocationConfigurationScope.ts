@@ -13,13 +13,7 @@ function positiveIds(values: unknown[]): number[] | null {
   return [...new Set(ids)];
 }
 
-function deny(
-  req: Request,
-  res: Response,
-  reason: string,
-  status = 404,
-  message = "Configuration not found"
-): false {
+function deny(req: Request, res: Response, reason: string, status = 404, message = "Configuration not found"): false {
   logger.error(
     JSON.stringify({
       event: "user_location_configuration_scope_denied",
@@ -37,10 +31,7 @@ function deny(
   return false;
 }
 
-export async function enforceUserLocationConfigurationScope(
-  req: Request,
-  res: Response
-): Promise<boolean> {
+export async function enforceUserLocationConfigurationScope(req: Request, res: Response): Promise<boolean> {
   const route = classifyUserLocationConfigurationRoute(req.path);
   if (!route) return true;
 
@@ -67,11 +58,7 @@ export async function enforceUserLocationConfigurationScope(
   }
 
   const method = req.method.toUpperCase();
-  if (
-    method === "GET" &&
-    route.userId !== sessionUserId &&
-    !["Admin", "Owner", "Developer"].includes(actorRole)
-  ) {
+  if (method === "GET" && route.userId !== sessionUserId && !["Admin", "Owner", "Developer"].includes(actorRole)) {
     return deny(req, res, "USER_LOCATION_READ_ROLE_DENIED", 403, "Access denied");
   }
 
@@ -89,13 +76,7 @@ export async function enforceUserLocationConfigurationScope(
     const rows = await db
       .select({ id: locations.id })
       .from(locations)
-      .where(
-        and(
-          inArray(locations.id, ids),
-          eq(locations.companyId, activeCompanyId),
-          isNull(locations.deletedAt)
-        )
-      );
+      .where(and(inArray(locations.id, ids), eq(locations.companyId, activeCompanyId), isNull(locations.deletedAt)));
     if (rows.length !== ids.length) {
       return deny(req, res, "USER_LOCATION_OWNERSHIP_INVALID", 400, "Invalid location selection");
     }
@@ -105,8 +86,8 @@ export async function enforceUserLocationConfigurationScope(
   const mappings = req.body?.mappings;
   if (!Array.isArray(mappings)) return true;
 
-  const locationIds = positiveIds(mappings.map((mapping: any) => mapping?.locationId));
-  const cashAccountIds = positiveIds(mappings.map((mapping: any) => mapping?.cashAccountId));
+  const locationIds = positiveIds(mappings.map((mapping) => mapping?.locationId));
+  const cashAccountIds = positiveIds(mappings.map((mapping) => mapping?.cashAccountId));
   if (locationIds == null || cashAccountIds == null) {
     return deny(req, res, "USER_CASH_MAPPING_ID_INVALID", 400, "Invalid cash mapping");
   }
@@ -117,11 +98,7 @@ export async function enforceUserLocationConfigurationScope(
       .select({ id: locations.id })
       .from(locations)
       .where(
-        and(
-          inArray(locations.id, locationIds),
-          eq(locations.companyId, activeCompanyId),
-          isNull(locations.deletedAt)
-        )
+        and(inArray(locations.id, locationIds), eq(locations.companyId, activeCompanyId), isNull(locations.deletedAt))
       ),
     db
       .select({ id: ledgerAccounts.id, accountType: ledgerAccounts.accountType })

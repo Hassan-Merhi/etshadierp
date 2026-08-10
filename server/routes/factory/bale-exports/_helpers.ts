@@ -70,7 +70,7 @@ export async function buildWeeklyReportExcelBuffer(companyId: number, period: st
     .select({ id: factorySupplierCategories.id, name: factorySupplierCategories.name })
     .from(factorySupplierCategories)
     .where(eq(factorySupplierCategories.companyId, companyId));
-  const catNameMap = new Map<number, string>(catRows.map((c: any) => [c.id, c.name]));
+  const catNameMap = new Map<number, string>(catRows.map((c) => [c.id, c.name]));
   const catBalMap = new Map<WrCatKey, { name: string; currentBalance: number }>();
   const getCK = (id: number | null | undefined): WrCatKey => (id != null ? id : "uncategorized") as WrCatKey;
   const getCN = (id: number | null | undefined): string =>

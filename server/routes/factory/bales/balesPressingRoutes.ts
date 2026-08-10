@@ -140,7 +140,7 @@ export function registerBalesPressingRoutes(app: Express) {
         return res.status(400).json({ message: "items array is required with at least one entry" });
       }
 
-      const parsedQuantities = items.map((item: any) => parseBaleQuantity(item.quantity ?? item.qty));
+      const parsedQuantities = items.map((item) => parseBaleQuantity(item.quantity ?? item.qty));
       if (parsedQuantities.some((quantity: number | null) => quantity === null)) {
         return res.status(400).json({ message: QUANTITY_MESSAGE });
       }
@@ -355,8 +355,8 @@ export function registerBalesPressingRoutes(app: Express) {
             .where(eq(factoryBales.pressingBatchId, batch.id))
             .orderBy(factoryBales.referenceNumber);
 
-          const pendingCount = balesForBatch.filter((b: any) => b.status === "PENDING_PRESSING").length;
-          const finalizedCount = balesForBatch.filter((b: any) => b.status === "IN_STOCK").length;
+          const pendingCount = balesForBatch.filter((b) => b.status === "PENDING_PRESSING").length;
+          const finalizedCount = balesForBatch.filter((b) => b.status === "IN_STOCK").length;
 
           return { ...batch, pendingCount, finalizedCount, bales: balesForBatch };
         })

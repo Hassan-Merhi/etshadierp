@@ -306,13 +306,13 @@ export function registerFactorySheetsRoutes(app: Express) {
         // First row = column headers (skip empty leading cells in first col)
         const headerRow = rawData[0] ?? [];
         // Col 0 is the row-label column; cols 1..N are data columns
-        const columns: string[] = headerRow.slice(1).map((h: any) => (h == null ? "" : String(h)));
+        const columns: string[] = headerRow.slice(1).map((h) => (h == null ? "" : String(h)));
 
         const rows: { label: string; cells: (number | string | null)[] }[] = [];
         for (let r = 1; r < rawData.length; r++) {
           const rawRow = rawData[r] ?? [];
           // Skip entirely empty rows
-          const hasData = rawRow.some((v: any) => v !== null && v !== undefined && v !== "");
+          const hasData = rawRow.some((v) => v !== null && v !== undefined && v !== "");
           if (!hasData) continue;
 
           const rawLabel = rawRow[0];
@@ -328,7 +328,7 @@ export function registerFactorySheetsRoutes(app: Express) {
             label = String(rawLabel).trim();
           }
 
-          const cells: (number | string | null)[] = rawRow.slice(1).map((v: any) => {
+          const cells: (number | string | null)[] = rawRow.slice(1).map((v) => {
             if (v === null || v === undefined || v === "") return null;
             if (v instanceof Date) {
               // Date in a data cell — format as ISO
@@ -446,7 +446,7 @@ export function registerFactorySheetsRoutes(app: Express) {
 
         // Build the 2D array: header row + data rows + difference row
         const headerRow = ["", ...colLabels];
-        const dataRows = rows.map((r) => [r.label, ...r.cells.map((c: any) => getCellRawValue(c) ?? "")]);
+        const dataRows = rows.map((r) => [r.label, ...r.cells.map((c) => getCellRawValue(c) ?? "")]);
 
         // Difference row = sum of all cells per column (using raw values)
         const diffCells = colLabels.map((_, colIdx) => {

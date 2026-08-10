@@ -69,7 +69,7 @@ export function registerOrderVerificationSummaryRoutes(app: Express) {
 
       const rawBalesResult = await db.execute(sql`SELECT * FROM customer_order_bales WHERE order_id = ${orderId}`);
       const rawBaleRows: any[] = resultRows(rawBalesResult);
-      const orderBales = rawBaleRows.map((r: any) => ({
+      const orderBales = rawBaleRows.map((r) => ({
         id: r.id,
         order_id: r.order_id,
         bale_id: r.bale_id,
@@ -102,7 +102,7 @@ export function registerOrderVerificationSummaryRoutes(app: Express) {
       if (orderBales.length === 0 && order.totalQtyBales > 0) {
         const rawLinesResult = await db.execute(sql`SELECT * FROM customer_order_lines WHERE order_id = ${orderId}`);
         const linesRows: any[] = resultRows(rawLinesResult);
-        const hasLines = linesRows.some((r: any) => (r.qty ?? 0) > 0);
+        const hasLines = linesRows.some((r) => (r.qty ?? 0) > 0);
 
         if (hasLines) {
           dataSource = "order_lines";

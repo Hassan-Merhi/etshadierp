@@ -58,7 +58,7 @@ export function EmployeeStatementDialog({
               <p className="font-mono font-semibold text-sm mt-1">
                 {formatAmount(
                   employeeTransactions
-                    .filter((t: any) => !t.isDebit)
+                    .filter((t) => !t.isDebit)
                     .reduce((s: number, t: any) => s + parseFloat(t.amount || "0"), 0)
                 )}
               </p>
@@ -69,7 +69,7 @@ export function EmployeeStatementDialog({
               <p className="font-mono font-semibold text-sm mt-1">
                 {formatAmount(
                   employeeTransactions
-                    .filter((t: any) => t.isDebit)
+                    .filter((t) => t.isDebit)
                     .reduce((s: number, t: any) => s + parseFloat(t.amount || "0"), 0)
                 )}
               </p>
@@ -158,7 +158,7 @@ export function EmployeeStatementDialog({
                                 )}
                               </TableCell>
                             </TableRow>
-                            {sorted.map((txn: any) => (
+                            {sorted.map((txn) => (
                               <TableRow key={txn.id || `${txn.voucherId}-${txn.date}`}>
                                 <TableCell className="font-mono text-sm whitespace-nowrap">
                                   {txn.date ? formatDisplayDate(txn.date) : "-"}
@@ -211,7 +211,7 @@ export function EmployeeStatementDialog({
                       </div>
                       <div className="md:hidden space-y-0 border rounded-md overflow-hidden">
                         <div className="divide-y">
-                          {sorted.map((txn: any) => (
+                          {sorted.map((txn) => (
                             <div
                               key={txn.id || `${txn.voucherId}-${txn.date}`}
                               className="flex items-start justify-between gap-3 px-3 py-2"

@@ -284,7 +284,7 @@ export default function EditSupplier() {
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="__none__">No stock group linked</SelectItem>
-                          {stockGroups.map((g: any) => (
+                          {stockGroups.map((g) => (
                             <SelectItem key={g.id} value={String(g.id)}>
                               {g.name}
                             </SelectItem>

@@ -41,7 +41,7 @@ export function registerFactoryEmployeeAttendanceRoutes(app: Express) {
 
       if (emps.length === 0) return res.json({ employees: [], attendance: [] });
 
-      const empIds = emps.map((e: any) => e.id);
+      const empIds = emps.map((e) => e.id);
       const existing = await db.execute(sql`
         SELECT * FROM employee_attendance
         WHERE company_id = ${companyId} AND attendance_date = ${date}

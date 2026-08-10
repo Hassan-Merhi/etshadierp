@@ -73,7 +73,7 @@ export async function captureRecalcSnapshot(companyId: number, containerIds: num
     ),
   ]);
 
-  const batchIds = [...new Set(mixBatchSources.map((s: any) => s.mixBatchId as number))];
+  const batchIds = [...new Set(mixBatchSources.map((s) => s.mixBatchId as number))];
 
   let mixBatches: any[] = [];
   let bales: any[] = [];

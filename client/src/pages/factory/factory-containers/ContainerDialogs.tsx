@@ -350,9 +350,9 @@ export async function exportContainers(rows: ContainerWithSupplier[], suppliersD
     "Freight Currency",
     "Other Charges (legacy)",
   ];
-  const dataRows = rows.map((c: any) => {
+  const dataRows = rows.map((c) => {
     const brokerSupId = c.commissionSupplierId;
-    const brokerName = brokerSupId ? (suppliersData?.find((s: any) => s.id === brokerSupId)?.name ?? "") : "";
+    const brokerName = brokerSupId ? (suppliersData?.find((s) => s.id === brokerSupId)?.name ?? "") : "";
     return [
       c.containerNumber,
       c.supplierName || "",
@@ -466,7 +466,7 @@ export async function parseContainerImportFile(file: File): Promise<any[]> {
   const ws = wb.Sheets[wb.SheetNames[0]];
   const jsonRows: any[] = XLSX.utils.sheet_to_json(ws, { defval: "" });
   return jsonRows
-    .map((row: any) => {
+    .map((row) => {
       const get = (keys: string[]) => {
         for (const k of keys) {
           const val = row[k] ?? row[k.toLowerCase()] ?? row[k.toUpperCase()];
@@ -491,7 +491,7 @@ export async function parseContainerImportFile(file: File): Promise<any[]> {
           get(["Commission Currency", "CommissionCurrency", "commission_currency_code", "Comm Currency"]) || "USD",
       };
     })
-    .filter((r: any) => r.containerNumber);
+    .filter((r) => r.containerNumber);
 }
 
 // ── Full Import Dialog (stateful) ─────────────────────────────────────────────

@@ -104,7 +104,7 @@ export function registerOrderBaleScanRoutes(app: Express) {
             )
           )
         );
-      const matchingProductIds = matchingProductsByName.map((p: any) => p.id);
+      const matchingProductIds = matchingProductsByName.map((p) => p.id);
 
       const nameConditions =
         matchingProductIds.length > 0

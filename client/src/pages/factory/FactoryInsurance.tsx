@@ -1,27 +1,41 @@
-import {useState, useMemo, useRef, useEffect} from "react";
-import {useQuery, useMutation} from "@tanstack/react-query";
-import {useLocation} from "wouter";
-import {Shield, Plus, Edit, ToggleLeft, ToggleRight, Trash2, DollarSign, Users, UserCheck, Loader2, Receipt, Search, BookOpen} from "lucide-react";
-import {useToast} from "@/hooks/use-toast";
-import {queryClient, apiRequest} from "@/lib/queryClient";
-import {Button} from "@/components/ui/button";
-import {Card, CardContent} from "@/components/ui/card";
-import {Badge} from "@/components/ui/badge";
-import {PageHeader} from "@/components/PageHeader";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter} from "@/components/ui/dialog";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Input} from "@/components/ui/input";
-import {Label} from "@/components/ui/label";
-import {Textarea} from "@/components/ui/textarea";
-import {Switch} from "@/components/ui/switch";
-import {useDateFormat} from "@/contexts/DateFormatContext";
-import {useCompany} from "@/contexts/CompanyContext";
+import { useState, useMemo, useRef, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import {
+  Shield,
+  Plus,
+  Edit,
+  ToggleLeft,
+  ToggleRight,
+  Trash2,
+  DollarSign,
+  Users,
+  UserCheck,
+  Loader2,
+  Receipt,
+  Search,
+  BookOpen,
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/PageHeader";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { useDateFormat } from "@/contexts/DateFormatContext";
+import { useCompany } from "@/contexts/CompanyContext";
 
-import type {InsuranceMember} from "./factoryinsurance/types";
-import {MONTHS, YEARS} from "./factoryinsurance/utils";
-import {MemberFormDialog} from "./factoryinsurance/components/MemberFormDialog";
-import {MemberStatementDrawer} from "./factoryinsurance/components/MemberStatementDrawer";
+import type { InsuranceMember } from "./factoryinsurance/types";
+import { MONTHS, YEARS } from "./factoryinsurance/utils";
+import { MemberFormDialog } from "./factoryinsurance/components/MemberFormDialog";
+import { MemberStatementDrawer } from "./factoryinsurance/components/MemberStatementDrawer";
 export default function FactoryInsurance() {
   const { toast } = useToast();
   const { formatDisplayDate } = useDateFormat();
@@ -527,9 +541,9 @@ export default function FactoryInsurance() {
                 {ecDrOpen && (
                   <div className="absolute z-50 mt-1 w-full max-h-48 overflow-y-auto rounded-md border bg-popover shadow-md text-sm">
                     {ledgerAccounts
-                      .filter((a: any) => a.name.toLowerCase().includes(ecDrSearch.toLowerCase()))
+                      .filter((a) => a.name.toLowerCase().includes(ecDrSearch.toLowerCase()))
                       .slice(0, 60)
-                      .map((a: any) => (
+                      .map((a) => (
                         <div
                           key={a.id}
                           className="px-3 py-2 cursor-pointer hover:bg-muted"
@@ -542,8 +556,8 @@ export default function FactoryInsurance() {
                           {a.name}
                         </div>
                       ))}
-                    {ledgerAccounts.filter((a: any) => a.name.toLowerCase().includes(ecDrSearch.toLowerCase()))
-                      .length === 0 && <div className="px-3 py-2 text-muted-foreground italic">No accounts found</div>}
+                    {ledgerAccounts.filter((a) => a.name.toLowerCase().includes(ecDrSearch.toLowerCase())).length ===
+                      0 && <div className="px-3 py-2 text-muted-foreground italic">No accounts found</div>}
                   </div>
                 )}
               </div>
@@ -567,9 +581,9 @@ export default function FactoryInsurance() {
                 {ecCrOpen && (
                   <div className="absolute z-50 mt-1 w-full max-h-48 overflow-y-auto rounded-md border bg-popover shadow-md text-sm">
                     {ledgerAccounts
-                      .filter((a: any) => a.name.toLowerCase().includes(ecCrSearch.toLowerCase()))
+                      .filter((a) => a.name.toLowerCase().includes(ecCrSearch.toLowerCase()))
                       .slice(0, 60)
-                      .map((a: any) => (
+                      .map((a) => (
                         <div
                           key={a.id}
                           className="px-3 py-2 cursor-pointer hover:bg-muted"
@@ -582,8 +596,8 @@ export default function FactoryInsurance() {
                           {a.name}
                         </div>
                       ))}
-                    {ledgerAccounts.filter((a: any) => a.name.toLowerCase().includes(ecCrSearch.toLowerCase()))
-                      .length === 0 && <div className="px-3 py-2 text-muted-foreground italic">No accounts found</div>}
+                    {ledgerAccounts.filter((a) => a.name.toLowerCase().includes(ecCrSearch.toLowerCase())).length ===
+                      0 && <div className="px-3 py-2 text-muted-foreground italic">No accounts found</div>}
                   </div>
                 )}
               </div>

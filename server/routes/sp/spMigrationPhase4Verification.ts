@@ -58,9 +58,9 @@ async function verifyHistoricalSales(
   const voucherLinks = await completedPairLinks(sourceId, targetId, "vouchers", "vouchers");
   const itemLinks = await completedPairLinks(sourceId, targetId, "sales_items", "sales_items");
   const entryLinks = await completedPairLinks(sourceId, targetId, "voucher_entries", "voucher_entries");
-  const linkedVoucherIds = new Set(voucherLinks.map((row: any) => pn(row.source_id)));
-  const linkedItemIds = new Set(itemLinks.map((row: any) => pn(row.source_id)));
-  const linkedEntryIds = new Set(entryLinks.map((row: any) => pn(row.source_id)));
+  const linkedVoucherIds = new Set(voucherLinks.map((row) => pn(row.source_id)));
+  const linkedItemIds = new Set(itemLinks.map((row) => pn(row.source_id)));
+  const linkedEntryIds = new Set(entryLinks.map((row) => pn(row.source_id)));
 
   const sourceVouchersResult = await db.execute(sql`
     SELECT id, voucher_number FROM vouchers
@@ -82,9 +82,9 @@ async function verifyHistoricalSales(
   const sourceVouchers = resultRows(sourceVouchersResult);
   const sourceItems = resultRows(sourceItemsResult);
   const sourceEntries = resultRows(sourceEntriesResult);
-  const missingVouchers = sourceVouchers.filter((row: any) => !linkedVoucherIds.has(pn(row.id)));
-  const missingItems = sourceItems.filter((row: any) => !linkedItemIds.has(pn(row.id)));
-  const missingEntries = sourceEntries.filter((row: any) => !linkedEntryIds.has(pn(row.id)));
+  const missingVouchers = sourceVouchers.filter((row) => !linkedVoucherIds.has(pn(row.id)));
+  const missingItems = sourceItems.filter((row) => !linkedItemIds.has(pn(row.id)));
+  const missingEntries = sourceEntries.filter((row) => !linkedEntryIds.has(pn(row.id)));
 
   if (missingVouchers.length) {
     deltas.push({
@@ -154,7 +154,7 @@ async function verifyHistoricalSales(
       detail:
         `Vouchers ${voucherLinks.length}/${sourceVouchers.length}; items ${itemLinks.length}/${sourceItems.length}; ` +
         `entries ${entryLinks.length}/${sourceEntries.length} linked to their source rows.`,
-      mismatches: missingVouchers.slice(0, 50).map((row: any) => `Missing voucher: ${row.voucher_number}`),
+      mismatches: missingVouchers.slice(0, 50).map((row) => `Missing voucher: ${row.voucher_number}`),
     },
   };
 }
@@ -171,7 +171,7 @@ async function verifyContainers(
   const blockers: VerificationIssue[] = [];
   const deltas: VerificationIssue[] = [];
   const links = await completedPairLinks(sourceId, targetId, "containers", "sp_containers");
-  const linkMap = new Map(links.map((row: any) => [pn(row.source_id), pn(row.target_id)]));
+  const linkMap = new Map(links.map((row) => [pn(row.source_id), pn(row.target_id)]));
   const sourceResult = await db.execute(sql`
     SELECT c.*, s.legal_name AS source_supplier_name
     FROM containers c
@@ -180,7 +180,7 @@ async function verifyContainers(
     ORDER BY c.id ASC
   `);
   const sourceContainers = resultRows(sourceResult);
-  const missing = sourceContainers.filter((row: any) => !linkMap.has(pn(row.id)));
+  const missing = sourceContainers.filter((row) => !linkMap.has(pn(row.id)));
   if (missing.length) {
     deltas.push({
       code: "CONTAINER_COPY_DELTA",
@@ -244,7 +244,7 @@ async function verifyContainers(
       WHERE company_id = ${targetId} AND container_id = ${targetContainerId}
       ORDER BY id ASC
     `);
-    const targetLineIds = resultRows(targetLinesResult).map((row: any) => pn(row.id));
+    const targetLineIds = resultRows(targetLinesResult).map((row) => pn(row.id));
     const trackedResult = await db.execute(sql`
       SELECT DISTINCT rr.row_id
       FROM sp_migration_run_rows rr
@@ -255,7 +255,7 @@ async function verifyContainers(
         AND r.status <> 'rolled_back'
         AND rr.row_id = ANY(${sqlArray(targetLineIds.length ? targetLineIds : [-1])})
     `);
-    const trackedIds = new Set(resultRows(trackedResult).map((row: any) => pn(row.row_id)));
+    const trackedIds = new Set(resultRows(trackedResult).map((row) => pn(row.row_id)));
     const untracked = targetLineIds.filter((id: number) => !trackedIds.has(id));
     if (untracked.length) untrackedTargetLines += untracked.length;
     if (sourceLines.rows.length !== targetLineIds.length) {

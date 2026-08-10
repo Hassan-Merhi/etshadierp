@@ -152,8 +152,7 @@ export function registerSilentTransferRoutes(app: Express) {
           errorLines,
           sourceLocation: sourceLocation.name,
           destLocation: destLocation.name,
-          totalRows: rawData.filter((r: any) => (r.Barcode || r.barcode || r.Code || r.code || "").toString().trim())
-            .length,
+          totalRows: rawData.filter((r) => (r.Barcode || r.barcode || r.Code || r.code || "").toString().trim()).length,
         });
       } catch (err: unknown) {
         logger.error("Silent transfer parse error:", { error: err });
