@@ -1,5 +1,6 @@
 import "./bandwidthPhase1HotspotGuard";
 import "./bandwidthPhase2PayloadGuard";
+import "./heavyListPaginationClient";
 import {
   attachAccountingRequestIdentity,
   isProtectedAccountingRequest,
