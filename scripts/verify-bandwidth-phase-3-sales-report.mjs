@@ -46,7 +46,11 @@ assert.match(
   "compact company-comparison route is required"
 );
 assert.match(routes, /GROUP BY \$\{dateKey\}/, "main report aggregation must happen in SQL");
-assert.match(routes, /SUM\(COALESCE\(sales\.total_sales/, "summary totals must be calculated server-side");
+assert.match(
+  routes,
+  /COALESCE\(SUM\(COALESCE\(sales\.total_sales/,
+  "summary totals must be calculated server-side with null-safe aggregation"
+);
 assert.match(routes, /getAccessibleCompanyIds/, "all-company routes must retain company access scoping");
 assert.match(routes, /stockGroupNames/, "all-company stock groups must filter by cross-company names");
 
