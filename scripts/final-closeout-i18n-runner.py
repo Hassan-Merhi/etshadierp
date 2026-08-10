@@ -61,6 +61,40 @@ for file, findings in by_file.items():
         continue
     lines = path.read_text(encoding='utf-8').splitlines()
     changed = False
+
+    for finding in sorted(findings, key=lambda item: item['line'], reverse=True):
+        if finding['kind'] != 'error-constructor':
+            continue
+        index = finding['line'] - 1
+        if index < 0 or index >= len(lines):
+            continue
+        opener = lines[index]
+        if re.search(r'(?:new\s+Error|Error|send|statusText)\s*\(\s*[`"\']', opener):
+            continue
+        text = finding['text']
+        end = min(len(lines), index + 5)
+        literal_index = None
+        literal_line = None
+        for candidate_index in range(index + 1, end):
+            candidate = lines[candidate_index].strip()
+            if text in candidate and candidate[:1] in {'`', '"', "'"}:
+                literal_index = candidate_index
+                literal_line = candidate
+                break
+        if literal_index is None or literal_line is None:
+            continue
+        close_index = literal_index + 1
+        while close_index < end and lines[close_index].strip() == '':
+            close_index += 1
+        if close_index >= len(lines) or lines[close_index].strip() not in {');', ')'}:
+            continue
+        indent = opener[: len(opener) - len(opener.lstrip())]
+        constructor = opener.strip()
+        if not constructor.endswith('('):
+            continue
+        lines[index : close_index + 1] = [f'{indent}{constructor}{literal_line});']
+        changed = True
+
     for finding in sorted(findings, key=lambda item: item['line'], reverse=True):
         if finding['kind'] != 'jsx-text':
             continue
