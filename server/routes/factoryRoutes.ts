@@ -36,6 +36,7 @@ import { enforceCompanyResourceScope } from "../middleware/companyResourceScope"
 import { enforceDeletedItemCompanyScope } from "../middleware/deletedItemCompanyScope";
 import { enforceGlobalTransactionCompanyScope } from "../middleware/globalTransactionCompanyScope";
 import { enforceOperationalPermissionScope } from "../middleware/operationalPermissionScope";
+import { operationalBandwidthCompactResponse } from "../middleware/operationalBandwidthCompactResponse";
 import {
   ActiveCompanyPermissionContextError,
   getActiveCompanyPermissionContext,
@@ -113,6 +114,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   });
 
   app.use(enforceOperationalPermissionScope);
+  // Negotiated wire compaction runs after security gates but before the legacy
+  // route handlers. It changes only serialized response bytes; route code still
+  // sees and produces its existing business objects.
+  app.use(operationalBandwidthCompactResponse);
   registerCentralGlobalTransactionRoutes(app, requireAuth);
   registerPerformanceReadMicrocache(app);
 
