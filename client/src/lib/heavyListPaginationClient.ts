@@ -3,7 +3,7 @@ import { queryClient } from "./queryClient";
 const STOCK_ENTRY_ENDPOINT = "/api/factory/bales/stock-entry-history";
 const STOCK_ENTRY_ROUTE = "/factory/stock-entry";
 const SCREEN_SENTINEL_LIMIT = 9999;
-const DEFAULT_LIMIT = 100;
+const DEFAULT_LIMIT = 50;
 const ALLOWED_LIMITS = [50, 100] as const;
 
 interface PaginationMeta {
