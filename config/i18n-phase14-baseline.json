@@ -2,32 +2,60 @@
   "schemaVersion": 2,
   "detectorVersion": 9,
   "policyDigest": "c26178dd9bc7d71d34976e5bb87aa946cc5d59e6db54b7415f9e363514809f8f",
-  "reviewedAt": "2026-08-09",
-  "reviewedHead": "quality-audit-integration-20260808@bcadb4118031267beb381c2817131c5cfe9c94bb",
-  "description": "Reviewed the classified untranslated-text report after synchronizing current main and the PR 590 quality-audit integration fixes. The payroll module gained one intentional user-facing confirmation message for the destructive migration guard. The detector and policy digest are unchanged and unclassified findings remain at zero. This snapshot pins the exact observed current counts only; any additional untranslated-text growth continues to fail CI. Stock item names, stock group names, business names, codes, references, dates, and amounts remain outside translation behavior.",
+  "reviewedAt": "2026-08-10",
+  "reviewedHead": "claude/system-rating-n9dczd@93afb5f97730c8272c71c1accc772ae3744a8896",
+  "description": "Re-pinned after the Phase 4 god-file split of FactoryPayrollTab, DailyProductionReport, FactoryBaleProductHistory and workerStatsAdvancesRoutes. No untranslated string was added: total actionable text FELL from 12,468 to 12,440. The accounting module rises 1,351 -> 1,368 purely because the bale-ledger tab panel now lives in a file whose path contains \"ledger\", which config/i18n-audit-policy.json classifies as accounting — the same rule that already classified the LedgerSection component beside it. Factory falls 5,409 -> 5,386 and inventory-logistics 1,488 -> 1,474 for the same reason, so the accounting rise is a reclassification and is more than offset. Detector and policy digest are unchanged and unclassified findings remain at zero.",
   "reviewedTotals": {
-    "candidates": 22914,
-    "actionable": 12468,
-    "excluded": 10446,
+    "candidates": 22918,
+    "actionable": 12440,
+    "excluded": 10478,
     "compatibilityCovered": 9381,
     "unclassified": 0
   },
-  "maxActionable": 12468,
+  "maxActionable": 12440,
   "modules": {
-    "accounting": { "maxActionable": 1351 },
-    "administration": { "maxActionable": 1154 },
-    "backend-messages": { "maxActionable": 2 },
-    "container-purchasing": { "maxActionable": 848 },
-    "factory": { "maxActionable": 5409 },
-    "inventory-logistics": { "maxActionable": 1488 },
-    "other-client": { "maxActionable": 842 },
-    "payroll": { "maxActionable": 549 },
-    "properties-rentals": { "maxActionable": 0 },
-    "reports-exports": { "maxActionable": 0 },
-    "sales-pos": { "maxActionable": 783 },
-    "shared-contracts": { "maxActionable": 4 },
-    "shared-ui": { "maxActionable": 4 },
-    "supplier-partner": { "maxActionable": 34 }
+    "accounting": {
+      "maxActionable": 1368
+    },
+    "administration": {
+      "maxActionable": 1153
+    },
+    "backend-messages": {
+      "maxActionable": 2
+    },
+    "container-purchasing": {
+      "maxActionable": 848
+    },
+    "factory": {
+      "maxActionable": 5386
+    },
+    "inventory-logistics": {
+      "maxActionable": 1474
+    },
+    "other-client": {
+      "maxActionable": 841
+    },
+    "payroll": {
+      "maxActionable": 548
+    },
+    "properties-rentals": {
+      "maxActionable": 0
+    },
+    "reports-exports": {
+      "maxActionable": 0
+    },
+    "sales-pos": {
+      "maxActionable": 781
+    },
+    "shared-contracts": {
+      "maxActionable": 4
+    },
+    "shared-ui": {
+      "maxActionable": 1
+    },
+    "supplier-partner": {
+      "maxActionable": 34
+    }
   },
   "maxUnclassified": 0
 }

@@ -1004,11 +1004,6 @@
         0,
         0
       ],
-      "client/src/pages/factory/DailyProductionReport.tsx": [
-        11,
-        0,
-        0
-      ],
       "client/src/pages/factory/DailyScan.tsx": [
         1,
         0,
@@ -1217,11 +1212,6 @@
       "client/src/pages/factory/FactoryPayrollHub.tsx": [
         1,
         0,
-        0
-      ],
-      "client/src/pages/factory/FactoryPayrollTab.tsx": [
-        3,
-        1,
         0
       ],
       "client/src/pages/factory/FactoryPendingInvoiceVerify.tsx": [
@@ -5289,11 +5279,6 @@
         2,
         0
       ],
-      "server/routes/payroll/workerStatsAdvancesRoutes.ts": [
-        48,
-        10,
-        0
-      ],
       "server/routes/performance/bandwidthPhase3FactoryReads.ts": [
         11,
         0,
@@ -6752,6 +6737,46 @@
       "server/wsServer.ts": [
         0,
         3,
+        0
+      ],
+      "client/src/pages/factory/dailyproductionreport/components/ProductionTabPanel.tsx": [
+        11,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factorypayrolltab/useFactoryPayroll.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factorypayrolltab/components/PayrollRunDialogs.tsx": [
+        1,
+        1,
+        0
+      ],
+      "server/routes/payroll/worker-stats-advances/helpers.ts": [
+        4,
+        5,
+        0
+      ],
+      "server/routes/payroll/worker-stats-advances/statsRoutes.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/payroll/worker-stats-advances/advancesRoutes.ts": [
+        14,
+        1,
+        0
+      ],
+      "server/routes/payroll/worker-stats-advances/deductionsRoutes.ts": [
+        14,
+        2,
+        0
+      ],
+      "server/routes/payroll/worker-stats-advances/advanceAdminRoutes.ts": [
+        12,
+        2,
         0
       ]
     }
