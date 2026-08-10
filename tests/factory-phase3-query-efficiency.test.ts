@@ -18,6 +18,17 @@ describe("Phase 3 factory database query efficiency", () => {
     expect(loading).not.toMatch(/for\s*\(const\s+b\s+of\s+bales\)[\s\S]{0,500}update\(factoryBales\)/);
   });
 
+  it("batch-validates and batch-sells bales during invoice finalization", () => {
+    const finalize = source("server/routes/factory/customer-orders/finalize-loading/finalize.ts");
+
+    expect(finalize).toContain("factoryBaleById");
+    expect(finalize).toContain("inArray(factoryBales.id, baleIds)");
+    expect(finalize).toContain("eq(factoryBales.companyId, companyId)");
+    expect(finalize).toContain('status: "SOLD"');
+    expect(finalize).not.toMatch(/for\s*\(const\s+b\s+of\s+bales\)[\s\S]{0,500}select\(\)[\s\S]{0,200}from\(factoryBales\)/);
+    expect(finalize).not.toMatch(/for\s*\(const\s+b\s+of\s+bales\)[\s\S]{0,500}update\(factoryBales\)/);
+  });
+
   it("does not run bilingual snapshot work for loading-note metadata edits", () => {
     const routes = source("server/routes/factory/factoryBilingualSnapshotRoutes.ts");
 
