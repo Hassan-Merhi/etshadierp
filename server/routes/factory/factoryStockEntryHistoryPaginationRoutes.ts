@@ -58,12 +58,15 @@ export function registerFactoryStockEntryHistoryPaginationRoutes(app: Express): 
         const startDate = typeof req.query.startDate === "string" && req.query.startDate ? req.query.startDate : today;
         const endDate = typeof req.query.endDate === "string" && req.query.endDate ? req.query.endDate : today;
         const workerId = parseOptionalId(req.query.workerId);
+        const workerCategoryId = parseOptionalId(req.query.workerCategoryId);
         const productId = parseOptionalId(req.query.productId);
         const locationId = parseOptionalId(req.query.locationId);
-        // categoryId may be a comma-separated list for multi-select
         const categoryIdRaw = typeof req.query.categoryId === "string" ? req.query.categoryId.trim() : "";
         const categoryIds = categoryIdRaw
-          ? categoryIdRaw.split(",").map((s) => parseInt(s, 10)).filter((n) => Number.isFinite(n) && n > 0)
+          ? categoryIdRaw
+              .split(",")
+              .map((value) => Number.parseInt(value, 10))
+              .filter((value) => Number.isFinite(value) && value > 0)
           : [];
         const status = typeof req.query.status === "string" && req.query.status ? req.query.status : undefined;
         const search = typeof req.query.search === "string" ? req.query.search.trim().toLowerCase() : "";
@@ -87,6 +90,20 @@ export function registerFactoryStockEntryHistoryPaginationRoutes(app: Express): 
 
         if (!(isPrivileged && search)) conditions.push(`fb.status NOT IN ('DELETED', 'REMOVED')`);
         if (workerId) conditions.push(`fb.finalized_by = ${bind(workerId)}`);
+        if (workerCategoryId) {
+          const workerCategoryParam = bind(workerCategoryId);
+          conditions.push(`fb.finalized_by IN (
+            SELECT category_worker.id
+            FROM factory_worker_categories fwc
+            CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(fwc.worker_ids, '[]'::jsonb)) AS category_ids(worker_id)
+            INNER JOIN factory_workers category_worker
+              ON category_worker.id = category_ids.worker_id::int
+              AND category_worker.company_id = ${companyParam}
+              AND category_worker.active = TRUE
+            WHERE fwc.id = ${workerCategoryParam}
+              AND fwc.company_id = ${companyParam}
+          )`);
+        }
         if (productId) conditions.push(`fb.product_id = ${bind(productId)}`);
         if (locationId) conditions.push(`fb.erp_location_id = ${bind(locationId)}`);
         if (categoryIds.length === 1) {
@@ -148,6 +165,13 @@ export function registerFactoryStockEntryHistoryPaginationRoutes(app: Express): 
               fbp.name,
               fbp.article_code
           ),
+          metadata AS (
+            SELECT
+              COUNT(*)::int AS total,
+              COALESCE(SUM("baleCount"), 0)::int AS "totalBales",
+              COALESCE(SUM(("totalWeight")::numeric), 0)::float AS "totalWeight"
+            FROM grouped
+          ),
           page_rows AS (
             SELECT *
             FROM grouped
@@ -159,7 +183,9 @@ export function registerFactoryStockEntryHistoryPaginationRoutes(app: Express): 
             LIMIT ${limitParam} OFFSET ${offsetParam}
           )
           SELECT
-            (SELECT COUNT(*)::int FROM grouped) AS total,
+            metadata.total,
+            metadata."totalBales",
+            metadata."totalWeight",
             COALESCE(
               (
                 SELECT JSONB_AGG(
@@ -174,10 +200,13 @@ export function registerFactoryStockEntryHistoryPaginationRoutes(app: Express): 
               ),
               '[]'::jsonb
             ) AS items
+          FROM metadata
         `;
 
         const result = await pool.query(query, values);
         const total = Number(result.rows[0]?.total || 0);
+        const totalBales = Number(result.rows[0]?.totalBales || 0);
+        const totalWeight = Number(result.rows[0]?.totalWeight || 0);
         const items = Array.isArray(result.rows[0]?.items) ? result.rows[0].items : [];
         const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
 
@@ -190,6 +219,8 @@ export function registerFactoryStockEntryHistoryPaginationRoutes(app: Express): 
         return res.json({
           items,
           total,
+          totalBales,
+          totalWeight,
           page,
           limit,
           totalPages,
