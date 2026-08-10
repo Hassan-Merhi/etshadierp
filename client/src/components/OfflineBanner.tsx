@@ -125,7 +125,9 @@ function OfflineBannerInner() {
           let errMsg = errText;
           try {
             errMsg = JSON.parse(errText)?.message || errText;
-          } catch {}
+          } catch {
+            // Malformed or absent payload — fall through to the default rather than surface a parse error.
+          }
           updateItemStatus(item.id, "failed", errMsg);
           failed++;
         }

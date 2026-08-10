@@ -43,7 +43,7 @@ export function StockEntryProductionPositions({
   if (assignedItems.length === 0) return null;
 
   const workerName = (workerId: number | null) => {
-    const worker = workers.find((candidate: any) => candidate.id === workerId);
+    const worker = workers.find((candidate) => candidate.id === workerId);
     return worker?.fullName || worker?.name || `Worker #${workerId}`;
   };
 

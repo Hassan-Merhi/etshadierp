@@ -64,7 +64,7 @@ async function loadUserLocations(tx: any, userId: string, companyId: number): Pr
     WHERE user_id = ${userId} AND company_id = ${companyId}
     ORDER BY location_id ASC
   `);
-  return resultRows(result).map((row: any) => ({ locationId: pn(row.location_id) }));
+  return resultRows(result).map((row) => ({ locationId: pn(row.location_id) }));
 }
 
 async function loadCashMappings(tx: any, userId: string, companyId: number): Promise<any[]> {
@@ -74,7 +74,7 @@ async function loadCashMappings(tx: any, userId: string, companyId: number): Pro
     WHERE user_id = ${userId} AND company_id = ${companyId}
     ORDER BY location_id ASC
   `);
-  return resultRows(result).map((row: any) => ({
+  return resultRows(result).map((row) => ({
     locationId: pn(row.location_id),
     cashAccountId: pn(row.cash_account_id),
     posStation: row.pos_station ?? null,
@@ -105,7 +105,7 @@ async function mapRole(sourceId: number, targetId: number, sourceRole: any): Pro
 }
 
 async function mapAllLocations(sourceId: number, targetId: number, rows: any[]): Promise<any[]> {
-  const mapped: any[] = [];
+  const mapped = [];
   for (const row of rows) {
     const location = await resolveTargetLocation(sourceId, targetId, pn(row.locationId));
     if (!location) throw new Error(`Location ${row.locationId} has no safe target mapping.`);
@@ -115,7 +115,7 @@ async function mapAllLocations(sourceId: number, targetId: number, rows: any[]):
 }
 
 async function mapAllCashMappings(sourceId: number, targetId: number, rows: any[]): Promise<any[]> {
-  const mapped: any[] = [];
+  const mapped = [];
   for (const row of rows) {
     const location = await resolveTargetLocation(sourceId, targetId, pn(row.locationId));
     const cashAccountId = await resolveTargetLedgerAccount(pn(row.cashAccountId), targetId);

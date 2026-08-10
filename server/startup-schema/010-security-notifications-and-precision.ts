@@ -743,12 +743,16 @@ END $$`,
   `ALTER TABLE factory_container_receipts ADD COLUMN IF NOT EXISTS fx_rate_to_usd numeric(20,8)`,
 
   // -- factory_container_receipts: integrity constraints + idempotency key (July 2026) --
-  // Each migration statement is individually caught by the runner; duplicate-constraint
-  // errors on re-deploy are non-fatal (logged but do not block startup).
+  // Wrapped in the same DO/duplicate_object guard the rest of this file uses.
+  // Unguarded they raised "constraint already exists" on every startup after the
+  // first — harmless while nothing read the outcome, but they were three of the
+  // failures counted by config/startup-migration-baseline.json, and a gate that
+  // reports three known-noise failures on every re-run is a gate people learn to
+  // ignore. Postgres has no ADD CONSTRAINT IF NOT EXISTS; this is the idiom.
   `ALTER TABLE factory_container_receipts ADD COLUMN IF NOT EXISTS idempotency_key varchar(100)`,
-  `ALTER TABLE factory_container_receipts ADD CONSTRAINT fcr_positive_received_kg CHECK (received_kg > 0)`,
-  `ALTER TABLE factory_container_receipts ADD CONSTRAINT fcr_cumulative_gte_received CHECK (cumulative_received_kg >= received_kg)`,
-  `ALTER TABLE factory_container_receipts ADD CONSTRAINT fcr_container_fkey FOREIGN KEY (container_id) REFERENCES factory_containers(id) ON DELETE RESTRICT`,
+  `DO $$ BEGIN ALTER TABLE factory_container_receipts ADD CONSTRAINT fcr_positive_received_kg CHECK (received_kg > 0); EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+  `DO $$ BEGIN ALTER TABLE factory_container_receipts ADD CONSTRAINT fcr_cumulative_gte_received CHECK (cumulative_received_kg >= received_kg); EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+  `DO $$ BEGIN ALTER TABLE factory_container_receipts ADD CONSTRAINT fcr_container_fkey FOREIGN KEY (container_id) REFERENCES factory_containers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
   `CREATE UNIQUE INDEX IF NOT EXISTS factory_container_receipts_idempotency_idx ON factory_container_receipts(company_id, container_id, idempotency_key) WHERE idempotency_key IS NOT NULL`,
 
   // -- Per-KG column precision (July 2026, cost columns raised to 7dp) --

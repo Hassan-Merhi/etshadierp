@@ -44,7 +44,7 @@ interface DeliveryContext {
 }
 
 function safeFilePart(value: string): string {
-  return value.replace(/[^\w\s.\-]/g, "_").replace(/\s+/g, "_");
+  return value.replace(/[^\w\s.-]/g, "_").replace(/\s+/g, "_");
 }
 
 function normalizeReportDate(value?: string): string {

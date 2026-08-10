@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -10,7 +10,7 @@ import { resultRows } from "../../lib/queryResult";
 // ── Aliases (article code → stock item mapping) ───────────────────────────
 
 export function registerSpAliasRoutes(app: Express) {
-  app.get("/api/sp/aliases", requireAuth, async (req: any, res: any) => {
+  app.get("/api/sp/aliases", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
@@ -28,7 +28,7 @@ export function registerSpAliasRoutes(app: Express) {
     }
   });
 
-  app.post("/api/sp/aliases", requireAuth, async (req: any, res: any) => {
+  app.post("/api/sp/aliases", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
@@ -51,7 +51,7 @@ export function registerSpAliasRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/sp/aliases/:id", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/sp/aliases/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;

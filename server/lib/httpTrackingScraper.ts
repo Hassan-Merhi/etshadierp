@@ -107,7 +107,7 @@ async function tryMsc(containerNumber: string): Promise<HttpScraperResult> {
     const data: any = await resp.json();
     const activities: any[] = data?.TrackingDetails?.TrackingActivities ?? data?.trackingActivities ?? [];
     if (!activities.length) return { success: false, shipment: null, error: "MSC: no activities" };
-    const events = activities.map((a: any) => ({
+    const events = activities.map((a) => ({
       date: a.ActivityDate ?? a.date ?? "",
       status: a.ActivityDescription ?? a.description ?? "",
       location: a.Location ?? a.location ?? "",
@@ -122,7 +122,7 @@ async function tryMsc(containerNumber: string): Promise<HttpScraperResult> {
       data?.eta ??
       null;
     if (!etaRaw) {
-      const etaActivity = activities.find((a: any) => {
+      const etaActivity = activities.find((a) => {
         const desc = ((a.ActivityDescription ?? a.description ?? "") as string).toLowerCase();
         return desc.includes("estimated time of arrival") || desc.includes("estimated arrival") || desc === "eta";
       });
@@ -156,7 +156,7 @@ async function tryHapag(containerNumber: string): Promise<HttpScraperResult> {
     const data: any = await resp.json();
     const moves: any[] = data?.containerJourneys?.[0]?.containerMoves ?? data?.moves ?? [];
     if (!moves.length) return { success: false, shipment: null, error: "Hapag: no moves" };
-    const events = moves.map((m: any) => ({
+    const events = moves.map((m) => ({
       date: m.eventDateTime ?? m.date ?? "",
       status: m.transportModeDescription ?? m.event ?? m.status ?? "",
       location: m.portOfCall ?? m.location ?? "",
@@ -187,7 +187,7 @@ async function tryCosco(containerNumber: string): Promise<HttpScraperResult> {
     const detail = data?.data?.content?.[0];
     if (!detail) return { success: false, shipment: null, error: "COSCO: no data" };
     const moves: any[] = detail.movementActivities ?? detail.activities ?? [];
-    const events = moves.map((m: any) => ({
+    const events = moves.map((m) => ({
       date: m.eventDate ?? m.date ?? "",
       status: m.activity ?? m.status ?? "",
       location: m.location ?? "",
@@ -217,7 +217,7 @@ async function tryEvergreen(containerNumber: string): Promise<HttpScraperResult>
     const data: any = await resp.json();
     const moves: any[] = data?.EventList ?? data?.events ?? [];
     if (!moves.length) return { success: false, shipment: null, error: "Evergreen: no events" };
-    const events = moves.map((m: any) => ({
+    const events = moves.map((m) => ({
       date: m.EventDate ?? m.date ?? "",
       status: m.EventName ?? m.status ?? "",
       location: m.PortName ?? m.location ?? "",
@@ -262,7 +262,7 @@ async function tryMaerskHtml(containerNumber: string): Promise<HttpScraperResult
         if (td) {
           const rawEvents: any[] = td.events ?? td.movements ?? td.milestones ?? td.containers?.[0]?.events ?? [];
           if (rawEvents.length > 0) {
-            const events = rawEvents.map((e: any) => ({
+            const events = rawEvents.map((e) => ({
               date: e.eventDateTime ?? e.eventDate ?? e.timestamp ?? e.date ?? "",
               status: e.activityName ?? e.eventCode ?? e.status ?? e.description ?? "",
               location: e.location?.portName ?? e.portName ?? (typeof e.location === "string" ? e.location : "") ?? "",
@@ -287,7 +287,7 @@ async function tryMaerskHtml(containerNumber: string): Promise<HttpScraperResult
         const data = JSON.parse(m[1]);
         const events: any[] = data?.events ?? data?.movements ?? [];
         if (events.length > 0) {
-          const mapped = events.map((e: any) => ({
+          const mapped = events.map((e) => ({
             date: e.date ?? e.eventDateTime ?? "",
             status: e.status ?? e.activityName ?? "",
             location: e.location ?? e.portName ?? "",
@@ -361,7 +361,7 @@ function extractFromNuxt(payload: any, containerNumber: string): ParcelsAppShipm
     payload?.shipments ?? payload?.parcels ?? payload?.data?.shipments ?? payload?.data?.parcels ?? [];
   if (candidates.length) {
     const match =
-      candidates.find((s: any) => s?.trackingId === containerNumber || s?.id === containerNumber) ?? candidates[0];
+      candidates.find((s) => s?.trackingId === containerNumber || s?.id === containerNumber) ?? candidates[0];
     if (match?.trackingId || match?.id) return match as ParcelsAppShipment;
   }
   for (const key of ["data", "state", "fetch", "nuxt", "payload"]) {

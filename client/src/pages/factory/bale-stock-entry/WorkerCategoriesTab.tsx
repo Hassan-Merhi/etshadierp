@@ -87,7 +87,7 @@ export function WorkerCategoriesTab() {
       toast({ title: "Name is required", variant: "destructive" });
       return;
     }
-    const activeIds = catWorkers.filter((w: any) => w.active !== false).map((w: any) => w.id);
+    const activeIds = catWorkers.filter((w) => w.active !== false).map((w) => w.id);
     const filtered = catWorkerIds.filter((id) => activeIds.includes(id));
     if (editingCat) updateCatMutation.mutate({ id: editingCat.id, name: catName.trim(), workerIds: filtered });
     else createCatMutation.mutate({ name: catName.trim(), workerIds: filtered });

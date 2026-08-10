@@ -21,6 +21,18 @@
  * routes real tests; a route leaves the guard-only set as soon as any other
  * test names it.
  *
+ * Four worker-deduction routes briefly left this list when
+ * server/routes/payroll/workerStatsAdvancesRoutes.ts was split. They write
+ * factory_worker_deductions only, and the audit classifies by owner file, so
+ * sharing a 936-line file with the voucher-posting advance routes had been
+ * lending them a sensitivity they did not declare themselves.
+ *
+ * Rather than accept the narrower set, factory_worker_deductions was added to
+ * SENSITIVE_TABLES. A payroll deduction reduces what a worker is paid, and
+ * reaching the ledger through a payroll voucher rather than directly does not
+ * make it less real. Both zero ceilings still hold at the wider set, so the
+ * coverage was already there — only the classification was wrong.
+ *
  * The inventory below is written out rather than derived from the manifest at
  * runtime, for two reasons: the coverage audit looks for path literals in test
  * sources, and an explicit list is reviewable in a diff. The first test keeps

@@ -790,7 +790,7 @@ export default function DeletedItems() {
                             </tr>
                           </thead>
                           <tbody>
-                            {voucherEntries.map((entry: any, i: number) => (
+                            {voucherEntries.map((entry, i: number) => (
                               <tr key={entry.id ?? i} className="border-b last:border-0">
                                 <td className="px-3 py-2">
                                   <p className="font-medium text-xs">{entry.accountName || "—"}</p>

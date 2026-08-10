@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { requireAuth, requireRole } from "../../auth";
@@ -25,49 +25,59 @@ import {
 export function registerSpMigrationSetupRoutes(app: Express) {
   // ── POST /api/sp/migration/create-sp-company ─────────────────────────────
   // Creates a new supplier_partner company for the GC-LSHI migration.
-  app.post("/api/sp/migration/create-sp-company", requireAuth, requireRole("Developer"), async (req: any, res: any) => {
-    try {
-      const { name, code } = req.body ?? {};
-      if (!name || !code) return res.status(400).json({ message: "name and code are required" });
+  app.post(
+    "/api/sp/migration/create-sp-company",
+    requireAuth,
+    requireRole("Developer"),
+    async (req: Request, res: Response) => {
+      try {
+        const { name, code } = req.body ?? {};
+        if (!name || !code) return res.status(400).json({ message: "name and code are required" });
 
-      // Check for duplicate code
-      const existing = (await db.execute(sql`SELECT id FROM companies WHERE code = ${code} LIMIT 1`)).rows[0] as any;
-      if (existing) return res.status(409).json({ message: `Company code "${code}" already exists` });
+        // Check for duplicate code
+        const existing = (await db.execute(sql`SELECT id FROM companies WHERE code = ${code} LIMIT 1`)).rows[0] as any;
+        if (existing) return res.status(409).json({ message: `Company code "${code}" already exists` });
 
-      const [row] = (
-        await db.execute(sql`
+        const [row] = (
+          await db.execute(sql`
         INSERT INTO companies (code, name, company_type, base_currency, active)
         VALUES (${code}, ${name}, 'supplier_partner', 'USD', true)
         RETURNING id, code, name, company_type
       `)
-      ).rows as any[];
+        ).rows as any[];
 
-      return res.json({ success: true, company: row });
-    } catch (err: unknown) {
-      logger.error("[SP Migration] create-sp-company error:", { error: err });
-      return res.status(500).json({ message: "Internal server error" });
+        return res.json({ success: true, company: row });
+      } catch (err: unknown) {
+        logger.error("[SP Migration] create-sp-company error:", { error: err });
+        return res.status(500).json({ message: "Internal server error" });
+      }
     }
-  });
+  );
 
   // ── GET /api/sp/migration/gc-preview ─────────────────────────────────────
   // Canonical read-only preview for the staged GC migration flow. Developer-only,
   // no writes. See buildGcMigrationPreview for the exact response shape.
-  app.get("/api/sp/migration/gc-preview", requireAuth, requireRole("Developer"), async (req: any, res: any) => {
-    try {
-      const sourceId = parseInt(String(req.query.sourceCompanyId ?? ""), 10);
-      const targetId = parseInt(String(req.query.targetCompanyId ?? ""), 10);
+  app.get(
+    "/api/sp/migration/gc-preview",
+    requireAuth,
+    requireRole("Developer"),
+    async (req: Request, res: Response) => {
+      try {
+        const sourceId = parseInt(String(req.query.sourceCompanyId ?? ""), 10);
+        const targetId = parseInt(String(req.query.targetCompanyId ?? ""), 10);
 
-      if (!sourceId || !targetId)
-        return res.status(400).json({ message: "sourceCompanyId and targetCompanyId are required" });
-      if (sourceId === targetId) return res.status(400).json({ message: "Source and target must be different" });
+        if (!sourceId || !targetId)
+          return res.status(400).json({ message: "sourceCompanyId and targetCompanyId are required" });
+        if (sourceId === targetId) return res.status(400).json({ message: "Source and target must be different" });
 
-      const { status, body } = await buildGcMigrationPreview(sourceId, targetId);
-      return res.status(status).json(body);
-    } catch (err: unknown) {
-      logger.error("[SP Migration] gc-preview error:", { error: err });
-      return res.status(500).json({ message: "Internal server error" });
+        const { status, body } = await buildGcMigrationPreview(sourceId, targetId);
+        return res.status(status).json(body);
+      } catch (err: unknown) {
+        logger.error("[SP Migration] gc-preview error:", { error: err });
+        return res.status(500).json({ message: "Internal server error" });
+      }
     }
-  });
+  );
 
   // ── POST /api/sp/migration/gc-rehearsal ──────────────────────────────────
   // Full GC-LSHI → SP migration:
@@ -90,40 +100,45 @@ export function registerSpMigrationSetupRoutes(app: Express) {
   // ── GET /api/sp/migration/gc-account-plan ────────────────────────────────
   // Returns the full proposed chart-of-accounts list (SP + GC profit accounts)
   // with default code/name so the UI can let the user rename before creation.
-  app.get("/api/sp/migration/gc-account-plan", requireAuth, requireRole("Developer"), async (req: any, res: any) => {
-    try {
-      const targetId = parseInt(String(req.query.targetCompanyId ?? ""), 10);
-      if (!targetId) return res.status(400).json({ message: "targetCompanyId is required" });
+  app.get(
+    "/api/sp/migration/gc-account-plan",
+    requireAuth,
+    requireRole("Developer"),
+    async (req: Request, res: Response) => {
+      try {
+        const targetId = parseInt(String(req.query.targetCompanyId ?? ""), 10);
+        if (!targetId) return res.status(400).json({ message: "targetCompanyId is required" });
 
-      const existingRows = (
-        await db.execute(sql`
+        const existingRows = (
+          await db.execute(sql`
         SELECT sub_type, code, name FROM ledger_accounts
         WHERE company_id = ${targetId} AND deleted_at IS NULL
           AND sub_type = ANY(${sqlArray(ALL_ACCOUNT_DEFS.map((a) => a.subType))})
       `)
-      ).rows as any[];
-      const existingBySubType = new Map(existingRows.map((r: any) => [r.sub_type, r]));
+        ).rows as any[];
+        const existingBySubType = new Map(existingRows.map((r) => [r.sub_type, r]));
 
-      const accounts = ALL_ACCOUNT_DEFS.map((a) => {
-        const existing = existingBySubType.get(a.subType);
-        return {
-          subType: a.subType,
-          accountType: a.accountType,
-          defaultCode: a.code,
-          defaultName: a.name,
-          exists: !!existing,
-          currentCode: existing?.code ?? a.code,
-          currentName: existing?.name ?? a.name,
-          group: SP_ACCOUNTS.some((s) => s.subType === a.subType) ? "sp" : "gc",
-        };
-      });
+        const accounts = ALL_ACCOUNT_DEFS.map((a) => {
+          const existing = existingBySubType.get(a.subType);
+          return {
+            subType: a.subType,
+            accountType: a.accountType,
+            defaultCode: a.code,
+            defaultName: a.name,
+            exists: !!existing,
+            currentCode: existing?.code ?? a.code,
+            currentName: existing?.name ?? a.name,
+            group: SP_ACCOUNTS.some((s) => s.subType === a.subType) ? "sp" : "gc",
+          };
+        });
 
-      return res.json({ accounts });
-    } catch (err: unknown) {
-      logger.error("[SP Migration] gc-account-plan error:", { error: err });
-      return res.status(500).json({ message: "Internal server error" });
+        return res.json({ accounts });
+      } catch (err: unknown) {
+        logger.error("[SP Migration] gc-account-plan error:", { error: err });
+        return res.status(500).json({ message: "Internal server error" });
+      }
     }
-  });
+  );
 
   // ── POST /api/sp/migration/gc-create-accounts ────────────────────────────
   // Creates only the missing accounts from the whitelist, using user-supplied
@@ -132,7 +147,7 @@ export function registerSpMigrationSetupRoutes(app: Express) {
     "/api/sp/migration/gc-create-accounts",
     requireAuth,
     requireRole("Developer"),
-    async (req: any, res: any) => {
+    async (req: Request, res: Response) => {
       try {
         const { targetCompanyId, accounts } = req.body ?? {};
         const targetId = parseInt(String(targetCompanyId ?? ""), 10);
@@ -192,111 +207,126 @@ export function registerSpMigrationSetupRoutes(app: Express) {
 
   // ── GET /api/sp/migration/session-role ──────────────────────────────────
   // Returns the current session's role — used by the frontend to gate the page.
-  app.get("/api/sp/migration/session-role", requireAuth, requireRole("Developer"), async (req: any, res: any) => {
-    return res.json({ role: req.session?.currentRole ?? null });
-  });
+  app.get(
+    "/api/sp/migration/session-role",
+    requireAuth,
+    requireRole("Developer"),
+    async (req: Request, res: Response) => {
+      return res.json({ role: req.session?.currentRole ?? null });
+    }
+  );
 
   // ── GET /api/sp/migration/cash-accounts ─────────────────────────────────
   // Returns Cash/Bank ledger accounts for a given SP target company.
-  app.get("/api/sp/migration/cash-accounts", requireAuth, requireRole("Developer"), async (req: any, res: any) => {
-    try {
-      const targetId = parseInt(String(req.query.targetCompanyId ?? ""), 10);
-      if (!targetId) return res.status(400).json({ message: "targetCompanyId is required" });
-      const rows = (
-        await db.execute(sql`
+  app.get(
+    "/api/sp/migration/cash-accounts",
+    requireAuth,
+    requireRole("Developer"),
+    async (req: Request, res: Response) => {
+      try {
+        const targetId = parseInt(String(req.query.targetCompanyId ?? ""), 10);
+        if (!targetId) return res.status(400).json({ message: "targetCompanyId is required" });
+        const rows = (
+          await db.execute(sql`
         SELECT id, code, name, account_type
         FROM ledger_accounts
         WHERE company_id = ${targetId} AND account_type IN ('Cash', 'Bank') AND deleted_at IS NULL
         ORDER BY account_type, name
       `)
-      ).rows as any[];
-      return res.json({ accounts: rows });
-    } catch (err: unknown) {
-      return res.status(500).json({ message: "Internal server error" });
+        ).rows as any[];
+        return res.json({ accounts: rows });
+      } catch (err: unknown) {
+        return res.status(500).json({ message: "Internal server error" });
+      }
     }
-  });
+  );
 
   // ── POST /api/sp/migration/opening-balance ───────────────────────────────
   // Creates a Journal voucher: Dr selected Cash/Bank account → Cr SP-OPNBAL
   // Requires cashAccountId — no silent auto-pick.
-  app.post("/api/sp/migration/opening-balance", requireAuth, requireRole("Developer"), async (req: any, res: any) => {
-    try {
-      const { targetCompanyId, cashAccountId, amount, date, narration } = req.body ?? {};
-      const targetId = parseInt(String(targetCompanyId ?? ""), 10);
-      const cashId = parseInt(String(cashAccountId ?? ""), 10);
+  app.post(
+    "/api/sp/migration/opening-balance",
+    requireAuth,
+    requireRole("Developer"),
+    async (req: Request, res: Response) => {
+      try {
+        const { targetCompanyId, cashAccountId, amount, date, narration } = req.body ?? {};
+        const targetId = parseInt(String(targetCompanyId ?? ""), 10);
+        const cashId = parseInt(String(cashAccountId ?? ""), 10);
 
-      if (!targetId) return res.status(400).json({ message: "targetCompanyId is required" });
-      if (!cashId)
-        return res.status(400).json({ message: "cashAccountId is required — select a cash or bank account" });
-      if (!amount || isNaN(parseFloat(amount))) return res.status(400).json({ message: "amount is required" });
-      if (!date) return res.status(400).json({ message: "date is required" });
+        if (!targetId) return res.status(400).json({ message: "targetCompanyId is required" });
+        if (!cashId)
+          return res.status(400).json({ message: "cashAccountId is required — select a cash or bank account" });
+        if (!amount || isNaN(parseFloat(amount))) return res.status(400).json({ message: "amount is required" });
+        if (!date) return res.status(400).json({ message: "date is required" });
 
-      const targetComp = await getCompanyRow(targetId);
-      if (!targetComp) return res.status(404).json({ message: "Target company not found" });
-      if (targetComp.company_type !== "supplier_partner") {
-        return res.status(400).json({ message: "Target must be a supplier_partner company" });
-      }
+        const targetComp = await getCompanyRow(targetId);
+        if (!targetComp) return res.status(404).json({ message: "Target company not found" });
+        if (targetComp.company_type !== "supplier_partner") {
+          return res.status(400).json({ message: "Target must be a supplier_partner company" });
+        }
 
-      // Verify the selected cash account belongs to target company
-      const cashAcctRow = (
-        await db.execute(sql`
+        // Verify the selected cash account belongs to target company
+        const cashAcctRow = (
+          await db.execute(sql`
         SELECT id, name, account_type FROM ledger_accounts
         WHERE id = ${cashId} AND company_id = ${targetId} AND deleted_at IS NULL LIMIT 1
       `)
-      ).rows[0] as any;
-      if (!cashAcctRow) {
-        return res.status(400).json({ message: "Selected cash account not found in target company" });
-      }
-      if (!["Cash", "Bank"].includes(cashAcctRow.account_type)) {
-        return res
-          .status(400)
-          .json({ message: `Account "${cashAcctRow.name}" is type "${cashAcctRow.account_type}", not Cash or Bank` });
-      }
+        ).rows[0] as any;
+        if (!cashAcctRow) {
+          return res.status(400).json({ message: "Selected cash account not found in target company" });
+        }
+        if (!["Cash", "Bank"].includes(cashAcctRow.account_type)) {
+          return res
+            .status(400)
+            .json({ message: `Account "${cashAcctRow.name}" is type "${cashAcctRow.account_type}", not Cash or Bank` });
+        }
 
-      // Find SP-OPNBAL account
-      const opnBalRows = (
-        await db.execute(sql`
+        // Find SP-OPNBAL account
+        const opnBalRows = (
+          await db.execute(sql`
         SELECT id FROM ledger_accounts
         WHERE company_id = ${targetId} AND sub_type = 'sp_opnbal' AND deleted_at IS NULL LIMIT 1
       `)
-      ).rows as any[];
-      if (!opnBalRows.length) {
-        return res
-          .status(400)
-          .json({ message: "SP-OPNBAL account not found in target company. Run the GC migration first." });
-      }
-      const opnBalId = pn(opnBalRows[0].id);
+        ).rows as any[];
+        if (!opnBalRows.length) {
+          return res
+            .status(400)
+            .json({ message: "SP-OPNBAL account not found in target company. Run the GC migration first." });
+        }
+        const opnBalId = pn(opnBalRows[0].id);
 
-      const amtStr = parseFloat(amount).toFixed(2);
-      const voucherNumber = `OB-${targetId}-${Date.now()}`;
+        const amtStr = parseFloat(amount).toFixed(2);
+        const voucherNumber = `OB-${targetId}-${Date.now()}`;
 
-      const [vRow] = (
-        await db.execute(sql`
+        const [vRow] = (
+          await db.execute(sql`
         INSERT INTO vouchers (company_id, voucher_number, voucher_type, voucher_date, description, total_amount, currency, source_module)
         VALUES (${targetId}, ${voucherNumber}, 'Journal', ${date},
                 ${narration ?? "GC Opening Cash Balance"}, ${amtStr}, 'USD', 'ERP')
         RETURNING id
       `)
-      ).rows as any[];
-      const voucherId = pn(vRow.id);
+        ).rows as any[];
+        const voucherId = pn(vRow.id);
 
-      // Dr selected Cash/Bank account
-      await db.execute(sql`
+        // Dr selected Cash/Bank account
+        await db.execute(sql`
         INSERT INTO voucher_entries (voucher_id, ledger_account_id, debit_amount, credit_amount, narration)
         VALUES (${voucherId}, ${cashId}, ${amtStr}, '0.00', ${narration ?? "Opening cash balance"})
       `);
-      // Cr SP-OPNBAL
-      await db.execute(sql`
+        // Cr SP-OPNBAL
+        await db.execute(sql`
         INSERT INTO voucher_entries (voucher_id, ledger_account_id, debit_amount, credit_amount, narration)
         VALUES (${voucherId}, ${opnBalId}, '0.00', ${amtStr}, ${narration ?? "Opening cash balance"})
       `);
 
-      return res.json({ success: true, voucherId, voucherNumber, amount: amtStr, cashAccountName: cashAcctRow.name });
-    } catch (err: unknown) {
-      logger.error("[SP Migration] opening-balance error:", { error: err });
-      return res.status(500).json({ message: "Internal server error" });
+        return res.json({ success: true, voucherId, voucherNumber, amount: amtStr, cashAccountName: cashAcctRow.name });
+      } catch (err: unknown) {
+        logger.error("[SP Migration] opening-balance error:", { error: err });
+        return res.status(500).json({ message: "Internal server error" });
+      }
     }
-  });
+  );
 
   // ── POST /api/sp/migration/rollback (extended) ───────────────────────────
   // Updated below — existing endpoint handles all tracked tables.

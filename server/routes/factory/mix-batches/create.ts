@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { logAudit } from "../../helpers/auditHelpers";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
@@ -19,7 +19,7 @@ import { getLockedSupplierRate } from "../../../services/factory/rawStockLockedR
 import Decimal from "decimal.js";
 
 export function registerFactoryMixBatchCreateRoutes(app: Express) {
-  app.post("/api/factory/mix-batches", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/mix-batches", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -66,7 +66,7 @@ export function registerFactoryMixBatchCreateRoutes(app: Express) {
         // DEFECT 15 FIX: use Decimal.js for cost accumulation (create route).
         let dTotalWeightKg = new Decimal(0);
         let dTotalCost = new Decimal(0);
-        const sourceRecords: any[] = [];
+        const sourceRecords = [];
 
         if (hasOpeningBatch) {
           const [srcBatch] = await tx

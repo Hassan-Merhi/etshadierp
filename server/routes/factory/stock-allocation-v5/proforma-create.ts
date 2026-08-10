@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { db } from "../../../db";
@@ -17,7 +17,7 @@ import { resultRows } from "../../../lib/queryResult";
 export function registerV5ProformaCreateRoutes(app: Express) {
   // ── POST /api/factory/v5/proforma-with-loading ──────────────────────────
   // Body: { customerId, name, isActive, lines[], sendToLoading, containerNames[] }
-  app.post("/api/factory/v5/proforma-with-loading", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/v5/proforma-with-loading", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -27,7 +27,7 @@ export function registerV5ProformaCreateRoutes(app: Express) {
       if (!customerId || !name || !Array.isArray(lines) || lines.length === 0) {
         return res.status(400).json({ message: "customerId, name, and at least one line are required" });
       }
-      const validLines = lines.filter((l: any) => l.articleCode && l.productName && parseInt(l.quantity) > 0);
+      const validLines = lines.filter((l) => l.articleCode && l.productName && parseInt(l.quantity) > 0);
       if (validLines.length === 0) {
         return res
           .status(400)
@@ -42,7 +42,7 @@ export function registerV5ProformaCreateRoutes(app: Express) {
           .values({ companyId, customerId: Number(customerId), name, isActive: isActive ?? false })
           .returning();
 
-        const lineValues = validLines.map((l: any) => ({
+        const lineValues = validLines.map((l) => ({
           proformaId: proforma.id,
           articleCode: l.articleCode,
           productName: l.productName,
@@ -55,7 +55,7 @@ export function registerV5ProformaCreateRoutes(app: Express) {
         }));
         const insertedLines = await tx.insert(customerProformaLines).values(lineValues).returning();
 
-        let createdOrders: any[] = [];
+        let createdOrders = [];
         if (sendToLoading && names.length > 0) {
           const today = getClientDate(req);
           const orderValues = names.map((containerName: string) => ({
@@ -76,7 +76,7 @@ export function registerV5ProformaCreateRoutes(app: Express) {
           // Phase B: Insert one expected line per (container × proforma line).
           // These lock in the expected quantity at order creation time.
           // V5 guard: proformaIdUsed IS NOT NULL (all createdOrders are V5 by construction)
-          const expectedLineValues: any[] = [];
+          const expectedLineValues = [];
           for (const order of createdOrders) {
             for (const line of insertedLines) {
               expectedLineValues.push({
@@ -110,7 +110,7 @@ export function registerV5ProformaCreateRoutes(app: Express) {
   // Creates customer_orders + customer_order_expected_lines for each new container.
   // Does NOT touch existing containers or their expected lines.
   // V5 guard: proformaIdUsed IS NOT NULL (all created orders are V5 by construction)
-  app.post("/api/factory/v5/proforma/:proformaId/add-containers", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/v5/proforma/:proformaId/add-containers", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -124,7 +124,7 @@ export function registerV5ProformaCreateRoutes(app: Express) {
       }
 
       // Trim names
-      containerNames = (containerNames as any[]).map((n: any) => String(n ?? "").trim());
+      containerNames = (containerNames as any[]).map((n) => String(n ?? "").trim());
 
       // Reject empty names
       if (containerNames.some((n: string) => !n)) {
@@ -156,9 +156,7 @@ export function registerV5ProformaCreateRoutes(app: Express) {
             WHERE proforma_id_used = ${proformaId}
               AND container_number IS NOT NULL`
       );
-      const existingNames = new Set(
-        resultRows(existingOrdersRaw).map((r: any) => String(r.container_number ?? "").trim())
-      );
+      const existingNames = new Set(resultRows(existingOrdersRaw).map((r) => String(r.container_number ?? "").trim()));
       const conflicting = containerNames.filter((n: string) => existingNames.has(n));
       if (conflicting.length > 0) {
         return res
@@ -193,7 +191,7 @@ export function registerV5ProformaCreateRoutes(app: Express) {
         // This locks in the expected qty at order creation time.
         // Existing containers and their expected lines are not touched.
         // V5 guard: proformaIdUsed IS NOT NULL (all createdOrders are V5 by construction)
-        const expectedLineValues: any[] = [];
+        const expectedLineValues = [];
         for (const order of createdOrders) {
           for (const line of proformaLines) {
             expectedLineValues.push({

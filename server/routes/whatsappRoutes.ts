@@ -317,7 +317,7 @@ export function registerWhatsAppRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const allCompanies = await storage.getAllCompanies();
-      const company = allCompanies.find((c: any) => c.id === companyId);
+      const company = allCompanies.find((c) => c.id === companyId);
       const companyName = company?.name || "Company";
 
       const endDate = (req.body.endDate as string) || getClientDate(req);
@@ -648,7 +648,7 @@ export function registerWhatsAppRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "companyId is required" });
 
       const allCompanies = await storage.getAllCompanies();
-      const company = allCompanies.find((c: any) => c.id === companyId);
+      const company = allCompanies.find((c) => c.id === companyId);
       if (!company) return res.status(404).json({ message: "Company not found" });
 
       // Resolve recipient chatId

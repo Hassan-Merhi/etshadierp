@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -21,7 +21,7 @@ import { resultRows } from "../../lib/queryResult";
 // ── Sales + Stock Movements ───────────────────────────────────────────────────
 
 export function registerSpSalesRoutes(app: Express) {
-  app.get("/api/sp/sales", requireAuth, async (req: any, res: any) => {
+  app.get("/api/sp/sales", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
@@ -45,7 +45,7 @@ export function registerSpSalesRoutes(app: Express) {
     }
   });
 
-  app.post("/api/sp/sales", requireAuth, async (req: any, res: any) => {
+  app.post("/api/sp/sales", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
@@ -274,7 +274,7 @@ export function registerSpSalesRoutes(app: Express) {
         });
 
         await tx.insert(spSaleLines).values(
-          postedLines.map((pl: any) => ({
+          postedLines.map((pl) => ({
             saleId: sale.id,
             companyId,
             movementId: pl.movementId,
@@ -302,7 +302,7 @@ export function registerSpSalesRoutes(app: Express) {
 
   // ── Stock Movements ───────────────────────────────────────────────────────
 
-  app.get("/api/sp/stock", requireAuth, async (req: any, res: any) => {
+  app.get("/api/sp/stock", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
@@ -319,7 +319,7 @@ export function registerSpSalesRoutes(app: Express) {
     }
   });
 
-  app.get("/api/sp/stock/all", requireAuth, async (req: any, res: any) => {
+  app.get("/api/sp/stock/all", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;

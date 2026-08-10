@@ -187,7 +187,7 @@ export default function ContainerVerification() {
         const data = new Uint8Array(evt.target?.result as ArrayBuffer);
         const wb = await XLSX.read(data, { type: "array" });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows: any[] = XLSX.utils.sheet_to_json(ws);
+        const rows = XLSX.utils.sheet_to_json(ws);
         const items = rows
           .map((r) => ({
             barcode: String(r.Barcode || r.barcode || "").trim(),
@@ -274,7 +274,7 @@ export default function ContainerVerification() {
   useEffect(() => {
     const container = containerData?.container;
     if (container?.supplierId && suppliers.length > 0 && !selectedSupplierId) {
-      const supplierMatch = suppliers.find((s: any) => s.id === container.supplierId);
+      const supplierMatch = suppliers.find((s) => s.id === container.supplierId);
       if (supplierMatch) {
         setSelectedSupplierId(String(supplierMatch.id));
       }
@@ -297,7 +297,7 @@ export default function ContainerVerification() {
   // Auto-select supplier when opened via "Compare" from Daybook (supplierId URL param).
   useEffect(() => {
     if (!autoSupplierId || selectedSupplierId || suppliers.length === 0) return;
-    const found = suppliers.find((s: any) => String(s.id) === autoSupplierId);
+    const found = suppliers.find((s) => String(s.id) === autoSupplierId);
     if (found) setSelectedSupplierId(autoSupplierId);
   }, [autoSupplierId, selectedSupplierId, suppliers]);
 
@@ -305,7 +305,7 @@ export default function ContainerVerification() {
   // Prefers the starred proforma; falls back to the most recent if none is starred.
   useEffect(() => {
     if (!autoCompare || !selectedSupplierId || proformas.length === 0 || selectedProformaId) return;
-    const starred = proformas.find((p: any) => p.isStarred);
+    const starred = proformas.find((p) => p.isStarred);
     const pick = starred ?? proformas[proformas.length - 1];
     if (pick) setSelectedProformaId(String(pick.id));
   }, [autoCompare, selectedSupplierId, proformas, selectedProformaId]);
@@ -576,7 +576,7 @@ export default function ContainerVerification() {
                   <SelectValue placeholder="Select supplier" />
                 </SelectTrigger>
                 <SelectContent>
-                  {suppliers.map((s: any) => (
+                  {suppliers.map((s) => (
                     <SelectItem key={s.id} value={String(s.id)}>
                       {s.legalName || s.name || s.code}
                     </SelectItem>
@@ -591,7 +591,7 @@ export default function ContainerVerification() {
                   <SelectValue placeholder={selectedSupplierId ? "Select proforma" : "Select a supplier first"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {proformas.map((p: any) => (
+                  {proformas.map((p) => (
                     <SelectItem key={p.id} value={String(p.id)}>
                       <span className="flex items-center gap-1.5">
                         {p.isStarred && <Star className="h-3 w-3 fill-amber-400 text-amber-400 shrink-0" />}
@@ -601,7 +601,7 @@ export default function ContainerVerification() {
                   ))}
                 </SelectContent>
               </Select>
-              {proformas.length > 0 && !proformas.some((p: any) => p.isStarred) && (
+              {proformas.length > 0 && !proformas.some((p) => p.isStarred) && (
                 <p className="text-xs text-muted-foreground mt-1">
                   Tip: star a proforma on the supplier page to auto-select it here
                 </p>

@@ -91,7 +91,9 @@ export const posExportsAndDispatch: string[] = [
   // ── Approved agent mappings — idempotent upsert ──────────────────────────
   // Company 1 (HADI L'SHI): NAHLI → HUSSAIN NAHLI (id=40)
   `INSERT INTO agent_declarant_mappings (agent_name, company_id, ledger_account_id, aliases, active)
-       VALUES ('NAHLI', 1, 40, ARRAY['HUSSAIN NAHLI','HUSSEIN NAHLI','NAHLI AGENT'], TRUE)
+       SELECT 'NAHLI', 1, 40, ARRAY['HUSSAIN NAHLI','HUSSEIN NAHLI','NAHLI AGENT'], TRUE
+       WHERE EXISTS (SELECT 1 FROM companies WHERE id = 1)
+         AND EXISTS (SELECT 1 FROM ledger_accounts WHERE id = 40)
        ON CONFLICT ((LOWER(agent_name)), company_id) WHERE company_id IS NOT NULL
        DO UPDATE SET ledger_account_id = EXCLUDED.ledger_account_id,
                      aliases           = EXCLUDED.aliases,
@@ -99,7 +101,9 @@ export const posExportsAndDispatch: string[] = [
 
   // Company 1 (HADI L'SHI): NCA → NCA (id=43)
   `INSERT INTO agent_declarant_mappings (agent_name, company_id, ledger_account_id, aliases, active)
-       VALUES ('NCA', 1, 43, ARRAY[]::TEXT[], TRUE)
+       SELECT 'NCA', 1, 43, ARRAY[]::TEXT[], TRUE
+       WHERE EXISTS (SELECT 1 FROM companies WHERE id = 1)
+         AND EXISTS (SELECT 1 FROM ledger_accounts WHERE id = 43)
        ON CONFLICT ((LOWER(agent_name)), company_id) WHERE company_id IS NOT NULL
        DO UPDATE SET ledger_account_id = EXCLUDED.ledger_account_id,
                      aliases           = EXCLUDED.aliases,
@@ -107,7 +111,9 @@ export const posExportsAndDispatch: string[] = [
 
   // Company 1 (HADI L'SHI): AFEPRO → AFEPRO (id=607)
   `INSERT INTO agent_declarant_mappings (agent_name, company_id, ledger_account_id, aliases, active)
-       VALUES ('AFEPRO', 1, 607, ARRAY[]::TEXT[], TRUE)
+       SELECT 'AFEPRO', 1, 607, ARRAY[]::TEXT[], TRUE
+       WHERE EXISTS (SELECT 1 FROM companies WHERE id = 1)
+         AND EXISTS (SELECT 1 FROM ledger_accounts WHERE id = 607)
        ON CONFLICT ((LOWER(agent_name)), company_id) WHERE company_id IS NOT NULL
        DO UPDATE SET ledger_account_id = EXCLUDED.ledger_account_id,
                      aliases           = EXCLUDED.aliases,
@@ -115,7 +121,9 @@ export const posExportsAndDispatch: string[] = [
 
   // Company 8 (HMD KINSHASA): HUSSAIN SAAD → HUSSEIN SAAD (id=359)
   `INSERT INTO agent_declarant_mappings (agent_name, company_id, ledger_account_id, aliases, active)
-       VALUES ('HUSSAIN SAAD', 8, 359, ARRAY['HUSSEIN SAAD'], TRUE)
+       SELECT 'HUSSAIN SAAD', 8, 359, ARRAY['HUSSEIN SAAD'], TRUE
+       WHERE EXISTS (SELECT 1 FROM companies WHERE id = 8)
+         AND EXISTS (SELECT 1 FROM ledger_accounts WHERE id = 359)
        ON CONFLICT ((LOWER(agent_name)), company_id) WHERE company_id IS NOT NULL
        DO UPDATE SET ledger_account_id = EXCLUDED.ledger_account_id,
                      aliases           = EXCLUDED.aliases,
@@ -123,7 +131,9 @@ export const posExportsAndDispatch: string[] = [
 
   // Company 8 (HMD KINSHASA): RIDA SALEH → RIDA SALEH (id=365)
   `INSERT INTO agent_declarant_mappings (agent_name, company_id, ledger_account_id, aliases, active)
-       VALUES ('RIDA SALEH', 8, 365, ARRAY[]::TEXT[], TRUE)
+       SELECT 'RIDA SALEH', 8, 365, ARRAY[]::TEXT[], TRUE
+       WHERE EXISTS (SELECT 1 FROM companies WHERE id = 8)
+         AND EXISTS (SELECT 1 FROM ledger_accounts WHERE id = 365)
        ON CONFLICT ((LOWER(agent_name)), company_id) WHERE company_id IS NOT NULL
        DO UPDATE SET ledger_account_id = EXCLUDED.ledger_account_id,
                      aliases           = EXCLUDED.aliases,
@@ -131,7 +141,9 @@ export const posExportsAndDispatch: string[] = [
 
   // Company 10 (GC - LSHI): NAHLI → Hussein Nahli (id=419)
   `INSERT INTO agent_declarant_mappings (agent_name, company_id, ledger_account_id, aliases, active)
-       VALUES ('NAHLI', 10, 419, ARRAY['HUSSAIN NAHLI','HUSSEIN NAHLI','NAHLI AGENT'], TRUE)
+       SELECT 'NAHLI', 10, 419, ARRAY['HUSSAIN NAHLI','HUSSEIN NAHLI','NAHLI AGENT'], TRUE
+       WHERE EXISTS (SELECT 1 FROM companies WHERE id = 10)
+         AND EXISTS (SELECT 1 FROM ledger_accounts WHERE id = 419)
        ON CONFLICT ((LOWER(agent_name)), company_id) WHERE company_id IS NOT NULL
        DO UPDATE SET ledger_account_id = EXCLUDED.ledger_account_id,
                      aliases           = EXCLUDED.aliases,

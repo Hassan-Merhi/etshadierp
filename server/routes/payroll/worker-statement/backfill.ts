@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { getClientDate } from "../../../lib/dateUtils";
@@ -16,7 +16,7 @@ import { factoryWorkers, factoryPayrolls, ledgerAccounts, vouchers, voucherEntri
 import { getFactoryCompanyId } from "./_helpers";
 
 export function registerPayrollVoucherBackfillRoutes(app: Express) {
-  app.post("/api/admin/backfill-payroll-vouchers", requireAuth, async (req: any, res: any) => {
+  app.post("/api/admin/backfill-payroll-vouchers", requireAuth, async (req: Request, res: Response) => {
     try {
       const currentRole = (req.session as any).currentRole;
       if (currentRole !== "Admin" && currentRole !== "Owner" && currentRole !== "Developer") {
@@ -61,37 +61,37 @@ export function registerPayrollVoucherBackfillRoutes(app: Express) {
 
       const existingPayrollIds = new Set(
         existingVouchers
-          .map((v: any) => {
+          .map((v) => {
             const parts = v.voucherNumber.split("-");
             return parseInt(parts[2]);
           })
           .filter((id: number) => !isNaN(id))
       );
 
-      const toBackfill = paidPayrolls.filter((p: any) => {
+      const toBackfill = paidPayrolls.filter((p) => {
         const net = parseFloat(p.netSalary || "0");
         return net > 0 && !existingPayrollIds.has(p.id);
       });
 
       const skipped = paidPayrolls
-        .filter((p: any) => {
+        .filter((p) => {
           const net = parseFloat(p.netSalary || "0");
           return net <= 0 || existingPayrollIds.has(p.id);
         })
-        .map((p: any) => p.id);
+        .map((p) => p.id);
 
       if (toBackfill.length === 0) {
         return res.json({ message: "No payrolls need backfill", found: paidPayrolls.length, backfilled: 0, skipped });
       }
 
-      const companyIds = [...new Set(toBackfill.map((p: any) => p.companyId))];
-      const workerIds = [...new Set(toBackfill.map((p: any) => p.workerId))];
+      const companyIds = [...new Set(toBackfill.map((p) => p.companyId))];
+      const workerIds = [...new Set(toBackfill.map((p) => p.workerId))];
 
       const workerRows = await db
         .select({ id: factoryWorkers.id, fullName: factoryWorkers.fullName })
         .from(factoryWorkers)
         .where(inArray(factoryWorkers.id, workerIds));
-      const workerMap = new Map(workerRows.map((w: any) => [w.id, w.fullName]));
+      const workerMap = new Map(workerRows.map((w) => [w.id, w.fullName]));
 
       const backfilledIds: number[] = [];
 

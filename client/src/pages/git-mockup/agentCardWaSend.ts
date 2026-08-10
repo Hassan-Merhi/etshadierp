@@ -40,7 +40,7 @@ export async function sendAgentCardToWhatsApp(params: SendAgentDutyWaParams): Pr
     const ledgerBalance = agent.ledgerBalance;
     const openBalance = agent.openBalance;
     const hasBalance = ledgerBalance !== null;
-    const activePreviewRows = agent.activePreviewRows.filter((r: any) => !!(r.numberPlate ?? "").trim());
+    const activePreviewRows = agent.activePreviewRows.filter((r) => !!(r.numberPlate ?? "").trim());
     const cbClearedRows = agent.clearedRows as ApiAllocatedRow[];
     const cbAllOpenPartial: ApiAllocatedRow[] = [
       ...(agent.partialRows as ApiAllocatedRow[]),
@@ -88,8 +88,8 @@ export async function sendAgentCardToWhatsApp(params: SendAgentDutyWaParams): Pr
     const isReconciledWa = hasAdj && hasBalance && Math.abs(adjustedBal) <= 0.01;
 
     const waPrepaidSet = new Set<number>(dbPrepaidIds);
-    const waPrepaidRows = activePreviewRows.filter((r: any) => waPrepaidSet.has(r.id));
-    const waRemainingRows = activePreviewRows.filter((r: any) => !waPrepaidSet.has(r.id));
+    const waPrepaidRows = activePreviewRows.filter((r) => waPrepaidSet.has(r.id));
+    const waRemainingRows = activePreviewRows.filter((r) => !waPrepaidSet.has(r.id));
     const designatedPrepaidSum = waPrepaidRows.reduce((s: number, r: any) => s + Number(r.dutyFee ?? 0), 0);
     const waPrepaidBudget = Math.max(0, ledgerBalance ?? 0);
     const minOpenRem =
@@ -141,7 +141,7 @@ export async function sendAgentCardToWhatsApp(params: SendAgentDutyWaParams): Pr
     } else if (isReconciledWa && waPrepaidRows.length === 0) {
       openRowsHtml = `<tr><td colspan="11" style="padding:16px;text-align:center;color:#065f46;font-style:italic;font-size:11px;border:1px solid #a7f3d0;background:#d1fae5;">All containers reconciled by manual entries — no outstanding balance.</td></tr>`;
     } else {
-      waPrepaidRows.forEach((r: any) => {
+      waPrepaidRows.forEach((r) => {
         openRowsHtml += `<tr style="background:#d1fae5">
           <td style="${tdOpen("left", true)}">${esc(r.containerNumber)}</td>
           <td style="${tdOpen()}">${esc(r.supplierCode ?? r.supplierName ?? "—")}</td>
@@ -217,7 +217,7 @@ export async function sendAgentCardToWhatsApp(params: SendAgentDutyWaParams): Pr
 
     let transitHtml = "";
     const waTransitRows = transitTransporterFilter
-      ? waRemainingRows.filter((r: any) => r.transporter === transitTransporterFilter)
+      ? waRemainingRows.filter((r) => r.transporter === transitTransporterFilter)
       : waRemainingRows;
     if (waTransitRows.length > 0) {
       const transitTotal = waTransitRows.reduce((s: number, r: any) => s + r.dutyFee, 0);
@@ -230,7 +230,7 @@ export async function sendAgentCardToWhatsApp(params: SendAgentDutyWaParams): Pr
         const sB = (b.supplierCode ?? b.supplierName ?? "").toLowerCase();
         return sA < sB ? -1 : sA > sB ? 1 : 0;
       });
-      sortedWaTransitRows.forEach((r: any, i: number) => {
+      sortedWaTransitRows.forEach((r, i: number) => {
         const bg = i % 2 === 0 ? "#f0f9ff" : "#e0f2fe";
         transitRowsHtml += `<tr style="background:${bg}">
           <td style="${tdTransit("left", true)}">${esc(r.containerNumber)}</td>

@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { logAudit } from "../helpers/auditHelpers";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -30,7 +30,7 @@ import {
 } from "./_helpers";
 
 export function registerFactoryPayrollGenerateRoutes(app: Express, requireAuth: any, db: any) {
-  app.post("/api/factory/payroll/generate", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/payroll/generate", requireAuth, async (req: Request, res: Response) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;
       const { companyId, startDate, endDate } = req.body;
@@ -109,7 +109,7 @@ export function registerFactoryPayrollGenerateRoutes(app: Express, requireAuth: 
       const periodDays = daysInPeriod(startDate, endDate);
       const weekdays = countWeekdays(startDate, endDate);
       const monthDays = daysInMonth(startDate);
-      const payrollRecords: any[] = [];
+      const payrollRecords = [];
 
       for (const worker of workers) {
         let basePay = 0;

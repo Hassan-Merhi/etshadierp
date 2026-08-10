@@ -23,9 +23,7 @@ export function useAccountBalance({
   // avoids a second round-trip that can return 0 on first render or drift from
   // the sidebar figure.
   const sidebarAccount = useMemo(
-    () =>
-      sidebarAccounts?.find((a) => a.type === paymentAccountType && a.id === paymentAccountId) ??
-      null,
+    () => sidebarAccounts?.find((a) => a.type === paymentAccountType && a.id === paymentAccountId) ?? null,
     [sidebarAccounts, paymentAccountType, paymentAccountId]
   );
 
@@ -131,7 +129,7 @@ export function useAccountBalance({
         const ledgers: any[] = data.currencyLedgers || [];
         if (ledgers.length <= 1) return null;
         return ledgers
-          .map((section: any) => ({
+          .map((section) => ({
             currency: section.currencyCode,
             balance: parseFloat(section.netBalance || "0"),
           }))

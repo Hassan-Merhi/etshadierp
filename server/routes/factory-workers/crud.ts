@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { parseId, parseOptionalId } from "../../lib/parseId";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -23,7 +23,7 @@ import { getFactoryCompanyId, writeDaybookEntry } from "./_helpers";
 
 export function registerFactoryWorkerCrudRoutes(app: Express, requireAuth: any, db: any) {
   // GET /api/factory/workers/:id - Get single worker with computed stats
-  app.get("/api/factory/workers/:id", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/workers/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -69,7 +69,7 @@ export function registerFactoryWorkerCrudRoutes(app: Express, requireAuth: any, 
   });
 
   // POST /api/factory/workers - Create worker
-  app.post("/api/factory/workers", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/workers", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -142,7 +142,7 @@ export function registerFactoryWorkerCrudRoutes(app: Express, requireAuth: any, 
       absentEnd.setDate(absentEnd.getDate() - 1);
 
       if (absentEnd >= yearStart) {
-        const absentRecords: any[] = [];
+        const absentRecords = [];
         const cursor = new Date(yearStart);
         while (cursor <= absentEnd) {
           absentRecords.push({
@@ -173,7 +173,7 @@ export function registerFactoryWorkerCrudRoutes(app: Express, requireAuth: any, 
   });
 
   // PATCH /api/factory/workers/:id - Update worker
-  app.patch("/api/factory/workers/:id", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/workers/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -234,7 +234,7 @@ export function registerFactoryWorkerCrudRoutes(app: Express, requireAuth: any, 
   });
 
   // POST /api/factory/workers/:id/end-contract - End contract
-  app.post("/api/factory/workers/:id/end-contract", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/workers/:id/end-contract", requireAuth, async (req: Request, res: Response) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;
       const companyId = req.body.companyId || getFactoryCompanyId(req);
@@ -271,7 +271,7 @@ export function registerFactoryWorkerCrudRoutes(app: Express, requireAuth: any, 
   });
 
   // POST /api/factory/workers/:id/reactivate - Reactivate an inactive worker
-  app.post("/api/factory/workers/:id/reactivate", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/workers/:id/reactivate", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });

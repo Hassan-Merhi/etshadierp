@@ -4,13 +4,13 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { pool } from "../../db";
 
 export function registerSupplierProfitAnalyzeRoutes(app: Express, requireAuth: any) {
-  app.post("/api/supplier-profit-check/analyze", requireAuth, async (req: any, res: any) => {
+  app.post("/api/supplier-profit-check/analyze", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -119,8 +119,8 @@ export function registerSupplierProfitAnalyzeRoutes(app: Express, requireAuth: a
       const items = itemsResult.rows;
       if (items.length === 0) return res.json([]);
 
-      const stockItemIds = items.map((r: any) => r.id);
-      const idsParam = stockItemIds.map((_: any, i: number) => `$${i + 1}`).join(",");
+      const stockItemIds = items.map((r) => r.id);
+      const idsParam = stockItemIds.map((_, i: number) => `$${i + 1}`).join(",");
 
       // 2. Average selling price + total sales qty per item in date range
       const avgSellResult = allTime
@@ -274,7 +274,7 @@ export function registerSupplierProfitAnalyzeRoutes(app: Express, requireAuth: a
       }
 
       // Build response
-      const rows = items.map((item: any) => {
+      const rows = items.map((item) => {
         const id = Number(item.id);
         const salesData = avgSellMap.get(id);
         const avgSellingPrice = salesData?.avgSellingPrice ?? null;

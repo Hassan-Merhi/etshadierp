@@ -180,7 +180,7 @@ export function AuditLog({
   // any unexpected row so a stale cache or future backend regression cannot
   // display another company's activity.
   const auditLogs = useMemo(
-    () => rawAuditLogs.filter((log: any) => Number(log.companyId) === activeCompanyId),
+    () => rawAuditLogs.filter((log) => Number(log.companyId) === activeCompanyId),
     [rawAuditLogs, activeCompanyId]
   );
 
@@ -382,7 +382,7 @@ export function AuditLog({
                     </TableCell>
                   </TableRow>
 
-                  {logs.map((log: any) => (
+                  {logs.map((log) => (
                     <TableRow
                       key={log.id}
                       className="group cursor-pointer hover:bg-muted/50 transition-colors"

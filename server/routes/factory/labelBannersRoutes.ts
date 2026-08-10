@@ -1,3 +1,4 @@
+import type { Request, Response } from "express";
 /**
  * labelBannersRoutes.ts
  * Manages label banner color slots — both the color metadata (DB) and the
@@ -69,12 +70,7 @@ export function registerLabelBannersRoutes(app: any, requireAuth: any) {
           // serve as immutable so the browser caches it indefinitely.
           // Without ?t= (rare / legacy) give a short 10-minute TTL.
           const hasTimestamp = !!req.query.t;
-          res.setHeader(
-            "Cache-Control",
-            hasTimestamp
-              ? "public, max-age=31536000, immutable"
-              : "public, max-age=600"
-          );
+          res.setHeader("Cache-Control", hasTimestamp ? "public, max-age=31536000, immutable" : "public, max-age=600");
           res.setHeader("Content-Type", mimeType);
           return res.send(buffer);
         }
@@ -112,7 +108,7 @@ export function registerLabelBannersRoutes(app: any, requireAuth: any) {
   });
 
   // ── POST /api/factory/label-design-colors — create new color (+ image) ─────
-  app.post("/api/factory/label-design-colors", requireAuth, requireNonPOS, (req: any, res: any) => {
+  app.post("/api/factory/label-design-colors", requireAuth, requireNonPOS, (req: Request, res: Response) => {
     upload.single("image")(req, res, async (err: any) => {
       if (err) return res.status(400).json({ message: err.message });
 
@@ -168,45 +164,55 @@ export function registerLabelBannersRoutes(app: any, requireAuth: any) {
   });
 
   // ── PATCH /api/factory/label-design-colors/:slug — update label and/or hex ─
-  app.patch("/api/factory/label-design-colors/:slug", requireAuth, requireNonPOS, async (req: any, res: any) => {
-    const { slug } = req.params;
-    const { label, colorHex } = req.body;
-    if (!label && !colorHex) return res.status(400).json({ message: "Nothing to update" });
+  app.patch(
+    "/api/factory/label-design-colors/:slug",
+    requireAuth,
+    requireNonPOS,
+    async (req: Request, res: Response) => {
+      const { slug } = req.params;
+      const { label, colorHex } = req.body;
+      if (!label && !colorHex) return res.status(400).json({ message: "Nothing to update" });
 
-    try {
-      const updates: Record<string, string> = {};
-      if (label) updates.label = String(label);
-      if (colorHex) updates.colorHex = String(colorHex);
+      try {
+        const updates: Record<string, string> = {};
+        if (label) updates.label = String(label);
+        if (colorHex) updates.colorHex = String(colorHex);
 
-      const [updated] = await db
-        .update(labelDesignColors)
-        .set(updates)
-        .where(eq(labelDesignColors.slug, slug))
-        .returning();
-      if (!updated) return res.status(404).json({ message: "Color not found" });
-      res.json({ ...updated, imageData: undefined, ...rowInfo(updated) });
-    } catch (e: unknown) {
-      res.status(500).json({ message: getErrorMessage(e) });
+        const [updated] = await db
+          .update(labelDesignColors)
+          .set(updates)
+          .where(eq(labelDesignColors.slug, slug))
+          .returning();
+        if (!updated) return res.status(404).json({ message: "Color not found" });
+        res.json({ ...updated, imageData: undefined, ...rowInfo(updated) });
+      } catch (e: unknown) {
+        res.status(500).json({ message: getErrorMessage(e) });
+      }
     }
-  });
+  );
 
   // ── DELETE /api/factory/label-design-colors/:slug — remove custom color ────
-  app.delete("/api/factory/label-design-colors/:slug", requireAuth, requireNonPOS, async (req: any, res: any) => {
-    const { slug } = req.params;
-    try {
-      const [row] = await db.select().from(labelDesignColors).where(eq(labelDesignColors.slug, slug));
-      if (!row) return res.status(404).json({ message: "Color not found" });
-      if (row.isDefault) return res.status(400).json({ message: "Built-in colors cannot be deleted" });
+  app.delete(
+    "/api/factory/label-design-colors/:slug",
+    requireAuth,
+    requireNonPOS,
+    async (req: Request, res: Response) => {
+      const { slug } = req.params;
+      try {
+        const [row] = await db.select().from(labelDesignColors).where(eq(labelDesignColors.slug, slug));
+        if (!row) return res.status(404).json({ message: "Color not found" });
+        if (row.isDefault) return res.status(400).json({ message: "Built-in colors cannot be deleted" });
 
-      await db.delete(labelDesignColors).where(eq(labelDesignColors.slug, slug));
-      res.json({ ok: true });
-    } catch (e: unknown) {
-      res.status(500).json({ message: getErrorMessage(e) });
+        await db.delete(labelDesignColors).where(eq(labelDesignColors.slug, slug));
+        res.json({ ok: true });
+      } catch (e: unknown) {
+        res.status(500).json({ message: getErrorMessage(e) });
+      }
     }
-  });
+  );
 
   // ── POST /api/factory/label-banners/:slug — upload/replace banner image ────
-  app.post("/api/factory/label-banners/:slug", requireAuth, requireNonPOS, (req: any, res: any) => {
+  app.post("/api/factory/label-banners/:slug", requireAuth, requireNonPOS, (req: Request, res: Response) => {
     const { slug } = req.params;
     if (!/^[a-z0-9-]+$/.test(slug)) return res.status(400).json({ message: "Invalid slug" });
 
@@ -235,7 +241,7 @@ export function registerLabelBannersRoutes(app: any, requireAuth: any) {
   });
 
   // ── DELETE /api/factory/label-banners/:slug — revert to default image ──────
-  app.delete("/api/factory/label-banners/:slug", requireAuth, requireNonPOS, async (req: any, res: any) => {
+  app.delete("/api/factory/label-banners/:slug", requireAuth, requireNonPOS, async (req: Request, res: Response) => {
     const { slug } = req.params;
     try {
       await db

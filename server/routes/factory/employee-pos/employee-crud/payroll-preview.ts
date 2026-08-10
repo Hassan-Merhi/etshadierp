@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../../lib/httpHandlers";
 import { db } from "../../../../db";
 import { requireAuth } from "../../../../auth";
@@ -15,7 +15,7 @@ import { sqlArray } from "../../../../lib/sqlArray";
 export function registerFactoryEmployeePayrollPreviewRoutes(app: Express) {
   // GET /api/factory/employee-payroll-preview?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
   // Returns attendance-based salary calculation for each active employee
-  app.get("/api/factory/employee-payroll-preview", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/employee-payroll-preview", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -37,7 +37,7 @@ export function registerFactoryEmployeePayrollPreviewRoutes(app: Express) {
 
       if (emps.length === 0) return res.json({ preview: [] });
 
-      const empIds = emps.map((e: any) => e.id);
+      const empIds = emps.map((e) => e.id);
       const attResult = await db.execute(sql`
         SELECT employee_id, status, COUNT(*) as count
         FROM employee_attendance
@@ -73,7 +73,7 @@ export function registerFactoryEmployeePayrollPreviewRoutes(app: Express) {
       const monthStart = new Date(startDate + "T00:00:00");
       const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
 
-      const preview = emps.map((emp: any) => {
+      const preview = emps.map((emp) => {
         const eid = emp.id;
         const a = attMap[eid] || {};
         const present = (a.present || 0) + (a.late || 0) + (a.leave || 0);

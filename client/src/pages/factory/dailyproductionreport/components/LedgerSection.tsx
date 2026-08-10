@@ -3,16 +3,16 @@
  *
  * Extracted from DailyProductionReport.tsx during the Phase 4 god-file split.
  */
-import {useState} from "react";
-import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
-import {Badge} from "@/components/ui/badge";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Collapsible, CollapsibleContent, CollapsibleTrigger} from "@/components/ui/collapsible";
-import {ChevronDown, ChevronRight, Pencil} from "lucide-react";
-import {useQueryClient} from "@tanstack/react-query";
-import {BaleWeightEditDialog, type WeightEditBale} from "@/components/BaleWeightEditDialog";
-import type {LedgerSectionProps} from "../types";
-import {fmtL, fmtML, fmtNL, groupByCategory} from "../utils";
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown, ChevronRight, Pencil } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { BaleWeightEditDialog, type WeightEditBale } from "@/components/BaleWeightEditDialog";
+import type { LedgerSectionProps } from "../types";
+import { fmtL, fmtML, fmtNL, groupByCategory } from "../utils";
 
 export function LedgerSection({
   title,

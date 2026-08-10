@@ -352,7 +352,7 @@ export function NetProfitPanel({
                           </div>
                           {expandedNetProfitSections.has("indirectIncomes") && nonZeroIndirectInc.length > 0 && (
                             <div className="bg-muted/30 divide-y">
-                              {nonZeroIndirectInc.map((acc: any) => (
+                              {nonZeroIndirectInc.map((acc) => (
                                 <div
                                   key={acc.id}
                                   className="flex justify-between items-center px-6 py-2 text-sm text-muted-foreground cursor-pointer hover-elevate"

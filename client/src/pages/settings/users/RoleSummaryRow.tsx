@@ -18,7 +18,7 @@ const NON_RESTRICTABLE_ROLES = ["Developer", "Admin"];
 
 function countActivePermissions(role: string, permissions: any[]): number {
   const isNormal = role === "Normal User";
-  return permissions.filter((p: any) => {
+  return permissions.filter((p) => {
     if (p.role !== role) return false;
     return isNormal ? p.enabled === true : p.enabled === false;
   }).length;

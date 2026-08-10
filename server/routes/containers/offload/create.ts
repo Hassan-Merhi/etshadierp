@@ -102,7 +102,7 @@ export function registerContainerOffloadCreateRoutes(app: Express) {
               }
             } else {
               const pos = await storage.getPurchaseOrdersByContainer(containerId);
-              const allLineItems: any[] = [];
+              const allLineItems = [];
               for (const po of pos) {
                 const lineItems = await storage.getLineItemsByPO(po.id);
                 allLineItems.push(...lineItems);

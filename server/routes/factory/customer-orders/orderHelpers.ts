@@ -145,7 +145,9 @@ export async function buildOrderExcelBuffer(
       const logoId = workbook.addImage({ buffer: toArrayBuffer(logoBuf), extension: "jpeg" });
       sheet.addImage(logoId, { tl: { col: 0, row: 0 }, ext: { width: 180, height: 110 } });
     }
-  } catch {}
+  } catch {
+    // Failure here is non-fatal and the surrounding flow continues deliberately.
+  }
 
   const r1 = sheet.addRow(["HMD INTERNATIONAL GROUP"]);
   r1.height = 26;
@@ -213,7 +215,7 @@ export async function buildOrderExcelBuffer(
     totalH += g.total;
     const unitPriceH =
       g.pricingMode === "per_kg" ? (g.totalWt > 0 ? g.total / g.totalWt : g.pricePerKg || 0) : g.pricePerBale;
-    const rowCells: any[] = [idx + 1, g.articleCode, g.productName, g.qty, fmtNum(g.wtPerBale), fmtNum(g.totalWt)];
+    const rowCells = [idx + 1, g.articleCode, g.productName, g.qty, fmtNum(g.wtPerBale), fmtNum(g.totalWt)];
     if (!hideSelling) {
       rowCells.push(fmtMoney(unitPriceH));
       rowCells.push(fmtMoney(g.total));
@@ -235,7 +237,7 @@ export async function buildOrderExcelBuffer(
     setBorderH(dr);
   });
 
-  const totRowCells: any[] = ["", "", "Totals", totalQtyH, "", fmtNum(totalWtH)];
+  const totRowCells = ["", "", "Totals", totalQtyH, "", fmtNum(totalWtH)];
   if (!hideSelling) {
     totRowCells.push("");
     totRowCells.push(fmtMoney(totalH));

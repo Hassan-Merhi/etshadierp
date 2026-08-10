@@ -1,7 +1,7 @@
 /**
  * payrollCoreRoutes: PayrollCoreRead endpoints.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
@@ -34,7 +34,7 @@ const emptyBonusTotals = () => ({
 });
 
 export function registerPayrollCoreReadRoutes(app: Express) {
-  app.get("/api/factory/cash-accounts", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/cash-accounts", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -50,7 +50,7 @@ export function registerPayrollCoreReadRoutes(app: Express) {
   });
 
   // GET /api/factory/payrolls - live Workers Hub payroll records with production-bonus state.
-  app.get("/api/factory/payrolls", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/payrolls", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -74,7 +74,7 @@ export function registerPayrollCoreReadRoutes(app: Express) {
         if (payroll.status === "DRAFT") await attachProductionBonusesToPayroll(db, payroll.id);
       }
 
-      const workerIds = [...new Set(payrolls.map((payroll: any) => payroll.workerId))];
+      const workerIds = [...new Set(payrolls.map((payroll) => payroll.workerId))];
       const workers = workerIds.length
         ? await db
             .select({
@@ -86,12 +86,12 @@ export function registerPayrollCoreReadRoutes(app: Express) {
             .from(factoryWorkers)
             .where(inArray(factoryWorkers.id, workerIds))
         : [];
-      const workerMap = new Map(workers.map((worker: any) => [worker.id, worker]));
+      const workerMap = new Map(workers.map((worker) => [worker.id, worker]));
       const productionTotals = await getProductionBonusTotalsForPayrollIds(
         db,
         payrolls.map((payroll) => payroll.id)
       );
-      const result = payrolls.map((payroll: any) => {
+      const result = payrolls.map((payroll) => {
         const production = productionTotals.get(payroll.id) ?? emptyBonusTotals();
         return {
           ...payroll,
@@ -113,7 +113,7 @@ export function registerPayrollCoreReadRoutes(app: Express) {
   });
 
   // GET /api/factory/workers/amount-due
-  app.get("/api/factory/workers/amount-due", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/workers/amount-due", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -281,7 +281,7 @@ export function registerPayrollCoreReadRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/workers/:id/payrolls", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/workers/:id/payrolls", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });

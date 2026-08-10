@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { sqlArray } from "../../../lib/sqlArray";
@@ -18,7 +18,7 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
 
   // GET /api/factory/stock-allocation — returns all article codes with IN_STOCK bale counts,
   // all proformas with their lines, existing reservations, and LOADING/PENDING_VERIFICATION/VERIFIED order quantities
-  app.get("/api/factory/stock-allocation", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/stock-allocation", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -158,7 +158,7 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
   });
 
   // GET /api/factory/stock-allocation/loading-mode — returns active loadings with per-article bale counts
-  app.get("/api/factory/stock-allocation/loading-mode", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/stock-allocation/loading-mode", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -314,7 +314,7 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
   });
 
   // POST /api/factory/stock-allocation/reservations/toggle — toggle a reservation on/off
-  app.post("/api/factory/stock-allocation/reservations/toggle", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/stock-allocation/reservations/toggle", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

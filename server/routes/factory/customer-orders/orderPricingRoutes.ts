@@ -1,7 +1,7 @@
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { parseId } from "../../../lib/parseId";
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { recalculateOrderTotals } from "../_helpers";
@@ -19,7 +19,7 @@ import {
 import { eq, and, sql, inArray } from "drizzle-orm";
 
 export function registerOrderPricingRoutes(app: Express) {
-  app.post("/api/factory/customer-orders/:id/reprice", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/customer-orders/:id/reprice", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -171,7 +171,7 @@ export function registerOrderPricingRoutes(app: Express) {
   });
 
   // Apply PRODUCTION prices to all bales in this order
-  app.post("/api/factory/customer-orders/:id/reprice-production", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/customer-orders/:id/reprice-production", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -295,170 +295,179 @@ export function registerOrderPricingRoutes(app: Express) {
   });
 
   // Apply a specific proforma's prices to all bales in an order (by articleCode match)
-  app.post("/api/factory/customer-orders/:id/apply-proforma-prices", requireAuth, async (req: any, res: any) => {
-    try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
+  app.post(
+    "/api/factory/customer-orders/:id/apply-proforma-prices",
+    requireAuth,
+    async (req: Request, res: Response) => {
+      try {
+        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseId(req.params.id);
+        const orderId = parseId(req.params.id);
 
-      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
-      const { proformaId } = req.body;
-      if (!proformaId) return res.status(400).json({ message: "proformaId is required" });
+        if (orderId === null) return res.status(400).json({ message: "Invalid id" });
+        const { proformaId } = req.body;
+        if (!proformaId) return res.status(400).json({ message: "proformaId is required" });
 
-      const [order] = await db
-        .select()
-        .from(customerOrders)
-        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
-      if (!order) return res.status(404).json({ message: "Order not found" });
-      if (order.status === "CANCELLED") return res.status(400).json({ message: "Cannot reprice a cancelled order" });
+        const [order] = await db
+          .select()
+          .from(customerOrders)
+          .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+        if (!order) return res.status(404).json({ message: "Order not found" });
+        if (order.status === "CANCELLED") return res.status(400).json({ message: "Cannot reprice a cancelled order" });
 
-      // Validate proforma belongs to this company
-      const [proforma] = await db
-        .select()
-        .from(customerProformas)
-        .where(and(eq(customerProformas.id, proformaId), eq(customerProformas.companyId, companyId)));
-      if (!proforma) return res.status(404).json({ message: "Proforma not found" });
+        // Validate proforma belongs to this company
+        const [proforma] = await db
+          .select()
+          .from(customerProformas)
+          .where(and(eq(customerProformas.id, proformaId), eq(customerProformas.companyId, companyId)));
+        if (!proforma) return res.status(404).json({ message: "Proforma not found" });
 
-      const proformaLines = await db
-        .select()
-        .from(customerProformaLines)
-        .where(eq(customerProformaLines.proformaId, proformaId));
+        const proformaLines = await db
+          .select()
+          .from(customerProformaLines)
+          .where(eq(customerProformaLines.proformaId, proformaId));
 
-      if (proformaLines.length === 0) return res.status(400).json({ message: "Selected proforma has no price lines" });
+        if (proformaLines.length === 0)
+          return res.status(400).json({ message: "Selected proforma has no price lines" });
 
-      // Build articleCode → price map from proforma
-      const priceMap = new Map<string, string>();
-      for (const pl of proformaLines) {
-        if (pl.articleCode && pl.pricePerBale != null) {
-          priceMap.set(pl.articleCode.toLowerCase().trim(), pl.pricePerBale);
+        // Build articleCode → price map from proforma
+        const priceMap = new Map<string, string>();
+        for (const pl of proformaLines) {
+          if (pl.articleCode && pl.pricePerBale != null) {
+            priceMap.set(pl.articleCode.toLowerCase().trim(), pl.pricePerBale);
+          }
         }
+
+        const orderBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
+        if (orderBales.length === 0) return res.status(400).json({ message: "Order has no bales" });
+
+        let updated = 0;
+        for (const bale of orderBales) {
+          const key = bale.articleCode?.toLowerCase().trim();
+          if (!key) continue;
+          const newPrice = priceMap.get(key);
+          if (!newPrice) continue;
+          const newPriceNum = parseFloat(newPrice);
+          if (newPriceNum <= 0) continue;
+          const curPriceNum = parseFloat(bale.priceUsed || "0");
+          if (Math.abs(newPriceNum - curPriceNum) < 0.001) continue;
+
+          await db
+            .update(customerOrderBales)
+            .set({ priceUsed: newPriceNum.toFixed(2) })
+            .where(eq(customerOrderBales.id, bale.id));
+          updated++;
+        }
+
+        await recalculateOrderTotals(db, orderId);
+
+        const [updatedOrder] = await db.select().from(customerOrders).where(eq(customerOrders.id, orderId));
+
+        // Keep customer balance ledger entry in sync if already finalized entry exists
+        const newGrandTotal = parseFloat(updatedOrder.grandTotal || "0");
+        const [existingLedgerEntry] = await db
+          .select({ id: customerBalances.id })
+          .from(customerBalances)
+          .where(
+            and(
+              eq(customerBalances.companyId, companyId),
+              eq(customerBalances.referenceType, "INVOICE"),
+              eq(customerBalances.referenceId, orderId)
+            )
+          );
+        if (existingLedgerEntry) {
+          await db
+            .update(customerBalances)
+            .set({ debitAmount: String(newGrandTotal), balance: String(newGrandTotal) })
+            .where(eq(customerBalances.id, existingLedgerEntry.id));
+        }
+
+        const updatedBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
+        const updatedLines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
+        const updatedCharges = await db
+          .select()
+          .from(customerOrderCharges)
+          .where(eq(customerOrderCharges.orderId, orderId));
+
+        res.json({
+          ...updatedOrder,
+          bales: updatedBales,
+          lines: updatedLines,
+          charges: updatedCharges,
+          repriced: updated,
+        });
+      } catch (error: unknown) {
+        logger.error("Error applying proforma prices:", { error: error });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
+    }
+  );
 
-      const orderBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
-      if (orderBales.length === 0) return res.status(400).json({ message: "Order has no bales" });
+  app.patch(
+    "/api/factory/customer-orders/:id/bales/reprice-article",
+    requireAuth,
+    async (req: Request, res: Response) => {
+      try {
+        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      let updated = 0;
-      for (const bale of orderBales) {
-        const key = bale.articleCode?.toLowerCase().trim();
-        if (!key) continue;
-        const newPrice = priceMap.get(key);
-        if (!newPrice) continue;
-        const newPriceNum = parseFloat(newPrice);
-        if (newPriceNum <= 0) continue;
-        const curPriceNum = parseFloat(bale.priceUsed || "0");
-        if (Math.abs(newPriceNum - curPriceNum) < 0.001) continue;
+        const orderId = parseId(req.params.id);
+
+        if (orderId === null) return res.status(400).json({ message: "Invalid id" });
+        const { articleCode, pricePerBale } = req.body;
+
+        if (!articleCode || pricePerBale === undefined || pricePerBale === null) {
+          return res.status(400).json({ message: "articleCode and pricePerBale are required" });
+        }
+
+        const price = parseFloat(pricePerBale);
+        if (isNaN(price) || price < 0) {
+          return res.status(400).json({ message: "Invalid price value" });
+        }
+
+        const [order] = await db
+          .select()
+          .from(customerOrders)
+          .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+        if (!order) return res.status(404).json({ message: "Order not found" });
 
         await db
           .update(customerOrderBales)
-          .set({ priceUsed: newPriceNum.toFixed(2) })
-          .where(eq(customerOrderBales.id, bale.id));
-        updated++;
+          .set({ priceUsed: String(price) })
+          .where(and(eq(customerOrderBales.orderId, orderId), eq(customerOrderBales.articleCode, articleCode)));
+
+        await recalculateOrderTotals(db, orderId);
+
+        const [updatedOrder] = await db.select().from(customerOrders).where(eq(customerOrders.id, orderId));
+
+        const newGrandTotal = parseFloat(updatedOrder.grandTotal || "0");
+        const [existingLedgerEntry] = await db
+          .select({ id: customerBalances.id })
+          .from(customerBalances)
+          .where(
+            and(
+              eq(customerBalances.companyId, companyId),
+              eq(customerBalances.referenceType, "INVOICE"),
+              eq(customerBalances.referenceId, orderId)
+            )
+          );
+        if (existingLedgerEntry) {
+          await db
+            .update(customerBalances)
+            .set({ debitAmount: String(newGrandTotal), balance: String(newGrandTotal) })
+            .where(eq(customerBalances.id, existingLedgerEntry.id));
+        }
+
+        res.json(updatedOrder);
+      } catch (error: unknown) {
+        logger.error("Error repricing article:", { error: error });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
-
-      await recalculateOrderTotals(db, orderId);
-
-      const [updatedOrder] = await db.select().from(customerOrders).where(eq(customerOrders.id, orderId));
-
-      // Keep customer balance ledger entry in sync if already finalized entry exists
-      const newGrandTotal = parseFloat(updatedOrder.grandTotal || "0");
-      const [existingLedgerEntry] = await db
-        .select({ id: customerBalances.id })
-        .from(customerBalances)
-        .where(
-          and(
-            eq(customerBalances.companyId, companyId),
-            eq(customerBalances.referenceType, "INVOICE"),
-            eq(customerBalances.referenceId, orderId)
-          )
-        );
-      if (existingLedgerEntry) {
-        await db
-          .update(customerBalances)
-          .set({ debitAmount: String(newGrandTotal), balance: String(newGrandTotal) })
-          .where(eq(customerBalances.id, existingLedgerEntry.id));
-      }
-
-      const updatedBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
-      const updatedLines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
-      const updatedCharges = await db
-        .select()
-        .from(customerOrderCharges)
-        .where(eq(customerOrderCharges.orderId, orderId));
-
-      res.json({
-        ...updatedOrder,
-        bales: updatedBales,
-        lines: updatedLines,
-        charges: updatedCharges,
-        repriced: updated,
-      });
-    } catch (error: unknown) {
-      logger.error("Error applying proforma prices:", { error: error });
-      res.status(500).json({ message: getErrorMessage(error) });
     }
-  });
+  );
 
-  app.patch("/api/factory/customer-orders/:id/bales/reprice-article", requireAuth, async (req: any, res: any) => {
-    try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
-
-      const orderId = parseId(req.params.id);
-
-      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
-      const { articleCode, pricePerBale } = req.body;
-
-      if (!articleCode || pricePerBale === undefined || pricePerBale === null) {
-        return res.status(400).json({ message: "articleCode and pricePerBale are required" });
-      }
-
-      const price = parseFloat(pricePerBale);
-      if (isNaN(price) || price < 0) {
-        return res.status(400).json({ message: "Invalid price value" });
-      }
-
-      const [order] = await db
-        .select()
-        .from(customerOrders)
-        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
-      if (!order) return res.status(404).json({ message: "Order not found" });
-
-      await db
-        .update(customerOrderBales)
-        .set({ priceUsed: String(price) })
-        .where(and(eq(customerOrderBales.orderId, orderId), eq(customerOrderBales.articleCode, articleCode)));
-
-      await recalculateOrderTotals(db, orderId);
-
-      const [updatedOrder] = await db.select().from(customerOrders).where(eq(customerOrders.id, orderId));
-
-      const newGrandTotal = parseFloat(updatedOrder.grandTotal || "0");
-      const [existingLedgerEntry] = await db
-        .select({ id: customerBalances.id })
-        .from(customerBalances)
-        .where(
-          and(
-            eq(customerBalances.companyId, companyId),
-            eq(customerBalances.referenceType, "INVOICE"),
-            eq(customerBalances.referenceId, orderId)
-          )
-        );
-      if (existingLedgerEntry) {
-        await db
-          .update(customerBalances)
-          .set({ debitAmount: String(newGrandTotal), balance: String(newGrandTotal) })
-          .where(eq(customerBalances.id, existingLedgerEntry.id));
-      }
-
-      res.json(updatedOrder);
-    } catch (error: unknown) {
-      logger.error("Error repricing article:", { error: error });
-      res.status(500).json({ message: getErrorMessage(error) });
-    }
-  });
-
-  app.post("/api/factory/repair-perkg-prices", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/repair-perkg-prices", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

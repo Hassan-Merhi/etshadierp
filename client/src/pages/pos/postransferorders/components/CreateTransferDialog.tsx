@@ -3,18 +3,18 @@
  *
  * Extracted from PosTransferOrders.tsx during the Phase 4 god-file split.
  */
-import {useState, useMemo, useRef} from "react";
-import {useQuery, useMutation} from "@tanstack/react-query";
-import {Loader2, Save, Search, Trash2} from "lucide-react";
-import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
-import {Textarea} from "@/components/ui/textarea";
-import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription} from "@/components/ui/dialog";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {useToast} from "@/hooks/use-toast";
-import {queryClient} from "@/lib/queryClient";
-import type {InventoryItem, NewTransferItem} from "../types";
-import {fmtQty} from "../utils";
+import { useState, useMemo, useRef } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Loader2, Save, Search, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
+import type { InventoryItem, NewTransferItem } from "../types";
+import { fmtQty } from "../utils";
 
 export function CreateTransferDialog({
   open,
@@ -199,7 +199,7 @@ export function CreateTransferDialog({
               </div>
               {itemSearch && searchMatches.length > 0 && (
                 <div className="border rounded-md overflow-hidden max-h-48 overflow-y-auto">
-                  {searchMatches.map((inv: any) => {
+                  {searchMatches.map((inv) => {
                     const qty = parseFloat(inv.quantity ?? "0") || 0;
                     return (
                       <button

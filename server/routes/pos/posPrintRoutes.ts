@@ -4,22 +4,12 @@ import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
-import {
-  locations,
-  vouchers,
-  voucherEntries,
-  ledgerAccounts,
-  posShifts,
-  companies,
-} from "@shared/schema";
+import { locations, vouchers, voucherEntries, ledgerAccounts, posShifts, companies } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { generateStockPdf } from "../../helpers/generateStockPdf";
 import { generateInvoicePdf, generateInvoicePdfMeta } from "../../helpers/generateInvoicePdf";
 import { getErpExportVisibility } from "../../helpers/exportVisibility";
-import {
-  sendWhatsAppFileToChatIdPos,
-  sendWhatsAppFileByUploadPos,
-} from "../../services/whatsappService";
+import { sendWhatsAppFileToChatIdPos, sendWhatsAppFileByUploadPos } from "../../services/whatsappService";
 import { tempPdfStore } from "./posHelpers";
 
 export function registerPosPrintRoutes(app: Express): void {
@@ -64,7 +54,7 @@ export function registerPosPrintRoutes(app: Express): void {
         return res.status(400).json({ message: "No WhatsApp group configured for this location" });
 
       const pdfBuffer = Buffer.from(pdfBase64, "base64");
-      const safeFile = (filename || "report.pdf").replace(/[^\w\s.()\-]/g, "_");
+      const safeFile = (filename || "report.pdf").replace(/[^\w\s.()-]/g, "_");
 
       logger.info(`[WA PDF upload] chatId=${location.whatsappGroupChatId} file=${safeFile} size=${pdfBuffer.length}`);
       const result = await sendWhatsAppFileByUploadPos(
@@ -136,7 +126,7 @@ export function registerPosPrintRoutes(app: Express): void {
       }
 
       const dateStr = getClientDate(req);
-      const safeName = `${locName} STK ${companyName} ${dateStr}`.replace(/[^\w\s.()\-]/g, "_").trim();
+      const safeName = `${locName} STK ${companyName} ${dateStr}`.replace(/[^\w\s.()-]/g, "_").trim();
       const stampStr = new Date().toLocaleString("en-GB", {
         day: "2-digit",
         month: "short",
@@ -228,16 +218,19 @@ export function registerPosPrintRoutes(app: Express): void {
       // inside the PDF generator when no item has a configured price — do NOT
       // force them hidden here, or a location with a selling price fix would
       // lose its P/L per bale + Total P/L on the WhatsApp invoice.
-      const compactMode   = true;
-      const whatsappMode  = true;
+      const compactMode = true;
+      const whatsappMode = true;
       const erpVis = await getErpExportVisibility(req);
       const hideProfitCols = erpVis.hideSelling || erpVis.hideCost;
-      const { buffer: pdfBuffer, pageCount, itemCount } = await generateInvoicePdfMeta(
-        parsedVoucherId,
-        companyId,
-        (req as any).user?.username,
-        { hideProfitCols, compactMode, whatsappMode },
-      );
+      const {
+        buffer: pdfBuffer,
+        pageCount,
+        itemCount,
+      } = await generateInvoicePdfMeta(parsedVoucherId, companyId, (req as any).user?.username, {
+        hideProfitCols,
+        compactMode,
+        whatsappMode,
+      });
 
       // ── PDF validation ─────────────────────────────────────────────────────
       const pdfSize = pdfBuffer?.length ?? 0;
@@ -252,15 +245,19 @@ export function registerPosPrintRoutes(app: Express): void {
 
       logger.info(
         `[WA invoice backend] voucherId=${voucherId} locationId=${locId} itemCount=${itemCount} ` +
-        `pageCount=${pageCount} pdfSize=${pdfSize} compactMode=${compactMode} dryRun=${!!dryRun}`,
+          `pageCount=${pageCount} pdfSize=${pdfSize} compactMode=${compactMode} dryRun=${!!dryRun}`
       );
 
       if (!pdfBuffer || pdfSize < 1000 || !validHeader) {
-        logger.error(`[WA invoice backend] PDF validation failed voucherId=${voucherId} size=${pdfSize} validHeader=${validHeader}`);
+        logger.error(
+          `[WA invoice backend] PDF validation failed voucherId=${voucherId} size=${pdfSize} validHeader=${validHeader}`
+        );
         return res.status(500).json({ message: "PDF generation failed: invalid or empty PDF" });
       }
       if (!pageCountOk) {
-        logger.error(`[WA invoice backend] PDF page count excessive voucherId=${voucherId} pages=${pageCount} items=${itemCount}`);
+        logger.error(
+          `[WA invoice backend] PDF page count excessive voucherId=${voucherId} pages=${pageCount} items=${itemCount}`
+        );
         return res.status(500).json({
           message: `PDF page count (${pageCount}) is excessive for ${itemCount} items — aborting WhatsApp send`,
         });
@@ -269,17 +266,17 @@ export function registerPosPrintRoutes(app: Express): void {
       // ── Dry-run: return metadata, do NOT send to WhatsApp ─────────────────
       if (dryRun) {
         // Build filename for the dry-run response (same logic as real send)
-        const locName  = location.name;
-        const dateStr  = getClientDate(req);
-        const rawName  = `${locName} Invoice ${dateStr}`;
-        const safeName = rawName.replace(/[^\w\s.()\-]/g, "_").trim();
+        const locName = location.name;
+        const dateStr = getClientDate(req);
+        const rawName = `${locName} Invoice ${dateStr}`;
+        const safeName = rawName.replace(/[^\w\s.()-]/g, "_").trim();
         return res.json({
-          success:     true,
-          dryRun:      true,
+          success: true,
+          dryRun: true,
           pdfSize,
           pageCount,
           itemCount,
-          filename:    `${safeName}.pdf`,
+          filename: `${safeName}.pdf`,
           compactMode,
           whatsappMode,
         });
@@ -300,24 +297,22 @@ export function registerPosPrintRoutes(app: Express): void {
           .select({ name: ledgerAccounts.name })
           .from(voucherEntries)
           .innerJoin(ledgerAccounts, eq(ledgerAccounts.id, voucherEntries.ledgerAccountId))
-          .where(
-            and(eq(voucherEntries.voucherId, parsedVoucherId), sql`${voucherEntries.debitAmount}::numeric > 0`),
-          )
+          .where(and(eq(voucherEntries.voucherId, parsedVoucherId), sql`${voucherEntries.debitAmount}::numeric > 0`))
           .limit(1);
         customerNameForFile = custEntry?.name || null;
       }
 
-      const rawName  = customerNameForFile
+      const rawName = customerNameForFile
         ? `${customerNameForFile} Invoice ${locName} ${dateStr}`
         : `${locName} Invoice ${dateStr}`;
-      const safeName = rawName.replace(/[^\w\s.()\-]/g, "_").trim();
-      const caption  = "";
+      const safeName = rawName.replace(/[^\w\s.()-]/g, "_").trim();
+      const caption = "";
 
       const result = await sendWhatsAppFileToChatIdPos(
         location.whatsappGroupChatId!,
         pdfBuffer,
         `${safeName}.pdf`,
-        caption,
+        caption
       );
 
       if (!result.success) return res.status(502).json({ message: result.error ?? "WhatsApp send failed" });
@@ -370,7 +365,7 @@ export function registerPosPrintRoutes(app: Express): void {
       }
       const dateStr = voucherRow.voucherDate ? String(voucherRow.voucherDate).slice(0, 10) : getClientDate(req);
       const rawName = customerName ? `${customerName} Invoice ${dateStr}` : `Invoice ${dateStr}`;
-      const safeName = rawName.replace(/[^\w\s.()\-]/g, "_").trim();
+      const safeName = rawName.replace(/[^\w\s.()-]/g, "_").trim();
 
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `inline; filename="${safeName}.pdf"`);

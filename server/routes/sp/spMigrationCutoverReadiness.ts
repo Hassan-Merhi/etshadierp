@@ -200,8 +200,8 @@ export async function buildCutoverReadiness(sourceId: number, targetId: number):
     ORDER BY id ASC
   `);
   const sourceInventory = resultRows(sourceInventoryResult);
-  const stockDiffs: any[] = [];
-  const unmappedInventory: any[] = [];
+  const stockDiffs = [];
+  const unmappedInventory = [];
 
   for (const sourceRow of sourceInventory) {
     const targetStockItemId = stockItemMap.get(pn(sourceRow.stock_item_id));

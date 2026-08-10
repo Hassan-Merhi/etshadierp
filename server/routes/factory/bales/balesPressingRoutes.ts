@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { parseId } from "../../../lib/parseId";
@@ -39,7 +39,7 @@ export function registerBalesPressingRoutes(app: Express) {
   registerFactoryMixBatchRoutes(app);
   registerFactoryBaleExportRoutes(app);
   registerFactoryFxRatesRoutes(app);
-  app.post("/api/factory/pressing/create-and-print", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/pressing/create-and-print", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -90,7 +90,7 @@ export function registerBalesPressingRoutes(app: Express) {
           });
         }
 
-        const bales: any[] = [];
+        const bales = [];
         for (let i = 0; i < quantity; i++) {
           const refNum = `REF${String(nextNumber + i).padStart(6, "0")}`;
           const [bale] = await tx
@@ -130,7 +130,7 @@ export function registerBalesPressingRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/pressing/create-multi", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/pressing/create-multi", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -140,7 +140,7 @@ export function registerBalesPressingRoutes(app: Express) {
         return res.status(400).json({ message: "items array is required with at least one entry" });
       }
 
-      const parsedQuantities = items.map((item: any) => parseBaleQuantity(item.quantity ?? item.qty));
+      const parsedQuantities = items.map((item) => parseBaleQuantity(item.quantity ?? item.qty));
       if (parsedQuantities.some((quantity: number | null) => quantity === null)) {
         return res.status(400).json({ message: QUANTITY_MESSAGE });
       }
@@ -180,7 +180,7 @@ export function registerBalesPressingRoutes(app: Express) {
           });
         }
 
-        const bales: any[] = [];
+        const bales = [];
         let baleIndex = 0;
 
         for (const [itemIndex, item] of items.entries()) {
@@ -235,7 +235,7 @@ export function registerBalesPressingRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/bales/create-batch", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/bales/create-batch", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -286,7 +286,7 @@ export function registerBalesPressingRoutes(app: Express) {
           });
         }
 
-        const bales: any[] = [];
+        const bales = [];
         for (let i = 0; i < quantity; i++) {
           const refNum = `REF${String(nextNumber + i).padStart(6, "0")}`;
           const [bale] = await tx
@@ -320,7 +320,7 @@ export function registerBalesPressingRoutes(app: Express) {
   // 8. Factory Pressing Batches
   // ───────────────────────────────────────────────
 
-  app.get("/api/factory/pressing-batches", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/pressing-batches", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -355,8 +355,8 @@ export function registerBalesPressingRoutes(app: Express) {
             .where(eq(factoryBales.pressingBatchId, batch.id))
             .orderBy(factoryBales.referenceNumber);
 
-          const pendingCount = balesForBatch.filter((b: any) => b.status === "PENDING_PRESSING").length;
-          const finalizedCount = balesForBatch.filter((b: any) => b.status === "IN_STOCK").length;
+          const pendingCount = balesForBatch.filter((b) => b.status === "PENDING_PRESSING").length;
+          const finalizedCount = balesForBatch.filter((b) => b.status === "IN_STOCK").length;
 
           return { ...batch, pendingCount, finalizedCount, bales: balesForBatch };
         })
@@ -369,7 +369,7 @@ export function registerBalesPressingRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/pressing-batches/:id", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/pressing-batches/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

@@ -2,7 +2,7 @@ import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { parseId } from "../../../lib/parseId";
 import { getClientDate } from "../../../lib/dateUtils";
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { getOrCreateLedgerAccount, recalculateOrderTotals } from "../_helpers";
@@ -19,7 +19,7 @@ import {
 import { eq, and, sql, inArray, isNull } from "drizzle-orm";
 
 export function registerOrderChargesRoutes(app: Express) {
-  app.post("/api/factory/customer-orders/:id/charges", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/customer-orders/:id/charges", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -252,152 +252,156 @@ export function registerOrderChargesRoutes(app: Express) {
   });
 
   // Retroactively create missing ledger vouchers for charges that were saved without one
-  app.post("/api/factory/customer-orders/:id/charges/relink-vouchers", requireAuth, async (req: any, res: any) => {
-    try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
+  app.post(
+    "/api/factory/customer-orders/:id/charges/relink-vouchers",
+    requireAuth,
+    async (req: Request, res: Response) => {
+      try {
+        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const orderId = parseId(req.params.id);
-      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
+        const orderId = parseId(req.params.id);
+        if (orderId === null) return res.status(400).json({ message: "Invalid id" });
 
-      const [order] = await db
-        .select()
-        .from(customerOrders)
-        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
-      if (!order) return res.status(404).json({ message: "Order not found" });
-      if (order.status !== "FINALIZED") return res.status(400).json({ message: "Order is not finalized" });
+        const [order] = await db
+          .select()
+          .from(customerOrders)
+          .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+        if (!order) return res.status(404).json({ message: "Order not found" });
+        if (order.status !== "FINALIZED") return res.status(400).json({ message: "Order is not finalized" });
 
-      const [customer] = await db
-        .select({ ledgerAccountId: customers.ledgerAccountId, legalName: customers.legalName })
-        .from(customers)
-        .where(eq(customers.id, order.customerId));
-
-      // Auto-create and link a ledger account for the customer if one doesn't exist yet
-      let customerLedgerAccountId = customer?.ledgerAccountId;
-      if (!customerLedgerAccountId) {
-        const customerName = customer?.legalName || `Customer ${order.customerId}`;
-        customerLedgerAccountId = await getOrCreateLedgerAccount(
-          companyId,
-          `CUST-${order.customerId}`,
-          customerName,
-          "Asset"
-        );
-        await db
-          .update(customers)
-          .set({ ledgerAccountId: customerLedgerAccountId })
+        const [customer] = await db
+          .select({ ledgerAccountId: customers.ledgerAccountId, legalName: customers.legalName })
+          .from(customers)
           .where(eq(customers.id, order.customerId));
-      }
 
-      // Find all charges missing a voucher
-      const unlinkedCharges = await db
-        .select()
-        .from(customerOrderCharges)
-        .where(and(eq(customerOrderCharges.orderId, orderId), isNull(customerOrderCharges.voucherId)));
-
-      const actionableCharges = unlinkedCharges.filter((c) => parseFloat(c.amount || "0") > 0);
-      if (actionableCharges.length === 0) {
-        return res.json({ linked: 0, message: "All charges already have ledger entries — nothing to relink." });
-      }
-
-      // For charges without a ledgerAccountId, attempt to auto-match by name
-      // (e.g. a charge named "Surcharge" matches a ledger account named "Surcharge")
-      const allLedgerAccounts = await db
-        .select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
-        .from(ledgerAccounts)
-        .where(eq(ledgerAccounts.companyId, companyId));
-
-      const resolvedCharges: Array<(typeof actionableCharges)[0] & { resolvedLedgerAccountId: number }> = [];
-      const skipped: string[] = [];
-
-      for (const charge of actionableCharges) {
-        let resolvedId = charge.ledgerAccountId ?? null;
-        if (!resolvedId && charge.name) {
-          const match = allLedgerAccounts.find(
-            (a) => a.name.trim().toLowerCase() === charge.name!.trim().toLowerCase()
+        // Auto-create and link a ledger account for the customer if one doesn't exist yet
+        let customerLedgerAccountId = customer?.ledgerAccountId;
+        if (!customerLedgerAccountId) {
+          const customerName = customer?.legalName || `Customer ${order.customerId}`;
+          customerLedgerAccountId = await getOrCreateLedgerAccount(
+            companyId,
+            `CUST-${order.customerId}`,
+            customerName,
+            "Asset"
           );
-          if (match) {
-            resolvedId = match.id;
-            // Persist the resolved account so future relinks don't need to re-match
-            await db
-              .update(customerOrderCharges)
-              .set({ ledgerAccountId: resolvedId })
-              .where(eq(customerOrderCharges.id, charge.id));
+          await db
+            .update(customers)
+            .set({ ledgerAccountId: customerLedgerAccountId })
+            .where(eq(customers.id, order.customerId));
+        }
+
+        // Find all charges missing a voucher
+        const unlinkedCharges = await db
+          .select()
+          .from(customerOrderCharges)
+          .where(and(eq(customerOrderCharges.orderId, orderId), isNull(customerOrderCharges.voucherId)));
+
+        const actionableCharges = unlinkedCharges.filter((c) => parseFloat(c.amount || "0") > 0);
+        if (actionableCharges.length === 0) {
+          return res.json({ linked: 0, message: "All charges already have ledger entries — nothing to relink." });
+        }
+
+        // For charges without a ledgerAccountId, attempt to auto-match by name
+        // (e.g. a charge named "Surcharge" matches a ledger account named "Surcharge")
+        const allLedgerAccounts = await db
+          .select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
+          .from(ledgerAccounts)
+          .where(eq(ledgerAccounts.companyId, companyId));
+
+        const resolvedCharges: Array<(typeof actionableCharges)[0] & { resolvedLedgerAccountId: number }> = [];
+        const skipped: string[] = [];
+
+        for (const charge of actionableCharges) {
+          let resolvedId = charge.ledgerAccountId ?? null;
+          if (!resolvedId && charge.name) {
+            const match = allLedgerAccounts.find(
+              (a) => a.name.trim().toLowerCase() === charge.name!.trim().toLowerCase()
+            );
+            if (match) {
+              resolvedId = match.id;
+              // Persist the resolved account so future relinks don't need to re-match
+              await db
+                .update(customerOrderCharges)
+                .set({ ledgerAccountId: resolvedId })
+                .where(eq(customerOrderCharges.id, charge.id));
+            }
+          }
+          if (resolvedId) {
+            resolvedCharges.push({ ...charge, resolvedLedgerAccountId: resolvedId });
+          } else {
+            skipped.push(charge.name || `#${charge.id}`);
           }
         }
-        if (resolvedId) {
-          resolvedCharges.push({ ...charge, resolvedLedgerAccountId: resolvedId });
-        } else {
-          skipped.push(charge.name || `#${charge.id}`);
+
+        if (resolvedCharges.length === 0) {
+          const skippedMsg = skipped.length
+            ? ` Could not auto-match: ${skipped.join(", ")}. Link a ledger account to each charge first.`
+            : "";
+          return res.json({ linked: 0, message: `No charges could be linked.${skippedMsg}` });
         }
-      }
 
-      if (resolvedCharges.length === 0) {
+        const voucherRef = order.invoiceNumber || `ORD-${orderId}`;
+        let linked = 0;
+
+        for (const charge of resolvedCharges) {
+          const chargeAmt = parseFloat(charge.amount || "0");
+          const chargeVoucherNumber = `CHARGE-${voucherRef}-${charge.id}-${Date.now()}`;
+          const chargeDesc = order.containerNumber
+            ? `${charge.name} for offloaded container - ${order.containerNumber}`
+            : `${charge.name} - ${voucherRef}`;
+
+          await db.transaction(async (tx: any) => {
+            const [chargeVoucher] = await tx
+              .insert(vouchers)
+              .values({
+                companyId,
+                voucherType: "Journal",
+                voucherNumber: chargeVoucherNumber,
+                voucherDate: order.orderDate || getClientDate(req),
+                description: chargeDesc,
+                totalAmount: String(chargeAmt),
+                sourceModule: "FACTORY",
+              })
+              .returning();
+            await tx.insert(voucherEntries).values({
+              voucherId: chargeVoucher.id,
+              ledgerAccountId: customerLedgerAccountId,
+              customerId: order.customerId,
+              debitAmount: String(chargeAmt),
+              creditAmount: "0",
+              narration: chargeDesc,
+            });
+            await tx.insert(voucherEntries).values({
+              voucherId: chargeVoucher.id,
+              ledgerAccountId: charge.resolvedLedgerAccountId,
+              debitAmount: "0",
+              creditAmount: String(chargeAmt),
+              narration: chargeDesc,
+            });
+            await tx
+              .update(customerOrderCharges)
+              .set({ voucherId: chargeVoucher.id })
+              .where(eq(customerOrderCharges.id, charge.id));
+          });
+          linked++;
+        }
+
         const skippedMsg = skipped.length
-          ? ` Could not auto-match: ${skipped.join(", ")}. Link a ledger account to each charge first.`
+          ? ` ${skipped.length} skipped (no matching account): ${skipped.join(", ")}.`
           : "";
-        return res.json({ linked: 0, message: `No charges could be linked.${skippedMsg}` });
-      }
-
-      const voucherRef = order.invoiceNumber || `ORD-${orderId}`;
-      let linked = 0;
-
-      for (const charge of resolvedCharges) {
-        const chargeAmt = parseFloat(charge.amount || "0");
-        const chargeVoucherNumber = `CHARGE-${voucherRef}-${charge.id}-${Date.now()}`;
-        const chargeDesc = order.containerNumber
-          ? `${charge.name} for offloaded container - ${order.containerNumber}`
-          : `${charge.name} - ${voucherRef}`;
-
-        await db.transaction(async (tx: any) => {
-          const [chargeVoucher] = await tx
-            .insert(vouchers)
-            .values({
-              companyId,
-              voucherType: "Journal",
-              voucherNumber: chargeVoucherNumber,
-              voucherDate: order.orderDate || getClientDate(req),
-              description: chargeDesc,
-              totalAmount: String(chargeAmt),
-              sourceModule: "FACTORY",
-            })
-            .returning();
-          await tx.insert(voucherEntries).values({
-            voucherId: chargeVoucher.id,
-            ledgerAccountId: customerLedgerAccountId,
-            customerId: order.customerId,
-            debitAmount: String(chargeAmt),
-            creditAmount: "0",
-            narration: chargeDesc,
-          });
-          await tx.insert(voucherEntries).values({
-            voucherId: chargeVoucher.id,
-            ledgerAccountId: charge.resolvedLedgerAccountId,
-            debitAmount: "0",
-            creditAmount: String(chargeAmt),
-            narration: chargeDesc,
-          });
-          await tx
-            .update(customerOrderCharges)
-            .set({ voucherId: chargeVoucher.id })
-            .where(eq(customerOrderCharges.id, charge.id));
+        res.json({
+          linked,
+          message: `${linked} charge${linked !== 1 ? "s" : ""} successfully linked to the ledger.${skippedMsg}`,
         });
-        linked++;
+      } catch (error: unknown) {
+        logger.error("Error relinking charge vouchers:", { error: error });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
-
-      const skippedMsg = skipped.length
-        ? ` ${skipped.length} skipped (no matching account): ${skipped.join(", ")}.`
-        : "";
-      res.json({
-        linked,
-        message: `${linked} charge${linked !== 1 ? "s" : ""} successfully linked to the ledger.${skippedMsg}`,
-      });
-    } catch (error: unknown) {
-      logger.error("Error relinking charge vouchers:", { error: error });
-      res.status(500).json({ message: getErrorMessage(error) });
     }
-  });
+  );
 
-  app.patch("/api/factory/customer-orders/:id/charges/:chargeId", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/customer-orders/:id/charges/:chargeId", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -648,7 +652,7 @@ export function registerOrderChargesRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/factory/customer-orders/:id/charges/:chargeId", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/customer-orders/:id/charges/:chargeId", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -703,7 +707,7 @@ export function registerOrderChargesRoutes(app: Express) {
               })`
             )
           );
-        chargeVoucherIdsToDelete = legacyMatches.map((v: any) => v.id);
+        chargeVoucherIdsToDelete = legacyMatches.map((v) => v.id);
       }
 
       if (chargeVoucherIdsToDelete.length > 0) {

@@ -182,7 +182,7 @@ export function useLocationInventoryQueries({
     retry: false,
   });
   // queryFn always resolves to a flat array of inventory rows.
-  const allInventoryData: any[] = Array.isArray(allInventoryRaw) ? allInventoryRaw : [];
+  const allInventoryData = Array.isArray(allInventoryRaw) ? allInventoryRaw : [];
 
   const { data: allNegativeStock = [], isLoading: negativeStockLoading } = useQuery<any[]>({
     queryKey: companyId ? ["/api/inventory/negative", companyId] : [],

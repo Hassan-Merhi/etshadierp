@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { logAudit } from "../../helpers/auditHelpers";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
@@ -28,7 +28,7 @@ import {
 import { eq, and, desc, sql, inArray, not } from "drizzle-orm";
 
 export function registerBalesCrudRoutes(app: Express) {
-  app.get("/api/factory/bales", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/bales", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -54,7 +54,7 @@ export function registerBalesCrudRoutes(app: Express) {
       const page = pageQ !== undefined ? Math.max(1, Number(pageQ) || 1) : null;
       const rowOffset = page !== null ? (page - 1) * rowLimit : Math.max(Number(offsetQ) || 0, 0);
 
-      const conditions: any[] = [
+      const conditions = [
         eq(factoryBales.companyId, companyId),
         // Always exclude deleted/removed bales from the history view
         not(inArray(factoryBales.status, ["DELETED", "REMOVED"])),
@@ -169,7 +169,7 @@ export function registerBalesCrudRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/factory/bales/bulk-status", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/bales/bulk-status", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -209,7 +209,7 @@ export function registerBalesCrudRoutes(app: Express) {
   });
 
   // PATCH /api/factory/bales/bulk-date — update stock_entry_date for a set of bales
-  app.patch("/api/factory/bales/bulk-date", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/bales/bulk-date", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -233,7 +233,7 @@ export function registerBalesCrudRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/factory/bales/:id/status", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/bales/:id/status", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -316,7 +316,7 @@ export function registerBalesCrudRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/factory/bales/:id", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/bales/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -349,7 +349,7 @@ export function registerBalesCrudRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/factory/bales/:id/product-name", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/bales/:id/product-name", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -398,7 +398,7 @@ export function registerBalesCrudRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/factory/bales/:id/assign-worker", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/bales/:id/assign-worker", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -455,7 +455,7 @@ export function registerBalesCrudRoutes(app: Express) {
   });
 
   // ── Bulk assign worker to multiple bales (for stock entry history groups) ──
-  app.patch("/api/factory/bales/bulk-assign-worker", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/bales/bulk-assign-worker", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -511,7 +511,7 @@ export function registerBalesCrudRoutes(app: Express) {
   });
 
   // ── Correct bale weight (cascades to load bales, invoice bales, order bales) ──
-  app.patch("/api/factory/bales/:id/weight", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/bales/:id/weight", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -603,7 +603,7 @@ export function registerBalesCrudRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/bales/:id/repack", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/bales/:id/repack", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

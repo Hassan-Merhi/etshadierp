@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { and, eq, sql } from "drizzle-orm";
 import {
   spContainers,
@@ -44,7 +44,7 @@ function lifecycleDate(value: unknown): string {
 }
 
 export function registerSpLifecycleRoutes(app: Express) {
-  app.post("/api/sp/sales/:id/reverse", requireAuth, requireRole("Admin"), async (req: any, res: any) => {
+  app.post("/api/sp/sales/:id/reverse", requireAuth, requireRole("Admin"), async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
@@ -231,7 +231,7 @@ export function registerSpLifecycleRoutes(app: Express) {
     }
   });
 
-  app.post("/api/sp/containers/:id/cancel", requireAuth, requireRole("Admin"), async (req: any, res: any) => {
+  app.post("/api/sp/containers/:id/cancel", requireAuth, requireRole("Admin"), async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;

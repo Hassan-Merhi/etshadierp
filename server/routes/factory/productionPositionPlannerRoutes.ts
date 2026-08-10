@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { sql } from "drizzle-orm";
 import { requireAuth } from "../../auth";
 import { db } from "../../db";
@@ -50,7 +50,7 @@ function parseMembers(value: unknown): ProductionBonusMemberSnapshot[] {
   }
   if (!Array.isArray(parsed)) return [];
   return parsed
-    .map((member: any) => ({
+    .map((member) => ({
       workerId: Number(member?.workerId),
       workerName: String(member?.workerName ?? ""),
     }))
@@ -98,7 +98,7 @@ async function loadEffectivePositionSnapshots(companyId: number, date: string): 
     ORDER BY p.name
   `);
 
-  return rows(result).map((row: any) => ({
+  return rows(result).map((row) => ({
     positionId: Number(row.positionId),
     positionName: String(row.positionName),
     targetBales: Number(row.targetBales ?? 0),
@@ -122,7 +122,7 @@ async function loadSavedPositionSnapshots(planId: number, companyId: number): Pr
     WHERE plan_id = ${planId} AND company_id = ${companyId}
     ORDER BY position_name_snapshot
   `);
-  return rows(result).map((row: any) => ({
+  return rows(result).map((row) => ({
     positionId: Number(row.positionId),
     positionName: String(row.positionName),
     targetBales: Number(row.targetBales ?? 0),
@@ -246,7 +246,7 @@ async function buildPlannerResponse(companyId: number, date: string) {
 function validateEntries(value: unknown): PositionPlanInput[] {
   if (!Array.isArray(value)) throw new Error("entries must be an array");
   const seen = new Set<number>();
-  return value.map((raw: any) => {
+  return value.map((raw) => {
     const positionId = Number(raw?.positionId);
     const targetBales = Number(raw?.targetBales);
     const bonusPerExtraBale = Number(raw?.bonusPerExtraBale);
@@ -265,7 +265,7 @@ function validateEntries(value: unknown): PositionPlanInput[] {
 }
 
 export function registerProductionPositionPlannerRoutes(app: Express) {
-  app.get("/api/factory/production-position-planner/:date", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/production-position-planner/:date", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = companyIdFor(req);
       const date = String(req.params.date ?? "");
@@ -278,7 +278,7 @@ export function registerProductionPositionPlannerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/production-position-planner/:date", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/production-position-planner/:date", requireAuth, async (req: Request, res: Response) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;
       const companyId = companyIdFor(req);
@@ -364,14 +364,17 @@ export function registerProductionPositionPlannerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/production-position-planner/:date/copy-previous", requireAuth, async (req: any, res: any) => {
-    try {
-      const companyId = companyIdFor(req);
-      const date = String(req.params.date ?? "");
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
-      if (!DATE_RE.test(date)) return res.status(400).json({ message: "Date must be YYYY-MM-DD" });
+  app.get(
+    "/api/factory/production-position-planner/:date/copy-previous",
+    requireAuth,
+    async (req: Request, res: Response) => {
+      try {
+        const companyId = companyIdFor(req);
+        const date = String(req.params.date ?? "");
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        if (!DATE_RE.test(date)) return res.status(400).json({ message: "Date must be YYYY-MM-DD" });
 
-      const previousResult = await db.execute(sql`
+        const previousResult = await db.execute(sql`
         SELECT p.id, p.plan_date, p.notes
         FROM factory_production_plans p
         WHERE p.company_id = ${companyId}
@@ -382,31 +385,32 @@ export function registerProductionPositionPlannerRoutes(app: Express) {
         ORDER BY p.plan_date DESC
         LIMIT 1
       `);
-      const previous = rows(previousResult)[0];
-      if (!previous) return res.json({ fromDate: null, notes: "", entries: [] });
+        const previous = rows(previousResult)[0];
+        if (!previous) return res.json({ fromDate: null, notes: "", entries: [] });
 
-      const previousEntries = await loadSavedPositionSnapshots(Number(previous.id), companyId);
-      const currentEntries = await loadEffectivePositionSnapshots(companyId, date);
-      const previousById = new Map(previousEntries.map((entry) => [entry.positionId, entry]));
-      const merged = currentEntries.map((entry) => {
-        const prior = previousById.get(entry.positionId);
-        return prior
-          ? {
-              ...entry,
-              targetBales: prior.targetBales,
-              bonusPerExtraBale: prior.bonusPerExtraBale,
-              bonusEnabled: prior.bonusEnabled,
-            }
-          : entry;
-      });
-      res.json({
-        fromDate: String(previous.plan_date),
-        notes: previous.notes ?? "",
-        entries: merged,
-      });
-    } catch (error: unknown) {
-      logger.error("[ProductionPositionPlanner] copy previous error", { error: getErrorMessage(error) });
-      res.status(500).json({ message: getErrorMessage(error) });
+        const previousEntries = await loadSavedPositionSnapshots(Number(previous.id), companyId);
+        const currentEntries = await loadEffectivePositionSnapshots(companyId, date);
+        const previousById = new Map(previousEntries.map((entry) => [entry.positionId, entry]));
+        const merged = currentEntries.map((entry) => {
+          const prior = previousById.get(entry.positionId);
+          return prior
+            ? {
+                ...entry,
+                targetBales: prior.targetBales,
+                bonusPerExtraBale: prior.bonusPerExtraBale,
+                bonusEnabled: prior.bonusEnabled,
+              }
+            : entry;
+        });
+        res.json({
+          fromDate: String(previous.plan_date),
+          notes: previous.notes ?? "",
+          entries: merged,
+        });
+      } catch (error: unknown) {
+        logger.error("[ProductionPositionPlanner] copy previous error", { error: getErrorMessage(error) });
+        res.status(500).json({ message: getErrorMessage(error) });
+      }
     }
-  });
+  );
 }

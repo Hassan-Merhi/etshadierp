@@ -3,7 +3,7 @@
  *
  * Extracted from DailyProductionReport.tsx during the Phase 4 god-file split.
  */
-import type {BucketRow} from "./types";
+import type { BucketRow } from "./types";
 
 export function todayStr() {
   return new Date().toISOString().slice(0, 10);

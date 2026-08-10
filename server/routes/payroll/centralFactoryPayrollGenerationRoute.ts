@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getClientDate } from "../../lib/dateUtils";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -8,9 +8,7 @@ import { generateFactoryPayrollBatch } from "../../services/payroll/factoryPayro
 
 function statusForGenerationError(error: unknown): number {
   const message = getErrorMessage(error);
-  if (
-    /required|invalid|YYYY-MM-DD|cannot be after|No active workers/i.test(message)
-  ) {
+  if (/required|invalid|YYYY-MM-DD|cannot be after|No active workers/i.test(message)) {
     return 400;
   }
   return 500;
@@ -24,7 +22,7 @@ function statusForGenerationError(error: unknown): number {
  * compatibility fallback in source but is shadowed by registration order.
  */
 export function registerCentralFactoryPayrollGenerationRoute(app: Express, requireAuth: any): void {
-  app.post("/api/factory/payroll/generate", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/payroll/generate", requireAuth, async (req: Request, res: Response) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;
 

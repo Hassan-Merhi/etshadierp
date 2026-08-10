@@ -1,25 +1,14 @@
-import { useLocation } from "wouter";
+import { useBackToParent } from "./use-back-to-parent";
 import { useEscapeBack } from "./use-escape-back";
-import { getParentRoute } from "@/lib/parent-routes";
-import { useAppMode } from "@/contexts/AppModeContext";
-import { goBackToPreviousErpLocation } from "@/lib/erp-navigation-history";
 
 /**
  * Esc-back wrapper.
  *
- * ERP mode prefers the exact previous browser entry so tabs/query state and
- * the originating list context survive. Direct links and refreshed detail
- * pages fall back to the deterministic parent-route registry.
- *
- * Factory/Properties retain deterministic parent routing.
+ * Delegates to the exact same callback as shared page Back controls, so ERP
+ * history, deterministic parent fallbacks, and Factory/Properties behavior
+ * cannot drift between clicking Back and pressing Escape.
  */
 export function useEscapeToParent(parent?: string | null) {
-  const [location, navigate] = useLocation();
-  const mode = useAppMode();
-  const target = parent ?? getParentRoute(location);
-
-  useEscapeBack(() => {
-    if (mode === "erp" && goBackToPreviousErpLocation()) return;
-    if (target) navigate(target);
-  });
+  const handleBack = useBackToParent(parent);
+  useEscapeBack(handleBack);
 }

@@ -250,8 +250,11 @@ export function ContainerFormBody({
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Estimated total value</span>
                 <span className="font-semibold font-mono tabular-nums">
-                  {sym}{total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  {currency !== "USD" && <span className="text-xs text-muted-foreground font-normal ml-1"> {currency}</span>}
+                  {sym}
+                  {total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {currency !== "USD" && (
+                    <span className="text-xs text-muted-foreground font-normal ml-1"> {currency}</span>
+                  )}
                   <span className="text-xs text-muted-foreground font-normal ml-1.5">
                     ({rate.toLocaleString("en-US", { maximumFractionDigits: 7 })} ×{" "}
                     {kg.toLocaleString("en-US", { maximumFractionDigits: 2 })} kg)
@@ -264,7 +267,8 @@ export function ContainerFormBody({
                   <span className="font-mono tabular-nums text-xs text-muted-foreground">
                     ${totalUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
                     <span className="ml-1.5 opacity-70">
-                      ({sym}{total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} × {fx} FX)
+                      ({sym}
+                      {total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} × {fx} FX)
                     </span>
                   </span>
                 </div>
@@ -378,7 +382,7 @@ export function ContainerFormBody({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__none__">None</SelectItem>
-              {ledgerAccounts.map((acc: any) => (
+              {ledgerAccounts.map((acc) => (
                 <SelectItem key={acc.id} value={String(acc.id)}>
                   {acc.name}
                   {acc.code ? ` (${acc.code})` : ""}
@@ -442,7 +446,7 @@ export function ContainerFormBody({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">None</SelectItem>
-                {ledgerAccounts.map((acc: any) => (
+                {ledgerAccounts.map((acc) => (
                   <SelectItem key={acc.id} value={String(acc.id)}>
                     {acc.name}
                     {acc.code ? ` (${acc.code})` : ""}
@@ -494,7 +498,7 @@ export function ContainerFormBody({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">Select account...</SelectItem>
-                    {ledgerAccounts.map((acc: any) => (
+                    {ledgerAccounts.map((acc) => (
                       <SelectItem key={acc.id} value={String(acc.id)}>
                         {acc.name}
                         {acc.code ? ` (${acc.code})` : ""}
@@ -520,7 +524,10 @@ export function ContainerFormBody({
               variant="outline"
               className="h-7 px-2 text-xs"
               onClick={() =>
-                setOtherChargeLines((prev) => [...prev, { amount: "", currencyCode: currency, ledgerAccountId: "", narration: "" }])
+                setOtherChargeLines((prev) => [
+                  ...prev,
+                  { amount: "", currencyCode: currency, ledgerAccountId: "", narration: "" },
+                ])
               }
               data-testid="button-add-other-charge"
             >
@@ -575,7 +582,7 @@ export function ContainerFormBody({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__none__">No account</SelectItem>
-                      {ledgerAccounts.map((acc: any) => (
+                      {ledgerAccounts.map((acc) => (
                         <SelectItem key={acc.id} value={String(acc.id)}>
                           {acc.name}
                           {acc.code ? ` (${acc.code})` : ""}

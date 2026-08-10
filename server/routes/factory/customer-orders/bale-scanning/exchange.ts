@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../../lib/httpHandlers";
 import { logger } from "../../../../lib/logger";
 import { parseId } from "../../../../lib/parseId";
@@ -24,7 +24,7 @@ import { eq, and, or, desc } from "drizzle-orm";
 
 export function registerOrderBaleExchangeRoutes(app: Express) {
   // POST /api/factory/customer-orders/:id/bales/exchange — swap one bale for another on a FINALIZED order
-  app.post("/api/factory/customer-orders/:id/bales/exchange", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/customer-orders/:id/bales/exchange", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -125,7 +125,7 @@ export function registerOrderBaleExchangeRoutes(app: Express) {
   });
 
   // GET removal log for a specific order/loading
-  app.get("/api/factory/customer-orders/:id/bale-removals", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/customer-orders/:id/bale-removals", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

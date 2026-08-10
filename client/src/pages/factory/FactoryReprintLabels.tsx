@@ -202,7 +202,9 @@ export default function FactoryReprintLabels() {
     for (const row of rowsToPrint) {
       try {
         await modeApiRequest("POST", "/api/bale-label-prints/reprint", { baleId: row.bale.id });
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
     }
 
     if (isZebraMode()) {

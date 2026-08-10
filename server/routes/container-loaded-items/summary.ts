@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { eq, and } from "drizzle-orm";
@@ -26,7 +26,7 @@ export function registerContainerLoadedItemSummaryRoutes(app: Express, requireAu
   app.get(
     "/api/suppliers/:supplierId/containers/:containerId/verification-summary-export.xlsx",
     requireAuth,
-    async (req: any, res: any) => {
+    async (req: Request, res: Response) => {
       try {
         const companyId = req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -90,11 +90,11 @@ export function registerContainerLoadedItemSummaryRoutes(app: Express, requireAu
         }
 
         const allBarcodes = new Set([...proformaByBarcode.keys(), ...loadedByBarcode.keys()]);
-        const overloaded: any[] = [];
-        const lessLoaded: any[] = [];
-        const notRequested: any[] = [];
-        const priceDiffs: any[] = [];
-        const fullComparison: any[] = [];
+        const overloaded = [];
+        const lessLoaded = [];
+        const notRequested = [];
+        const priceDiffs = [];
+        const fullComparison = [];
 
         for (const barcode of allBarcodes) {
           const exp = proformaByBarcode.get(barcode);
@@ -169,13 +169,13 @@ export function registerContainerLoadedItemSummaryRoutes(app: Express, requireAu
           titleFont: "FFFFFF",
           summaryBg: "F5F5F5",
         };
-        const sThin: any = {
+        const sThin = {
           top: { style: "thin", color: { argb: "BDBDBD" } },
           left: { style: "thin", color: { argb: "BDBDBD" } },
           bottom: { style: "thin", color: { argb: "BDBDBD" } },
           right: { style: "thin", color: { argb: "BDBDBD" } },
         };
-        const dblBorder: any = {
+        const dblBorder = {
           top: { style: "double", color: { argb: "424242" } },
           bottom: { style: "double", color: { argb: "424242" } },
           left: sThin.left,

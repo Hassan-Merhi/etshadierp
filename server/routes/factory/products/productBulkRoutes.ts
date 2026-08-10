@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { parseId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
@@ -16,7 +16,7 @@ import { factoryBaleProducts } from "@shared/schema";
 import { eq, and, or, sql, inArray, ilike } from "drizzle-orm";
 
 export function registerFactoryProductBulkRoutes(app: Express) {
-  app.delete("/api/factory/bale-products/:id", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/bale-products/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -38,7 +38,7 @@ export function registerFactoryProductBulkRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/bale-products/bulk-toggle-active", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/bale-products/bulk-toggle-active", requireAuth, async (req: Request, res: Response) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
@@ -59,7 +59,7 @@ export function registerFactoryProductBulkRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/bale-products/bulk-rename-preview", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/bale-products/bulk-rename-preview", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -99,7 +99,7 @@ export function registerFactoryProductBulkRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/bale-products/bulk-rename-apply", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/bale-products/bulk-rename-apply", requireAuth, async (req: Request, res: Response) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
@@ -128,7 +128,7 @@ export function registerFactoryProductBulkRoutes(app: Express) {
   });
 
   // POST /api/factory/bale-products/merge — merge source products into target
-  app.post("/api/factory/bale-products/merge", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/bale-products/merge", requireAuth, async (req: Request, res: Response) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
@@ -203,7 +203,7 @@ export function registerFactoryProductBulkRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/bale-products/bulk-update-prices", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/bale-products/bulk-update-prices", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

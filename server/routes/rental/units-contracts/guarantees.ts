@@ -154,7 +154,7 @@ export function registerRentalGuaranteeRoutes(app: Express, ctx: RentalRoutesCon
       res.json({ ok: true });
     } catch (e: unknown) {
       if (e instanceof z.ZodError)
-        return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
+        return res.status(400).json({ message: e.issues.map((err) => err.message).join(", ") });
       res.status(500).json({ message: getErrorMessage(e) });
     }
   });
@@ -300,7 +300,7 @@ export function registerRentalGuaranteeRoutes(app: Express, ctx: RentalRoutesCon
       res.json({ ok: true });
     } catch (e: unknown) {
       if (e instanceof z.ZodError)
-        return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
+        return res.status(400).json({ message: e.issues.map((err) => err.message).join(", ") });
       res.status(500).json({ message: getErrorMessage(e) });
     }
   });
@@ -530,7 +530,7 @@ export function registerRentalGuaranteeRoutes(app: Express, ctx: RentalRoutesCon
       res.json({ ok: true, allocations });
     } catch (e: unknown) {
       if (e instanceof z.ZodError)
-        return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
+        return res.status(400).json({ message: e.issues.map((err) => err.message).join(", ") });
       res.status(500).json({ message: getErrorMessage(e) });
     }
   });

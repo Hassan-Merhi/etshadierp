@@ -39,7 +39,7 @@ export function sheetToJson<T = Record<string, any>>(worksheet: ExcelJS.Workshee
       row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
         const header = headers[colNumber - 1];
         if (header) {
-          let value: any = cell.value;
+          let value = cell.value;
           if (value && typeof value === "object" && "result" in value) value = (value as any).result;
           if (value && typeof value === "object" && "text" in value) value = (value as any).text;
           rowData[header] = value;

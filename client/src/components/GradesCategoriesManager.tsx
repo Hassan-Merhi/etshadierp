@@ -156,7 +156,7 @@ function MetaList({
           <Icon className="h-5 w-5 text-muted-foreground" />
           <h3 className="text-base font-semibold">{title}</h3>
           <Badge variant="secondary" className="text-xs">
-            {items.filter((i: any) => i.active).length} active
+            {items.filter((i) => i.active).length} active
           </Badge>
         </div>
         <Button

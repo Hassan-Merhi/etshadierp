@@ -278,7 +278,7 @@ export default function OptionalVouchers() {
                 </tr>
               </thead>
               <tbody>
-                {vouchers.map((v: any) => (
+                {vouchers.map((v) => (
                   <tr
                     key={v.id}
                     className="border-t hover:bg-muted/30 transition-colors"
@@ -354,7 +354,7 @@ export default function OptionalVouchers() {
 
           {/* Mobile cards */}
           <div className="md:hidden space-y-2">
-            {vouchers.map((v: any) => (
+            {vouchers.map((v) => (
               <div key={v.id} className="border rounded-xl p-4 space-y-2" data-testid={`card-voucher-${v.id}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div>

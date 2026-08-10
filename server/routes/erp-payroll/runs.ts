@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { eq, and, desc } from "drizzle-orm";
@@ -26,7 +26,7 @@ export function registerPayrollRunRoutes(app: Express) {
   // ── ERP Payroll Runs (draft → paid workflow) ──────────────────────────────
 
   // Create a new payroll run (saves as DRAFT, no ledger entries yet)
-  app.post("/api/payroll/runs", requireAuth, requireNonPOS, async (req: any, res: any) => {
+  app.post("/api/payroll/runs", requireAuth, requireNonPOS, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -39,7 +39,7 @@ export function registerPayrollRunRoutes(app: Express) {
         .values({ companyId, status: "DRAFT", date, notes: notes || null, createdAt })
         .returning();
       await db.insert(erpPayrollRunItems).values(
-        items.map((it: any) => ({
+        items.map((it) => ({
           runId: run.id,
           employeeId: it.employeeId,
           employeeName: it.employeeName,
@@ -56,7 +56,7 @@ export function registerPayrollRunRoutes(app: Express) {
   });
 
   // List payroll runs for current company
-  app.get("/api/payroll/runs", requireAuth, requireNonPOS, async (req: any, res: any) => {
+  app.get("/api/payroll/runs", requireAuth, requireNonPOS, async (req: Request, res: Response) => {
     try {
       // Accept companyId from query param (explicit) or fall back to session
       const paramCompanyId = req.query.companyId ? parseInt(req.query.companyId as string) : null;
@@ -99,7 +99,7 @@ export function registerPayrollRunRoutes(app: Express) {
   });
 
   // Update a DRAFT run's items / mark as PAID
-  app.patch("/api/payroll/runs/:id", requireAuth, requireNonPOS, async (req: any, res: any) => {
+  app.patch("/api/payroll/runs/:id", requireAuth, requireNonPOS, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -155,7 +155,7 @@ export function registerPayrollRunRoutes(app: Express) {
                 .substring(0, 25)}`;
           const expName = isDefault ? "Salary Expense" : `Salary Expense - ${grp}`;
 
-          let expAccount = allAccounts.find((a: any) => a.code === expCode);
+          let expAccount = allAccounts.find((a) => a.code === expCode);
           if (!expAccount) {
             expAccount = await storage.createLedgerAccount({
               companyId,
@@ -258,7 +258,7 @@ export function registerPayrollRunRoutes(app: Express) {
         if (Array.isArray(items) && items.length > 0) {
           await db.delete(erpPayrollRunItems).where(eq(erpPayrollRunItems.runId, runId));
           await db.insert(erpPayrollRunItems).values(
-            items.map((it: any) => ({
+            items.map((it) => ({
               runId,
               employeeId: it.employeeId,
               employeeName: it.employeeName,

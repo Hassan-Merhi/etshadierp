@@ -140,52 +140,52 @@ export default function SpAliases() {
           <Card>
             <CardContent className="py-3">
               <div className="overflow-x-auto">
-              <div className="space-y-0.5 min-w-[480px]">
-                <div className="grid grid-cols-12 text-xs font-medium text-muted-foreground pb-1 border-b border-border/40">
-                  <span className="col-span-3">Alias Code</span>
-                  <span className="col-span-1 flex justify-center">
-                    <Link2 className="h-3.5 w-3.5" />
-                  </span>
-                  <span className="col-span-3">Stock Item</span>
-                  <span className="col-span-4">Description</span>
-                  <span className="col-span-1"></span>
-                </div>
-                {(aliases as any[]).map((a: any) => (
-                  <div
-                    key={a.id}
-                    className="grid grid-cols-12 text-xs py-2 border-b border-border/30 last:border-0 items-center"
-                    data-testid={`row-sp-alias-${a.id}`}
-                  >
-                    <span className="col-span-3 font-mono font-semibold">{a.alias_code}</span>
-                    <span className="col-span-1 flex justify-center text-muted-foreground">→</span>
-                    <div className="col-span-3">
-                      {a.stock_item_name ? (
-                        <>
-                          <p className="font-medium">{a.stock_item_name}</p>
-                          <p className="text-muted-foreground font-mono text-xs">
-                            {a.stock_item_code} #{a.stock_item_id}
-                          </p>
-                        </>
-                      ) : (
-                        <span className="text-muted-foreground">Item #{a.stock_item_id}</span>
-                      )}
-                    </div>
-                    <span className="col-span-4 text-muted-foreground">{a.description || ""}</span>
-                    <div className="col-span-1 flex justify-end">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => deleteMutation.mutate(a.id)}
-                        disabled={deleteMutation.isPending}
-                        data-testid={`button-sp-delete-alias-${a.id}`}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
+                <div className="space-y-0.5 min-w-[480px]">
+                  <div className="grid grid-cols-12 text-xs font-medium text-muted-foreground pb-1 border-b border-border/40">
+                    <span className="col-span-3">Alias Code</span>
+                    <span className="col-span-1 flex justify-center">
+                      <Link2 className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="col-span-3">Stock Item</span>
+                    <span className="col-span-4">Description</span>
+                    <span className="col-span-1"></span>
                   </div>
-                ))}
-              </div>
+                  {(aliases as any[]).map((a) => (
+                    <div
+                      key={a.id}
+                      className="grid grid-cols-12 text-xs py-2 border-b border-border/30 last:border-0 items-center"
+                      data-testid={`row-sp-alias-${a.id}`}
+                    >
+                      <span className="col-span-3 font-mono font-semibold">{a.alias_code}</span>
+                      <span className="col-span-1 flex justify-center text-muted-foreground">→</span>
+                      <div className="col-span-3">
+                        {a.stock_item_name ? (
+                          <>
+                            <p className="font-medium">{a.stock_item_name}</p>
+                            <p className="text-muted-foreground font-mono text-xs">
+                              {a.stock_item_code} #{a.stock_item_id}
+                            </p>
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground">Item #{a.stock_item_id}</span>
+                        )}
+                      </div>
+                      <span className="col-span-4 text-muted-foreground">{a.description || ""}</span>
+                      <div className="col-span-1 flex justify-end">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => deleteMutation.mutate(a.id)}
+                          disabled={deleteMutation.isPending}
+                          data-testid={`button-sp-delete-alias-${a.id}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </CardContent>
           </Card>

@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { getClientDate } from "../../../lib/dateUtils";
@@ -16,7 +16,7 @@ import { factoryBaleProducts, factoryBales, stockItems, users, userCompanyRoles 
 import { eq, and, inArray } from "drizzle-orm";
 
 export function registerFactoryStockRemovalRoutes(app: Express) {
-  app.post("/api/factory/stock-entry/remove", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/stock-entry/remove", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -56,7 +56,7 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
           .from(factoryBales)
           .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, baleIds)));
 
-        const removedBales: any[] = [];
+        const removedBales = [];
         const now = new Date();
 
         const productIds: number[] = [];
@@ -141,7 +141,7 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
   });
 
   // Remove N bales of a specific product from a specific location
-  app.post("/api/factory/stock-entry/remove-by-product", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/stock-entry/remove-by-product", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -189,7 +189,7 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
           throw new Error("No in-stock bales found for this product at this location");
         }
 
-        const removedBales: any[] = [];
+        const removedBales = [];
         const now = new Date();
         const [factoryProduct] = await tx
           .select()

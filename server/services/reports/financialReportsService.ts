@@ -35,19 +35,13 @@ export async function getProfitLoss(
   const incomeAccounts = companyAccounts.filter((acc) => acc.accountType === "Income");
   const expenseAccounts = companyAccounts.filter(
     (acc) =>
-      acc.accountType === "Expense" ||
-      acc.accountType === "Indirect Expense" ||
-      acc.accountType === "Direct Expense"
+      acc.accountType === "Expense" || acc.accountType === "Indirect Expense" || acc.accountType === "Direct Expense"
   );
 
   const incomeAccountIds = incomeAccounts.map((acc) => acc.id);
   const expenseAccountIds = expenseAccounts.map((acc) => acc.id);
 
-  const plConditions: any[] = [
-    eq(vouchers.companyId, companyId),
-    eq(vouchers.optional, false),
-    isNull(vouchers.deletedAt),
-  ];
+  const plConditions = [eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)];
   if (startDate) {
     plConditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
   }
@@ -152,7 +146,7 @@ export async function getBalanceSheet(
   asOfDate: string | null;
 }> {
   // Build conditions for voucher date filter
-  const conditions: any[] = [eq(vouchers.companyId, companyId)];
+  const conditions = [eq(vouchers.companyId, companyId)];
   if (asOfDate) {
     conditions.push(lte(vouchers.voucherDate, asOfDate));
   }

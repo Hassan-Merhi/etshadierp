@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { z } from "zod";
 import { and, asc, desc, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
 import { db } from "../../../../db";
@@ -188,7 +188,7 @@ async function replaceMemberships(
 }
 
 export function registerProductionPositionRoutes(app: Express) {
-  app.get("/api/factory/production-positions", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/production-positions", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = companyIdFor(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -205,7 +205,7 @@ export function registerProductionPositionRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/production-positions/:id/history", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/production-positions/:id/history", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = companyIdFor(req);
       const positionId = Number(req.params.id);
@@ -250,7 +250,7 @@ export function registerProductionPositionRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/production-positions", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/production-positions", requireAuth, async (req: Request, res: Response) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;
       const companyId = companyIdFor(req);
@@ -285,7 +285,7 @@ export function registerProductionPositionRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/factory/production-positions/:id", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/production-positions/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;
       const companyId = companyIdFor(req);
@@ -335,7 +335,7 @@ export function registerProductionPositionRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/factory/production-positions/:id", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/production-positions/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;
       const companyId = companyIdFor(req);

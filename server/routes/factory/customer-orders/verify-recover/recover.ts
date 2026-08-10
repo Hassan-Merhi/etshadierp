@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../../lib/httpHandlers";
 import { parseId } from "../../../../lib/parseId";
 import { logger } from "../../../../lib/logger";
@@ -33,7 +33,7 @@ export function registerOrderRecoverBalesRoutes(app: Express) {
   //            SELECT 1 FROM customer_order_bales cob WHERE cob.bale_id = fb.id
   //          )
   //    ORDER BY fb.updated_at DESC;
-  app.post("/api/factory/customer-orders/:id/recover-bales", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/customer-orders/:id/recover-bales", requireAuth, async (req: Request, res: Response) => {
     try {
       const session = req.session as any;
       const companyId = session.factoryCompanyId || session.currentCompanyId;
@@ -173,7 +173,7 @@ export function registerOrderRecoverBalesRoutes(app: Express) {
   // are IN_STOCK or SOLD, not already linked to any other active order,
   // and auto-links up to the proforma quantity of each article.
   // Requires Admin / Owner. Order must have a proformaIdUsed and 0 existing bales.
-  app.post("/api/factory/customer-orders/:id/auto-recover-bales", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/customer-orders/:id/auto-recover-bales", requireAuth, async (req: Request, res: Response) => {
     try {
       const session = req.session as any;
       const companyId = session.factoryCompanyId || session.currentCompanyId;
@@ -223,7 +223,7 @@ export function registerOrderRecoverBalesRoutes(app: Express) {
               AND co.status != 'CANCELLED'
               AND cob.order_id != ${orderId}`
       );
-      const claimedIds = new Set<number>(resultRows(claimedResult).map((r: any) => Number(r.bale_id)));
+      const claimedIds = new Set<number>(resultRows(claimedResult).map((r) => Number(r.bale_id)));
 
       const scannerName: string | null = session.username || session.name || session.email || null;
       let totalLinked = 0;
@@ -245,7 +245,7 @@ export function registerOrderRecoverBalesRoutes(app: Express) {
               LIMIT ${needed * 3}`
         );
         const candidates: any[] = resultRows(candidatesResult);
-        const available = candidates.filter((b: any) => !claimedIds.has(Number(b.id))).slice(0, needed);
+        const available = candidates.filter((b) => !claimedIds.has(Number(b.id))).slice(0, needed);
 
         for (const bale of available) {
           await db.insert(customerOrderBales).values({

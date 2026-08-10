@@ -233,7 +233,7 @@ export default function SpOpeningStock() {
                     <span className="text-right">Base/u</span>
                     <span className="text-right">Final/u</span>
                   </div>
-                  {(past as any[]).map((p: any, i: number) => (
+                  {(past as any[]).map((p, i: number) => (
                     <div
                       key={p.id}
                       className="grid grid-cols-6 text-xs py-1.5 border-b border-border/30 last:border-0"

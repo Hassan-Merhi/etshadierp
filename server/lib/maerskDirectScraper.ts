@@ -224,7 +224,10 @@ function parseEvents(rawEvents: unknown[]): TrackingEvent[] {
     });
 }
 
-const normContainer = (v: unknown): string => String(v ?? "").replace(/\s+/g, "").toUpperCase();
+const normContainer = (v: unknown): string =>
+  String(v ?? "")
+    .replace(/\s+/g, "")
+    .toUpperCase();
 
 /**
  * Pick the container the caller actually asked for out of a synergy/generic
@@ -236,8 +239,10 @@ function pickContainer(list: any[], wantContainer?: string): any {
   if (!Array.isArray(list) || list.length === 0) return null;
   const wanted = wantContainer ? normContainer(wantContainer) : "";
   if (wanted) {
-    const match = list.find(
-      (c) => [c?.container_num, c?.containerNum, c?.containerNumber, c?.containerNo, c?.number].some((n) => normContainer(n) === wanted)
+    const match = list.find((c) =>
+      [c?.container_num, c?.containerNum, c?.containerNumber, c?.containerNo, c?.number].some(
+        (n) => normContainer(n) === wanted
+      )
     );
     if (match) return match;
   }
@@ -307,14 +312,14 @@ export function extractFromJson(
         } else {
           // Priority 2: latest (by event_time) expected event at the last location
           const expectedAtDest = lastLocEvents
-            .filter((ev: any) => ev.event_time_type === "EXPECTED" && ev.event_time)
+            .filter((ev) => ev.event_time_type === "EXPECTED" && ev.event_time)
             .sort((a: any, b: any) => new Date(b.event_time).getTime() - new Date(a.event_time).getTime());
           if (expectedAtDest.length > 0) {
             // Pick the earliest future expected event as the true ETA
             const futureExpected = expectedAtDest
               .slice()
               .reverse()
-              .find((ev: any) => new Date(ev.event_time).getTime() > Date.now());
+              .find((ev) => new Date(ev.event_time).getTime() > Date.now());
             etaRaw = futureExpected?.event_time ?? expectedAtDest[expectedAtDest.length - 1]?.event_time ?? null;
           }
         }
@@ -353,7 +358,7 @@ export function extractFromJson(
     // NEVER use portCalls[0] — that is the origin.
     const cPortCalls: any[] = Array.isArray(c.portCalls) ? c.portCalls : [];
     const cDestCall =
-      cPortCalls.find((p: any) => p.isDestination === true || p.isDestination === "true") ??
+      cPortCalls.find((p) => p.isDestination === true || p.isDestination === "true") ??
       (cPortCalls.length > 0 ? cPortCalls[cPortCalls.length - 1] : null);
 
     etaRaw =
@@ -372,7 +377,7 @@ export function extractFromJson(
     // Top-level portCalls (some API shapes put them here)
     const dPortCalls: any[] = Array.isArray(d.portCalls) ? d.portCalls : [];
     const dDestCall =
-      dPortCalls.find((p: any) => p.isDestination === true || p.isDestination === "true") ??
+      dPortCalls.find((p) => p.isDestination === true || p.isDestination === "true") ??
       (dPortCalls.length > 0 ? dPortCalls[dPortCalls.length - 1] : null);
 
     etaRaw =
@@ -420,7 +425,7 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
   // ── Acquire global Puppeteer slot (shared with ParcelsApp scraper) ───────
   // Returns a "no_data" result immediately when the queue is full.
   logger.info(`[MaerskDirect] ${containerNumber}: waiting for Puppeteer slot…`);
-  let release: (() => void) | null = null;
+  let release: () => void;
   try {
     release = await acquirePuppeteerSlot();
   } catch (err: unknown) {
@@ -550,7 +555,12 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
     } | null = null;
 
     for (const payload of capturedPayloads) {
-      const { events, eta: jsonEta, latestStatus: parsedStatus, synergy } = extractFromJson(payload.data, containerNumber);
+      const {
+        events,
+        eta: jsonEta,
+        latestStatus: parsedStatus,
+        synergy,
+      } = extractFromJson(payload.data, containerNumber);
 
       // Also try the deep recursive scan in case extractFromJson missed a nested ETA key
       const deepEta = !jsonEta ? deepScanForEta(payload.data) : null;
@@ -560,7 +570,15 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
 
       const score = (synergy ? 1_000_000 : 0) + (eta ? 10_000 : 0) + events.length;
       if (!best || score > best.score) {
-        best = { score, events, eta, latestStatus: parsedStatus, url: payload.url, data: payload.data, deepPath: deepEta?.path };
+        best = {
+          score,
+          events,
+          eta,
+          latestStatus: parsedStatus,
+          url: payload.url,
+          data: payload.data,
+          deepPath: deepEta?.path,
+        };
       }
     }
 

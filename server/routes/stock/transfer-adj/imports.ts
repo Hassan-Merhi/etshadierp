@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { db } from "../../../db";
 import { storage } from "../../../storage";
@@ -167,7 +167,7 @@ export function registerStockItemImportRoutes(app: Express) {
   });
 
   // ── Bulk category (stock group) update for existing stock items ───────────────
-  app.post("/api/stock-items/update-categories", requireAuth, requireNonPOS, async (req: any, res: any) => {
+  app.post("/api/stock-items/update-categories", requireAuth, requireNonPOS, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -181,13 +181,13 @@ export function registerStockItemImportRoutes(app: Express) {
         .select({ id: stockItems.id, code: stockItems.code })
         .from(stockItems)
         .where(and(eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)));
-      const itemByCode = new Map(allItems.map((i: any) => [i.code.toLowerCase().trim(), i.id]));
+      const itemByCode = new Map(allItems.map((i) => [i.code.toLowerCase().trim(), i.id]));
 
       const allCats = await db
         .select({ id: stockCategories.id, name: stockCategories.name })
         .from(stockCategories)
         .where(eq(stockCategories.companyId, companyId));
-      const catByName = new Map(allCats.map((c: any) => [c.name.toLowerCase().trim(), c.id]));
+      const catByName = new Map(allCats.map((c) => [c.name.toLowerCase().trim(), c.id]));
 
       let updated = 0;
       let notFound = 0;

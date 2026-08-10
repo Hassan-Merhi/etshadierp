@@ -523,7 +523,7 @@ export async function getAllCompanyTransferWaSettings(): Promise<
     `SELECT id, name, COALESCE(transfer_wa_group_chat_id, '') AS group_chat_id
      FROM companies WHERE active = true ORDER BY name`
   );
-  return res.rows.map((r: any) => ({
+  return res.rows.map((r) => ({
     companyId: r.id,
     companyName: r.name,
     groupChatId: r.group_chat_id ?? "",

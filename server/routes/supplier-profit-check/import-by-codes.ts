@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { pool } from "../../db";
@@ -14,7 +14,7 @@ export function registerSupplierProfitImportRoutes(app: Express, requireAuth: an
   // ── Import by codes (Excel upload) ─────────────────────────────────────────
   // Accepts a list of item codes (from Excel). Looks up stock_items by code for
   // this company and runs the same profit analysis as /analyze.
-  app.post("/api/supplier-profit-check/import-by-codes", requireAuth, async (req: any, res: any) => {
+  app.post("/api/supplier-profit-check/import-by-codes", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -54,7 +54,7 @@ export function registerSupplierProfitImportRoutes(app: Express, requireAuth: an
       if (items.length === 0) return res.json({ rows: [], notFound: codes });
 
       // Build found set from direct codes plus any matched alias codes
-      const foundDirectCodes = new Set(items.map((r: any) => r.code.toLowerCase()));
+      const foundDirectCodes = new Set(items.map((r) => r.code.toLowerCase()));
       const aliasMatchResult = await pool.query(
         `SELECT lower(sica.alias_code) as alias_code
          FROM stock_item_code_aliases sica
@@ -65,11 +65,11 @@ export function registerSupplierProfitImportRoutes(app: Express, requireAuth: an
            AND lower(sica.alias_code) = ANY($2::text[])`,
         [companyId, lowerCodes]
       );
-      const foundAliasCodes = new Set(aliasMatchResult.rows.map((r: any) => r.alias_code));
+      const foundAliasCodes = new Set(aliasMatchResult.rows.map((r) => r.alias_code));
       const foundCodes = new Set([...foundDirectCodes, ...foundAliasCodes]);
       const notFound = codes.filter((c: string) => !foundCodes.has(c.toLowerCase().trim()));
 
-      const stockItemIds = items.map((r: any) => Number(r.id));
+      const stockItemIds = items.map((r) => Number(r.id));
       const allTime = !fromDate || !toDate;
 
       // 2. Avg selling price + total sales qty
@@ -210,7 +210,7 @@ export function registerSupplierProfitImportRoutes(app: Express, requireAuth: an
       }
 
       // Build response rows (same shape as /analyze)
-      const rows = items.map((item: any) => {
+      const rows = items.map((item) => {
         const id = Number(item.id);
         const salesData = avgSellMap.get(id);
         const avgSellingPrice = overrideAvgMap.get(id) ?? salesData?.avgSellingPrice ?? null;

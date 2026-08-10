@@ -93,12 +93,10 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY ict.transfer_date DESC
         LIMIT ${rowLimit}
       `);
-      let totalOut = 0,
-        totalIn = 0;
+      // No in/out totals are computed here: the shard renders rows and a count,
+      // and the accumulators that used to sit here were written but never read.
       const tableRows4 = (rows.rows as any[]).map((r) => {
         const amt = parseFloat(r.amount || "0");
-        const isOut = r.from_company === (rows.rows[0] as any)?.from_company;
-        totalOut += amt;
         return [
           String(r.transfer_date).slice(0, 10),
           r.transfer_type,

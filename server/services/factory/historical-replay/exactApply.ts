@@ -152,32 +152,32 @@ export async function applyExactHistoricalCostReplay(
     const snapshot = await captureExactReplaySnapshot(executor, companyId, publicScope, approvedBaleIds);
     assertSameIds(
       publicScope.containerIdsToUpdate,
-      snapshot.containers.map((row: any) => Number(row.id)),
+      snapshot.containers.map((row) => Number(row.id)),
       "container snapshot"
     );
     assertSameIds(
       publicScope.rawStockIdsToUpdate,
-      snapshot.rawStockRows.map((row: any) => Number(row.id)),
+      snapshot.rawStockRows.map((row) => Number(row.id)),
       "raw-stock snapshot"
     );
     assertSameIds(
       publicScope.sourceIdsToUpdate,
-      snapshot.mixBatchSources.map((row: any) => Number(row.id)),
+      snapshot.mixBatchSources.map((row) => Number(row.id)),
       "source snapshot"
     );
     assertSameIds(
       publicScope.batchIdsToUpdate,
-      snapshot.mixBatches.map((row: any) => Number(row.id)),
+      snapshot.mixBatches.map((row) => Number(row.id)),
       "batch snapshot"
     );
     assertSameIds(
       approvedBaleIds,
-      snapshot.bales.map((row: any) => Number(row.id)),
+      snapshot.bales.map((row) => Number(row.id)),
       "bale snapshot"
     );
     assertSameIds(
       publicScope.supplierIds,
-      snapshot.suppliers.map((row: any) => Number(row.id)),
+      snapshot.suppliers.map((row) => Number(row.id)),
       "supplier snapshot"
     );
 

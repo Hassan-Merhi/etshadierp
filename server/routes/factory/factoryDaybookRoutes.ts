@@ -20,7 +20,10 @@ export function registerFactoryDaybookRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const currentUserId = (req.session as any).userId != null ? String((req.session as any).userId) : undefined;
-      let { startDate, endDate, txType, currencyCode } = req.query;
+      // startDate/endDate are reassigned by the unbounded-range guard below;
+      // the other two are read as sent.
+      let { startDate, endDate } = req.query;
+      const { txType, currencyCode } = req.query;
 
       // Guard against unbounded "return everything ever" queries: only apply when
       // the caller omits the params entirely (e.g. a raw/older API call) — not when
@@ -86,8 +89,8 @@ export function registerFactoryDaybookRoutes(app: Express) {
       // ── 1b. Safety-net: drop real daybook entries whose source voucher was deleted ─
       // Also fetch `optional` flag for voucher-backed rows
       const voucherRefIds = daybookRows
-        .filter((r: any) => r.referenceTable === "vouchers" && r.referenceId != null)
-        .map((r: any) => r.referenceId as number);
+        .filter((r) => r.referenceTable === "vouchers" && r.referenceId != null)
+        .map((r) => r.referenceId as number);
 
       const validVoucherIds = new Set<number>();
       const voucherOptionalMap = new Map<number, boolean>();
@@ -119,7 +122,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
           })
           .from(vouchers)
           .where(and(inArray(vouchers.id, voucherRefIds), sql`${vouchers.deletedAt} IS NULL`));
-        liveVouchers.forEach((v: any) => {
+        liveVouchers.forEach((v) => {
           validVoucherIds.add(v.id);
           voucherOptionalMap.set(v.id, !!v.optional);
           const currency = v.currency || "USD";
@@ -144,7 +147,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
       const validSourceIds = await buildLegacyValidSourceIds(daybookRows, companyId);
 
       const filteredDaybookRows = daybookRows
-        .filter((r: any) => {
+        .filter((r) => {
           // Voucher check uses live-data maps from block 1b (supports description/amount refresh).
           if (r.referenceTable === "vouchers" && r.referenceId != null) {
             return validVoucherIds.has(r.referenceId);
@@ -152,7 +155,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
           // All other source-backed types: registry-driven validity check.
           return isRowIntegrityValid(r, validSourceIds);
         })
-        .map((r: any) => {
+        .map((r) => {
           if (r.referenceTable === "vouchers" && r.referenceId != null) {
             const live = voucherLiveDataMap.get(r.referenceId);
             return {
@@ -206,7 +209,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
               sql`${factoryDaybookEntries.referenceId} IS NOT NULL`
             )
           );
-        const capturedVoucherIds = new Set<number>(allCapturedRows.map((r: any) => r.referenceId as number));
+        const capturedVoucherIds = new Set<number>(allCapturedRows.map((r) => r.referenceId as number));
 
         const voucherConds: any[] = [
           eq(vouchers.companyId, companyId),
@@ -229,8 +232,8 @@ export function registerFactoryDaybookRoutes(app: Express) {
           .where(and(...voucherConds));
 
         syntheticRows = rawVouchers
-          .filter((v: any) => !capturedVoucherIds.has(v.id))
-          .map((v: any) => {
+          .filter((v) => !capturedVoucherIds.has(v.id))
+          .map((v) => {
             const txTypeVal = voucherTxTypeMap[v.voucherType] || "JOURNAL";
             const currency = v.currency || "USD";
             const fxRate = parseFloat(v.exchangeRate || "1") || 1;
@@ -271,7 +274,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
 
       if (zeroRows.length > 0) {
         // BALE_STOCK_ENTRY: derive from bale IDs stored in metaJson
-        const baleStockRows = zeroRows.filter((r: any) => r.txType === "BALE_STOCK_ENTRY");
+        const baleStockRows = zeroRows.filter((r) => r.txType === "BALE_STOCK_ENTRY");
         if (baleStockRows.length > 0) {
           // Collect all bale IDs across all zero bale stock entries
           // Only integer IDs are valid — old entries may have stored UUIDs which Postgres rejects
@@ -286,7 +289,9 @@ export function registerFactoryDaybookRoutes(app: Express) {
                 if (!baleIdToEntry.has(numId)) baleIdToEntry.set(numId, []);
                 baleIdToEntry.get(numId)!.push({ row, weightKg: parseFloat(b.weightKg || "0") });
               }
-            } catch {}
+            } catch {
+              // Failure here is non-fatal and the surrounding flow continues deliberately.
+            }
           }
           if (baleIdToEntry.size > 0) {
             const allBaleIds = Array.from(baleIdToEntry.keys());
@@ -313,7 +318,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
               })
               .from(factoryBaleProducts)
               .where(eq(factoryBaleProducts.companyId, companyId));
-            allProducts.forEach((p: any) => {
+            allProducts.forEach((p) => {
               productProductionPriceById.set(p.id, parseFloat(p.productionPrice || "0"));
               if (p.articleCode)
                 productProductionPriceByArticleCode.set(p.articleCode, parseFloat(p.productionPrice || "0"));
@@ -355,7 +360,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
           (r: any) => ["LOADING_SUBMITTED", "ORDER_VERIFIED"].includes(r.txType) && r.referenceId
         );
         if (loadingRows.length > 0) {
-          const orderIds = [...new Set(loadingRows.map((r: any) => r.referenceId as number))];
+          const orderIds = [...new Set(loadingRows.map((r) => r.referenceId as number))];
           const orderGrandTotals = await db
             .select({
               id: customerOrders.id,
@@ -392,7 +397,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
       // desc by id so the first occurrence of each key is the most recent.
       const SINGLETON_TX_TYPES = new Set(["INVOICE", "INVOICE_REVERTED", "ORDER_VERIFIED", "ORDER_CANCELLED"]);
       const _seenSingletonKeys = new Set<string>();
-      const deduplicatedRows = (filteredDaybookRows as any[]).filter((r: any) => {
+      const deduplicatedRows = (filteredDaybookRows as any[]).filter((r) => {
         if (!SINGLETON_TX_TYPES.has(r.txType) || r.referenceId == null) return true;
         const key = `${r.txType}:${r.referenceId}`;
         if (_seenSingletonKeys.has(key)) return false;

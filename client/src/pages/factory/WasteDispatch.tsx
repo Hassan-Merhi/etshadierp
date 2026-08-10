@@ -186,7 +186,7 @@ export default function WasteDispatch() {
   };
 
   const handleHistoryPrint = (d: any) => {
-    const dispatchBales: any[] = d.bales || [];
+    const dispatchBales = d.bales || [];
     const totalW = dispatchBales.reduce((s: number, b: any) => s + parseFloat(b.weightKg || 0), 0);
     const totalC = dispatchBales.reduce((s: number, b: any) => s + parseFloat(b.totalCost || 0), 0);
     const baleRows = dispatchBales
@@ -636,7 +636,7 @@ export default function WasteDispatch() {
               <div className="divide-y">
                 {(showAllHistory ? history : history.slice(0, 10)).map((d: any) => {
                   const isOpen = expandedHistoryIds.has(d.id);
-                  const dispatchBales: any[] = d.bales || [];
+                  const dispatchBales = d.bales || [];
                   return (
                     <div key={d.id}>
                       <div

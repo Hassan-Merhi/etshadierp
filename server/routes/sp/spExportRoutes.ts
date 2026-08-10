@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
@@ -23,7 +23,7 @@ function readString(row: QueryRecord | undefined, key: string): string {
 // ── Sales Form Excel Export (V1 legacy + V2) ─────────────────────────────────
 
 export function registerSpExportRoutes(app: Express) {
-  app.get("/api/sp/sales-form/export", requireAuth, async (req: any, res: any) => {
+  app.get("/api/sp/sales-form/export", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
@@ -42,11 +42,15 @@ export function registerSpExportRoutes(app: Express) {
       try {
         const locRows = await db.execute(sql`SELECT name FROM locations WHERE id = ${locId} LIMIT 1`);
         locationName = readString(firstQueryRow(locRows), "name");
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
       try {
         const coRows = await db.execute(sql`SELECT name FROM companies WHERE id = ${companyId} LIMIT 1`);
         companyName = readString(firstQueryRow(coRows), "name");
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
 
       const buffer = await generateSpSalesFormExcel({
         companyId,
@@ -72,7 +76,7 @@ export function registerSpExportRoutes(app: Express) {
   });
 
   // ── V2: from-scratch ExcelJS export (matches system inventory) ────────────
-  app.get("/api/sp/sales-form/export-v2", requireAuth, async (req: any, res: any) => {
+  app.get("/api/sp/sales-form/export-v2", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
@@ -112,11 +116,15 @@ export function registerSpExportRoutes(app: Express) {
           const r = await db.execute(sql`SELECT name FROM locations WHERE id = ${locId} LIMIT 1`);
           locationName = readString(firstQueryRow(r), "name");
         }
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
       try {
         const r = await db.execute(sql`SELECT name FROM companies WHERE id = ${companyId} LIMIT 1`);
         companyName = readString(firstQueryRow(r), "name");
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
 
       const buffer = await generateSpSalesFormExcelV2({
         companyId,

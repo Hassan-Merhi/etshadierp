@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { parseId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
@@ -25,7 +25,7 @@ export function registerFactoryProductReadRoutes(app: Express) {
   // 3. Factory Bale Products CRUD + Import
   // ───────────────────────────────────────────────
 
-  app.get("/api/factory/bale-products", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/bale-products", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -43,7 +43,7 @@ export function registerFactoryProductReadRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/bale-products/generate-code", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/bale-products/generate-code", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -107,7 +107,7 @@ export function registerFactoryProductReadRoutes(app: Express) {
   });
 
   // GET /api/factory/bale-products/merge-stats — must be before /:id to avoid interception
-  app.get("/api/factory/bale-products/merge-stats", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/bale-products/merge-stats", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -136,7 +136,7 @@ export function registerFactoryProductReadRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/bale-products/:id", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/bale-products/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -158,7 +158,7 @@ export function registerFactoryProductReadRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/bale-product-detail/:productId", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/bale-product-detail/:productId", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -205,9 +205,9 @@ export function registerFactoryProductReadRoutes(app: Express) {
       const pressed = Array.from(pressedMap.values()).sort((a, b) => b.date.localeCompare(a.date));
 
       // 2. Sales: finalized orders for this article code
-      const sales: any[] = [];
+      const sales = [];
       // 3. Loaded/OTW: loading-status orders for this article code
-      const loaded: any[] = [];
+      const loaded = [];
 
       if (articleCode) {
         const orderBalesForProduct = await db
@@ -220,7 +220,7 @@ export function registerFactoryProductReadRoutes(app: Express) {
           .where(eq(customerOrderBales.articleCode, articleCode));
 
         if (orderBalesForProduct.length > 0) {
-          const orderIds = [...new Set(orderBalesForProduct.map((b: any) => b.orderId))];
+          const orderIds = [...new Set(orderBalesForProduct.map((b) => b.orderId))];
 
           const allRelevantOrders = await db
             .select({
@@ -235,7 +235,7 @@ export function registerFactoryProductReadRoutes(app: Express) {
             .where(and(eq(customerOrders.companyId, companyId), inArray(customerOrders.id, orderIds)));
 
           for (const order of allRelevantOrders) {
-            const balesInOrder = orderBalesForProduct.filter((b: any) => b.orderId === order.id);
+            const balesInOrder = orderBalesForProduct.filter((b) => b.orderId === order.id);
             const qty = balesInOrder.length;
             const total = balesInOrder.reduce((s: number, b: any) => s + parseFloat(b.priceUsed || "0"), 0);
             const pricePerBale = qty > 0 ? total / qty : 0;

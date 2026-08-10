@@ -146,8 +146,7 @@ export function registerFactoryTransporterRoutes(app: Express) {
 
       res.json(created);
     } catch (e: unknown) {
-      if (e instanceof z.ZodError)
-        return res.status(400).json({ message: e.issues.map((x: any) => x.message).join(", ") });
+      if (e instanceof z.ZodError) return res.status(400).json({ message: e.issues.map((x) => x.message).join(", ") });
       res.status(500).json({ message: getErrorMessage(e) });
     }
   });
@@ -250,8 +249,7 @@ export function registerFactoryTransporterRoutes(app: Express) {
 
       res.json(tx);
     } catch (e: unknown) {
-      if (e instanceof z.ZodError)
-        return res.status(400).json({ message: e.issues.map((x: any) => x.message).join(", ") });
+      if (e instanceof z.ZodError) return res.status(400).json({ message: e.issues.map((x) => x.message).join(", ") });
       res.status(500).json({ message: getErrorMessage(e) });
     }
   });
@@ -326,8 +324,7 @@ export function registerFactoryTransporterRoutes(app: Express) {
 
       res.json(tx);
     } catch (e: unknown) {
-      if (e instanceof z.ZodError)
-        return res.status(400).json({ message: e.issues.map((x: any) => x.message).join(", ") });
+      if (e instanceof z.ZodError) return res.status(400).json({ message: e.issues.map((x) => x.message).join(", ") });
       res.status(500).json({ message: getErrorMessage(e) });
     }
   });

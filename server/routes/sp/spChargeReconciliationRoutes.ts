@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../../auth";
 import { db } from "../../db";
@@ -11,17 +11,14 @@ function first(result: any): any {
 }
 
 export function registerSpChargeReconciliationRoutes(app: Express): void {
-  app.get(
-    "/api/sp/reconciliation/charges",
-    requireAuth,
-    requireRole("Admin"),
-    async (req: any, res: any) => {
-      try {
-        await ensureSpOffloadReversalStorage();
-        const companyId = await requireSpCompany(req, res);
-        if (!companyId) return;
+  app.get("/api/sp/reconciliation/charges", requireAuth, requireRole("Admin"), async (req: Request, res: Response) => {
+    try {
+      await ensureSpOffloadReversalStorage();
+      const companyId = await requireSpCompany(req, res);
+      if (!companyId) return;
 
-        const summary = first(await db.execute(sql`
+      const summary = first(
+        await db.execute(sql`
           WITH active_offloads AS (
             SELECT o.*
             FROM sp_offloads o
@@ -151,39 +148,39 @@ export function registerSpChargeReconciliationRoutes(app: Express): void {
                 'supplier_freight', 'other', 'parent_agent'
               )
             ) AS unknown_charge_type_count
-        `));
+        `)
+      );
 
-        const checks = {
-          landedChargeTotals: Number(summary.landed_charge_mismatch_count ?? 0),
-          prepaidReferences: Number(summary.prepaid_reference_mismatch_count ?? 0),
-          prepaidBalances: Number(summary.prepaid_balance_mismatch_count ?? 0),
-          paidNowReferences: Number(summary.paid_now_reference_mismatch_count ?? 0),
-          payableAndOtherLedgerReferences: Number(summary.ledger_reference_mismatch_count ?? 0),
-          parentAgentReferences: Number(summary.parent_agent_reference_mismatch_count ?? 0),
-          parentAgentAmounts: Number(summary.parent_agent_amount_mismatch_count ?? 0),
-          balancedVouchers: Number(summary.unbalanced_voucher_count ?? 0),
-          exactReversalAmounts: Number(summary.reversal_amount_mismatch_count ?? 0),
-          unknownChargeTypes: Number(summary.unknown_charge_type_count ?? 0),
-        };
-        const mismatchCount = Object.values(checks).reduce((sum, count) => sum + count, 0);
+      const checks = {
+        landedChargeTotals: Number(summary.landed_charge_mismatch_count ?? 0),
+        prepaidReferences: Number(summary.prepaid_reference_mismatch_count ?? 0),
+        prepaidBalances: Number(summary.prepaid_balance_mismatch_count ?? 0),
+        paidNowReferences: Number(summary.paid_now_reference_mismatch_count ?? 0),
+        payableAndOtherLedgerReferences: Number(summary.ledger_reference_mismatch_count ?? 0),
+        parentAgentReferences: Number(summary.parent_agent_reference_mismatch_count ?? 0),
+        parentAgentAmounts: Number(summary.parent_agent_amount_mismatch_count ?? 0),
+        balancedVouchers: Number(summary.unbalanced_voucher_count ?? 0),
+        exactReversalAmounts: Number(summary.reversal_amount_mismatch_count ?? 0),
+        unknownChargeTypes: Number(summary.unknown_charge_type_count ?? 0),
+      };
+      const mismatchCount = Object.values(checks).reduce((sum, count) => sum + count, 0);
 
-        res.json({
-          status: mismatchCount === 0 ? "PASS" : "FAIL",
-          mismatchCount,
-          checks,
-          supportedChargeTypes: [
-            "prepaid_used",
-            "paid_now",
-            "unpaid_payable",
-            "invoice_freight",
-            "supplier_freight",
-            "other",
-            "parent_agent",
-          ],
-        });
-      } catch (error: unknown) {
-        res.status(500).json({ message: getErrorMessage(error) });
-      }
+      res.json({
+        status: mismatchCount === 0 ? "PASS" : "FAIL",
+        mismatchCount,
+        checks,
+        supportedChargeTypes: [
+          "prepaid_used",
+          "paid_now",
+          "unpaid_payable",
+          "invoice_freight",
+          "supplier_freight",
+          "other",
+          "parent_agent",
+        ],
+      });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
-  );
+  });
 }

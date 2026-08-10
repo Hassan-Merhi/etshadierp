@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { parseOptionalId } from "../../../lib/parseId";
@@ -22,7 +22,7 @@ import { _getKpiCached, _setKpiCached } from "./_helpers";
 export function registerBalesReportRoutes(app: Express) {
   // Lightweight daily summary — counts and weights by category for a single date.
   // Much faster than the full /api/factory/bales endpoint which returns up to 2000 rows.
-  app.get("/api/factory/bales/daily-summary", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/bales/daily-summary", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -47,7 +47,7 @@ export function registerBalesReportRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/bales/stock-entry-history", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/bales/stock-entry-history", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -188,7 +188,7 @@ export function registerBalesReportRoutes(app: Express) {
         const total = parseInt(String((countResult.rows[0] as any)?.total ?? "0"), 10);
         const totalBales = parseInt(String((countResult.rows[0] as any)?.total_bales ?? "0"), 10);
         const totalWeight = parseFloat(String((countResult.rows[0] as any)?.total_weight ?? "0"));
-        const items = liteResult.rows.map((r: any) => ({ ...r, bales: [] }));
+        const items = liteResult.rows.map((r) => ({ ...r, bales: [] }));
         return res.json(buildPaginatedResponse(items, total, totalBales, totalWeight));
       }
 
@@ -240,7 +240,7 @@ export function registerBalesReportRoutes(app: Express) {
   });
 
   // ── Stock Entry History: PDF Export ──────────────────────────────────────
-  app.get("/api/factory/bales/stock-entry-history/export-pdf", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/bales/stock-entry-history/export-pdf", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -338,7 +338,9 @@ export function registerBalesReportRoutes(app: Express) {
       if (fs.existsSync(sehLogoPath)) {
         try {
           doc.image(sehLogoPath, (doc.page.width - 200) / 2, 10, { width: 200 });
-        } catch {}
+        } catch {
+          // Failure here is non-fatal and the surrounding flow continues deliberately.
+        }
       }
 
       // ── Header bar ──────────────────────────────────────────────────────
@@ -463,7 +465,7 @@ export function registerBalesReportRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/bales/lookup/:barcode", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/bales/lookup/:barcode", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -521,7 +523,7 @@ export function registerBalesReportRoutes(app: Express) {
       }
 
       if (excludeIds.length > 0) {
-        results = results.filter((b: any) => !excludeIds.includes(b.id));
+        results = results.filter((b) => !excludeIds.includes(b.id));
       }
 
       if (results.length === 0) return res.status(404).json({ message: "Bale not found" });
@@ -536,7 +538,7 @@ export function registerBalesReportRoutes(app: Express) {
   // 11. Factory Production Summary
   // ───────────────────────────────────────────────
 
-  app.get("/api/factory/production-summary", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/production-summary", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -605,7 +607,7 @@ export function registerBalesReportRoutes(app: Express) {
   // Factory Dashboard KPIs
   // ───────────────────────────────────────────────
 
-  app.get("/api/factory/dashboard-kpis", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/dashboard-kpis", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -674,7 +676,7 @@ export function registerBalesReportRoutes(app: Express) {
         kgsUsedToday: kgsUsedToday.toFixed(3),
         totalBaleWeightToday: totalBaleWeightToday.toFixed(3),
         categories,
-        balesDetail: todayBales.map((b: any) => ({ ...b, quantity: 1 })),
+        balesDetail: todayBales.map((b) => ({ ...b, quantity: 1 })),
       };
       _setKpiCached(_kpiKey, _kpiResult);
       res.json(_kpiResult);

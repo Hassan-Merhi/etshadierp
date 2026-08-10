@@ -3,19 +3,19 @@
  *
  * Extracted from FactoryImport.tsx during the Phase 4 god-file split.
  */
-import {useState, useCallback} from "react";
-import {useMutation} from "@tanstack/react-query";
-import {AlertCircle, CheckCircle2, X, Loader2} from "lucide-react";
-import {Button} from "@/components/ui/button";
-import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
-import {Badge} from "@/components/ui/badge";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {useToast} from "@/hooks/use-toast";
-import {factoryApiRequest} from "@/lib/factoryApi";
+import { useState, useCallback } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { AlertCircle, CheckCircle2, X, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useToast } from "@/hooks/use-toast";
+import { factoryApiRequest } from "@/lib/factoryApi";
 import Papa from "papaparse";
 
-import type {OpeningStockRow} from "../types";
-import {ImportModeChooser} from "./ImportModeChooser";
+import type { OpeningStockRow } from "../types";
+import { ImportModeChooser } from "./ImportModeChooser";
 
 export function OpeningStockImport() {
   const [mode, setMode] = useState<"choose" | "csv">("choose");
@@ -45,7 +45,7 @@ export function OpeningStockImport() {
 
     const parse = (rows: any[]) => {
       const parsed: OpeningStockRow[] = rows
-        .map((row: any) => ({
+        .map((row) => ({
           supplier: String(row.supplier || row.Supplier || "").trim(),
           kg: String(row.kg || row.Kg || row.KG || "").trim(),
           costPerKg: String(row.costPerKg || row.cost_per_kg || row["Cost Per Kg"] || row["costperkg"] || "").trim(),

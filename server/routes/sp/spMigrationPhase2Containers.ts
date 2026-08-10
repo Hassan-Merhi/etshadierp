@@ -1,3 +1,4 @@
+import type { Request, Response } from "express";
 import { sql } from "drizzle-orm";
 import { db } from "../../db";
 import { logger } from "../../lib/logger";
@@ -21,7 +22,7 @@ import {
 import { getContainerChargeCandidates, getSourceContainerLines, upsertChargeMapping } from "./spMigrationPhase2Charges";
 import { resultRows, firstRow } from "../../lib/queryResult";
 
-export async function importContainers(req: any, res: any): Promise<any> {
+export async function importContainers(req: Request, res: Response): Promise<any> {
   const pair = await validateMigrationPair(req, res, true);
   if (!pair) return;
   const dependencyError = await requireCompletedAction(pair.sourceId, pair.targetId, "gc_containers");

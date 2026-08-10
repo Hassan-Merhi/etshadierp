@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { logAudit } from "../../../helpers/auditHelpers";
 import { getErrorMessage } from "../../../../lib/httpHandlers";
 import { logger } from "../../../../lib/logger";
@@ -27,7 +27,7 @@ import fs from "fs";
 import { buildExportFilename } from "../orderHelpers";
 
 export function registerOrderPdfRoutes(app: Express) {
-  app.get("/api/factory/customer-orders/:id/export-pdf", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/customer-orders/:id/export-pdf", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -63,7 +63,7 @@ export function registerOrderPdfRoutes(app: Express) {
       const lines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
       const charges = await db.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
 
-      const invArticleCodes = [...new Set(lines.map((l: any) => l.articleCode).filter(Boolean))];
+      const invArticleCodes = [...new Set(lines.map((l) => l.articleCode).filter(Boolean))];
       const invNameMap = new Map<string, string>();
       if (invArticleCodes.length > 0) {
         const invProds = await db
@@ -118,7 +118,9 @@ export function registerOrderPdfRoutes(app: Express) {
             height: LOGO_H,
             fit: [LOGO_W, LOGO_H],
           });
-        } catch {}
+        } catch {
+          // Failure here is non-fatal and the surrounding flow continues deliberately.
+        }
       }
       const afterLogo = LOGO_TOP + LOGO_H + 10;
 
@@ -244,8 +246,8 @@ export function registerOrderPdfRoutes(app: Express) {
 
       // ── Charges & grand-total summary (omit when hiding prices or noCharges) ──
       if (!hideSellingPdf && !noChargesPdf) {
-        const freightCharges = charges.filter((ch: any) => ch.chargeType === "FREIGHT");
-        const otherCharges = charges.filter((ch: any) => ch.chargeType !== "FREIGHT");
+        const freightCharges = charges.filter((ch) => ch.chargeType === "FREIGHT");
+        const otherCharges = charges.filter((ch) => ch.chargeType !== "FREIGHT");
         const hasCharges = freightCharges.length > 0 || otherCharges.length > 0;
 
         if (hasCharges) {

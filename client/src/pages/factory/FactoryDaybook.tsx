@@ -379,7 +379,9 @@ export default function FactoryDaybook() {
           state.scrollY = window.scrollY;
           sessionStorage.setItem(FACTORY_DAYBOOK_STATE_KEY, JSON.stringify(state));
         }
-      } catch {}
+      } catch {
+        // Storage is unavailable in private mode and can throw on quota; the value is a convenience, not state we need.
+      }
     };
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
@@ -481,7 +483,7 @@ export default function FactoryDaybook() {
             const res = await fetch(`/api/vouchers/${entry.referenceId}/view-entries`, { credentials: "include" });
             if (res.ok) {
               const raw = await res.json();
-              const vEntries: any[] = Array.isArray(raw) ? raw : raw.entries || [];
+              const vEntries = Array.isArray(raw) ? raw : raw.entries || [];
               if (vEntries.length > 0) {
                 for (const ve of vEntries) {
                   detailedData.push({
@@ -494,7 +496,9 @@ export default function FactoryDaybook() {
                 continue;
               }
             }
-          } catch {}
+          } catch {
+            // Failure here is non-fatal and the surrounding flow continues deliberately.
+          }
         }
         detailedData.push({ ...baseRow, "Account Name": "", Debit: "", Credit: "" });
       }

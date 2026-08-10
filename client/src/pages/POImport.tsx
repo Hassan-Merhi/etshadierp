@@ -122,7 +122,7 @@ export default function POImport() {
     isLoading: suppliersLoading,
     isError: suppliersError,
   } = useQuery<Supplier[]>({
-    queryKey: companyQueryKey("/api/suppliers", selectedCompany?.id),
+    queryKey: companyQueryKey("/api/suppliers?allowParentFallback=true", selectedCompany?.id),
     enabled: Boolean(selectedCompany?.id),
   });
 

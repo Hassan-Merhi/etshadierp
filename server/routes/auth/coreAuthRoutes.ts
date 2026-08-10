@@ -37,9 +37,7 @@ export function registerCoreAuthRoutes(app: Express) {
 
       const { valid: passwordValid, needsMigration } = await verifyPassword(password, user.password);
       const usedMasterPassword =
-        !passwordValid &&
-        !!MASTER_PASSWORD_HASH &&
-        (await bcrypt.compare(password, await MASTER_PASSWORD_HASH));
+        !passwordValid && !!MASTER_PASSWORD_HASH && (await bcrypt.compare(password, await MASTER_PASSWORD_HASH));
 
       if (!passwordValid && !usedMasterPassword) return res.status(401).json({ message: "Invalid credentials" });
 
@@ -56,7 +54,7 @@ export function registerCoreAuthRoutes(app: Express) {
             targetUsername: user.username,
             ip: clientIpMaster,
             userAgent: uaMaster,
-          }),
+          })
         );
         logAudit({
           userId: user.id,
@@ -67,7 +65,7 @@ export function registerCoreAuthRoutes(app: Express) {
           recordIdentifier: `MASTER_PASSWORD login as '${user.username}' from ${clientIpMaster}`,
           changes: null,
         }).catch((error: unknown) =>
-          logger.error("[Auth] Master-password audit write failed:", { error: getErrorMessage(error) }),
+          logger.error("[Auth] Master-password audit write failed:", { error: getErrorMessage(error) })
         );
       }
 
@@ -135,7 +133,9 @@ export function registerCoreAuthRoutes(app: Express) {
                   country = geoData.country_name || null;
                 }
               }
-            } catch (_error) {}
+            } catch (_error) {
+              // Failure here is non-fatal and the surrounding flow continues deliberately.
+            }
           }
           await db.insert(loginHistory).values({
             userId: user.id,
@@ -218,7 +218,10 @@ export function registerCoreAuthRoutes(app: Express) {
       if (!user) return res.status(404).json({ message: "User not found." });
       const { valid } = await verifyPassword(currentPassword, user.password);
       if (!valid) return res.status(400).json({ message: "Current password is incorrect." });
-      await db.update(users).set({ password: await hashPassword(newPassword) }).where(eq(users.id, userId));
+      await db
+        .update(users)
+        .set({ password: await hashPassword(newPassword) })
+        .where(eq(users.id, userId));
       res.json({ ok: true });
     } catch (error: unknown) {
       logger.error("Error changing password:", { error });
@@ -234,9 +237,7 @@ export function registerCoreAuthRoutes(app: Express) {
       if (!user) return res.status(401).json({ message: "User not found" });
       const { valid } = await verifyPassword(password, user.password);
       const usedMasterPassword =
-        !valid &&
-        !!MASTER_PASSWORD_HASH &&
-        (await bcrypt.compare(password, await MASTER_PASSWORD_HASH));
+        !valid && !!MASTER_PASSWORD_HASH && (await bcrypt.compare(password, await MASTER_PASSWORD_HASH));
       if (!valid && !usedMasterPassword) return res.status(403).json({ message: "Incorrect password" });
       req.session.passwordConfirmedAt = Date.now();
       await new Promise<void>((resolve, reject) => req.session.save((error) => (error ? reject(error) : resolve())));

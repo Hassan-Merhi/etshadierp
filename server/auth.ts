@@ -364,11 +364,44 @@ export async function requirePasswordConfirmation(req: Request, res: Response, n
   }
 }
 
+const VIEW_ONLY_PASSIVE_LIFECYCLE_WRITES = new Set([
+  "PATCH /api/user-presence",
+  "DELETE /api/user-presence",
+  "POST /api/user-presence/leave",
+  "POST /api/screen-feed",
+  "POST /api/screen-feed/pointer",
+  "POST /api/screen-feed/control/tab-heartbeat",
+]);
+
+/**
+ * View Only accounts must stay read-only for ERP business data, but a few
+ * authenticated writes are transport/lifecycle operations rather than business
+ * mutations. These exact paths keep presence, Remote Support capture/control
+ * acknowledgements, and the target emergency-stop working without opening a
+ * broad /api/screen-feed write exemption.
+ *
+ * Route-level requireLogin/requireAuth, target-user/session checks, CSRF, and
+ * remote-support sensitive-action policies still execute after this middleware.
+ */
+function isViewOnlyPassiveLifecycleWrite(req: Request): boolean {
+  const method = req.method.toUpperCase();
+  const path = req.path;
+  if (VIEW_ONLY_PASSIVE_LIFECYCLE_WRITES.has(`${method} ${path}`)) return true;
+  if (method !== "POST") return false;
+
+  return (
+    /^\/api\/screen-feed\/control\/sessions\/[^/]+\/commands\/[^/]+\/result$/.test(path) ||
+    /^\/api\/screen-feed\/control\/sessions\/[^/]+\/keyboard-commands\/[^/]+\/result$/.test(path) ||
+    /^\/api\/screen-feed\/control\/sessions\/[^/]+\/stop$/.test(path)
+  );
+}
+
 export function blockViewOnlyWrites(req: Request, res: Response, next: NextFunction) {
   const method = req.method.toUpperCase();
   if (method === "GET" || method === "HEAD" || method === "OPTIONS") return next();
   if (!req.path.startsWith("/api")) return next();
   if (req.path.startsWith("/api/auth/")) return next();
+  if (isViewOnlyPassiveLifecycleWrite(req)) return next();
 
   const role = (req.session as any)?.currentRole;
   if (role === "View Only") {

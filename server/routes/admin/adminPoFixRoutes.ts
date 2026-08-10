@@ -418,7 +418,7 @@ export function registerAdminPoFixRoutes(app: Express) {
       let fixed = 0;
       let skipped = 0;
       let totalAmount = 0;
-      const details: any[] = [];
+      const details = [];
 
       for (const po of allPOs) {
         if (!po.voucherId || !po.supplierId) {

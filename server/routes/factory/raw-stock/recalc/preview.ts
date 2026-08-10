@@ -68,7 +68,7 @@ export function registerRawStockRecalcPreviewRoutes(app: Express) {
         if (!Array.isArray(containerIds) || containerIds.length === 0) {
           return res.json([]);
         }
-        const parsedIds = containerIds.map((id: any) => parseInt(id)).filter((id: number) => !isNaN(id));
+        const parsedIds = containerIds.map((id) => parseInt(id)).filter((id: number) => !isNaN(id));
         const rows = await getAffectedMixBatchesPreview(companyId, parsedIds, includeCompletedBatches === true);
         res.json(rows);
       } catch (err: unknown) {
@@ -103,7 +103,7 @@ export function registerRawStockRecalcPreviewRoutes(app: Express) {
           return res.status(400).json({ message: "containerIds must be a non-empty array" });
         }
         const parsedIds = containerIds
-          .map((id: any) => parseInt(id))
+          .map((id) => parseInt(id))
           .filter((id: number) => !isNaN(id))
           .sort((a: number, b: number) => a - b);
         if (parsedIds.length === 0) {
@@ -225,7 +225,7 @@ export function registerRawStockRecalcPreviewRoutes(app: Express) {
         }
 
         // Persist undo snapshot (non-fatal if it fails — apply already committed)
-        const appliedContainerNumbers = (snapshot.containers as any[]).map((c: any) =>
+        const appliedContainerNumbers = (snapshot.containers as any[]).map((c) =>
           String(c.finalPayableAmount !== undefined ? c.id : c.id)
         );
         const containerNumbersForDescription = results.filter((r) => r.applied).map((r) => r.containerNumber);

@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
@@ -22,7 +22,7 @@ import { eq, and, sql, inArray } from "drizzle-orm";
 
 export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
   /* Single proforma by ID — used by EditProformaV5Drawer and lazy detail readers. */
-  app.get("/api/factory/customer-proformas/:id", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/customer-proformas/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -31,7 +31,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
       const rawProformaRes = await db.execute(
         sql`SELECT * FROM customer_proformas WHERE id = ${id} AND company_id = ${companyId} AND deleted_at IS NULL LIMIT 1`
       );
-      const rawProformaRows: any[] = (rawProformaRes as any).rows ?? (rawProformaRes as unknown as any[]);
+      const rawProformaRows = (rawProformaRes as any).rows ?? (rawProformaRes as unknown as any[]);
       if (!rawProformaRows.length) return res.status(404).json({ message: "Proforma not found" });
       const pr = rawProformaRows[0];
       const proforma = {
@@ -45,7 +45,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
         updatedAt: pr.updated_at ?? pr.created_at,
       };
       const rawLinesRes = await db.execute(sql`SELECT * FROM customer_proforma_lines WHERE proforma_id = ${id}`);
-      const lines: any[] = ((rawLinesRes as any).rows ?? (rawLinesRes as unknown as any[])).map((l: any) => ({
+      const lines = ((rawLinesRes as any).rows ?? (rawLinesRes as unknown as any[])).map((l: any) => ({
         id: l.id,
         proformaId: l.proforma_id,
         articleCode: l.article_code ?? "",
@@ -86,7 +86,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/customer-proformas", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/customer-proformas", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -137,7 +137,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
           GROUP BY cp.id, cp.company_id, cp.customer_id, cp.name, cp.is_active, cp.created_at
           ORDER BY cp.name ASC
         `);
-        const summaryRows: any[] = (rawSummary as any).rows ?? (rawSummary as unknown as any[]);
+        const summaryRows = (rawSummary as any).rows ?? (rawSummary as unknown as any[]);
         const summaries = summaryRows.map((row: any) => ({
           id: row.id,
           companyId: row.company_id,
@@ -166,21 +166,19 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
               AND deleted_at IS NULL
             ORDER BY name ASC`
       );
-      const proformas: any[] = ((rawProformasRes as any).rows ?? (rawProformasRes as unknown as any[])).map(
-        (r: any) => ({
-          id: r.id,
-          companyId: r.company_id,
-          customerId: r.customer_id,
-          name: r.name ?? "",
-          isActive: r.is_active ?? false,
-          deletedAt: r.deleted_at ?? null,
-          createdAt: r.created_at,
-          updatedAt: r.updated_at ?? r.created_at,
-        })
-      );
+      const proformas = ((rawProformasRes as any).rows ?? (rawProformasRes as unknown as any[])).map((r: any) => ({
+        id: r.id,
+        companyId: r.company_id,
+        customerId: r.customer_id,
+        name: r.name ?? "",
+        isActive: r.is_active ?? false,
+        deletedAt: r.deleted_at ?? null,
+        createdAt: r.created_at,
+        updatedAt: r.updated_at ?? r.created_at,
+      }));
 
       const proformaIds = proformas.map((p: any) => p.id);
-      let lines: any[] = [];
+      let lines = [];
       if (proformaIds.length > 0) {
         const idList = sql.join(
           proformaIds.map((id: number) => sql`${id}`),
@@ -195,7 +193,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
           FROM customer_proforma_lines
           WHERE proforma_id IN (${idList})
         `);
-        const rawRows: any[] = (rawLines as any).rows ?? (rawLines as unknown as any[]);
+        const rawRows = (rawLines as any).rows ?? (rawLines as unknown as any[]);
         lines = rawRows.map((l: any) => ({
           id: l.id,
           proformaId: l.proforma_id,
@@ -260,7 +258,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/customer-proformas", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/customer-proformas", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -292,7 +290,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
     }
   });
 
-  app.put("/api/factory/customer-proformas/:id", requireAuth, async (req: any, res: any) => {
+  app.put("/api/factory/customer-proformas/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -338,7 +336,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/factory/customer-proformas/:id", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/customer-proformas/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

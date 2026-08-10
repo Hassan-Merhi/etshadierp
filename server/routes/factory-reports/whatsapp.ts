@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { pool } from "../../db";
@@ -12,7 +12,7 @@ import { logAudit } from "../_helpers";
 
 export function registerFactoryMixBatchWhatsappRoutes(app: Express, requireAuth: any, db: any) {
   // ── Send mix batch image to WhatsApp ─────────────────────────────────────
-  app.post("/api/factory/send-mix-batch-image-whatsapp", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/send-mix-batch-image-whatsapp", requireAuth, async (req: Request, res: Response) => {
     try {
       const { imageBase64, date, fileName } = req.body ?? {};
       if (!imageBase64) return res.status(400).json({ message: "imageBase64 is required" });

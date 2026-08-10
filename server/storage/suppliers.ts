@@ -1,17 +1,14 @@
 import { and, asc, eq, ilike, isNull } from "drizzle-orm";
 import { db } from "../db";
 import { companyScopedSuppliers } from "@shared/schema/supplierCompanyScope";
-import type {
-  CompanyScopedSupplier,
-  InsertCompanyScopedSupplier,
-} from "@shared/schema/supplierCompanyScope";
+import type { CompanyScopedSupplier, InsertCompanyScopedSupplier } from "@shared/schema/supplierCompanyScope";
 
 export async function getAllSuppliers(
   search?: string,
   limit?: number,
   companyId?: number
 ): Promise<CompanyScopedSupplier[]> {
-  const conditions: any[] = [isNull(companyScopedSuppliers.deletedAt)];
+  const conditions = [isNull(companyScopedSuppliers.deletedAt)];
   if (companyId) {
     conditions.push(eq(companyScopedSuppliers.companyId, companyId));
   }
@@ -29,10 +26,7 @@ export async function getAllSuppliers(
   return await query;
 }
 
-export async function getSupplierByCode(
-  code: string,
-  companyId?: number
-): Promise<CompanyScopedSupplier | undefined> {
+export async function getSupplierByCode(code: string, companyId?: number): Promise<CompanyScopedSupplier | undefined> {
   const conditions = [eq(companyScopedSuppliers.code, code), isNull(companyScopedSuppliers.deletedAt)];
   if (companyId) conditions.push(eq(companyScopedSuppliers.companyId, companyId));
   const [supplier] = await db
@@ -42,10 +36,7 @@ export async function getSupplierByCode(
   return supplier;
 }
 
-export async function getSupplierById(
-  id: number,
-  companyId?: number
-): Promise<CompanyScopedSupplier | undefined> {
+export async function getSupplierById(id: number, companyId?: number): Promise<CompanyScopedSupplier | undefined> {
   const conditions = [eq(companyScopedSuppliers.id, id), isNull(companyScopedSuppliers.deletedAt)];
   if (companyId) conditions.push(eq(companyScopedSuppliers.companyId, companyId));
   const [supplier] = await db
@@ -56,7 +47,10 @@ export async function getSupplierById(
 }
 
 export async function createSupplier(supplier: InsertCompanyScopedSupplier): Promise<CompanyScopedSupplier> {
-  const [created] = await db.insert(companyScopedSuppliers).values(supplier as any).returning();
+  const [created] = await db
+    .insert(companyScopedSuppliers)
+    .values(supplier as any)
+    .returning();
   return created;
 }
 

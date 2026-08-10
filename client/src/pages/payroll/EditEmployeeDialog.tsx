@@ -198,7 +198,7 @@ export function EditEmployeeDialog({
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="none">No Group</SelectItem>
-                        {employeeGroups.map((group: any) => (
+                        {employeeGroups.map((group) => (
                           <SelectItem key={group.id} value={group.id.toString()}>
                             {group.name}
                           </SelectItem>
@@ -251,7 +251,7 @@ export function EditEmployeeDialog({
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="__current__">{selectedCompany?.name || "This company"}</SelectItem>
-                                {otherCompanies.map((c: any) => (
+                                {otherCompanies.map((c) => (
                                   <SelectItem key={c.id} value={String(c.id)}>
                                     {c.name}
                                   </SelectItem>
@@ -273,7 +273,7 @@ export function EditEmployeeDialog({
                               <SelectValue placeholder="Select location" />
                             </SelectTrigger>
                             <SelectContent>
-                              {pctLocations.map((loc: any) => (
+                              {pctLocations.map((loc) => (
                                 <SelectItem key={loc.id} value={String(loc.id)}>
                                   {loc.name}
                                 </SelectItem>
@@ -312,7 +312,7 @@ export function EditEmployeeDialog({
                 {editBaleRates.map((row, idx) => {
                   const rowCompanyId = row.sourceCompanyId || "";
                   const locationsForRow = rowCompanyId
-                    ? allCompanyLocations.filter((l: any) => String(l.companyId) === rowCompanyId)
+                    ? allCompanyLocations.filter((l) => String(l.companyId) === rowCompanyId)
                     : locations;
                   return (
                     <div key={idx} className="flex gap-2 items-start flex-wrap">
@@ -332,7 +332,7 @@ export function EditEmployeeDialog({
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="__current__">{selectedCompany?.name || "This company"}</SelectItem>
-                            {otherCompanies.map((c: any) => (
+                            {otherCompanies.map((c) => (
                               <SelectItem key={c.id} value={String(c.id)}>
                                 {c.name}
                               </SelectItem>
@@ -353,7 +353,7 @@ export function EditEmployeeDialog({
                           <SelectValue placeholder="Select location" />
                         </SelectTrigger>
                         <SelectContent>
-                          {locationsForRow.map((loc: any) => (
+                          {locationsForRow.map((loc) => (
                             <SelectItem key={loc.id} value={String(loc.id)}>
                               {loc.name}
                             </SelectItem>
@@ -411,7 +411,7 @@ export function EditEmployeeDialog({
                 {editBalePctRates.map((row, idx) => {
                   const rowCompanyId = row.sourceCompanyId || "";
                   const locationsForRow = rowCompanyId
-                    ? allCompanyLocations.filter((l: any) => String(l.companyId) === rowCompanyId)
+                    ? allCompanyLocations.filter((l) => String(l.companyId) === rowCompanyId)
                     : locations;
                   return (
                     <div key={idx} className="flex gap-2 items-start flex-wrap">
@@ -431,7 +431,7 @@ export function EditEmployeeDialog({
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="__current__">{selectedCompany?.name || "This company"}</SelectItem>
-                            {otherCompanies.map((c: any) => (
+                            {otherCompanies.map((c) => (
                               <SelectItem key={c.id} value={String(c.id)}>
                                 {c.name}
                               </SelectItem>
@@ -452,7 +452,7 @@ export function EditEmployeeDialog({
                           <SelectValue placeholder="Select location" />
                         </SelectTrigger>
                         <SelectContent>
-                          {locationsForRow.map((loc: any) => (
+                          {locationsForRow.map((loc) => (
                             <SelectItem key={loc.id} value={String(loc.id)}>
                               {loc.name}
                             </SelectItem>

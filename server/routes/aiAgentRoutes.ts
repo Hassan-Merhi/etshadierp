@@ -160,7 +160,7 @@ async function assertTaskOwner(taskId: number, companyId: number) {
     .from(aiAgentTasks)
     .where(and(eq(aiAgentTasks.id, taskId), eq(aiAgentTasks.companyId, companyId)));
   if (!task) {
-    const err: any = new Error("Task not found");
+    const err = new Error("Task not found");
     (err as { status?: number }).status = 404;
     throw err;
   }
@@ -249,7 +249,9 @@ export function registerAiAgentRoutes(app: Express) {
 
         res.status(201).json({ ...task, plan });
       } catch (err: unknown) {
-        res.status((err as { status?: number }).status ?? 500).json({ message: (err as { status?: number }).status ? getErrorMessage(err) : "Internal server error" });
+        res
+          .status((err as { status?: number }).status ?? 500)
+          .json({ message: (err as { status?: number }).status ? getErrorMessage(err) : "Internal server error" });
       }
     }
   );
@@ -303,7 +305,9 @@ export function registerAiAgentRoutes(app: Express) {
 
         res.json({ ...task, approvals });
       } catch (err: unknown) {
-        res.status((err as { status?: number }).status ?? 500).json({ message: (err as { status?: number }).status ? getErrorMessage(err) : "Internal server error" });
+        res
+          .status((err as { status?: number }).status ?? 500)
+          .json({ message: (err as { status?: number }).status ? getErrorMessage(err) : "Internal server error" });
       }
     }
   );
@@ -397,7 +401,9 @@ export function registerAiAgentRoutes(app: Express) {
 
         res.json({ status: newStatus, plan, approvalId });
       } catch (err: unknown) {
-        res.status((err as { status?: number }).status ?? 500).json({ message: (err as { status?: number }).status ? getErrorMessage(err) : "Internal server error" });
+        res
+          .status((err as { status?: number }).status ?? 500)
+          .json({ message: (err as { status?: number }).status ? getErrorMessage(err) : "Internal server error" });
       }
     }
   );
@@ -425,7 +431,9 @@ export function registerAiAgentRoutes(app: Express) {
 
         res.json({ success: true });
       } catch (err: unknown) {
-        res.status((err as { status?: number }).status ?? 500).json({ message: (err as { status?: number }).status ? getErrorMessage(err) : "Internal server error" });
+        res
+          .status((err as { status?: number }).status ?? 500)
+          .json({ message: (err as { status?: number }).status ? getErrorMessage(err) : "Internal server error" });
       }
     }
   );
@@ -515,7 +523,9 @@ export function registerAiAgentRoutes(app: Express) {
 
         res.json({ success: true, taskStatus: finalStatus, plan });
       } catch (err: unknown) {
-        res.status((err as { status?: number }).status ?? 500).json({ message: (err as { status?: number }).status ? getErrorMessage(err) : "Internal server error" });
+        res
+          .status((err as { status?: number }).status ?? 500)
+          .json({ message: (err as { status?: number }).status ? getErrorMessage(err) : "Internal server error" });
       }
     }
   );
@@ -574,7 +584,9 @@ export function registerAiAgentRoutes(app: Express) {
 
         res.json({ success: true, taskStatus: "cancelled" });
       } catch (err: unknown) {
-        res.status((err as { status?: number }).status ?? 500).json({ message: (err as { status?: number }).status ? getErrorMessage(err) : "Internal server error" });
+        res
+          .status((err as { status?: number }).status ?? 500)
+          .json({ message: (err as { status?: number }).status ? getErrorMessage(err) : "Internal server error" });
       }
     }
   );

@@ -1,7 +1,6 @@
 {
   "description": "Reviewed CI ratchet deltas for intentional functionality added before the architecture snapshots were refreshed. Every allowance is exact so unrelated growth or routes still fail. The route-manifest additions were folded into config/route-manifest.json on 2026-08-05, so these lists only contain exact reviewed deltas since that snapshot.",
   "godFileLineCaps": {
-    "server/routes/payroll/workerStatsAdvancesRoutes.ts": 937,
     "server/services/factory/postOffloadPhase6Safety.ts": 927,
     "server/services/rental/rentalPaymentPostingService.ts": 958,
     "client/src/pages/ContainerLoadingScan.tsx": 1133,
@@ -51,8 +50,9 @@
       "tests/pos-revision-whatsapp-routing.test.ts",
       "tests/ui/remote-support-fast-viewer.test.ts",
       "tests/stock-item-name-update-by-code.test.ts",
-      "server/lib/reportPrecision.test.ts"
+      "server/lib/reportPrecision.test.ts",
+      "tests/remote-support-phase4-hardening.test.ts"
     ],
-    "maxAdditionalTextAssertions": 577
+    "maxAdditionalTextAssertions": 604
   }
 }

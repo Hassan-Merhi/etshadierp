@@ -199,7 +199,7 @@ export function SupplierOtherDialogs({
                 {(dueDialogSupplier?.containers || [])
                   .slice()
                   .sort((a: any, b: any) => new Date(a.offloadDate).getTime() - new Date(b.offloadDate).getTime())
-                  .map((c: any) => (
+                  .map((c) => (
                     <div key={c.id} className="flex items-center justify-between px-3 py-2.5 gap-3">
                       <div>
                         <div className="font-medium">{c.containerNumber}</div>

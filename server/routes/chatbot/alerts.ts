@@ -98,7 +98,9 @@ export function registerChatbotAlertRoutes(app: Express) {
           .from(factoryPayrolls)
           .where(and(eq(factoryPayrolls.companyId, companyId), eq(factoryPayrolls.status, "DRAFT")))
           .limit(5);
-      } catch (_) {}
+      } catch (_) {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
 
       res.json({
         lowStock: lowStock.slice(0, 10),

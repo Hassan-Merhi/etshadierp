@@ -469,7 +469,7 @@ export default function BalesHistory() {
   };
 
   const toggleSelectAll = (filteredItems: any[]) => {
-    const filteredIds = filteredItems.map((r: any) => r.bale.id);
+    const filteredIds = filteredItems.map((r) => r.bale.id);
     const allSelected = filteredIds.every((id: number) => selectedIds.has(id));
     if (allSelected) {
       setSelectedIds(new Set());
@@ -490,7 +490,9 @@ export default function BalesHistory() {
     try {
       await modeApiRequest("POST", "/api/bale-label-prints/reprint", { baleId: baleRow.bale.id });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
-    } catch {}
+    } catch {
+      // Cache invalidation is best-effort; the next fetch corrects it and a failure here is not worth surfacing.
+    }
 
     if (isZebraMode()) {
       try {
@@ -556,7 +558,7 @@ export default function BalesHistory() {
     }
   };
 
-  const filtered = (balesData || []).filter((row: any) => {
+  const filtered = (balesData || []).filter((row) => {
     const bale = row.bale;
     const product = row.product;
     const batch = row.mixBatch;
@@ -651,7 +653,7 @@ export default function BalesHistory() {
 
   const todayStr = new Date().toLocaleDateString("en-CA");
   const summaryDate = dateFilter || todayStr;
-  const todayInStock = (balesData || []).filter((row: any) => {
+  const todayInStock = (balesData || []).filter((row) => {
     const bale = row.bale;
     if (bale.status !== "IN_STOCK") return false;
     const baleDate = bale.stockEntryDate
@@ -666,7 +668,7 @@ export default function BalesHistory() {
   // so "Garbage Bales", "GARBAGE", " garbage " and "wiper"/"WIPERS" all classify correctly
   const getBaleClassification = (row: any): "garbage" | "wipers" | "regular" => {
     const candidates = [row.bale?.category, row.bale?.productName, row.product?.name]
-      .filter((v: any) => v && typeof v === "string")
+      .filter((v) => v && typeof v === "string")
       .map((v: string) => v.toLowerCase().trim());
 
     for (const c of candidates) {
@@ -676,9 +678,9 @@ export default function BalesHistory() {
     return "regular";
   };
 
-  const todayGarbage = todayInStock.filter((row: any) => getBaleClassification(row) === "garbage");
-  const todayWipers = todayInStock.filter((row: any) => getBaleClassification(row) === "wipers");
-  const todayRegular = todayInStock.filter((row: any) => getBaleClassification(row) === "regular");
+  const todayGarbage = todayInStock.filter((row) => getBaleClassification(row) === "garbage");
+  const todayWipers = todayInStock.filter((row) => getBaleClassification(row) === "wipers");
+  const todayRegular = todayInStock.filter((row) => getBaleClassification(row) === "regular");
   const regularQty = todayRegular.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
   const regularKg = todayRegular.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
   const garbageQty = todayGarbage.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
@@ -696,7 +698,7 @@ export default function BalesHistory() {
   }
 
   const inStockSelectedCount = Array.from(selectedIds).filter((id) =>
-    (balesData || []).some((r: any) => r.bale.id === id && r.bale.status === "IN_STOCK")
+    (balesData || []).some((r) => r.bale.id === id && r.bale.status === "IN_STOCK")
   ).length;
 
   return (
@@ -994,7 +996,7 @@ export default function BalesHistory() {
                 <TableRow>
                   <TableHead className="w-10">
                     <Checkbox
-                      checked={filtered.length > 0 && filtered.every((r: any) => selectedIds.has(r.bale.id))}
+                      checked={filtered.length > 0 && filtered.every((r) => selectedIds.has(r.bale.id))}
                       onCheckedChange={() => toggleSelectAll(filtered)}
                       data-testid="checkbox-select-all"
                     />
@@ -1028,9 +1030,9 @@ export default function BalesHistory() {
               <TableBody>
                 {groupedFiltered.map((group) => {
                   const isExpanded = expandedGroups.has(group.key);
-                  const allGroupSelected = group.rows.every((r: any) => selectedIds.has(r.bale.id));
-                  const someGroupSelected = group.rows.some((r: any) => selectedIds.has(r.bale.id));
-                  const uniqueStatuses = [...new Set(group.rows.map((r: any) => r.bale.status as string))];
+                  const allGroupSelected = group.rows.every((r) => selectedIds.has(r.bale.id));
+                  const someGroupSelected = group.rows.some((r) => selectedIds.has(r.bale.id));
+                  const uniqueStatuses = [...new Set(group.rows.map((r) => r.bale.status as string))];
 
                   return [
                     // ── Group summary row ──
@@ -1046,8 +1048,8 @@ export default function BalesHistory() {
                           onCheckedChange={() => {
                             setSelectedIds((prev) => {
                               const next = new Set(prev);
-                              if (allGroupSelected) group.rows.forEach((r: any) => next.delete(r.bale.id));
-                              else group.rows.forEach((r: any) => next.add(r.bale.id));
+                              if (allGroupSelected) group.rows.forEach((r) => next.delete(r.bale.id));
+                              else group.rows.forEach((r) => next.add(r.bale.id));
                               return next;
                             });
                           }}
@@ -1093,7 +1095,7 @@ export default function BalesHistory() {
 
                     // ── Expanded individual bale rows ──
                     ...(isExpanded
-                      ? group.rows.map((row: any) => {
+                      ? group.rows.map((row) => {
                           const bale = row.bale;
                           const product = row.product;
                           return (
@@ -1362,7 +1364,7 @@ export default function BalesHistory() {
               disabled={!supervisorUsername || !supervisorPassword || removeMutation.isPending}
               onClick={() => {
                 const idsToRemove = Array.from(selectedIds).filter((id) =>
-                  (balesData || []).some((r: any) => r.bale.id === id && r.bale.status === "IN_STOCK")
+                  (balesData || []).some((r) => r.bale.id === id && r.bale.status === "IN_STOCK")
                 );
                 removeMutation.mutate({
                   ids: idsToRemove,

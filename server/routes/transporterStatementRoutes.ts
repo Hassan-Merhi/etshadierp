@@ -446,16 +446,16 @@ export function registerTransporterStatementRoutes(app: Express) {
       // We iterate payments in date order and apply them oldest-charge-first.
       // This gives us paidMap: creditEntryId → how much of that charge is covered.
       const fifoCharges = allRows
-        .filter((r: any) => parseFloat(r.credit_amount || "0") > 0)
-        .map((r: any) => ({
+        .filter((r) => parseFloat(r.credit_amount || "0") > 0)
+        .map((r) => ({
           id: r.id as number,
           total: parseFloat(r.credit_amount),
           remaining: parseFloat(r.credit_amount),
         }));
 
       const fifoPayments = allRows
-        .filter((r: any) => parseFloat(r.debit_amount || "0") > 0)
-        .map((r: any) => ({
+        .filter((r) => parseFloat(r.debit_amount || "0") > 0)
+        .map((r) => ({
           id: r.id as number,
           total: parseFloat(r.debit_amount),
           remaining: parseFloat(r.debit_amount),
@@ -483,7 +483,7 @@ export function registerTransporterStatementRoutes(app: Express) {
       }
 
       // Build rows with running balance
-      const statementRows = allRows.map((row: any) => {
+      const statementRows = allRows.map((row) => {
         const debit = parseFloat(row.debit_amount || "0");
         const credit = parseFloat(row.credit_amount || "0");
         runningBalance = runningBalance + credit - debit;
@@ -555,7 +555,7 @@ export function registerTransporterStatementRoutes(app: Express) {
       const filteredOpeningBalance =
         filteredRows.length > 0
           ? (() => {
-              const firstIdx = allRows.findIndex((r: any) => r.id === filteredRows[0].id);
+              const firstIdx = allRows.findIndex((r) => r.id === filteredRows[0].id);
               if (firstIdx === 0) {
                 return (obSide === "Dr" ? -ob : ob).toFixed(2);
               }

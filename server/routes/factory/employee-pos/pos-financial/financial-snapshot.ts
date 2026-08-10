@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../../lib/httpHandlers";
 import { logger } from "../../../../lib/logger";
 import { db } from "../../../../db";
@@ -25,7 +25,7 @@ export function registerFactoryFinancialSnapshotRoutes(app: Express) {
   // ─────────────────────────────────────────────────────────────────────────
   // Factory Financial Snapshot  —  single-request aggregates for the snapshot page
   // ─────────────────────────────────────────────────────────────────────────
-  app.get("/api/factory/financial-snapshot", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/financial-snapshot", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -137,7 +137,7 @@ export function registerFactoryFinancialSnapshotRoutes(app: Express) {
       // Get voucher entries for equity accounts
       let capitalTotal = 0;
       if ((equityAccounts as any[]).length > 0) {
-        const equityIds = (equityAccounts as any[]).map((a: any) => a.id);
+        const equityIds = (equityAccounts as any[]).map((a) => a.id);
         const equityEntries = await db
           .select({
             ledgerAccountId: voucherEntries.ledgerAccountId,
@@ -182,7 +182,7 @@ export function registerFactoryFinancialSnapshotRoutes(app: Express) {
         advanceCount,
         activeWorkerCount,
         capitalTotal: round2(capitalTotal),
-        equityAccounts: (equityAccounts as any[]).map((a: any) => ({
+        equityAccounts: (equityAccounts as any[]).map((a) => ({
           id: a.id,
           name: a.name,
           code: a.code,

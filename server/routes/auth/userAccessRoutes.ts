@@ -21,7 +21,7 @@ export function registerUserAccessRoutes(app: Express) {
         await db
           .select()
           .from(userLocations)
-          .where(and(eq(userLocations.userId, userId), eq(userLocations.companyId, parseInt(companyId)))),
+          .where(and(eq(userLocations.userId, userId), eq(userLocations.companyId, parseInt(companyId))))
       );
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
@@ -39,9 +39,9 @@ export function registerUserAccessRoutes(app: Express) {
         .delete(userLocations)
         .where(and(eq(userLocations.userId, userId), eq(userLocations.companyId, companyIdNum)));
       if (locationIds.length > 0) {
-        await db.insert(userLocations).values(
-          locationIds.map((locationId: number) => ({ userId, companyId: companyIdNum, locationId })),
-        );
+        await db
+          .insert(userLocations)
+          .values(locationIds.map((locationId: number) => ({ userId, companyId: companyIdNum, locationId })));
         await db
           .update(userCompanyRoles)
           .set({ assignedLocationId: locationIds[0] })
@@ -51,7 +51,7 @@ export function registerUserAccessRoutes(app: Express) {
         await db
           .select()
           .from(userLocations)
-          .where(and(eq(userLocations.userId, userId), eq(userLocations.companyId, companyIdNum))),
+          .where(and(eq(userLocations.userId, userId), eq(userLocations.companyId, companyIdNum)))
       );
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
@@ -117,13 +117,13 @@ export function registerUserAccessRoutes(app: Express) {
             .where(and(eq(userLocationCashAccounts.userId, userId), eq(userLocationCashAccounts.companyId, companyId)));
           if (mappings.length > 0) {
             await tx.insert(userLocationCashAccounts).values(
-              mappings.map((mapping: any) => ({
+              mappings.map((mapping) => ({
                 userId,
                 companyId,
                 locationId: mapping.locationId,
                 cashAccountId: mapping.cashAccountId,
                 posStation: mapping.posStation ?? null,
-              })),
+              }))
             );
           }
         });
@@ -131,7 +131,7 @@ export function registerUserAccessRoutes(app: Express) {
       } catch (error: unknown) {
         res.status(500).json({ message: getErrorMessage(error) });
       }
-    },
+    }
   );
 
   app.get("/api/my-locations", requireAuth, async (req, res) => {
@@ -159,11 +159,13 @@ export function registerUserAccessRoutes(app: Express) {
           and(
             eq(userLocationCashAccounts.userId, req.user.id),
             eq(userLocationCashAccounts.companyId, companyId),
-            eq(userLocationCashAccounts.locationId, locations.id),
-          ),
+            eq(userLocationCashAccounts.locationId, locations.id)
+          )
         )
         .leftJoin(ledgerAccounts, eq(ledgerAccounts.id, userLocationCashAccounts.cashAccountId))
-        .where(and(eq(userLocations.userId, req.user.id), eq(userLocations.companyId, companyId), eq(locations.active, true)));
+        .where(
+          and(eq(userLocations.userId, req.user.id), eq(userLocations.companyId, companyId), eq(locations.active, true))
+        );
 
       if (userLocs.length === 0) {
         const [role] = await db
@@ -191,8 +193,8 @@ export function registerUserAccessRoutes(app: Express) {
               and(
                 eq(userLocationCashAccounts.userId, req.user.id),
                 eq(userLocationCashAccounts.companyId, companyId),
-                eq(userLocationCashAccounts.locationId, locations.id),
-              ),
+                eq(userLocationCashAccounts.locationId, locations.id)
+              )
             )
             .leftJoin(ledgerAccounts, eq(ledgerAccounts.id, userLocationCashAccounts.cashAccountId))
             .where(and(eq(locations.id, fallbackLocId), eq(locations.active, true)))
@@ -205,8 +207,8 @@ export function registerUserAccessRoutes(app: Express) {
                 and(
                   eq(userLocations.userId, req.user.id),
                   eq(userLocations.companyId, companyId),
-                  eq(userLocations.locationId, fallbackLocId),
-                ),
+                  eq(userLocations.locationId, fallbackLocId)
+                )
               )
               .limit(1);
             if (existing.length === 0) {

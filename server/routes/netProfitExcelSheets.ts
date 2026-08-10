@@ -53,13 +53,13 @@ export function computeStats(
   );
   let directIncTotal = 0;
   const directIncDetails = directIncAccounts
-    .map((acc: any) => {
+    .map((acc) => {
       const b = balances.get(acc.id) || { debit: 0, credit: 0 };
       const net = b.credit - b.debit;
       directIncTotal += net;
       return { id: acc.id, name: acc.name, debit: b.debit, credit: b.credit, balance: net };
     })
-    .filter((r: any) => r.debit !== 0 || r.credit !== 0);
+    .filter((r) => r.debit !== 0 || r.credit !== 0);
 
   const totalIncome = salesTotal + directIncTotal;
 
@@ -69,13 +69,13 @@ export function computeStats(
   );
   let purchaseTotal = 0;
   const purchaseDetails = purchaseAccounts
-    .map((acc: any) => {
+    .map((acc) => {
       const b = balances.get(acc.id) || { debit: 0, credit: 0 };
       const net = b.debit - b.credit;
       purchaseTotal += net;
       return { id: acc.id, name: acc.name, debit: b.debit, credit: b.credit, balance: net };
     })
-    .filter((r: any) => r.debit !== 0 || r.credit !== 0);
+    .filter((r) => r.debit !== 0 || r.credit !== 0);
 
   // Direct Expenses
   const directExpAccounts = ctx.companyAccounts.filter(
@@ -88,13 +88,13 @@ export function computeStats(
   );
   let directExpTotal = 0;
   const directExpDetails = directExpAccounts
-    .map((acc: any) => {
+    .map((acc) => {
       const b = balances.get(acc.id) || { debit: 0, credit: 0 };
       const net = b.debit - b.credit;
       directExpTotal += net;
       return { id: acc.id, name: acc.name, debit: b.debit, credit: b.credit, balance: net };
     })
-    .filter((r: any) => r.debit !== 0 || r.credit !== 0);
+    .filter((r) => r.debit !== 0 || r.credit !== 0);
 
   // Indirect Expenses
   const indirectExpAccounts = ctx.companyAccounts.filter(
@@ -107,13 +107,13 @@ export function computeStats(
   );
   let indirectExpTotal = 0;
   const indirectExpDetails = indirectExpAccounts
-    .map((acc: any) => {
+    .map((acc) => {
       const b = balances.get(acc.id) || { debit: 0, credit: 0 };
       const net = b.debit - b.credit;
       indirectExpTotal += net;
       return { id: acc.id, name: acc.name, debit: b.debit, credit: b.credit, balance: net };
     })
-    .filter((r: any) => r.debit !== 0 || r.credit !== 0);
+    .filter((r) => r.debit !== 0 || r.credit !== 0);
 
   // COGS: Opening + Purchases + Direct + Indirect - Closing (monthlyMode: no opening/closing)
   const totalCOGS = monthlyMode

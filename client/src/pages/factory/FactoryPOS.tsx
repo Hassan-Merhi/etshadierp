@@ -1369,7 +1369,7 @@ export default function FactoryPOS() {
                   (s: number, r: CartRow) => s + r.quantity * r.weightPerBale,
                   0
                 );
-                const printExpenses: any[] = savedSale?.expenses ?? [];
+                const printExpenses = savedSale?.expenses ?? [];
                 const printNetTotal: number = savedSale?.netTotal ?? savedSale?.total ?? 0;
                 return (
                   <>

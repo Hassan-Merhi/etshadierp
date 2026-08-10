@@ -82,7 +82,12 @@ async function logStatusBuilderChanges(
   }
   for (const oldRow of oldRows || []) {
     if (!newRows?.some((r) => r.id === oldRow.id)) {
-      entries.push({ rowLabel: oldRow.label || "(row)", columnLabel: "(row)", oldValue: "present", newValue: "deleted" });
+      entries.push({
+        rowLabel: oldRow.label || "(row)",
+        columnLabel: "(row)",
+        oldValue: "present",
+        newValue: "deleted",
+      });
     }
   }
 
@@ -203,7 +208,7 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
       const sheetId = parseOptionalId(req.query.sheetId as string | undefined);
       const limit = Math.min(parseInt((req.query.limit as string) || "200") || 200, 1000);
 
-      const params: any[] = [companyId];
+      const params = [companyId];
       const conditions = ["company_id = $1"];
       if (sheetId != null) {
         params.push(sheetId);
@@ -279,12 +284,12 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
         }
 
         const headerRow = rawData[0] ?? [];
-        const columns: string[] = headerRow.slice(1).map((h: any) => (h == null ? "" : String(h)));
+        const columns: string[] = headerRow.slice(1).map((h) => (h == null ? "" : String(h)));
 
         const rows: { label: string; cells: (number | string | null)[] }[] = [];
         for (let r = 1; r < rawData.length; r++) {
           const rawRow = rawData[r] ?? [];
-          const hasData = rawRow.some((v: any) => v !== null && v !== undefined && v !== "");
+          const hasData = rawRow.some((v) => v !== null && v !== undefined && v !== "");
           if (!hasData) continue;
 
           const rawLabel = rawRow[0];
@@ -300,7 +305,7 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
             label = String(rawLabel).trim();
           }
 
-          const cells: (number | string | null)[] = rawRow.slice(1).map((v: any) => {
+          const cells: (number | string | null)[] = rawRow.slice(1).map((v) => {
             if (v === null || v === undefined || v === "") return null;
             if (v instanceof Date) {
               const y = v.getFullYear();
@@ -382,7 +387,7 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
         const colLabels = rawColumns.map(getColLabel);
 
         const headerRow = ["", ...colLabels];
-        const dataRows = rows.map((r) => [r.label, ...r.cells.map((c: any) => getCellRawValue(c) ?? "")]);
+        const dataRows = rows.map((r) => [r.label, ...r.cells.map((c) => getCellRawValue(c) ?? "")]);
 
         const diffCells = colLabels.map((_, colIdx) => {
           const sum = rows.reduce((acc, r) => {

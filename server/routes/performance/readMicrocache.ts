@@ -204,7 +204,7 @@ export function buildReadMicrocacheKey(req: Request): string {
 
 function makeEtag(body: string): string {
   const digest = createHash("sha1").update(body).digest("base64url").slice(0, 24);
-  return `W/\"${Buffer.byteLength(body, "utf8").toString(16)}-${digest}\"`;
+  return `W/"${Buffer.byteLength(body, "utf8").toString(16)}-${digest}"`;
 }
 
 function etagMatches(value: unknown, etag: string): boolean {

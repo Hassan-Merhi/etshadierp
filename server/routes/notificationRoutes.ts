@@ -20,7 +20,7 @@ export function registerNotificationRoutes(app: Express) {
       const typeFilter = req.query.type as string | undefined;
       const limit = Math.min(parseInt((req.query.limit as string) || "60"), 100);
 
-      const conditions: any[] = [eq(notifications.recipientUserId, userId)];
+      const conditions = [eq(notifications.recipientUserId, userId)];
       // Scope to the currently-selected company
       if (companyId) conditions.push(eq(notifications.companyId, companyId));
       if (unreadOnly) conditions.push(eq(notifications.isRead, false));
@@ -81,7 +81,7 @@ export function registerNotificationRoutes(app: Express) {
       const userId = req.session?.userId;
       const companyId = req.session?.currentCompanyId;
       if (!userId) return res.json({ count: 0 });
-      const conds: any[] = [eq(notifications.recipientUserId, userId), eq(notifications.isRead, false)];
+      const conds = [eq(notifications.recipientUserId, userId), eq(notifications.isRead, false)];
       if (companyId) conds.push(eq(notifications.companyId, companyId));
       const [row] = await db
         .select({ count: sql<number>`COUNT(*)::int` })
@@ -115,7 +115,7 @@ export function registerNotificationRoutes(app: Express) {
       const userId = req.session?.userId;
       const companyId = req.session?.currentCompanyId;
       if (!userId) return res.status(401).json({ message: "Not authenticated" });
-      const conds: any[] = [eq(notifications.recipientUserId, userId), eq(notifications.isRead, false)];
+      const conds = [eq(notifications.recipientUserId, userId), eq(notifications.isRead, false)];
       if (companyId) conds.push(eq(notifications.companyId, companyId));
       await db
         .update(notifications)

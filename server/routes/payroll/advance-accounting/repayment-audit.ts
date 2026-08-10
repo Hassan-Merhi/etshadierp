@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { parseOptionalId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
@@ -24,7 +24,7 @@ import { getFactoryCompanyId } from "./_helpers";
 
 export function registerAdvanceRepaymentAuditRoutes(app: Express) {
   // GET /api/factory/advances/repayment-audit — find salary deduction advances missing cash vouchers
-  app.get("/api/factory/advances/repayment-audit", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/advances/repayment-audit", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -42,7 +42,7 @@ export function registerAdvanceRepaymentAuditRoutes(app: Express) {
         )
         .orderBy(desc(factoryWorkerAdvances.advanceDate));
 
-      const advanceIds = allAdvances.map((r: any) => r.factory_worker_advances.id);
+      const advanceIds = allAdvances.map((r) => r.factory_worker_advances.id);
 
       // 2. All repayment records for those advances
       const repayments =
@@ -84,7 +84,7 @@ export function registerAdvanceRepaymentAuditRoutes(app: Express) {
       }
 
       // 5. Categorize
-      const auditAdvances: any[] = [];
+      const auditAdvances = [];
       for (const row of allAdvances) {
         const adv = row.factory_worker_advances;
         const worker = row.factory_workers;
@@ -107,7 +107,7 @@ export function registerAdvanceRepaymentAuditRoutes(app: Express) {
             });
           }
         } else {
-          const missingVoucherRepays = advRepays.filter((r: any) => !voucheredRepayIds.has(r.id));
+          const missingVoucherRepays = advRepays.filter((r) => !voucheredRepayIds.has(r.id));
           if (missingVoucherRepays.length > 0) {
             auditAdvances.push({
               id: adv.id,
@@ -130,8 +130,8 @@ export function registerAdvanceRepaymentAuditRoutes(app: Express) {
         summary: {
           total: allAdvances.length,
           ok: allAdvances.length - auditAdvances.length,
-          missingVoucher: auditAdvances.filter((a: any) => a.caseType === "missing_voucher").length,
-          noRepayment: auditAdvances.filter((a: any) => a.caseType === "no_repayment").length,
+          missingVoucher: auditAdvances.filter((a) => a.caseType === "missing_voucher").length,
+          noRepayment: auditAdvances.filter((a) => a.caseType === "no_repayment").length,
         },
       });
     } catch (error: unknown) {
@@ -141,7 +141,7 @@ export function registerAdvanceRepaymentAuditRoutes(app: Express) {
   });
 
   // POST /api/factory/advances/post-repayment-vouchers — fix missing repayment accounting
-  app.post("/api/factory/advances/post-repayment-vouchers", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/advances/post-repayment-vouchers", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -194,7 +194,7 @@ export function registerAdvanceRepaymentAuditRoutes(app: Express) {
           )
         );
 
-      const advanceIds = allAdvances.map((r: any) => r.factory_worker_advances.id);
+      const advanceIds = allAdvances.map((r) => r.factory_worker_advances.id);
       const repayments =
         advanceIds.length > 0
           ? await db
@@ -320,7 +320,7 @@ export function registerAdvanceRepaymentAuditRoutes(app: Express) {
             posted++;
           } else {
             // Case A: repayment records exist, re-create missing vouchers
-            const missingRepays = advRepays.filter((r: any) => !voucheredRepayIds.has(r.id));
+            const missingRepays = advRepays.filter((r) => !voucheredRepayIds.has(r.id));
             for (const repay of missingRepays) {
               const amount = parseFloat(repay.amount || "0");
               if (amount <= 0) continue;

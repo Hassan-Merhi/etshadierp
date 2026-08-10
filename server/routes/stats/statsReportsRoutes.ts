@@ -177,7 +177,7 @@ export function registerStatsReportsRoutes(app: Express) {
       if (allCompanies === "true") {
         const isDeveloper = (req.user as any)?.role === "Developer";
         const companyIds = isDeveloper
-          ? (await storage.getAllCompanies()).map((company: any) => company.id)
+          ? (await storage.getAllCompanies()).map((company) => company.id)
           : (await storage.getUserCompaniesWithRoles(req.user!.id)).map((membership) => membership.companyId);
         companyCondition =
           companyIds.length > 0 ? inArray(containers.companyId, companyIds) : eq(containers.companyId, companyId);
@@ -261,7 +261,7 @@ export function registerStatsReportsRoutes(app: Express) {
       const cached = _getCached(cacheKey);
       if (cached) return res.json(cached);
 
-      const entryConditions: any[] = [eq(vouchers.companyId, companyId)];
+      const entryConditions = [eq(vouchers.companyId, companyId)];
       if (startDate) entryConditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
       if (endDate) entryConditions.push(sql`${vouchers.voucherDate} <= ${endDate}`);
       const companyEntries = await db

@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../../lib/httpHandlers";
 import { logger } from "../../../../lib/logger";
 import { EXPECTED_CLIENT_RESPONSE_CODES, markExpectedClientResponse } from "../../../../lib/expectedClientResponse";
@@ -23,7 +23,7 @@ import { eq, and, or, sql, inArray, ilike } from "drizzle-orm";
 import { firstRow } from "../../../../lib/queryResult";
 
 export function registerOrderBaleScanRoutes(app: Express) {
-  app.post("/api/factory/customer-orders/:id/bales", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/customer-orders/:id/bales", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -104,7 +104,7 @@ export function registerOrderBaleScanRoutes(app: Express) {
             )
           )
         );
-      const matchingProductIds = matchingProductsByName.map((p: any) => p.id);
+      const matchingProductIds = matchingProductsByName.map((p) => p.id);
 
       const nameConditions =
         matchingProductIds.length > 0
@@ -202,7 +202,7 @@ export function registerOrderBaleScanRoutes(app: Express) {
         // fallback when bale.articleCode is null. Bales pressed before the
         // articleCode column was added (or imported without it) can otherwise
         // bypass the proforma overload check entirely.
-        let productForBale: any = null;
+        let productForBale = null;
         if (bale.productId) {
           const [p] = await tx.select().from(factoryBaleProducts).where(eq(factoryBaleProducts.id, bale.productId));
           productForBale = p || null;
@@ -225,7 +225,7 @@ export function registerOrderBaleScanRoutes(app: Express) {
                 eq(customerProformaLines.articleCode, effectiveArticleCode)
               )
             );
-          const proformaLine: any = pl || null;
+          const proformaLine = pl || null;
           if (proformaLine) {
             const pricingMode = (proformaLine as any).pricingMode ?? "per_bale";
             const perKgVal = (proformaLine as any).pricePerKg;

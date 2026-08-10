@@ -41,7 +41,7 @@ export function registerPayrollWorkerPaymentRoutes(app: Express) {
 
       // Get or create SALARY_EXPENSE ledger account
       const allAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
-      let salaryExpenseAccount = allAccounts.find((a: any) => a.code === "SALARY_EXPENSE");
+      let salaryExpenseAccount = allAccounts.find((a) => a.code === "SALARY_EXPENSE");
 
       if (!salaryExpenseAccount) {
         salaryExpenseAccount = await storage.createLedgerAccount({
@@ -171,7 +171,7 @@ export function registerPayrollWorkerPaymentRoutes(app: Express) {
               .replace(/[^A-Z0-9]/g, "_")
               .substring(0, 25)}`;
         const expName = isDefault ? "Salary Expense" : `Salary Expense - ${grp}`;
-        let expAccount = bulkPayFreshAccounts.find((a: any) => a.code === expCode);
+        let expAccount = bulkPayFreshAccounts.find((a) => a.code === expCode);
         if (!expAccount) {
           expAccount = await storage.createLedgerAccount({
             companyId: req.session.currentCompanyId!,

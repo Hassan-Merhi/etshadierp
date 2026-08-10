@@ -121,7 +121,7 @@ export function registerVoucherTransferOnlyRoutes(app: Express) {
           // Calculate totals and prepare items data
           let totalAmount = 0;
 
-          const transferItemsData = items.map((item: any) => {
+          const transferItemsData = items.map((item) => {
             const quantity = parseFloat(item.quantity);
             const rate = parseFloat(item.rate);
             const itemTotal = quantity * rate;

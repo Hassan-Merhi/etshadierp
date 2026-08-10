@@ -4,7 +4,7 @@
  * Extracted from FactoryBaleRelabeling.tsx during the Phase 4 god-file split.
  */
 import * as XLSX from "@/lib/excelHelper";
-import type {ApplyItem, ParsedRow} from "./types";
+import type { ApplyItem, ParsedRow } from "./types";
 
 export const POSSIBLE_COLUMNS = [
   "current_reference_code",
@@ -20,7 +20,7 @@ export const POSSIBLE_COLUMNS = [
 ];
 
 export function normalizeHeader(h: string): string {
-  return h.toLowerCase().replace(/[\s_\-]/g, "");
+  return h.toLowerCase().replace(/[\s_-]/g, "");
 }
 
 export function findRefColumn(headers: string[]): string | null {
@@ -41,7 +41,7 @@ export function parseExcelFile(file: File): Promise<ParsedRow[]> {
         const data = e.target?.result;
         const wb = await XLSX.read(data, { type: "binary" });
         const sheet = wb.Sheets[wb.SheetNames[0]];
-        const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
         if (rows.length === 0) {
           reject(new Error("No rows found in file"));
           return;
@@ -57,7 +57,7 @@ export function parseExcelFile(file: File): Promise<ParsedRow[]> {
           return;
         }
         const parsed: ParsedRow[] = rows
-          .map((r: any, i: number) => ({ currentRef: String(r[refCol] || "").trim(), rowNum: i + 2 }))
+          .map((r, i: number) => ({ currentRef: String(r[refCol] || "").trim(), rowNum: i + 2 }))
           .filter((r) => r.currentRef);
         resolve(parsed);
       } catch (err: any) {

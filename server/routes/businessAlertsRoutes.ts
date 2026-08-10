@@ -79,7 +79,7 @@ export async function runAlertChecks(companyId: number): Promise<void> {
   if (negStockRes.rows.length > 0) {
     const preview = negStockRes.rows
       .slice(0, 5)
-      .map((r: any) => `${r.name} (${r.quantity} @ ${r.location})`)
+      .map((r) => `${r.name} (${r.quantity} @ ${r.location})`)
       .join(", ");
     await upsertAlert({
       companyId,
@@ -161,7 +161,7 @@ export async function runAlertChecks(companyId: number): Promise<void> {
       alertType: "import_errors",
       severity: "info",
       title: `${total} row error(s) in recent imports`,
-      message: importErrorRes.rows.map((r: any) => `${r.file_name} (${r.invalid_rows} errors)`).join(", "),
+      message: importErrorRes.rows.map((r) => `${r.file_name} (${r.invalid_rows} errors)`).join(", "),
       metadata: { batches: importErrorRes.rows },
     });
   } else {

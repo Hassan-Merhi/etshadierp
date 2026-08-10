@@ -18,12 +18,7 @@ import {
   supportsCentralGenericVoucher,
 } from "../../services/accounting/genericVoucherPosting";
 import { triggerIntercompanyNotifications } from "../intercompanyNotificationRoutes";
-import {
-  buildVoucherChangesForCreate,
-  getCurrentExchangeRate,
-  logAudit,
-  snapshotVoucherEntries,
-} from "../_helpers";
+import { buildVoucherChangesForCreate, getCurrentExchangeRate, logAudit, snapshotVoucherEntries } from "../_helpers";
 
 const postingDependencies = createDatabasePostingDependencies();
 type PersistedPostingResult = CentralPostingResult<any, any>;
@@ -35,11 +30,7 @@ async function resolveCustomerLinkedLedgersTx(input: {
   entries: Array<Record<string, unknown>>;
 }): Promise<Array<Record<string, unknown>>> {
   const customerIds = [
-    ...new Set(
-      input.entries
-        .map((entry) => Number(entry.customerId))
-        .filter((id) => Number.isInteger(id) && id > 0),
-    ),
+    ...new Set(input.entries.map((entry) => Number(entry.customerId)).filter((id) => Number.isInteger(id) && id > 0)),
   ];
 
   if (customerIds.length === 0) return input.entries.map((entry) => ({ ...entry }));
@@ -48,9 +39,7 @@ async function resolveCustomerLinkedLedgersTx(input: {
     .select({ id: customers.id, ledgerAccountId: customers.ledgerAccountId })
     .from(customers)
     .where(and(eq(customers.companyId, input.companyId), inArray(customers.id, customerIds)));
-  const customerById = new Map<number, CustomerLinkedLedgerRow>(
-    rows.map((row) => [Number(row.id), row] as const),
-  );
+  const customerById = new Map<number, CustomerLinkedLedgerRow>(rows.map((row) => [Number(row.id), row] as const));
 
   return input.entries.map((entry) => {
     const customerId = Number(entry.customerId);
@@ -60,7 +49,7 @@ async function resolveCustomerLinkedLedgersTx(input: {
     if (!customer) {
       throw new PostingValidationError(
         "POSTING_TARGET_NOT_OWNED",
-        `Customer ${customerId} not found in company ${input.companyId}`,
+        `Customer ${customerId} not found in company ${input.companyId}`
       );
     }
 
@@ -69,7 +58,7 @@ async function resolveCustomerLinkedLedgersTx(input: {
     if (linkedLedgerId && suppliedLedgerId && linkedLedgerId !== suppliedLedgerId) {
       throw new PostingValidationError(
         "POSTING_LINKED_LEDGER_MISMATCH",
-        `Customer ${customerId} is linked to ledger ${linkedLedgerId}, but the entry specifies ledger ${suppliedLedgerId}`,
+        `Customer ${customerId} is linked to ledger ${linkedLedgerId}, but the entry specifies ledger ${suppliedLedgerId}`
       );
     }
 
@@ -84,11 +73,7 @@ function postingStatus(error: PostingValidationError): number {
   return error.code === "POSTING_IDEMPOTENCY_CORRUPT" ? 409 : 400;
 }
 
-async function createCentralGenericVoucher(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> {
+async function createCentralGenericVoucher(req: Request, res: Response, next: NextFunction): Promise<void> {
   if (!supportsCentralGenericVoucher(req.body)) {
     next();
     return;
@@ -128,11 +113,7 @@ async function createCentralGenericVoucher(
         },
       });
 
-      const posted = (await postBalancedVoucherTx(
-        tx,
-        built.request,
-        postingDependencies,
-      )) as PersistedPostingResult;
+      const posted = (await postBalancedVoucherTx(tx, built.request, postingDependencies)) as PersistedPostingResult;
 
       if (!posted.replayed) {
         await applyEmployeeBalanceDeltasTx({
@@ -174,13 +155,13 @@ async function createCentralGenericVoucher(
         posted.voucher.voucherDate,
         posted.voucher.totalAmount || "0",
         posted.voucher.description,
-        posted.entries.map((entry: any) => entry.ledgerAccountId),
-        posted.voucher.voucherType,
+        posted.entries.map((entry) => entry.ledgerAccountId),
+        posted.voucher.voucherType
       ).catch(() => {});
 
       autoReallocateLoansAccounts(
         companyId,
-        posted.entries.map((entry: any) => entry.ledgerAccountId),
+        posted.entries.map((entry) => entry.ledgerAccountId)
       ).catch(() => {});
     }
 
@@ -224,6 +205,6 @@ export function registerCentralGenericVoucherCreateRoute(app: Express): void {
     "/api/vouchers/with-entries",
     requireAuth,
     requireNonPOS,
-    (req, res, next) => void createCentralGenericVoucher(req, res, next),
+    (req, res, next) => void createCentralGenericVoucher(req, res, next)
   );
 }

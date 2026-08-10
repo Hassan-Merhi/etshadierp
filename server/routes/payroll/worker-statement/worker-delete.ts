@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { parseId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
@@ -17,7 +17,7 @@ import { getFactoryCompanyId } from "./_helpers";
 
 export function registerWorkerDeleteRoutes(app: Express) {
   // DELETE /api/factory/workers/:id - Permanently delete a factory worker
-  app.delete("/api/factory/workers/:id", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/workers/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });

@@ -183,7 +183,7 @@ function AccountSection({
   badgeColor: string;
 }) {
   const [open, setOpen] = useState(false);
-  const filteredAccounts = accounts.filter((a: any) => a.debit !== 0 || a.credit !== 0);
+  const filteredAccounts = accounts.filter((a) => a.debit !== 0 || a.credit !== 0);
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
@@ -224,7 +224,7 @@ function AccountSection({
                 </tr>
               </thead>
               <tbody>
-                {filteredAccounts.map((acc: any, i: number) => (
+                {filteredAccounts.map((acc, i: number) => (
                   <tr key={i} className="border-t">
                     <td className="px-3 py-2 text-foreground">{acc.name}</td>
                     <td className="px-3 py-2 text-right text-muted-foreground">{formatAmount(acc.debit)}</td>
@@ -345,7 +345,7 @@ export default function NetProfitReport() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="current">Current Company</SelectItem>
-                {companies.map((c: any) => (
+                {companies.map((c) => (
                   <SelectItem key={c.id} value={String(c.id)} data-testid={`option-company-${c.id}`}>
                     {c.name}
                   </SelectItem>

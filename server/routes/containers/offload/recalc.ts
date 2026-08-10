@@ -88,7 +88,7 @@ export function registerContainerOffloadRecalcRoutes(app: Express) {
           } else {
             // Fallback for old offloads without stored items (legacy approach)
             const pos = await storage.getPurchaseOrdersByContainer(containerId);
-            const allLineItems: any[] = [];
+            const allLineItems = [];
             for (const po of pos) {
               const items = await storage.getLineItemsByPO(po.id);
               allLineItems.push(...items);

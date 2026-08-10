@@ -5,7 +5,7 @@ import { toArrayBuffer } from "../../../lib/bufferCompatibility";
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { buildSafeFilename, contentDisposition } from "../../../lib/contentDisposition";
@@ -18,7 +18,7 @@ import fs from "fs";
 
 export function registerFactoryCustomerStatementExcelRoutes(app: Express) {
   // ── Customer Statement: Excel Export ────────────────────────────────────
-  app.get("/api/factory/customers/:id/statement/export-excel", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/customers/:id/statement/export-excel", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -83,7 +83,7 @@ export function registerFactoryCustomerStatementExcelRoutes(app: Express) {
           _fromVoucher: true,
         });
       }
-      const allRowsXlsx = [...balanceRows.map((r: any) => ({ ...r, _fromVoucher: false })), ...voucherRowsXlsx].sort(
+      const allRowsXlsx = [...balanceRows.map((r) => ({ ...r, _fromVoucher: false })), ...voucherRowsXlsx].sort(
         (a, b) => {
           const da = (a.transactionDate || "").toString(),
             db2 = (b.transactionDate || "").toString();
@@ -95,9 +95,7 @@ export function registerFactoryCustomerStatementExcelRoutes(app: Express) {
       // Build destination map for Excel
       const xlsxInvoiceRefIds = [
         ...new Set(
-          allRowsXlsx
-            .filter((r: any) => r.referenceType === "INVOICE" && r.referenceId)
-            .map((r: any) => r.referenceId as number)
+          allRowsXlsx.filter((r) => r.referenceType === "INVOICE" && r.referenceId).map((r) => r.referenceId as number)
         ),
       ];
       const destinationMapXlsx = new Map<number, string>();
@@ -121,7 +119,7 @@ export function registerFactoryCustomerStatementExcelRoutes(app: Express) {
       const destFilterXlsx = ((req.query.destination as string) || "").trim().toLowerCase();
 
       // First pass: enrich ALL rows with running balance (needed before filtering)
-      const allEnrichedXlsx = allRowsXlsx.map((row: any) => {
+      const allEnrichedXlsx = allRowsXlsx.map((row) => {
         const debit = parseFloat(row.debitAmount || "0");
         const credit = parseFloat(row.creditAmount || "0");
         runningBalance += debit - credit;
@@ -141,7 +139,7 @@ export function registerFactoryCustomerStatementExcelRoutes(app: Express) {
       }
 
       // Apply filters (mirrors frontend filteredHistory logic)
-      const rows = allEnrichedXlsx.filter((row: any) => {
+      const rows = allEnrichedXlsx.filter((row) => {
         if (destFilterXlsx) {
           if (!(row.destination || "").toLowerCase().includes(destFilterXlsx)) return false;
         }
@@ -207,7 +205,9 @@ export function registerFactoryCustomerStatementExcelRoutes(app: Express) {
           sheet.addImage(slId, { tl: { col: 1.9, row: 0 }, ext: { width: 300, height: 90 } });
           sheet.mergeCells(`A1:G1`);
         }
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
       const r1 = sheet.addRow(["HMD INTERNATIONAL GROUP"]);
       r1.getCell(1).font = { bold: true, size: 14, color: { argb: "FF1F3864" } };
       sheet.mergeCells(`A${r1.number}:G${r1.number}`);
@@ -290,7 +290,7 @@ export function registerFactoryCustomerStatementExcelRoutes(app: Express) {
       }
 
       // Data rows
-      rows.forEach((row: any, idx: number) => {
+      rows.forEach((row, idx: number) => {
         const dr = row.debit > 0 ? row.debit : null;
         const cr = row.credit > 0 ? row.credit : null;
         const dateVal = row.transactionDate ? new Date(row.transactionDate + "T00:00:00") : "";

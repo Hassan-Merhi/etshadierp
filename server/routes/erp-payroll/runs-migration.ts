@@ -40,7 +40,7 @@ export function registerPayrollRunMigrationRoutes(app: Express) {
       // Helper: get or create a ledger account by code
       async function getOrCreateAccount(code: string, name: string): Promise<any> {
         const accs = await storage.getAllLedgerAccounts(companyId);
-        let acc = accs.find((a: any) => a.code === code);
+        let acc = accs.find((a) => a.code === code);
         if (!acc) {
           const isBonus = code === "BONUS_EXPENSE" || code.startsWith("BONUS_EXP_");
           acc = await storage.createLedgerAccount({
@@ -58,9 +58,7 @@ export function registerPayrollRunMigrationRoutes(app: Express) {
       // ── 1. Worker payroll runs (SAL-{runId}-*) ───────────────────────────────
       const allAccounts = await storage.getAllLedgerAccounts(companyId);
       const oldSalaryIds = new Set(
-        allAccounts
-          .filter((a: any) => a.code === "SALARY_EXPENSE" || a.code.startsWith("WORKER_PAY_"))
-          .map((a: any) => a.id)
+        allAccounts.filter((a) => a.code === "SALARY_EXPENSE" || a.code.startsWith("WORKER_PAY_")).map((a) => a.id)
       );
 
       const paidRuns = await db
@@ -88,7 +86,7 @@ export function registerPayrollRunMigrationRoutes(app: Express) {
           `SELECT * FROM voucher_entries WHERE voucher_id = $1 AND debit_amount::numeric > 0`,
           [oldVoucher.id]
         );
-        const hasOldDebit = debitRes.rows.some((e: any) => oldSalaryIds.has(e.ledger_account_id));
+        const hasOldDebit = debitRes.rows.some((e) => oldSalaryIds.has(e.ledger_account_id));
         if (!hasOldDebit) {
           alreadyCorrect++;
           continue;
@@ -158,11 +156,9 @@ export function registerPayrollRunMigrationRoutes(app: Express) {
       // Old codes: PAYROLL_DEPOSIT_EXPENSE (very old) or a single SALARY_EXPENSE (no per-group split)
       const freshAccs2 = await storage.getAllLedgerAccounts(companyId);
       const oldDepIds = new Set(
-        freshAccs2
-          .filter((a: any) => a.code === "PAYROLL_DEPOSIT_EXPENSE" || a.code === "SALARY_EXPENSE")
-          .map((a: any) => a.id)
+        freshAccs2.filter((a) => a.code === "PAYROLL_DEPOSIT_EXPENSE" || a.code === "SALARY_EXPENSE").map((a) => a.id)
       );
-      const accCodeById = new Map(freshAccs2.map((a: any) => [a.id, a.code]));
+      const accCodeById = new Map(freshAccs2.map((a) => [a.id, a.code]));
 
       const depVouchersRes = await pool.query(
         `SELECT * FROM vouchers WHERE company_id = $1 AND voucher_number LIKE 'SAL-DEP-%' AND deleted_at IS NULL ORDER BY id`,
@@ -182,7 +178,7 @@ export function registerPayrollRunMigrationRoutes(app: Express) {
           [dv.id]
         );
 
-        const hasOldDebit = debitRes.rows.some((e: any) => oldDepIds.has(e.ledger_account_id));
+        const hasOldDebit = debitRes.rows.some((e) => oldDepIds.has(e.ledger_account_id));
         if (!hasOldDebit) {
           depositsAlreadyCorrect++;
           continue;
@@ -247,12 +243,10 @@ export function registerPayrollRunMigrationRoutes(app: Express) {
       const freshAccs3 = await storage.getAllLedgerAccounts(companyId);
       // IDs that need replacing: both the old SALARY_EXPENSE and the unsplit generic BONUS_EXPENSE
       const oldBonusIds = new Set(
-        freshAccs3.filter((a: any) => a.code === "SALARY_EXPENSE" || a.code === "BONUS_EXPENSE").map((a: any) => a.id)
+        freshAccs3.filter((a) => a.code === "SALARY_EXPENSE" || a.code === "BONUS_EXPENSE").map((a) => a.id)
       );
       // IDs that are already per-group (BONUS_EXP_*) — vouchers with only these are already correct
-      const perGroupBonusIds = new Set(
-        freshAccs3.filter((a: any) => a.code.startsWith("BONUS_EXP_")).map((a: any) => a.id)
-      );
+      const perGroupBonusIds = new Set(freshAccs3.filter((a) => a.code.startsWith("BONUS_EXP_")).map((a) => a.id));
 
       const bonusVouchersRes = await pool.query(
         `SELECT * FROM vouchers WHERE company_id = $1 AND voucher_number LIKE 'BONUS-%' AND deleted_at IS NULL ORDER BY id`,
@@ -273,8 +267,8 @@ export function registerPayrollRunMigrationRoutes(app: Express) {
         );
 
         // Determine what kind of debit entries exist on this voucher
-        const hasOldOrGenericDebit = debitRes.rows.some((e: any) => oldBonusIds.has(e.ledger_account_id));
-        const hasPerGroupDebit = debitRes.rows.some((e: any) => perGroupBonusIds.has(e.ledger_account_id));
+        const hasOldOrGenericDebit = debitRes.rows.some((e) => oldBonusIds.has(e.ledger_account_id));
+        const hasPerGroupDebit = debitRes.rows.some((e) => perGroupBonusIds.has(e.ledger_account_id));
         const creditTotal = creditRes.rows.reduce((s: number, e: any) => s + parseFloat(e.credit_amount), 0);
 
         // Skip only when per-group debits exist AND no old/generic debit remains
@@ -297,7 +291,7 @@ export function registerPayrollRunMigrationRoutes(app: Express) {
         // debit entries were already deleted by a previous failed migration run)
         if (byGroup.size === 0) {
           const totalFromDebits = debitRes.rows
-            .filter((e: any) => oldBonusIds.has(e.ledger_account_id))
+            .filter((e) => oldBonusIds.has(e.ledger_account_id))
             .reduce((s: number, e: any) => s + parseFloat(e.debit_amount), 0);
           const fallbackTotal = totalFromDebits > 0 ? totalFromDebits : creditTotal;
           if (fallbackTotal > 0) byGroup.set("__default__", fallbackTotal);

@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../../lib/httpHandlers";
 import { logger } from "../../../../lib/logger";
 import { requireAuth, requireRole } from "../../../../auth";
@@ -35,7 +35,7 @@ export function registerRawStockPartialOffloadScanRoutes(app: Express) {
     "/api/factory/raw-stock/recalc/partial-offload-scan",
     requireAuth,
     requireRole(...ADMIN_ROLES),
-    async (req: any, res: any) => {
+    async (req: Request, res: Response) => {
       try {
         const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -58,7 +58,7 @@ export function registerRawStockPartialOffloadScanRoutes(app: Express) {
     "/api/factory/raw-stock/recalc/partial-offload-scan/apply",
     requireAuth,
     requireRole(...ADMIN_ROLES),
-    async (req: any, res: any) => {
+    async (req: Request, res: Response) => {
       try {
         const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -110,8 +110,8 @@ export function registerRawStockPartialOffloadScanRoutes(app: Express) {
           includeCompletedBatches: true,
         });
 
-        const applied = results.filter((r: any) => r.applied);
-        const skipped = results.filter((r: any) => !r.applied);
+        const applied = results.filter((r) => r.applied);
+        const skipped = results.filter((r) => !r.applied);
 
         // Write undo log entry
         await pool.query(
@@ -124,7 +124,7 @@ export function registerRawStockPartialOffloadScanRoutes(app: Express) {
             req.session.username || null,
             `Partial-offload legacy cost fix — ${applied.length} container(s) corrected`,
             applied.length,
-            applied.map((r: any) => r.containerNumber),
+            applied.map((r) => r.containerNumber),
             JSON.stringify(snapshot),
           ]
         );

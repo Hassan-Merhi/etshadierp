@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { parseId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
@@ -15,7 +15,7 @@ import { eq, and } from "drizzle-orm";
 
 export function registerFactoryCustomerProformaTransferRoutes(app: Express) {
   // Transfer a proforma to a different customer
-  app.patch("/api/factory/customer-proformas/:id/transfer", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/customer-proformas/:id/transfer", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -84,22 +84,30 @@ export function registerFactoryCustomerProformaTransferRoutes(app: Express) {
   });
 
   // Toggle price_fixed flag on a proforma line
-  app.patch("/api/factory/customer-proforma-lines/:lineId/toggle-fixed", requireAuth, async (req: any, res: any) => {
-    try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const lineId = parseId(req.params.lineId);
-      if (lineId === null) return res.status(400).json({ message: "Invalid id" });
-      const [line] = await db.select().from(customerProformaLines).where(eq(customerProformaLines.id, lineId)).limit(1);
-      if (!line) return res.status(404).json({ message: "Line not found" });
-      const [updated] = await db
-        .update(customerProformaLines)
-        .set({ priceFixed: !(line as any).priceFixed })
-        .where(eq(customerProformaLines.id, lineId))
-        .returning();
-      res.json(updated);
-    } catch (error: unknown) {
-      res.status(500).json({ message: getErrorMessage(error) });
+  app.patch(
+    "/api/factory/customer-proforma-lines/:lineId/toggle-fixed",
+    requireAuth,
+    async (req: Request, res: Response) => {
+      try {
+        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        const lineId = parseId(req.params.lineId);
+        if (lineId === null) return res.status(400).json({ message: "Invalid id" });
+        const [line] = await db
+          .select()
+          .from(customerProformaLines)
+          .where(eq(customerProformaLines.id, lineId))
+          .limit(1);
+        if (!line) return res.status(404).json({ message: "Line not found" });
+        const [updated] = await db
+          .update(customerProformaLines)
+          .set({ priceFixed: !(line as any).priceFixed })
+          .where(eq(customerProformaLines.id, lineId))
+          .returning();
+        res.json(updated);
+      } catch (error: unknown) {
+        res.status(500).json({ message: getErrorMessage(error) });
+      }
     }
-  });
+  );
 }

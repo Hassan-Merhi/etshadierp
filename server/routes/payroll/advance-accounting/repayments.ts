@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
@@ -24,7 +24,7 @@ import {
 import { getFactoryCompanyId, writeDaybookEntry } from "./_helpers";
 
 export function registerAdvanceRepaymentRoutes(app: Express) {
-  app.get("/api/factory/advances/:id/repayments", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/advances/:id/repayments", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -52,7 +52,7 @@ export function registerAdvanceRepaymentRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/advances/:id/repayments", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/advances/:id/repayments", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });

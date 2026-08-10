@@ -68,7 +68,7 @@ export async function syncProformaReservations(tx: DbOrTx, companyId: number, pr
         GROUP BY fb.article_code`
   );
   const loadedMap = new Map<string, number>(
-    resultRows(loadedRaw).map((r: any) => [r.articleCode as string, Number(r.loaded)])
+    resultRows(loadedRaw).map((r) => [r.articleCode as string, Number(r.loaded)])
   );
 
   // 4. Upsert reservations for every current line

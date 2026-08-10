@@ -25,7 +25,9 @@ function loadFromStorage(companyId: number | undefined): RecentNavEntry[] {
 function saveToStorage(entries: RecentNavEntry[], companyId: number | undefined) {
   try {
     localStorage.setItem(storageKey(companyId), JSON.stringify(entries));
-  } catch {}
+  } catch {
+    // Storage is unavailable in private mode and can throw on quota; the value is a convenience, not state we need.
+  }
 }
 
 interface NavItemLike {

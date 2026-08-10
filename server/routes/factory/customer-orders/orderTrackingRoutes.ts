@@ -1,6 +1,6 @@
 import { trackOneFactoryContainerById } from "../../../services/factory-container-tracking";
 import { getErrorMessage } from "../../../lib/httpHandlers";
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 
@@ -8,7 +8,7 @@ import { factoryContainers, customerOrders, customers, containers } from "@share
 import { eq, and, desc, sql, inArray, isNull } from "drizzle-orm";
 
 export function registerOrderTrackingRoutes(app: Express) {
-  app.get("/api/factory/invoice-container-tracking", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/invoice-container-tracking", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -50,7 +50,7 @@ export function registerOrderTrackingRoutes(app: Express) {
   // POST /api/factory/shipping-containers/track-now
   // Finds all active factory customer orders with container numbers, matches
   // them to ERP containers table, and triggers live tracking for each one.
-  app.post("/api/factory/shipping-containers/track-now", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/shipping-containers/track-now", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

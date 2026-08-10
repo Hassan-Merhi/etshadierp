@@ -3,6 +3,113 @@ BEGIN;
 ALTER TABLE suppliers
   ADD COLUMN IF NOT EXISTS company_id INTEGER;
 
+-- The first version of this migration assigned every legacy supplier whose
+-- company_id was NULL to the configured parent company. Before supplier rows
+-- became company-owned, however, supplier identities were global and the
+-- company context lived in the surrounding ERP activity/audit trail. That means
+-- a supplier created inside another ERP company could be incorrectly stamped as
+-- the configured parent and then disappear as soon as strict company scoping was
+-- enabled.
+--
+-- Repair only when we have authoritative, unambiguous ownership evidence:
+--   1. exactly one company recorded the supplier CREATE audit event; or
+--   2. no CREATE audit owner exists, but the supplier is linked to a stock group
+--      that belongs to one company.
+-- This block is idempotent and also repairs rows that were already misassigned
+-- by an earlier production run of this migration.
+DO $$
+DECLARE
+  repaired_from_audit INTEGER := 0;
+  repaired_from_stock_group INTEGER := 0;
+BEGIN
+  WITH unique_create_owner AS (
+    SELECT record_id AS supplier_id,
+           MIN(company_id)::INTEGER AS company_id
+      FROM audit_log
+     WHERE table_name = 'suppliers'
+       AND action = 'create'
+       AND record_id IS NOT NULL
+       AND company_id IS NOT NULL
+     GROUP BY record_id
+    HAVING COUNT(DISTINCT company_id) = 1
+  )
+  UPDATE suppliers AS s
+     SET company_id = owner.company_id
+    FROM unique_create_owner AS owner
+   WHERE s.id = owner.supplier_id
+     AND s.company_id IS DISTINCT FROM owner.company_id;
+
+  GET DIAGNOSTICS repaired_from_audit = ROW_COUNT;
+
+  WITH unique_create_owner AS (
+    SELECT record_id AS supplier_id
+      FROM audit_log
+     WHERE table_name = 'suppliers'
+       AND action = 'create'
+       AND record_id IS NOT NULL
+       AND company_id IS NOT NULL
+     GROUP BY record_id
+    HAVING COUNT(DISTINCT company_id) = 1
+  )
+  UPDATE suppliers AS s
+     SET company_id = sg.company_id
+    FROM stock_groups AS sg
+   WHERE s.stock_group_id = sg.id
+     AND s.company_id IS DISTINCT FROM sg.company_id
+     AND NOT EXISTS (
+       SELECT 1
+         FROM unique_create_owner AS owner
+        WHERE owner.supplier_id = s.id
+     );
+
+  GET DIAGNOSTICS repaired_from_stock_group = ROW_COUNT;
+
+  IF repaired_from_audit > 0 OR repaired_from_stock_group > 0 THEN
+    RAISE NOTICE
+      'Supplier company ownership repaired from historical evidence: audit=%, stock_group=%',
+      repaired_from_audit,
+      repaired_from_stock_group;
+  END IF;
+END
+$$;
+
+-- Production correction confirmed on 2026-08-10: supplier 28 (HMD BEIRUT)
+-- belongs to company 17. The old NULL-company backfill stamped it onto the
+-- configured parent instead, which made it disappear from company 17 and made
+-- Journal posting fail with "Supplier 28 not found in company 17". Keep the
+-- correction guarded by both ID and name so it cannot affect an unrelated row
+-- in another database. Skip rather than violate the company/code uniqueness
+-- rule if a local duplicate already exists.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+      FROM suppliers
+     WHERE id = 28
+       AND UPPER(TRIM(legal_name)) = 'HMD BEIRUT'
+  )
+  AND EXISTS (
+    SELECT 1
+      FROM companies
+     WHERE id = 17
+  )
+  AND NOT EXISTS (
+    SELECT 1
+      FROM suppliers AS local_supplier
+      JOIN suppliers AS source_supplier ON source_supplier.id = 28
+     WHERE local_supplier.company_id = 17
+       AND local_supplier.code = source_supplier.code
+       AND local_supplier.id <> source_supplier.id
+  ) THEN
+    UPDATE suppliers
+       SET company_id = 17
+     WHERE id = 28
+       AND UPPER(TRIM(legal_name)) = 'HMD BEIRUT'
+       AND company_id IS DISTINCT FROM 17;
+  END IF;
+END
+$$;
+
 DO $$
 DECLARE
   configured_parent_id INTEGER;

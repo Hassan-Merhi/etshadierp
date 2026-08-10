@@ -5,7 +5,7 @@ const EMAIL_KEY_PATTERN = /email/i;
 const URL_KEY_PATTERN = /(?:url|uri|link|download|upload)/i;
 const PRIVATE_FILE_URL_PATTERN = /(?:green-api|storage|signed|presigned|private|attachment)/i;
 const JWT_PATTERN = /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g;
-const AUTH_PATTERN = /\b(?:Bearer|Basic)\s+[A-Za-z0-9._~+\/=:-]+/gi;
+const AUTH_PATTERN = /\b(?:Bearer|Basic)\s+[A-Za-z0-9._~+/=:-]+/gi;
 const WHATSAPP_GROUP_PATTERN = /\b(\d{6,})-\d+@g\.us\b/gi;
 const WHATSAPP_CONTACT_PATTERN = /\b(\d{7,})@c\.us\b/gi;
 const QUERY_SECRET_PATTERN = /([?&](?:access_token|token|api_key|apikey|key|signature|sig|secret|auth)=)[^&#\s]+/gi;
@@ -51,10 +51,13 @@ export function redactLogString(value: string, key = ""): string {
   if (URL_KEY_PATTERN.test(key) || /^https?:\/\//i.test(output)) output = redactUrl(output);
   if (PHONE_KEY_PATTERN.test(key) && /\d{7,}/.test(output)) return maskTail(output, "contact");
   if (EMAIL_KEY_PATTERN.test(key)) {
-    output = output.replace(/\b([A-Z0-9._%+-]{1,})@([A-Z0-9.-]+\.[A-Z]{2,})\b/gi, (_, local: string, domain: string) => {
-      const visible = local.slice(0, 1) || "x";
-      return `${visible}***@${domain}`;
-    });
+    output = output.replace(
+      /\b([A-Z0-9._%+-]{1,})@([A-Z0-9.-]+\.[A-Z]{2,})\b/gi,
+      (_, local: string, domain: string) => {
+        const visible = local.slice(0, 1) || "x";
+        return `${visible}***@${domain}`;
+      }
+    );
   }
   return output;
 }

@@ -122,8 +122,8 @@ function FullConnectivityProvider({ children }: Props) {
         getConflictCount(),
       ]);
       const legacyQueue = getQueue();
-      const legacyPending = legacyQueue.filter((item: any) => item.status === "pending").length;
-      const legacyFailed = legacyQueue.filter((item: any) => item.status === "failed").length;
+      const legacyPending = legacyQueue.filter((item) => item.status === "pending").length;
+      const legacyFailed = legacyQueue.filter((item) => item.status === "failed").length;
       if (isMountedRef.current) {
         setPendingCount(idbPending + legacyPending);
         setFailedCount(idbFailed + legacyFailed);

@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { parseId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
@@ -16,7 +16,7 @@ import { factoryCategories, factoryBaleProducts, factoryBales, factoryBaleSequen
 import { eq, and } from "drizzle-orm";
 
 export function registerFactoryProductImportRoutes(app: Express) {
-  app.post("/api/factory/bale-products/import-excel", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/bale-products/import-excel", requireAuth, async (req: Request, res: Response) => {
     try {
       const multer = (await import("multer")).default;
       const upload = multer({ storage: multer.memoryStorage() });
@@ -221,7 +221,7 @@ export function registerFactoryProductImportRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/bales/validate-import", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/bales/validate-import", requireAuth, async (req: Request, res: Response) => {
     try {
       const multer = (await import("multer")).default;
       const upload = multer({ storage: multer.memoryStorage() });
@@ -362,7 +362,7 @@ export function registerFactoryProductImportRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/bales/import-excel", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/bales/import-excel", requireAuth, async (req: Request, res: Response) => {
     try {
       const multer = (await import("multer")).default;
       const upload = multer({ storage: multer.memoryStorage() });

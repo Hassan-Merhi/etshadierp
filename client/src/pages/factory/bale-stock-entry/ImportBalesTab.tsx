@@ -63,7 +63,7 @@ export function ImportBalesTab() {
         let headerRowIdx = -1;
         for (let i = 0; i < Math.min(jsonData.length, 10); i++) {
           const row = jsonData[i] as any[];
-          if (row && row.some((cell: any) => String(cell).toUpperCase().includes("ITEM NAME"))) {
+          if (row && row.some((cell) => String(cell).toUpperCase().includes("ITEM NAME"))) {
             headerRowIdx = i;
             break;
           }
@@ -78,7 +78,7 @@ export function ImportBalesTab() {
           return;
         }
 
-        const headers = (jsonData[headerRowIdx] as any[]).map((h: any) => String(h).toUpperCase().trim());
+        const headers = (jsonData[headerRowIdx] as any[]).map((h) => String(h).toUpperCase().trim());
         const nameIdx = headers.findIndex((h) => h.includes("ITEM NAME"));
         const weightIdx = headers.findIndex((h) => h.includes("WEIGHT"));
         const barcodeIdx = headers.findIndex((h) => h.includes("BARCODE"));
@@ -92,8 +92,8 @@ export function ImportBalesTab() {
           if (!val && val !== 0) return "";
           const raw = String(val).trim();
           if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
-          if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$/.test(raw)) {
-            const parts = raw.split(/[\/\-]/);
+          if (/^\d{1,2}[/-]\d{1,2}[/-]\d{4}$/.test(raw)) {
+            const parts = raw.split(/[/-]/);
             return `${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
           }
           const serial = parseFloat(raw);

@@ -690,7 +690,7 @@ export default function FactoryContainerLoadingScan() {
   const proformaArticleCodesForStock = useMemo(() => {
     if (!orderDetail?.proformaIdUsed) return [];
     const pf = proformas.find((p) => p.id === orderDetail.proformaIdUsed) || proformas.find((p) => p.isActive);
-    return (Array.isArray(pf?.lines) ? pf!.lines : []).map((l: any) => l.articleCode).filter(Boolean);
+    return (Array.isArray(pf?.lines) ? pf!.lines : []).map((l) => l.articleCode).filter(Boolean);
   }, [orderDetail?.proformaIdUsed, proformas]);
   const stockLocationId = orderDetail?.locationId || (selectedLocationId ? parseInt(selectedLocationId) : null);
   const { data: stockCounts = {} } = useQuery<Record<string, number>>({

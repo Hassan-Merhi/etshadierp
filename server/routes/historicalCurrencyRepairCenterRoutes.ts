@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { requireAuth, requireNonPOS } from "../auth";
 import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
@@ -29,7 +29,7 @@ interface RepairCenterTokenPayload {
   expiresAt: number;
 }
 
-function requireRepairRole(req: any, res: any): boolean {
+function requireRepairRole(req: Request, res: Response): boolean {
   const role = req.session?.currentRole;
   if (!role || !ALLOWED_ROLES.has(role)) {
     res.status(403).json({ message: "Admin, Owner, or Developer access is required" });
@@ -49,7 +49,7 @@ export function registerHistoricalCurrencyRepairCenterRoutes(app: Express) {
     "/api/accounts/multi-currency/repair-center",
     requireAuth,
     requireNonPOS,
-    async (req: any, res: any) => {
+    async (req: Request, res: Response) => {
       if (!requireRepairRole(req, res)) return;
       try {
         const companyId = req.session.currentCompanyId;
@@ -70,14 +70,14 @@ export function registerHistoricalCurrencyRepairCenterRoutes(app: Express) {
         logger.error("Historical currency repair-center diagnostic failed", { error });
         return res.status(500).json({ message: getErrorMessage(error) });
       }
-    },
+    }
   );
 
   app.post(
     "/api/accounts/multi-currency/repair-center/plan",
     requireAuth,
     requireNonPOS,
-    async (req: any, res: any) => {
+    async (req: Request, res: Response) => {
       if (!requireRepairRole(req, res)) return;
       try {
         const companyId = req.session.currentCompanyId;
@@ -104,14 +104,14 @@ export function registerHistoricalCurrencyRepairCenterRoutes(app: Express) {
         const status = error instanceof RepairTokenConfigurationError ? 503 : 400;
         return res.status(status).json({ message: getErrorMessage(error) });
       }
-    },
+    }
   );
 
   app.post(
     "/api/accounts/multi-currency/repair-center/apply",
     requireAuth,
     requireNonPOS,
-    async (req: any, res: any) => {
+    async (req: Request, res: Response) => {
       if (!requireRepairRole(req, res)) return;
       try {
         const companyId = req.session.currentCompanyId;
@@ -149,9 +149,12 @@ export function registerHistoricalCurrencyRepairCenterRoutes(app: Express) {
         }
         const message = getErrorMessage(error);
         const status = /changed after preview|stale/i.test(message) ? 409 : 400;
-        logger.error("Historical currency repair-center apply failed", { error, companyId: req.session.currentCompanyId });
+        logger.error("Historical currency repair-center apply failed", {
+          error,
+          companyId: req.session.currentCompanyId,
+        });
         return res.status(status).json({ message });
       }
-    },
+    }
   );
 }

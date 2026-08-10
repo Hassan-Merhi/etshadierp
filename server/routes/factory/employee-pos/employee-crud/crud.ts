@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../../lib/httpHandlers";
 import { db } from "../../../../db";
 import { requireAuth } from "../../../../auth";
@@ -12,7 +12,7 @@ import { voucherEntries, employees, vouchers } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
 
 export function registerFactoryEmployeeCrudRoutes(app: Express) {
-  app.get("/api/factory/employees", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/employees", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -36,7 +36,7 @@ export function registerFactoryEmployeeCrudRoutes(app: Express) {
   });
 
   // GET /api/factory/employees/:id - single employee
-  app.get("/api/factory/employees/:id", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/employees/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -57,7 +57,7 @@ export function registerFactoryEmployeeCrudRoutes(app: Express) {
   });
 
   // POST /api/factory/employees - create employee with employeeType = "Employee"
-  app.post("/api/factory/employees", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/employees", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -78,7 +78,7 @@ export function registerFactoryEmployeeCrudRoutes(app: Express) {
           .select({ code: employees.code })
           .from(employees)
           .where(eq(employees.companyId, companyId));
-        const existingCodes = new Set(existing.map((e: any) => e.code));
+        const existingCodes = new Set(existing.map((e) => e.code));
         while (existingCodes.has(empCode)) {
           empCode = `${baseCode}${suffix}`;
           suffix++;
@@ -114,7 +114,7 @@ export function registerFactoryEmployeeCrudRoutes(app: Express) {
   });
 
   // PATCH /api/factory/employees/:id - update employee
-  app.patch("/api/factory/employees/:id", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/employees/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -145,7 +145,7 @@ export function registerFactoryEmployeeCrudRoutes(app: Express) {
   });
 
   // DELETE /api/factory/employees/:id - soft-delete employee
-  app.delete("/api/factory/employees/:id", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/employees/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -167,7 +167,7 @@ export function registerFactoryEmployeeCrudRoutes(app: Express) {
   });
 
   // GET /api/factory/employees/:id/statement - running ledger from voucher entries
-  app.get("/api/factory/employees/:id/statement", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/employees/:id/statement", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -201,7 +201,7 @@ export function registerFactoryEmployeeCrudRoutes(app: Express) {
 
       // Build running balance
       let runningBalance = 0;
-      const rows = entries.map((e: any) => {
+      const rows = entries.map((e) => {
         const credit = parseFloat(e.creditAmount || "0");
         const debit = parseFloat(e.debitAmount || "0");
         runningBalance += credit - debit;

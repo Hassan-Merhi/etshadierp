@@ -1,16 +1,28 @@
-import {useState, useMemo} from "react";
-import {useQuery} from "@tanstack/react-query";
-import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
-import {Button} from "@/components/ui/button";
-import {Skeleton} from "@/components/ui/skeleton";
-import {PageHeader} from "@/components/PageHeader";
-import {ChevronRight, ChevronLeft, TrendingUp, TrendingDown, Equal, RefreshCw, AlertCircle, Clock, CheckCircle2, PackageOpen, CalendarDays} from "lucide-react";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/PageHeader";
+import {
+  ChevronRight,
+  ChevronLeft,
+  TrendingUp,
+  TrendingDown,
+  Equal,
+  RefreshCw,
+  AlertCircle,
+  Clock,
+  CheckCircle2,
+  PackageOpen,
+  CalendarDays,
+} from "lucide-react";
 
-import type {NetPositionData} from "./factorynetposition/types";
-import {fmt, formatDateLabel, r2, shiftDate, todayStr} from "./factorynetposition/utils";
-import {Side} from "./factorynetposition/components/Side";
-import {OrderGroup} from "./factorynetposition/components/OrderGroup";
-import {CustomNetPositionView} from "./factorynetposition/components/CustomNetPositionView";
+import type { NetPositionData } from "./factorynetposition/types";
+import { fmt, formatDateLabel, r2, shiftDate, todayStr } from "./factorynetposition/utils";
+import { Side } from "./factorynetposition/components/Side";
+import { OrderGroup } from "./factorynetposition/components/OrderGroup";
+import { CustomNetPositionView } from "./factorynetposition/components/CustomNetPositionView";
 export default function FactoryNetPosition() {
   const [asOf, setAsOf] = useState<string>(todayStr);
   const isToday = asOf === todayStr();
@@ -57,8 +69,8 @@ export default function FactoryNetPosition() {
     // broker parent's grand total via buildBrokerStatement, so including them separately
     // would double-count their EUR/AUD exposure.
     const correctedItems = supplierWithBalances
-      .filter((s: any) => !s.parentId)
-      .map((s: any) => ({ id: s.id as number, name: s.name as string, balanceUsd: parseFloat(s.totalValue || "0") }))
+      .filter((s) => !s.parentId)
+      .map((s) => ({ id: s.id as number, name: s.name as string, balanceUsd: parseFloat(s.totalValue || "0") }))
       .filter((s) => Math.abs(s.balanceUsd) > 0.01);
 
     const correctedLiabilities = r2(

@@ -840,7 +840,7 @@ export default function BaleProducts() {
       const workbook = await XLSX.read(buffer, { type: "array" });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      const rows: any[] = XLSX.utils.sheet_to_json(worksheet);
+      const rows = XLSX.utils.sheet_to_json(worksheet);
 
       if (rows.length === 0) {
         setImportError("Excel file is empty");

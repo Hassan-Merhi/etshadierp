@@ -3,6 +3,7 @@ import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { logAudit } from "./_helpers";
 import { Express } from "express";
+import type { Request, Response } from "express";
 import { db } from "../db";
 import { eq, and, ne } from "drizzle-orm";
 import ExcelJS from "exceljs";
@@ -19,7 +20,7 @@ import { supplierProformas, supplierProformaLines, suppliers } from "@shared/sch
 function sanitizeDecimal(v: any): string {
   const raw = String(v ?? "").trim();
   // Strip leading/trailing currency symbols and whitespace
-  const stripped = raw.replace(/^[^0-9\-\(]+/, "").replace(/[^0-9\.]+$/, "");
+  const stripped = raw.replace(/^[^0-9\-(]+/, "").replace(/[^0-9.]+$/, "");
   // Remove thousands commas: only valid when pattern is NNN,NNN,...
   const noCommas = stripped.replace(/,(?=\d{3}(?:[,.]|$))/g, "");
   // Must match: optional minus, digits, optional .digits — nothing else
@@ -45,7 +46,7 @@ async function batchInsertProformaLines(rows: any[]) {
 }
 
 export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
-  app.get("/api/suppliers/:supplierId/proformas", requireAuth, async (req: any, res: any) => {
+  app.get("/api/suppliers/:supplierId/proformas", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -61,7 +62,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
     }
   });
 
-  app.get("/api/suppliers/:supplierId/proformas/:proformaId", requireAuth, async (req: any, res: any) => {
+  app.get("/api/suppliers/:supplierId/proformas/:proformaId", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -82,7 +83,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
     }
   });
 
-  app.post("/api/suppliers/:supplierId/proformas", requireAuth, async (req: any, res: any) => {
+  app.post("/api/suppliers/:supplierId/proformas", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -103,7 +104,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         // are always stored with the canonical code regardless of what code the
         // supplier's packing-list used.
         const { map: aliasMap } = await buildAliasMap(companyId);
-        const lineValues = lines.map((l: any) => ({
+        const lineValues = lines.map((l) => ({
           proformaId: proforma.id,
           barcode: resolveBarcode(String(l.barcode || "").trim(), aliasMap),
           itemName: String(l.itemName || "").trim(),
@@ -133,7 +134,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
     }
   });
 
-  app.patch("/api/suppliers/:supplierId/proformas/:proformaId", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/suppliers/:supplierId/proformas/:proformaId", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -155,7 +156,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
     }
   });
 
-  app.delete("/api/suppliers/:supplierId/proformas/:proformaId", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/suppliers/:supplierId/proformas/:proformaId", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -181,37 +182,41 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
     }
   });
 
-  app.post("/api/suppliers/:supplierId/proformas/:proformaId/lines", requireAuth, async (req: any, res: any) => {
-    try {
-      const companyId = req.session.currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const proformaId = parseId(req.params.proformaId);
-      if (proformaId === null) return res.status(400).json({ message: "Invalid id" });
-      const [proforma] = await db
-        .select()
-        .from(supplierProformas)
-        .where(and(eq(supplierProformas.id, proformaId), eq(supplierProformas.companyId, companyId)));
-      if (!proforma) return res.status(403).json({ message: "Access denied" });
-      const { barcode, itemName, qty, weightPerBale, pricePerBale } = req.body;
-      const [line] = await db
-        .insert(supplierProformaLines)
-        .values({
-          proformaId,
-          barcode: barcode || "",
-          itemName: itemName || "",
-          qty: parseInt(qty) || 0,
-          weightPerBale: weightPerBale || "0",
-          pricePerBale: pricePerBale || "0",
-        })
-        .returning();
-      await db.update(supplierProformas).set({ updatedAt: new Date() }).where(eq(supplierProformas.id, proformaId));
-      res.json(line);
-    } catch (error: unknown) {
-      res.status(500).json({ message: getErrorMessage(error) });
+  app.post(
+    "/api/suppliers/:supplierId/proformas/:proformaId/lines",
+    requireAuth,
+    async (req: Request, res: Response) => {
+      try {
+        const companyId = req.session.currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        const proformaId = parseId(req.params.proformaId);
+        if (proformaId === null) return res.status(400).json({ message: "Invalid id" });
+        const [proforma] = await db
+          .select()
+          .from(supplierProformas)
+          .where(and(eq(supplierProformas.id, proformaId), eq(supplierProformas.companyId, companyId)));
+        if (!proforma) return res.status(403).json({ message: "Access denied" });
+        const { barcode, itemName, qty, weightPerBale, pricePerBale } = req.body;
+        const [line] = await db
+          .insert(supplierProformaLines)
+          .values({
+            proformaId,
+            barcode: barcode || "",
+            itemName: itemName || "",
+            qty: parseInt(qty) || 0,
+            weightPerBale: weightPerBale || "0",
+            pricePerBale: pricePerBale || "0",
+          })
+          .returning();
+        await db.update(supplierProformas).set({ updatedAt: new Date() }).where(eq(supplierProformas.id, proformaId));
+        res.json(line);
+      } catch (error: unknown) {
+        res.status(500).json({ message: getErrorMessage(error) });
+      }
     }
-  });
+  );
 
-  app.patch("/api/supplier-proforma-lines/:lineId", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/supplier-proforma-lines/:lineId", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -242,7 +247,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
     }
   });
 
-  app.delete("/api/supplier-proforma-lines/:lineId", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/supplier-proforma-lines/:lineId", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -263,333 +268,345 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
     }
   });
 
-  app.post("/api/suppliers/:supplierId/proformas/:proformaId/import-lines", requireAuth, async (req: any, res: any) => {
-    try {
-      const companyId = req.session.currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const proformaId = parseId(req.params.proformaId);
-      if (proformaId === null) return res.status(400).json({ message: "Invalid id" });
-      const [proforma] = await db
-        .select()
-        .from(supplierProformas)
-        .where(and(eq(supplierProformas.id, proformaId), eq(supplierProformas.companyId, companyId)));
-      if (!proforma) return res.status(403).json({ message: "Access denied" });
-      const { lines } = req.body;
-      if (!lines || !Array.isArray(lines) || lines.length === 0) {
-        return res.status(400).json({ message: "No lines to import" });
+  app.post(
+    "/api/suppliers/:supplierId/proformas/:proformaId/import-lines",
+    requireAuth,
+    async (req: Request, res: Response) => {
+      try {
+        const companyId = req.session.currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        const proformaId = parseId(req.params.proformaId);
+        if (proformaId === null) return res.status(400).json({ message: "Invalid id" });
+        const [proforma] = await db
+          .select()
+          .from(supplierProformas)
+          .where(and(eq(supplierProformas.id, proformaId), eq(supplierProformas.companyId, companyId)));
+        if (!proforma) return res.status(403).json({ message: "Access denied" });
+        const { lines } = req.body;
+        if (!lines || !Array.isArray(lines) || lines.length === 0) {
+          return res.status(400).json({ message: "No lines to import" });
+        }
+        // Resolve alias codes to primary stock-item codes at import time so that
+        // items imported with different (supplier) codes are stored canonically.
+        const { map: aliasMap } = await buildAliasMap(companyId);
+        const lineValues = lines.map((l) => ({
+          proformaId,
+          barcode: resolveBarcode(String(l.barcode || l.Barcode || "").trim(), aliasMap),
+          itemName: String(l.itemName || l["Item Name"] || "").trim(),
+          qty: parseInt(l.qty ?? l.Qty ?? 0) || 0,
+          weightPerBale: sanitizeDecimal(l.weightPerBale ?? l["Weight per Bale"]),
+          pricePerBale: sanitizeDecimal(l.pricePerBale ?? l["Price per Bale"]),
+        }));
+        await batchInsertProformaLines(lineValues);
+        await db.update(supplierProformas).set({ updatedAt: new Date() }).where(eq(supplierProformas.id, proformaId));
+        const allLines = await db
+          .select()
+          .from(supplierProformaLines)
+          .where(eq(supplierProformaLines.proformaId, proformaId));
+        res.json({ imported: lineValues.length, lines: allLines });
+      } catch (error: unknown) {
+        res.status(500).json({ message: getErrorMessage(error) });
       }
-      // Resolve alias codes to primary stock-item codes at import time so that
-      // items imported with different (supplier) codes are stored canonically.
-      const { map: aliasMap } = await buildAliasMap(companyId);
-      const lineValues = lines.map((l: any) => ({
-        proformaId,
-        barcode: resolveBarcode(String(l.barcode || l.Barcode || "").trim(), aliasMap),
-        itemName: String(l.itemName || l["Item Name"] || "").trim(),
-        qty: parseInt(l.qty ?? l.Qty ?? 0) || 0,
-        weightPerBale: sanitizeDecimal(l.weightPerBale ?? l["Weight per Bale"]),
-        pricePerBale: sanitizeDecimal(l.pricePerBale ?? l["Price per Bale"]),
-      }));
-      await batchInsertProformaLines(lineValues);
-      await db.update(supplierProformas).set({ updatedAt: new Date() }).where(eq(supplierProformas.id, proformaId));
-      const allLines = await db
-        .select()
-        .from(supplierProformaLines)
-        .where(eq(supplierProformaLines.proformaId, proformaId));
-      res.json({ imported: lineValues.length, lines: allLines });
-    } catch (error: unknown) {
-      res.status(500).json({ message: getErrorMessage(error) });
     }
-  });
+  );
 
   registerContainerLoadedItemsRoutes(app, requireAuth);
 
   // ── Pretty Excel export for a single proforma ──────────────────────────────
-  app.get("/api/suppliers/:supplierId/proformas/:proformaId/export-excel", requireAuth, async (req: any, res: any) => {
-    try {
-      const companyId = req.session.currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const proformaId = parseId(req.params.proformaId);
-      const sid = parseId(req.params.supplierId);
-      if (!proformaId || !sid) return res.status(400).json({ message: "Invalid id" });
+  app.get(
+    "/api/suppliers/:supplierId/proformas/:proformaId/export-excel",
+    requireAuth,
+    async (req: Request, res: Response) => {
+      try {
+        const companyId = req.session.currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        const proformaId = parseId(req.params.proformaId);
+        const sid = parseId(req.params.supplierId);
+        if (!proformaId || !sid) return res.status(400).json({ message: "Invalid id" });
 
-      const [proforma] = await db
-        .select()
-        .from(supplierProformas)
-        .where(and(eq(supplierProformas.id, proformaId), eq(supplierProformas.companyId, companyId)));
-      if (!proforma) return res.status(404).json({ message: "Proforma not found" });
+        const [proforma] = await db
+          .select()
+          .from(supplierProformas)
+          .where(and(eq(supplierProformas.id, proformaId), eq(supplierProformas.companyId, companyId)));
+        if (!proforma) return res.status(404).json({ message: "Proforma not found" });
 
-      const lines = await db
-        .select()
-        .from(supplierProformaLines)
-        .where(eq(supplierProformaLines.proformaId, proformaId));
-      const [supplier] = await db.select().from(suppliers).where(eq(suppliers.id, sid));
+        const lines = await db
+          .select()
+          .from(supplierProformaLines)
+          .where(eq(supplierProformaLines.proformaId, proformaId));
+        const [supplier] = await db.select().from(suppliers).where(eq(suppliers.id, sid));
 
-      // ── Workbook ───────────────────────────────────────────────────────────
-      const wb = new ExcelJS.Workbook();
-      wb.creator = "HMD ERP";
-      wb.created = new Date();
+        // ── Workbook ───────────────────────────────────────────────────────────
+        const wb = new ExcelJS.Workbook();
+        wb.creator = "HMD ERP";
+        wb.created = new Date();
 
-      const ws = wb.addWorksheet("Proforma", {
-        pageSetup: { paperSize: 9, orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
-      });
+        const ws = wb.addWorksheet("Proforma", {
+          pageSetup: { paperSize: 9, orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
+        });
 
-      // 8 columns: #, Barcode, Item Name, Qty, Weight/Bale, Price/Bale, Total Weight, Total Value
-      const NUM_COLS = 8;
-      ws.columns = [
-        { width: 5 }, // #
-        { width: 16 }, // Barcode
-        { width: 34 }, // Item Name
-        { width: 10 }, // Qty
-        { width: 14 }, // Weight/Bale (kg)
-        { width: 14 }, // Price/Bale
-        { width: 16 }, // Total Weight
-        { width: 16 }, // Total Value
-      ];
+        // 8 columns: #, Barcode, Item Name, Qty, Weight/Bale, Price/Bale, Total Weight, Total Value
+        const NUM_COLS = 8;
+        ws.columns = [
+          { width: 5 }, // #
+          { width: 16 }, // Barcode
+          { width: 34 }, // Item Name
+          { width: 10 }, // Qty
+          { width: 14 }, // Weight/Bale (kg)
+          { width: 14 }, // Price/Bale
+          { width: 16 }, // Total Weight
+          { width: 16 }, // Total Value
+        ];
 
-      // Colour palette
-      const C = {
-        navy: "FF0D1F3C",
-        blue: "FF1A4A8A",
-        blueMid: "FF2563B0",
-        headerText: "FFFFFFFF",
-        altRow: "FFD6E4F7",
-        whiteRow: "FFFFFFFF",
-        totalBg: "FF0F3422",
-        totalText: "FFFFFFFF",
-        subtleBg: "FFEEF4FC",
-        notesBg: "FFFFF8E6",
-        colLabel: "FFBBCFE8",
-        borderCol: "FFB0C4DE",
-      };
-
-      const thin = (c = C.borderCol) => ({ style: "thin" as const, color: { argb: c } });
-      const medium = (c = C.navy) => ({ style: "medium" as const, color: { argb: c } });
-      const allBorder = (t = thin(), m?: any) => ({
-        top: m ?? t,
-        bottom: m ?? t,
-        left: t,
-        right: t,
-      });
-
-      // ── Row 1 — title banner ───────────────────────────────────────────────
-      ws.mergeCells(1, 1, 1, NUM_COLS);
-      const r1 = ws.getRow(1);
-      r1.height = 40;
-      const t1 = ws.getCell("A1");
-      t1.value = "SUPPLIER PROFORMA";
-      t1.font = { bold: true, size: 18, color: { argb: C.headerText }, name: "Calibri" };
-      t1.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.navy } };
-      t1.alignment = { horizontal: "center", vertical: "middle" };
-
-      // ── Row 2 — supplier | reference ──────────────────────────────────────
-      ws.mergeCells(2, 1, 2, 4);
-      ws.mergeCells(2, 5, 2, NUM_COLS);
-      ws.getRow(2).height = 24;
-      const suppCell = ws.getCell(2, 1);
-      suppCell.value = `Supplier: ${supplier?.legalName || `#${sid}`}`;
-      suppCell.font = { bold: true, size: 11, color: { argb: C.navy } };
-      suppCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.subtleBg } };
-      suppCell.alignment = { vertical: "middle", indent: 1 };
-      const refCell = ws.getCell(2, 5);
-      refCell.value = `Reference: ${proforma.reference}`;
-      refCell.font = { bold: true, size: 11, color: { argb: C.navy } };
-      refCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.subtleBg } };
-      refCell.alignment = { horizontal: "right", vertical: "middle", indent: 1 };
-
-      // ── Row 3 — date | item count ─────────────────────────────────────────
-      ws.mergeCells(3, 1, 3, 4);
-      ws.mergeCells(3, 5, 3, NUM_COLS);
-      ws.getRow(3).height = 18;
-      const dateStr = new Date(proforma.createdAt).toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-      });
-      const dateCell = ws.getCell(3, 1);
-      dateCell.value = `Date: ${dateStr}`;
-      dateCell.font = { size: 9, italic: true, color: { argb: "FF555566" } };
-      dateCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF4F8FE" } };
-      dateCell.alignment = { vertical: "middle", indent: 1 };
-      const cntCell = ws.getCell(3, 5);
-      cntCell.value = `${lines.length} line items`;
-      cntCell.font = { size: 9, italic: true, color: { argb: "FF555566" } };
-      cntCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF4F8FE" } };
-      cntCell.alignment = { horizontal: "right", vertical: "middle", indent: 1 };
-
-      // ── Row 4 — notes (optional) ──────────────────────────────────────────
-      let nextRowIdx = 4;
-      if (proforma.notes) {
-        ws.mergeCells(4, 1, 4, NUM_COLS);
-        ws.getRow(4).height = 18;
-        const nc = ws.getCell(4, 1);
-        nc.value = `Notes: ${proforma.notes}`;
-        nc.font = { size: 9, italic: true, color: { argb: "FF444444" } };
-        nc.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.notesBg } };
-        nc.alignment = { vertical: "middle", indent: 1, wrapText: true };
-        nextRowIdx = 5;
-      }
-
-      // ── Blank spacer ──────────────────────────────────────────────────────
-      ws.getRow(nextRowIdx).height = 8;
-      nextRowIdx++;
-
-      // ── Column header row ─────────────────────────────────────────────────
-      const hdrRowNum = nextRowIdx;
-      const headers = [
-        "#",
-        "Barcode",
-        "Item Name",
-        "Qty",
-        "Wt / Bale (kg)",
-        "Price / Bale",
-        "Total Weight",
-        "Total Value",
-      ];
-      const hdrRow = ws.getRow(hdrRowNum);
-      hdrRow.values = headers;
-      hdrRow.height = 30;
-      hdrRow.eachCell((cell: any, col: number) => {
-        cell.font = { bold: true, size: 10, color: { argb: C.headerText } };
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.blueMid } };
-        cell.alignment = {
-          horizontal: col <= 3 ? "left" : "right",
-          vertical: "middle",
-          indent: col === 1 ? 0 : 1,
+        // Colour palette
+        const C = {
+          navy: "FF0D1F3C",
+          blue: "FF1A4A8A",
+          blueMid: "FF2563B0",
+          headerText: "FFFFFFFF",
+          altRow: "FFD6E4F7",
+          whiteRow: "FFFFFFFF",
+          totalBg: "FF0F3422",
+          totalText: "FFFFFFFF",
+          subtleBg: "FFEEF4FC",
+          notesBg: "FFFFF8E6",
+          colLabel: "FFBBCFE8",
+          borderCol: "FFB0C4DE",
         };
-        cell.border = {
-          top: medium(),
-          bottom: medium(),
-          left: thin(),
-          right: thin(),
-        };
-      });
-      nextRowIdx++;
 
-      // ── Data rows ─────────────────────────────────────────────────────────
-      let totQty = 0,
-        totWeightKg = 0,
-        totValue = 0;
+        const thin = (c = C.borderCol) => ({ style: "thin" as const, color: { argb: c } });
+        const medium = (c = C.navy) => ({ style: "medium" as const, color: { argb: c } });
+        const allBorder = (t = thin(), m?: any) => ({
+          top: m ?? t,
+          bottom: m ?? t,
+          left: t,
+          right: t,
+        });
 
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        const qty = Number(line.qty) || 0;
-        const wt = parseFloat(line.weightPerBale || "0");
-        const price = parseFloat(line.pricePerBale || "0");
-        const lineWt = qty * wt;
-        const lineVal = qty * price;
-        totQty += qty;
-        totWeightKg += lineWt;
-        totValue += lineVal;
+        // ── Row 1 — title banner ───────────────────────────────────────────────
+        ws.mergeCells(1, 1, 1, NUM_COLS);
+        const r1 = ws.getRow(1);
+        r1.height = 40;
+        const t1 = ws.getCell("A1");
+        t1.value = "SUPPLIER PROFORMA";
+        t1.font = { bold: true, size: 18, color: { argb: C.headerText }, name: "Calibri" };
+        t1.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.navy } };
+        t1.alignment = { horizontal: "center", vertical: "middle" };
 
-        const row = ws.getRow(nextRowIdx);
-        row.values = [i + 1, line.barcode, line.itemName, qty, wt, price, lineWt, lineVal];
-        row.height = 20;
+        // ── Row 2 — supplier | reference ──────────────────────────────────────
+        ws.mergeCells(2, 1, 2, 4);
+        ws.mergeCells(2, 5, 2, NUM_COLS);
+        ws.getRow(2).height = 24;
+        const suppCell = ws.getCell(2, 1);
+        suppCell.value = `Supplier: ${supplier?.legalName || `#${sid}`}`;
+        suppCell.font = { bold: true, size: 11, color: { argb: C.navy } };
+        suppCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.subtleBg } };
+        suppCell.alignment = { vertical: "middle", indent: 1 };
+        const refCell = ws.getCell(2, 5);
+        refCell.value = `Reference: ${proforma.reference}`;
+        refCell.font = { bold: true, size: 11, color: { argb: C.navy } };
+        refCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.subtleBg } };
+        refCell.alignment = { horizontal: "right", vertical: "middle", indent: 1 };
 
-        const isAlt = i % 2 === 1;
-        const rowBg = isAlt ? C.altRow : C.whiteRow;
+        // ── Row 3 — date | item count ─────────────────────────────────────────
+        ws.mergeCells(3, 1, 3, 4);
+        ws.mergeCells(3, 5, 3, NUM_COLS);
+        ws.getRow(3).height = 18;
+        const dateStr = new Date(proforma.createdAt).toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "long",
+          year: "numeric",
+        });
+        const dateCell = ws.getCell(3, 1);
+        dateCell.value = `Date: ${dateStr}`;
+        dateCell.font = { size: 9, italic: true, color: { argb: "FF555566" } };
+        dateCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF4F8FE" } };
+        dateCell.alignment = { vertical: "middle", indent: 1 };
+        const cntCell = ws.getCell(3, 5);
+        cntCell.value = `${lines.length} line items`;
+        cntCell.font = { size: 9, italic: true, color: { argb: "FF555566" } };
+        cntCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF4F8FE" } };
+        cntCell.alignment = { horizontal: "right", vertical: "middle", indent: 1 };
 
-        row.eachCell((cell: any, col: number) => {
-          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowBg } };
-          cell.border = allBorder();
+        // ── Row 4 — notes (optional) ──────────────────────────────────────────
+        let nextRowIdx = 4;
+        if (proforma.notes) {
+          ws.mergeCells(4, 1, 4, NUM_COLS);
+          ws.getRow(4).height = 18;
+          const nc = ws.getCell(4, 1);
+          nc.value = `Notes: ${proforma.notes}`;
+          nc.font = { size: 9, italic: true, color: { argb: "FF444444" } };
+          nc.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.notesBg } };
+          nc.alignment = { vertical: "middle", indent: 1, wrapText: true };
+          nextRowIdx = 5;
+        }
+
+        // ── Blank spacer ──────────────────────────────────────────────────────
+        ws.getRow(nextRowIdx).height = 8;
+        nextRowIdx++;
+
+        // ── Column header row ─────────────────────────────────────────────────
+        const hdrRowNum = nextRowIdx;
+        const headers = [
+          "#",
+          "Barcode",
+          "Item Name",
+          "Qty",
+          "Wt / Bale (kg)",
+          "Price / Bale",
+          "Total Weight",
+          "Total Value",
+        ];
+        const hdrRow = ws.getRow(hdrRowNum);
+        hdrRow.values = headers;
+        hdrRow.height = 30;
+        hdrRow.eachCell((cell: any, col: number) => {
+          cell.font = { bold: true, size: 10, color: { argb: C.headerText } };
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.blueMid } };
           cell.alignment = {
             horizontal: col <= 3 ? "left" : "right",
             vertical: "middle",
             indent: col === 1 ? 0 : 1,
           };
-          if (col === 1) {
-            cell.font = { size: 9, color: { argb: "FF8899AA" } };
-            cell.alignment = { horizontal: "center", vertical: "middle" };
-          }
-          if (col === 2) {
-            cell.font = { name: "Courier New", size: 9 };
-          }
+          cell.border = {
+            top: medium(),
+            bottom: medium(),
+            left: thin(),
+            right: thin(),
+          };
+        });
+        nextRowIdx++;
+
+        // ── Data rows ─────────────────────────────────────────────────────────
+        let totQty = 0,
+          totWeightKg = 0,
+          totValue = 0;
+
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const qty = Number(line.qty) || 0;
+          const wt = parseFloat(line.weightPerBale || "0");
+          const price = parseFloat(line.pricePerBale || "0");
+          const lineWt = qty * wt;
+          const lineVal = qty * price;
+          totQty += qty;
+          totWeightKg += lineWt;
+          totValue += lineVal;
+
+          const row = ws.getRow(nextRowIdx);
+          row.values = [i + 1, line.barcode, line.itemName, qty, wt, price, lineWt, lineVal];
+          row.height = 20;
+
+          const isAlt = i % 2 === 1;
+          const rowBg = isAlt ? C.altRow : C.whiteRow;
+
+          row.eachCell((cell: any, col: number) => {
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowBg } };
+            cell.border = allBorder();
+            cell.alignment = {
+              horizontal: col <= 3 ? "left" : "right",
+              vertical: "middle",
+              indent: col === 1 ? 0 : 1,
+            };
+            if (col === 1) {
+              cell.font = { size: 9, color: { argb: "FF8899AA" } };
+              cell.alignment = { horizontal: "center", vertical: "middle" };
+            }
+            if (col === 2) {
+              cell.font = { name: "Courier New", size: 9 };
+            }
+            if (col === 4) cell.numFmt = "#,##0";
+            if (col === 5) cell.numFmt = "#,##0.##";
+            if (col === 6) cell.numFmt = "#,##0.00";
+            if (col === 7) cell.numFmt = "#,##0.##";
+            if (col === 8) cell.numFmt = "#,##0.00";
+          });
+
+          nextRowIdx++;
+        }
+
+        // ── Total row ─────────────────────────────────────────────────────────
+        const totalRow = ws.getRow(nextRowIdx);
+        totalRow.values = ["", "", "TOTAL", totQty, "", "", totWeightKg, totValue];
+        totalRow.height = 28;
+        totalRow.eachCell((cell: any, col: number) => {
+          cell.font = { bold: true, size: 11, color: { argb: C.totalText } };
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.totalBg } };
+          cell.border = { top: medium(), bottom: medium(), left: thin(), right: thin() };
+          cell.alignment = {
+            horizontal: col <= 3 ? (col === 3 ? "left" : "center") : "right",
+            vertical: "middle",
+            indent: col === 3 ? 1 : 0,
+          };
           if (col === 4) cell.numFmt = "#,##0";
-          if (col === 5) cell.numFmt = "#,##0.##";
-          if (col === 6) cell.numFmt = "#,##0.00";
           if (col === 7) cell.numFmt = "#,##0.##";
           if (col === 8) cell.numFmt = "#,##0.00";
         });
 
-        nextRowIdx++;
+        // ── Autofilter + freeze ────────────────────────────────────────────────
+        ws.autoFilter = { from: { row: hdrRowNum, column: 1 }, to: { row: hdrRowNum, column: NUM_COLS } };
+        ws.views = [{ state: "frozen", xSplit: 0, ySplit: hdrRowNum }];
+
+        // ── Send ──────────────────────────────────────────────────────────────
+        const safeRef = (proforma.reference || "proforma").replace(/[^a-zA-Z0-9 \-_]/g, "").trim();
+        res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        res.setHeader("Content-Disposition", `attachment; filename="${safeRef}.xlsx"`);
+        const buf = Buffer.from(await wb.xlsx.writeBuffer());
+        res.end(buf);
+      } catch (error: unknown) {
+        logger.error("Proforma export error:", { error: error });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
-
-      // ── Total row ─────────────────────────────────────────────────────────
-      const totalRow = ws.getRow(nextRowIdx);
-      totalRow.values = ["", "", "TOTAL", totQty, "", "", totWeightKg, totValue];
-      totalRow.height = 28;
-      totalRow.eachCell((cell: any, col: number) => {
-        cell.font = { bold: true, size: 11, color: { argb: C.totalText } };
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.totalBg } };
-        cell.border = { top: medium(), bottom: medium(), left: thin(), right: thin() };
-        cell.alignment = {
-          horizontal: col <= 3 ? (col === 3 ? "left" : "center") : "right",
-          vertical: "middle",
-          indent: col === 3 ? 1 : 0,
-        };
-        if (col === 4) cell.numFmt = "#,##0";
-        if (col === 7) cell.numFmt = "#,##0.##";
-        if (col === 8) cell.numFmt = "#,##0.00";
-      });
-
-      // ── Autofilter + freeze ────────────────────────────────────────────────
-      ws.autoFilter = { from: { row: hdrRowNum, column: 1 }, to: { row: hdrRowNum, column: NUM_COLS } };
-      ws.views = [{ state: "frozen", xSplit: 0, ySplit: hdrRowNum }];
-
-      // ── Send ──────────────────────────────────────────────────────────────
-      const safeRef = (proforma.reference || "proforma").replace(/[^a-zA-Z0-9 \-_]/g, "").trim();
-      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.setHeader("Content-Disposition", `attachment; filename="${safeRef}.xlsx"`);
-      const buf = Buffer.from(await wb.xlsx.writeBuffer());
-      res.end(buf);
-    } catch (error: unknown) {
-      logger.error("Proforma export error:", { error: error });
-      res.status(500).json({ message: getErrorMessage(error) });
     }
-  });
+  );
 
   // ── Star / unstar a proforma ──────────────────────────────────────────────
   // PATCH /api/suppliers/:supplierId/proformas/:proformaId/star
   // Toggles the starred state. Only one proforma per supplier+company can be
   // starred at a time — starring a new one automatically unstarches the old one.
-  app.patch("/api/suppliers/:supplierId/proformas/:proformaId/star", requireAuth, async (req: any, res: any) => {
-    try {
-      const companyId = req.session.currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const supplierId = parseId(req.params.supplierId);
-      const proformaId = parseId(req.params.proformaId);
-      if (supplierId === null || proformaId === null) return res.status(400).json({ message: "Invalid id" });
+  app.patch(
+    "/api/suppliers/:supplierId/proformas/:proformaId/star",
+    requireAuth,
+    async (req: Request, res: Response) => {
+      try {
+        const companyId = req.session.currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        const supplierId = parseId(req.params.supplierId);
+        const proformaId = parseId(req.params.proformaId);
+        if (supplierId === null || proformaId === null) return res.status(400).json({ message: "Invalid id" });
 
-      const [current] = await db
-        .select({ id: supplierProformas.id, isStarred: supplierProformas.isStarred })
-        .from(supplierProformas)
-        .where(and(eq(supplierProformas.id, proformaId), eq(supplierProformas.companyId, companyId)));
-      if (!current) return res.status(404).json({ message: "Proforma not found" });
+        const [current] = await db
+          .select({ id: supplierProformas.id, isStarred: supplierProformas.isStarred })
+          .from(supplierProformas)
+          .where(and(eq(supplierProformas.id, proformaId), eq(supplierProformas.companyId, companyId)));
+        if (!current) return res.status(404).json({ message: "Proforma not found" });
 
-      const newStarred = !current.isStarred;
+        const newStarred = !current.isStarred;
 
-      if (newStarred) {
-        // Unstar all other proformas for this supplier+company first
-        await db
+        if (newStarred) {
+          // Unstar all other proformas for this supplier+company first
+          await db
+            .update(supplierProformas)
+            .set({ isStarred: false })
+            .where(
+              and(
+                eq(supplierProformas.companyId, companyId),
+                eq(supplierProformas.supplierId, supplierId),
+                ne(supplierProformas.id, proformaId)
+              )
+            );
+        }
+
+        const [updated] = await db
           .update(supplierProformas)
-          .set({ isStarred: false })
-          .where(
-            and(
-              eq(supplierProformas.companyId, companyId),
-              eq(supplierProformas.supplierId, supplierId),
-              ne(supplierProformas.id, proformaId)
-            )
-          );
+          .set({ isStarred: newStarred })
+          .where(eq(supplierProformas.id, proformaId))
+          .returning();
+
+        res.json(updated);
+      } catch (error: unknown) {
+        res.status(500).json({ message: getErrorMessage(error) });
       }
-
-      const [updated] = await db
-        .update(supplierProformas)
-        .set({ isStarred: newStarred })
-        .where(eq(supplierProformas.id, proformaId))
-        .returning();
-
-      res.json(updated);
-    } catch (error: unknown) {
-      res.status(500).json({ message: getErrorMessage(error) });
     }
-  });
+  );
 }

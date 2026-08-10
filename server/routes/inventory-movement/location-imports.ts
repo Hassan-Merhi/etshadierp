@@ -99,7 +99,7 @@ export function registerLocationImportRoutes(app: Express) {
           const barcodeKey = item.Item_barcode.trim().toLowerCase();
 
           // 1. Check session-local registry first (fastest, no DB hit)
-          let stockItem: any = barcodeItemMap.get(barcodeKey) ?? null;
+          let stockItem = barcodeItemMap.get(barcodeKey) ?? null;
 
           // 2. If not seen this session, look up in DB (code field OR alias)
           if (!stockItem) {

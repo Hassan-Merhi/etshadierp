@@ -204,7 +204,7 @@ function installPhase4WriteGuard(app: Express): void {
 }
 
 async function invokeMigrationHandler(
-  handler: (req: any, res: any) => Promise<any>,
+  handler: (req: Request, res: Response) => Promise<any>,
   req: any,
   body: any
 ): Promise<any> {
@@ -322,7 +322,7 @@ async function loadCutover(cutoverId: number): Promise<any | null> {
   return firstRow(result) ?? null;
 }
 
-async function prepareCutover(req: any, res: any): Promise<any> {
+async function prepareCutover(req: Request, res: Response): Promise<any> {
   const pair = await validateMigrationPair(req, res, false);
   if (!pair) return;
   const error = exactCutoverConfirmation(
@@ -365,7 +365,7 @@ async function prepareCutover(req: any, res: any): Promise<any> {
   });
 }
 
-async function finalizeCutover(req: any, res: any): Promise<any> {
+async function finalizeCutover(req: Request, res: Response): Promise<any> {
   const pair = await validateMigrationPair(req, res, false);
   if (!pair) return;
   const error = exactCutoverConfirmation(
@@ -515,7 +515,7 @@ async function finalizeCutover(req: any, res: any): Promise<any> {
   }
 }
 
-async function rollbackCutover(req: any, res: any): Promise<any> {
+async function rollbackCutover(req: Request, res: Response): Promise<any> {
   const cutoverId = pn(req.body?.cutoverId);
   if (!cutoverId) return res.status(400).json({ message: "cutoverId is required" });
   await ensurePhase4Schema();
@@ -565,7 +565,7 @@ async function rollbackCutover(req: any, res: any): Promise<any> {
   });
 }
 
-async function cancelPreparedCutover(req: any, res: any): Promise<any> {
+async function cancelPreparedCutover(req: Request, res: Response): Promise<any> {
   const cutoverId = pn(req.body?.cutoverId);
   if (!cutoverId) return res.status(400).json({ message: "cutoverId is required" });
   await ensurePhase4Schema();
@@ -618,7 +618,7 @@ async function cancelPreparedCutover(req: any, res: any): Promise<any> {
   });
 }
 
-async function releaseTargetHold(req: any, res: any): Promise<any> {
+async function releaseTargetHold(req: Request, res: Response): Promise<any> {
   const cutoverId = pn(req.body?.cutoverId);
   if (!cutoverId) return res.status(400).json({ message: "cutoverId is required" });
   await ensurePhase4Schema();
@@ -660,7 +660,7 @@ async function releaseTargetHold(req: any, res: any): Promise<any> {
   return res.json({ success: true, cutover: resultRows(released)[0] });
 }
 
-async function statusCutover(req: any, res: any): Promise<any> {
+async function statusCutover(req: Request, res: Response): Promise<any> {
   const pair = await validateMigrationPair(req, res, false);
   if (!pair) return;
   await ensurePhase4Schema();
@@ -677,7 +677,7 @@ async function statusCutover(req: any, res: any): Promise<any> {
   });
 }
 
-async function finalVerification(req: any, res: any): Promise<any> {
+async function finalVerification(req: Request, res: Response): Promise<any> {
   const pair = await validateMigrationPair(req, res, false);
   if (!pair) return;
   const live = await getLiveCutover(pair.sourceId, pair.targetId);
@@ -701,7 +701,7 @@ export function registerSpMigrationPhase4Routes(app: Express): void {
   app.post("/api/sp/migration/cutover/rollback", ...developer, rollbackCutover);
   app.post("/api/sp/migration/cutover/cancel", ...developer, cancelPreparedCutover);
   app.post("/api/sp/migration/cutover/release-target-hold", ...developer, releaseTargetHold);
-  app.post("/api/sp/migration/cutover", ...developer, async (req: any, res: any) => {
+  app.post("/api/sp/migration/cutover", ...developer, async (req: Request, res: Response) => {
     if (req.body?.action === "prepare") return prepareCutover(req, res);
     if (req.body?.action === "finalize") return finalizeCutover(req, res);
     if (req.body?.action === "rollback") return rollbackCutover(req, res);

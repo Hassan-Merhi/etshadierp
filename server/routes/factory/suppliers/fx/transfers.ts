@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { parseId } from "../../../../lib/parseId";
 import { getErrorMessage } from "../../../../lib/httpHandlers";
 import { logger } from "../../../../lib/logger";
@@ -25,7 +25,7 @@ import {
 import { eq, and, desc, inArray } from "drizzle-orm";
 
 export function registerSupplierFxTransferRoutes(app: Express) {
-  app.get("/api/factory/supplier-fx-transfers", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/supplier-fx-transfers", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -41,7 +41,7 @@ export function registerSupplierFxTransferRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/supplier-fx-transfers", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/supplier-fx-transfers", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -85,7 +85,7 @@ export function registerSupplierFxTransferRoutes(app: Express) {
           )
         );
 
-      const containerIds = contRowsInCurrency.map((c: any) => c.id);
+      const containerIds = contRowsInCurrency.map((c) => c.id);
       const totalValue = contRowsInCurrency.reduce((s: number, c: any) => {
         const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
         const rate = parseFloat(c.ratePerKg || "0");
@@ -124,7 +124,7 @@ export function registerSupplierFxTransferRoutes(app: Express) {
           );
         // Only count commissions denominated in the transfer currency
         totalCommission = commRows
-          .filter((cm: any) => (cm.currencyCode || "USD") === currCode)
+          .filter((cm) => (cm.currencyCode || "USD") === currCode)
           .reduce((s: number, cm: any) => s + parseFloat(cm.commissionTotal || "0"), 0);
 
         // Also include direct commissions from containers (commissionAmount / commissionCurrencyCode)
@@ -137,7 +137,7 @@ export function registerSupplierFxTransferRoutes(app: Express) {
             .from(factoryContainers)
             .where(and(eq(factoryContainers.companyId, companyId), eq(factoryContainers.supplierId, fromSupId)));
           const directAmt = directRows
-            .filter((r: any) => (r.commissionCurrencyCode || "USD") === currCode)
+            .filter((r) => (r.commissionCurrencyCode || "USD") === currCode)
             .reduce((s: number, r: any) => s + parseFloat(r.commissionAmount || "0"), 0);
           // Use whichever is larger (factoryContainerCommissions may supersede commissionAmount)
           if (directAmt > totalCommission) totalCommission = directAmt;
@@ -174,11 +174,11 @@ export function registerSupplierFxTransferRoutes(app: Express) {
 
       // FX deducted from supplier bucket (source = supplier or both)
       const fxSupplierOut = fxRows
-        .filter((t: any) => !t.sourceType || t.sourceType === "supplier" || t.sourceType === "both")
+        .filter((t) => !t.sourceType || t.sourceType === "supplier" || t.sourceType === "both")
         .reduce((s: number, t: any) => s + parseFloat(t.fromAmount || "0"), 0);
       // FX deducted from commission bucket (source = commission or both)
       const fxCommOut = fxRows
-        .filter((t: any) => t.sourceType === "commission" || t.sourceType === "both")
+        .filter((t) => t.sourceType === "commission" || t.sourceType === "both")
         .reduce((s: number, t: any) => s + parseFloat(t.fromAmount || "0"), 0);
 
       const supplierAvail = totalValue - totalCommission - totalPaid - fxSupplierOut;
@@ -221,7 +221,7 @@ export function registerSupplierFxTransferRoutes(app: Express) {
           )
           .orderBy(factoryContainers.createdAt); // oldest first
 
-        const cIds = allContainers.map((c: any) => c.id);
+        const cIds = allContainers.map((c) => c.id);
         const prevAllocs =
           cIds.length > 0
             ? await db
@@ -241,7 +241,7 @@ export function registerSupplierFxTransferRoutes(app: Express) {
             (allocatedPerContainer[a.containerId] || 0) + parseFloat(a.allocatedAmount || "0");
 
         let rem = parseFloat(created.fromAmount);
-        const rows: any[] = [];
+        const rows = [];
         for (const c of allContainers) {
           if (rem <= 0.001) break;
           // Use totalKg (agreed weight) for FX allocation ceiling — same as supplier balance.
@@ -290,7 +290,7 @@ export function registerSupplierFxTransferRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/factory/supplier-fx-transfers/:id", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/supplier-fx-transfers/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

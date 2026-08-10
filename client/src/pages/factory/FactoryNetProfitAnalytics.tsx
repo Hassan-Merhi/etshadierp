@@ -140,7 +140,7 @@ function AccountBreakdown({
 }) {
   const [open, setOpen] = useState(false);
   const [, navigate] = useLocation();
-  const active = (accounts || []).filter((a: any) => a.debit !== 0 || a.credit !== 0);
+  const active = (accounts || []).filter((a) => a.debit !== 0 || a.credit !== 0);
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
@@ -179,7 +179,7 @@ function AccountBreakdown({
                 </tr>
               </thead>
               <tbody>
-                {active.map((acc: any, i: number) => (
+                {active.map((acc, i: number) => (
                   <tr
                     key={i}
                     className="border-t hover-elevate cursor-pointer"

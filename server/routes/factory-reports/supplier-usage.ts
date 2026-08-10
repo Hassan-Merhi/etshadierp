@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
@@ -23,7 +23,7 @@ import { getUserHideAllCosts } from "../factory/_helpers";
 import { generateEmptyExcel, generateEmptyPdf, generateExcel, generatePdf, writeDaybookEntry } from "./_helpers";
 
 export function registerFactorySupplierUsageReportRoutes(app: Express, requireAuth: any, db: any) {
-  app.post("/api/factory/reports/supplier-usage", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/reports/supplier-usage", requireAuth, async (req: Request, res: Response) => {
     try {
       const hideAllCosts = await getUserHideAllCosts(req);
       const { companyId, supplierId, startDate, endDate, format } = req.body;
@@ -41,7 +41,7 @@ export function registerFactorySupplierUsageReportRoutes(app: Express, requireAu
         return res.status(404).json({ message: "Company not found" });
       }
 
-      const containerConditions: any[] = [eq(factoryContainers.companyId, companyId)];
+      const containerConditions = [eq(factoryContainers.companyId, companyId)];
       if (supplierId) {
         containerConditions.push(eq(factoryContainers.supplierId, supplierId));
       }
@@ -126,7 +126,7 @@ export function registerFactorySupplierUsageReportRoutes(app: Express, requireAu
         }
       }
 
-      const supplierSummaries: any[] = [];
+      const supplierSummaries = [];
       const supplierGroups = new Map<number, any[]>();
 
       for (const container of allContainers) {
@@ -228,7 +228,7 @@ export function registerFactorySupplierUsageReportRoutes(app: Express, requireAu
         });
       }
 
-      const baleBreakdown: any[] = [];
+      const baleBreakdown = [];
       for (const summary of supplierSummaries) {
         for (const bale of summary.bales) {
           const mixSources = allMixSources.filter((ms: any) => ms.mixBatchId === bale.mixBatchId);

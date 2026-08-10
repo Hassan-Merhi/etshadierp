@@ -3,7 +3,7 @@ import { db } from "../../db";
 import * as schema from "@shared/schema";
 
 export async function getAllCustomers(companyId: number, search?: string, limit?: number): Promise<schema.Customer[]> {
-  const conditions: any[] = [eq(schema.customers.companyId, companyId), isNull(schema.customers.deletedAt)];
+  const conditions = [eq(schema.customers.companyId, companyId), isNull(schema.customers.deletedAt)];
   if (search) conditions.push(ilike(schema.customers.legalName, `%${search}%`));
   let query = db
     .select()
