@@ -25,6 +25,20 @@ function transformStockEntry(source: string): string {
 
   code = replaceExactly(
     code,
+    `      if (group.erpLocationId) gp.set("locationId", String(group.erpLocationId));\n      return {`,
+    `      if (group.erpLocationId) gp.set("locationId", String(group.erpLocationId));\n      if (statusFilter !== "all") gp.set("status", statusFilter);\n      if (debouncedSearch.trim()) gp.set("search", debouncedSearch.trim());\n      return {`,
+    "stock-entry lazy expanded group filters"
+  );
+
+  code = replaceExactly(
+    code,
+    `    if (g.erpLocationId) gp.set("locationId", String(g.erpLocationId));\n\n    const rows = await qc.fetchQuery<GroupRow[]>({`,
+    `    if (g.erpLocationId) gp.set("locationId", String(g.erpLocationId));\n    if (statusFilter !== "all") gp.set("status", statusFilter);\n    if (debouncedSearch.trim()) gp.set("search", debouncedSearch.trim());\n\n    const rows = await qc.fetchQuery<GroupRow[]>({`,
+    "stock-entry on-demand group action filters"
+  );
+
+  code = replaceExactly(
+    code,
     `  async function exportExcel() {\n    const wb = XLSX.utils.book_new();\n\n    const summaryRows = filteredGroups.map((g) => ({`,
     `  async function exportExcel() {\n    const wb = XLSX.utils.book_new();\n\n    // The screen is paged in condensed mode, so exports must resolve the complete\n    // filtered result before building any sheet, including the summary sheet.\n    const groupsWithBales = await fetchGroupsWithBales();\n\n    const summaryRows = groupsWithBales.map((g) => ({`,
     "stock-entry export summary source"
