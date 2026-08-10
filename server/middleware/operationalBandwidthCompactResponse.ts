@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 
 const REQUEST_HEADER = "x-erp-compact-response";
+const PROFILE_HEADER = "x-erp-response-profile";
 const RESPONSE_HEADER = "X-ERP-Compact-Response";
 const WIRE_VERSION = "v1";
 const DICT_TOKEN = /^~([0-9a-z]+)$/;
@@ -37,6 +38,39 @@ function shouldCompactPath(path: string): boolean {
   if (/^\/api\/factory\/customer-orders\/\d+$/.test(path)) return true;
   if (/^\/api\/factory\/customer-orders\/\d+\/verification-summary$/.test(path)) return true;
   return false;
+}
+
+function withoutKeys(record: JsonRecord, keys: readonly string[]): JsonRecord {
+  const omitted = new Set(keys);
+  return Object.fromEntries(Object.entries(record).filter(([key]) => !omitted.has(key)));
+}
+
+function preparePayload(req: Request, payload: unknown): unknown {
+  const profile = req.header(PROFILE_HEADER);
+
+  if (
+    profile === "location-inventory-summary-v1" &&
+    /^\/api\/factory\/location-inventory\/\d+$/.test(req.path) &&
+    Array.isArray(payload)
+  ) {
+    // Location Inventory renders grouped counts/weights/prices and fetches bale
+    // detail lazily when reprinting. The full reference-number arrays are used by
+    // POS elsewhere, so remove them only for this page-scoped negotiated profile.
+    return payload.map((row) => (isPlainRecord(row) ? withoutKeys(row, ["referenceNumbers"]) : row));
+  }
+
+  if (
+    profile === "loading-order-state-v1" &&
+    /^\/api\/factory\/customer-orders\/\d+$/.test(req.path) &&
+    isPlainRecord(payload)
+  ) {
+    // Both loading-scan clients declare/use only order header + bales. Lines and
+    // charges remain available to invoice/detail screens through the unchanged
+    // default response when this profile header is absent.
+    return withoutKeys(payload, ["lines", "charges"]);
+  }
+
+  return payload;
 }
 
 function collectStrings(value: unknown, counts: Map<string, number>): void {
@@ -127,6 +161,20 @@ function compactPayload(payload: unknown): CompactEnvelope {
   };
 }
 
+function appendVary(res: Response, headerName: string): void {
+  const existing = res.getHeader("Vary");
+  const values = new Set<string>();
+  const parts = Array.isArray(existing) ? existing : existing ? [String(existing)] : [];
+  for (const part of parts) {
+    for (const value of part.split(",")) {
+      const normalized = value.trim();
+      if (normalized) values.add(normalized);
+    }
+  }
+  values.add(headerName);
+  res.setHeader("Vary", [...values].join(", "));
+}
+
 export function operationalBandwidthCompactResponse(req: Request, res: Response, next: NextFunction): void {
   if (req.method !== "GET" || req.header(REQUEST_HEADER) !== WIRE_VERSION || !shouldCompactPath(req.path)) {
     next();
@@ -136,9 +184,11 @@ export function operationalBandwidthCompactResponse(req: Request, res: Response,
   const originalJson = res.json.bind(res);
   res.json = ((payload: unknown) => {
     if (res.statusCode < 200 || res.statusCode >= 300 || payload == null) return originalJson(payload);
+    const prepared = preparePayload(req, payload);
     res.setHeader(RESPONSE_HEADER, WIRE_VERSION);
-    res.setHeader("Vary", [res.getHeader("Vary"), REQUEST_HEADER].filter(Boolean).join(", "));
-    return originalJson(compactPayload(payload));
+    appendVary(res, REQUEST_HEADER);
+    if (req.header(PROFILE_HEADER)) appendVary(res, PROFILE_HEADER);
+    return originalJson(compactPayload(prepared));
   }) as typeof res.json;
 
   next();
@@ -148,4 +198,5 @@ export function operationalBandwidthCompactResponse(req: Request, res: Response,
 export const operationalBandwidthWireInternals = {
   DICT_TOKEN,
   shouldCompactPath,
+  preparePayload,
 };
