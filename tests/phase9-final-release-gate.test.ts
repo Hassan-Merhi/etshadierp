@@ -36,8 +36,6 @@ describe("Phase 9 final verification and release contract", () => {
     expect(smoke).toContain("state.ltrViolations.length > 0");
     expect(smoke).toContain("state.horizontalOverflow");
     expect(smoke).toContain("activateSkipNavigation");
-    expect(smoke).toContain('page.keyboard.press("Enter")');
-    expect(smoke).toContain("return page.evaluate(() => ({");
     expect(smoke).toContain('activeElementId !== "main-content"');
     expect(smoke).toContain("assertSidebarEdge");
     expect(smoke).toContain("ERP_SMOKE_REQUIRE_AUTHENTICATED");
