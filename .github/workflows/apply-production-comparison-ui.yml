@@ -1,0 +1,280 @@
+name: Apply production comparison UI patch
+
+on:
+  push:
+    branches:
+      - fix/production-comparison-arabic-workers-hover
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[production-ui-patch]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply requested UI changes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('client/src/pages/factory/ProductionComparison.tsx')
+          s = path.read_text()
+
+          def replace_once(old: str, new: str, label: str):
+              global s
+              count = s.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected exactly one match, found {count}')
+              s = s.replace(old, new, 1)
+
+          replace_once(
+              'import { Badge } from "@/components/ui/badge";\nimport { Skeleton } from "@/components/ui/skeleton";',
+              'import { Badge } from "@/components/ui/badge";\nimport { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";\nimport { Skeleton } from "@/components/ui/skeleton";',
+              'hover-card import',
+          )
+
+          replace_once(
+              '''  const { data: workers = [] } = useQuery<{ id: number; fullName: string; active?: boolean }[]>({
+    queryKey: ["/api/factory/workers"],
+    staleTime: 60_000,
+  });
+
+  // Worker categories — the filter only offers the pressing-team workers.''',
+              '''  const { data: workers = [] } = useQuery<{ id: number; fullName: string; active?: boolean }[]>({
+    queryKey: ["/api/factory/workers"],
+    staleTime: 60_000,
+  });
+
+  const { data: baleProducts = [] } = useQuery<
+    Array<{ code: string; articleCode?: string | null; nameAr?: string | null }>
+  >({
+    queryKey: ["/api/factory/bale-products"],
+    staleTime: 60_000,
+  });
+
+  // Worker categories — the filter only offers the pressing-team workers.''',
+              'bale product query',
+          )
+
+          replace_once(
+              '''  // Stable key for the query cache / request param.
+  const workerIdsParam = useMemo(() => [...filterWorkers].sort().join(","), [filterWorkers]);''',
+              '''  const arabicNameByArticle = useMemo(() => {
+    const map = new Map<string, string>();
+    const add = (key: string | null | undefined, nameAr: string | null | undefined) => {
+      const normalized = (key || "").trim().toUpperCase();
+      const name = (nameAr || "").trim();
+      if (normalized && name) map.set(normalized, name);
+    };
+    for (const product of baleProducts) {
+      add(product.articleCode, product.nameAr);
+      add(product.code, product.nameAr);
+    }
+    return map;
+  }, [baleProducts]);
+
+  // Stable key for the query cache / request param.
+  const workerIdsParam = useMemo(() => [...filterWorkers].sort().join(","), [filterWorkers]);''',
+              'arabic name map',
+          )
+
+          replace_once(
+              '''  const mergedAll = useMemo<MergedRow[]>(() => {''',
+              '''  const workerSummaryByArticle = useMemo(() => {
+    type WorkerSummary = { name: string; aQty: number; bQty: number; total: number };
+    const byArticle = new Map<string, Map<string, { name: string; aQty: number; bQty: number }>>();
+
+    const tally = (row: ProductRow, period: "a" | "b") => {
+      let workersForProduct = byArticle.get(row.articleCode);
+      if (!workersForProduct) {
+        workersForProduct = new Map();
+        byArticle.set(row.articleCode, workersForProduct);
+      }
+      for (const worker of row.workers ?? []) {
+        const name = (worker?.name || "").trim();
+        if (!name) continue;
+        const key = worker.id != null ? `id:${worker.id}` : `name:${name.toLowerCase()}`;
+        const existing = workersForProduct.get(key) ?? { name, aQty: 0, bQty: 0 };
+        if (period === "a") existing.aQty += worker.qty ?? 0;
+        else existing.bQty += worker.qty ?? 0;
+        workersForProduct.set(key, existing);
+      }
+    };
+
+    for (const row of qA.data?.production.byProduct ?? []) tally(row, "a");
+    for (const row of qB.data?.production.byProduct ?? []) tally(row, "b");
+
+    const result = new Map<string, WorkerSummary[]>();
+    for (const [articleCode, workersForProduct] of byArticle) {
+      result.set(
+        articleCode,
+        [...workersForProduct.values()]
+          .map((worker) => ({ ...worker, total: worker.aQty + worker.bQty }))
+          .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name))
+      );
+    }
+    return result;
+  }, [qA.data, qB.data]);
+
+  const mergedAll = useMemo<MergedRow[]>(() => {''',
+              'worker summary map',
+          )
+
+          replace_once(
+              '''          const q = filterProduct.toLowerCase();
+          return r.articleCode.toLowerCase().includes(q) || r.productName.toLowerCase().includes(q);''',
+              '''          const q = filterProduct.toLowerCase();
+          const arabicName = arabicNameByArticle.get(r.articleCode.trim().toUpperCase()) ?? "";
+          return (
+            r.articleCode.toLowerCase().includes(q) ||
+            r.productName.toLowerCase().includes(q) ||
+            arabicName.toLowerCase().includes(q)
+          );''',
+              'arabic product search',
+          )
+
+          replace_once(
+              '''    [mergedAll, filterCategories, filterGrades, filterProduct]
+  );''',
+              '''    [mergedAll, filterCategories, filterGrades, filterProduct, arabicNameByArticle]
+  );''',
+              'filtered dependencies',
+          )
+
+          replace_once(
+              '''                      <th
+                        rowSpan={2}
+                        className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground border-r border-border/50 align-bottom"
+                      >
+                        Category
+                      </th>''',
+              '''                      <th
+                        rowSpan={2}
+                        className="px-3 py-3 text-right text-xs font-bold uppercase tracking-wider text-muted-foreground border-r border-border/50 align-bottom min-w-[180px]"
+                      >
+                        Product (Arabic)
+                      </th>
+                      <th
+                        rowSpan={2}
+                        className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground border-r border-border/50 align-bottom"
+                      >
+                        Category
+                      </th>''',
+              'arabic product header',
+          )
+
+          replace_once(
+              '''                        className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground border-r border-border/50 align-bottom min-w-[140px]"
+                      >
+                        Worker''',
+              '''                        className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground border-r border-border/50 align-bottom min-w-[100px]"
+                      >
+                        Workers''',
+              'compact worker header',
+          )
+
+          replace_once(
+              '''                      const qDiff = row.aQty - row.bQty;
+                      const kDiff = row.aKg - row.bKg;
+                      return (''',
+              '''                      const qDiff = row.aQty - row.bQty;
+                      const kDiff = row.aKg - row.bKg;
+                      const workerSummary = workerSummaryByArticle.get(row.articleCode) ?? [];
+                      const arabicName = arabicNameByArticle.get(row.articleCode.trim().toUpperCase()) ?? "";
+                      return (''',
+              'row worker and arabic lookup',
+          )
+
+          replace_once(
+              '''                          <td className="px-3 py-2.5 text-sm text-muted-foreground border-r border-border/30">
+                            {row.categoryName || "—"}
+                          </td>''',
+              '''                          <td
+                            className="px-3 py-2.5 text-sm text-right border-r border-border/30 min-w-[180px]"
+                            dir="rtl"
+                          >
+                            <span className={arabicName ? "font-medium" : "text-muted-foreground"}>
+                              {arabicName || "—"}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2.5 text-sm text-muted-foreground border-r border-border/30">
+                            {row.categoryName || "—"}
+                          </td>''',
+              'arabic product cell',
+          )
+
+          replace_once(
+              '''                          <td className="px-3 py-2.5 border-r border-border/30">
+                            {row.workers.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {row.workers.map((w) => (
+                                  <Badge key={w} variant="outline" className="text-xs font-normal">
+                                    {w}
+                                  </Badge>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">—</span>
+                            )}
+                          </td>''',
+              '''                          <td className="px-3 py-2.5 border-r border-border/30">
+                            {workerSummary.length > 0 ? (
+                              <HoverCard openDelay={150} closeDelay={100}>
+                                <HoverCardTrigger asChild>
+                                  <button
+                                    type="button"
+                                    className="inline-flex items-center rounded-md border border-border bg-background px-2 py-1 text-xs font-medium whitespace-nowrap hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    aria-label={`${workerSummary.length} worker${workerSummary.length === 1 ? "" : "s"}. Hover for bale details.`}
+                                  >
+                                    {workerSummary.length} worker{workerSummary.length === 1 ? "" : "s"}
+                                  </button>
+                                </HoverCardTrigger>
+                                <HoverCardContent align="start" className="w-80 p-3">
+                                  <div className="mb-2 flex items-center justify-between gap-3">
+                                    <p className="text-sm font-semibold">
+                                      {workerSummary.length} worker{workerSummary.length === 1 ? "" : "s"}
+                                    </p>
+                                    <span className="text-xs text-muted-foreground">Bales by worker</span>
+                                  </div>
+                                  <div className="space-y-2">
+                                    {workerSummary.map((worker) => (
+                                      <div key={worker.name} className="rounded-md border bg-muted/20 px-2.5 py-2">
+                                        <div className="flex items-center justify-between gap-3">
+                                          <span className="min-w-0 truncate text-sm font-medium" dir="auto">
+                                            {worker.name}
+                                          </span>
+                                          <span className="shrink-0 text-sm font-semibold tabular-nums">
+                                            {fmtNum(worker.total)} bale{worker.total === 1 ? "" : "s"}
+                                          </span>
+                                        </div>
+                                        <div className="mt-1 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                                          <span>{labelA}: {fmtNum(worker.aQty)}</span>
+                                          <span>{labelB}: {fmtNum(worker.bQty)}</span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </HoverCardContent>
+                              </HoverCard>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">—</span>
+                            )}
+                          </td>''',
+              'worker hover summary cell',
+          )
+
+          path.write_text(s)
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/apply-production-comparison-ui.yml
+          git add client/src/pages/factory/ProductionComparison.tsx
+          git commit -m "feat: add Arabic product names and worker hover summary [production-ui-patch]"
+          git push origin HEAD
