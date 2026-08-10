@@ -184,7 +184,7 @@ export default function SpOverview() {
               </p>
             ) : (
               <div className="divide-y">
-                {recentSales.map((sale: any) => (
+                {recentSales.map((sale) => (
                   <div
                     key={sale.id}
                     className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center"
