@@ -282,9 +282,33 @@ jobs:
         run: |
           set -euo pipefail
           status=success
-          for value in "$INSTALL" "$DEPENDENCIES" "$FORMATTING" "$TYPECHECK" "$BUILD" "$LINT" "$CONTRACTS" "$RECONCILIATION" "$READINESS" "$DB_SCHEMA" "$BROWSER_SMOKE" "$BACKEND" "$SMOKE" "$BACKEND_COVERAGE" "$FRONTEND" "$FRONTEND_COVERAGE" "$I18N" "$SECURITY" "$DEPENDENCY_AUDIT" "$SECRET_SCAN"; do
-            if [ "$value" != "success" ]; then status=failure; fi
-          done
+          while IFS='|' read -r name value; do
+            if [ "$value" != "success" ]; then
+              status=failure
+              echo "::error title=Release gate failed::$name outcome=$value"
+            fi
+          done <<EOF
+          Dependency install|$INSTALL
+          Lockfile and production dependencies|$DEPENDENCIES
+          Phase 9 formatting|$FORMATTING
+          TypeScript|$TYPECHECK
+          Production build|$BUILD
+          Lint|$LINT
+          Release contracts|$CONTRACTS
+          Current-main multilingual reconciliation|$RECONCILIATION
+          Final production readiness|$READINESS
+          Disposable PostgreSQL schema|$DB_SCHEMA
+          Startup, migrations and multilingual browser smoke|$BROWSER_SMOKE
+          Full backend tests|$BACKEND
+          API smoke sweep|$SMOKE
+          Backend coverage|$BACKEND_COVERAGE
+          Full frontend tests|$FRONTEND
+          Frontend coverage|$FRONTEND_COVERAGE
+          Untranslated-text release ratchet|$I18N
+          Focused security checks|$SECURITY
+          Critical production dependency audit|$DEPENDENCY_AUDIT
+          Verified secret scan|$SECRET_SCAN
+          EOF
 
           cat >> "$GITHUB_STEP_SUMMARY" <<EOF
           ## Phase 9 final verification: $status
