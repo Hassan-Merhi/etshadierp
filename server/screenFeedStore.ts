@@ -30,6 +30,16 @@ export interface ScreenFeedCaptureInfo {
   quality: number;
   encodedBytes: number;
   durationMs: number;
+  failureReason?: string;
+}
+
+export type ScreenFeedFailureStage = "capture" | "encode" | "upload" | "capture-or-upload" | "pipeline";
+
+export interface ScreenFeedFailureInfo {
+  stage: ScreenFeedFailureStage;
+  reason: string;
+  occurredAt: Date;
+  durationMs?: number;
 }
 
 export interface ScreenFrame {
@@ -47,6 +57,10 @@ export interface ScreenFrame {
 // One frame per user, kept in memory only — ephemeral by design.
 export const screenFeedStore = new Map<string, ScreenFrame>();
 
+// Latest sanitized capture/upload failure per user. This contains diagnostic
+// metadata only — never image bytes, page text, form values or route contents.
+export const screenFeedFailureStore = new Map<string, ScreenFeedFailureInfo>();
+
 // Latest pointer position per user. Pointer updates are tiny and independent
 // from image frames so cursor movement does not force duplicate image uploads.
 export const screenFeedCursorStore = new Map<string, ScreenFeedCursor>();
@@ -55,12 +69,15 @@ export const screenFeedCursorStore = new Map<string, ScreenFeedCursor>();
 // Key = watched userId, Value = timestamp (ms).
 export const watcherPollStore = new Map<string, number>();
 
-// Evict frames, cursors, and stale watcher polls older than 2 minutes.
+// Evict frames, diagnostics, cursors, and stale watcher polls older than 2 minutes.
 setInterval(() => {
   const cutoff = Date.now() - 2 * 60 * 1000;
   const cutoffDt = new Date(cutoff);
   for (const [userId, frame] of screenFeedStore.entries()) {
     if (frame.capturedAt < cutoffDt) screenFeedStore.delete(userId);
+  }
+  for (const [userId, failure] of screenFeedFailureStore.entries()) {
+    if (failure.occurredAt < cutoffDt) screenFeedFailureStore.delete(userId);
   }
   for (const [userId, cursor] of screenFeedCursorStore.entries()) {
     if (cursor.ts < cutoff) screenFeedCursorStore.delete(userId);
