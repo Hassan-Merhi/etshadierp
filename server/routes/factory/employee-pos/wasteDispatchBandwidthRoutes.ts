@@ -167,7 +167,9 @@ export function registerWasteDispatchBandwidthRoutes(app: Express) {
     }
   });
 
-  // Bale rows are loaded only when a product group is expanded.
+  // Bale rows are loaded only when a product group is expanded. Keep the same
+  // server-side search filter as the summary so an expanded searched group
+  // cannot reveal or select non-matching bales.
   app.get("/api/factory/waste-dispatch/group-bales/:productId", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = getCompanyId(req);
@@ -177,9 +179,10 @@ export function registerWasteDispatchBandwidthRoutes(app: Express) {
       if (!Number.isFinite(productId) || productId < 1) {
         return res.status(400).json({ message: "Invalid product id" });
       }
+      const search = getSearch(req);
 
       const raw = await db.execute(sql`
-        WITH eligible AS (${eligibleWasteBalesSql(companyId, "")})
+        WITH eligible AS (${eligibleWasteBalesSql(companyId, search)})
         SELECT *
         FROM eligible
         WHERE "productId" = ${productId}
