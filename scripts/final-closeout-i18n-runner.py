@@ -21,6 +21,7 @@ files = [
     root / "client/src/pages/location-inventory/LocationInventoryHeader.tsx",
     root / "client/src/pages/CustomerInvoiceCreate.tsx",
 ]
+files.extend(sorted((root / "client/src/pages/sp").rglob("*.tsx")))
 
 for path in files:
     lines = path.read_text(encoding="utf-8").splitlines()
