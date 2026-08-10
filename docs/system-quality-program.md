@@ -19,7 +19,7 @@ audit fails instead of allowing the reference to drift.
 |---|---|---|
 | Type escapes (AST) | 10,087 total | `npm run audit:type-escapes` |
 | ESLint warnings | 10,754 total | `npm run lint` |
-| Startup migration failures | 11 on a fresh database | `npm run verify:startup-migrations` |
+| Startup migration failures | 0 on a fresh database | `npm run verify:startup-migrations` |
 | Backend coverage floor (lines) | 18% | `config/coverage-thresholds.json` |
 | Write routes with no test at all | 0 of 328 | `npm run audit:write-routes` |
 | Write routes covered only by the guard sweep | 0 of 328 | `npm run audit:write-routes` |
@@ -140,13 +140,21 @@ own check is `/api/health/ready`.
 `totals.failureCeiling` may only fall, and any failure not already recorded
 fails the build.
 
-It is a baseline rather than a demand for zero because nine of the eleven are
-seed `INSERT`s whose `company_id` foreign keys cannot resolve until companies
-exist: they fail on an empty CI database and succeed in production. A gate that
-is permanently red is a gate that gets switched off. The remaining two are real
-ordering problems — `supplier_containers` and `bales.erp_location_id` do not
-exist when foreign keys are added to them — and are the entries worth fixing
-first.
+The ceiling is **0**: any startup migration failure fails the build. It did not
+start there. The first measurement on a fresh database found eleven failures,
+which were frozen as a baseline so the gate was real immediately rather than
+permanently red — a gate that is always red is one that gets switched off. All
+eleven were then fixed and the ceiling lowered to zero:
+
+- Nine were seed `INSERT`s pinning `company_id` values that do not exist on a
+  fresh database. Each is now a guarded `SELECT` checking that both the company
+  and the referenced ledger account exist, so they no-op on an empty database
+  and still seed once the target company is created.
+- Two were foreign keys targeting schema that no longer exists:
+  `supplier_containers`, which is defined neither here nor in `shared/schema`,
+  and `bales.erp_location_id`, a column only `factory_bales` still carries.
+  Both statements are guarded on the object being present rather than deleted,
+  so a long-lived database that still has them still gains the key.
 
 Three `factory_container_receipts` constraints were fixed in the same change:
 they lacked the `DO`/`duplicate_object` guard the rest of that file uses, so

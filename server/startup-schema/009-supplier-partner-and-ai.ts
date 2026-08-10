@@ -487,17 +487,20 @@ export const supplierPartnerAndAi: string[] = [
   // Prepaid Expenses account in SP Test Co — opening $21,300 Dr
   `INSERT INTO ledger_accounts (company_id, code, name, account_type, sub_type, opening_balance, opening_balance_side, active, is_hidden)
      SELECT 14, 'SP-PREEXP', 'Prepaid Expenses', 'Asset', 'sp_prepaid_expenses', 21300, 'Dr', true, false
-     WHERE NOT EXISTS (SELECT 1 FROM ledger_accounts WHERE company_id = 14 AND code = 'SP-PREEXP')`,
+     WHERE NOT EXISTS (SELECT 1 FROM ledger_accounts WHERE company_id = 14 AND code = 'SP-PREEXP')
+       AND EXISTS (SELECT 1 FROM companies WHERE id = 14)`,
 
   // HADI L'SHI — Intercompany tracking account in SP Test Co
   `INSERT INTO ledger_accounts (company_id, code, name, account_type, sub_type, active, is_hidden)
      SELECT 14, 'SP-HADI-IC', 'HADI L''SHI — Intercompany', 'Intercompany', 'sp_hadi_intercompany', true, false
-     WHERE NOT EXISTS (SELECT 1 FROM ledger_accounts WHERE company_id = 14 AND code = 'SP-HADI-IC')`,
+     WHERE NOT EXISTS (SELECT 1 FROM ledger_accounts WHERE company_id = 14 AND code = 'SP-HADI-IC')
+       AND EXISTS (SELECT 1 FROM companies WHERE id = 14)`,
 
   // SP Test Co — Intercompany tracking account in HADI L'SHI (company_id=1)
   `INSERT INTO ledger_accounts (company_id, code, name, account_type, sub_type, active, is_hidden)
      SELECT 1, 'SP-IC', 'SP Test Co — Intercompany', 'Intercompany', 'hadi_sp_intercompany', true, false
-     WHERE NOT EXISTS (SELECT 1 FROM ledger_accounts WHERE company_id = 1 AND code = 'SP-IC')`,
+     WHERE NOT EXISTS (SELECT 1 FROM ledger_accounts WHERE company_id = 1 AND code = 'SP-IC')
+       AND EXISTS (SELECT 1 FROM companies WHERE id = 1)`,
 
   // ── SP: Hide "Stock on Floor" (sp_stock) from normal Accounts UI (May 2026) ──
   // sp_stock is an internal double-entry counterpart to the inventory table.

@@ -78,6 +78,14 @@ const SENSITIVE_TABLES = [
   "factoryBales",
   "ledger_accounts",
   "ledgerAccounts",
+  // A payroll deduction reduces what a worker is paid. It reaches the ledger
+  // through a payroll voucher rather than directly, which is why it was missing
+  // here — but the money is no less real. Its absence only became visible when
+  // splitting workerStatsAdvancesRoutes.ts moved the deduction routes out of the
+  // file that also posts vouchers: the audit classifies by owner file, so the god
+  // file had been lending them a sensitivity they did not declare themselves.
+  "factory_worker_deductions",
+  "factoryWorkerDeductions",
 ];
 
 /** Ways this codebase writes: drizzle builders and raw SQL alike. */

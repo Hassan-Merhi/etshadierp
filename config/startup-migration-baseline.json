@@ -1,58 +1,13 @@
 {
   "version": 1,
-  "description": "One-way ratchet on startup migrations that fail against a freshly provisioned database, read by scripts/verify-startup-migrations.mjs from the migrations block of /api/health/db. CI gates the whole backend suite on the startup step, and that step used to succeed whether or not any migration in it had failed, so a broken migration ran the suite against a partly applied schema. knownFailures freezes the set observed on a fresh CI database; totals.failureCeiling is the count and may only fall. Any failure not listed here fails the build. Lower the ceiling in the same change that fixes a migration - leaving headroom lets it refill silently.",
+  "description": "Zero-tolerance gate on startup migrations, read by scripts/verify-startup-migrations.mjs from the migrations block of /api/health/db. CI gates the whole backend suite on the startup step, and that step used to succeed whether or not any migration in it had failed, so a broken migration ran the suite against a partly applied schema. The baseline began at 11 failures observed on a fresh database; all 11 were fixed, so the ceiling is now 0 and ANY startup migration failure fails the build. It may only fall, which means it may not rise again.",
   "totals": {
-    "failureCeiling": 11
+    "failureCeiling": 0
   },
   "classes": {
-    "seed-foreign-key": "Nine of the eleven: six INSERTs into agent_declarant_mappings and three into ledger_accounts pin company_id values that do not exist until companies are created. They fail on an empty database and succeed once the target company exists, which is why this gate is a frozen baseline rather than a demand for zero.",
-    "schema-order": "Two of the eleven are real: supplier_containers does not exist when a foreign key is added to it, and bales.erp_location_id does not exist when a foreign key is added to it. Both are ordering problems in the migration list and are the entries worth fixing first."
+    "resolved-seed-foreign-key": "Nine seed INSERTs into agent_declarant_mappings and ledger_accounts pinned company_id values that do not exist on a fresh database. Each is now a guarded SELECT that checks both the company and the referenced ledger account exist, so they no-op on an empty database and still seed once the target company is created.",
+    "resolved-stale-schema": "Two foreign keys targeted schema that no longer exists: supplier_containers (the table is defined neither in startup-schema nor in shared/schema) and bales.erp_location_id (only factory_bales carries that column now). Both statements are kept and guarded on the object existing rather than deleted, so a long-lived database that still has them still gains the key."
   },
-  "knownFailures": [
-    {
-      "sql": "DO $$ BEGIN ALTER TABLE supplier_containers ADD CONSTRAINT supplier_containers_supplier_id_fkey FORE",
-      "error": "relation \"supplier_containers\" does not exist"
-    },
-    {
-      "sql": "DO $$ BEGIN ALTER TABLE bales ADD CONSTRAINT bales_erp_location_id_fkey FOREIGN KEY (erp_location_id",
-      "error": "column \"erp_location_id\" referenced in foreign key constraint does not exist"
-    },
-    {
-      "sql": "INSERT INTO agent_declarant_mappings (agent_name, company_id, ledger_account_id, aliases, active) VA",
-      "error": "insert or update on table \"agent_declarant_mappings\" violates foreign key constraint \"agent_declarant_mappings_company_id_companies_id_fk\""
-    },
-    {
-      "sql": "INSERT INTO agent_declarant_mappings (agent_name, company_id, ledger_account_id, aliases, active) VA",
-      "error": "insert or update on table \"agent_declarant_mappings\" violates foreign key constraint \"agent_declarant_mappings_company_id_companies_id_fk\""
-    },
-    {
-      "sql": "INSERT INTO agent_declarant_mappings (agent_name, company_id, ledger_account_id, aliases, active) VA",
-      "error": "insert or update on table \"agent_declarant_mappings\" violates foreign key constraint \"agent_declarant_mappings_company_id_companies_id_fk\""
-    },
-    {
-      "sql": "INSERT INTO agent_declarant_mappings (agent_name, company_id, ledger_account_id, aliases, active) VA",
-      "error": "insert or update on table \"agent_declarant_mappings\" violates foreign key constraint \"agent_declarant_mappings_company_id_companies_id_fk\""
-    },
-    {
-      "sql": "INSERT INTO agent_declarant_mappings (agent_name, company_id, ledger_account_id, aliases, active) VA",
-      "error": "insert or update on table \"agent_declarant_mappings\" violates foreign key constraint \"agent_declarant_mappings_company_id_companies_id_fk\""
-    },
-    {
-      "sql": "INSERT INTO agent_declarant_mappings (agent_name, company_id, ledger_account_id, aliases, active) VA",
-      "error": "insert or update on table \"agent_declarant_mappings\" violates foreign key constraint \"agent_declarant_mappings_company_id_companies_id_fk\""
-    },
-    {
-      "sql": "INSERT INTO ledger_accounts (company_id, code, name, account_type, sub_type, opening_balance, openin",
-      "error": "insert or update on table \"ledger_accounts\" violates foreign key constraint \"ledger_accounts_company_id_fkey\""
-    },
-    {
-      "sql": "INSERT INTO ledger_accounts (company_id, code, name, account_type, sub_type, active, is_hidden) SELE",
-      "error": "insert or update on table \"ledger_accounts\" violates foreign key constraint \"ledger_accounts_company_id_fkey\""
-    },
-    {
-      "sql": "INSERT INTO ledger_accounts (company_id, code, name, account_type, sub_type, active, is_hidden) SELE",
-      "error": "insert or update on table \"ledger_accounts\" violates foreign key constraint \"ledger_accounts_company_id_fkey\""
-    }
-  ],
-  "observedOn": "Fresh database provisioned with drizzle-kit push, matching the CI sequence in .github/workflows/ci.yml (db:push, then node dist/index.js). The three factory_container_receipts ADD CONSTRAINT statements that used to fail only on a second startup were given the DO/duplicate_object guard in the same change, so a re-run against an already-migrated database now produces this same set of 11 rather than 14."
+  "knownFailures": [],
+  "observedOn": "Fresh database provisioned with drizzle-kit push, matching the CI sequence in .github/workflows/ci.yml. Verified at 0 failures after the Phase B fixes."
 }
