@@ -7,8 +7,8 @@ import {
 
 describe("Phase 3 shared interface translations", () => {
   it("covers every reviewed shared UI phrase exactly once", () => {
-    expect(phase3SharedUiTranslations).toHaveLength(494);
-    expect(new Set(phase3SharedUiTranslations.map((entry) => entry.en)).size).toBe(494);
+    expect(phase3SharedUiTranslations).toHaveLength(535);
+    expect(new Set(phase3SharedUiTranslations.map((entry) => entry.en)).size).toBe(535);
 
     for (const entry of phase3SharedUiTranslations) {
       expect(entry.en.trim()).not.toBe("");
