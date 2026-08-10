@@ -15,6 +15,14 @@ function replaceExactly(source: string, before: string, after: string, label: st
 
 function transformStockEntry(source: string): string {
   let code = source;
+
+  code = replaceExactly(
+    code,
+    `  if (workerIdFilter !== "all") params.set("workerId", workerIdFilter);`,
+    `  if (workerIdFilter !== "all") params.set("workerId", workerIdFilter);\n  if (categoryFilter !== "all") params.set("workerCategoryId", categoryFilter);`,
+    "stock-entry worker group server filter"
+  );
+
   code = replaceExactly(
     code,
     `  async function exportExcel() {\n    const wb = XLSX.utils.book_new();\n\n    const summaryRows = filteredGroups.map((g) => ({`,
