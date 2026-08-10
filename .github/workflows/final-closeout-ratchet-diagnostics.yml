@@ -1,0 +1,76 @@
+name: Final closeout ratchet diagnostics
+
+on:
+  push:
+    branches:
+      - agent/final-closeout-i18n-release
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22.14"
+          cache: npm
+      - run: npm ci --no-audit --bin-links=true
+      - name: Compare lint warnings with main
+        shell: bash
+        run: |
+          set -uo pipefail
+          mapfile -t files < <(git diff --name-only --diff-filter=ACMR origin/main...HEAD -- client/src server shared tests scripts | grep -E '\.(ts|tsx|mjs|css)$' || true)
+          printf '%s\n' "${files[@]}" > /tmp/changed-files.txt
+          node node_modules/eslint/bin/eslint.js --format json "${files[@]}" > /tmp/head-eslint.json || true
+          base_files=()
+          for f in "${files[@]}"; do
+            if git cat-file -e "origin/main:$f" 2>/dev/null; then
+              git show "origin/main:$f" > "$f"
+              base_files+=("$f")
+            else
+              rm -f "$f"
+            fi
+          done
+          if [ "${#base_files[@]}" -gt 0 ]; then
+            node node_modules/eslint/bin/eslint.js --format json "${base_files[@]}" > /tmp/base-eslint.json || true
+          else
+            echo '[]' > /tmp/base-eslint.json
+          fi
+          git reset --hard HEAD
+          python - <<'PY'
+          import json
+          from collections import Counter, defaultdict
+          head=json.load(open('/tmp/head-eslint.json'))
+          base=json.load(open('/tmp/base-eslint.json'))
+          def norm(report):
+              counts=Counter(); messages=defaultdict(list)
+              for file in report:
+                  path=file['filePath'].split('/etshadierp/')[-1]
+                  for m in file.get('messages', []):
+                      if m.get('severity') != 1: continue
+                      rule=m.get('ruleId') or '<none>'
+                      counts[(path,rule)] += 1
+                      messages[(path,rule)].append(m)
+              return counts,messages
+          hc,hm=norm(head); bc,bm=norm(base)
+          print('=== POSITIVE LINT DELTAS VS MAIN ===')
+          total=0
+          for key in sorted(set(hc)|set(bc)):
+              delta=hc[key]-bc[key]
+              if delta <= 0: continue
+              total += delta
+              print(f'{key[0]} :: {key[1]} :: +{delta} (head {hc[key]} / main {bc[key]})')
+              for m in hm[key]:
+                  print(f"  L{m.get('line')}:{m.get('column')} {m.get('message')}")
+          print('TOTAL_POSITIVE_DELTA', total)
+          print('=== END LINT DELTAS ===')
+          PY
+      - name: Type escape ratchet detail
+        run: npm run audit:type-escapes || true
+      - name: Script inventory detail
+        run: npm run audit:scripts || true
