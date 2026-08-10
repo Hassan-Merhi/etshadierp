@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import {} from "@/components/ui/command";
@@ -53,6 +54,13 @@ export default function ProductionComparison() {
     staleTime: 60_000,
   });
 
+  const { data: baleProducts = [] } = useQuery<
+    Array<{ code: string; articleCode?: string | null; nameAr?: string | null }>
+  >({
+    queryKey: ["/api/factory/bale-products"],
+    staleTime: 60_000,
+  });
+
   // Worker categories — the filter only offers the pressing-team workers.
   const { data: workerCategories = [] } = useQuery<{ id: number; name: string; workerIds: number[] }[]>({
     queryKey: ["/api/factory/worker-categories"],
@@ -79,6 +87,20 @@ export default function ProductionComparison() {
       .sort((a, b) => (a.fullName || "").localeCompare(b.fullName || ""))
       .map((w) => ({ value: String(w.id), label: w.fullName }));
   }, [workers, workerCategories]);
+
+  const arabicNameByArticle = useMemo(() => {
+    const map = new Map<string, string>();
+    const add = (key: string | null | undefined, nameAr: string | null | undefined) => {
+      const normalized = (key || "").trim().toUpperCase();
+      const name = (nameAr || "").trim();
+      if (normalized && name) map.set(normalized, name);
+    };
+    for (const product of baleProducts) {
+      add(product.articleCode, product.nameAr);
+      add(product.code, product.nameAr);
+    }
+    return map;
+  }, [baleProducts]);
 
   // Stable key for the query cache / request param.
   const workerIdsParam = useMemo(() => [...filterWorkers].sort().join(","), [filterWorkers]);
@@ -149,6 +171,42 @@ export default function ProductionComparison() {
     return { categories: [...catSet].sort(), grades: [...gradeSet].sort() };
   }, [qA.data, qB.data]);
 
+  const workerSummaryByArticle = useMemo(() => {
+    type WorkerSummary = { name: string; aQty: number; bQty: number; total: number };
+    const byArticle = new Map<string, Map<string, { name: string; aQty: number; bQty: number }>>();
+
+    const tally = (row: ProductRow, period: "a" | "b") => {
+      let workersForProduct = byArticle.get(row.articleCode);
+      if (!workersForProduct) {
+        workersForProduct = new Map();
+        byArticle.set(row.articleCode, workersForProduct);
+      }
+      for (const worker of row.workers ?? []) {
+        const name = (worker?.name || "").trim();
+        if (!name) continue;
+        const key = worker.id != null ? `id:${worker.id}` : `name:${name.toLowerCase()}`;
+        const existing = workersForProduct.get(key) ?? { name, aQty: 0, bQty: 0 };
+        if (period === "a") existing.aQty += worker.qty ?? 0;
+        else existing.bQty += worker.qty ?? 0;
+        workersForProduct.set(key, existing);
+      }
+    };
+
+    for (const row of qA.data?.production.byProduct ?? []) tally(row, "a");
+    for (const row of qB.data?.production.byProduct ?? []) tally(row, "b");
+
+    const result = new Map<string, WorkerSummary[]>();
+    for (const [articleCode, workersForProduct] of byArticle) {
+      result.set(
+        articleCode,
+        [...workersForProduct.values()]
+          .map((worker) => ({ ...worker, total: worker.aQty + worker.bQty }))
+          .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name))
+      );
+    }
+    return result;
+  }, [qA.data, qB.data]);
+
   const mergedAll = useMemo<MergedRow[]>(() => {
     const map = new Map<string, MergedRow>();
     // Worker names are accumulated across both periods, ordered by bale count.
@@ -199,7 +257,11 @@ export default function ProductionComparison() {
 
     for (const row of map.values()) {
       const t = workerTally.get(row.articleCode);
-      row.workers = t ? [...t.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([n]) => n) : [];
+      row.workers = t
+        ? [...t.entries()]
+            .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+            .map(([n]) => n)
+        : [];
     }
     return [...map.values()];
   }, [qA.data, qB.data]);
@@ -212,10 +274,15 @@ export default function ProductionComparison() {
         .filter((r) => {
           if (!filterProduct) return true;
           const q = filterProduct.toLowerCase();
-          return r.articleCode.toLowerCase().includes(q) || r.productName.toLowerCase().includes(q);
+          const arabicName = arabicNameByArticle.get(r.articleCode.trim().toUpperCase()) ?? "";
+          return (
+            r.articleCode.toLowerCase().includes(q) ||
+            r.productName.toLowerCase().includes(q) ||
+            arabicName.toLowerCase().includes(q)
+          );
         })
         .sort((a, b) => (a.productName || a.articleCode).localeCompare(b.productName || b.articleCode)),
-    [mergedAll, filterCategories, filterGrades, filterProduct]
+    [mergedAll, filterCategories, filterGrades, filterProduct, arabicNameByArticle]
   );
 
   const totalABales = filtered.reduce((s, r) => s + r.aQty, 0);
@@ -709,6 +776,12 @@ export default function ProductionComparison() {
                       </th>
                       <th
                         rowSpan={2}
+                        className="px-3 py-3 text-right text-xs font-bold uppercase tracking-wider text-muted-foreground border-r border-border/50 align-bottom min-w-[180px]"
+                      >
+                        Product (Arabic)
+                      </th>
+                      <th
+                        rowSpan={2}
                         className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground border-r border-border/50 align-bottom"
                       >
                         Category
@@ -721,9 +794,9 @@ export default function ProductionComparison() {
                       </th>
                       <th
                         rowSpan={2}
-                        className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground border-r border-border/50 align-bottom min-w-[140px]"
+                        className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground border-r border-border/50 align-bottom min-w-[100px]"
                       >
-                        Worker
+                        Workers
                       </th>
                       <th
                         colSpan={3}
@@ -762,6 +835,8 @@ export default function ProductionComparison() {
                     {filtered.map((row, idx) => {
                       const qDiff = row.aQty - row.bQty;
                       const kDiff = row.aKg - row.bKg;
+                      const workerSummary = workerSummaryByArticle.get(row.articleCode) ?? [];
+                      const arabicName = arabicNameByArticle.get(row.articleCode.trim().toUpperCase()) ?? "";
                       return (
                         <tr
                           key={row.articleCode}
@@ -773,6 +848,14 @@ export default function ProductionComparison() {
                           <td className="px-4 py-2.5 border-r border-border/30">
                             <span className="font-medium text-sm leading-snug">
                               {row.productName || row.articleCode}
+                            </span>
+                          </td>
+                          <td
+                            className="px-3 py-2.5 text-sm text-right border-r border-border/30 min-w-[180px]"
+                            dir="rtl"
+                          >
+                            <span className={arabicName ? "font-medium" : "text-muted-foreground"}>
+                              {arabicName || "—"}
                             </span>
                           </td>
                           <td className="px-3 py-2.5 text-sm text-muted-foreground border-r border-border/30">
@@ -788,14 +871,48 @@ export default function ProductionComparison() {
                             )}
                           </td>
                           <td className="px-3 py-2.5 border-r border-border/30">
-                            {row.workers.length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
-                                {row.workers.map((w) => (
-                                  <Badge key={w} variant="outline" className="text-xs font-normal">
-                                    {w}
-                                  </Badge>
-                                ))}
-                              </div>
+                            {workerSummary.length > 0 ? (
+                              <HoverCard openDelay={150} closeDelay={100}>
+                                <HoverCardTrigger asChild>
+                                  <button
+                                    type="button"
+                                    className="inline-flex items-center rounded-md border border-border bg-background px-2 py-1 text-xs font-medium whitespace-nowrap hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    aria-label={`${workerSummary.length} worker${workerSummary.length === 1 ? "" : "s"}. Hover for bale details.`}
+                                  >
+                                    {workerSummary.length} worker{workerSummary.length === 1 ? "" : "s"}
+                                  </button>
+                                </HoverCardTrigger>
+                                <HoverCardContent align="start" className="w-80 p-3">
+                                  <div className="mb-2 flex items-center justify-between gap-3">
+                                    <p className="text-sm font-semibold">
+                                      {workerSummary.length} worker{workerSummary.length === 1 ? "" : "s"}
+                                    </p>
+                                    <span className="text-xs text-muted-foreground">Bales by worker</span>
+                                  </div>
+                                  <div className="space-y-2">
+                                    {workerSummary.map((worker) => (
+                                      <div key={worker.name} className="rounded-md border bg-muted/20 px-2.5 py-2">
+                                        <div className="flex items-center justify-between gap-3">
+                                          <span className="min-w-0 truncate text-sm font-medium" dir="auto">
+                                            {worker.name}
+                                          </span>
+                                          <span className="shrink-0 text-sm font-semibold tabular-nums">
+                                            {fmtNum(worker.total)} bale{worker.total === 1 ? "" : "s"}
+                                          </span>
+                                        </div>
+                                        <div className="mt-1 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                                          <span>
+                                            {labelA}: {fmtNum(worker.aQty)}
+                                          </span>
+                                          <span>
+                                            {labelB}: {fmtNum(worker.bQty)}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </HoverCardContent>
+                              </HoverCard>
                             ) : (
                               <span className="text-muted-foreground text-xs">—</span>
                             )}
