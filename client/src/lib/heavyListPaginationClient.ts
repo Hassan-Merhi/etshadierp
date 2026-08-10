@@ -2,8 +2,9 @@ import { queryClient } from "./queryClient";
 
 const STOCK_ENTRY_ENDPOINT = "/api/factory/bales/stock-entry-history";
 const STOCK_ENTRY_ROUTE = "/factory/stock-entry";
-const DEFAULT_LIMIT = 9999;   // load everything in one request — no pagination UI
-const ALLOWED_LIMITS = [9999];
+const SCREEN_SENTINEL_LIMIT = 9999;
+const DEFAULT_LIMIT = 100;
+const ALLOWED_LIMITS = [50, 100] as const;
 
 interface PaginationMeta {
   key: string;
@@ -28,8 +29,7 @@ if (typeof window !== "undefined" && !window.__erpHeavyListPaginationClientInsta
   let activeMeta: PaginationMeta | null = null;
   let activeBaseKey = "";
   let selectedPage = 1;
-  let selectedLimit = DEFAULT_LIMIT;
-  let condensedMode = true;
+  let selectedLimit: number = DEFAULT_LIMIT;
   let controlsRoot: HTMLDivElement | null = null;
 
   function resolveUrl(input: RequestInfo | URL): URL | null {
@@ -61,20 +61,25 @@ if (typeof window !== "undefined" && !window.__erpHeavyListPaginationClientInsta
     return url.toString();
   }
 
+  /**
+   * StockEntryHistory deliberately leaves `limit=9999` in its source as a
+   * sentinel for the normal on-screen query. We rewrite only that request.
+   * Full-data helpers for exports, print, bulk actions and lazy group details
+   * explicitly use `limit=250`, so they bypass this interceptor and retain
+   * their complete-result behavior.
+   */
   function shouldPaginate(input: RequestInfo | URL, init?: RequestInit): { url: URL; key: string } | null {
     if (getMethod(input, init) !== "GET") return null;
     const url = resolveUrl(input);
     if (!url || url.pathname !== STOCK_ENTRY_ENDPOINT) return null;
-
-    // Only the condensed screen request is paged. Detailed mode, lazy group
-    // expansion, print/PDF, and Excel deliberately omit lite=1 and remain full.
-    if (url.searchParams.get("lite") !== "1") return null;
-
+    if (Number(url.searchParams.get("limit")) !== SCREEN_SENTINEL_LIMIT) return null;
     return { url, key: buildBaseKey(url) };
   }
 
-  function isVisibleRoute(): boolean {
-    return window.location.pathname === STOCK_ENTRY_ROUTE;
+  function isHistoryTabActive(): boolean {
+    if (window.location.pathname !== STOCK_ENTRY_ROUTE) return false;
+    const trigger = document.querySelector<HTMLElement>('[data-testid="tab-stock-entry-history"]');
+    return trigger?.getAttribute("data-state") === "active";
   }
 
   function controlButton(label: string, testId: string, onClick: () => void): HTMLButtonElement {
@@ -105,7 +110,7 @@ if (typeof window !== "undefined" && !window.__erpHeavyListPaginationClientInsta
     if (!activeMeta) return;
     const nextPage = Math.max(1, Math.min(page, Math.max(activeMeta.totalPages, 1)));
     selectedPage = nextPage;
-    selectedLimit = limit;
+    selectedLimit = ALLOWED_LIMITS.includes(limit as (typeof ALLOWED_LIMITS)[number]) ? limit : DEFAULT_LIMIT;
     renderControls();
     refetchStockEntry();
   }
@@ -141,15 +146,7 @@ if (typeof window !== "undefined" && !window.__erpHeavyListPaginationClientInsta
 
   function renderControls(): void {
     const root = ensureControls();
-    // Pagination UI intentionally hidden — all data loads in a single request.
-    // Typed as boolean (not the literal `false`) so the disabled controls below
-    // stay reachable for type-checking until pagination is re-enabled.
-    const PAGINATION_UI_ENABLED = false as boolean;
-    if (!PAGINATION_UI_ENABLED) {
-      root.style.display = "none";
-      return;
-    }
-    if (!activeMeta || !isVisibleRoute() || !condensedMode) {
+    if (!activeMeta || !isHistoryTabActive()) {
       root.style.display = "none";
       return;
     }
@@ -165,7 +162,7 @@ if (typeof window !== "undefined" && !window.__erpHeavyListPaginationClientInsta
     const label = document.createElement("span");
     const from = activeMeta.total === 0 ? 0 : (selectedPage - 1) * selectedLimit + 1;
     const to = Math.min(selectedPage * selectedLimit, activeMeta.total);
-    label.textContent = `${from}-${to} of ${activeMeta.total} groups · Page ${selectedPage} of ${Math.max(activeMeta.totalPages, 1)} · screen totals are this page`;
+    label.textContent = `${from}-${to} of ${activeMeta.total} groups · Page ${selectedPage} of ${Math.max(activeMeta.totalPages, 1)}`;
     label.dataset.testid = "stock-entry-page-label";
     label.style.fontSize = "12px";
     label.style.whiteSpace = "nowrap";
@@ -197,7 +194,7 @@ if (typeof window !== "undefined" && !window.__erpHeavyListPaginationClientInsta
       select.appendChild(option);
     }
     select.addEventListener("change", () => requestPage(1, Number(select.value) || DEFAULT_LIMIT));
-    sizeLabel.append("Rows", select);
+    sizeLabel.append("Groups", select);
 
     root.append(previous, label, next, sizeLabel);
   }
@@ -206,7 +203,6 @@ if (typeof window !== "undefined" && !window.__erpHeavyListPaginationClientInsta
     const match = shouldPaginate(input, init);
     if (!match) return previousFetch(input, init);
 
-    condensedMode = true;
     if (match.key !== activeBaseKey) {
       activeBaseKey = match.key;
       selectedPage = 1;
@@ -225,53 +221,43 @@ if (typeof window !== "undefined" && !window.__erpHeavyListPaginationClientInsta
       if (!payload || !Array.isArray(payload.items)) return response;
 
       const total = Number(payload.total || 0);
-      const limit = Number(payload.limit || selectedLimit) || selectedLimit;
+      const serverLimit = Number(payload.limit || selectedLimit) || selectedLimit;
       const totalPages = Number(payload.totalPages || 0);
       const serverPage = Number(payload.page || selectedPage) || selectedPage;
 
-      // A deletion can make the current page disappear. Move to the final valid
-      // page instead of leaving an apparently empty screen with records elsewhere.
       if (totalPages > 0 && serverPage > totalPages) {
         selectedPage = totalPages;
         queueMicrotask(refetchStockEntry);
       } else {
         selectedPage = serverPage;
       }
-      selectedLimit = limit;
+      selectedLimit = ALLOWED_LIMITS.includes(serverLimit as (typeof ALLOWED_LIMITS)[number])
+        ? serverLimit
+        : DEFAULT_LIMIT;
       activeMeta = {
         key: match.key,
         page: selectedPage,
-        limit,
+        limit: selectedLimit,
         total,
         totalPages,
-        hasNextPage: selectedPage < totalPages,
-        hasPreviousPage: selectedPage > 1 && totalPages > 0,
+        hasNextPage: Boolean(payload.hasNextPage ?? selectedPage < totalPages),
+        hasPreviousPage: Boolean(payload.hasPreviousPage ?? (selectedPage > 1 && totalPages > 0)),
       };
       renderControls();
-
-      const headers = new Headers(response.headers);
-      headers.set("Content-Type", "application/json; charset=utf-8");
-      return new Response(JSON.stringify(payload.items), {
-        status: response.status,
-        statusText: response.statusText,
-        headers,
-      });
     } catch {
-      return response;
+      // Preserve the original server response if pagination metadata cannot be read.
     }
+
+    return response;
   };
 
-  document.addEventListener("click", (event) => {
-    const target = event.target instanceof Element ? event.target.closest("[data-testid]") : null;
-    const testId = target?.getAttribute("data-testid");
-    if (testId === "button-view-detailed") {
-      condensedMode = false;
-      renderControls();
-    } else if (testId === "button-view-condensed") {
-      condensedMode = true;
-      renderControls();
-    }
-  });
+  const refreshForTabInteraction = (event: Event) => {
+    const target = event.target instanceof Element ? event.target.closest('[data-testid^="tab-"]') : null;
+    if (!target) return;
+    window.setTimeout(renderControls, 0);
+  };
+  document.addEventListener("click", refreshForTabInteraction);
+  document.addEventListener("keydown", refreshForTabInteraction);
 
   window.addEventListener("popstate", renderControls);
   const originalPushState = history.pushState.bind(history);
@@ -284,6 +270,4 @@ if (typeof window !== "undefined" && !window.__erpHeavyListPaginationClientInsta
     originalReplaceState(...args);
     queueMicrotask(renderControls);
   };
-
-  setInterval(renderControls, 1000);
 }
