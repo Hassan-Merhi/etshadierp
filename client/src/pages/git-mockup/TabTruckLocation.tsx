@@ -35,8 +35,8 @@ export function TabTruckLocation() {
     try {
       const html2canvas = (await import("html2canvas")).default;
       const el = printRef.current;
-      const canvas = await html2canvas(el, {
-        scale: 1.0,
+      const sourceCanvas = await html2canvas(el, {
+        scale: 1,
         useCORS: true,
         allowTaint: true,
         backgroundColor: "#f8fafc",
@@ -47,44 +47,55 @@ export function TabTruckLocation() {
         windowHeight: el.scrollHeight,
       });
 
-      // Estimate decoded byte size from the base64 payload (strip data URL prefix
-      // and account for base64 padding before calculating).
-      const approxBytes = (b64: string) => {
-        const payload = b64.slice(b64.indexOf(",") + 1);
-        const padding = (payload.match(/=+$/) ?? [""])[0].length;
-        return Math.ceil((payload.length * 3) / 4) - padding;
-      };
-      // Target ≤ 1.5 MB decoded so the JSON body stays comfortably under the
-      // global 2 MB Express limit after base64 and JSON overhead.
-      const SIZE_LIMIT = 1.35 * 1024 * 1024;
-
-      const qualities = [0.82, 0.68, 0.55, 0.42];
+      const today = new Date().toISOString().substring(0, 10);
+      const fileName = `TruckLocation_${today}.jpg`;
+      // The API has a 2 MB JSON body limit. Base64 expands binary data by ~33%,
+      // so enforce the actual serialized request size instead of estimating only
+      // the decoded JPEG size. Keep headroom for middleware/proxy overhead.
+      const MAX_JSON_BYTES = 1.55 * 1024 * 1024;
+      const dimensionScales = [1, 0.86, 0.72, 0.6, 0.5];
+      const qualities = [0.78, 0.64, 0.52, 0.42, 0.34];
       let imageBase64 = "";
-      for (const q of qualities) {
-        imageBase64 = canvas.toDataURL("image/jpeg", q);
-        if (approxBytes(imageBase64) <= SIZE_LIMIT) break;
+
+      outer: for (const scale of dimensionScales) {
+        let candidateCanvas = sourceCanvas;
+        if (scale !== 1) {
+          candidateCanvas = document.createElement("canvas");
+          candidateCanvas.width = Math.max(1, Math.round(sourceCanvas.width * scale));
+          candidateCanvas.height = Math.max(1, Math.round(sourceCanvas.height * scale));
+          const context = candidateCanvas.getContext("2d");
+          if (!context) continue;
+          context.drawImage(sourceCanvas, 0, 0, candidateCanvas.width, candidateCanvas.height);
+        }
+
+        for (const quality of qualities) {
+          const candidate = candidateCanvas.toDataURL("image/jpeg", quality);
+          const payloadBytes = new TextEncoder().encode(JSON.stringify({ imageBase64: candidate, fileName })).byteLength;
+          if (payloadBytes <= MAX_JSON_BYTES) {
+            imageBase64 = candidate;
+            break outer;
+          }
+        }
       }
 
-      if (!imageBase64 || approxBytes(imageBase64) > SIZE_LIMIT) {
+      if (!imageBase64) {
         toast({
           title: "Failed to send",
-          description:
-            "The tracking report is too large to send in one image. Use My Company instead of All Accessible Companies, or reduce the displayed container rows.",
+          description: "The tracking report is too large to fit in one WhatsApp image even after compression.",
           variant: "destructive",
         });
         return;
       }
 
-      const today = new Date().toISOString().substring(0, 10);
       try {
         await apiRequest("POST", "/api/git/send-containers-whatsapp", {
           imageBase64,
-          fileName: `TruckLocation_${today}.jpg`,
+          fileName,
         });
       } catch (apiErr: any) {
         const msg =
-          apiErr?.status === 413 || String(apiErr?.message).includes("too large")
-            ? "Tracking report is too large to send to WhatsApp."
+          apiErr?.status === 413 || String(apiErr?.message).toLowerCase().includes("too large")
+            ? "Tracking report is still too large to send to WhatsApp."
             : (apiErr?.message ?? "Failed to send");
         toast({ title: "Failed to send", description: msg, variant: "destructive" });
         return;
