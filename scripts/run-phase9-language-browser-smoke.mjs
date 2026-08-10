@@ -100,21 +100,26 @@ async function login(page) {
 }
 
 async function activateSkipNavigation(page) {
-  const result = await page.evaluate(() => {
+  const available = await page.evaluate(() => {
     const link = document.querySelector('[data-slot="skip-link"]');
     if (!(link instanceof HTMLAnchorElement)) {
-      return { available: false, activeElementId: "", hash: window.location.hash };
+      return false;
     }
     link.focus();
-    link.click();
-    return {
-      available: true,
-      activeElementId: document.activeElement instanceof HTMLElement ? document.activeElement.id : "",
-      hash: window.location.hash,
-    };
+    return true;
   });
+
+  if (!available) {
+    return { available: false, activeElementId: "", hash: await page.evaluate(() => window.location.hash) };
+  }
+
+  await page.keyboard.press("Enter");
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
-  return result;
+  return page.evaluate(() => ({
+    available: true,
+    activeElementId: document.activeElement instanceof HTMLElement ? document.activeElement.id : "",
+    hash: window.location.hash,
+  }));
 }
 
 async function readPageState(page) {

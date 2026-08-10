@@ -1,16 +1,30 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
-import {
-  HorizontalScrollRegion,
-  LiveRegion,
-  ResponsiveActions,
-  SkipLink,
-} from "./responsive-accessibility";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { HorizontalScrollRegion, LiveRegion, ResponsiveActions, SkipLink } from "./responsive-accessibility";
 
 describe("responsive accessibility primitives", () => {
   it("links keyboard users to the main workspace", () => {
     render(<SkipLink />);
     expect(screen.getByRole("link", { name: "Skip to main content" })).toHaveAttribute("href", "#main-content");
+  });
+
+  it("focuses the main workspace when activated", () => {
+    render(
+      <>
+        <SkipLink />
+        <main id="main-content" tabIndex={-1}>
+          Workspace
+        </main>
+      </>
+    );
+    const main = screen.getByRole("main");
+    main.scrollIntoView = vi.fn();
+
+    fireEvent.click(screen.getByRole("link", { name: "Skip to main content" }));
+
+    expect(document.activeElement).toBe(main);
+    expect(window.location.hash).toBe("#main-content");
+    expect(main.scrollIntoView).toHaveBeenCalledWith({ block: "start" });
   });
 
   it("uses the requested live-region urgency", () => {
@@ -25,7 +39,7 @@ describe("responsive accessibility primitives", () => {
     render(
       <ResponsiveActions label="Invoice actions">
         <button type="button">Save</button>
-      </ResponsiveActions>,
+      </ResponsiveActions>
     );
     expect(screen.getByRole("group", { name: "Invoice actions" })).toBeInTheDocument();
   });
@@ -33,8 +47,14 @@ describe("responsive accessibility primitives", () => {
   it("makes horizontally scrollable data keyboard discoverable", () => {
     render(
       <HorizontalScrollRegion label="Accounts table">
-        <table><tbody><tr><td>Cash</td></tr></tbody></table>
-      </HorizontalScrollRegion>,
+        <table>
+          <tbody>
+            <tr>
+              <td>Cash</td>
+            </tr>
+          </tbody>
+        </table>
+      </HorizontalScrollRegion>
     );
     const region = screen.getByRole("region", { name: "Accounts table" });
     expect(region).toHaveAttribute("tabindex", "0");

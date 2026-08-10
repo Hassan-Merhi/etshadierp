@@ -11,9 +11,11 @@ describe("Phase 3 shared interface translations", () => {
     // added when AnalyticsLegacy.tsx was split. That split moved those literals into
     // the reports-exports i18n module, which must stay at zero actionable strings, so
     // translating them was the only resolution that neither renamed a component to
-    // dodge the path-based classifier nor weakened that invariant.
-    expect(phase3SharedUiTranslations).toHaveLength(544);
-    expect(new Set(phase3SharedUiTranslations.map((entry) => entry.en)).size).toBe(544);
+    // dodge the path-based classifier nor weakened that invariant. The same split
+    // exposed 23 sales-panel findings (22 unique phrases) to the sales-pos classifier,
+    // so those phrases are translated instead of raising the reviewed Phase 9 release cap.
+    expect(phase3SharedUiTranslations).toHaveLength(566);
+    expect(new Set(phase3SharedUiTranslations.map((entry) => entry.en)).size).toBe(566);
 
     for (const entry of phase3SharedUiTranslations) {
       expect(entry.en.trim()).not.toBe("");
@@ -26,6 +28,12 @@ describe("Phase 3 shared interface translations", () => {
     expect(translatePhase3SharedUiText("Search pages...", "ar")).toBe("ابحث في الصفحات...");
     expect(translatePhase3SharedUiText("No pending actions", "fr")).toBe("Aucune action en attente");
     expect(translatePhase3SharedUiText("Page not available offline", "ar")).toBe("الصفحة غير متاحة دون اتصال");
+  });
+
+  it("translates the analytics sales panel exposed by the current-main split", () => {
+    expect(translatePhase3SharedUiText("Sales by Location", "ar")).toBe("المبيعات حسب الموقع");
+    expect(translatePhase3SharedUiText("Factory POS", "fr")).toBe("Point de vente usine");
+    expect(translatePhase3SharedUiText("Total Transactions:", "fr")).toBe("Total des transactions :");
   });
 
   it("preserves dynamic business references while translating their interface message", () => {
