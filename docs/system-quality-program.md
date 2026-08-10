@@ -18,6 +18,7 @@ audit fails instead of allowing the reference to drift.
 | Signal | Now | Command |
 |---|---|---|
 | Type escapes (AST) | 11,442 total | `npm run audit:type-escapes` |
+| ESLint warnings | 12,304 total | `npm run lint` |
 | Backend coverage floor (lines) | 18% | `config/coverage-thresholds.json` |
 | Write routes with no test at all | 0 of 328 | `npm run audit:write-routes` |
 | Write routes covered only by the guard sweep | 0 of 328 | `npm run audit:write-routes` |
@@ -80,6 +81,39 @@ forced through `any`.
 The rule for future work is simple: **do not raise a frozen type-escape baseline
 to make unrelated churn fit**. If formatting or file-size gates block a cleanup,
 fix the structural blocker instead of creating headroom that can refill.
+
+### Lint warning ratchet
+
+The ESLint cap was the last gate in this repository whose threshold was not
+measured. It lived in the `lint` script as `--max-warnings 12358`, a number
+nobody could trace: the tree was actually at 12,304, so 54 warnings could be
+added before anything failed, and a cap that has never been re-measured only
+ever describes the day it was typed.
+
+The ceiling now lives in `config/lint-warning-ratchet.json`, alongside the
+coverage floors and type-escape baselines. `scripts/run-lint.mjs` reads it, so
+`npm run lint` has no number of its own, and the ratchet is a two-part gate:
+
+- **`totals.warningCeiling`** is the repository total, currently 12,304, and may
+  only fall. `totals.errorCeiling` is 0 and permanent — errors are not part of
+  the drawdown.
+- **`perRule`** freezes each rule at its own count, checked by
+  `npm run audit:lint-ratchet`. This is the part that matters: 11,440 of the
+  12,304 warnings are `no-explicit-any`, so a total-only gate is a count of
+  `any` wearing a lint badge. Under one, deleting 500 `any` annotations pays for
+  500 new `react-hooks/exhaustive-deps` warnings — stale-closure bugs — and the
+  total reports the trade as flat. Per-rule ceilings make it fail.
+
+`scan.step` is 500. When measured warnings sit a full step under the ceiling,
+both scripts ask for the gain to be locked in; the ceilings are lowered in the
+same change that removes the warnings, never after.
+
+`no-explicit-any` is the one rule whose real gate is elsewhere:
+`config/type-escape-boundaries.json` freezes it per file, which is strictly
+stronger than any repository total. Its `perRule` entry exists so the two cannot
+drift apart, and the audit fails if they disagree — the ESLint count must always
+equal the type-escape ceiling minus its ts-comment suppressions, which are not a
+rule (11,440 = 11,442 − 2).
 
 ---
 
@@ -330,6 +364,9 @@ so the improvement cannot silently refill later.
 Targets include:
 
 - lower type-escape ceilings as domains are cleaned;
+- lower the lint warning ceiling a 500-warning step at a time, and the matching
+  `perRule` entry with it, whenever `npm run audit:lint-ratchet` reports the
+  step earned;
 - raise coverage floors to track measured coverage with margin;
 - lower god-file soft limits/backlog as files are split;
 - keep sensitive-write uncovered and guard-only ceilings permanently at zero.

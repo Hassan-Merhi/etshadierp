@@ -65,6 +65,21 @@
       ]
     },
     {
+      "id": "lintWarningCeiling",
+      "description": "Repository-wide ESLint warning ceiling enforced by npm run lint; may only fall.",
+      "source": {
+        "kind": "jsonValue",
+        "file": "config/lint-warning-ratchet.json",
+        "path": "totals.warningCeiling"
+      },
+      "claims": [
+        {
+          "doc": "docs/system-quality-program.md",
+          "pattern": "ESLint warnings \\| ([\\d,]+) total"
+        }
+      ]
+    },
+    {
       "id": "backendCoverageLinesFloor",
       "description": "Global backend line-coverage floor enforced by vitest.config.ts.",
       "source": {

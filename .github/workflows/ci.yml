@@ -171,6 +171,15 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      # The lint step enforces the repository-wide warning ceiling; this checks
+      # each rule against its own. Without it, removing `any` annotations buys
+      # room for new react-hooks/exhaustive-deps warnings at no net cost, and
+      # the total reports the trade as flat. Reads the report the lint step
+      # already wrote, so it costs no second lint run.
+      - name: Lint warning ratchet
+        if: always() && steps.lint.conclusion != 'skipped'
+        run: npm run audit:lint-ratchet
+
       - name: Format changed source files
         id: format_check
         if: always() && steps.install.outcome == 'success'

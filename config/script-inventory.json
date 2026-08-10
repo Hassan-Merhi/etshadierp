@@ -12,6 +12,7 @@
     "verify-database-backup.mjs": "Exercises backup and restore against a database.",
     "verify-memory-stabilization.mjs": "Measures runtime memory against a running server.",
     "audit-coverage-ratchet.mjs": "Reads coverage/ — requires a coverage run.",
+    "audit-lint-warnings.mjs": "Reads artifacts/lint/eslint-report.json — requires npm run lint.",
     "audit-god-file-boundaries.mjs": "Reports reviewed growth allowances as failures; the gate is tests/god-file-boundaries.test.ts, which consults config/ci-ratchet-allowances.json."
   },
   "knownFailing": {
