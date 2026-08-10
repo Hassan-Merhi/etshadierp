@@ -1,0 +1,42 @@
+name: Final closeout format fix
+
+on:
+  push:
+    branches:
+      - agent/final-closeout-i18n-release
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/final-closeout-i18n-release
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.14
+          cache: npm
+      - run: npm ci
+      - name: Format failing files
+        run: node node_modules/prettier/bin/prettier.cjs --write server/routes/sp/spAccessControl.ts server/routes/sp/spPermissionRoutes.ts
+      - name: Verify formatting
+        run: node node_modules/prettier/bin/prettier.cjs --check server/routes/sp/spAccessControl.ts server/routes/sp/spPermissionRoutes.ts
+      - name: Commit formatting and remove helper
+        shell: bash
+        run: |
+          rm -f .github/workflows/final-closeout-format-fix.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo "No formatting changes needed"
+            exit 0
+          fi
+          git commit -m "style: format final i18n closeout"
+          git pull --rebase origin agent/final-closeout-i18n-release
+          git push origin HEAD:agent/final-closeout-i18n-release
