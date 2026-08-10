@@ -40,7 +40,7 @@ jobs:
       - name: Focused route-template regression
         run: >-
           node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts
-          tests/trace-context-route-template.test.ts
+          tests/ui/trace-context-route-template.test.ts
 
       - name: Focused frontend bandwidth regressions
         run: >-
