@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { useLocation } from "wouter";
+import { useEscapeBack } from "@/hooks/use-escape-back";
 import { getParentRoute } from "@/lib/parent-routes";
 import { goBackToPreviousErpLocation } from "@/lib/erp-navigation-history";
 import { useGlobalScrollKeys } from "./useGlobalScrollKeys";
@@ -67,6 +68,9 @@ export function useAppNavigation() {
     navigateToParent();
   }, [navigateToParent]);
 
+  // Keep one app-level Escape handler registered so every ERP page goes
+  // through the same exact-history path even when it has no page-specific hook.
+  useEscapeBack(handleGoBack);
   useGlobalScrollKeys(handleGoBack);
 
   return { showLeaveConfirm, setShowLeaveConfirm, handleGoBack, handleConfirmLeave };
