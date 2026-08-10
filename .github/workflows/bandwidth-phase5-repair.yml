@@ -1,75 +1,162 @@
-# Final post-manifest Phase 5 verification trigger.
 name: Bandwidth Phase 5 Repair
 
 on:
   push:
-    branches:
-      - agent/bandwidth-phase4-global-request-pressure
-    paths:
-      - .github/workflows/bandwidth-phase5-repair.yml
-      - config/ci-ratchet-allowances.json
-      - tests/god-file-boundaries.test.ts
-      - tests/ui/bandwidth-phase-4-heavy-pages.test.ts
+    branches: [agent/bandwidth-phase-1-waste-dispatch]
+    paths: [.github/workflows/bandwidth-phase5-repair.yml]
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
   repair:
-    runs-on: ubuntu-24.04
-    env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
-      PGSSLMODE: disable
-      NODE_ENV: test
-      SESSION_SECRET: bandwidth-phase5-session-secret
-      CSRF_ENFORCE: "0"
-      ENABLE_SCHEDULERS: "false"
-      NODE_OPTIONS: --max-old-space-size=4096
-    services:
-      postgres:
-        image: postgres:15.13
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: heliumdb
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d heliumdb"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
+      - name: Checkout bandwidth branch
+        uses: actions/checkout@v7
         with:
-          ref: agent/bandwidth-phase4-global-request-pressure
+          ref: agent/bandwidth-phase-1-waste-dispatch
           fetch-depth: 0
-      - uses: actions/setup-node@v6
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v6
         with:
-          node-version: 22.14
+          node-version: 22.14.0
           cache: npm
-      - name: Normalize registry and install
+
+      - name: Normalize package registry URLs
+        run: sed -i 's#https://registry.replit.com/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Apply Phase 5 source repairs
+        shell: bash
         run: |
-          sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
-          npm ci --no-audit --bin-links=true
-      - name: Prepare disposable database schema
-        run: node node_modules/drizzle-kit/bin.cjs push --force
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          sales = Path("server/routes/stats/salesReportBandwidthRoutes.ts")
+          text = sales.read_text()
+          text = text.replace("getAccessibleCompanyIds(userId)", "getAccessibleCompanyIds(String(userId))")
+          text = text.replace("(row: any): SummaryGroup", "(row: Record<string, unknown>): SummaryGroup")
+          text = text.replace("(row: any) => {", "(row: Record<string, unknown>) => {")
+          sales.write_text(text)
+
+          waste_server = Path("server/routes/factory/employee-pos/wasteDispatchBandwidthRoutes.ts")
+          text = waste_server.read_text()
+          text = text.replace('import type { Express } from "express";', 'import type { Express, Request } from "express";')
+          text = text.replace("function getCompanyId(req: any): number | null", "function getCompanyId(req: Request): number | null")
+          text = text.replace("function getSearch(req: any): string", "function getSearch(req: Request): string")
+          text = text.replace("function mapWasteBale(row: any)", "function mapWasteBale(row: Record<string, unknown>)")
+          text = text.replace("async (req: any, res: any) =>", "async (req, res) =>")
+          text = text.replace(
+              "const rows: any[] = Array.isArray(raw) ? raw : resultRows(raw);",
+              "const rows = (Array.isArray(raw) ? raw : resultRows(raw)) as Record<string, unknown>[];",
+          )
+          text = text.replace(
+              "const dispatchRows: any[] = Array.isArray(dispatchRaw) ? dispatchRaw : resultRows(dispatchRaw);",
+              "const dispatchRows = (Array.isArray(dispatchRaw) ? dispatchRaw : resultRows(dispatchRaw)) as Record<string, unknown>[];",
+          )
+          if re.search(r"\bany\b|as\s+any\b", text):
+              raise SystemExit("Waste Dispatch server still contains an explicit any")
+          waste_server.write_text(text)
+
+          waste_client = Path("client/src/pages/factory/WasteDispatchOptimized.tsx")
+          text = waste_client.read_text()
+          text = text.replace(
+              'import type { Bale } from "./wastedispatch/types";\nimport { fmt, fmtKg, today } from "./wastedispatch/utils";',
+              'import { baleMatchesSearch, fetchGroupBales, fetchHistoryBales, readWasteJson } from "./wastedispatch/optimizedData";\nimport { printDispatchDocument } from "./wastedispatch/optimizedPrint";\nimport type { GroupSummary, HistoryBale, HistoryResponse, PrintDispatch, SummaryResponse, WasteBale } from "./wastedispatch/optimizedTypes";\nimport { fmt, fmtKg, today } from "./wastedispatch/utils";',
+          )
+          text, count = re.subn(
+              r'type WasteBale = Bale & \{.*?type PrintDispatch = Pick<HistoryItem, "dispatchNumber" \| "dispatchDate" \| "notes">;\n\n',
+              '', text, count=1, flags=re.S,
+          )
+          if count != 1:
+              raise SystemExit(f"Waste Dispatch type block split count was {count}")
+          text, count = re.subn(
+              r'async function readJson<T>\(url: string\): Promise<T> \{.*?function baleMatchesSearch\(bale: WasteBale, search: string\): boolean \{.*?\n\}\n\n',
+              'function errorMessage(error: unknown): string {\n  return error instanceof Error ? error.message : String(error);\n}\n\nfunction isGloballyHandled(error: unknown): boolean {\n  return Boolean(\n    typeof error === "object" &&\n      error !== null &&\n      "_handledGlobally" in error &&\n      (error as { _handledGlobally?: boolean })._handledGlobally\n  );\n}\n\n',
+              text, count=1, flags=re.S,
+          )
+          if count != 1:
+              raise SystemExit(f"Waste Dispatch data helper split count was {count}")
+          text, count = re.subn(
+              r'function escapeHtml\(value: unknown\): string \{.*?\n\}\n\nfunction printDispatchDocument\(dispatch: PrintDispatch, bales: HistoryBale\[\]\) \{.*?\n\}\n\n(?=export default function WasteDispatchOptimized)',
+              '', text, count=1, flags=re.S,
+          )
+          if count != 1:
+              raise SystemExit(f"Waste Dispatch print helper split count was {count}")
+          text = text.replace("readJson<", "readWasteJson<")
+          text = text.replace("catch (error: any)", "catch (error: unknown)")
+          text = text.replace("onError: (error: any)", "onError: (error: unknown)")
+          text = text.replace("description: error.message", "description: errorMessage(error)")
+          text = text.replace("if (error?._handledGlobally) return;", "if (isGloballyHandled(error)) return;")
+          marker = "  const toggleBale = (bale: WasteBale) => {"
+          if marker not in text:
+              raise SystemExit("Waste Dispatch toggleBale insertion point missing")
+          text = text.replace(marker, "  const clearSelectedBales = () => setSelected(new Map<number, WasteBale>());\n\n" + marker, 1)
+          text = text.replace("onClick={() => setSelected(new Map<number, WasteBale>())}", "onClick={clearSelectedBales}")
+          if re.search(r"\bany\b|as\s+any\b", text):
+              raise SystemExit("Waste Dispatch client still contains an explicit any")
+          waste_client.write_text(text)
+          PY
+
+      - name: Format Phase 5 changed sources
+        run: >-
+          node node_modules/prettier/bin/prettier.cjs --write
+          client/src/pages/factory/WasteDispatchOptimized.tsx
+          client/src/pages/factory/wastedispatch/optimizedData.ts
+          client/src/pages/factory/wastedispatch/optimizedPrint.ts
+          client/src/pages/factory/wastedispatch/optimizedTypes.ts
+          client/src/i18n/sharedUiPhase3Translations.part6.ts
+          client/src/i18n/backendMessagesPhase7Translations.part11.ts
+          server/routes/factory/employee-pos/wasteDispatchBandwidthRoutes.ts
+          server/routes/stats/salesReportBandwidthRoutes.ts
+          client/src/pages/BaleProductsBilingual.tsx
+          client/src/lib/bandwidthInvalidationPolicy.ts
+          tests/trace-context-route-template.test.ts
+          tests/ui/bandwidth-phase-1-invalidation-policy.test.ts
+
       - name: Regenerate route manifest
         env:
           UPDATE_ROUTE_MANIFEST: "1"
-        run: npx vitest run tests/route-manifest.test.ts
-      - name: Run Phase 5 targeted regression set
+        run: node node_modules/vitest/vitest.mjs run tests/route-manifest.test.ts
+
+      - name: Commit and push repairs
         run: |
-          npx vitest run tests/loading-proforma-summary-lines.test.ts tests/phase7-backend-messages-translations.test.ts tests/god-file-boundaries.test.ts tests/source-text-assertions.test.ts tests/route-manifest.test.ts
-          npx vitest run --config vitest.config.frontend.ts tests/ui/bandwidth-phase-1-invalidation-policy.test.ts tests/ui/bandwidth-phase-2-payloads.test.ts tests/ui/bandwidth-phase-4-heavy-pages.test.ts
-      - name: Commit regenerated manifest
-        run: |
-          if git diff --quiet config/route-manifest.json; then
-            echo "Route manifest already current."
-            exit 0
-          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add config/route-manifest.json
-          git commit --no-verify -m "refresh route manifest for bandwidth phase 5"
-          git push --no-verify origin HEAD:agent/bandwidth-phase4-global-request-pressure
+          git add -A
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Phase 5: repair cumulative bandwidth verification"
+          git push origin HEAD:agent/bandwidth-phase-1-waste-dispatch
+
+      - name: Verify type-escape ratchet
+        run: npm run audit:type-escapes
+
+      - name: Verify i18n ratchet
+        run: node scripts/audit-i18n-phase14.mjs
+
+      - name: Verify script inventory
+        run: npm run audit:scripts
+
+      - name: Verify TypeScript
+        run: npm run check
+
+      - name: Verify bandwidth contracts
+        run: |
+          node scripts/verify-bandwidth-phase-3-sales-report.mjs
+          node scripts/verify-bandwidth-phase-4-global-pressure.mjs
+
+      - name: Verify architecture regressions
+        run: >-
+          node node_modules/vitest/vitest.mjs run
+          tests/type-escape-boundaries.test.ts
+          tests/toolchain-and-script-inventory.test.ts
+          tests/script-inventory-contract.test.ts
+          tests/god-file-boundaries.test.ts
+          tests/route-manifest.test.ts
