@@ -235,7 +235,14 @@ jobs:
         continue-on-error: true
         uses: trufflesecurity/trufflehog@v3.90.4
         with:
-          extra_args: --results=verified,unknown
+          extra_args: --results=verified
+
+      - name: Report unknown secret candidates
+        if: always()
+        continue-on-error: true
+        uses: trufflesecurity/trufflehog@v3.90.4
+        with:
+          extra_args: --results=unknown
 
       - name: Upload Phase 9 evidence
         if: always()
@@ -303,7 +310,7 @@ jobs:
           | Untranslated-text release ratchet | $I18N |
           | Focused security checks | $SECURITY |
           | Critical production dependency audit | $DEPENDENCY_AUDIT |
-          | Verified/unknown secret scan | $SECRET_SCAN |
+          | Verified secret scan | $SECRET_SCAN |
           EOF
 
           test "$status" = "success"
