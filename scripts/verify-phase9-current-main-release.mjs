@@ -33,6 +33,8 @@ for (const token of [
   "scripts/verify-phase9-current-main-release.mjs",
   "PHASE9_ERP_SMOKE_USERNAME",
   "PHASE9_ERP_SMOKE_PASSWORD",
+  "scripts/prepare-phase9-browser-smoke-fixture.mjs",
+  "Prepare disposable authenticated browser fixture",
   'ERP_SMOKE_REQUIRE_AUTHENTICATED: "1"',
   'ERP_SMOKE_REQUIRE_EXACT_ROUTES: "1"',
   "Record and enforce final release result",

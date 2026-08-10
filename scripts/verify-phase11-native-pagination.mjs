@@ -6,10 +6,11 @@ import fs from "node:fs/promises";
 const files = {
   registration: "server/routes/factoryRoutes.ts",
   daybook: "server/routes/factory/factoryDaybookPaginationRoutes.ts",
+  daybookIntegrity: "server/services/factory/daybookSourceIntegrity.ts",
   stockEntry: "server/routes/factory/factoryStockEntryHistoryPaginationRoutes.ts",
   allocation: "server/routes/factory/factoryStockAllocationV5PaginationRoutes.ts",
   common: "server/routes/location/commonInventoryPerformanceRoutes.ts",
-  bales: "server/routes/factory/factoryBalesRoutes.ts",
+  bales: "server/routes/factory/bales/balesCrudRoutes.ts",
 };
 
 const source = Object.fromEntries(
@@ -57,14 +58,13 @@ for (const [label, text] of [
 
 containsAll(
   source.daybook,
-  [
-    /synthetic_rows AS/,
-    /factory_worker_advances/,
-    /factory_advance_repayments/,
-    /dedup_rank/,
-    /deriveBaleStockEntryAmounts/,
-  ],
+  [/synthetic_rows AS/, /buildPaginationIntegrityConditions/, /dedup_rank/, /deriveBaleStockEntryAmounts/],
   "daybook business compatibility"
+);
+containsAll(
+  source.daybookIntegrity,
+  [/factory_worker_advances/, /factory_advance_repayments/, /buildPaginationIntegrityConditions/],
+  "daybook source-integrity compatibility"
 );
 
 containsAll(

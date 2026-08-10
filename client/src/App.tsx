@@ -149,7 +149,11 @@ export default function App() {
         <ThemeProvider>
           <ConnectivityProvider>
             <Switch>
-              <Route path="/login" component={Login} />
+              <Route path="/login">
+                <ApplicationLanguageProvider>
+                  <Login />
+                </ApplicationLanguageProvider>
+              </Route>
               <Route>
                 <AuthenticatedRoot />
               </Route>

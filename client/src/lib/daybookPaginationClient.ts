@@ -2,7 +2,7 @@ import { queryClient } from "./queryClient";
 
 const ENDPOINT = "/api/factory/daybook";
 const ROUTES = new Set(["/factory/daybook", "/properties/daybook"]);
-const DEFAULT_LIMIT = 9999;
+const DEFAULT_LIMIT = 100;
 const MAX_ACTION_LIMIT = 250;
 const ALLOWED_LIMITS = [50, 100, 250];
 

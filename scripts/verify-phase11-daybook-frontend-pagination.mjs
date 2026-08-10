@@ -7,14 +7,17 @@ import path from "node:path";
 const ROOT = process.cwd();
 const read = (relativePath) => fs.readFile(path.join(ROOT, relativePath), "utf8");
 
-const [main, client, plugin, source] = await Promise.all([
-  read("client/src/main.tsx"),
+const [client, plugin, source] = await Promise.all([
   read("client/src/lib/daybookPaginationClient.ts"),
   read("build/viteHeavyListPaginationPlugin.ts"),
   read("client/src/pages/factory/FactoryDaybook.tsx"),
 ]);
 
-assert.match(main, /import "\.\/lib\/daybookPaginationClient";/, "main.tsx must install Daybook pagination");
+assert.match(
+  plugin,
+  /import \{ fetchAllDaybookEntries \} from "@\/lib\/daybookPaginationClient";/,
+  "the Daybook transform must install its complete-data client"
+);
 assert.match(client, /const ENDPOINT = "\/api\/factory\/daybook";/, "Daybook endpoint must be targeted");
 assert.match(client, /const DEFAULT_LIMIT = 100;/, "Daybook default page size must be 100");
 assert.match(client, /fetchAllDaybookEntries/, "complete export loader is required");
@@ -46,8 +49,8 @@ assert.match(plugin, /Ambiguous transform target/, "ambiguous replacements must 
 
 const exactMarkers = [
   'import { queryClient } from "@/lib/queryClient";',
-  'if (startDate) queryParams.set("startDate", startDate);',
-  'if (endDate) queryParams.set("endDate", endDate);',
+  'queryParams.set("startDate", startDate || "");',
+  'queryParams.set("endDate", endDate || "");',
   'queryKey: ["/api/factory/daybook", startDate, endDate, txTypeFilter, currencyFilter],',
   'const handleExportToExcel = async () => {',
   'const handleExportDetailedToExcel = async () => {',

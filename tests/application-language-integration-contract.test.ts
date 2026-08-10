@@ -6,9 +6,11 @@ const root = process.cwd();
 const read = (file: string) => fs.readFileSync(path.join(root, file), "utf8");
 
 describe("global application language integration", () => {
-  it("mounts one global provider without a floating language overlay", () => {
+  it("mounts the language provider for both login and authenticated routes", () => {
     const app = read("client/src/App.tsx");
-    expect(app).toContain("<ApplicationLanguageProvider>");
+    expect(app.match(/<ApplicationLanguageProvider>/g)).toHaveLength(2);
+    expect(app).toContain("<ApplicationLanguageProvider>\n                  <Login />");
+    expect(app).toContain("<ApplicationLanguageProvider>\n      <CompanyProvider>");
     expect(app).not.toContain("GlobalLanguageSwitch");
     expect(fs.existsSync(path.join(root, "client/src/components/GlobalLanguageSwitch.tsx"))).toBe(false);
   });

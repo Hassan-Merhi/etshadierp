@@ -55,6 +55,7 @@ describe("Phase 9 final verification and release contract", () => {
       "Lint",
       "Current-main multilingual reconciliation",
       "Prepare disposable PostgreSQL schema",
+      "Prepare disposable authenticated browser fixture",
       "Application startup and multilingual browser smoke",
       "Full backend tests",
       "Backend coverage thresholds",
@@ -73,6 +74,7 @@ describe("Phase 9 final verification and release contract", () => {
       'ERP_SMOKE_REQUIRE_EXACT_ROUTES: "1"',
       "PHASE9_ERP_SMOKE_USERNAME",
       "PHASE9_ERP_SMOKE_PASSWORD",
+      "scripts/prepare-phase9-browser-smoke-fixture.mjs",
     ]) {
       expect(workflow).toContain(token);
     }
@@ -82,6 +84,7 @@ describe("Phase 9 final verification and release contract", () => {
     expect(workflow).toContain("scripts/verify-phase9-final-i18n-baseline.mjs");
     expect(workflow).toContain("Record and enforce final release result");
     expect(workflow).toContain("RECONCILIATION: ${{ steps.reconciliation.outcome }}");
+    expect(workflow).toContain("BROWSER_FIXTURE: ${{ steps.browser_fixture.outcome }}");
     expect(workflow).toContain("INSTALL: ${{ steps.install.outcome }}");
     expect(workflow).toContain("SECRET_SCAN: ${{ steps.secret_scan.outcome }}");
     expect(workflow).toContain("set -euo pipefail");

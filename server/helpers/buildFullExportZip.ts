@@ -3,6 +3,7 @@ import type { Writable } from "stream";
 import { streamCompanyWorkbookDirect } from "../services/export-excel";
 import { logger } from "../lib/logger";
 import { withHeavyExportSlot } from "../services/heavyExportCoordinator";
+import { getExportAttachmentSize } from "./exportAttachmentSource";
 
 export interface ExportZipResult {
   zip: Buffer;
@@ -177,7 +178,7 @@ async function buildFullExportZipUnsafe(
     const zip = await zipPromise;
 
     log(
-      `ZIP ready — ${(zip.length / 1024 / 1024).toFixed(1)} MB (${names.length} companies, ${skipped.length} skipped)`,
+      `ZIP ready — ${(getExportAttachmentSize(zip) / 1024 / 1024).toFixed(1)} MB (${names.length} companies, ${skipped.length} skipped)`,
       "success"
     );
     return { zip, names, skipped };
