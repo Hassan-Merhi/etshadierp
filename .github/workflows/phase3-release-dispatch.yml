@@ -17,4 +17,4 @@ jobs:
       - name: Dispatch Release Verification for Phase 3 branch
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run release-verification.yml --ref agent/phase3-release-verification-20260810
+        run: gh workflow run release-verification.yml --repo Hassan-Merhi/etshadierp --ref agent/phase3-release-verification-20260810
