@@ -1,5 +1,6 @@
 const REQUEST_HEADER = "x-erp-compact-response";
 const RESPONSE_HEADER = "x-erp-compact-response";
+const PROFILE_HEADER = "x-erp-response-profile";
 const WIRE_VERSION = "v1";
 const DICT_TOKEN = /^~([0-9a-z]+)$/;
 
@@ -45,6 +46,17 @@ function isTargetPath(path: string): boolean {
   if (/^\/api\/factory\/customer-orders\/\d+$/.test(path)) return true;
   if (/^\/api\/factory\/customer-orders\/\d+\/verification-summary$/.test(path)) return true;
   return false;
+}
+
+function responseProfileFor(path: string): string | null {
+  const pagePath = window.location.pathname;
+  if (pagePath === "/factory/location-inventory" && /^\/api\/factory\/location-inventory\/\d+$/.test(path)) {
+    return "location-inventory-summary-v1";
+  }
+  if (pagePath === "/factory/sales/loading/new" && /^\/api\/factory\/customer-orders\/\d+$/.test(path)) {
+    return "loading-order-state-v1";
+  }
+  return null;
 }
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
@@ -145,6 +157,8 @@ export function installOperationalPhase4BandwidthFetch(): void {
 
     const headers = requestHeaders(input, init);
     headers.set(REQUEST_HEADER, WIRE_VERSION);
+    const profile = responseProfileFor(url.pathname);
+    if (profile) headers.set(PROFILE_HEADER, profile);
     const response = await originalFetch(input, { ...(init || {}), headers });
     return decodeCompactResponse(response);
   };
@@ -155,4 +169,5 @@ if (typeof window !== "undefined") installOperationalPhase4BandwidthFetch();
 export const operationalPhase4BandwidthWireInternals = {
   decodeValue,
   isTargetPath,
+  responseProfileFor,
 };
