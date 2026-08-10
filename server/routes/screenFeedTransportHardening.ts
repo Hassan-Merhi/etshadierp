@@ -36,6 +36,9 @@ function frameEtag(userId: string, frame: any): string {
     Number(frame?.cursor?.ts) || 0,
     latestClickTs,
     Number(frame?.capture?.encodedBytes) || 0,
+    frame?.captureFailure?.occurredAt ?? "",
+    frame?.captureFailure?.stage ?? "",
+    frame?.captureFailure?.reason ?? "",
   ].join(":");
   const digest = createHash("sha1").update(identity).digest("hex");
   return `W/"screen-feed-${digest}"`;

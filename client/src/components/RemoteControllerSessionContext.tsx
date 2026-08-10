@@ -172,7 +172,7 @@ export function RemoteControllerSessionProvider({ children }: { children: ReactN
             ? {
                 ...next,
                 mouseAuthorization: next.mouseAuthorization ?? current.mouseAuthorization,
-                keyboardAuthorization: next.keyboardAuthorization ?? current.keyboardAuthorization,
+                keyboardAuthorization: next.keyboardAuthorization,
               }
             : next;
         setSession(merged);

@@ -141,6 +141,16 @@ export const remoteSupportPhase5Translations: readonly Phase7BackendMessagesEntr
     fr: "La requête de flux d’écran a échoué.",
   },
   {
+    en: "Screen capture issue",
+    ar: "مشكلة في التقاط الشاشة",
+    fr: "Problème de capture d’écran",
+  },
+  {
+    en: "Screen capture failed",
+    ar: "فشل التقاط الشاشة",
+    fr: "Échec de la capture d’écran",
+  },
+  {
     en: "Frame payload is too large.",
     ar: "حجم بيانات الإطار كبير جدًا.",
     fr: "La charge utile de la trame est trop volumineuse.",

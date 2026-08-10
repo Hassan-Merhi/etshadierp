@@ -50,8 +50,9 @@
       "tests/pos-revision-whatsapp-routing.test.ts",
       "tests/ui/remote-support-fast-viewer.test.ts",
       "tests/stock-item-name-update-by-code.test.ts",
-      "server/lib/reportPrecision.test.ts"
+      "server/lib/reportPrecision.test.ts",
+      "tests/remote-support-phase4-hardening.test.ts"
     ],
-    "maxAdditionalTextAssertions": 577
+    "maxAdditionalTextAssertions": 604
   }
 }

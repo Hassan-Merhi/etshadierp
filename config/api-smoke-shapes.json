@@ -1285,6 +1285,10 @@
       "status": 200,
       "shape": "{fast:scalar,lastWatcherPollAgeMs:scalar,userId:scalar,watched:scalar}"
     },
+    "/api/screen-feed/capabilities": {
+      "status": 200,
+      "shape": "{flags:{fastScreenFeed:scalar,keyboardControl:scalar,remoteControl:scalar,screenFeedEnabled:scalar}}"
+    },
     "/api/screen-feed/control/audit": {
       "status": 200,
       "shape": "{knownModules:[scalar],logs:[],page:scalar,pageSize:scalar,total:scalar,totalPages:scalar}"
@@ -1306,8 +1310,8 @@
       "shape": "{message:scalar}"
     },
     "/api/screen-feed/live/status": {
-      "status": 204,
-      "shape": "{}"
+      "status": 200,
+      "shape": "{fast:scalar,watched:scalar}"
     },
     "/api/settings/role-permissions": {
       "status": 200,
