@@ -51,9 +51,29 @@ export function registerOrderFinalizeRoutes(app: Express) {
         const bales = await tx.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
         if (bales.length === 0) throw new Error("Order has no bales");
 
+        // Validate every linked bale with one set-based read instead of one query
+        // per bale. Preserve the existing rule: only missing/DELETED bales block
+        // finalization; other statuses are accepted here.
+        const baleIds = [
+          ...new Set(
+            bales
+              .map((b: any) => Number(b.baleId))
+              .filter((id: number) => Number.isSafeInteger(id) && id > 0)
+          ),
+        ];
+        const factoryBaleRows =
+          baleIds.length > 0
+            ? await tx
+                .select({ id: factoryBales.id, status: factoryBales.status })
+                .from(factoryBales)
+                .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, baleIds)))
+            : [];
+        const factoryBaleById = new Map<number, { id: number; status: string | null }>(
+          factoryBaleRows.map((b: any) => [Number(b.id), { id: Number(b.id), status: b.status ?? null }])
+        );
+
         for (const b of bales) {
-          // Just verify the bale still exists — status is not checked here.
-          const [factoryBale] = await tx.select().from(factoryBales).where(eq(factoryBales.id, b.baleId));
+          const factoryBale = factoryBaleById.get(Number(b.baleId));
           if (!factoryBale || factoryBale.status === "DELETED") {
             throw new Error(`Bale ${b.baleReference} is no longer available`);
           }
@@ -73,11 +93,12 @@ export function registerOrderFinalizeRoutes(app: Express) {
           .where(eq(customerInvoiceSequences.companyId, companyId));
         const invoiceNumber = `INV-${String(invoiceNum).padStart(6, "0")}`;
 
-        for (const b of bales) {
+        // One set-based status write replaces the previous per-bale UPDATE loop.
+        if (baleIds.length > 0) {
           await tx
             .update(factoryBales)
             .set({ status: "SOLD", updatedAt: new Date() })
-            .where(eq(factoryBales.id, b.baleId));
+            .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, baleIds)));
         }
 
         await recalculateOrderTotals(tx, orderId);
