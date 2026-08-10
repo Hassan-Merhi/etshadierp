@@ -104,11 +104,7 @@ async function buildSalesSummary(companyIds: number[], params: SummaryParams): P
     return `$${values.length}`;
   };
 
-  const conditions = [
-    `v.company_id = ANY(${bind(companyIds)}::int[])`,
-    `v.optional = FALSE`,
-    `v.deleted_at IS NULL`,
-  ];
+  const conditions = [`v.company_id = ANY(${bind(companyIds)}::int[])`, `v.optional = FALSE`, `v.deleted_at IS NULL`];
   if (params.startDate) conditions.push(`v.voucher_date >= ${bind(params.startDate)}::date`);
   if (params.endDate) conditions.push(`v.voucher_date <= ${bind(params.endDate)}::date`);
   if (params.locationIds.length > 0) conditions.push(`v.location_id = ANY(${bind(params.locationIds)}::int[])`);
@@ -186,7 +182,7 @@ async function buildSalesSummary(companyIds: number[], params: SummaryParams): P
   `;
 
   const result = await pool.query(query, values);
-  const rows = result.rows.map((row: any): SummaryGroup => {
+  const rows = result.rows.map((row: Record<string, unknown>): SummaryGroup => {
     const cleanDateKey = String(row.dateKey || "");
     const isCreditSale = Boolean(row.isCreditSale);
     return {
@@ -236,7 +232,7 @@ function buildSummaryTotals(groups: SummaryGroup[]) {
 }
 
 async function getAccessibleCompanies(userId: string | number): Promise<CompanyOption[]> {
-  const accessibleIds = Array.from(await getAccessibleCompanyIds(userId));
+  const accessibleIds = Array.from(await getAccessibleCompanyIds(String(userId)));
   if (accessibleIds.length === 0) return [];
   const accessibleSet = new Set(accessibleIds);
   const companies = await storage.getAllCompanies();
@@ -248,7 +244,12 @@ async function getAccessibleCompanies(userId: string | number): Promise<CompanyO
 
 function filterCompaniesByCodes(companies: CompanyOption[], value: unknown): CompanyOption[] {
   if (typeof value !== "string" || !value.trim()) return companies;
-  const codes = new Set(value.split(",").map((code) => code.trim()).filter(Boolean));
+  const codes = new Set(
+    value
+      .split(",")
+      .map((code) => code.trim())
+      .filter(Boolean)
+  );
   return companies.filter((company) => codes.has(company.code));
 }
 
@@ -294,7 +295,7 @@ async function buildComparisonRows(companies: CompanyOption[], req: Request) {
   );
 
   const byId = new Map(companies.map((company) => [company.id, company]));
-  return result.rows.map((row: any) => {
+  return result.rows.map((row: Record<string, unknown>) => {
     const company = byId.get(Number(row.companyId));
     return {
       stockItemId: Number(row.stockItemId || 0),

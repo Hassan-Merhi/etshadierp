@@ -73,7 +73,7 @@ export const backendMessagesPhase7TranslationsPart11: readonly Phase7BackendMess
     fr: "La référence est requise",
   },
   {
-    en: "No eligible waste bale with ref \"${reference}\"",
+    en: 'No eligible waste bale with ref "${reference}"',
     ar: "لا توجد بالة هدر مؤهلة بالمرجع «{0}»",
     fr: "Aucune balle de déchets admissible avec la référence « {0} »",
   },

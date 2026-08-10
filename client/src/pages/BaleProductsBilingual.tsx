@@ -141,10 +141,7 @@ function CatalogFetchBoundary({
   useEffect(() => {
     const products = fullCatalogRef.current;
     if (!products) return;
-    queryClient.setQueryData(
-      ["/api/factory/bale-products"],
-      filterCatalog(products, search, translationFilter)
-    );
+    queryClient.setQueryData(["/api/factory/bale-products"], filterCatalog(products, search, translationFilter));
   }, [search, translationFilter]);
 
   return ready ? <BaleProductsPage /> : null;

@@ -31,9 +31,10 @@ export async function fetchHistoryBales(dispatchId: number): Promise<HistoryBale
 export function baleMatchesSearch(bale: WasteBale, search: string): boolean {
   const needle = search.trim().toLowerCase();
   if (!needle) return true;
-  return [bale.referenceNumber, bale.productName, bale.articleCode, bale.categoryName, bale.locationName].some((value) =>
-    String(value || "")
-      .toLowerCase()
-      .includes(needle)
+  return [bale.referenceNumber, bale.productName, bale.articleCode, bale.categoryName, bale.locationName].some(
+    (value) =>
+      String(value || "")
+        .toLowerCase()
+        .includes(needle)
   );
 }

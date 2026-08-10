@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { sql } from "drizzle-orm";
 import { requireAuth } from "../../../auth";
 import { db } from "../../../db";
@@ -18,14 +18,16 @@ function positiveInt(value: unknown, fallback: number, max: number): number {
   return Math.min(Math.floor(parsed), max);
 }
 
-function getCompanyId(req: any): number | null {
+function getCompanyId(req: Request): number | null {
   const value = req.session?.factoryCompanyId || req.session?.currentCompanyId;
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
-function getSearch(req: any): string {
-  return String(req.query?.search || "").trim().slice(0, MAX_SEARCH_LENGTH);
+function getSearch(req: Request): string {
+  return String(req.query?.search || "")
+    .trim()
+    .slice(0, MAX_SEARCH_LENGTH);
 }
 
 function eligibleWasteBalesSql(companyId: number, search: string) {
@@ -76,7 +78,7 @@ function eligibleWasteBalesSql(companyId: number, search: string) {
   `;
 }
 
-function mapWasteBale(row: any) {
+function mapWasteBale(row: Record<string, unknown>) {
   return {
     id: Number(row.id),
     productId: Number(row.productId),
@@ -93,7 +95,7 @@ function mapWasteBale(row: any) {
 export function registerWasteDispatchBandwidthRoutes(app: Express) {
   // Lightweight grouped summary. The old /bales route is intentionally left
   // untouched for compatibility; the optimized client uses this endpoint.
-  app.get("/api/factory/waste-dispatch/summary", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/waste-dispatch/summary", requireAuth, async (req, res) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -129,7 +131,7 @@ export function registerWasteDispatchBandwidthRoutes(app: Express) {
         OFFSET ${offset}
       `);
 
-      const rows: any[] = Array.isArray(raw) ? raw : resultRows(raw);
+      const rows = (Array.isArray(raw) ? raw : resultRows(raw)) as Record<string, unknown>[];
       const first = rows[0];
       const totalGroups = Number(first?.totalGroups || 0);
       const totalPages = totalGroups > 0 ? Math.ceil(totalGroups / limit) : 1;
@@ -170,7 +172,7 @@ export function registerWasteDispatchBandwidthRoutes(app: Express) {
   // Bale rows are loaded only when a product group is expanded. Keep the same
   // server-side search filter as the summary so an expanded searched group
   // cannot reveal or select non-matching bales.
-  app.get("/api/factory/waste-dispatch/group-bales/:productId", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/waste-dispatch/group-bales/:productId", requireAuth, async (req, res) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -188,7 +190,7 @@ export function registerWasteDispatchBandwidthRoutes(app: Express) {
         WHERE "productId" = ${productId}
         ORDER BY id DESC
       `);
-      const rows: any[] = Array.isArray(raw) ? raw : resultRows(raw);
+      const rows = (Array.isArray(raw) ? raw : resultRows(raw)) as Record<string, unknown>[];
       res.json({ bales: rows.map(mapWasteBale) });
     } catch (error: unknown) {
       logger.error("Error fetching waste dispatch group bales", { error: getErrorMessage(error) });
@@ -198,12 +200,14 @@ export function registerWasteDispatchBandwidthRoutes(app: Express) {
 
   // Exact-reference lookup keeps barcode/manual scanning functional even when
   // the scanned bale is not on the currently visible summary page.
-  app.get("/api/factory/waste-dispatch/scan", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/waste-dispatch/scan", requireAuth, async (req, res) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const reference = String(req.query.ref || "").trim().slice(0, 120);
+      const reference = String(req.query.ref || "")
+        .trim()
+        .slice(0, 120);
       if (!reference) return res.status(400).json({ message: "Reference is required" });
 
       const raw = await db.execute(sql`
@@ -213,7 +217,7 @@ export function registerWasteDispatchBandwidthRoutes(app: Express) {
         WHERE UPPER("referenceNumber") = UPPER(${reference})
         LIMIT 1
       `);
-      const rows: any[] = Array.isArray(raw) ? raw : resultRows(raw);
+      const rows = (Array.isArray(raw) ? raw : resultRows(raw)) as Record<string, unknown>[];
       if (rows.length === 0) return res.status(404).json({ message: `No eligible waste bale with ref "${reference}"` });
       res.json({ bale: mapWasteBale(rows[0]) });
     } catch (error: unknown) {
@@ -224,7 +228,7 @@ export function registerWasteDispatchBandwidthRoutes(app: Express) {
 
   // Explicit user action only. This preserves the old "Select All" behavior
   // without transferring every bale during normal page load.
-  app.get("/api/factory/waste-dispatch/select-all", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/waste-dispatch/select-all", requireAuth, async (req, res) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -236,7 +240,7 @@ export function registerWasteDispatchBandwidthRoutes(app: Express) {
         FROM eligible
         ORDER BY id DESC
       `);
-      const rows: any[] = Array.isArray(raw) ? raw : resultRows(raw);
+      const rows = (Array.isArray(raw) ? raw : resultRows(raw)) as Record<string, unknown>[];
       res.json({ bales: rows.map(mapWasteBale) });
     } catch (error: unknown) {
       logger.error("Error selecting all waste dispatch bales", { error: getErrorMessage(error) });
@@ -245,7 +249,7 @@ export function registerWasteDispatchBandwidthRoutes(app: Express) {
   });
 
   // History summaries use stored dispatch totals and do not embed every linked bale.
-  app.get("/api/factory/waste-dispatch/history-summary", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/waste-dispatch/history-summary", requireAuth, async (req, res) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -272,7 +276,7 @@ export function registerWasteDispatchBandwidthRoutes(app: Express) {
         LIMIT ${limit}
         OFFSET ${offset}
       `);
-      const rows: any[] = Array.isArray(raw) ? raw : resultRows(raw);
+      const rows = (Array.isArray(raw) ? raw : resultRows(raw)) as Record<string, unknown>[];
       const total = Number(rows[0]?.totalRows || 0);
       const totalPages = total > 0 ? Math.ceil(total / limit) : 1;
 
@@ -293,7 +297,7 @@ export function registerWasteDispatchBandwidthRoutes(app: Express) {
   });
 
   // Bale details are fetched only for the single dispatch the user expands or prints.
-  app.get("/api/factory/waste-dispatch/history/:id/bales", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/waste-dispatch/history/:id/bales", requireAuth, async (req, res) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -309,7 +313,10 @@ export function registerWasteDispatchBandwidthRoutes(app: Express) {
         WHERE id = ${dispatchId} AND company_id = ${companyId}
         LIMIT 1
       `);
-      const dispatchRows: any[] = Array.isArray(dispatchRaw) ? dispatchRaw : resultRows(dispatchRaw);
+      const dispatchRows = (Array.isArray(dispatchRaw) ? dispatchRaw : resultRows(dispatchRaw)) as Record<
+        string,
+        unknown
+      >[];
       if (dispatchRows.length === 0) return res.status(404).json({ message: "Dispatch not found" });
 
       const raw = await db.execute(sql`
@@ -324,7 +331,7 @@ export function registerWasteDispatchBandwidthRoutes(app: Express) {
           AND waste_dispatch_id = ${dispatchId}
         ORDER BY id ASC
       `);
-      const rows: any[] = Array.isArray(raw) ? raw : resultRows(raw);
+      const rows = (Array.isArray(raw) ? raw : resultRows(raw)) as Record<string, unknown>[];
       res.json({
         bales: rows.map((row) => ({
           id: Number(row.id),
