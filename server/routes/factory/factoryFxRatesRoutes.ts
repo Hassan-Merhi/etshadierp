@@ -22,7 +22,7 @@ export function registerFactoryFxRatesRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { currencyCode } = req.query;
       // Only return manually-set rates in the UI list (auto rows are internal cache only)
-      const conditions: any[] = [eq(factoryFxRates.companyId, companyId), eq(factoryFxRates.source, "manual")];
+      const conditions = [eq(factoryFxRates.companyId, companyId), eq(factoryFxRates.source, "manual")];
       if (currencyCode) conditions.push(eq(factoryFxRates.currencyCode, currencyCode as string));
       const results = await db
         .select()

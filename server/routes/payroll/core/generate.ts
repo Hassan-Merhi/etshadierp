@@ -286,7 +286,7 @@ export function registerPayrollGenerateRoutes(app: Express) {
               sourceModule: "FACTORY",
             })
             .returning();
-          const journalEntries: any[] = [];
+          const journalEntries = [];
           // DR entries per worker (one salary line + one bonus line each)
           for (const { workerId, workerName, salAmt, bonAmt } of workerExpenses) {
             const accs = workerAccCache.get(workerId)!;

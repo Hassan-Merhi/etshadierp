@@ -134,7 +134,7 @@ export default function Bales() {
         credentials: "include",
       });
 
-      let pendingBarcode: any = null;
+      let pendingBarcode = null;
       if (pendingResponse.ok) {
         pendingBarcode = await pendingResponse.json();
       }

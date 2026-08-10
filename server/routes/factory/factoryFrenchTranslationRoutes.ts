@@ -200,7 +200,7 @@ export function registerFactoryFrenchTranslationRoutes(app: Express) {
         : { rows: [] as any[] };
       const byCode = new Map(catalog.rows.map((row: any) => [row.articleCode, row]));
       const preview = rows.map((row) => {
-        const match: any = byCode.get(String(row.articleCode));
+        const match = byCode.get(String(row.articleCode));
         return {
           ...row,
           productId: match?.id ?? null,

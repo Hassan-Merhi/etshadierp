@@ -37,7 +37,7 @@ export function registerFactoryContainerImportRoutes(app: Express) {
       const supplierMap = new Map<string, number>();
       allSuppliers.forEach((s) => supplierMap.set(s.name.toLowerCase().trim(), s.id));
 
-      const results: any[] = [];
+      const results = [];
       const errors: string[] = [];
 
       for (let i = 0; i < rows.length; i++) {

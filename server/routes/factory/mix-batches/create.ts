@@ -66,7 +66,7 @@ export function registerFactoryMixBatchCreateRoutes(app: Express) {
         // DEFECT 15 FIX: use Decimal.js for cost accumulation (create route).
         let dTotalWeightKg = new Decimal(0);
         let dTotalCost = new Decimal(0);
-        const sourceRecords: any[] = [];
+        const sourceRecords = [];
 
         if (hasOpeningBatch) {
           const [srcBatch] = await tx

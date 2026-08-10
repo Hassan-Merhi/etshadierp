@@ -41,7 +41,7 @@ export function registerFactoryMixBatchesByDateRoutes(app: Express, requireAuth:
       const batches = batchesResult.rows;
       const batchIds = batches.map((b) => b.id);
 
-      let sources: any[] = [];
+      let sources = [];
       if (batchIds.length > 0) {
         const sourcesResult = await pool.query(
           `

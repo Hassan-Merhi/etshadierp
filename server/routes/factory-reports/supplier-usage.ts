@@ -41,7 +41,7 @@ export function registerFactorySupplierUsageReportRoutes(app: Express, requireAu
         return res.status(404).json({ message: "Company not found" });
       }
 
-      const containerConditions: any[] = [eq(factoryContainers.companyId, companyId)];
+      const containerConditions = [eq(factoryContainers.companyId, companyId)];
       if (supplierId) {
         containerConditions.push(eq(factoryContainers.supplierId, supplierId));
       }
@@ -126,7 +126,7 @@ export function registerFactorySupplierUsageReportRoutes(app: Express, requireAu
         }
       }
 
-      const supplierSummaries: any[] = [];
+      const supplierSummaries = [];
       const supplierGroups = new Map<number, any[]>();
 
       for (const container of allContainers) {
@@ -228,7 +228,7 @@ export function registerFactorySupplierUsageReportRoutes(app: Express, requireAu
         });
       }
 
-      const baleBreakdown: any[] = [];
+      const baleBreakdown = [];
       for (const summary of supplierSummaries) {
         for (const bale of summary.bales) {
           const mixSources = allMixSources.filter((ms: any) => ms.mixBatchId === bale.mixBatchId);

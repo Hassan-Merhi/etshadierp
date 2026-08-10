@@ -19,7 +19,7 @@ export function setPrinterName(name: string) {
   localStorage.setItem(PRINTER_NAME_KEY, name);
 }
 
-let qzInstance: any = null;
+let qzInstance = null;
 
 async function loadQzTray(): Promise<any> {
   if ((window as any).qz) return (window as any).qz;

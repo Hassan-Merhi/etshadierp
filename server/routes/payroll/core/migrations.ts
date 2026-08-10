@@ -118,7 +118,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
         await db.execute(sql`DELETE FROM voucher_entries WHERE id = ${row.entry_id}`);
 
         // Insert new split entries
-        const newEntries: any[] = [];
+        const newEntries = [];
         const allCities = new Set([...salByCity.keys(), ...bonByCity.keys()]);
         for (const city of allCities) {
           const salAmt = salByCity.get(city) || 0;
@@ -310,7 +310,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
         `);
 
         // Insert new per-worker DR entries
-        const newEntries: any[] = [];
+        const newEntries = [];
         for (const p of payrollData.rows as any[]) {
           const workerName = (p.full_name as string) || `Worker #${p.worker_id}`;
           const accs = workerAccMap.get(p.worker_id)!;

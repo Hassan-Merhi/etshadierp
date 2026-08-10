@@ -261,7 +261,7 @@ export function registerStatsReportsRoutes(app: Express) {
       const cached = _getCached(cacheKey);
       if (cached) return res.json(cached);
 
-      const entryConditions: any[] = [eq(vouchers.companyId, companyId)];
+      const entryConditions = [eq(vouchers.companyId, companyId)];
       if (startDate) entryConditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
       if (endDate) entryConditions.push(sql`${vouchers.voucherDate} <= ${endDate}`);
       const companyEntries = await db

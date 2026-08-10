@@ -244,7 +244,7 @@ export function registerFactoryCompanyImportRoutes(app: Express) {
               let count = 0;
               for (const row of rows) {
                 const oldId = row.id;
-                const rec: any = fixDates({ ...row });
+                const rec = fixDates({ ...row });
                 delete rec.id;
                 if (hasCompanyId) rec.companyId = targetCompanyId;
                 for (const [fkField, remapKey] of Object.entries(fkRemaps)) {
@@ -278,7 +278,7 @@ export function registerFactoryCompanyImportRoutes(app: Express) {
 
               for (const row of roots) {
                 const oldId = row.id;
-                const rec: any = fixDates({ ...row });
+                const rec = fixDates({ ...row });
                 delete rec.id;
                 if (hasCompanyId) rec.companyId = targetCompanyId;
                 rec[parentField] = null;
@@ -293,12 +293,12 @@ export function registerFactoryCompanyImportRoutes(app: Express) {
               let remaining = [...children];
               let maxPasses = 20;
               while (remaining.length > 0 && maxPasses > 0) {
-                const nextRemaining: any[] = [];
+                const nextRemaining = [];
                 for (const row of remaining) {
                   const parentMapped = r(tableName, row[parentField]);
                   if (parentMapped != null) {
                     const oldId = row.id;
-                    const rec: any = fixDates({ ...row });
+                    const rec = fixDates({ ...row });
                     delete rec.id;
                     if (hasCompanyId) rec.companyId = targetCompanyId;
                     rec[parentField] = parentMapped;
@@ -319,7 +319,7 @@ export function registerFactoryCompanyImportRoutes(app: Express) {
               if (remaining.length > 0) {
                 for (const row of remaining) {
                   const oldId = row.id;
-                  const rec: any = fixDates({ ...row });
+                  const rec = fixDates({ ...row });
                   delete rec.id;
                   if (hasCompanyId) rec.companyId = targetCompanyId;
                   rec[parentField] = null;
@@ -339,7 +339,7 @@ export function registerFactoryCompanyImportRoutes(app: Express) {
             if (t.locations?.length) {
               for (const row of t.locations) {
                 const oldId = row.id;
-                const rec: any = fixDates({ ...row });
+                const rec = fixDates({ ...row });
                 delete rec.id;
                 rec.companyId = targetCompanyId;
                 rec.code = await makeUniqueCode(tx, locations, locations.code, rec.code);
@@ -357,7 +357,7 @@ export function registerFactoryCompanyImportRoutes(app: Express) {
             if (t.bank_accounts?.length) {
               for (const row of t.bank_accounts) {
                 const oldId = row.id;
-                const rec: any = fixDates({ ...row });
+                const rec = fixDates({ ...row });
                 delete rec.id;
                 rec.companyId = targetCompanyId;
                 rec.linkedLedgerId = r("ledger_accounts", rec.linkedLedgerId);
@@ -694,7 +694,7 @@ export function registerFactoryCompanyImportRoutes(app: Express) {
             if (t.vouchers?.length) {
               for (const row of t.vouchers) {
                 const oldId = row.id;
-                const rec: any = fixDates({ ...row });
+                const rec = fixDates({ ...row });
                 delete rec.id;
                 rec.companyId = targetCompanyId;
                 rec.locationId = r("locations", rec.locationId);

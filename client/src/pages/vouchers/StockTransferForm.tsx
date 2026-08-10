@@ -685,7 +685,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       (e) => !(e.stockItemId > 0 && e.sourceLocationId > 0 && parseFloat(e.quantity) === 0)
     );
     const isEditMode = !!voucherIdToEdit;
-    let originalItems: any[] = [];
+    let originalItems = [];
     if (isEditMode && voucherIdToEdit) {
       let st = stockTransferToEdit as any | undefined;
       if (!st) {

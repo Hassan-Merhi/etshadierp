@@ -70,8 +70,8 @@ export function registerSilentTransferRoutes(app: Express) {
 
         // Three output buckets
         const errorLines: Array<{ rowNum: number; barcode: string; reason: string }> = [];
-        const validItems: any[] = [];
-        const warnItems: any[] = []; // insufficient stock but can still be applied
+        const validItems = [];
+        const warnItems = []; // insufficient stock but can still be applied
 
         // Track barcodes already seen to detect duplicates in the file
         const seenBarcodes = new Map<string, number>(); // barcode → first rowNum

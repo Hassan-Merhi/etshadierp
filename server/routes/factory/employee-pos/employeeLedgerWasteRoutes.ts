@@ -82,7 +82,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
         ]
       );
 
-      const allBales: any[] = Array.isArray(allBalesRaw) ? allBalesRaw : resultRows(allBalesRaw);
+      const allBales = Array.isArray(allBalesRaw) ? allBalesRaw : resultRows(allBalesRaw);
       const pendingOrderBaleIds = new Set<number>(
         (Array.isArray(pendingOrderBaleIdsRaw) ? pendingOrderBaleIdsRaw : resultRows(pendingOrderBaleIdsRaw)).map(
           (r: any) => Number(r.baleId)
@@ -337,7 +337,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
         ]
       );
 
-      const allBales: any[] = Array.isArray(allBalesRaw) ? allBalesRaw : resultRows(allBalesRaw);
+      const allBales = Array.isArray(allBalesRaw) ? allBalesRaw : resultRows(allBalesRaw);
       const pendingOrderBaleIds = new Set<number>(
         (Array.isArray(pendingOrderBaleIdsRaw) ? pendingOrderBaleIdsRaw : resultRows(pendingOrderBaleIdsRaw)).map(
           (r: any) => Number(r.baleId)
@@ -538,7 +538,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
           AND waste_dispatch_id IS NOT NULL
         ORDER BY waste_dispatch_id, id
       `);
-      const linkedBales: any[] = Array.isArray(linkedBalesRaw) ? linkedBalesRaw : resultRows(linkedBalesRaw);
+      const linkedBales = Array.isArray(linkedBalesRaw) ? linkedBalesRaw : resultRows(linkedBalesRaw);
 
       const balesByDispatch = new Map<number, any[]>();
       for (const bale of linkedBales) {
@@ -582,7 +582,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
         FROM factory_bales
         WHERE company_id = ${companyId} AND waste_dispatch_id = ${dispatchId}
       `);
-      const bales: any[] = Array.isArray(linkedBales) ? linkedBales : resultRows(linkedBales);
+      const bales = Array.isArray(linkedBales) ? linkedBales : resultRows(linkedBales);
 
       await db.transaction(async (tx: any) => {
         const now = new Date();

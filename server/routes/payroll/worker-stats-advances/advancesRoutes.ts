@@ -22,7 +22,7 @@ export function registerWorkerAdvancesRoutes(app: Express) {
       const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const conditions: any[] = [eq(factoryAdvanceRepayments.companyId, companyId)];
+      const conditions = [eq(factoryAdvanceRepayments.companyId, companyId)];
       const workerId = req.query.workerId ? parseOptionalId(req.query.workerId) : null;
       if (req.query.workerId && workerId === null) {
         return res.status(400).json({ message: "Invalid workerId" });
@@ -65,7 +65,7 @@ export function registerWorkerAdvancesRoutes(app: Express) {
       const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const conditions: any[] = [eq(factoryWorkerAdvances.companyId, companyId)];
+      const conditions = [eq(factoryWorkerAdvances.companyId, companyId)];
       const workerId = req.query.workerId ? parseOptionalId(req.query.workerId) : null;
       if (req.query.workerId && workerId === null) {
         return res.status(400).json({ message: "Invalid workerId" });

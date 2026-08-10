@@ -52,10 +52,7 @@ export async function computeRentalOutstanding(
       .where(inArray(propertyMonthlyLedger.contractId, contractIds))
       .groupBy(propertyMonthlyLedger.contractId);
 
-    const paidConditions: any[] = [
-      inArray(propertyPayments.contractId, contractIds),
-      isNotNull(propertyPayments.ledgerRowId),
-    ];
+    const paidConditions = [inArray(propertyPayments.contractId, contractIds), isNotNull(propertyPayments.ledgerRowId)];
     if (toDate) paidConditions.push(lte(propertyPayments.paymentDate, toDate));
     const paidRows = await db
       .select({

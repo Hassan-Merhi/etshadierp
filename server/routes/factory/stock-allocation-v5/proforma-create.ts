@@ -55,7 +55,7 @@ export function registerV5ProformaCreateRoutes(app: Express) {
         }));
         const insertedLines = await tx.insert(customerProformaLines).values(lineValues).returning();
 
-        let createdOrders: any[] = [];
+        let createdOrders = [];
         if (sendToLoading && names.length > 0) {
           const today = getClientDate(req);
           const orderValues = names.map((containerName: string) => ({
@@ -76,7 +76,7 @@ export function registerV5ProformaCreateRoutes(app: Express) {
           // Phase B: Insert one expected line per (container × proforma line).
           // These lock in the expected quantity at order creation time.
           // V5 guard: proformaIdUsed IS NOT NULL (all createdOrders are V5 by construction)
-          const expectedLineValues: any[] = [];
+          const expectedLineValues = [];
           for (const order of createdOrders) {
             for (const line of insertedLines) {
               expectedLineValues.push({
@@ -191,7 +191,7 @@ export function registerV5ProformaCreateRoutes(app: Express) {
         // This locks in the expected qty at order creation time.
         // Existing containers and their expected lines are not touched.
         // V5 guard: proformaIdUsed IS NOT NULL (all createdOrders are V5 by construction)
-        const expectedLineValues: any[] = [];
+        const expectedLineValues = [];
         for (const order of createdOrders) {
           for (const line of proformaLines) {
             expectedLineValues.push({

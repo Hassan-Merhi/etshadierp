@@ -84,7 +84,7 @@ export function registerAdvanceRepaymentAuditRoutes(app: Express) {
       }
 
       // 5. Categorize
-      const auditAdvances: any[] = [];
+      const auditAdvances = [];
       for (const row of allAdvances) {
         const adv = row.factory_worker_advances;
         const worker = row.factory_workers;

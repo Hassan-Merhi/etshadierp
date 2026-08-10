@@ -54,7 +54,7 @@ export function registerBalesCrudRoutes(app: Express) {
       const page = pageQ !== undefined ? Math.max(1, Number(pageQ) || 1) : null;
       const rowOffset = page !== null ? (page - 1) * rowLimit : Math.max(Number(offsetQ) || 0, 0);
 
-      const conditions: any[] = [
+      const conditions = [
         eq(factoryBales.companyId, companyId),
         // Always exclude deleted/removed bales from the history view
         not(inArray(factoryBales.status, ["DELETED", "REMOVED"])),

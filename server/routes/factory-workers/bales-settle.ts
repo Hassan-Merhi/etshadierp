@@ -33,7 +33,7 @@ export function registerFactoryWorkerBaleSettleRoutes(app: Express, requireAuth:
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       const { startDate, endDate } = req.query;
 
-      const conditions: any[] = [eq(factoryBales.finalizedBy, id), eq(factoryBales.companyId, companyId)];
+      const conditions = [eq(factoryBales.finalizedBy, id), eq(factoryBales.companyId, companyId)];
 
       if (startDate) {
         conditions.push(sql`${factoryBales.finalizedAt} >= ${startDate}::timestamp`);

@@ -105,7 +105,7 @@ async function mapRole(sourceId: number, targetId: number, sourceRole: any): Pro
 }
 
 async function mapAllLocations(sourceId: number, targetId: number, rows: any[]): Promise<any[]> {
-  const mapped: any[] = [];
+  const mapped = [];
   for (const row of rows) {
     const location = await resolveTargetLocation(sourceId, targetId, pn(row.locationId));
     if (!location) throw new Error(`Location ${row.locationId} has no safe target mapping.`);
@@ -115,7 +115,7 @@ async function mapAllLocations(sourceId: number, targetId: number, rows: any[]):
 }
 
 async function mapAllCashMappings(sourceId: number, targetId: number, rows: any[]): Promise<any[]> {
-  const mapped: any[] = [];
+  const mapped = [];
   for (const row of rows) {
     const location = await resolveTargetLocation(sourceId, targetId, pn(row.locationId));
     const cashAccountId = await resolveTargetLedgerAccount(pn(row.cashAccountId), targetId);
