@@ -40,6 +40,14 @@ function shouldCompactPath(path: string): boolean {
   return false;
 }
 
+function onlyKeys(record: JsonRecord, keys: readonly string[]): JsonRecord {
+  const output: JsonRecord = {};
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(record, key)) output[key] = record[key];
+  }
+  return output;
+}
+
 function withoutKeys(record: JsonRecord, keys: readonly string[]): JsonRecord {
   const omitted = new Set(keys);
   return Object.fromEntries(Object.entries(record).filter(([key]) => !omitted.has(key)));
@@ -68,6 +76,43 @@ function preparePayload(req: Request, payload: unknown): unknown {
     // charges remain available to invoice/detail screens through the unchanged
     // default response when this profile header is absent.
     return withoutKeys(payload, ["lines", "charges"]);
+  }
+
+  if (profile === "waste-dispatch-page-v1" && req.path === "/api/factory/waste-dispatch/bales" && isPlainRecord(payload)) {
+    const bales = Array.isArray(payload.bales)
+      ? payload.bales.map((row) =>
+          isPlainRecord(row)
+            ? onlyKeys(row, ["id", "referenceNumber", "productName", "categoryName", "locationName", "weightKg", "totalCost"])
+            : row
+        )
+      : [];
+    // The Waste Dispatch page never renders the separate category metadata; it
+    // groups directly from each bale's categoryName.
+    return { bales };
+  }
+
+  if (profile === "waste-dispatch-page-v1" && req.path === "/api/factory/waste-dispatch/history" && Array.isArray(payload)) {
+    return payload.map((dispatch) => {
+      if (!isPlainRecord(dispatch)) return dispatch;
+      const summary = onlyKeys(dispatch, [
+        "id",
+        "dispatchNumber",
+        "dispatchDate",
+        "notes",
+        "totalBales",
+        "totalWeightKg",
+        "totalCostWrittenOff",
+        "bales",
+      ]);
+      if (Array.isArray(summary.bales)) {
+        summary.bales = summary.bales.map((bale) =>
+          isPlainRecord(bale)
+            ? onlyKeys(bale, ["id", "referenceNumber", "productName", "weightKg", "totalCost"])
+            : bale
+        );
+      }
+      return summary;
+    });
   }
 
   return payload;
