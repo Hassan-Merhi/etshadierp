@@ -173,6 +173,23 @@ if (!globalThis[BRIDGE_FLAG]) {
     return value && typeof value === "object" ? value[EXPORT_MARKER_KEY] : undefined;
   }
 
+  // A number of legacy export routes normalize ExcelJS results with
+  // `Buffer.from(await workbook.xlsx.writeBuffer())`. Large workbooks are
+  // represented by zero-backed deferred markers, so the native Buffer.from
+  // implementation would turn those markers into ordinary empty buffers and
+  // discard the deferred payload. Preserve only our private marker while
+  // delegating every normal Buffer conversion to Node unchanged.
+  const originalBufferFrom = Buffer.from;
+  if (!Buffer.from[BRIDGE_FLAG]) {
+    const bridgedBufferFrom = function exportMarkerBufferFrom(value, ...args) {
+      const payload = markerPayload(value);
+      if (payload) return createMarker(payload);
+      return originalBufferFrom.call(Buffer, value, ...args);
+    };
+    Object.defineProperty(bridgedBufferFrom, BRIDGE_FLAG, { value: true });
+    Buffer.from = bridgedBufferFrom;
+  }
+
   async function cleanupStaleFiles() {
     try {
       await mkdir(tempRoot, { recursive: true });

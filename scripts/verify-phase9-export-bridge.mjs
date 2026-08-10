@@ -41,7 +41,7 @@ const server = http.createServer(async (req, res) => {
 
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", 'attachment; filename="phase9-smoke.xlsx"');
-    const workbookResult = await workbook.xlsx.writeBuffer();
+    const workbookResult = Buffer.from(await workbook.xlsx.writeBuffer());
     // Routes commonly derive Content-Length from the Buffer-compatible marker.
     // Native-safe markers have zero backing bytes, so the response bridge must
     // replace that placeholder with the deferred payload's real length.
