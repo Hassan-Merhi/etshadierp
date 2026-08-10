@@ -49,7 +49,16 @@ def is_target(finding):
         return (finding['kind'], finding.get('name'), finding['text']) in sales_targets
     return False
 
+def finding_key(finding):
+    return (
+        finding['file'],
+        finding['kind'],
+        finding.get('name'),
+        finding['text'],
+    )
+
 targets = [finding for finding in report['findings'] if is_target(finding)]
+initial_target_keys = {finding_key(finding) for finding in targets}
 by_file = {}
 for finding in targets:
     by_file.setdefault(finding['file'], []).append(finding)
@@ -118,3 +127,34 @@ for file, findings in by_file.items():
         path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
 
 subprocess.run(['python', 'scripts/final-closeout-i18n-once.py'], cwd=root, check=True)
+
+post_path = pathlib.Path('/tmp/final-closeout-runner-post.json')
+subprocess.run(
+    [
+        'node',
+        'scripts/audit-i18n-phase14.mjs',
+        '--json-out',
+        str(post_path),
+        '--markdown-out',
+        '/tmp/final-closeout-runner-post.md',
+    ],
+    cwd=root,
+    check=True,
+)
+post = json.loads(post_path.read_text(encoding='utf-8'))
+residual = [
+    finding
+    for finding in post['findings']
+    if finding['status'] == 'actionable' and finding_key(finding) in initial_target_keys
+]
+if residual:
+    print('Residual initial closeout targets after codemod:')
+    for finding in residual:
+        print(json.dumps({
+            'module': finding['module'],
+            'file': finding['file'],
+            'line': finding['line'],
+            'kind': finding['kind'],
+            'name': finding.get('name'),
+            'text': finding['text'],
+        }, ensure_ascii=False))
