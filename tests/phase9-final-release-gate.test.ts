@@ -72,6 +72,7 @@ describe("Phase 9 final verification and release contract", () => {
       "scripts/verify-phase9-current-main-release.mjs",
       'ERP_SMOKE_REQUIRE_AUTHENTICATED: "1"',
       'ERP_SMOKE_REQUIRE_EXACT_ROUTES: "1"',
+      "BROWSER_FIXTURE: ${{ steps.browser_fixture.outcome }}",
       "PHASE9_ERP_SMOKE_USERNAME",
       "PHASE9_ERP_SMOKE_PASSWORD",
       "scripts/prepare-phase9-browser-smoke-fixture.mjs",
@@ -84,7 +85,6 @@ describe("Phase 9 final verification and release contract", () => {
     expect(workflow).toContain("scripts/verify-phase9-final-i18n-baseline.mjs");
     expect(workflow).toContain("Record and enforce final release result");
     expect(workflow).toContain("RECONCILIATION: ${{ steps.reconciliation.outcome }}");
-    expect(workflow).toContain("BROWSER_FIXTURE: ${{ steps.browser_fixture.outcome }}");
     expect(workflow).toContain("INSTALL: ${{ steps.install.outcome }}");
     expect(workflow).toContain("SECRET_SCAN: ${{ steps.secret_scan.outcome }}");
     expect(workflow).toContain("set -euo pipefail");

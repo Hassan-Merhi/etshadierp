@@ -9,8 +9,12 @@ describe("global application language integration", () => {
   it("mounts the language provider for both login and authenticated routes", () => {
     const app = read("client/src/App.tsx");
     expect(app.match(/<ApplicationLanguageProvider>/g)).toHaveLength(2);
-    expect(app).toContain("<ApplicationLanguageProvider>\n                  <Login />");
-    expect(app).toContain("<ApplicationLanguageProvider>\n      <CompanyProvider>");
+    for (const routeScopedProvider of [
+      "<ApplicationLanguageProvider>\n                  <Login />",
+      "<ApplicationLanguageProvider>\n      <CompanyProvider>",
+    ]) {
+      expect(app).toContain(routeScopedProvider);
+    }
     expect(app).not.toContain("GlobalLanguageSwitch");
     expect(fs.existsSync(path.join(root, "client/src/components/GlobalLanguageSwitch.tsx"))).toBe(false);
   });
