@@ -434,11 +434,6 @@
         0,
         0
       ],
-      "client/src/pages/AnalyticsLegacy.tsx": [
-        18,
-        0,
-        0
-      ],
       "client/src/pages/BalanceRepair.tsx": [
         4,
         0,
@@ -864,8 +859,28 @@
         0,
         0
       ],
+      "client/src/pages/analyticslegacy/components/ContainersSectionPanel.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/analyticslegacy/components/ReportsSectionPanel.tsx": [
+        5,
+        0,
+        0
+      ],
+      "client/src/pages/analyticslegacy/components/SalesSectionPanel.tsx": [
+        6,
+        0,
+        0
+      ],
       "client/src/pages/analyticslegacy/types.ts": [
         1,
+        0,
+        0
+      ],
+      "client/src/pages/analyticslegacy/useAnalyticsLegacy.tsx": [
+        3,
         0,
         0
       ],

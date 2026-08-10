@@ -7,8 +7,13 @@ import {
 
 describe("Phase 3 shared interface translations", () => {
   it("covers every reviewed shared UI phrase exactly once", () => {
-    expect(phase3SharedUiTranslations).toHaveLength(542);
-    expect(new Set(phase3SharedUiTranslations.map((entry) => entry.en)).size).toBe(542);
+    // 542 (main) + 2: "Particulars" and "Adjust your filters and try again" were
+    // added when AnalyticsLegacy.tsx was split. That split moved those literals into
+    // the reports-exports i18n module, which must stay at zero actionable strings, so
+    // translating them was the only resolution that neither renamed a component to
+    // dodge the path-based classifier nor weakened that invariant.
+    expect(phase3SharedUiTranslations).toHaveLength(544);
+    expect(new Set(phase3SharedUiTranslations.map((entry) => entry.en)).size).toBe(544);
 
     for (const entry of phase3SharedUiTranslations) {
       expect(entry.en.trim()).not.toBe("");
