@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -54,6 +54,17 @@ function matchesCatalogSearch(product: BilingualProduct, search: string): boolea
   ].some((value) => value?.toLocaleLowerCase().includes(needle));
 }
 
+function filterCatalog(
+  products: BilingualProduct[],
+  search: string,
+  translationFilter: TranslationFilter
+): BilingualProduct[] {
+  if (!search && translationFilter === "all") return products;
+  return products.filter(
+    (product) => matchesCatalogSearch(product, search) && matchesTranslationFilter(product, translationFilter)
+  );
+}
+
 function CatalogFetchBoundary({
   language,
   search,
@@ -64,7 +75,15 @@ function CatalogFetchBoundary({
   translationFilter: TranslationFilter;
 }) {
   const [ready, setReady] = useState(false);
+  const fullCatalogRef = useRef<BilingualProduct[] | null>(null);
+  const searchRef = useRef(search);
+  const translationFilterRef = useRef(translationFilter);
+  searchRef.current = search;
+  translationFilterRef.current = translationFilter;
 
+  // Install one fetch boundary per language. Search and translation-status are
+  // presentation state, so they must never remount this boundary or evict the
+  // underlying language catalog from React Query.
   useLayoutEffect(() => {
     const originalFetch = window.fetch;
     const patchedFetch: typeof window.fetch = async (input, init) => {
@@ -75,22 +94,19 @@ function CatalogFetchBoundary({
       const isRelative = rawUrl.startsWith("/");
 
       if (parsed.pathname === "/api/factory/bale-products") {
-        // Phase 4 bandwidth fix: search/status filters are presentation state,
-        // not different server datasets. Fetch one language-specific catalog
-        // representation and filter it locally so typing does not create a new
-        // large HTTP response for every debounced search term.
         parsed.searchParams.delete("q");
         parsed.searchParams.set("lang", language);
         const response = await originalFetch(
           isRelative ? `${parsed.pathname}${parsed.search}` : parsed.toString(),
           init
         );
-        if (!response.ok || (!search && translationFilter === "all")) return response;
+        if (!response.ok) return response;
 
         const products = (await response.clone().json()) as BilingualProduct[];
-        const filtered = products.filter(
-          (product) => matchesCatalogSearch(product, search) && matchesTranslationFilter(product, translationFilter)
-        );
+        fullCatalogRef.current = products;
+        const filtered = filterCatalog(products, searchRef.current, translationFilterRef.current);
+        if (filtered === products) return response;
+
         const headers = new Headers(response.headers);
         headers.set("content-type", "application/json; charset=utf-8");
         headers.delete("content-length");
@@ -117,7 +133,19 @@ function CatalogFetchBoundary({
       queryClient.removeQueries({ queryKey: ["/api/factory/bale-products"] });
       queryClient.removeQueries({ queryKey: ["/api/factory/categories"] });
     };
-  }, [language, search, translationFilter]);
+  }, [language]);
+
+  // Reuse the full language catalog already in memory. This updates the active
+  // BaleProducts observer directly, so typing/filtering performs no query
+  // removal, no refetch, and no extra catalog response.
+  useEffect(() => {
+    const products = fullCatalogRef.current;
+    if (!products) return;
+    queryClient.setQueryData(
+      ["/api/factory/bale-products"],
+      filterCatalog(products, search, translationFilter)
+    );
+  }, [search, translationFilter]);
 
   return ready ? <BaleProductsPage /> : null;
 }
@@ -245,7 +273,7 @@ export default function BaleProductsBilingual() {
       </div>
 
       <CatalogFetchBoundary
-        key={`${language}:${requestSearch}:${translationFilter}`}
+        key={language}
         language={language}
         search={requestSearch}
         translationFilter={translationFilter}
