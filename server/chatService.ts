@@ -18,12 +18,7 @@ import {
   matchLocationByName,
 } from "./services/stockTransferAnalysis";
 
-import {
-  type AIProvider,
-  getSelectedAIProvider,
-  getAvailableProviders,
-  callAIWithFallback,
-} from "./chat/aiProviders";
+import { type AIProvider, getSelectedAIProvider, getAvailableProviders, callAIWithFallback } from "./chat/aiProviders";
 
 import { runDataQuery } from "./chat/reports";
 
@@ -234,11 +229,7 @@ async function tryBuildEarlyMultiSourceTargetTransfer(
   return { response: responseText, suggestions, provider: usedProvider, stockTransferDrafts: draftsPayload };
 }
 
-import {
-  getCachedERPContext,
-  type ERPContext,
-  type UserPreferences,
-} from "./chat/erpContext";
+import { getCachedERPContext, type ERPContext, type UserPreferences } from "./chat/erpContext";
 export { getERPContext, clearERPContextCache } from "./chat/erpContext";
 
 import {
@@ -530,7 +521,9 @@ Rules:
       selectedProvider
     );
     if (earlyMultiSourceTransfer) {
-      logger.info(`[ChatService] Early deterministic multi-source stock-transfer route handled request; hard-returning.`);
+      logger.info(
+        `[ChatService] Early deterministic multi-source stock-transfer route handled request; hard-returning.`
+      );
       return earlyMultiSourceTransfer;
     }
 
@@ -669,7 +662,9 @@ If the intent is unclear or amounts/accounts are too ambiguous to resolve, respo
                   entry.balanceBefore = parseFloat((balResult.rows[0] as any)?.net || "0");
                 }
               }
-            } catch (_) {}
+            } catch (_) {
+              // Failure here is non-fatal and the surrounding flow continues deliberately.
+            }
             voucherDraft = parsed;
           }
         }
@@ -767,7 +762,9 @@ If intent is unclear, respond with exactly: null`;
                   }
                 }
               }
-            } catch (_) {}
+            } catch (_) {
+              // Failure here is non-fatal and the surrounding flow continues deliberately.
+            }
             stockAdjustmentDraft = parsedAdj;
           }
         }
@@ -1465,9 +1462,7 @@ If this is not this kind of quantity-target multi-source transfer request, respo
                 );
 
                 const missingNote =
-                  unresolvedSources.length > 0
-                    ? ` (couldn't find: ${unresolvedSources.join(", ")})`
-                    : "";
+                  unresolvedSources.length > 0 ? ` (couldn't find: ${unresolvedSources.join(", ")})` : "";
 
                 if (ctx.noEligibleStock) {
                   stockTransferResponseOverride = onlyDestinationStockGroups
@@ -1516,24 +1511,24 @@ If this is not this kind of quantity-target multi-source transfer request, respo
             }
           } else {
             stockTransferResponseOverride =
-              "I couldn't tell which destination, source location(s), and total quantity you want for this transfer. Could you restate it, e.g. \"transfer 410 bales to Kolwezi from Hadi 1,2,3,4\"?";
+              'I couldn\'t tell which destination, source location(s), and total quantity you want for this transfer. Could you restate it, e.g. "transfer 410 bales to Kolwezi from Hadi 1,2,3,4"?';
           }
         } else {
           const [items, locs] = await Promise.all([
-          db
-            .select({ id: schema.stockItems.id, name: schema.stockItems.name, code: schema.stockItems.code })
-            .from(schema.stockItems)
-            .where(and(eq(schema.stockItems.companyId, companyId), eq(schema.stockItems.active, true)))
-            .limit(120),
-          db
-            .select({ id: schema.locations.id, name: schema.locations.name })
-            .from(schema.locations)
-            .where(eq(schema.locations.companyId, companyId))
-            .limit(30),
-        ]);
+            db
+              .select({ id: schema.stockItems.id, name: schema.stockItems.name, code: schema.stockItems.code })
+              .from(schema.stockItems)
+              .where(and(eq(schema.stockItems.companyId, companyId), eq(schema.stockItems.active, true)))
+              .limit(120),
+            db
+              .select({ id: schema.locations.id, name: schema.locations.name })
+              .from(schema.locations)
+              .where(eq(schema.locations.companyId, companyId))
+              .limit(30),
+          ]);
 
-        const today = new Date().toISOString().slice(0, 10);
-        const transferPrompt = `You are a stock transfer extraction assistant.
+          const today = new Date().toISOString().slice(0, 10);
+          const transferPrompt = `You are a stock transfer extraction assistant.
 User message: "${userMessage}"
 Today: ${today}
 Stock items (id:name:code): ${items.map((i) => `${i.id}:${i.name}:${i.code}`).join(" | ")}
@@ -1551,35 +1546,35 @@ Respond with ONLY valid JSON (no markdown):
 
 If intent is unclear or this is not a stock transfer request, respond with exactly: null`;
 
-        const tfResult = await callAIWithFallback(
-          selectedProvider,
-          transferPrompt,
-          [],
-          "Extract stock transfer or return null"
-        );
-        const rawTf = tfResult.response
-          .trim()
-          .replace(/```json\n?|```/g, "")
-          .trim();
-        if (rawTf !== "null" && rawTf.startsWith("{")) {
-          const parsedTf = JSON.parse(rawTf);
-          if (parsedTf && parsedTf.sourceLocationId && parsedTf.destinationLocationId && parsedTf.items?.length > 0) {
-            // Enrich with currentStock
-            for (const item of parsedTf.items) {
-              if (item.stockItemId && parsedTf.sourceLocationId) {
-                const invResult = await db.execute(sql`
+          const tfResult = await callAIWithFallback(
+            selectedProvider,
+            transferPrompt,
+            [],
+            "Extract stock transfer or return null"
+          );
+          const rawTf = tfResult.response
+            .trim()
+            .replace(/```json\n?|```/g, "")
+            .trim();
+          if (rawTf !== "null" && rawTf.startsWith("{")) {
+            const parsedTf = JSON.parse(rawTf);
+            if (parsedTf && parsedTf.sourceLocationId && parsedTf.destinationLocationId && parsedTf.items?.length > 0) {
+              // Enrich with currentStock
+              for (const item of parsedTf.items) {
+                if (item.stockItemId && parsedTf.sourceLocationId) {
+                  const invResult = await db.execute(sql`
                   SELECT COALESCE(SUM(CAST(quantity AS numeric)), 0) AS qty
                   FROM inventory
                   WHERE stock_item_id = ${item.stockItemId}
                     AND location_id = ${parsedTf.sourceLocationId}
                     AND company_id = ${companyId}
                 `);
-                item.currentStock = parseFloat((invResult.rows[0] as any)?.qty || "0");
+                  item.currentStock = parseFloat((invResult.rows[0] as any)?.qty || "0");
+                }
               }
+              stockTransferDraft = parsedTf;
             }
-            stockTransferDraft = parsedTf;
           }
-        }
         }
 
         // ── Anti-hallucination guard: never let the assistant claim a draft
@@ -1594,17 +1589,18 @@ If intent is unclear or this is not a stock transfer request, respond with exact
             stockTransferResponseOverride =
               stockTransferDraft.analysisSummary ||
               "That location name matches more than one location. Please tell me exactly which one you mean.";
-          } else if (
-            !stockTransferDraft &&
-            (!stockTransferDrafts || stockTransferDrafts.length === 0)
-          ) {
+          } else if (!stockTransferDraft && (!stockTransferDrafts || stockTransferDrafts.length === 0)) {
             stockTransferResponseOverride =
               "I wasn't able to build a stock transfer draft from that — please tell me the exact source location, destination location, and which item(s)/quantities (or a total target quantity) to move.";
           }
         }
       } catch (_) {
         // Extraction failed silently
-        if (!stockTransferResponseOverride && !stockTransferDraft && (!stockTransferDrafts || stockTransferDrafts.length === 0)) {
+        if (
+          !stockTransferResponseOverride &&
+          !stockTransferDraft &&
+          (!stockTransferDrafts || stockTransferDrafts.length === 0)
+        ) {
           stockTransferResponseOverride =
             "I wasn't able to build a stock transfer draft from that — please tell me the exact source location, destination location, and which item(s)/quantities (or a total target quantity) to move.";
         }
@@ -1631,9 +1627,9 @@ If intent is unclear or this is not a stock transfer request, respond with exact
       try {
         // Try to extract a container number from the message
         const containerNumMatch =
-          userMessage.match(/container\s+(?:no\.?\s*|number\s+|#\s*)?["']?([A-Z0-9][A-Z0-9\-\/]{3,25})["']?/i) ||
+          userMessage.match(/container\s+(?:no\.?\s*|number\s+|#\s*)?["']?([A-Z0-9][A-Z0-9\-/]{3,25})["']?/i) ||
           userMessage.match(/\b([A-Z]{4}\d{6,7})\b/) ||
-          userMessage.match(/\bfor\s+["']?([A-Z0-9][A-Z0-9\-]{4,20})["']?\s*(?:$|\s)/i);
+          userMessage.match(/\bfor\s+["']?([A-Z0-9][A-Z0-9-]{4,20})["']?\s*(?:$|\s)/i);
 
         const containerNumber = containerNumMatch ? containerNumMatch[1].toUpperCase() : null;
 
@@ -1873,7 +1869,11 @@ If the intent does not match any type, output: null`;
         suggestions: [],
       };
     }
-    if (getErrorMessage(error)?.includes("quota") || getErrorMessage(error)?.includes("rate limit") || getErrorMessage(error)?.includes("429")) {
+    if (
+      getErrorMessage(error)?.includes("quota") ||
+      getErrorMessage(error)?.includes("rate limit") ||
+      getErrorMessage(error)?.includes("429")
+    ) {
       const available = getAvailableProviders();
       return {
         response: `API quota exceeded. ${available.length > 1 ? "Trying fallback providers also failed. " : ""}Please try again later or add additional AI provider keys in your environment.`,

@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { db } from "../../../db";
@@ -17,7 +17,7 @@ import { resultRows } from "../../../lib/queryResult";
 export function registerV5ProformaCreateRoutes(app: Express) {
   // ── POST /api/factory/v5/proforma-with-loading ──────────────────────────
   // Body: { customerId, name, isActive, lines[], sendToLoading, containerNames[] }
-  app.post("/api/factory/v5/proforma-with-loading", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/v5/proforma-with-loading", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -110,7 +110,7 @@ export function registerV5ProformaCreateRoutes(app: Express) {
   // Creates customer_orders + customer_order_expected_lines for each new container.
   // Does NOT touch existing containers or their expected lines.
   // V5 guard: proformaIdUsed IS NOT NULL (all created orders are V5 by construction)
-  app.post("/api/factory/v5/proforma/:proformaId/add-containers", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/v5/proforma/:proformaId/add-containers", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

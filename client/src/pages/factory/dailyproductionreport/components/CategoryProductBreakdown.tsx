@@ -3,12 +3,12 @@
  *
  * Extracted from DailyProductionReport.tsx during the Phase 4 god-file split.
  */
-import {useState, useMemo} from "react";
-import {Badge} from "@/components/ui/badge";
-import {Button} from "@/components/ui/button";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {ChevronDown, ChevronRight, Tag} from "lucide-react";
-import {fmtKg, fmtMoney} from "../utils";
+import { useState, useMemo } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ChevronDown, ChevronRight, Tag } from "lucide-react";
+import { fmtKg, fmtMoney } from "../utils";
 
 export function CategoryProductBreakdown({
   categories,

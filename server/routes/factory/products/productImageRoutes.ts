@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { parseId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { db } from "../../../db";
@@ -41,7 +41,7 @@ export function registerFactoryProductImageRoutes(app: Express) {
     },
   });
 
-  app.get("/api/factory/bale-product-images", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/bale-product-images", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -59,7 +59,7 @@ export function registerFactoryProductImageRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/bale-product-images", requireAuth, (req: any, res: any) => {
+  app.post("/api/factory/bale-product-images", requireAuth, (req: Request, res: Response) => {
     productImageUpload.single("image")(req, res, async (err: any) => {
       try {
         if (err) return res.status(400).json({ message: getErrorMessage(err) });
@@ -87,7 +87,7 @@ export function registerFactoryProductImageRoutes(app: Express) {
     });
   });
 
-  app.delete("/api/factory/bale-product-images/:id", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/bale-product-images/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

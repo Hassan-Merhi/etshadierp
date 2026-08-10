@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { eq, and, desc, sql } from "drizzle-orm";
@@ -24,7 +24,7 @@ import {
 import { balePhotoUpload } from "./_helpers";
 
 export function registerFactoryBaleTracePhotoRoutes(app: Express, requireAuth: any, db: any) {
-  app.get("/api/factory/bales/:id/trace", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/bales/:id/trace", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -121,7 +121,7 @@ export function registerFactoryBaleTracePhotoRoutes(app: Express, requireAuth: a
   // 10. Bale Photos
   // ───────────────────────────────────────────────
 
-  app.get("/api/factory/bales/:id/photos", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/bales/:id/photos", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -145,7 +145,7 @@ export function registerFactoryBaleTracePhotoRoutes(app: Express, requireAuth: a
     "/api/factory/bales/:id/photos",
     requireAuth,
     balePhotoUpload.single("photo"),
-    async (req: any, res: any) => {
+    async (req: Request, res: Response) => {
       try {
         const companyId =
           req.body.companyId || (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
@@ -175,7 +175,7 @@ export function registerFactoryBaleTracePhotoRoutes(app: Express, requireAuth: a
     }
   );
 
-  app.delete("/api/factory/bale-photos/:photoId", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/bale-photos/:photoId", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -206,7 +206,7 @@ export function registerFactoryBaleTracePhotoRoutes(app: Express, requireAuth: a
     }
   });
 
-  app.get("/api/factory/uploads/bale-photos/:filename", requireAuth, (req: any, res: any) => {
+  app.get("/api/factory/uploads/bale-photos/:filename", requireAuth, (req: Request, res: Response) => {
     try {
       // Strip any directory component from the supplied filename so a caller
       // cannot escape the uploads/bale-photos directory with "../" segments.

@@ -350,6 +350,7 @@ export function applyRemoteKeyboardCommand(
   }
 
   if (command.type === "insert-text") {
+    // eslint-disable-next-line no-control-regex -- matching control characters is the point — this is the remote-input trust boundary, and C0/DEL in injected text is how a keystroke stream smuggles control codes
     if (typeof command.text !== "string" || command.text.length === 0 || /[\u0000-\u001f\u007f]/u.test(command.text)) {
       return { status: "ignored", reason: "invalid-text" };
     }

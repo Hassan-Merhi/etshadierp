@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
@@ -16,48 +16,52 @@ import { ApplySnapshot, parseNum } from "./_helpers";
 
 export function registerBalanceRepairUndoRoutes(app: Express) {
   // ── POST /api/admin/repair-balances/undo ────────────────────────────────
-  app.post("/api/admin/repair-balances/undo", requireAuth, requireRole("Admin"), async (req: any, res: any) => {
-    try {
-      const { snapshot } = req.body as { snapshot: ApplySnapshot };
-      if (!snapshot) return res.status(400).json({ message: "No snapshot provided" });
+  app.post(
+    "/api/admin/repair-balances/undo",
+    requireAuth,
+    requireRole("Admin"),
+    async (req: Request, res: Response) => {
+      try {
+        const { snapshot } = req.body as { snapshot: ApplySnapshot };
+        if (!snapshot) return res.status(400).json({ message: "No snapshot provided" });
 
-      // 1. Revert ledger drift
-      for (const s of snapshot.ledgerSnapshots ?? []) {
-        await db
-          .update(propertyMonthlyLedger)
-          .set({ paidAmount: s.oldPaid.toFixed(2) })
-          .where(eq(propertyMonthlyLedger.id, s.id));
-      }
+        // 1. Revert ledger drift
+        for (const s of snapshot.ledgerSnapshots ?? []) {
+          await db
+            .update(propertyMonthlyLedger)
+            .set({ paidAmount: s.oldPaid.toFixed(2) })
+            .where(eq(propertyMonthlyLedger.id, s.id));
+        }
 
-      // 2. Remove inserted voucher entries
-      for (const entryId of snapshot.voucherEntriesAdded ?? []) {
-        await db.execute(sql`DELETE FROM voucher_entries WHERE id = ${entryId}`);
-      }
+        // 2. Remove inserted voucher entries
+        for (const entryId of snapshot.voucherEntriesAdded ?? []) {
+          await db.execute(sql`DELETE FROM voucher_entries WHERE id = ${entryId}`);
+        }
 
-      // 3. Re-soft-delete vouchers that were un-deleted
-      for (const v of snapshot.vouchersUndeleted ?? []) {
-        await db.execute(sql`UPDATE vouchers SET deleted_at = NOW() WHERE id = ${v.id}`);
-      }
+        // 3. Re-soft-delete vouchers that were un-deleted
+        for (const v of snapshot.vouchersUndeleted ?? []) {
+          await db.execute(sql`UPDATE vouchers SET deleted_at = NOW() WHERE id = ${v.id}`);
+        }
 
-      // 4. Restore deleted orphaned vouchers + their entries, then re-link transfer
-      for (const ov of snapshot.orphanedVouchersDeleted ?? []) {
-        // Re-insert voucher with same id (use raw SQL to preserve id)
-        await db.execute(sql`
+        // 4. Restore deleted orphaned vouchers + their entries, then re-link transfer
+        for (const ov of snapshot.orphanedVouchersDeleted ?? []) {
+          // Re-insert voucher with same id (use raw SQL to preserve id)
+          await db.execute(sql`
             INSERT INTO vouchers (id, company_id, voucher_number, voucher_type, voucher_date, description, total_amount)
             VALUES (${ov.id}, ${ov.companyId}, ${ov.voucherNumber}, ${ov.voucherType}, ${ov.voucherDate}::date, ${ov.description}, ${ov.totalAmount})
             ON CONFLICT (id) DO NOTHING
           `);
-        for (const e of ov.entries) {
-          await db.execute(sql`
+          for (const e of ov.entries) {
+            await db.execute(sql`
               INSERT INTO voucher_entries (voucher_id, ledger_account_id, debit_amount, credit_amount, narration)
               VALUES (${ov.id}, ${e.ledgerAccountId}, ${e.debitAmount}, ${e.creditAmount}, ${e.narration})
             `);
+          }
         }
-      }
 
-      // 5. Re-insert deleted inter_company_transfers rows
-      for (const t of snapshot.transfersDeleted ?? []) {
-        await db.execute(sql`
+        // 5. Re-insert deleted inter_company_transfers rows
+        for (const t of snapshot.transfersDeleted ?? []) {
+          await db.execute(sql`
             INSERT INTO inter_company_transfers
               (id, transfer_type, from_company_id, to_company_id, transfer_date, amount,
                from_ledger_account_id, to_ledger_account_id, from_voucher_id, to_voucher_id,
@@ -68,30 +72,31 @@ export function registerBalanceRepairUndoRoutes(app: Express) {
                ${t.description}, ${t.sourcePaymentId})
             ON CONFLICT (id) DO NOTHING
           `);
-      }
+        }
 
-      // 6. Revert deposit flags
-      for (const s of snapshot.depositSnapshots ?? []) {
-        await db
-          .update(propertyContracts)
-          .set({
-            guaranteePostedToStatement: s.oldFlag,
-            guaranteePostedAmount: s.oldPostedAmount.toFixed(2),
-          })
-          .where(eq(propertyContracts.id, s.contractId));
-      }
+        // 6. Revert deposit flags
+        for (const s of snapshot.depositSnapshots ?? []) {
+          await db
+            .update(propertyContracts)
+            .set({
+              guaranteePostedToStatement: s.oldFlag,
+              guaranteePostedAmount: s.oldPostedAmount.toFixed(2),
+            })
+            .where(eq(propertyContracts.id, s.contractId));
+        }
 
-      res.json({
-        ledgerRestored: (snapshot.ledgerSnapshots ?? []).length,
-        entriesRemoved: (snapshot.voucherEntriesAdded ?? []).length,
-        orphansRestored: (snapshot.transfersDeleted ?? []).length,
-        depositsRestored: (snapshot.depositSnapshots ?? []).length,
-      });
-    } catch (err: unknown) {
-      logger.error("[BalanceRepair] undo error:", { error: err });
-      res.status(500).json({ message: getErrorMessage(err) });
+        res.json({
+          ledgerRestored: (snapshot.ledgerSnapshots ?? []).length,
+          entriesRemoved: (snapshot.voucherEntriesAdded ?? []).length,
+          orphansRestored: (snapshot.transfersDeleted ?? []).length,
+          depositsRestored: (snapshot.depositSnapshots ?? []).length,
+        });
+      } catch (err: unknown) {
+        logger.error("[BalanceRepair] undo error:", { error: err });
+        res.status(500).json({ message: getErrorMessage(err) });
+      }
     }
-  });
+  );
 
   // ── POST /api/properties/repair/reallocate-payments/:contractId ────────────
   // Two-phase fix:
@@ -104,7 +109,7 @@ export function registerBalanceRepairUndoRoutes(app: Express) {
     "/api/properties/repair/reallocate-payments/:contractId",
     requireAuth,
     requireRole("Admin"),
-    async (req: any, res: any) => {
+    async (req: Request, res: Response) => {
       try {
         const companyId: number | undefined = req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });

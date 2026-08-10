@@ -11,7 +11,9 @@ import { hashPassword, logAudit, verifyPassword } from "../_helpers";
 async function invalidateUserSessions(userId: string) {
   try {
     await db.execute(sql`DELETE FROM session WHERE sess::jsonb ->> 'userId' = ${userId}`);
-  } catch (_error) {}
+  } catch (_error) {
+    // Failure here is non-fatal and the surrounding flow continues deliberately.
+  }
 }
 
 export function registerUserAdministrationRoutes(app: Express) {
@@ -81,7 +83,8 @@ export function registerUserAdministrationRoutes(app: Express) {
       if (!currentPassword || !newPassword) {
         return res.status(400).json({ message: "Current password and new password are required" });
       }
-      if (newPassword.length < 4) return res.status(400).json({ message: "New password must be at least 4 characters" });
+      if (newPassword.length < 4)
+        return res.status(400).json({ message: "New password must be at least 4 characters" });
       const userId = req.user?.id;
       if (!userId) return res.status(401).json({ message: "Not authenticated" });
       const user = await storage.getUser(userId);
@@ -130,7 +133,9 @@ export function registerUserAdministrationRoutes(app: Express) {
         .where(and(eq(userCompanyRoles.userId, parsed.userId), eq(userCompanyRoles.companyId, parsed.companyId)))
         .limit(1);
       if (existing.length > 0) {
-        return res.status(409).json({ message: "This user already has a role in this company. Edit the existing role instead." });
+        return res
+          .status(409)
+          .json({ message: "This user already has a role in this company. Edit the existing role instead." });
       }
       const role = await storage.createUserCompanyRole(parsed);
       await logAudit({

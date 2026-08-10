@@ -1,6 +1,6 @@
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 
@@ -10,7 +10,7 @@ import { sqlArray } from "../../../lib/sqlArray";
 import { resultRows } from "../../../lib/queryResult";
 
 export function registerEmployeeAttendanceRoutes(app: Express) {
-  app.get("/api/factory/net-position/payroll-breakdown", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/net-position/payroll-breakdown", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -57,7 +57,7 @@ export function registerEmployeeAttendanceRoutes(app: Express) {
   // GET /api/factory/workers/attendance-report?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
   // Also supports legacy ?year=YYYY&month=M params.
   // Returns all active workers + attendance matrix for the given date range.
-  app.get("/api/factory/workers/attendance-report", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/workers/attendance-report", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -240,7 +240,7 @@ export function registerEmployeeAttendanceRoutes(app: Express) {
 
   // GET /api/factory/monthly-salary-summary?date=YYYY-MM-DD
   // Returns month totals prorated to the given date (defaults to today)
-  app.get("/api/factory/monthly-salary-summary", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/monthly-salary-summary", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

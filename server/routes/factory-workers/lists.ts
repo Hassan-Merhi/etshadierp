@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { parseOptionalId } from "../../lib/parseId";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -18,7 +18,7 @@ import { parseListPagination, setListPaginationHeaders } from "../../lib/listPag
 export function registerFactoryWorkerListRoutes(app: Express, requireAuth: any, db: any) {
   // GET /api/factory/workers/with-balances - List active workers with computed current balances
   // Balance = total advances (debit) minus total paid payroll net salary (credit), all-time
-  app.get("/api/factory/workers/with-balances", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/workers/with-balances", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -74,7 +74,7 @@ export function registerFactoryWorkerListRoutes(app: Express, requireAuth: any, 
   });
 
   // GET /api/factory/workers - List workers
-  app.get("/api/factory/workers", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/workers", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -183,7 +183,7 @@ export function registerFactoryWorkerListRoutes(app: Express, requireAuth: any, 
   });
 
   // GET /api/factory/workers/nationalities - Distinct nationalities saved for this company
-  app.get("/api/factory/workers/nationalities", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/workers/nationalities", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -206,7 +206,7 @@ export function registerFactoryWorkerListRoutes(app: Express, requireAuth: any, 
   });
 
   // GET /api/factory/workers/document-counts - Document count per worker
-  app.get("/api/factory/workers/document-counts", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/workers/document-counts", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });

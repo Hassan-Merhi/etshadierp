@@ -1,7 +1,7 @@
 import { parseId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { getLockedSupplierRate } from "../../../services/factory/rawStockLockedRate";
@@ -20,7 +20,7 @@ import {
 import { eq, and, desc, sql, inArray, ilike, isNull } from "drizzle-orm";
 
 export function registerRawStockAdjRoutes(app: Express) {
-  app.get("/api/factory/raw-stock/adjustments", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/raw-stock/adjustments", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -59,7 +59,7 @@ export function registerRawStockAdjRoutes(app: Express) {
 
   // GET combined history for a specific supplier's raw material
   // Returns adjustments + mix batch usage sorted newest-first
-  app.get("/api/factory/raw-stock/history/:supplierId", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/raw-stock/history/:supplierId", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -231,7 +231,7 @@ export function registerRawStockAdjRoutes(app: Express) {
   });
 
   // POST create a new adjustment (ADD or REMOVE), or create a new standalone manual material
-  app.post("/api/factory/raw-stock/adjustment", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/raw-stock/adjustment", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -370,7 +370,7 @@ export function registerRawStockAdjRoutes(app: Express) {
   });
 
   // DELETE a specific adjustment
-  app.delete("/api/factory/raw-stock/adjustments/:id", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/raw-stock/adjustments/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -475,7 +475,7 @@ export function registerRawStockAdjRoutes(app: Express) {
   });
 
   // DELETE a batch source entry for a supplier from a batch (reverses usedKg on raw stock)
-  app.delete("/api/factory/raw-stock/batch-source", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/raw-stock/batch-source", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -552,7 +552,7 @@ export function registerRawStockAdjRoutes(app: Express) {
   });
 
   // DELETE a container raw stock receipt (only if no kg has been used yet)
-  app.delete("/api/factory/raw-stock/receipts/:rawStockId", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/raw-stock/receipts/:rawStockId", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -603,7 +603,7 @@ export function registerRawStockAdjRoutes(app: Express) {
   });
 
   // PATCH update receivedKg on a container raw stock record (fixes balance going forward)
-  app.patch("/api/factory/raw-stock/receipts/:rawStockId", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/raw-stock/receipts/:rawStockId", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -644,7 +644,7 @@ export function registerRawStockAdjRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/raw-stock/by-container", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/raw-stock/by-container", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -693,7 +693,7 @@ export function registerRawStockAdjRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/raw-stock/available-containers", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/raw-stock/available-containers", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

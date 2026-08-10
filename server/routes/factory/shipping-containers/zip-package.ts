@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { db } from "../../../db";
@@ -24,7 +24,7 @@ import { fetchInternalBuffer, getCompanyId } from "./_helpers";
 
 export function registerShippingZipPackageRoutes(app: Express) {
   // ── GET download ZIP package ──────────────────────────────────────────────────
-  app.get("/api/factory/shipping-container-rows/:id/zip-package", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/shipping-container-rows/:id/zip-package", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -136,7 +136,7 @@ export function registerShippingZipPackageRoutes(app: Express) {
             }
 
             if (pdfBuf) {
-              const safeClient = (row.clientName || "client").replace(/[^\w\-]/g, "_");
+              const safeClient = (row.clientName || "client").replace(/[^\w-]/g, "_");
               archive.append(pdfBuf, { name: `Customer_Statement_${safeClient}.pdf` });
             }
 

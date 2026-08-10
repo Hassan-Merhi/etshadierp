@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
@@ -93,7 +93,7 @@ async function computeStockTruth(companyId: number) {
 export function registerFactoryStockAllocationV2Routes(app: Express) {
   // Phase 4: single backend endpoint returns computed stock truth per article.
   // Phase 5: frontend renders these values directly — no availability math on client.
-  app.get("/api/factory/v2/stock-allocation", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/v2/stock-allocation", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -258,7 +258,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
   });
 
   // Loading-mode: same data structure as v1 but sourced cleanly from backend truth
-  app.get("/api/factory/v2/stock-allocation/loading-mode", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/v2/stock-allocation/loading-mode", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

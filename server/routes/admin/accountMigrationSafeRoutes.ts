@@ -1,16 +1,10 @@
 import { randomUUID } from "crypto";
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../../db";
 import { requireAuth, requireRole } from "../../auth";
 import { logger } from "../../lib/logger";
-import {
-  auditLog,
-  companies,
-  ledgerAccounts,
-  voucherEntries,
-  vouchers,
-} from "@shared/schema";
+import { auditLog, companies, ledgerAccounts, voucherEntries, vouchers } from "@shared/schema";
 import {
   assertDestinationControlReferencesAreClear,
   detachAccountMigrationControlReferences,
@@ -135,7 +129,7 @@ export function registerAccountMigrationSafeRoutes(app: Express) {
     "/api/admin/account-migration/execute",
     requireAuth,
     requireRole("Admin", "Developer"),
-    async (req: any, res: any) => {
+    async (req: Request, res: Response) => {
       const accountIds = idArray(req.body?.accountIds);
       const srcCompanyId = positiveInt(req.body?.srcCompanyId);
       const destCompanyId = positiveInt(req.body?.destCompanyId);
@@ -167,7 +161,7 @@ export function registerAccountMigrationSafeRoutes(app: Express) {
           if (missingId) {
             throw new AccountMigrationConflict(
               `Account ${missingId} is no longer in the source company. Refresh and preview again.`,
-              404,
+              404
             );
           }
 
@@ -229,7 +223,7 @@ export function registerAccountMigrationSafeRoutes(app: Express) {
                 (entry) =>
                   entry.supplierId !== null ||
                   entry.employeeId !== null ||
-                  (entry.ledgerAccountId !== null && !selectedAccountSet.has(entry.ledgerAccountId)),
+                  (entry.ledgerAccountId !== null && !selectedAccountSet.has(entry.ledgerAccountId))
               );
               if (!shared) movedVoucherIds.push(voucherId);
             }
@@ -310,7 +304,7 @@ export function registerAccountMigrationSafeRoutes(app: Express) {
       } catch (error: unknown) {
         return respondWithError(res, error);
       }
-    },
+    }
   );
 
   app.post(
@@ -319,7 +313,7 @@ export function registerAccountMigrationSafeRoutes(app: Express) {
     requireRole("Admin", "Developer"),
     async (req: any, res: any, next: any) => {
       const accountIds = idArray(
-        Array.isArray(req.body?.accounts) ? req.body.accounts.map((account: any) => account?.accountId) : null,
+        Array.isArray(req.body?.accounts) ? req.body.accounts.map((account: any) => account?.accountId) : null
       );
       const movedVoucherIds = idArray(req.body?.movedVoucherIds, true);
       const srcCompanyId = positiveInt(req.body?.srcCompanyId);
@@ -381,7 +375,7 @@ export function registerAccountMigrationSafeRoutes(app: Express) {
             const owner = sourceCodeOwners.get(account.originalCode);
             if (owner !== undefined && owner !== account.accountId) {
               throw new AccountMigrationConflict(
-                `Another source-company account now uses code ${account.originalCode}.`,
+                `Another source-company account now uses code ${account.originalCode}.`
               );
             }
           }
@@ -420,6 +414,6 @@ export function registerAccountMigrationSafeRoutes(app: Express) {
       } catch (error: unknown) {
         return respondWithError(res, error);
       }
-    },
+    }
   );
 }

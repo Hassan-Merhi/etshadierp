@@ -1,7 +1,7 @@
 /**
  * payrollCoreRoutes: PayrollPaymentSummaryPdf endpoints.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
@@ -13,7 +13,7 @@ import { getFactoryCompanyId } from "./_helpers";
 import { getProductionBonusTotalsForPayrollIds } from "../../../services/payroll/productionBonusPayrollService";
 
 export function registerPayrollPaymentSummaryPdfRoutes(app: Express) {
-  app.post("/api/factory/payrolls/payment-summary-pdf", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/payrolls/payment-summary-pdf", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -63,7 +63,9 @@ export function registerPayrollPaymentSummaryPdfRoutes(app: Express) {
       try {
         convertArabic = (require("arabic-reshaper") as any).convertArabic;
         bidi = (require("bidi-js") as any)();
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
 
       const containsArabic = (text: string) => /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text);
       const shapeText = (text: string): string => {
@@ -99,7 +101,9 @@ export function registerPayrollPaymentSummaryPdfRoutes(app: Express) {
         try {
           doc.image(logoPath, (doc.page.width - 220) / 2, doc.y, { width: 220 });
           doc.moveDown(0.5);
-        } catch {}
+        } catch {
+          // Failure here is non-fatal and the surrounding flow continues deliberately.
+        }
       }
       doc
         .fontSize(11)

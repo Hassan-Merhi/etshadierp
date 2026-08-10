@@ -122,7 +122,9 @@ export function registerPayrollBonusRoutes(app: Express) {
             .limit(1);
           const pctCompanyId = locRow?.companyId ?? companyId;
           pctSales = await querySales(parseInt(pctLocationId), pctCompanyId);
-        } catch {}
+        } catch {
+          // Failure here is non-fatal and the surrounding flow continues deliberately.
+        }
       }
 
       const results: Array<{ employeeId: number; amount: string; breakdown: string[] }> = [];
@@ -145,7 +147,9 @@ export function registerPayrollBonusRoutes(app: Express) {
               total += sub;
               lines.push(`${qty} bales × $${rate} (${data.locationName}) = $${sub.toFixed(2)}`);
             }
-          } catch {}
+          } catch {
+            // Failure here is non-fatal and the surrounding flow continues deliberately.
+          }
         }
 
         // Per-location sales % rates (employee_bale_pct_rates table) — % of sales amount
@@ -162,7 +166,9 @@ export function registerPayrollBonusRoutes(app: Express) {
               total += sub;
               lines.push(`$${sales.toFixed(2)} sales × ${pct}% (${data.locationName}) = $${sub.toFixed(2)}`);
             }
-          } catch {}
+          } catch {
+            // Failure here is non-fatal and the surrounding flow continues deliberately.
+          }
         }
 
         // Legacy single bale rate field — only if no per-location rates
@@ -179,7 +185,9 @@ export function registerPayrollBonusRoutes(app: Express) {
                 total += sub;
                 lines.push(`${qty} bales × $${rate} (${data.locationName}) = $${sub.toFixed(2)}`);
               }
-            } catch {}
+            } catch {
+              // Failure here is non-fatal and the surrounding flow continues deliberately.
+            }
           }
         }
 

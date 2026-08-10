@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../../db";
@@ -43,7 +43,7 @@ async function ownsErpContainer(containerId: number, companyId: number): Promise
  * responses when an ERP user has a stale factory company stored in the session.
  */
 export function registerFactoryContainerReadAccessRoutes(app: Express) {
-  app.get("/api/factory/containers/:containerId/documents", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/containers/:containerId/documents", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = resolveErpContainerCompanyId(req);
       const containerId = parsePositiveId(req.params.containerId);
@@ -83,7 +83,7 @@ export function registerFactoryContainerReadAccessRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/containers/:containerId/freight", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/containers/:containerId/freight", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = resolveErpContainerCompanyId(req);
       const containerId = parsePositiveId(req.params.containerId);

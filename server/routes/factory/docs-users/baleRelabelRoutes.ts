@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
@@ -25,7 +25,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
   /** POST /api/factory/bales/relabel/validate
    *  Dry-run: checks each currentRef against factory_bales. Returns per-row results.
    */
-  app.post("/api/factory/bales/relabel/validate", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/bales/relabel/validate", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -87,7 +87,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
   /** POST /api/factory/bales/relabel/apply
    *  Atomically reassigns reference codes and records audit.
    */
-  app.post("/api/factory/bales/relabel/apply", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/bales/relabel/apply", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -224,7 +224,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
   /** GET /api/factory/bales/relabel/sessions
    *  Recent relabeling history for the company.
    */
-  app.get("/api/factory/bales/relabel/sessions", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/bales/relabel/sessions", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

@@ -86,7 +86,9 @@ export function ContainerListView({
       chargesByCcy = Array.isArray(raw)
         ? raw.map((x: any) => ({ currencyCode: x.currencyCode || "USD", amount: parseFloat(x.amount || "0") }))
         : [];
-    } catch {}
+    } catch {
+      // Malformed or absent payload — fall through to the default rather than surface a parse error.
+    }
     const hasCharges =
       freightAmt > 0 || legacyOtherAmt > 0 || chargesByCcy.some((x) => x.amount > 0) || additionalAmt > 0;
     if (!hasCharges) return <span className="text-muted-foreground">—</span>;

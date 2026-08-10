@@ -256,7 +256,7 @@ export function registerPosWhatsAppRoutes(app: Express): void {
       const hideProfitCols = waVis.hideSelling || waVis.hideCost;
       const pdfBuffer = await generateInvoicePdf(parseInt(voucherId), companyId, senderName, { hideProfitCols });
       const safeDate = (voucher.voucherDate ?? getClientDate(req)).replace(/[^0-9-]/g, "");
-      const safeLoc = (location.name ?? "").replace(/[^\w\s.()\-]/g, "_").trim();
+      const safeLoc = (location.name ?? "").replace(/[^\w\s.()-]/g, "_").trim();
 
       // For credit sales, resolve customer name for the filename
       let customerNameForFile2: string | null = null;
@@ -275,7 +275,7 @@ export function registerPosWhatsAppRoutes(app: Express): void {
         : `${safeLoc} Invoice ${safeDate}`;
       const fileName =
         rawFileName2
-          .replace(/[^\w\s.()\-]/g, "_")
+          .replace(/[^\w\s.()-]/g, "_")
           .replace(/\s+/g, " ")
           .trim() + ".pdf";
       const caption = "";

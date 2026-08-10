@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express, Request } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
@@ -25,7 +25,7 @@ import { firstRow, resultRows } from "../../../lib/queryResult";
 export function registerDispatchInvoiceRoutes(app: Express) {
   // ── GET /api/factory/dispatch-batches/:id/invoice-preview ─────────────────
   // Preview the final invoice before generation — proforma-aware
-  app.get("/api/factory/dispatch-batches/:id/invoice-preview", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/dispatch-batches/:id/invoice-preview", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -171,7 +171,7 @@ export function registerDispatchInvoiceRoutes(app: Express) {
 
   // ── POST /api/factory/dispatch-batches/:id/generate-invoice ───────────────
   // Generate one final invoice from all dispatched truck rides
-  app.post("/api/factory/dispatch-batches/:id/generate-invoice", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/dispatch-batches/:id/generate-invoice", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });

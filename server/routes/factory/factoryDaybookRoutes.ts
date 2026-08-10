@@ -20,7 +20,10 @@ export function registerFactoryDaybookRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const currentUserId = (req.session as any).userId != null ? String((req.session as any).userId) : undefined;
-      let { startDate, endDate, txType, currencyCode } = req.query;
+      // startDate/endDate are reassigned by the unbounded-range guard below;
+      // the other two are read as sent.
+      let { startDate, endDate } = req.query;
+      const { txType, currencyCode } = req.query;
 
       // Guard against unbounded "return everything ever" queries: only apply when
       // the caller omits the params entirely (e.g. a raw/older API call) — not when
@@ -286,7 +289,9 @@ export function registerFactoryDaybookRoutes(app: Express) {
                 if (!baleIdToEntry.has(numId)) baleIdToEntry.set(numId, []);
                 baleIdToEntry.get(numId)!.push({ row, weightKg: parseFloat(b.weightKg || "0") });
               }
-            } catch {}
+            } catch {
+              // Failure here is non-fatal and the surrounding flow continues deliberately.
+            }
           }
           if (baleIdToEntry.size > 0) {
             const allBaleIds = Array.from(baleIdToEntry.keys());

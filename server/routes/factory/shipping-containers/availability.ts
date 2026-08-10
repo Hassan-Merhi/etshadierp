@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
@@ -17,7 +17,7 @@ export function registerShippingAvailabilityRoutes(app: Express) {
   // ── Shipping Availability CRUD ────────────────────────────────────────────────
   const AVAIL_KEY = "/api/factory/shipping-availability";
 
-  app.get(AVAIL_KEY, requireAuth, async (req: any, res: any) => {
+  app.get(AVAIL_KEY, requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -32,7 +32,7 @@ export function registerShippingAvailabilityRoutes(app: Express) {
     }
   });
 
-  app.post(AVAIL_KEY, requireAuth, async (req: any, res: any) => {
+  app.post(AVAIL_KEY, requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -45,7 +45,7 @@ export function registerShippingAvailabilityRoutes(app: Express) {
     }
   });
 
-  app.patch(`${AVAIL_KEY}/:id`, requireAuth, async (req: any, res: any) => {
+  app.patch(`${AVAIL_KEY}/:id`, requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -70,7 +70,7 @@ export function registerShippingAvailabilityRoutes(app: Express) {
     }
   });
 
-  app.delete(`${AVAIL_KEY}/:id`, requireAuth, async (req: any, res: any) => {
+  app.delete(`${AVAIL_KEY}/:id`, requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });

@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getClientDate } from "../../lib/dateUtils";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -20,7 +20,7 @@ import {
 } from "@shared/schema";
 
 export function registerFactoryAlertRoutes(app: Express, requireAuth: any, db: any) {
-  app.get("/api/factory/alerts", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/alerts", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -39,7 +39,7 @@ export function registerFactoryAlertRoutes(app: Express, requireAuth: any, db: a
     }
   });
 
-  app.post("/api/factory/alerts/:id/read", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/alerts/:id/read", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId =
         req.body.companyId || (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
@@ -60,7 +60,7 @@ export function registerFactoryAlertRoutes(app: Express, requireAuth: any, db: a
     }
   });
 
-  app.post("/api/factory/alerts/generate", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/alerts/generate", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId =
         req.body.companyId || (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;

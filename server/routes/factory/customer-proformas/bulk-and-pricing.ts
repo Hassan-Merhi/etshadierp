@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { parseId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
@@ -21,7 +21,7 @@ import { eq, and } from "drizzle-orm";
 import { autoSavePriceToPriceList } from "./_helpers";
 
 export function registerFactoryCustomerProformaBulkPricingRoutes(app: Express) {
-  app.post("/api/factory/customer-proformas/bulk", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/customer-proformas/bulk", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -79,7 +79,7 @@ export function registerFactoryCustomerProformaBulkPricingRoutes(app: Express) {
     }
   });
 
-  app.put("/api/factory/customer-proformas/:id/replace-lines", requireAuth, async (req: any, res: any) => {
+  app.put("/api/factory/customer-proformas/:id/replace-lines", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -130,97 +130,111 @@ export function registerFactoryCustomerProformaBulkPricingRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/customer-proformas/:id/apply-catalog-prices", requireAuth, async (req: any, res: any) => {
-    try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
+  app.post(
+    "/api/factory/customer-proformas/:id/apply-catalog-prices",
+    requireAuth,
+    async (req: Request, res: Response) => {
+      try {
+        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseId(req.params.id);
+        const id = parseId(req.params.id);
 
-      if (id === null) return res.status(400).json({ message: "Invalid id" });
+        if (id === null) return res.status(400).json({ message: "Invalid id" });
 
-      const lines = await db.select().from(customerProformaLines).where(eq(customerProformaLines.proformaId, id));
-      if (!lines.length) return res.json({ updated: 0, skipped: 0 });
+        const lines = await db.select().from(customerProformaLines).where(eq(customerProformaLines.proformaId, id));
+        if (!lines.length) return res.json({ updated: 0, skipped: 0 });
 
-      const products = await db.select().from(factoryBaleProducts).where(eq(factoryBaleProducts.companyId, companyId));
-      const priceByArticleCode = new Map<string, string>();
-      for (const p of products) {
-        if (p.articleCode && p.sellingPrice && parseFloat(String(p.sellingPrice)) > 0) {
-          priceByArticleCode.set(p.articleCode.toLowerCase(), String(p.sellingPrice));
+        const products = await db
+          .select()
+          .from(factoryBaleProducts)
+          .where(eq(factoryBaleProducts.companyId, companyId));
+        const priceByArticleCode = new Map<string, string>();
+        for (const p of products) {
+          if (p.articleCode && p.sellingPrice && parseFloat(String(p.sellingPrice)) > 0) {
+            priceByArticleCode.set(p.articleCode.toLowerCase(), String(p.sellingPrice));
+          }
         }
+
+        let updated = 0;
+        let skipped = 0;
+        let fixed = 0;
+        for (const line of lines) {
+          if ((line as any).priceFixed) {
+            fixed++;
+            continue;
+          }
+          const newPrice = priceByArticleCode.get((line.articleCode || "").toLowerCase());
+          if (newPrice) {
+            await db
+              .update(customerProformaLines)
+              .set({ pricePerBale: newPrice })
+              .where(eq(customerProformaLines.id, line.id));
+            updated++;
+          } else {
+            skipped++;
+          }
+        }
+
+        res.json({ updated, skipped, fixed });
+      } catch (error: unknown) {
+        logger.error("Error applying catalog prices:", { error: error });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
-
-      let updated = 0;
-      let skipped = 0;
-      let fixed = 0;
-      for (const line of lines) {
-        if ((line as any).priceFixed) {
-          fixed++;
-          continue;
-        }
-        const newPrice = priceByArticleCode.get((line.articleCode || "").toLowerCase());
-        if (newPrice) {
-          await db
-            .update(customerProformaLines)
-            .set({ pricePerBale: newPrice })
-            .where(eq(customerProformaLines.id, line.id));
-          updated++;
-        } else {
-          skipped++;
-        }
-      }
-
-      res.json({ updated, skipped, fixed });
-    } catch (error: unknown) {
-      logger.error("Error applying catalog prices:", { error: error });
-      res.status(500).json({ message: getErrorMessage(error) });
     }
-  });
+  );
 
   // Apply production price from catalogue to all non-fixed lines
-  app.post("/api/factory/customer-proformas/:id/apply-production-prices", requireAuth, async (req: any, res: any) => {
-    try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
+  app.post(
+    "/api/factory/customer-proformas/:id/apply-production-prices",
+    requireAuth,
+    async (req: Request, res: Response) => {
+      try {
+        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseId(req.params.id);
-      if (id === null) return res.status(400).json({ message: "Invalid id" });
+        const id = parseId(req.params.id);
+        if (id === null) return res.status(400).json({ message: "Invalid id" });
 
-      const lines = await db.select().from(customerProformaLines).where(eq(customerProformaLines.proformaId, id));
-      if (!lines.length) return res.json({ updated: 0, skipped: 0 });
+        const lines = await db.select().from(customerProformaLines).where(eq(customerProformaLines.proformaId, id));
+        if (!lines.length) return res.json({ updated: 0, skipped: 0 });
 
-      const products = await db.select().from(factoryBaleProducts).where(eq(factoryBaleProducts.companyId, companyId));
-      const priceByArticleCode = new Map<string, string>();
-      for (const p of products) {
-        if (p.articleCode && p.productionPrice && parseFloat(String(p.productionPrice)) > 0) {
-          priceByArticleCode.set(p.articleCode.toLowerCase(), String(p.productionPrice));
+        const products = await db
+          .select()
+          .from(factoryBaleProducts)
+          .where(eq(factoryBaleProducts.companyId, companyId));
+        const priceByArticleCode = new Map<string, string>();
+        for (const p of products) {
+          if (p.articleCode && p.productionPrice && parseFloat(String(p.productionPrice)) > 0) {
+            priceByArticleCode.set(p.articleCode.toLowerCase(), String(p.productionPrice));
+          }
         }
+
+        let updated = 0;
+        let skipped = 0;
+        let fixed = 0;
+        for (const line of lines) {
+          if ((line as any).priceFixed) {
+            fixed++;
+            continue;
+          }
+          const newPrice = priceByArticleCode.get((line.articleCode || "").toLowerCase());
+          if (newPrice) {
+            await db
+              .update(customerProformaLines)
+              .set({ pricePerBale: newPrice })
+              .where(eq(customerProformaLines.id, line.id));
+            updated++;
+          } else {
+            skipped++;
+          }
+        }
+
+        res.json({ updated, skipped, fixed });
+      } catch (error: unknown) {
+        logger.error("Error applying production prices:", { error: error });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
-
-      let updated = 0;
-      let skipped = 0;
-      let fixed = 0;
-      for (const line of lines) {
-        if ((line as any).priceFixed) {
-          fixed++;
-          continue;
-        }
-        const newPrice = priceByArticleCode.get((line.articleCode || "").toLowerCase());
-        if (newPrice) {
-          await db
-            .update(customerProformaLines)
-            .set({ pricePerBale: newPrice })
-            .where(eq(customerProformaLines.id, line.id));
-          updated++;
-        } else {
-          skipped++;
-        }
-      }
-
-      res.json({ updated, skipped, fixed });
-    } catch (error: unknown) {
-      logger.error("Error applying production prices:", { error: error });
-      res.status(500).json({ message: getErrorMessage(error) });
     }
-  });
+  );
 }

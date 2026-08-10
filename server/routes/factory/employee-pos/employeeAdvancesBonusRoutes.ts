@@ -1,6 +1,6 @@
 import { getClientDate } from "../../../lib/dateUtils";
 import { getErrorMessage } from "../../../lib/httpHandlers";
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 
@@ -8,7 +8,7 @@ import { ledgerAccounts, voucherEntries, employees, factoryWorkers, vouchers } f
 import { eq, and, sql } from "drizzle-orm";
 
 export function registerEmployeeAdvancesBonusRoutes(app: Express) {
-  app.get("/api/factory/employee-advances", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/employee-advances", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -35,7 +35,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/employee-advances", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/employee-advances", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -62,7 +62,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/employee-advances/:id/repay", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/employee-advances/:id/repay", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -93,7 +93,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/employee-advance-repayments", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/employee-advance-repayments", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -114,7 +114,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/factory/employee-advances/:id", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/employee-advances/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -132,7 +132,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
 
   // ─── Employee Bonuses ─────────────────────────────────────────────────────────
 
-  app.get("/api/factory/employee-bonuses", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/employee-bonuses", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -152,7 +152,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/employee-bonuses", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/employee-bonuses", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -235,7 +235,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/factory/employee-bonuses/:id", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/employee-bonuses/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -280,7 +280,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
 
   // ─── Worker Bonuses ───────────────────────────────────────────────────────────
 
-  app.get("/api/factory/worker-bonuses", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/worker-bonuses", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -307,7 +307,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/worker-bonuses", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/worker-bonuses", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -335,7 +335,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/worker-bonuses/:id/pay", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/worker-bonuses/:id/pay", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -439,7 +439,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/factory/worker-bonuses/:id", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/worker-bonuses/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

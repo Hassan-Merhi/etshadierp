@@ -276,7 +276,6 @@ export function registerContainerFreightWriteRoutes(app: Express) {
                 // Strategy: keep first DR (purchases), keep first non-freight CR (supplier),
                 // keep/create freight CR at freightParentAccountId, delete extras.
                 let purchasesEntryId: number | null = null;
-                let freightCrEntryId: number | null;
                 let mainCrEntryId: number | null = null;
                 const toDeleteIds: number[] = [];
                 const freightCrCandidatesPatch: number[] = [];
@@ -298,7 +297,7 @@ export function registerContainerFreightWriteRoutes(app: Express) {
                     toDeleteIds.push(entry.id); // extras — delete
                   }
                 }
-                freightCrEntryId = freightCrCandidatesPatch[0] ?? null;
+                const freightCrEntryId: number | null = freightCrCandidatesPatch[0] ?? null;
                 toDeleteIds.push(...freightCrCandidatesPatch.slice(1));
 
                 if (toDeleteIds.length > 0) {

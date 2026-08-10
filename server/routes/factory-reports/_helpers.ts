@@ -61,7 +61,9 @@ export function addPdfBranding(doc: any) {
     try {
       doc.image(hmdLogo, (doc.page.width - 220) / 2, doc.y, { width: 220 });
       doc.moveDown(0.4);
-    } catch {}
+    } catch {
+      // Failure here is non-fatal and the surrounding flow continues deliberately.
+    }
   }
   doc.font("Helvetica");
 }
@@ -91,7 +93,9 @@ export async function generateEmptyExcel(res: any, companyName: string, startDat
     if (fs.existsSync(hmdLogo)) {
       xlLogoId = workbook.addImage({ buffer: toArrayBuffer(fs.readFileSync(hmdLogo)), extension: "jpeg" });
     }
-  } catch {}
+  } catch {
+    // Failure here is non-fatal and the surrounding flow continues deliberately.
+  }
   const lr = sheet.addRow([]);
   lr.height = 90;
   if (xlLogoId !== null) sheet.addImage(xlLogoId, { tl: { col: 1.5, row: 0 }, ext: { width: 300, height: 90 } });
@@ -270,7 +274,9 @@ export async function generateExcel(
     if (fs.existsSync(hmdLogo)) {
       xlLogoId2 = workbook.addImage({ buffer: toArrayBuffer(fs.readFileSync(hmdLogo)), extension: "jpeg" });
     }
-  } catch {}
+  } catch {
+    // Failure here is non-fatal and the surrounding flow continues deliberately.
+  }
   const sheet1 = workbook.addWorksheet("Summary");
   const lr1 = sheet1.addRow([]);
   lr1.height = 90;

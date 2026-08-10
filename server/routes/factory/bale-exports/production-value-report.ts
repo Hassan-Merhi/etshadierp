@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { db, pool } from "../../../db";
@@ -26,7 +26,7 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
   // ───────────────────────────────────────────────
   // 8. Daily Production Value Report
   // ───────────────────────────────────────────────
-  app.get("/api/factory/production-value-report", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/production-value-report", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -318,8 +318,8 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
         if (displayWeightKg.gt(0)) {
           displayCostPerKg = displayCost.dividedBy(displayWeightKg);
         } else {
-          // No source rows — fall back to stored batch values
-          displayWeightKg = new Decimal(b.totalWeightKg || 0);
+          // No source rows — fall back to stored batch values. Only cost and
+          // cost/kg are read past this branch; the weight is not projected out.
           displayCost = new Decimal(b.totalCost || 0);
           displayCostPerKg = new Decimal(b.costPerKg || 0);
         }

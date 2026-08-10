@@ -2,7 +2,7 @@ import { parseId, parseOptionalId } from "../../lib/parseId";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { eq, and, desc, sql, inArray, isNull } from "drizzle-orm";
@@ -165,7 +165,7 @@ function computeMonthlyPayFromAttendance(baseSalary: number, periodStart: string
 }
 
 export function registerAdvanceManagementRoutes(app: Express) {
-  app.post("/api/factory/advances/reconcile", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/advances/reconcile", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -270,7 +270,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
   });
 
   // DELETE /api/factory/advances/:id - Delete advance (admin/owner only)
-  app.delete("/api/factory/advances/:id", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/advances/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const currentRole = (req.session as any).currentRole;
       if (currentRole !== "Admin" && currentRole !== "Owner" && currentRole !== "Developer") {
@@ -369,7 +369,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
   });
 
   // POST /api/factory/advances/:id/reverse - Reverse a paid advance (restore to outstanding)
-  app.post("/api/factory/advances/:id/reverse", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/advances/:id/reverse", requireAuth, async (req: Request, res: Response) => {
     try {
       const currentRole = (req.session as any).currentRole;
       if (currentRole !== "Admin" && currentRole !== "Owner" && currentRole !== "Developer") {
@@ -428,7 +428,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/advances/unvouchered", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/advances/unvouchered", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -470,7 +470,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/advances/post-accounting", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/advances/post-accounting", requireAuth, async (req: Request, res: Response) => {
     try {
       const currentRole = (req.session as any).currentRole;
       if (currentRole !== "Admin" && currentRole !== "Owner" && currentRole !== "Developer") {
@@ -617,7 +617,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
 
   // POST /api/factory/advances/bulk-update-cash-account
   // Updates cashAccountId on selected advances, creates/patches PAYMENT-ADV-* vouchers, and writes daybook entries.
-  app.post("/api/factory/advances/bulk-update-cash-account", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/advances/bulk-update-cash-account", requireAuth, async (req: Request, res: Response) => {
     try {
       const currentRole = (req.session as any).currentRole;
       if (currentRole !== "Admin" && currentRole !== "Owner" && currentRole !== "Developer") {
@@ -801,7 +801,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
   });
 
   // GET /api/factory/workers/:id/advance-balance - Get total outstanding advance balance
-  app.get("/api/factory/workers/:id/advance-balance", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/workers/:id/advance-balance", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });

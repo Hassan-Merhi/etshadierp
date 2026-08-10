@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getClientDate } from "../../../lib/dateUtils";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
@@ -32,7 +32,7 @@ import { eq, and, desc, sql } from "drizzle-orm";
 export function registerFactoryDaybookEditRoutes(app: Express) {
   // ─────── DAYBOOK ENTRY EDIT ───────
 
-  app.put("/api/factory/daybook/:entryId", requireAuth, async (req: any, res: any) => {
+  app.put("/api/factory/daybook/:entryId", requireAuth, async (req: Request, res: Response) => {
     try {
       const rawEntryId = Number(req.params.entryId);
       if (isNaN(rawEntryId)) return res.status(400).json({ message: "Invalid entry ID" });
@@ -156,7 +156,7 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/daybook/:entryId/edits", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/daybook/:entryId/edits", requireAuth, async (req: Request, res: Response) => {
     try {
       const entryId = Number(req.params.entryId);
       const edits = await db
@@ -173,7 +173,7 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
   // PATCH /api/factory/daybook/:entryId/cost-edit — Edit a container cost entry and cascade changes
   // Supports: OFFLOAD_RAW_STOCK, FREIGHT, COMMISSION, DUTY, OTHER_CHARGE
   // Restricted to admin/owner/developer. Triggers full container cost recalculation.
-  app.patch("/api/factory/daybook/:entryId/cost-edit", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/daybook/:entryId/cost-edit", requireAuth, async (req: Request, res: Response) => {
     try {
       const session = req.session as any;
       const companyId = session.factoryCompanyId || session.currentCompanyId;
@@ -214,7 +214,9 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
       let meta: any = {};
       try {
         meta = JSON.parse(entry.metaJson || "{}");
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
 
       // Resolve containerId from metaJson or txType + referenceId fallback
       let containerId: number | null = meta.containerId ?? null;
@@ -439,7 +441,7 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
   });
 
   // DELETE /api/factory/daybook/entry/:id — Hard delete a non-voucher-backed entry (admin/developer only)
-  app.delete("/api/factory/daybook/entry/:id", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/daybook/entry/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const session = req.session as any;
       const companyId = session.factoryCompanyId || session.currentCompanyId;
@@ -471,7 +473,7 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
   });
 
   // DELETE /api/factory/daybook/entry/:id/void — Void a voucher-backed daybook entry
-  app.delete("/api/factory/daybook/entry/:id/void", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/daybook/entry/:id/void", requireAuth, async (req: Request, res: Response) => {
     try {
       const session = req.session as any;
       const companyId = session.factoryCompanyId || session.currentCompanyId;

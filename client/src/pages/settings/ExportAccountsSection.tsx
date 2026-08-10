@@ -130,7 +130,7 @@ export function ExportAccountsSection() {
   ) => {
     const suffix = totalParts > 1 ? ` ${part}` : "";
     const rawName = `${baseName}${suffix}`;
-    const sheetName = rawName.replace(/[\\\/\?\*\[\]:]/g, "").substring(0, 31);
+    const sheetName = rawName.replace(/[\\/?*[\]:]/g, "").substring(0, 31);
     const ws = wb.addWorksheet(sheetName);
 
     ws.columns = [
@@ -210,9 +210,11 @@ export function ExportAccountsSection() {
         try {
           const res = await fetch(getTransactionUrl(acc), { credentials: "include" });
           if (res.ok) txns = await res.json();
-        } catch {}
+        } catch {
+          // Best-effort side request; the user-visible flow does not depend on it completing.
+        }
 
-        const baseName = acc.name.replace(/[\\\/\?\*\[\]:]/g, "").substring(0, 28) || `Acct_${accId}`;
+        const baseName = acc.name.replace(/[\\/?*[\]:]/g, "").substring(0, 28) || `Acct_${accId}`;
 
         if (txns.length <= MAX_ROWS_PER_SHEET) {
           addSheetForChunk(wb, baseName, 1, 1, txns, 0);

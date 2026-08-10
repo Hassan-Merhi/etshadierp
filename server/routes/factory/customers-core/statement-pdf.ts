@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { buildSafeFilename, contentDisposition } from "../../../lib/contentDisposition";
@@ -25,7 +25,7 @@ import fs from "fs";
 
 export function registerFactoryCustomerStatementPdfRoutes(app: Express) {
   // ── Customer Statement: PDF Export ──────────────────────────────────────
-  app.get("/api/factory/customers/:id/statement/export-pdf", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/customers/:id/statement/export-pdf", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -247,7 +247,9 @@ export function registerFactoryCustomerStatementPdfRoutes(app: Express) {
       if (!logoBuffer && fs.existsSync(custHmdLogoPath)) {
         try {
           logoBuffer = fs.readFileSync(custHmdLogoPath);
-        } catch {}
+        } catch {
+          // Failure here is non-fatal and the surrounding flow continues deliberately.
+        }
       }
 
       // ── PDF document ──
@@ -271,7 +273,9 @@ export function registerFactoryCustomerStatementPdfRoutes(app: Express) {
       try {
         custConvAr = (require("arabic-reshaper") as any).convertArabic;
         custBidi = (require("bidi-js") as any)();
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
       const custHasAr = (t: string) => /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/.test(t);
       const custShape = (t: string): string => {
         if (!t || !custConvAr) return t;

@@ -6,7 +6,7 @@ import { toArrayBuffer } from "../lib/bufferCompatibility";
  * rendering, and statement Excel export for a specific account. Extracted
  * from accountRoutes.ts as a sub-registrar; behaviour is unchanged.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import path from "path";
@@ -301,7 +301,7 @@ export function registerAccountStatementRoutes(app: Express) {
   });
 
   // ── Account Statement PDF export ──────────────────────────────────────────
-  app.get("/api/accounts/:type/:id/statement-pdf", requireAuth, async (req: any, res: any) => {
+  app.get("/api/accounts/:type/:id/statement-pdf", requireAuth, async (req: Request, res: Response) => {
     try {
       const accountType = req.params.type;
       const accountId = parseInt(req.params.id);
@@ -348,8 +348,10 @@ export function registerAccountStatementRoutes(app: Express) {
             .where(eq(employees.id, accountId));
           if (r) resolvedName = `${r.firstName} ${r.lastName}`.trim();
         }
-      } catch {}
-      const safeAccName = resolvedName.replace(/[^\w\s.()\-]/g, "_").replace(/\s+/g, "_");
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
+      const safeAccName = resolvedName.replace(/[^\w\s.()-]/g, "_").replace(/\s+/g, "_");
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename=statement_${safeAccName}.pdf`);
       res.end(pdfBuf);
@@ -363,7 +365,7 @@ export function registerAccountStatementRoutes(app: Express) {
   });
 
   // ── Ledger / Account Statement — Excel export ────────────────────────────
-  app.get("/api/accounts/statement/export-excel", requireAuth, async (req: any, res: any) => {
+  app.get("/api/accounts/statement/export-excel", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId as number;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -492,7 +494,9 @@ export function registerAccountStatementRoutes(app: Express) {
           sheet.addImage(logoId, { tl: { col: 2.5, row: 0 }, ext: { width: 260, height: 80 } });
           sheet.mergeCells(`A1:F1`);
         }
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
 
       // Header block
       const rComp = sheet.addRow([company?.name || "Company"]);
@@ -643,7 +647,7 @@ export function registerAccountStatementRoutes(app: Express) {
       cbRow.getCell(5).alignment = { horizontal: "right" };
       cbRow.getCell(6).alignment = { horizontal: "right" };
 
-      const safeAccName = accountName.replace(/[^\w\s.()\-]/g, "_").replace(/\s+/g, "_");
+      const safeAccName = accountName.replace(/[^\w\s.()-]/g, "_").replace(/\s+/g, "_");
       const buf = Buffer.from(await workbook.xlsx.writeBuffer());
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="${safeAccName}_Statement.xlsx"`);

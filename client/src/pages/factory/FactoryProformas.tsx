@@ -472,7 +472,7 @@ export default function FactoryProformas() {
       const normalize = (s: string) =>
         String(s ?? "")
           .toLowerCase()
-          .replace(/[\s_\-]/g, "");
+          .replace(/[\s_-]/g, "");
       const findCol = (row: Record<string, any>, aliases: string[]): string => {
         const keys = Object.keys(row);
         for (const alias of aliases) {
@@ -525,7 +525,7 @@ export default function FactoryProformas() {
       if (!excelImportName) {
         const base = file.name
           .replace(/\.(xlsx?|csv)$/i, "")
-          .replace(/[_\-]+/g, " ")
+          .replace(/[_-]+/g, " ")
           .trim();
         setExcelImportName(base || "Imported Proforma");
       }

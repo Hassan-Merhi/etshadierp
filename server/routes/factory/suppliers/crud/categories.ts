@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { parseId } from "../../../../lib/parseId";
 import { getErrorMessage } from "../../../../lib/httpHandlers";
 import { db } from "../../../../db";
@@ -13,7 +13,7 @@ import { factorySuppliers, factorySupplierCategories, insertFactorySupplierCateg
 import { eq, and, asc } from "drizzle-orm";
 
 export function registerFactorySupplierCategoryRoutes(app: Express) {
-  app.get("/api/factory/supplier-categories", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/supplier-categories", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -28,7 +28,7 @@ export function registerFactorySupplierCategoryRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/supplier-categories", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/supplier-categories", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -40,7 +40,7 @@ export function registerFactorySupplierCategoryRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/factory/supplier-categories/:id", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/supplier-categories/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -63,7 +63,7 @@ export function registerFactorySupplierCategoryRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/factory/supplier-categories/:id", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/supplier-categories/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

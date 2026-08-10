@@ -4,12 +4,12 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { pool } from "../../db";
 
 export function registerSupplierProfitPoOverrideRoutes(app: Express, requireAuth: any) {
-  app.get("/api/supplier-profit-check/po-overrides", requireAuth, async (req: any, res: any) => {
+  app.get("/api/supplier-profit-check/po-overrides", requireAuth, async (req: Request, res: Response) => {
     try {
       const supplierId = parseInt(req.query.supplierId as string);
       if (!supplierId) return res.status(400).json({ message: "supplierId required" });
@@ -25,7 +25,7 @@ export function registerSupplierProfitPoOverrideRoutes(app: Express, requireAuth
     }
   });
 
-  app.put("/api/supplier-profit-check/po-overrides", requireAuth, async (req: any, res: any) => {
+  app.put("/api/supplier-profit-check/po-overrides", requireAuth, async (req: Request, res: Response) => {
     try {
       const { supplierId, stockItemId, poPrice, avgPrice } = req.body;
       if (!supplierId || !stockItemId) {

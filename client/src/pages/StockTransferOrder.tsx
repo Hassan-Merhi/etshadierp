@@ -94,7 +94,9 @@ export default function StockTransferOrder() {
         sessionStorage.removeItem(SESSION_STATE_KEY);
         return JSON.parse(ss);
       }
-    } catch {}
+    } catch {
+      // Storage is unavailable in private mode and can throw on quota; the value is a convenience, not state we need.
+    }
     return null;
   })();
 
@@ -336,7 +338,9 @@ export default function StockTransferOrder() {
           setHasDraft(true);
         }
       }
-    } catch {}
+    } catch {
+      // Storage is unavailable in private mode and can throw on quota; the value is a convenience, not state we need.
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -504,7 +508,7 @@ export default function StockTransferOrder() {
           case "ArrowRight":
             col = Math.min(maxCol, col + 1);
             break;
-          case " ":
+          case " ": {
             const item = flatItems[row];
             const loc = selectedLocations[col];
             if (item && loc) {
@@ -515,6 +519,7 @@ export default function StockTransferOrder() {
               }
             }
             return current;
+          }
         }
 
         return { row, col };

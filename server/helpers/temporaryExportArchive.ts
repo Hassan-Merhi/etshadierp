@@ -114,7 +114,8 @@ export async function streamTemporaryExportArchive(
   try {
     stat = await fs.promises.stat(filePath);
   } catch (error: unknown) {
-    if ((error as { code?: string }).code === "ENOENT") throw new Error("Export archive has expired or was already downloaded");
+    if ((error as { code?: string }).code === "ENOENT")
+      throw new Error("Export archive has expired or was already downloaded", { cause: error });
     throw error;
   }
 

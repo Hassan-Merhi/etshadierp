@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getClientDate } from "../../../../lib/dateUtils";
 import { getErrorMessage } from "../../../../lib/httpHandlers";
 import { logger } from "../../../../lib/logger";
@@ -24,7 +24,7 @@ import { eq, and, or, desc, sql, inArray } from "drizzle-orm";
 
 export function registerPosSaleWriteRoutes(app: Express) {
   // POST /api/factory/pos/sale — create a factory POS sale
-  app.post("/api/factory/pos/sale", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/pos/sale", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       const rawUserId = (req.session as any).userId;
@@ -304,7 +304,7 @@ export function registerPosSaleWriteRoutes(app: Express) {
   });
 
   // PUT /api/factory/pos/sales/:id — edit an existing factory POS sale
-  app.put("/api/factory/pos/sales/:id", requireAuth, async (req: any, res: any) => {
+  app.put("/api/factory/pos/sales/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

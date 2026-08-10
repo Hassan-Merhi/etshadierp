@@ -329,7 +329,9 @@ function CustomNetPositionView({
       else next.add(key);
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify([...next]));
-      } catch {}
+      } catch {
+        // Storage is unavailable in private mode and can throw on quota; the value is a convenience, not state we need.
+      }
       return next;
     });
   }, []);
@@ -338,7 +340,9 @@ function CustomNetPositionView({
     setHiddenKeys(new Set());
     try {
       localStorage.removeItem(STORAGE_KEY);
-    } catch {}
+    } catch {
+      // Storage is unavailable in private mode and can throw on quota; the value is a convenience, not state we need.
+    }
   }, []);
 
   const forUsAccounts = useMemo(
@@ -558,7 +562,9 @@ export default function FactoryNetPositionDetails() {
         const err: any = new Error(text);
         try {
           err.code = JSON.parse(text)?.code;
-        } catch {}
+        } catch {
+          // Malformed or absent payload — fall through to the default rather than surface a parse error.
+        }
         throw err;
       }
       return res.json();

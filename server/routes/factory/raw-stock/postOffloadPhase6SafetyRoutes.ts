@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { requireAuth, requireRole } from "../../../auth";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
@@ -76,7 +76,7 @@ async function auditFailure(params: {
  * Audit-log writes remain enabled for every lifecycle outcome.
  */
 export function registerPostOffloadPhase6SafetyRoutes(app: Express): void {
-  app.get(READINESS_PATH, requireAuth, requireRole(...ADMIN_ROLES), async (req: any, res: any) => {
+  app.get(READINESS_PATH, requireAuth, requireRole(...ADMIN_ROLES), async (req: Request, res: Response) => {
     const context = requestContext(req);
     if (!context) {
       return res.status(400).json({
@@ -140,7 +140,7 @@ export function registerPostOffloadPhase6SafetyRoutes(app: Express): void {
     }
   });
 
-  app.post(REPAIR_PATH, requireAuth, requireRole(...ADMIN_ROLES), async (req: any, res: any) => {
+  app.post(REPAIR_PATH, requireAuth, requireRole(...ADMIN_ROLES), async (req: Request, res: Response) => {
     const context = requestContext(req);
     if (!context) {
       return res.status(400).json({

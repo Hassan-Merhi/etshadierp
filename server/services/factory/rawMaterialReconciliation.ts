@@ -134,7 +134,12 @@ export async function getRawMaterialReconciliation(companyId: number): Promise<R
     usedKg += used;
     const free = rec - used;
     if (free < -EPS) {
-      negativeStockRows.push({ rawStockId: r.id, containerId: r.containerId, containerNumber: r.containerNumber, freeKg: free });
+      negativeStockRows.push({
+        rawStockId: r.id,
+        containerId: r.containerId,
+        containerNumber: r.containerNumber,
+        freeKg: free,
+      });
     }
   }
 
@@ -176,12 +181,7 @@ export async function getRawMaterialReconciliation(companyId: number): Promise<R
   const supplierNameById = new Map<number, string>(suppliers.map((s) => [s.id, s.name]));
 
   const exposureBySupplier = new Map<number, SupplierCurrencyExposureRow>();
-  function bumpExposure(
-    supplierId: number | null,
-    currencyCode: string,
-    nativeAmount: number,
-    resolved: boolean
-  ) {
+  function bumpExposure(supplierId: number | null, currencyCode: string, nativeAmount: number, resolved: boolean) {
     if (!supplierId) return;
     if (!exposureBySupplier.has(supplierId)) {
       exposureBySupplier.set(supplierId, {
@@ -222,7 +222,10 @@ export async function getRawMaterialReconciliation(companyId: number): Promise<R
     .select()
     .from(factoryOffloadAdditionalCharges)
     .where(
-      and(eq(factoryOffloadAdditionalCharges.companyId, companyId), ne(factoryOffloadAdditionalCharges.currencyCode, "USD"))
+      and(
+        eq(factoryOffloadAdditionalCharges.companyId, companyId),
+        ne(factoryOffloadAdditionalCharges.currencyCode, "USD")
+      )
     );
   for (const oc of nonUsdCharges as any[]) {
     const { looksSet } = resolveStoredFxRate(oc.currencyCode, oc.fxRateToUsd, oc.fxRateConfirmed);
@@ -253,7 +256,13 @@ export async function getRawMaterialReconciliation(companyId: number): Promise<R
   const unresolvedFxRows: UnresolvedFxRow[] = [];
   const balanceBySupplier = new Map<
     number,
-    { grossNative: Map<string, number>; paymentsNative: Map<string, number>; usdGrossResolved: number; usdPayments: number; hasUnresolvedFx: boolean }
+    {
+      grossNative: Map<string, number>;
+      paymentsNative: Map<string, number>;
+      usdGrossResolved: number;
+      usdPayments: number;
+      hasUnresolvedFx: boolean;
+    }
   >();
   function getBalanceAcc(supplierId: number) {
     if (!balanceBySupplier.has(supplierId)) {
@@ -283,7 +292,7 @@ export async function getRawMaterialReconciliation(companyId: number): Promise<R
   }
 
   // Opening balance — USD-only, and only counts in the parent company's own books.
-  let parentCompanyId: number | null = null;
+  let parentCompanyId: number | null;
   try {
     parentCompanyId = await resolveParentCompanyId();
   } catch {
@@ -486,7 +495,8 @@ export async function getRawMaterialReconciliation(companyId: number): Promise<R
     const cc = p.currency || "USD";
     const amt = parseFloat(p.debitAmount || "0") || 0;
     if (!amt) continue;
-    const rate = p.exchangeRate !== null && p.exchangeRate !== undefined ? parseFloat(p.exchangeRate) : cc === "USD" ? 1 : null;
+    const rate =
+      p.exchangeRate !== null && p.exchangeRate !== undefined ? parseFloat(p.exchangeRate) : cc === "USD" ? 1 : null;
     const resolved = cc === "USD" ? true : rate !== null && rate > 0;
     addPayment(p.supplierId, cc, amt, resolved ? amt * (rate ?? 1) : null);
     if (!resolved) {
@@ -544,11 +554,17 @@ export async function getRawMaterialReconciliation(companyId: number): Promise<R
 
   // ── 4. Cross-company contamination ────────────────────────────────────────
   const crossCompanyContamination: CrossCompanyContaminationRow[] = [];
-  const allSuppliersEverywhere = await db.select({ id: factorySuppliers.id, companyId: factorySuppliers.companyId }).from(factorySuppliers);
+  const allSuppliersEverywhere = await db
+    .select({ id: factorySuppliers.id, companyId: factorySuppliers.companyId })
+    .from(factorySuppliers);
   const supplierCompanyById = new Map<number, number>(allSuppliersEverywhere.map((s) => [s.id, s.companyId]));
 
   for (const c of allContainersById.values()) {
-    if (c.supplierId && supplierCompanyById.has(c.supplierId) && supplierCompanyById.get(c.supplierId) !== c.companyId) {
+    if (
+      c.supplierId &&
+      supplierCompanyById.has(c.supplierId) &&
+      supplierCompanyById.get(c.supplierId) !== c.companyId
+    ) {
       crossCompanyContamination.push({
         table: "factory_containers",
         rowId: c.id,
@@ -561,7 +577,13 @@ export async function getRawMaterialReconciliation(companyId: number): Promise<R
   }
 
   const allRawStockCompanyCheck = await db
-    .select({ id: factoryRawStock.id, companyId: factoryRawStock.companyId, containerId: factoryRawStock.containerId, containerCompanyId: factoryContainers.companyId, containerNumber: factoryContainers.containerNumber })
+    .select({
+      id: factoryRawStock.id,
+      companyId: factoryRawStock.companyId,
+      containerId: factoryRawStock.containerId,
+      containerCompanyId: factoryContainers.companyId,
+      containerNumber: factoryContainers.containerNumber,
+    })
     .from(factoryRawStock)
     .innerJoin(factoryContainers, eq(factoryContainers.id, factoryRawStock.containerId))
     .where(isNull(factoryRawStock.deletedAt));
@@ -656,7 +678,12 @@ export async function getRawMaterialReconciliation(companyId: number): Promise<R
     // against receivedKg − usedKg here is a structural regression guard: it
     // will only ever flag if some future change makes "remaining" diverge
     // from Model A (e.g. by reintroducing a reservedKg subtraction).
-    const check = detectDoubleReservedDeduction({ receivedKg: received, usedKg: used, reservedKg: reserved, displayedFreeKg: remaining });
+    const check = detectDoubleReservedDeduction({
+      receivedKg: received,
+      usedKg: used,
+      reservedKg: reserved,
+      displayedFreeKg: remaining,
+    });
     if (check.provenDoubleSubtraction) {
       const container = allContainersById.get(r.containerId);
       doubleReservedDeductions.push({

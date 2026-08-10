@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { db } from "../../../db";
@@ -16,7 +16,7 @@ export function registerFactoryCustomerStatementRoutes(app: Express) {
   // CUSTOMER STATEMENT
   // ───────────────────────────────────────────────
 
-  app.get("/api/factory/customers/:id/statement", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/customers/:id/statement", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -227,7 +227,7 @@ export function registerFactoryCustomerStatementRoutes(app: Express) {
   });
 
   // ── Save Statement Note ─────────────────────────────────────────────────
-  app.patch("/api/factory/customers/:id/statement-note", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/customers/:id/statement-note", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -251,33 +251,37 @@ export function registerFactoryCustomerStatementRoutes(app: Express) {
   });
 
   // ── Save Row Note on a balance entry ────────────────────────────────────
-  app.patch("/api/factory/customers/:customerId/balance/:entryId/note", requireAuth, async (req: any, res: any) => {
-    try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const customerId = parseInt(req.params.customerId);
-      const entryId = parseInt(req.params.entryId);
-      if (isNaN(customerId) || isNaN(entryId)) return res.status(400).json({ message: "Invalid IDs" });
-      const { rowNote } = req.body;
-      if (typeof rowNote !== "string") return res.status(400).json({ message: "rowNote must be a string" });
-      const [entry] = await db
-        .select()
-        .from(customerBalances)
-        .where(
-          and(
-            eq(customerBalances.id, entryId),
-            eq(customerBalances.customerId, customerId),
-            eq(customerBalances.companyId, companyId)
-          )
-        );
-      if (!entry) return res.status(404).json({ message: "Entry not found" });
-      await db
-        .update(customerBalances)
-        .set({ rowNote: rowNote || null })
-        .where(eq(customerBalances.id, entryId));
-      res.json({ ok: true });
-    } catch (error: unknown) {
-      res.status(500).json({ message: getErrorMessage(error) });
+  app.patch(
+    "/api/factory/customers/:customerId/balance/:entryId/note",
+    requireAuth,
+    async (req: Request, res: Response) => {
+      try {
+        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        const customerId = parseInt(req.params.customerId);
+        const entryId = parseInt(req.params.entryId);
+        if (isNaN(customerId) || isNaN(entryId)) return res.status(400).json({ message: "Invalid IDs" });
+        const { rowNote } = req.body;
+        if (typeof rowNote !== "string") return res.status(400).json({ message: "rowNote must be a string" });
+        const [entry] = await db
+          .select()
+          .from(customerBalances)
+          .where(
+            and(
+              eq(customerBalances.id, entryId),
+              eq(customerBalances.customerId, customerId),
+              eq(customerBalances.companyId, companyId)
+            )
+          );
+        if (!entry) return res.status(404).json({ message: "Entry not found" });
+        await db
+          .update(customerBalances)
+          .set({ rowNote: rowNote || null })
+          .where(eq(customerBalances.id, entryId));
+        res.json({ ok: true });
+      } catch (error: unknown) {
+        res.status(500).json({ message: getErrorMessage(error) });
+      }
     }
-  });
+  );
 }

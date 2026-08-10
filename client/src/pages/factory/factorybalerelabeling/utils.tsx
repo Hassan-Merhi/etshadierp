@@ -4,7 +4,7 @@
  * Extracted from FactoryBaleRelabeling.tsx during the Phase 4 god-file split.
  */
 import * as XLSX from "@/lib/excelHelper";
-import type {ApplyItem, ParsedRow} from "./types";
+import type { ApplyItem, ParsedRow } from "./types";
 
 export const POSSIBLE_COLUMNS = [
   "current_reference_code",
@@ -20,7 +20,7 @@ export const POSSIBLE_COLUMNS = [
 ];
 
 export function normalizeHeader(h: string): string {
-  return h.toLowerCase().replace(/[\s_\-]/g, "");
+  return h.toLowerCase().replace(/[\s_-]/g, "");
 }
 
 export function findRefColumn(headers: string[]): string | null {

@@ -17,12 +17,14 @@ audit fails instead of allowing the reference to drift.
 
 | Signal | Now | Command |
 |---|---|---|
-| Type escapes (AST) | 11,441 total | `npm run audit:type-escapes` |
+| Type escapes (AST) | 10,087 total | `npm run audit:type-escapes` |
+| ESLint warnings | 10,754 total | `npm run lint` |
+| Startup migration failures | 11 on a fresh database | `npm run verify:startup-migrations` |
 | Backend coverage floor (lines) | 18% | `config/coverage-thresholds.json` |
 | Write routes with no test at all | 0 of 328 | `npm run audit:write-routes` |
 | Write routes covered only by the guard sweep | 0 of 328 | `npm run audit:write-routes` |
 | Registered routes | 1,895 | `config/route-manifest.json` |
-| God-file backlog | 63 files, 33,982 excess lines | `npm run audit:god-files` |
+| God-file backlog | 60 files, 32,869 excess lines | `npm run audit:god-files` |
 
 The schema layer remains the type source of truth. New code is not allowed to
 increase the type-escape ceiling, and sensitive write routes are not allowed to
@@ -80,6 +82,76 @@ forced through `any`.
 The rule for future work is simple: **do not raise a frozen type-escape baseline
 to make unrelated churn fit**. If formatting or file-size gates block a cleanup,
 fix the structural blocker instead of creating headroom that can refill.
+
+### Lint warning ratchet
+
+The ESLint cap was the last gate in this repository whose threshold was not
+measured. It lived in the `lint` script as `--max-warnings 12358`, a number
+nobody could trace: the tree was actually at 12,304, so 54 warnings could be
+added before anything failed, and a cap that has never been re-measured only
+ever describes the day it was typed.
+
+The ceiling now lives in `config/lint-warning-ratchet.json`, alongside the
+coverage floors and type-escape baselines. `scripts/run-lint.mjs` reads it, so
+`npm run lint` has no number of its own, and the ratchet is a two-part gate:
+
+- **`totals.warningCeiling`** is the repository total, currently 10,754, and may
+  only fall. `totals.errorCeiling` is 0 and permanent — errors are not part of
+  the drawdown.
+- **`perRule`** freezes each rule at its own count, checked by
+  `npm run audit:lint-ratchet`. This is the part that matters: 10,085 of the
+  10,754 warnings are `no-explicit-any`, so a total-only gate is a count of
+  `any` wearing a lint badge. Under one, deleting 500 `any` annotations pays for
+  500 new `react-hooks/exhaustive-deps` warnings — stale-closure bugs — and the
+  total reports the trade as flat. Per-rule ceilings make it fail.
+
+`scan.step` is 500. When measured warnings sit a full step under the ceiling,
+both scripts ask for the gain to be locked in; the ceilings are lowered in the
+same change that removes the warnings, never after.
+
+`no-explicit-any` is the one rule whose real gate is elsewhere:
+`config/type-escape-boundaries.json` freezes it per file, which is strictly
+stronger than any repository total. Its `perRule` entry exists so the two cannot
+drift apart, and the audit fails if they disagree — the ESLint count must always
+equal the type-escape ceiling minus its ts-comment suppressions, which are not a
+rule (10,085 = 10,087 − 2).
+
+---
+
+### Startup migration ratchet
+
+`.github/workflows/ci.yml` gates the entire backend suite on the startup step:
+`node dist/index.js` runs, CI polls `/api/health/db`, and the tests only run
+`if: steps.runtime_migrations.outcome == 'success'`. That endpoint reported
+`{"status":"ok","message":"Database ready"}` as soon as the migration pass
+*finished*, whether or not migrations inside it had failed — so eleven failed
+migrations on a fresh database passed the gate every run, and the suite tested
+whatever schema survived.
+
+`server/startupMigrationReport.ts` now records the outcome and
+`server/health/dbHealthRoute.ts` publishes it, so the endpoint carries a
+`migrations` block with the failure count and the failing statements. Readiness
+semantics are unchanged: the response is still 200 with `status: "ok"` once the
+pass completes, because CI uses it to learn that startup is done and Render's
+own check is `/api/health/ready`.
+
+`scripts/verify-startup-migrations.mjs` turns that report into a gate against
+`config/startup-migration-baseline.json`. The known set is frozen,
+`totals.failureCeiling` may only fall, and any failure not already recorded
+fails the build.
+
+It is a baseline rather than a demand for zero because nine of the eleven are
+seed `INSERT`s whose `company_id` foreign keys cannot resolve until companies
+exist: they fail on an empty CI database and succeed in production. A gate that
+is permanently red is a gate that gets switched off. The remaining two are real
+ordering problems — `supplier_containers` and `bales.erp_location_id` do not
+exist when foreign keys are added to them — and are the entries worth fixing
+first.
+
+Three `factory_container_receipts` constraints were fixed in the same change:
+they lacked the `DO`/`duplicate_object` guard the rest of that file uses, so
+they failed on every startup after the first. A re-run against an
+already-migrated database now produces the same eleven rather than fourteen.
 
 ---
 
@@ -330,6 +402,9 @@ so the improvement cannot silently refill later.
 Targets include:
 
 - lower type-escape ceilings as domains are cleaned;
+- lower the lint warning ceiling a 500-warning step at a time, and the matching
+  `perRule` entry with it, whenever `npm run audit:lint-ratchet` reports the
+  step earned;
 - raise coverage floors to track measured coverage with margin;
 - lower god-file soft limits/backlog as files are split;
 - keep sensitive-write uncovered and guard-only ceilings permanently at zero.

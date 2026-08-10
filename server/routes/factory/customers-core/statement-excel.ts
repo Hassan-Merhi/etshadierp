@@ -5,7 +5,7 @@ import { toArrayBuffer } from "../../../lib/bufferCompatibility";
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { buildSafeFilename, contentDisposition } from "../../../lib/contentDisposition";
@@ -18,7 +18,7 @@ import fs from "fs";
 
 export function registerFactoryCustomerStatementExcelRoutes(app: Express) {
   // ── Customer Statement: Excel Export ────────────────────────────────────
-  app.get("/api/factory/customers/:id/statement/export-excel", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/customers/:id/statement/export-excel", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -207,7 +207,9 @@ export function registerFactoryCustomerStatementExcelRoutes(app: Express) {
           sheet.addImage(slId, { tl: { col: 1.9, row: 0 }, ext: { width: 300, height: 90 } });
           sheet.mergeCells(`A1:G1`);
         }
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
       const r1 = sheet.addRow(["HMD INTERNATIONAL GROUP"]);
       r1.getCell(1).font = { bold: true, size: 14, color: { argb: "FF1F3864" } };
       sheet.mergeCells(`A${r1.number}:G${r1.number}`);

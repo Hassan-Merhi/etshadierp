@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { requireAuth, requireRole } from "../../../auth";
@@ -14,7 +14,7 @@ export function registerRawStockDiagnosticRoutes(app: Express) {
     "/api/factory/raw-stock/diagnostics/locked-rates",
     requireAuth,
     requireRole("Admin", "Developer"),
-    async (req: any, res: any) => {
+    async (req: Request, res: Response) => {
       try {
         const companyId = getFactoryCompanyId(req);
         if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -25,14 +25,14 @@ export function registerRawStockDiagnosticRoutes(app: Express) {
         logger.error("Error running locked-rate diagnostics:", { error });
         return res.status(500).json({ message: getErrorMessage(error) });
       }
-    },
+    }
   );
 
   app.get(
     "/api/factory/raw-stock/diagnostics/costing-integrity",
     requireAuth,
     requireRole("Admin", "Developer"),
-    async (req: any, res: any) => {
+    async (req: Request, res: Response) => {
       try {
         const companyId = getFactoryCompanyId(req);
         if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -42,6 +42,6 @@ export function registerRawStockDiagnosticRoutes(app: Express) {
         logger.error("Error running factory costing integrity diagnostics:", { error });
         return res.status(500).json({ message: getErrorMessage(error) });
       }
-    },
+    }
   );
 }

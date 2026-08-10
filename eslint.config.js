@@ -76,31 +76,5 @@ export default tseslint.config(
       "react-hooks/exhaustive-deps": "warn",
     },
   },
-  {
-    // Blocked, not deferred. CI format-checks every changed file, and Prettier
-    // reflow pushes each of these past a size gate:
-    //
-    //   FactoryBaleProductHistory   849 → 915  (becomes a *new* god file)
-    //   FactoryPayrollTab          1573 → 1610 (frozen at 1575)
-    //   DailyProductionReport      1328 → 1366 (frozen at 1350)
-    //   workerStatsAdvancesRoutes   921 → 928  (frozen at 922)
-    //
-    // Deleting an unused import from any of them therefore fails either the
-    // format gate or the size gate — they cannot be edited at all until they
-    // are split. Raising a frozen baseline to absorb formatting churn would
-    // leave headroom that silently refills, which working rule 4 of the
-    // god-file program exists to prevent.
-    //
-    // Remove this block when those files are split (that program's Phase 4).
-    files: [
-      "client/src/pages/factory/FactoryBaleProductHistory.tsx",
-      "client/src/pages/factory/FactoryPayrollTab.tsx",
-      "client/src/pages/factory/DailyProductionReport.tsx",
-      "server/routes/payroll/workerStatsAdvancesRoutes.ts",
-    ],
-    rules: {
-      "unused-imports/no-unused-imports": "off",
-    },
-  },
   configPrettier
 );

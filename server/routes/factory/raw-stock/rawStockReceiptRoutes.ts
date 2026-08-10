@@ -1,7 +1,7 @@
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { getClientDate } from "../../../lib/dateUtils";
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { getLockedSupplierRate } from "../../../services/factory/rawStockLockedRate";
@@ -19,7 +19,7 @@ import {
 import { eq, and, desc, sql, isNull } from "drizzle-orm";
 
 export function registerRawStockReceiptRoutes(app: Express) {
-  app.get("/api/factory/raw-stock", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/raw-stock", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -461,7 +461,7 @@ export function registerRawStockReceiptRoutes(app: Express) {
   // needed or allowed. The cascade to mix-batch sources/batches/bales is scoped to
   // OPEN batches only (ACTIVE/OPEN/CARRY_FORWARD) — completed/closed batches and their
   // bales already have finalized costing and must not be silently rewritten.
-  app.post("/api/factory/raw-stock/update-cost", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/raw-stock/update-cost", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -606,7 +606,7 @@ export function registerRawStockReceiptRoutes(app: Express) {
   });
 
   // POST deduct from received_kg directly on factory_raw_stock rows for a supplier
-  app.post("/api/factory/raw-stock/deduct-received", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/raw-stock/deduct-received", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

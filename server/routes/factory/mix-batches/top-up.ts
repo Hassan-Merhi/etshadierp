@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { logAudit } from "../../helpers/auditHelpers";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
@@ -21,7 +21,7 @@ import Decimal from "decimal.js";
 
 export function registerFactoryMixBatchTopUpRoutes(app: Express) {
   // Top-up an existing mix batch with additional sources
-  app.post("/api/factory/mix-batches/:id/top-up", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/mix-batches/:id/top-up", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
