@@ -1,6 +1,7 @@
 const REQUEST_HEADER = "x-erp-compact-response";
 const RESPONSE_HEADER = "x-erp-compact-response";
 const PROFILE_HEADER = "x-erp-response-profile";
+const PROFILE_QUERY = "_erpProfile";
 const WIRE_VERSION = "v1";
 const DICT_TOKEN = /^~([0-9a-z]+)$/;
 
@@ -63,6 +64,19 @@ function responseProfileFor(path: string): string | null {
     return "waste-dispatch-page-v1";
   }
   return null;
+}
+
+function inputWithProfile(input: RequestInfo | URL, url: URL, profile: string | null): RequestInfo | URL {
+  if (!profile) return input;
+  const profiled = new URL(url.toString());
+  // The shared request-storm cache keys by URL/company. Carry the profile in an
+  // ignored query parameter as well as the header so two response shapes can
+  // never share an in-flight/cache entry merely because their business URL is
+  // otherwise identical.
+  profiled.searchParams.set(PROFILE_QUERY, profile);
+  if (input instanceof Request) return new Request(profiled.toString(), input);
+  if (input instanceof URL) return profiled;
+  return profiled.toString();
 }
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
@@ -165,7 +179,8 @@ export function installOperationalPhase4BandwidthFetch(): void {
     headers.set(REQUEST_HEADER, WIRE_VERSION);
     const profile = responseProfileFor(url.pathname);
     if (profile) headers.set(PROFILE_HEADER, profile);
-    const response = await originalFetch(input, { ...(init || {}), headers });
+    const profiledInput = inputWithProfile(input, url, profile);
+    const response = await originalFetch(profiledInput, { ...(init || {}), headers });
     return decodeCompactResponse(response);
   };
 }
