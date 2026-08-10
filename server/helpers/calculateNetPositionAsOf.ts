@@ -118,7 +118,7 @@ export async function calculateNetPositionAsOf(
     ? companyAccounts.filter(
         (a: any) => a.accountType === "Cash" || a.subType === "sp_payable" || a.subType === "sp_hadi_intercompany"
       )
-    : companyAccounts.filter((a: any) => a.subType !== "sp_stock" && a.subType !== "sp_cost_clearing");
+    : companyAccounts.filter((a) => a.subType !== "sp_stock" && a.subType !== "sp_cost_clearing");
   const classified = classifyNetPositionAccounts(accountsForClassify, accountBalances, {
     includeSupplierTypeAccounts: shouldIncludeSuppliers,
   });

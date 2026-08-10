@@ -35,10 +35,10 @@ export function registerSupplierBalanceSingleRoutes(app: Express) {
 
       // Load the supplier + any children (for broker aggregation)
       const allSuppliers = await db.select().from(factorySuppliers).where(eq(factorySuppliers.companyId, companyId));
-      const supplier = allSuppliers.find((s: any) => s.id === supplierId);
+      const supplier = allSuppliers.find((s) => s.id === supplierId);
       if (!supplier) return res.status(404).json({ message: "Supplier not found" });
-      const children = allSuppliers.filter((s: any) => (s as any).parentId === supplierId);
-      const supplierIds = [supplierId, ...children.map((c: any) => c.id)];
+      const children = allSuppliers.filter((s) => (s as any).parentId === supplierId);
+      const supplierIds = [supplierId, ...children.map((c) => c.id)];
 
       // Load all containers, payments, and FX transfers for the relevant supplier IDs
       const allContainers = await db.select().from(factoryContainers).where(eq(factoryContainers.companyId, companyId));
@@ -132,7 +132,7 @@ export function registerSupplierBalanceSingleRoutes(app: Express) {
       // Commission from a supplier's own containers is included in the supplier's balance.
       // For brokers, their balance = only direct entries + FX-in (no child rollup).
       const computeBalance = (sid: number, openingBal: number) => {
-        const supplierContainers = allContainers.filter((c: any) => c.supplierId === sid);
+        const supplierContainers = allContainers.filter((c) => c.supplierId === sid);
         const containerValue = supplierContainers.reduce((sum: number, c: any) => {
           // Use totalKg (declared/agreed weight) not actualReceivedKg — weight differences
           // at offload affect inventory only, not what is owed to the supplier.
@@ -225,7 +225,7 @@ export function registerSupplierBalanceSingleRoutes(app: Express) {
             fxNetUsd -= parseFloat(t.toAmountUsd || "0");
           }
         }
-        const supplierPayments = allPayments.filter((p: any) => p.supplierId === sid);
+        const supplierPayments = allPayments.filter((p) => p.supplierId === sid);
         const totalPaid = supplierPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0);
         const voucherPaid = voucherPaidBySupplier[sid] || 0;
         return (

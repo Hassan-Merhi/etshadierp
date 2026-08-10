@@ -3,12 +3,12 @@
  *
  * Extracted from FactoryWorkerDetail.tsx during the Phase 4 god-file split.
  */
-import {useQuery} from "@tanstack/react-query";
-import {ChevronDown, ChevronRight, RotateCcw} from "lucide-react";
-import {Button} from "@/components/ui/button";
-import {Badge} from "@/components/ui/badge";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import type {AdvanceRowProps, CashAccount} from "../types";
+import { useQuery } from "@tanstack/react-query";
+import { ChevronDown, ChevronRight, RotateCcw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import type { AdvanceRowProps, CashAccount } from "../types";
 
 export function AdvanceRow({ adv, isLoan, isExpanded, onToggleExpand, onRepay, formatDate, fmt }: AdvanceRowProps) {
   const { data: cashAccounts } = useQuery<CashAccount[]>({
@@ -111,7 +111,7 @@ export function AdvanceRow({ adv, isLoan, isExpanded, onToggleExpand, onRepay, f
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {repaymentsWithRunningBalance.map((r: any) => (
+                  {repaymentsWithRunningBalance.map((r) => (
                     <TableRow key={r.id} data-testid={`row-repayment-${r.id}`}>
                       <TableCell className="text-xs">{formatDate(r.repaymentDate)}</TableCell>
                       <TableCell className="text-xs text-right font-mono">{fmt(r.amount)}</TableCell>

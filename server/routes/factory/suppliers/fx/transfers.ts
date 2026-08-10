@@ -85,7 +85,7 @@ export function registerSupplierFxTransferRoutes(app: Express) {
           )
         );
 
-      const containerIds = contRowsInCurrency.map((c: any) => c.id);
+      const containerIds = contRowsInCurrency.map((c) => c.id);
       const totalValue = contRowsInCurrency.reduce((s: number, c: any) => {
         const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
         const rate = parseFloat(c.ratePerKg || "0");
@@ -124,7 +124,7 @@ export function registerSupplierFxTransferRoutes(app: Express) {
           );
         // Only count commissions denominated in the transfer currency
         totalCommission = commRows
-          .filter((cm: any) => (cm.currencyCode || "USD") === currCode)
+          .filter((cm) => (cm.currencyCode || "USD") === currCode)
           .reduce((s: number, cm: any) => s + parseFloat(cm.commissionTotal || "0"), 0);
 
         // Also include direct commissions from containers (commissionAmount / commissionCurrencyCode)
@@ -137,7 +137,7 @@ export function registerSupplierFxTransferRoutes(app: Express) {
             .from(factoryContainers)
             .where(and(eq(factoryContainers.companyId, companyId), eq(factoryContainers.supplierId, fromSupId)));
           const directAmt = directRows
-            .filter((r: any) => (r.commissionCurrencyCode || "USD") === currCode)
+            .filter((r) => (r.commissionCurrencyCode || "USD") === currCode)
             .reduce((s: number, r: any) => s + parseFloat(r.commissionAmount || "0"), 0);
           // Use whichever is larger (factoryContainerCommissions may supersede commissionAmount)
           if (directAmt > totalCommission) totalCommission = directAmt;
@@ -174,11 +174,11 @@ export function registerSupplierFxTransferRoutes(app: Express) {
 
       // FX deducted from supplier bucket (source = supplier or both)
       const fxSupplierOut = fxRows
-        .filter((t: any) => !t.sourceType || t.sourceType === "supplier" || t.sourceType === "both")
+        .filter((t) => !t.sourceType || t.sourceType === "supplier" || t.sourceType === "both")
         .reduce((s: number, t: any) => s + parseFloat(t.fromAmount || "0"), 0);
       // FX deducted from commission bucket (source = commission or both)
       const fxCommOut = fxRows
-        .filter((t: any) => t.sourceType === "commission" || t.sourceType === "both")
+        .filter((t) => t.sourceType === "commission" || t.sourceType === "both")
         .reduce((s: number, t: any) => s + parseFloat(t.fromAmount || "0"), 0);
 
       const supplierAvail = totalValue - totalCommission - totalPaid - fxSupplierOut;
@@ -221,7 +221,7 @@ export function registerSupplierFxTransferRoutes(app: Express) {
           )
           .orderBy(factoryContainers.createdAt); // oldest first
 
-        const cIds = allContainers.map((c: any) => c.id);
+        const cIds = allContainers.map((c) => c.id);
         const prevAllocs =
           cIds.length > 0
             ? await db

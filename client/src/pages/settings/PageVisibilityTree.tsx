@@ -213,7 +213,7 @@ export function PageVisibilityTree({ appMode }: { appMode?: string }) {
   });
 
   const permissionMap = new Map<string, boolean>();
-  rolePermissions.forEach((p: any) => {
+  rolePermissions.forEach((p) => {
     permissionMap.set(`${p.role}:${p.featureKey}`, p.enabled);
   });
 

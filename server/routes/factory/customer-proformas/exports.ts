@@ -51,7 +51,7 @@ export function registerFactoryCustomerProformaExportRoutes(app: Express) {
         .catch(() => [null]);
 
       // Fetch weight per bale + canonical name from factoryBaleProducts by articleCode
-      const articleCodes = [...new Set(rawLines.map((l: any) => l.articleCode).filter(Boolean))];
+      const articleCodes = [...new Set(rawLines.map((l) => l.articleCode).filter(Boolean))];
       const wMap = new Map<string, number>();
       const nameMap = new Map<string, string>();
       if (articleCodes.length > 0) {
@@ -68,7 +68,7 @@ export function registerFactoryCustomerProformaExportRoutes(app: Express) {
               inArray(factoryBaleProducts.articleCode, articleCodes as string[])
             )
           );
-        prods.forEach((p: any) => {
+        prods.forEach((p) => {
           if (p.articleCode) {
             wMap.set(p.articleCode, parseFloat(p.weightPerBaleKg || "0"));
             nameMap.set(p.articleCode, p.name || "");
@@ -168,7 +168,7 @@ export function registerFactoryCustomerProformaExportRoutes(app: Express) {
       let totalQty = 0,
         totalKgAll = 0,
         totalPriceAll = 0;
-      rawLines.forEach((line: any, idx: number) => {
+      rawLines.forEach((line, idx: number) => {
         const qty = parseInt(String(line.quantity));
         const kgPerBale = wMap.get(line.articleCode) || 0;
         const price = parseFloat(String(line.pricePerBale));
@@ -253,7 +253,7 @@ export function registerFactoryCustomerProformaExportRoutes(app: Express) {
         .catch(() => [null]);
 
       // Fetch weight per bale + canonical name from factoryBaleProducts by articleCode
-      const articleCodes = [...new Set(rawLines.map((l: any) => l.articleCode).filter(Boolean))];
+      const articleCodes = [...new Set(rawLines.map((l) => l.articleCode).filter(Boolean))];
       const wMap = new Map<string, number>();
       const nameMap = new Map<string, string>();
       if (articleCodes.length > 0) {
@@ -270,7 +270,7 @@ export function registerFactoryCustomerProformaExportRoutes(app: Express) {
               inArray(factoryBaleProducts.articleCode, articleCodes as string[])
             )
           );
-        prods.forEach((p: any) => {
+        prods.forEach((p) => {
           if (p.articleCode) {
             wMap.set(p.articleCode, parseFloat(p.weightPerBaleKg || "0"));
             nameMap.set(p.articleCode, p.name || "");
@@ -396,7 +396,7 @@ export function registerFactoryCustomerProformaExportRoutes(app: Express) {
         totalKgAll = 0,
         totalPriceAll = 0;
 
-      rawLines.forEach((line: any, idx: number) => {
+      rawLines.forEach((line, idx: number) => {
         const qty = parseInt(String(line.quantity));
         const kgPerBale = wMap.get(line.articleCode) || 0;
         const price = parseFloat(String(line.pricePerBale));

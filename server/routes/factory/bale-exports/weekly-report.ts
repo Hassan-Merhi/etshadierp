@@ -94,7 +94,7 @@ export function registerFactoryWeeklyReportExportRoutes(app: Express) {
         .select({ id: factorySupplierCategories.id, name: factorySupplierCategories.name })
         .from(factorySupplierCategories)
         .where(eq(factorySupplierCategories.companyId, companyId));
-      const catNameMap = new Map<number, string>(catRows.map((c: any) => [c.id, c.name]));
+      const catNameMap = new Map<number, string>(catRows.map((c) => [c.id, c.name]));
 
       // Map: categoryKey → { name, currentBalance }
       // categoryKey = categoryId (number) or "uncategorized"

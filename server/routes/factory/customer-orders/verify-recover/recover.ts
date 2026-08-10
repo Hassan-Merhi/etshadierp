@@ -223,7 +223,7 @@ export function registerOrderRecoverBalesRoutes(app: Express) {
               AND co.status != 'CANCELLED'
               AND cob.order_id != ${orderId}`
       );
-      const claimedIds = new Set<number>(resultRows(claimedResult).map((r: any) => Number(r.bale_id)));
+      const claimedIds = new Set<number>(resultRows(claimedResult).map((r) => Number(r.bale_id)));
 
       const scannerName: string | null = session.username || session.name || session.email || null;
       let totalLinked = 0;
@@ -245,7 +245,7 @@ export function registerOrderRecoverBalesRoutes(app: Express) {
               LIMIT ${needed * 3}`
         );
         const candidates: any[] = resultRows(candidatesResult);
-        const available = candidates.filter((b: any) => !claimedIds.has(Number(b.id))).slice(0, needed);
+        const available = candidates.filter((b) => !claimedIds.has(Number(b.id))).slice(0, needed);
 
         for (const bale of available) {
           await db.insert(customerOrderBales).values({

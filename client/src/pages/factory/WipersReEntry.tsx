@@ -166,7 +166,7 @@ export default function WipersReEntry() {
     if (cleanupSelectedIds.size === currentWipersBales.length) {
       setCleanupSelectedIds(new Set());
     } else {
-      setCleanupSelectedIds(new Set(currentWipersBales.map((b: any) => b.id)));
+      setCleanupSelectedIds(new Set(currentWipersBales.map((b) => b.id)));
     }
   };
 
@@ -407,7 +407,7 @@ export default function WipersReEntry() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">— None —</SelectItem>
-                  {workers.map((w: any) => (
+                  {workers.map((w) => (
                     <SelectItem key={w.id} value={w.id.toString()}>
                       {w.fullName || w.name}
                     </SelectItem>
@@ -536,7 +536,7 @@ export default function WipersReEntry() {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="none">None</SelectItem>
-                              {workers.map((w: any) => (
+                              {workers.map((w) => (
                                 <SelectItem key={w.id} value={w.id.toString()}>
                                   {w.fullName || w.name}
                                 </SelectItem>
@@ -660,7 +660,7 @@ export default function WipersReEntry() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {currentWipersBales.map((bale: any) => (
+                        {currentWipersBales.map((bale) => (
                           <TableRow
                             key={bale.id}
                             className="cursor-pointer"

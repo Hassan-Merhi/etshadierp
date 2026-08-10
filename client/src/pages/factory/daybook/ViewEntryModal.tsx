@@ -122,17 +122,17 @@ export function ViewEntryModal({
     // Determine source entry (the "Paid From" / "Received In" account)
     const src =
       txType === "PAYMENT"
-        ? viewEntries.find((e: any) => parseFloat(e.creditAmount || "0") > 0)
+        ? viewEntries.find((e) => parseFloat(e.creditAmount || "0") > 0)
         : txType === "RECEIPT"
-          ? viewEntries.find((e: any) => parseFloat(e.debitAmount || "0") > 0)
+          ? viewEntries.find((e) => parseFloat(e.debitAmount || "0") > 0)
           : null;
 
     // Determine display entries
     const display =
       txType === "PAYMENT"
-        ? viewEntries.filter((e: any) => parseFloat(e.debitAmount || "0") > 0)
+        ? viewEntries.filter((e) => parseFloat(e.debitAmount || "0") > 0)
         : txType === "RECEIPT"
-          ? viewEntries.filter((e: any) => parseFloat(e.creditAmount || "0") > 0)
+          ? viewEntries.filter((e) => parseFloat(e.creditAmount || "0") > 0)
           : viewEntries;
 
     const resolveUrl = (e: any): string | null => {
@@ -211,9 +211,9 @@ export function ViewEntryModal({
 
     // Source account: For Payment = credit entry (cash going OUT), For Receipt = debit entry (cash coming IN)
     const sourceEntry = isPayment
-      ? viewEntries.find((e: any) => parseFloat(e.creditAmount || "0") > 0)
+      ? viewEntries.find((e) => parseFloat(e.creditAmount || "0") > 0)
       : isReceipt
-        ? viewEntries.find((e: any) => parseFloat(e.debitAmount || "0") > 0)
+        ? viewEntries.find((e) => parseFloat(e.debitAmount || "0") > 0)
         : null;
 
     // Total = opposite side of source for Payment/Receipt
@@ -225,9 +225,9 @@ export function ViewEntryModal({
 
     // Display entries: Payment = debit side only, Receipt = credit side only, Journal = all
     const displayEntries = isPayment
-      ? viewEntries.filter((e: any) => parseFloat(e.debitAmount || "0") > 0)
+      ? viewEntries.filter((e) => parseFloat(e.debitAmount || "0") > 0)
       : isReceipt
-        ? viewEntries.filter((e: any) => parseFloat(e.creditAmount || "0") > 0)
+        ? viewEntries.filter((e) => parseFloat(e.creditAmount || "0") > 0)
         : viewEntries;
 
     return (
@@ -311,7 +311,7 @@ export function ViewEntryModal({
                     </tr>
                   </thead>
                   <tbody>
-                    {displayEntries.map((e: any, i: number) => (
+                    {displayEntries.map((e, i: number) => (
                       <tr key={e.id ?? i} className="border-b last:border-0">
                         <td className="px-3 py-2">
                           <p className="font-medium">{e.accountName || "—"}</p>

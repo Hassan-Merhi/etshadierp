@@ -126,7 +126,7 @@ export function registerStockTransferRevisionWriteRoutes(app: Express) {
       }
 
       await db.insert(stockTransferRevisionItems).values(
-        items.map((item: any) => ({
+        items.map((item) => ({
           revisionId: revision.id,
           stockItemId: item.stockItemId,
           stockItemName: item.stockItemName,
@@ -169,14 +169,14 @@ export function registerStockTransferRevisionWriteRoutes(app: Express) {
               .where(eq(vouchers.id, transfer.voucherId));
             if (!voucherRow) return;
 
-            const uniqueSrcNames = [...new Set(items.map((i: any) => i.sourceLocationName).filter(Boolean))];
+            const uniqueSrcNames = [...new Set(items.map((i) => i.sourceLocationName).filter(Boolean))];
             const sourceName = uniqueSrcNames.length === 1 ? uniqueSrcNames[0] : "Multiple Sources";
 
             // Use the first item's sourceLocationId to route to the source WA group
-            const srcLocationId = items.find((i: any) => i.sourceLocationId)?.sourceLocationId ?? null;
+            const srcLocationId = items.find((i) => i.sourceLocationId)?.sourceLocationId ?? null;
             if (!srcLocationId) return;
 
-            const waItems = items.map((i: any) => ({
+            const waItems = items.map((i) => ({
               stockItemId: Number(i.stockItemId),
               stockItemName: i.stockItemName ?? null,
               originalQuantity: parseFloat(i.originalQuantity) || 0,

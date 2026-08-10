@@ -334,7 +334,7 @@ export function registerSpMigrationSalesRoutes(app: Express) {
         WHERE company_id = ${targetId} AND deleted_at IS NULL AND sub_type IN ('sp_goods_otw', 'sp_otw_clearing')
       `)
         ).rows as any[];
-        const otwBySubType = new Map(otwAcctRows.map((r: any) => [r.sub_type, pn(r.id)]));
+        const otwBySubType = new Map(otwAcctRows.map((r) => [r.sub_type, pn(r.id)]));
         const otwAssetAcctId = otwBySubType.get("sp_goods_otw");
         const otwClearingAcctId = otwBySubType.get("sp_otw_clearing");
 
@@ -605,7 +605,7 @@ export function registerSpMigrationSalesRoutes(app: Express) {
             AND sub_type IN ('gc_our_profit_share', 'gc_supplier_profit_share', 'gc_accumulated_profit_clearing')
         `)
         ).rows as any[];
-        const bySubType = new Map(acctRows.map((r: any) => [r.sub_type, pn(r.id)]));
+        const bySubType = new Map(acctRows.map((r) => [r.sub_type, pn(r.id)]));
         const ourAcctId = bySubType.get("gc_our_profit_share");
         const supAcctId = bySubType.get("gc_supplier_profit_share");
         const clrAcctId = bySubType.get("gc_accumulated_profit_clearing");

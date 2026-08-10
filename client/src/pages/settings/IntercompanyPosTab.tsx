@@ -234,7 +234,7 @@ export function IntercompanyPosTab() {
                     <SelectValue placeholder="Select account…" />
                   </SelectTrigger>
                   <SelectContent>
-                    {srcAccounts.map((a: any) => (
+                    {srcAccounts.map((a) => (
                       <SelectItem key={a.id} value={String(a.id)} data-testid={`option-src-account-${a.id}`}>
                         {a.name} <span className="text-muted-foreground text-xs ml-1">({a.accountType})</span>
                       </SelectItem>
@@ -261,7 +261,7 @@ export function IntercompanyPosTab() {
                       <SelectValue placeholder={destAccountsLoading ? "Loading…" : "Select account…"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {destAccounts.map((a: any) => (
+                      {destAccounts.map((a) => (
                         <SelectItem key={a.id} value={String(a.id)} data-testid={`option-dest-account-${a.id}`}>
                           {a.name} <span className="text-muted-foreground text-xs ml-1">({a.accountType})</span>
                         </SelectItem>

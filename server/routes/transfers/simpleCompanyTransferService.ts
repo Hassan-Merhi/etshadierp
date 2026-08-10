@@ -16,7 +16,7 @@ type TransferSide = "from" | "to";
 
 async function getOrCreateClearingAccount(companyId: number) {
   const accounts = await transferRepository.listLedgerAccounts(companyId);
-  const existing = accounts.find((account: any) => account.code === "TRANSFER-CLEARING");
+  const existing = accounts.find((account) => account.code === "TRANSFER-CLEARING");
   if (existing) return existing;
   return transferRepository.createLedgerAccount({
     companyId,
@@ -47,9 +47,7 @@ function buildTransferReversalRequest(input: {
     factorySupplierId: entry.factorySupplierId ?? undefined,
     debitAmount: String(entry.creditAmount ?? "0"),
     creditAmount: String(entry.debitAmount ?? "0"),
-    narration: entry.narration
-      ? `Reversal: ${entry.narration}`
-      : `Reversal of ${snapshot.voucher.voucherNumber}`,
+    narration: entry.narration ? `Reversal: ${entry.narration}` : `Reversal of ${snapshot.voucher.voucherNumber}`,
   }));
 
   return {
@@ -140,7 +138,7 @@ export const simpleCompanyTransferService = {
       const existingTransfer = await transferRepository.findTransferByVoucherIdsTx(
         tx,
         Number((fromPosted.voucher as any).id),
-        Number((toPosted.voucher as any).id),
+        Number((toPosted.voucher as any).id)
       );
       if (existingTransfer) return existingTransfer;
 
@@ -197,7 +195,7 @@ export const simpleCompanyTransferService = {
           snapshot: fromSnapshot,
           actor: reversalActor,
         }),
-        postingDependencies,
+        postingDependencies
       );
       const toReversal = await postBalancedVoucherTx(
         tx,
@@ -208,7 +206,7 @@ export const simpleCompanyTransferService = {
           snapshot: toSnapshot,
           actor: reversalActor,
         }),
-        postingDependencies,
+        postingDependencies
       );
 
       // Replaces the legacy deleteTransferVoucher behavior: originals remain for audit.
@@ -216,10 +214,7 @@ export const simpleCompanyTransferService = {
       return {
         success: true,
         replayed: fromReversal.replayed && toReversal.replayed,
-        reversalVoucherIds: [
-          Number((fromReversal.voucher as any).id),
-          Number((toReversal.voucher as any).id),
-        ],
+        reversalVoucherIds: [Number((fromReversal.voucher as any).id), Number((toReversal.voucher as any).id)],
       };
     });
   },

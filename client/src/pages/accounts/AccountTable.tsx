@@ -18,7 +18,6 @@ const TYPE_LABELS: Record<string, string> = {
   factoryWorker: "Worker",
 };
 
-
 const TYPE_ORDER = ["ledger", "supplier", "customer", "bank", "employee", "fixedAsset", "factoryWorker"];
 
 export function AccountTable({
@@ -38,20 +37,20 @@ export function AccountTable({
   const [typeFilter, setTypeFilter] = useState("all");
 
   const presentTypes = useMemo(() => {
-    const types = new Set(filteredAccounts.map((a: any) => a.type as string));
+    const types = new Set(filteredAccounts.map((a) => a.type as string));
     return TYPE_ORDER.filter((t) => types.has(t));
   }, [filteredAccounts]);
 
   const typeFiltered = useMemo(() => {
     if (typeFilter === "all") return filteredAccounts;
-    return filteredAccounts.filter((a: any) => a.type === typeFilter);
+    return filteredAccounts.filter((a) => a.type === typeFilter);
   }, [filteredAccounts, typeFilter]);
 
-  const accountIds = new Set(typeFiltered.map((a: any) => a.accountId as number));
-  const parents = typeFiltered.filter((a: any) => !a.parentId || !accountIds.has(a.parentId));
-  const childrenList = typeFiltered.filter((a: any) => a.parentId && accountIds.has(a.parentId));
+  const accountIds = new Set(typeFiltered.map((a) => a.accountId as number));
+  const parents = typeFiltered.filter((a) => !a.parentId || !accountIds.has(a.parentId));
+  const childrenList = typeFiltered.filter((a) => a.parentId && accountIds.has(a.parentId));
   const childMap = new Map<number, any[]>();
-  childrenList.forEach((c: any) => {
+  childrenList.forEach((c) => {
     if (!childMap.has(c.parentId)) childMap.set(c.parentId, []);
     childMap.get(c.parentId)!.push(c);
   });
@@ -93,7 +92,7 @@ export function AccountTable({
       <div className="rounded-xl border overflow-hidden">
         <Table>
           <TableBody>
-            {parents.map((account: any) => {
+            {parents.map((account) => {
               const kids = childMap.get(account.accountId) || [];
               const hasKids = kids.length > 0;
               const isExpanded = expandedParents.has(account.id);
@@ -132,7 +131,10 @@ export function AccountTable({
                         {onEdit && account.type === "ledger" && (
                           <button
                             className="opacity-0 group-hover/row:opacity-100 transition-opacity ml-1 p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground shrink-0"
-                            onClick={(e) => { e.stopPropagation(); onEdit(account); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEdit(account);
+                            }}
                             title="Edit account"
                             data-testid={`button-edit-account-${account.accountId}`}
                           >
@@ -166,7 +168,7 @@ export function AccountTable({
 
                   {hasKids &&
                     isExpanded &&
-                    kids.map((child: any) => {
+                    kids.map((child) => {
                       const childSide = child.balanceSide || (child.balance >= 0 ? "Dr" : "Cr");
                       return (
                         <TableRow
@@ -186,7 +188,10 @@ export function AccountTable({
                               {onEdit && child.type === "ledger" && (
                                 <button
                                   className="opacity-0 group-hover/child:opacity-100 transition-opacity p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground shrink-0"
-                                  onClick={(e) => { e.stopPropagation(); onEdit(child); }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onEdit(child);
+                                  }}
                                   title="Edit account"
                                   data-testid={`button-edit-account-${child.accountId}`}
                                 >

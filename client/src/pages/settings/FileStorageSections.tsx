@@ -138,7 +138,7 @@ export function PreviewModal({
                       key={ri}
                       className={ri === 0 ? "bg-muted font-semibold" : "border-b border-border/40 hover:bg-muted/30"}
                     >
-                      {row.map((cell: any, ci: number) => (
+                      {row.map((cell, ci: number) => (
                         <td
                           key={ci}
                           className="px-2 py-1 border-r border-border/40 whitespace-nowrap max-w-[200px] truncate"

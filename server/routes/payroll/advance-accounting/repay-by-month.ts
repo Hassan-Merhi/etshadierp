@@ -60,12 +60,12 @@ export function registerAdvanceRepayByMonthRoutes(app: Express) {
       }
 
       // Load worker names
-      const workerIds = [...new Set(outstanding.map((a: any) => a.workerId))];
+      const workerIds = [...new Set(outstanding.map((a) => a.workerId))];
       const workerRows = await db
         .select({ id: factoryWorkers.id, fullName: factoryWorkers.fullName })
         .from(factoryWorkers)
         .where(inArray(factoryWorkers.id, workerIds));
-      const workerMap: Record<number, string> = Object.fromEntries(workerRows.map((w: any) => [w.id, w.fullName]));
+      const workerMap: Record<number, string> = Object.fromEntries(workerRows.map((w) => [w.id, w.fullName]));
 
       const result = await db.transaction(async (tx: any) => {
         // Resolve/create the Factory Worker Advances ledger account once

@@ -318,7 +318,7 @@ export function registerSupplierProfitExportRoutes(app: Express, requireAuth: an
       }
 
       // Summary totals
-      const hasQty = rows.filter((r: any) => Number(r.qty) > 0);
+      const hasQty = rows.filter((r) => Number(r.qty) > 0);
       const totalQtyOrdered = hasQty.reduce((s: number, r: any) => s + (Number(r.qty) || 0), 0);
       const totalAvgCostSum = hasQty.reduce(
         (s: number, r: any) => s + (Number(r.qty) || 0) * (Number(r.offloadingCost) || 0),

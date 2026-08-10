@@ -358,7 +358,7 @@ export function registerBalesImportRoutes(app: Express) {
 
     if (obRawStocks.length === 0) return { suppliersProcessed: 0, totalAllocatedKg: 0, unmatchedKg: 0 };
 
-    const obIds = obRawStocks.map((r: any) => r.id);
+    const obIds = obRawStocks.map((r) => r.id);
     await db.update(factoryRawStock).set({ usedKg: "0" }).where(inArray(factoryRawStock.id, obIds));
 
     const consumed = await db

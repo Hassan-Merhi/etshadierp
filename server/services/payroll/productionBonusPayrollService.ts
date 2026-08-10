@@ -20,7 +20,7 @@ function parseMembers(value: unknown): ProductionBonusMemberSnapshot[] {
   }
   if (!Array.isArray(parsed)) return [];
   return parsed
-    .map((member: any) => ({ workerId: Number(member?.workerId), workerName: String(member?.workerName ?? "") }))
+    .map((member) => ({ workerId: Number(member?.workerId), workerName: String(member?.workerName ?? "") }))
     .filter((member) => Number.isInteger(member.workerId) && member.workerId > 0 && member.workerName.trim().length > 0)
     .sort((a, b) => a.workerId - b.workerId);
 }
@@ -95,7 +95,7 @@ async function loadSavedPlanEntries(
       AND p.plan_date BETWEEN ${startDate}::date AND ${endDate}::date
     ORDER BY p.plan_date, e.position_id
   `);
-  return rows(result).map((row: any) => ({
+  return rows(result).map((row) => ({
     planId: Number(row.planId),
     planEntryId: Number(row.planEntryId),
     productionDate: String(row.productionDate),
@@ -333,7 +333,7 @@ export async function getProductionBonusDetailsForPayroll(
     WHERE a.payroll_id = ${payrollId}
     ORDER BY r.production_date, r.position_name_snapshot, a.worker_id
   `);
-  const allocations = rows(detailResult).map((row: any) => ({
+  const allocations = rows(detailResult).map((row) => ({
     allocationId: Number(row.allocationId),
     runId: Number(row.runId),
     productionDate: String(row.productionDate),

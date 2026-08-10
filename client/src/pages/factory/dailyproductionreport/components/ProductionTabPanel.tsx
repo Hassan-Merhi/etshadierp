@@ -479,8 +479,8 @@ export function ProductionTabPanel({ report }: { report: DailyProductionReportSt
             totalValue: number;
           }[] = [];
           if (data) {
-            const wipersRows = data.wipersGarbage.rows.filter((r: any) => r.subType === "wiper");
-            const garbageRows = data.wipersGarbage.rows.filter((r: any) => r.subType !== "wiper");
+            const wipersRows = data.wipersGarbage.rows.filter((r) => r.subType === "wiper");
+            const garbageRows = data.wipersGarbage.rows.filter((r) => r.subType !== "wiper");
             if (wipersRows.length > 0) {
               wgCats.push({
                 categoryName: "Wipers",
@@ -489,7 +489,7 @@ export function ProductionTabPanel({ report }: { report: DailyProductionReportSt
                 totalValue: wipersRows.reduce((s: number, r: any) => s + r.totalValue, 0),
               });
               wgProds.push(
-                ...wipersRows.map((r: any) => ({
+                ...wipersRows.map((r) => ({
                   articleCode: r.categoryName.replace(/\s+/g, "-").toUpperCase(),
                   productName: r.categoryName,
                   categoryName: "Wipers",
@@ -508,7 +508,7 @@ export function ProductionTabPanel({ report }: { report: DailyProductionReportSt
                 totalValue: garbageRows.reduce((s: number, r: any) => s + r.totalValue, 0),
               });
               wgProds.push(
-                ...garbageRows.map((r: any) => ({
+                ...garbageRows.map((r) => ({
                   articleCode: r.categoryName.replace(/\s+/g, "-").toUpperCase(),
                   productName: r.categoryName,
                   categoryName: "Garbage",

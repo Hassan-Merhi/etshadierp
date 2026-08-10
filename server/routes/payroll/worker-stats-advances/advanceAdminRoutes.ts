@@ -217,14 +217,14 @@ export function registerWorkerAdvanceAdminRoutes(app: Express) {
         .orderBy(factoryAdvanceRepayments.advanceId, factoryAdvanceRepayments.repaymentDate);
 
       // Worker names
-      const workerIds = [...new Set(allAdvances.map((a: any) => a.workerId))];
+      const workerIds = [...new Set(allAdvances.map((a) => a.workerId))];
       let workerMap: Record<number, string> = {};
       if (workerIds.length > 0) {
         const wRows = await db
           .select({ id: factoryWorkers.id, fullName: factoryWorkers.fullName })
           .from(factoryWorkers)
           .where(inArray(factoryWorkers.id, workerIds));
-        workerMap = Object.fromEntries(wRows.map((w: any) => [w.id, w.fullName]));
+        workerMap = Object.fromEntries(wRows.map((w) => [w.id, w.fullName]));
       }
 
       const advancesByWorker = new Map<number, typeof allAdvances>();

@@ -89,7 +89,7 @@ export function registerFactoryFxDiagnosticRoutes(app: Express) {
           .select({ id: factorySuppliers.id, name: factorySuppliers.name })
           .from(factorySuppliers)
           .where(eq(factorySuppliers.companyId, companyId));
-        const supplierNameById = new Map<number, string>(suppliers.map((s: any) => [s.id, s.name]));
+        const supplierNameById = new Map<number, string>(suppliers.map((s) => [s.id, s.name]));
 
         // IMPORTANT: load ALL of this company's containers (not just non-USD ones) into
         // the lookup map. A non-USD charge/commission can be attached to a USD-currency
@@ -100,8 +100,8 @@ export function registerFactoryFxDiagnosticRoutes(app: Express) {
           .select()
           .from(factoryContainers)
           .where(eq(factoryContainers.companyId, companyId));
-        const containerById = new Map<number, any>(allContainers.map((c: any) => [c.id, c]));
-        const nonUsdContainers = allContainers.filter((c: any) => c.currencyCode !== "USD");
+        const containerById = new Map<number, any>(allContainers.map((c) => [c.id, c]));
+        const nonUsdContainers = allContainers.filter((c) => c.currencyCode !== "USD");
 
         // Charges/commissions are scanned by companyId directly — NEVER gated on
         // "does this company have any non-USD containers", so a non-USD charge/commission

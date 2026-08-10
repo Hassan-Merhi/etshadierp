@@ -178,7 +178,7 @@ export default function SpOverview() {
               <p className="p-6 text-sm text-muted-foreground">No Supplier Partner sales have been posted yet.</p>
             ) : (
               <div className="divide-y">
-                {recentSales.map((sale: any) => (
+                {recentSales.map((sale) => (
                   <div
                     key={sale.id}
                     className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center"

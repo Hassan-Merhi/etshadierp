@@ -192,7 +192,7 @@ export function registerBaleRoutes(app: Express) {
         return res.status(400).json({ message: "Invalid data format" });
       }
 
-      const validatedBales = balesData.map((b: any) => insertBaleSchema.parse({ ...b, companyId }));
+      const validatedBales = balesData.map((b) => insertBaleSchema.parse({ ...b, companyId }));
 
       const created = await storage.bulkCreateBales(validatedBales);
       res.json({ success: true, count: created.length, bales: created });
@@ -443,7 +443,6 @@ export function registerBaleRoutes(app: Express) {
 
   registerBaleLookupRoutes(app);
 
-
   // Company Settings API Routes
   app.get("/api/company-settings", requireAuth, async (req, res) => {
     try {
@@ -483,9 +482,7 @@ export function registerBaleRoutes(app: Express) {
 
   registerProductionRawStockRoutes(app);
 
-
   registerProductionBaleRoutes(app);
-
 
   // Customer Balance API Routes
   app.get("/api/customers/:id/balance", requireAuth, async (req, res) => {

@@ -91,7 +91,7 @@ export function registerFactoryCustomerStatementPdfRoutes(app: Express) {
           _fromVoucher: true,
         });
       }
-      const allRowsPdf = [...balanceRows.map((r: any) => ({ ...r, _fromVoucher: false })), ...voucherRowsPdf].sort(
+      const allRowsPdf = [...balanceRows.map((r) => ({ ...r, _fromVoucher: false })), ...voucherRowsPdf].sort(
         (a, b) => {
           const da = (a.transactionDate || "").toString(),
             db2 = (b.transactionDate || "").toString();
@@ -112,9 +112,7 @@ export function registerFactoryCustomerStatementPdfRoutes(app: Express) {
       // Build container number + destination maps for INVOICE-type rows
       const invoiceRefIds = [
         ...new Set(
-          allRowsPdf
-            .filter((r: any) => r.referenceType === "INVOICE" && r.referenceId)
-            .map((r: any) => r.referenceId as number)
+          allRowsPdf.filter((r) => r.referenceType === "INVOICE" && r.referenceId).map((r) => r.referenceId as number)
         ),
       ];
       const containerNumMap = new Map<number, string>();
@@ -135,7 +133,7 @@ export function registerFactoryCustomerStatementPdfRoutes(app: Express) {
       }
 
       // First pass: enrich ALL rows with running balance (needed before filtering)
-      const allEnrichedPdf = allRowsPdf.map((row: any) => {
+      const allEnrichedPdf = allRowsPdf.map((row) => {
         const debit = parseFloat(row.debitAmount || "0");
         const credit = parseFloat(row.creditAmount || "0");
         runningBalance += debit - credit;
@@ -161,7 +159,7 @@ export function registerFactoryCustomerStatementPdfRoutes(app: Express) {
       }
 
       // Apply filters (mirrors frontend filteredHistory logic)
-      const rows = allEnrichedPdf.filter((row: any) => {
+      const rows = allEnrichedPdf.filter((row) => {
         if (destFilterParam) {
           if (!(row.particulars || "").toLowerCase().includes(destFilterParam)) return false;
         }
@@ -435,7 +433,7 @@ export function registerFactoryCustomerStatementPdfRoutes(app: Express) {
       }
 
       // ── Data rows ──
-      rows.forEach((row: any, idx: number) => {
+      rows.forEach((row, idx: number) => {
         const cTxt = row.container || "";
         const pTxt = row.particulars || "";
 

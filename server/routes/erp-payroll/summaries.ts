@@ -38,7 +38,7 @@ export function registerPayrollSummaryRoutes(app: Express) {
 
       // Get all employees of type Worker for current company
       const allEmployees = await storage.getAllEmployees(req.session.currentCompanyId);
-      const workers = allEmployees.filter((emp: any) => emp.employeeType === "Worker");
+      const workers = allEmployees.filter((emp) => emp.employeeType === "Worker");
 
       // Get all ledger accounts for current company
       const allAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
@@ -48,7 +48,7 @@ export function registerPayrollSummaryRoutes(app: Express) {
         workers.map(async (worker: any) => {
           // Find employee's liability account (code: EMP-{worker.code})
           const employeeAccountCode = `EMP-${worker.code}`;
-          const employeeAccount = allAccounts.find((a: any) => a.code === employeeAccountCode);
+          const employeeAccount = allAccounts.find((a) => a.code === employeeAccountCode);
 
           let totalPaid = 0;
 

@@ -133,7 +133,7 @@ export function registerVoucherSalesLineUpdateRoutes(app: Express) {
 
       // Calculate totals and prepare items data
       let totalSalesAmount = 0;
-      const salesItemsData = items.map((item: any) => {
+      const salesItemsData = items.map((item) => {
         const stockItem = stockItemsMap.get(item.stockItemId);
         if (!stockItem) {
           throw new Error(`Stock item ${item.stockItemId} not found`);
@@ -317,7 +317,7 @@ export function registerVoucherSalesLineUpdateRoutes(app: Express) {
       if (finalPaymentAccountId && finalPaymentAccountType) {
         // EARLY VALIDATION: Check Sales account type BEFORE any destructive operations
         const allAccountsForValidation = await storage.getAllLedgerAccounts(existingVoucher.companyId);
-        const salesAccountCheck = allAccountsForValidation.find((a: any) => a.code === "SALES");
+        const salesAccountCheck = allAccountsForValidation.find((a) => a.code === "SALES");
 
         if (salesAccountCheck && salesAccountCheck.accountType !== "Income") {
           return res.status(400).json({
@@ -365,7 +365,7 @@ export function registerVoucherSalesLineUpdateRoutes(app: Express) {
         // Credit: Sales Account (Revenue increases)
         // Get or create SALES revenue account for this company
         const allAccounts = await storage.getAllLedgerAccounts(existingVoucher.companyId);
-        let salesAccount = allAccounts.find((a: any) => a.code === "SALES");
+        let salesAccount = allAccounts.find((a) => a.code === "SALES");
 
         if (!salesAccount) {
           salesAccount = await storage.createLedgerAccount({

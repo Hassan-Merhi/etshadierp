@@ -104,7 +104,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         // are always stored with the canonical code regardless of what code the
         // supplier's packing-list used.
         const { map: aliasMap } = await buildAliasMap(companyId);
-        const lineValues = lines.map((l: any) => ({
+        const lineValues = lines.map((l) => ({
           proformaId: proforma.id,
           barcode: resolveBarcode(String(l.barcode || "").trim(), aliasMap),
           itemName: String(l.itemName || "").trim(),
@@ -289,7 +289,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         // Resolve alias codes to primary stock-item codes at import time so that
         // items imported with different (supplier) codes are stored canonically.
         const { map: aliasMap } = await buildAliasMap(companyId);
-        const lineValues = lines.map((l: any) => ({
+        const lineValues = lines.map((l) => ({
           proformaId,
           barcode: resolveBarcode(String(l.barcode || l.Barcode || "").trim(), aliasMap),
           itemName: String(l.itemName || l["Item Name"] || "").trim(),

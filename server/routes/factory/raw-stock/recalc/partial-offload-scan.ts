@@ -110,8 +110,8 @@ export function registerRawStockPartialOffloadScanRoutes(app: Express) {
           includeCompletedBatches: true,
         });
 
-        const applied = results.filter((r: any) => r.applied);
-        const skipped = results.filter((r: any) => !r.applied);
+        const applied = results.filter((r) => r.applied);
+        const skipped = results.filter((r) => !r.applied);
 
         // Write undo log entry
         await pool.query(
@@ -124,7 +124,7 @@ export function registerRawStockPartialOffloadScanRoutes(app: Express) {
             req.session.username || null,
             `Partial-offload legacy cost fix — ${applied.length} container(s) corrected`,
             applied.length,
-            applied.map((r: any) => r.containerNumber),
+            applied.map((r) => r.containerNumber),
             JSON.stringify(snapshot),
           ]
         );

@@ -272,8 +272,8 @@ export function registerFactoryCompanyImportRoutes(app: Express) {
               opts?: { hasCompanyId?: boolean }
             ) {
               const hasCompanyId = opts?.hasCompanyId !== false;
-              const roots = rows.filter((r: any) => r[parentField] == null);
-              const children = rows.filter((r: any) => r[parentField] != null);
+              const roots = rows.filter((r) => r[parentField] == null);
+              const children = rows.filter((r) => r[parentField] != null);
               let count = 0;
 
               for (const row of roots) {

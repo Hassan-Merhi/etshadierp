@@ -402,7 +402,7 @@ export function registerProductionBaleRoutes(app: Express) {
         );
 
       const expectedCount = pendingBales.length;
-      const scannedIds = scannedBaleIds.map((id: any) => parseInt(id));
+      const scannedIds = scannedBaleIds.map((id) => parseInt(id));
 
       if (scannedIds.length !== expectedCount) {
         return res.status(400).json({
@@ -518,7 +518,7 @@ export function registerProductionBaleRoutes(app: Express) {
         return res.status(400).json({ message: "Invalid data format" });
       }
 
-      const validatedBales = balesData.map((b: any) => insertProductionBaleSchema.parse({ ...b, companyId }));
+      const validatedBales = balesData.map((b) => insertProductionBaleSchema.parse({ ...b, companyId }));
 
       const created = await storage.bulkCreateProductionBales(validatedBales);
       res.json({ success: true, count: created.length, bales: created });
@@ -703,7 +703,7 @@ export function registerProductionBaleRoutes(app: Express) {
           and(
             inArray(
               productionBales.id,
-              ids.map((id: any) => parseInt(id))
+              ids.map((id) => parseInt(id))
             ),
             eq(productionBales.companyId, companyId)
           )
@@ -736,7 +736,7 @@ export function registerProductionBaleRoutes(app: Express) {
       const mixBatchId = req.body.mixBatchId ? parseInt(req.body.mixBatchId) : undefined;
 
       // Map Excel rows to bale data
-      const balesData = rows.map((row: any) => {
+      const balesData = rows.map((row) => {
         return insertProductionBaleSchema.parse({
           companyId,
           mixBatchId,

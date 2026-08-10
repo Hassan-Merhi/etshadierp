@@ -59,7 +59,7 @@ export function registerRawStockRecalculateUsedRoutes(app: Express) {
 
       if (allRawStock.length === 0) return res.json({ updated: 0, dryRun, changes: [] });
 
-      const containerIds = allRawStock.map((r: any) => r.containerId as number);
+      const containerIds = allRawStock.map((r) => r.containerId as number);
 
       // 2. Sum used kg only from VALID (non-deleted) mix batch sources.
       const sourceSums = await db

@@ -446,7 +446,7 @@ export function registerAccountStatementRoutes(app: Express) {
 
       // Build running balance rows
       let runBal = startDate ? bfBalance : openingBalanceSide === "Dr" ? openingBalance : -openingBalance;
-      const enrichedRows = txRows.map((r: any) => {
+      const enrichedRows = txRows.map((r) => {
         const dr = parseFloat(r.debitAmount || "0");
         const cr = parseFloat(r.creditAmount || "0");
         runBal += dr - cr;
@@ -585,7 +585,7 @@ export function registerAccountStatementRoutes(app: Express) {
       }
 
       // Data rows
-      enrichedRows.forEach((row: any, idx: number) => {
+      enrichedRows.forEach((row, idx: number) => {
         const dr = row.dr > 0 ? row.dr : null;
         const cr = row.cr > 0 ? row.cr : null;
         const dateVal = row.voucherDate ? new Date(row.voucherDate + "T00:00:00") : "";

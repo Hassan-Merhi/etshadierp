@@ -147,7 +147,7 @@ export function registerPosPriceListRoutes(app: Express) {
           offloadMap.set(Number(r.stockItemId), String(r.offloadingCost ?? "0"));
         }
 
-        rows = rows.map((row: any) => ({
+        rows = rows.map((row) => ({
           ...row,
           costPrice: dubaiMap.get(row.stockItemId) ?? null,
           offloadingCost: offloadMap.get(row.stockItemId) ?? null,

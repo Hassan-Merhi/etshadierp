@@ -712,7 +712,7 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
                       </tr>
                     </thead>
                     <tbody>
-                      {rows.map((tx: any, i: number) => (
+                      {rows.map((tx, i: number) => (
                         <tr key={i} className="border-b hover:bg-muted/30 transition-colors">
                           <td className="px-3 py-2">
                             <span

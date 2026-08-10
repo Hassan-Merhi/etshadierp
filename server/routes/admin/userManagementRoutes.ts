@@ -552,7 +552,7 @@ export function registerUserManagementRoutes(app: Express) {
       }
 
       // Add companyId to each permission
-      const permissionsWithCompany = permissions.map((p: any) => ({
+      const permissionsWithCompany = permissions.map((p) => ({
         ...p,
         companyId,
       }));
@@ -575,7 +575,7 @@ export function registerUserManagementRoutes(app: Express) {
 
       // Session invalidation: force affected users to re-login so new permissions take effect
       try {
-        const affectedRoles = [...new Set(permissions.map((p: any) => p.role as string))];
+        const affectedRoles = [...new Set(permissions.map((p) => p.role as string))];
         const affectedUsers = await db
           .select({ userId: userCompanyRoles.userId })
           .from(userCompanyRoles)

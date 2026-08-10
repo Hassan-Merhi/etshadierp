@@ -356,7 +356,7 @@ export function registerRawStockReceiptRoutes(app: Express) {
       }
 
       // Build aggregated rows (reservedKg / freeKg will be fixed below for multi-row suppliers)
-      const aggregated = Array.from(supplierMap.values()).map((s: any) => {
+      const aggregated = Array.from(supplierMap.values()).map((s) => {
         const remainingKg = s._totalReceived - s._totalUsed;
         // For a REAL supplier, the displayed rate is ALWAYS the persisted locked rate —
         // never a recomputed receipt-weighted or remaining-value-derived figure. Only

@@ -634,7 +634,7 @@ END $mig$`;
            WHERE table_schema = 'public' AND table_name = ANY($1)`,
           [IC_TABLES]
         );
-        const found = new Set<string>(tableCheck.rows.map((r: any) => r.table_name as string));
+        const found = new Set<string>(tableCheck.rows.map((r) => r.table_name as string));
         const missing = IC_TABLES.filter((t) => !found.has(t));
         if (missing.length > 0) {
           logger.error(
@@ -1063,7 +1063,7 @@ END $mig$`;
           }
 
           // Re-point all voucher_entries from the old accounts to the unified one
-          const oldIds: number[] = oldAccts.rows.map((r: any) => Number(r.id));
+          const oldIds: number[] = oldAccts.rows.map((r) => Number(r.id));
           if (oldIds.length > 0) {
             const idList = oldIds.join(",");
             await migrationClient.query(
@@ -1128,7 +1128,7 @@ END $mig$`;
         `);
 
         if (badVariance.rows.length > 0) {
-          const companyIds: number[] = [...new Set<number>(badVariance.rows.map((r: any) => Number(r.company_id)))];
+          const companyIds: number[] = [...new Set<number>(badVariance.rows.map((r) => Number(r.company_id)))];
           let totalFixed = 0;
 
           for (const cid of companyIds) {
@@ -1168,7 +1168,7 @@ END $mig$`;
             }
             if (!accountId!) continue;
 
-            const entryIds = badVariance.rows.filter((r: any) => Number(r.company_id) === cid).map((r: any) => r.id);
+            const entryIds = badVariance.rows.filter((r) => Number(r.company_id) === cid).map((r) => r.id);
 
             await migrationClient.query(`UPDATE voucher_entries SET ledger_account_id = $1 WHERE id = ANY($2)`, [
               accountId,
@@ -1377,7 +1377,7 @@ END $mig$`;
         `);
         if (r.rowCount && r.rowCount > 0) {
           logger.info(`[BaleStatusFix] Fixed ${r.rowCount} bale(s) with deletedAt set but status != DELETED`, {
-            detail: r.rows.map((x: any) => x.reference_number).join(", "),
+            detail: r.rows.map((x) => x.reference_number).join(", "),
           });
         }
       } catch (e: unknown) {
@@ -1399,7 +1399,7 @@ END $mig$`;
         `);
         if (r.rowCount && r.rowCount > 0) {
           logger.info(`[ExportRun] Startup: marked ${r.rowCount} orphaned run(s) as failed`, {
-            detail: r.rows.map((x: any) => `#${x.id} ${x.run_type}`).join(", "),
+            detail: r.rows.map((x) => `#${x.id} ${x.run_type}`).join(", "),
           });
         }
       } catch (e: unknown) {
@@ -1420,7 +1420,7 @@ END $mig$`;
         `);
         if (r.rowCount && r.rowCount > 0) {
           logger.info(`[ExportRun] Periodic: timed out ${r.rowCount} hung run(s)`, {
-            detail: r.rows.map((x: any) => `#${x.id} ${x.run_type}`).join(", "),
+            detail: r.rows.map((x) => `#${x.id} ${x.run_type}`).join(", "),
           });
         }
       } catch (e: unknown) {

@@ -27,7 +27,7 @@ export function BaleLogoPickerPopover({
       fetch(`/api/factory/customers/${pickerCustomerId}/logos`, { credentials: "include" }).then((r) => r.json()),
     enabled: pickerCustomerId !== "none",
   });
-  const activeCustomers = allCustomers.filter((c: any) => c.active);
+  const activeCustomers = allCustomers.filter((c) => c.active);
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
@@ -57,7 +57,7 @@ export function BaleLogoPickerPopover({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="none">— Choose customer —</SelectItem>
-              {activeCustomers.map((c: any) => (
+              {activeCustomers.map((c) => (
                 <SelectItem key={c.id} value={String(c.id)}>
                   {c.legalName}
                 </SelectItem>
@@ -69,7 +69,7 @@ export function BaleLogoPickerPopover({
               <p className="text-xs text-muted-foreground py-1">No logos uploaded for this customer.</p>
             ) : (
               <div className="flex flex-wrap gap-1.5 pt-1">
-                {logos.map((logo: any) => (
+                {logos.map((logo) => (
                   <button
                     key={logo.id}
                     type="button"

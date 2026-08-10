@@ -363,7 +363,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           voucherDate: format(formData.voucherDate, "yyyy-MM-dd"),
           description: formData.notes || `${voucherType} (pending sync)`,
           totalAmount: formData.entries
-            .filter((e: any) => parseFloat(e.amount || "0") > 0)
+            .filter((e) => parseFloat(e.amount || "0") > 0)
             .reduce((sum: number, e: any) => sum + parseFloat(e.amount || "0"), 0)
             .toFixed(2),
           optional: formData.optional || false,
@@ -395,9 +395,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
   const sendWaStatementMutation = useMutation({
     mutationFn: async ({ accountId, month }: { accountId: number; month: string }) => {
-      const url = appMode === "factory"
-        ? `/api/factory/accounts/${accountId}/send-statement-whatsapp`
-        : `/api/accounts/${accountId}/send-statement-whatsapp`;
+      const url =
+        appMode === "factory"
+          ? `/api/factory/accounts/${accountId}/send-statement-whatsapp`
+          : `/api/accounts/${accountId}/send-statement-whatsapp`;
       const res = await modeApiRequest("POST", url, { month });
       const json = await res.json();
       if (!res.ok) throw new Error(json.message || "Failed to send WhatsApp");

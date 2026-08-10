@@ -42,7 +42,7 @@ export function registerAdvanceRepaymentAuditRoutes(app: Express) {
         )
         .orderBy(desc(factoryWorkerAdvances.advanceDate));
 
-      const advanceIds = allAdvances.map((r: any) => r.factory_worker_advances.id);
+      const advanceIds = allAdvances.map((r) => r.factory_worker_advances.id);
 
       // 2. All repayment records for those advances
       const repayments =
@@ -107,7 +107,7 @@ export function registerAdvanceRepaymentAuditRoutes(app: Express) {
             });
           }
         } else {
-          const missingVoucherRepays = advRepays.filter((r: any) => !voucheredRepayIds.has(r.id));
+          const missingVoucherRepays = advRepays.filter((r) => !voucheredRepayIds.has(r.id));
           if (missingVoucherRepays.length > 0) {
             auditAdvances.push({
               id: adv.id,
@@ -130,8 +130,8 @@ export function registerAdvanceRepaymentAuditRoutes(app: Express) {
         summary: {
           total: allAdvances.length,
           ok: allAdvances.length - auditAdvances.length,
-          missingVoucher: auditAdvances.filter((a: any) => a.caseType === "missing_voucher").length,
-          noRepayment: auditAdvances.filter((a: any) => a.caseType === "no_repayment").length,
+          missingVoucher: auditAdvances.filter((a) => a.caseType === "missing_voucher").length,
+          noRepayment: auditAdvances.filter((a) => a.caseType === "no_repayment").length,
         },
       });
     } catch (error: unknown) {
@@ -194,7 +194,7 @@ export function registerAdvanceRepaymentAuditRoutes(app: Express) {
           )
         );
 
-      const advanceIds = allAdvances.map((r: any) => r.factory_worker_advances.id);
+      const advanceIds = allAdvances.map((r) => r.factory_worker_advances.id);
       const repayments =
         advanceIds.length > 0
           ? await db
@@ -320,7 +320,7 @@ export function registerAdvanceRepaymentAuditRoutes(app: Express) {
             posted++;
           } else {
             // Case A: repayment records exist, re-create missing vouchers
-            const missingRepays = advRepays.filter((r: any) => !voucheredRepayIds.has(r.id));
+            const missingRepays = advRepays.filter((r) => !voucheredRepayIds.has(r.id));
             for (const repay of missingRepays) {
               const amount = parseFloat(repay.amount || "0");
               if (amount <= 0) continue;

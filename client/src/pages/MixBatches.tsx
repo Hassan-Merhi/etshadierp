@@ -578,7 +578,7 @@ export default function MixBatches() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {unlinkedBales.map((bale: any) => (
+                        {unlinkedBales.map((bale) => (
                           <TableRow
                             key={bale.id}
                             className="cursor-pointer"

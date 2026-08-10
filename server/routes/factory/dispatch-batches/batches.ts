@@ -323,7 +323,7 @@ export function registerDispatchBatchCrudRoutes(app: Express) {
           SELECT bale_id FROM customer_dispatch_bale_scans
           WHERE batch_id = ${batchId} AND company_id = ${companyId} AND removed_at IS NULL
         `);
-        const ids = resultRows(activeBaleIds).map((r: any) => Number(r.bale_id));
+        const ids = resultRows(activeBaleIds).map((r) => Number(r.bale_id));
         if (ids.length > 0) {
           // sqlArray, not a bare array: Drizzle renders a bare JS array as
           // tuple syntax, which ANY() rejects outright — so this statement used

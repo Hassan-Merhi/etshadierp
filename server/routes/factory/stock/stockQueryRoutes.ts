@@ -70,7 +70,7 @@ export function registerFactoryStockQueryRoutes(app: Express) {
             GROUP BY l.id, l.name
             ORDER BY count DESC`
       );
-      const result = resultRows(rows).map((r: any) => ({
+      const result = resultRows(rows).map((r) => ({
         id: Number(r.id),
         name: r.name as string,
         count: Number(r.count),

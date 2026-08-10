@@ -54,7 +54,7 @@ export function registerSupplierProfitImportRoutes(app: Express, requireAuth: an
       if (items.length === 0) return res.json({ rows: [], notFound: codes });
 
       // Build found set from direct codes plus any matched alias codes
-      const foundDirectCodes = new Set(items.map((r: any) => r.code.toLowerCase()));
+      const foundDirectCodes = new Set(items.map((r) => r.code.toLowerCase()));
       const aliasMatchResult = await pool.query(
         `SELECT lower(sica.alias_code) as alias_code
          FROM stock_item_code_aliases sica
@@ -65,11 +65,11 @@ export function registerSupplierProfitImportRoutes(app: Express, requireAuth: an
            AND lower(sica.alias_code) = ANY($2::text[])`,
         [companyId, lowerCodes]
       );
-      const foundAliasCodes = new Set(aliasMatchResult.rows.map((r: any) => r.alias_code));
+      const foundAliasCodes = new Set(aliasMatchResult.rows.map((r) => r.alias_code));
       const foundCodes = new Set([...foundDirectCodes, ...foundAliasCodes]);
       const notFound = codes.filter((c: string) => !foundCodes.has(c.toLowerCase().trim()));
 
-      const stockItemIds = items.map((r: any) => Number(r.id));
+      const stockItemIds = items.map((r) => Number(r.id));
       const allTime = !fromDate || !toDate;
 
       // 2. Avg selling price + total sales qty
@@ -210,7 +210,7 @@ export function registerSupplierProfitImportRoutes(app: Express, requireAuth: an
       }
 
       // Build response rows (same shape as /analyze)
-      const rows = items.map((item: any) => {
+      const rows = items.map((item) => {
         const id = Number(item.id);
         const salesData = avgSellMap.get(id);
         const avgSellingPrice = overrideAvgMap.get(id) ?? salesData?.avgSellingPrice ?? null;

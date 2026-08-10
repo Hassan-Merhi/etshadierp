@@ -29,7 +29,7 @@ async function getSettings(): Promise<EmailSettings | null> {
 async function getRecipients(): Promise<string[]> {
   try {
     const res = await pool.query(`SELECT email FROM export_recipients WHERE active = true ORDER BY id`);
-    return (res.rows || []).map((r: any) => r.email).filter(Boolean);
+    return (res.rows || []).map((r) => r.email).filter(Boolean);
   } catch {
     return [];
   }
@@ -98,11 +98,7 @@ Generated automatically at ${new Date().toUTCString()}.
 
 — ERP System`;
 
-  const attachment = toNodemailerAttachment(
-    attachmentSource,
-    `DailyExport_${dateLabel}.zip`,
-    "application/zip"
-  );
+  const attachment = toNodemailerAttachment(attachmentSource, `DailyExport_${dateLabel}.zip`, "application/zip");
 
   let sent = 0;
   const errors: string[] = [];

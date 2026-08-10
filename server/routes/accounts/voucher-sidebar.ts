@@ -92,7 +92,7 @@ export function registerAccountVoucherSidebarRoutes(app: Express) {
           .execute(),
       ]);
       // Strip internal system-only accounts (sp_stock, sp_opnbal are isHidden=true for a reason)
-      const ledgers = ledgersRaw.filter((a: any) => !["sp_stock", "sp_opnbal"].includes(a.subType ?? ""));
+      const ledgers = ledgersRaw.filter((a) => !["sp_stock", "sp_opnbal"].includes(a.subType ?? ""));
 
       const companyVoucherIds = companyVouchers.map((v) => v.id);
       // FACTORY-PAY-* voucher IDs — excluded when computing factory supplier voucher-paid amounts
@@ -300,13 +300,11 @@ export function registerAccountVoucherSidebarRoutes(app: Express) {
           const openingBalance = parseFloat(supplier.openingBalance || "0");
 
           // Collect all supplier IDs to aggregate (the supplier itself + any children brokered through it)
-          const linkedChildIds = (fSuppliers as any[])
-            .filter((s: any) => s.parentId === supplier.id)
-            .map((s: any) => s.id);
+          const linkedChildIds = (fSuppliers as any[]).filter((s) => s.parentId === supplier.id).map((s) => s.id);
           const aggregateIds = [supplier.id, ...linkedChildIds];
 
           // Container value: sum((actualReceivedKg || totalKg) * ratePerKg + freight) * fxRateToUsd
-          const supplierContainers = fContainers.filter((c: any) => aggregateIds.includes(c.supplierId));
+          const supplierContainers = fContainers.filter((c) => aggregateIds.includes(c.supplierId));
           const containerValueUsd = supplierContainers.reduce((sum: number, c: any) => {
             const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
             const rate = parseFloat(c.ratePerKg || "0");
@@ -330,7 +328,7 @@ export function registerAccountVoucherSidebarRoutes(app: Express) {
           }, 0);
 
           // Total paid via factorySupplierPayments (in USD) — aggregated across all linked IDs
-          const supplierPayments = fPayments.filter((p: any) => aggregateIds.includes(p.supplierId));
+          const supplierPayments = fPayments.filter((p) => aggregateIds.includes(p.supplierId));
           const totalPaidUsd = supplierPayments.reduce(
             (sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"),
             0

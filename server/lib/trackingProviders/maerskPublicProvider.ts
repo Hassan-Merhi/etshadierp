@@ -141,7 +141,8 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
     const data = await res.json();
     return parseResponse(containerNumber, data, base);
   } catch (err: unknown) {
-    const isTimeout = (err as { name?: string }).name === "TimeoutError" || (err as { name?: string }).name === "AbortError";
+    const isTimeout =
+      (err as { name?: string }).name === "TimeoutError" || (err as { name?: string }).name === "AbortError";
     logger.info(`[MaerskPublic] ${containerNumber}: ${isTimeout ? "timeout" : (getErrorMessage(err) ?? "error")}`);
     return { ...base, error: isTimeout ? "timeout" : (getErrorMessage(err) ?? "unknown_error") };
   }
@@ -225,7 +226,7 @@ function parseResponse(containerNumber: string, data: unknown, base: CarrierTrac
   // portCalls[0] is the ORIGIN — never use index 0 for ETA.
   const portCalls: any[] = Array.isArray(entry.portCalls) ? entry.portCalls : [];
   const destPortCall =
-    portCalls.find((p: any) => p.isDestination === true || p.isDestination === "true") ??
+    portCalls.find((p) => p.isDestination === true || p.isDestination === "true") ??
     (portCalls.length > 0 ? portCalls[portCalls.length - 1] : null);
 
   // Destination port call fields have highest priority — they represent the

@@ -194,7 +194,7 @@ export function registerVoucherJournalRoutes(app: Express) {
       // Calculate total debits and credits in transaction currency
       let totalDebits = 0;
       let totalCredits = 0;
-      entries.forEach((entry: any) => {
+      entries.forEach((entry) => {
         const amount = parseFloat(entry.amount || "0");
         if (entry.type === "DR") {
           totalDebits += amount;
@@ -459,7 +459,7 @@ export function registerVoucherJournalRoutes(app: Express) {
       // Calculate total debits and credits in transaction currency
       let totalDebits = 0;
       let totalCredits = 0;
-      entries.forEach((entry: any) => {
+      entries.forEach((entry) => {
         const amount = parseFloat(entry.amount || "0");
         if (entry.type === "DR") {
           totalDebits += amount;

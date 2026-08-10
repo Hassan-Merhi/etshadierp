@@ -60,25 +60,23 @@ export function registerFactoryCustomerStatementRoutes(app: Express) {
 
       // Build orderId → various field maps for enriching statement rows
       const containerByOrderId = new Map<number, string | null>(
-        invoices.map((inv: any) => [inv.id, inv.containerNumber ?? null])
+        invoices.map((inv) => [inv.id, inv.containerNumber ?? null])
       );
       const destinationByOrderId = new Map<number, string | null>(
-        invoices.map((inv: any) => [inv.id, inv.destination ?? null])
+        invoices.map((inv) => [inv.id, inv.destination ?? null])
       );
-      const totalQtyBalesByOrderId = new Map<number, number>(
-        invoices.map((inv: any) => [inv.id, inv.totalQtyBales ?? 0])
-      );
+      const totalQtyBalesByOrderId = new Map<number, number>(invoices.map((inv) => [inv.id, inv.totalQtyBales ?? 0]));
       const totalWeightKgByOrderId = new Map<number, number>(
-        invoices.map((inv: any) => [inv.id, parseFloat(inv.totalWeightKg ?? "0")])
+        invoices.map((inv) => [inv.id, parseFloat(inv.totalWeightKg ?? "0")])
       );
 
       // Build a map of orderId → current grandTotal so we can correct stale
       // INVOICE rows on the fly (read-only — no DB writes from a GET).
-      const invoiceGrandTotalMap = new Map<number, string>(invoices.map((inv: any) => [inv.id, inv.grandTotal]));
+      const invoiceGrandTotalMap = new Map<number, string>(invoices.map((inv) => [inv.id, inv.grandTotal]));
 
       // Map orderId → finalized date (date portion of finalizedAt, or orderDate fallback for legacy rows)
       const invoiceFinalizedDateMap = new Map<number, string>(
-        invoices.map((inv: any) => {
+        invoices.map((inv) => {
           const d: Date | null = inv.finalizedAt ?? null;
           return [inv.id, d ? d.toISOString().slice(0, 10) : (inv.orderDate as string)];
         })
@@ -91,7 +89,7 @@ export function registerFactoryCustomerStatementRoutes(app: Express) {
         .where(and(eq(customerBalances.companyId, companyId), eq(customerBalances.customerId, customerId)))
         .orderBy(customerBalances.transactionDate, customerBalances.id);
 
-      const balanceRows = rawBalanceRows.map((row: any) => {
+      const balanceRows = rawBalanceRows.map((row) => {
         if (row.referenceType === "INVOICE" && row.referenceId) {
           const overrides: Record<string, unknown> = {};
           if (invoiceGrandTotalMap.has(row.referenceId)) {
@@ -163,7 +161,7 @@ export function registerFactoryCustomerStatementRoutes(app: Express) {
       }
 
       // Merge customerBalances + voucher rows, sort by date then id
-      const allRows = [...balanceRows.map((r: any) => ({ ...r, _fromVoucher: false })), ...voucherRows].sort((a, b) => {
+      const allRows = [...balanceRows.map((r) => ({ ...r, _fromVoucher: false })), ...voucherRows].sort((a, b) => {
         const da = (a.transactionDate || "").toString();
         const db2 = (b.transactionDate || "").toString();
         if (da < db2) return -1;
@@ -179,7 +177,7 @@ export function registerFactoryCustomerStatementRoutes(app: Express) {
       const openingSide = customer.openingBalanceSide || "Dr";
       let runningBalance = openingSide === "Dr" ? openingBalance : -openingBalance;
 
-      const balanceHistory = allRows.map((row: any) => {
+      const balanceHistory = allRows.map((row) => {
         const debit = parseFloat(row.debitAmount || "0");
         const credit = parseFloat(row.creditAmount || "0");
         runningBalance += debit - credit;

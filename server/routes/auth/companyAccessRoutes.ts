@@ -39,7 +39,7 @@ export function registerCompanyAccessRoutes(app: Express) {
       if (req.user.role === "Developer") {
         const allCompanies = await storage.getAllCompanies();
         return res.json(
-          allCompanies.map((company: any) => ({
+          allCompanies.map((company) => ({
             id: -1,
             userId: req.user!.id,
             companyId: company.id,
@@ -55,7 +55,7 @@ export function registerCompanyAccessRoutes(app: Express) {
             companyName: company.name,
             companyActive: company.active,
             companyType: company.companyType || "erp",
-          })),
+          }))
         );
       }
 
@@ -82,7 +82,7 @@ export function registerCompanyAccessRoutes(app: Express) {
          INNER JOIN companies c ON c.id = ucr.company_id
          WHERE ucr.user_id = $1
          ORDER BY c.name`,
-        [req.user.id],
+        [req.user.id]
       );
       res.json(rows);
     } catch (error: unknown) {

@@ -190,9 +190,9 @@ export function registerSpMigrationPhase2Routes(app: Express): void {
         const items = resultRows(result);
         return res.json({
           count: items.length,
-          mapped: items.filter((item: any) => item.review_status === "mapped").length,
-          review: items.filter((item: any) => item.review_status === "review").length,
-          unmapped: items.filter((item: any) => item.review_status === "unmapped").length,
+          mapped: items.filter((item) => item.review_status === "mapped").length,
+          review: items.filter((item) => item.review_status === "review").length,
+          unmapped: items.filter((item) => item.review_status === "unmapped").length,
           totalAmountUsd: items.reduce((sum: number, item: any) => sum + pn(item.amount_usd), 0),
           items,
         });

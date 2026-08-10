@@ -69,7 +69,7 @@ function LedgerAccountForm({
     enabled: !!selectedCompany,
   });
 
-  const groupAccounts = allLedgerAccounts.filter((acc: any) => acc.subType === "Group");
+  const groupAccounts = allLedgerAccounts.filter((acc) => acc.subType === "Group");
   const [parentGroupOpen, setParentGroupOpen] = useState(false);
 
   return (
@@ -158,7 +158,7 @@ function LedgerAccountForm({
               control={form.control}
               name="parentId"
               render={({ field }) => {
-                const selectedGroup = groupAccounts.find((g: any) => g.id === field.value);
+                const selectedGroup = groupAccounts.find((g) => g.id === field.value);
                 return (
                   <FormItem className="flex flex-col">
                     <FormLabel>Parent Group</FormLabel>
@@ -193,7 +193,7 @@ function LedgerAccountForm({
                               />
                               — No group —
                             </CommandItem>
-                            {groupAccounts.map((g: any) => (
+                            {groupAccounts.map((g) => (
                               <CommandItem
                                 key={g.id}
                                 value={g.name}

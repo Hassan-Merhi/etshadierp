@@ -167,7 +167,7 @@ export async function runDevSeed() {
     products: createdProducts.length,
     bales: createdBales.length,
     labelPrints: createdLabels.length,
-    scannedLabels: createdLabels.filter((l: any) => l.scannedAt).length,
+    scannedLabels: createdLabels.filter((l) => l.scannedAt).length,
     sampleArticleCodes: sampleArticles,
     sampleReferenceNumbers: sampleRefs,
   };

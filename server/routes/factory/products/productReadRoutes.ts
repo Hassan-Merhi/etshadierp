@@ -220,7 +220,7 @@ export function registerFactoryProductReadRoutes(app: Express) {
           .where(eq(customerOrderBales.articleCode, articleCode));
 
         if (orderBalesForProduct.length > 0) {
-          const orderIds = [...new Set(orderBalesForProduct.map((b: any) => b.orderId))];
+          const orderIds = [...new Set(orderBalesForProduct.map((b) => b.orderId))];
 
           const allRelevantOrders = await db
             .select({
@@ -235,7 +235,7 @@ export function registerFactoryProductReadRoutes(app: Express) {
             .where(and(eq(customerOrders.companyId, companyId), inArray(customerOrders.id, orderIds)));
 
           for (const order of allRelevantOrders) {
-            const balesInOrder = orderBalesForProduct.filter((b: any) => b.orderId === order.id);
+            const balesInOrder = orderBalesForProduct.filter((b) => b.orderId === order.id);
             const qty = balesInOrder.length;
             const total = balesInOrder.reduce((s: number, b: any) => s + parseFloat(b.priceUsed || "0"), 0);
             const pricePerBale = qty > 0 ? total / qty : 0;

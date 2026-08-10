@@ -126,7 +126,7 @@ export function registerPayrollRunLifecycleRoutes(app: Express) {
       const paidRuns = allRuns.filter((r) => r.status === "PAID");
 
       const allAccounts = await storage.getAllLedgerAccounts(companyId);
-      const salaryExpenseAccount = allAccounts.find((a: any) => a.code === "SALARY_EXPENSE");
+      const salaryExpenseAccount = allAccounts.find((a) => a.code === "SALARY_EXPENSE");
 
       const runDetails = await Promise.all(
         paidRuns.map(async (run) => {

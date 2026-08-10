@@ -25,7 +25,7 @@ export function mergeBaleEntries(entries: DaybookEntry[]): DaybookEntry {
   const totalCurrency = entries.reduce((s, e) => s + parseFloat(e.amountCurrency || "0"), 0);
   const totalUsd = entries.reduce((s, e) => s + parseFloat(e.amountUsd || "0"), 0);
   const base = entries[0];
-  const productNames = [...new Set(allBales.map((b: any) => b.productName || b.ref || "Unknown"))];
+  const productNames = [...new Set(allBales.map((b) => b.productName || b.ref || "Unknown"))];
   return {
     ...base,
     amountCurrency: totalCurrency.toFixed(2),

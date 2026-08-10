@@ -118,7 +118,7 @@ export function registerRentalPaymentsAccrualRoutes(
           scheduled: true,
           paymentDate: data.paymentDate,
           paymentGroupId: result.paymentGroupId,
-          allocations: result.payments.map((r: any) => ({
+          allocations: result.payments.map((r) => ({
             year: r.forYear,
             month: r.forMonth,
             amount: r.amount,
@@ -129,7 +129,7 @@ export function registerRentalPaymentsAccrualRoutes(
       return res.json(result.payments[0] ?? { ok: true, paymentGroupId: result.paymentGroupId });
     } catch (e: unknown) {
       if (e instanceof z.ZodError)
-        return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
+        return res.status(400).json({ message: e.issues.map((err) => err.message).join(", ") });
       if ((e as { status?: number }).status === 400) return res.status(400).json({ message: getErrorMessage(e) });
       logger.error(`${tag} payments:`, { error: e });
       res.status(500).json({ message: getErrorMessage(e) });
@@ -216,7 +216,7 @@ export function registerRentalPaymentsAccrualRoutes(
       res.json({ processed: results.length, results });
     } catch (e: unknown) {
       if (e instanceof z.ZodError)
-        return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
+        return res.status(400).json({ message: e.issues.map((err) => err.message).join(", ") });
       logger.error(`${tag} bulk-payments:`, { error: e });
       res.status(500).json({ message: getErrorMessage(e) });
     }
@@ -407,7 +407,7 @@ export function registerRentalPaymentsAccrualRoutes(
         postedPayments = rentPaymentsAll.filter(
           (p: any) => p.postingStatus === "POSTED" && String(p.paymentDate) <= asOfDate
         );
-        scheduledPayments = rentPaymentsAll.filter((p: any) => p.postingStatus === "SCHEDULED");
+        scheduledPayments = rentPaymentsAll.filter((p) => p.postingStatus === "SCHEDULED");
 
         // Per-row effective paid totals (POSTED + payment_date <= asOfDate) — used for balance widget
         const { rows: paymentSums } = await pool.query<{ ledger_row_id: string; total_paid: string }>(

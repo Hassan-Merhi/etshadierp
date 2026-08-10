@@ -91,14 +91,35 @@ export function registerStockAdjustmentWasteRoutes(app: Express) {
         }
       }
 
-      logger.info("stock adjustment create started", { module: "stockAdjustment", action: "create", userId: _uid, companyId: _cid, adjustmentType, itemCount: items.length });
+      logger.info("stock adjustment create started", {
+        module: "stockAdjustment",
+        action: "create",
+        userId: _uid,
+        companyId: _cid,
+        adjustmentType,
+        itemCount: items.length,
+      });
 
       const adjustment = await storage.createStockAdjustment(voucherId, locationId, adjustmentType, notes || "", items);
 
-      logger.info("stock adjustment create succeeded", { module: "stockAdjustment", action: "create", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, adjustmentId: adjustment.adjustment.id });
+      logger.info("stock adjustment create succeeded", {
+        module: "stockAdjustment",
+        action: "create",
+        userId: _uid,
+        companyId: _cid,
+        durationMs: Date.now() - _t,
+        adjustmentId: adjustment.adjustment.id,
+      });
       res.status(201).json(adjustment);
     } catch (error: unknown) {
-      logger.error("stock adjustment create failed", { module: "stockAdjustment", action: "create", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
+      logger.error("stock adjustment create failed", {
+        module: "stockAdjustment",
+        action: "create",
+        userId: _uid,
+        companyId: _cid,
+        durationMs: Date.now() - _t,
+        error,
+      });
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
@@ -260,7 +281,7 @@ export function registerStockAdjustmentWasteRoutes(app: Express) {
       if (!location) return res.status(400).json({ message: "Location not found" });
 
       // Calculate total (will be updated after createStockAdjustment to use actual rates)
-      const itemsForAdj = items.map((item: any) => ({
+      const itemsForAdj = items.map((item) => ({
         stockItemId: parseInt(item.stockItemId),
         quantity: (-Math.abs(parseFloat(item.quantity))).toFixed(3), // negative = consumption
         rate: "0", // rate will be determined from inventory by createStockAdjustment

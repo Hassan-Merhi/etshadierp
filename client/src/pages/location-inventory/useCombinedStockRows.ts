@@ -17,7 +17,7 @@ export function useCombinedStockRows({
 }: UseCombinedStockRowsParams) {
   const allInventoryLocations = useMemo(() => {
     const locs = new Map<number, { id: number; name: string }>();
-    allInventoryData.forEach((item: any) => {
+    allInventoryData.forEach((item) => {
       if (item.locationId && !locs.has(item.locationId))
         locs.set(item.locationId, { id: item.locationId, name: item.locationName || "" });
     });
@@ -26,7 +26,7 @@ export function useCombinedStockRows({
 
   const allInventoryGroups = useMemo(() => {
     const groups = new Map<string, { id: number | null; name: string }>();
-    allInventoryData.forEach((item: any) => {
+    allInventoryData.forEach((item) => {
       const key = String(item.stockGroupId ?? "null");
       if (!groups.has(key))
         groups.set(key, { id: item.stockGroupId ?? null, name: item.stockGroupName || "Unassigned" });
@@ -36,7 +36,7 @@ export function useCombinedStockRows({
 
   const combinedStockRows = useMemo(() => {
     const itemMap = new Map<number, any>();
-    allInventoryData.forEach((item: any) => {
+    allInventoryData.forEach((item) => {
       const qty = parseFloat(item.quantity || "0");
       if (qty === 0) return;
       if (!itemMap.has(item.stockItemId)) {

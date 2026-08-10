@@ -28,14 +28,14 @@ export function registerPayrollPaymentSummaryPdfRoutes(app: Express) {
 
       const productionTotals = await getProductionBonusTotalsForPayrollIds(
         db,
-        payrollRows.map((payroll: any) => payroll.id)
+        payrollRows.map((payroll) => payroll.id)
       );
-      const workerIdList = [...new Set(payrollRows.map((payroll: any) => payroll.workerId))];
+      const workerIdList = [...new Set(payrollRows.map((payroll) => payroll.workerId))];
       const workerRows = await db
         .select({ id: factoryWorkers.id, fullName: factoryWorkers.fullName })
         .from(factoryWorkers)
         .where(inArray(factoryWorkers.id, workerIdList));
-      const workerMap = new Map(workerRows.map((worker: any) => [worker.id, worker.fullName]));
+      const workerMap = new Map(workerRows.map((worker) => [worker.id, worker.fullName]));
       const [companyRow] = await db.select({ name: companies.name }).from(companies).where(eq(companies.id, companyId));
 
       const PDFDocument = (await import("pdfkit")).default;
@@ -114,7 +114,7 @@ export function registerPayrollPaymentSummaryPdfRoutes(app: Express) {
       doc.fontSize(8).fillColor("#666666").text(`Generated: ${new Date().toLocaleDateString()}`, { align: "center" });
       doc.moveDown(0.8);
 
-      const periods = [...new Set(payrollRows.map((payroll: any) => `${payroll.periodStart} – ${payroll.periodEnd}`))];
+      const periods = [...new Set(payrollRows.map((payroll) => `${payroll.periodStart} – ${payroll.periodEnd}`))];
       doc
         .fontSize(8)
         .fillColor("#333333")
@@ -140,7 +140,7 @@ export function registerPayrollPaymentSummaryPdfRoutes(app: Express) {
       let totalNet = 0;
       let totalProduction = 0;
       let totalOther = 0;
-      payrollRows.forEach((payroll: any, index: number) => {
+      payrollRows.forEach((payroll, index: number) => {
         const name = (workerMap.get(payroll.workerId) as string) || `Worker #${payroll.workerId}`;
         const present = payroll.presentDays != null ? Number(payroll.presentDays) : null;
         const absent = payroll.absentDays != null ? Number(payroll.absentDays) : null;

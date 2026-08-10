@@ -87,11 +87,11 @@ export function usePosQueries({
   });
 
   const cashLedgerAccounts = useMemo(
-    () => (Array.isArray(allLedgerAccounts) ? allLedgerAccounts : []).filter((acc: any) => acc.accountType === "Cash"),
+    () => (Array.isArray(allLedgerAccounts) ? allLedgerAccounts : []).filter((acc) => acc.accountType === "Cash"),
     [allLedgerAccounts]
   );
   const customerAccounts = useMemo(
-    () => (Array.isArray(allLedgerAccounts) ? allLedgerAccounts : []).filter((acc: any) => acc.accountType === "Asset"),
+    () => (Array.isArray(allLedgerAccounts) ? allLedgerAccounts : []).filter((acc) => acc.accountType === "Asset"),
     [allLedgerAccounts]
   );
 

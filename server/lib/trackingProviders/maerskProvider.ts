@@ -72,7 +72,7 @@ function parseDate(raw: unknown): Date | null {
 function parseEvents(rawEvents: unknown): TrackingEvent[] {
   if (!Array.isArray(rawEvents)) return [];
   return rawEvents
-    .map((e: any): TrackingEvent => {
+    .map((e): TrackingEvent => {
       const date = parseDate(e.eventDateTime ?? e.eventDate ?? e.date ?? null);
       const location = e.location?.locationName ?? e.location?.UNLocationCode ?? e.portName ?? e.locationName ?? null;
       const status = e.transportEventTypeCode ?? e.eventCode ?? e.eventType ?? e.status ?? null;
@@ -89,7 +89,7 @@ function pickEta(obj: any): string | null {
   // NEVER use portCalls[0] — that is the origin.
   const portCalls: any[] = Array.isArray(obj.portCalls) ? obj.portCalls : [];
   const destPortCall =
-    portCalls.find((p: any) => p.isDestination === true || p.isDestination === "true") ??
+    portCalls.find((p) => p.isDestination === true || p.isDestination === "true") ??
     (portCalls.length > 0 ? portCalls[portCalls.length - 1] : null);
 
   // Destination port fields outrank generic top-level fields which may refer

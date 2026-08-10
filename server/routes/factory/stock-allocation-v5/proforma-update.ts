@@ -125,7 +125,7 @@ export function registerV5ProformaUpdateRoutes(app: Express) {
         if (eligibleOrders.length === 0) {
           return res.status(400).json({ message: "No draft containers are available to edit." });
         }
-        const eligibleIds = eligibleOrders.map((o: any) => Number(o.id));
+        const eligibleIds = eligibleOrders.map((o) => Number(o.id));
 
         // Update expected_qty per article × per eligible order.
         // Only updates rows that ALREADY EXIST — rejects silently for unknown articles

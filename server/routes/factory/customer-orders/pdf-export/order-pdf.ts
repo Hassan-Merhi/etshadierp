@@ -63,7 +63,7 @@ export function registerOrderPdfRoutes(app: Express) {
       const lines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
       const charges = await db.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
 
-      const invArticleCodes = [...new Set(lines.map((l: any) => l.articleCode).filter(Boolean))];
+      const invArticleCodes = [...new Set(lines.map((l) => l.articleCode).filter(Boolean))];
       const invNameMap = new Map<string, string>();
       if (invArticleCodes.length > 0) {
         const invProds = await db
@@ -246,8 +246,8 @@ export function registerOrderPdfRoutes(app: Express) {
 
       // ── Charges & grand-total summary (omit when hiding prices or noCharges) ──
       if (!hideSellingPdf && !noChargesPdf) {
-        const freightCharges = charges.filter((ch: any) => ch.chargeType === "FREIGHT");
-        const otherCharges = charges.filter((ch: any) => ch.chargeType !== "FREIGHT");
+        const freightCharges = charges.filter((ch) => ch.chargeType === "FREIGHT");
+        const otherCharges = charges.filter((ch) => ch.chargeType !== "FREIGHT");
         const hasCharges = freightCharges.length > 0 || otherCharges.length > 0;
 
         if (hasCharges) {

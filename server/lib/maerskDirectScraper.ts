@@ -312,14 +312,14 @@ export function extractFromJson(
         } else {
           // Priority 2: latest (by event_time) expected event at the last location
           const expectedAtDest = lastLocEvents
-            .filter((ev: any) => ev.event_time_type === "EXPECTED" && ev.event_time)
+            .filter((ev) => ev.event_time_type === "EXPECTED" && ev.event_time)
             .sort((a: any, b: any) => new Date(b.event_time).getTime() - new Date(a.event_time).getTime());
           if (expectedAtDest.length > 0) {
             // Pick the earliest future expected event as the true ETA
             const futureExpected = expectedAtDest
               .slice()
               .reverse()
-              .find((ev: any) => new Date(ev.event_time).getTime() > Date.now());
+              .find((ev) => new Date(ev.event_time).getTime() > Date.now());
             etaRaw = futureExpected?.event_time ?? expectedAtDest[expectedAtDest.length - 1]?.event_time ?? null;
           }
         }
@@ -358,7 +358,7 @@ export function extractFromJson(
     // NEVER use portCalls[0] — that is the origin.
     const cPortCalls: any[] = Array.isArray(c.portCalls) ? c.portCalls : [];
     const cDestCall =
-      cPortCalls.find((p: any) => p.isDestination === true || p.isDestination === "true") ??
+      cPortCalls.find((p) => p.isDestination === true || p.isDestination === "true") ??
       (cPortCalls.length > 0 ? cPortCalls[cPortCalls.length - 1] : null);
 
     etaRaw =
@@ -377,7 +377,7 @@ export function extractFromJson(
     // Top-level portCalls (some API shapes put them here)
     const dPortCalls: any[] = Array.isArray(d.portCalls) ? d.portCalls : [];
     const dDestCall =
-      dPortCalls.find((p: any) => p.isDestination === true || p.isDestination === "true") ??
+      dPortCalls.find((p) => p.isDestination === true || p.isDestination === "true") ??
       (dPortCalls.length > 0 ? dPortCalls[dPortCalls.length - 1] : null);
 
     etaRaw =
