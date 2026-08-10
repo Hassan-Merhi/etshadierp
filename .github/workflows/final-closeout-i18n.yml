@@ -38,7 +38,18 @@ jobs:
           node scripts/audit-i18n-phase14.mjs --json-out /tmp/i18n-after.json --markdown-out /tmp/i18n-after.md
           python - <<'PY'
           import json
+          pre=json.load(open('/tmp/final-closeout-runner-post.json'))
           report=json.load(open('/tmp/i18n-after.json'))
+          def key(f):
+              return (f['file'], f['line'], f['kind'], f.get('name'), f['text'], f['module'])
+          pre_inventory={key(f) for f in pre['findings'] if f['status']=='actionable' and f['module']=='inventory-logistics'}
+          post_inventory={key(f) for f in report['findings'] if f['status']=='actionable' and f['module']=='inventory-logistics'}
+          introduced=sorted(post_inventory-pre_inventory)
+          removed=sorted(pre_inventory-post_inventory)
+          if introduced or removed:
+              print('Formatter inventory audit delta:')
+              print('Introduced:', introduced)
+              print('Removed:', removed)
           caps={'backend-messages':0,'inventory-logistics':1381,'sales-pos':776,'shared-ui':0,'supplier-partner':0}
           current={k:report['modules'][k]['actionable'] for k in caps}
           print('Release counts:', current)
@@ -49,7 +60,7 @@ jobs:
       - name: Commit closeout changes
         shell: bash
         run: |
-          rm -f scripts/final-closeout-i18n-once.py scripts/final-closeout-i18n-runner.py .github/workflows/final-closeout-i18n.yml
+          rm -f scripts/final-closeout-i18n-once.py scripts/final-closeout-i18n-runner.py .github/workflows/final-closeout-i18n.yml .github/workflows/final-closeout-i18n-runner.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
