@@ -9,10 +9,7 @@ import { hydrateActiveCredentialVersion } from "./services/security/credentialVe
 import { CompanyIsolationError, assertRequestCompanyMatchesSession } from "./services/security/companyIsolationPolicy";
 import { decideExplicitCompanyScope } from "./services/security/companyRequestScopePolicy";
 
-const EXPECTED_ANONYMOUS_SESSION_REASONS = new Set([
-  "SESSION_REQUIRED",
-  "SESSION_USER_REQUIRED",
-]);
+const EXPECTED_ANONYMOUS_SESSION_REASONS = new Set(["SESSION_REQUIRED", "SESSION_USER_REQUIRED"]);
 
 // Session expiry is a normal lifecycle event (browser left open, user idle, etc.).
 // Log at WARN so operators can distinguish routine expiry from real security incidents.
@@ -44,8 +41,7 @@ function logDenied(params: {
     reason: params.reason,
   });
 
-  const isExpectedAnonymousRequest =
-    !params.userId && EXPECTED_ANONYMOUS_SESSION_REASONS.has(params.reason);
+  const isExpectedAnonymousRequest = !params.userId && EXPECTED_ANONYMOUS_SESSION_REASONS.has(params.reason);
 
   if (isExpectedAnonymousRequest) {
     logger.info(payload);

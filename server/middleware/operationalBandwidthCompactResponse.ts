@@ -19,7 +19,9 @@ type CompactEnvelope = {
 };
 
 function isPlainRecord(value: unknown): value is JsonRecord {
-  return !!value && typeof value === "object" && !Array.isArray(value) && Object.getPrototypeOf(value) === Object.prototype;
+  return (
+    !!value && typeof value === "object" && !Array.isArray(value) && Object.getPrototypeOf(value) === Object.prototype
+  );
 }
 
 function shouldCompactPath(path: string): boolean {
@@ -78,11 +80,23 @@ function preparePayload(req: Request, payload: unknown): unknown {
     return withoutKeys(payload, ["lines", "charges"]);
   }
 
-  if (profile === "waste-dispatch-page-v1" && req.path === "/api/factory/waste-dispatch/bales" && isPlainRecord(payload)) {
+  if (
+    profile === "waste-dispatch-page-v1" &&
+    req.path === "/api/factory/waste-dispatch/bales" &&
+    isPlainRecord(payload)
+  ) {
     const bales = Array.isArray(payload.bales)
       ? payload.bales.map((row) =>
           isPlainRecord(row)
-            ? onlyKeys(row, ["id", "referenceNumber", "productName", "categoryName", "locationName", "weightKg", "totalCost"])
+            ? onlyKeys(row, [
+                "id",
+                "referenceNumber",
+                "productName",
+                "categoryName",
+                "locationName",
+                "weightKg",
+                "totalCost",
+              ])
             : row
         )
       : [];
@@ -91,7 +105,11 @@ function preparePayload(req: Request, payload: unknown): unknown {
     return { bales };
   }
 
-  if (profile === "waste-dispatch-page-v1" && req.path === "/api/factory/waste-dispatch/history" && Array.isArray(payload)) {
+  if (
+    profile === "waste-dispatch-page-v1" &&
+    req.path === "/api/factory/waste-dispatch/history" &&
+    Array.isArray(payload)
+  ) {
     return payload.map((dispatch) => {
       if (!isPlainRecord(dispatch)) return dispatch;
       const summary = onlyKeys(dispatch, [
@@ -106,9 +124,7 @@ function preparePayload(req: Request, payload: unknown): unknown {
       ]);
       if (Array.isArray(summary.bales)) {
         summary.bales = summary.bales.map((bale) =>
-          isPlainRecord(bale)
-            ? onlyKeys(bale, ["id", "referenceNumber", "productName", "weightKg", "totalCost"])
-            : bale
+          isPlainRecord(bale) ? onlyKeys(bale, ["id", "referenceNumber", "productName", "weightKg", "totalCost"]) : bale
         );
       }
       return summary;
@@ -179,10 +195,7 @@ function encodeValue(value: unknown, indexes: Map<string, number>): unknown {
       const keys = sameObjectKeys(records);
       if (keys) {
         const compact: CompactArrayRows = {
-          "~a": [
-            keys,
-            records.map((row) => keys.map((key) => encodeValue(row[key], indexes))),
-          ],
+          "~a": [keys, records.map((row) => keys.map((key) => encodeValue(row[key], indexes)))],
         };
         return compact;
       }

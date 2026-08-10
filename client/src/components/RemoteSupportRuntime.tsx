@@ -1,10 +1,7 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import { usePresence } from "@/hooks/use-presence";
 import { useScreenFeed } from "@/hooks/use-screen-feed";
-import {
-  isRemoteSupportAuthLost,
-  subscribeRemoteSupportAuthLost,
-} from "@/components/remote-support-auth-lifecycle";
+import { isRemoteSupportAuthLost, subscribeRemoteSupportAuthLost } from "@/components/remote-support-auth-lifecycle";
 
 const RemoteSupportIndicator = lazy(() =>
   import("@/components/RemoteSupportIndicator").then((module) => ({ default: module.RemoteSupportIndicator }))

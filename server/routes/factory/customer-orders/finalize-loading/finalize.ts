@@ -54,10 +54,10 @@ export function registerOrderFinalizeRoutes(app: Express) {
         // Validate every linked bale with one set-based read instead of one query
         // per bale. Preserve the existing rule: only missing/DELETED bales block
         // finalization; other statuses are accepted here.
-        const baleIds = [
-          ...new Set(
+        const baleIds: number[] = [
+          ...new Set<number>(
             bales
-              .map((b: any) => Number(b.baleId))
+              .map((b: { baleId: number | null }) => Number(b.baleId))
               .filter((id: number) => Number.isSafeInteger(id) && id > 0)
           ),
         ];
@@ -69,7 +69,10 @@ export function registerOrderFinalizeRoutes(app: Express) {
                 .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, baleIds)))
             : [];
         const factoryBaleById = new Map<number, { id: number; status: string | null }>(
-          factoryBaleRows.map((b: any) => [Number(b.id), { id: Number(b.id), status: b.status ?? null }])
+          factoryBaleRows.map((b: { id: number; status: string | null }) => [
+            Number(b.id),
+            { id: Number(b.id), status: b.status ?? null },
+          ])
         );
 
         for (const b of bales) {
@@ -325,7 +328,7 @@ export function registerOrderFinalizeRoutes(app: Express) {
         .from(factoryBales)
         .where(inArray(factoryBales.id, baleIds));
 
-      const locIds = [...new Set(baleRows.map((b: any) => b.erpLocationId).filter(Boolean))];
+      const locIds = [...new Set(baleRows.map((b) => b.erpLocationId).filter(Boolean))];
       const locationRecords =
         locIds.length > 0
           ? await db

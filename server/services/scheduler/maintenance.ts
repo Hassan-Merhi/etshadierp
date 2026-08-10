@@ -134,7 +134,7 @@ async function purgeOldFactoryMixBatches(client: PoolClient, cutoff: string): Pr
 
       const references = referenceResult.rows[0];
       if (!references) {
-        throw new Error(`Unable to inspect references for mix batch ${candidate.id}`);
+        throw new Error("mix_batch_reference_inspection_failed");
       }
 
       if (mixBatchReferenceTotal(references) > 0) {
@@ -184,10 +184,13 @@ async function purgeOldFactoryMixBatches(client: PoolClient, cutoff: string): Pr
     logger.info(`[Purge] Permanently deleted ${deletedCount} unreferenced factory mix batch(es) older than 30 days.`);
   }
   if (protectedCount > 0) {
-    logger.info("[Purge] Retained soft-deleted factory mix batches because production/history references still exist.", {
-      protectedCount,
-      samples: protectedSamples,
-    });
+    logger.info(
+      "[Purge] Retained soft-deleted factory mix batches because production/history references still exist.",
+      {
+        protectedCount,
+        samples: protectedSamples,
+      }
+    );
   }
   if (failedCount > 0) {
     logger.warn("[Purge] Some factory mix batches were retained after isolated purge errors.", { failedCount });

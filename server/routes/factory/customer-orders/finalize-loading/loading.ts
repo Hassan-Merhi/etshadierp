@@ -79,7 +79,7 @@ export function registerOrderLoadingRoutes(app: Express) {
       const orderId = parseId(req.params.id);
       if (orderId === null) return res.status(400).json({ message: "Invalid id" });
 
-      const finalized = await db.transaction(async (tx: any) => {
+      const finalized = await db.transaction(async (tx) => {
         const [order] = await tx
           .select()
           .from(customerOrders)
@@ -107,7 +107,9 @@ export function registerOrderLoadingRoutes(app: Express) {
         // 700-bale loading generated ~700 database calls. Set the exact same SOLD
         // state in one company-scoped statement instead.
         if (order.proformaIdUsed) {
-          const baleIds = [...new Set(bales.map((b: any) => Number(b.baleId)).filter((id: number) => Number.isSafeInteger(id) && id > 0))];
+          const baleIds = [
+            ...new Set(bales.map((b) => Number(b.baleId)).filter((id: number) => Number.isSafeInteger(id) && id > 0)),
+          ];
           if (baleIds.length > 0) {
             await tx
               .update(factoryBales)

@@ -42,7 +42,7 @@ const SQL_RELATION_REFERENCE = /\b(?:FROM|JOIN)\s+([a-z_][a-z0-9_]*)\b/gi;
 
 const target = (
   value: Omit<FactoryBilingualSnapshotTarget, "productIdExpression" | "articleCodeExpression"> &
-    Partial<Pick<FactoryBilingualSnapshotTarget, "productIdExpression" | "articleCodeExpression">>,
+    Partial<Pick<FactoryBilingualSnapshotTarget, "productIdExpression" | "articleCodeExpression">>
 ): FactoryBilingualSnapshotTarget => ({
   productIdExpression: "NULL",
   articleCodeExpression: "NULL",
@@ -50,18 +50,114 @@ const target = (
 });
 
 export const FACTORY_BILINGUAL_SNAPSHOT_TARGETS: FactoryBilingualSnapshotTarget[] = [
-  target({ table: "factory_bales", arabicColumn: "product_name_ar", englishColumn: "product_name", companyExpression: "t.company_id", productIdExpression: "t.product_id", articleCodeExpression: "t.article_code", finalizedExpression: "t.finalized_at IS NOT NULL OR t.status IN ('FINALIZED','SOLD','DISPATCHED')" }),
-  target({ table: "customer_proforma_lines", arabicColumn: "product_name_ar", englishColumn: "product_name", companyExpression: "(SELECT p.company_id FROM customer_proformas p WHERE p.id=t.proforma_id)", articleCodeExpression: "t.article_code", finalizedExpression: "false" }),
-  target({ table: "customer_order_lines", arabicColumn: "bale_name_ar", englishColumn: "bale_name", companyExpression: "(SELECT o.company_id FROM customer_orders o WHERE o.id=t.order_id)", articleCodeExpression: "t.article_code", finalizedExpression: "EXISTS (SELECT 1 FROM customer_orders o WHERE o.id=t.order_id AND o.status IN ('FINALIZED','INVOICED','COMPLETED','CANCELLED'))" }),
-  target({ table: "customer_order_bales", arabicColumn: "bale_name_ar", englishColumn: "bale_name", companyExpression: "(SELECT o.company_id FROM customer_orders o WHERE o.id=t.order_id)", productIdExpression: "(SELECT b.product_id FROM factory_bales b WHERE b.id=t.bale_id)", articleCodeExpression: "COALESCE(t.article_code,(SELECT b.article_code FROM factory_bales b WHERE b.id=t.bale_id))", finalizedExpression: "EXISTS (SELECT 1 FROM customer_orders o WHERE o.id=t.order_id AND o.status IN ('FINALIZED','INVOICED','COMPLETED','CANCELLED'))" }),
-  target({ table: "customer_order_bales_history", arabicColumn: "bale_name_ar", englishColumn: "bale_name", companyExpression: "(SELECT o.company_id FROM customer_orders o WHERE o.id=t.order_id)", productIdExpression: "(SELECT b.product_id FROM factory_bales b WHERE b.id=t.bale_id)", articleCodeExpression: "COALESCE(t.article_code,(SELECT b.article_code FROM factory_bales b WHERE b.id=t.bale_id))", finalizedExpression: "true" }),
-  target({ table: "customer_order_expected_lines", arabicColumn: "product_name_ar", englishColumn: "product_name", companyExpression: "t.company_id", articleCodeExpression: "t.article_code", finalizedExpression: "EXISTS (SELECT 1 FROM customer_orders o WHERE o.id=t.order_id AND o.status IN ('FINALIZED','INVOICED','COMPLETED','CANCELLED'))" }),
-  target({ table: "factory_pos_sale_items", arabicColumn: "product_name_ar", englishColumn: "product_name", companyExpression: "(SELECT s.company_id FROM factory_pos_sales s WHERE s.id=t.sale_id)", productIdExpression: "t.product_id", articleCodeExpression: "t.article_code", finalizedExpression: "true" }),
-  target({ table: "customer_order_bale_removals", arabicColumn: "product_name_ar", englishColumn: "product_name", companyExpression: "(SELECT o.company_id FROM customer_orders o WHERE o.id=t.order_id)", productIdExpression: "(SELECT b.product_id FROM factory_bales b WHERE b.id=t.bale_id)", articleCodeExpression: "COALESCE(t.article_code,(SELECT b.article_code FROM factory_bales b WHERE b.id=t.bale_id))", finalizedExpression: "true" }),
-  target({ table: "factory_v3_load_bales", arabicColumn: "product_name_ar", englishColumn: "product_name", companyExpression: "(SELECT l.company_id FROM factory_v3_loads l WHERE l.id=t.load_id)", productIdExpression: "(SELECT b.product_id FROM factory_bales b WHERE b.id=t.bale_id)", articleCodeExpression: "COALESCE(t.article_code,(SELECT b.article_code FROM factory_bales b WHERE b.id=t.bale_id))", finalizedExpression: "false" }),
-  target({ table: "factory_invoice_loading_bales", arabicColumn: "product_name_ar", englishColumn: "product_name", companyExpression: "(SELECT l.company_id FROM factory_invoice_loadings l WHERE l.id=t.loading_id)", productIdExpression: "(SELECT b.product_id FROM factory_bales b WHERE b.id=t.bale_id)", articleCodeExpression: "COALESCE(t.article_code,(SELECT b.article_code FROM factory_bales b WHERE b.id=t.bale_id))", finalizedExpression: "false" }),
-  target({ table: "customer_dispatch_bale_scans", arabicColumn: "product_name_ar", englishColumn: "product_name", companyExpression: "(SELECT d.company_id FROM customer_dispatch_batches d WHERE d.id=t.batch_id)", productIdExpression: "(SELECT b.product_id FROM factory_bales b WHERE b.id=t.bale_id)", articleCodeExpression: "COALESCE(t.article_code,(SELECT b.article_code FROM factory_bales b WHERE b.id=t.bale_id))", finalizedExpression: "false" }),
-  target({ table: "bale_recode_items", arabicColumn: "product_name_ar", englishColumn: "product_name", companyExpression: "(SELECT s.company_id FROM bale_recode_sessions s WHERE s.id=t.session_id)", productIdExpression: "t.product_id", articleCodeExpression: "t.article_code", finalizedExpression: "true" }),
+  target({
+    table: "factory_bales",
+    arabicColumn: "product_name_ar",
+    englishColumn: "product_name",
+    companyExpression: "t.company_id",
+    productIdExpression: "t.product_id",
+    articleCodeExpression: "t.article_code",
+    finalizedExpression: "t.finalized_at IS NOT NULL OR t.status IN ('FINALIZED','SOLD','DISPATCHED')",
+  }),
+  target({
+    table: "customer_proforma_lines",
+    arabicColumn: "product_name_ar",
+    englishColumn: "product_name",
+    companyExpression: "(SELECT p.company_id FROM customer_proformas p WHERE p.id=t.proforma_id)",
+    articleCodeExpression: "t.article_code",
+    finalizedExpression: "false",
+  }),
+  target({
+    table: "customer_order_lines",
+    arabicColumn: "bale_name_ar",
+    englishColumn: "bale_name",
+    companyExpression: "(SELECT o.company_id FROM customer_orders o WHERE o.id=t.order_id)",
+    articleCodeExpression: "t.article_code",
+    finalizedExpression:
+      "EXISTS (SELECT 1 FROM customer_orders o WHERE o.id=t.order_id AND o.status IN ('FINALIZED','INVOICED','COMPLETED','CANCELLED'))",
+  }),
+  target({
+    table: "customer_order_bales",
+    arabicColumn: "bale_name_ar",
+    englishColumn: "bale_name",
+    companyExpression: "(SELECT o.company_id FROM customer_orders o WHERE o.id=t.order_id)",
+    productIdExpression: "(SELECT b.product_id FROM factory_bales b WHERE b.id=t.bale_id)",
+    articleCodeExpression: "COALESCE(t.article_code,(SELECT b.article_code FROM factory_bales b WHERE b.id=t.bale_id))",
+    finalizedExpression:
+      "EXISTS (SELECT 1 FROM customer_orders o WHERE o.id=t.order_id AND o.status IN ('FINALIZED','INVOICED','COMPLETED','CANCELLED'))",
+  }),
+  target({
+    table: "customer_order_bales_history",
+    arabicColumn: "bale_name_ar",
+    englishColumn: "bale_name",
+    companyExpression: "(SELECT o.company_id FROM customer_orders o WHERE o.id=t.order_id)",
+    productIdExpression: "(SELECT b.product_id FROM factory_bales b WHERE b.id=t.bale_id)",
+    articleCodeExpression: "COALESCE(t.article_code,(SELECT b.article_code FROM factory_bales b WHERE b.id=t.bale_id))",
+    finalizedExpression: "true",
+  }),
+  target({
+    table: "customer_order_expected_lines",
+    arabicColumn: "product_name_ar",
+    englishColumn: "product_name",
+    companyExpression: "t.company_id",
+    articleCodeExpression: "t.article_code",
+    finalizedExpression:
+      "EXISTS (SELECT 1 FROM customer_orders o WHERE o.id=t.order_id AND o.status IN ('FINALIZED','INVOICED','COMPLETED','CANCELLED'))",
+  }),
+  target({
+    table: "factory_pos_sale_items",
+    arabicColumn: "product_name_ar",
+    englishColumn: "product_name",
+    companyExpression: "(SELECT s.company_id FROM factory_pos_sales s WHERE s.id=t.sale_id)",
+    productIdExpression: "t.product_id",
+    articleCodeExpression: "t.article_code",
+    finalizedExpression: "true",
+  }),
+  target({
+    table: "customer_order_bale_removals",
+    arabicColumn: "product_name_ar",
+    englishColumn: "product_name",
+    companyExpression: "(SELECT o.company_id FROM customer_orders o WHERE o.id=t.order_id)",
+    productIdExpression: "(SELECT b.product_id FROM factory_bales b WHERE b.id=t.bale_id)",
+    articleCodeExpression: "COALESCE(t.article_code,(SELECT b.article_code FROM factory_bales b WHERE b.id=t.bale_id))",
+    finalizedExpression: "true",
+  }),
+  target({
+    table: "factory_v3_load_bales",
+    arabicColumn: "product_name_ar",
+    englishColumn: "product_name",
+    companyExpression: "(SELECT l.company_id FROM factory_v3_loads l WHERE l.id=t.load_id)",
+    productIdExpression: "(SELECT b.product_id FROM factory_bales b WHERE b.id=t.bale_id)",
+    articleCodeExpression: "COALESCE(t.article_code,(SELECT b.article_code FROM factory_bales b WHERE b.id=t.bale_id))",
+    finalizedExpression: "false",
+  }),
+  target({
+    table: "factory_invoice_loading_bales",
+    arabicColumn: "product_name_ar",
+    englishColumn: "product_name",
+    companyExpression: "(SELECT l.company_id FROM factory_invoice_loadings l WHERE l.id=t.loading_id)",
+    productIdExpression: "(SELECT b.product_id FROM factory_bales b WHERE b.id=t.bale_id)",
+    articleCodeExpression: "COALESCE(t.article_code,(SELECT b.article_code FROM factory_bales b WHERE b.id=t.bale_id))",
+    finalizedExpression: "false",
+  }),
+  target({
+    table: "customer_dispatch_bale_scans",
+    arabicColumn: "product_name_ar",
+    englishColumn: "product_name",
+    companyExpression: "(SELECT d.company_id FROM customer_dispatch_batches d WHERE d.id=t.batch_id)",
+    productIdExpression: "(SELECT b.product_id FROM factory_bales b WHERE b.id=t.bale_id)",
+    articleCodeExpression: "COALESCE(t.article_code,(SELECT b.article_code FROM factory_bales b WHERE b.id=t.bale_id))",
+    finalizedExpression: "false",
+  }),
+  target({
+    table: "bale_recode_items",
+    arabicColumn: "product_name_ar",
+    englishColumn: "product_name",
+    companyExpression: "(SELECT s.company_id FROM bale_recode_sessions s WHERE s.id=t.session_id)",
+    productIdExpression: "t.product_id",
+    articleCodeExpression: "t.article_code",
+    finalizedExpression: "true",
+  }),
 ];
 
 function assertIdentifier(value: string): string {
@@ -105,7 +201,10 @@ async function loadSnapshotSchemaAvailability(executor: typeof db = db): Promise
   for (const item of FACTORY_BILINGUAL_SNAPSHOT_TARGETS) {
     for (const relation of referencedTables(item)) tableNames.add(assertIdentifier(relation));
   }
-  const tableList = [...tableNames].sort().map((name) => `'${name}'`).join(",");
+  const tableList = [...tableNames]
+    .sort()
+    .map((name) => `'${name}'`)
+    .join(",");
 
   snapshotSchemaAvailabilityPromise = executor
     .execute(
@@ -114,7 +213,7 @@ async function loadSnapshotSchemaAvailability(executor: typeof db = db): Promise
         FROM information_schema.columns
         WHERE table_schema = 'public'
           AND table_name IN (${tableList})
-      `),
+      `)
     )
     .then((result) => {
       const availability: SnapshotSchemaAvailability = new Map();
@@ -185,7 +284,7 @@ function hasTargetScope(scope: FactoryBilingualSnapshotScope | undefined): boole
 
 function targetScopeGuard(
   item: FactoryBilingualSnapshotTarget,
-  scope: FactoryBilingualSnapshotScope | undefined,
+  scope: FactoryBilingualSnapshotScope | undefined
 ): string | null {
   if (!scope) return "true";
 
@@ -227,7 +326,10 @@ function targetScopeGuard(
   return null;
 }
 
-export async function buildFactoryBilingualSnapshotPlan(companyId: number, executor: typeof db = db): Promise<FactoryBilingualSnapshotPlan> {
+export async function buildFactoryBilingualSnapshotPlan(
+  companyId: number,
+  executor: typeof db = db
+): Promise<FactoryBilingualSnapshotPlan> {
   const targets: FactoryBilingualSnapshotPlanRow[] = [];
   for (const item of FACTORY_BILINGUAL_SNAPSHOT_TARGETS) {
     if (!(await targetExists(item, executor))) continue;
@@ -246,11 +348,26 @@ export async function buildFactoryBilingualSnapshotPlan(companyId: number, execu
     `;
     const result = await executor.execute(sql.raw(query));
     const row = (result.rows[0] ?? {}) as Record<string, number>;
-    targets.push({ table, arabicColumn: ar, missing: Number(row.missing ?? 0), resolvable: Number(row.resolvable ?? 0), orphaned: Number(row.orphaned ?? 0), finalized: Number(row.finalized ?? 0) });
+    targets.push({
+      table,
+      arabicColumn: ar,
+      missing: Number(row.missing ?? 0),
+      resolvable: Number(row.resolvable ?? 0),
+      orphaned: Number(row.orphaned ?? 0),
+      finalized: Number(row.finalized ?? 0),
+    });
   }
   return {
     companyId,
-    totals: targets.reduce((sum, row) => ({ missing: sum.missing + row.missing, resolvable: sum.resolvable + row.resolvable, orphaned: sum.orphaned + row.orphaned, finalized: sum.finalized + row.finalized }), { missing: 0, resolvable: 0, orphaned: 0, finalized: 0 }),
+    totals: targets.reduce(
+      (sum, row) => ({
+        missing: sum.missing + row.missing,
+        resolvable: sum.resolvable + row.resolvable,
+        orphaned: sum.orphaned + row.orphaned,
+        finalized: sum.finalized + row.finalized,
+      }),
+      { missing: 0, resolvable: 0, orphaned: 0, finalized: 0 }
+    ),
     targets,
   };
 }
@@ -263,7 +380,7 @@ async function applyTargets(
     productId?: number;
     scope?: FactoryBilingualSnapshotScope;
   } = {},
-  executor: typeof db = db,
+  executor: typeof db = db
 ): Promise<{ updated: number; byTable: Record<string, number> }> {
   let updated = 0;
   const byTable: Record<string, number> = {};
@@ -302,14 +419,18 @@ async function applyTargets(
   return { updated, byTable };
 }
 
-export function applyFactoryBilingualSnapshotBackfill(companyId: number, options: { overwrite?: boolean; includeFinalized?: boolean } = {}, executor: typeof db = db) {
+export function applyFactoryBilingualSnapshotBackfill(
+  companyId: number,
+  options: { overwrite?: boolean; includeFinalized?: boolean } = {},
+  executor: typeof db = db
+) {
   return applyTargets(companyId, options, executor);
 }
 
 export function applyFactoryBilingualSnapshotBackfillForScope(
   companyId: number,
   scope: FactoryBilingualSnapshotScope,
-  executor: typeof db = db,
+  executor: typeof db = db
 ) {
   return applyTargets(companyId, { overwrite: false, includeFinalized: false, scope }, executor);
 }
