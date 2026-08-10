@@ -45,7 +45,7 @@ describe("repository-wide god-file architecture boundaries", () => {
       return !mentionsReviewedPath || mentionsUnexpectedPath;
     });
 
-    expect(report.version).toBe(18);
+    expect(report.version).toBe(19);
     expect(unexpectedFailureMessages, unexpectedFailureMessages.join("\n")).toEqual([]);
     expect(report.summary.retiredFiles).toBe(4);
     expect(report.summary.boundedFiles).toBe(8);
