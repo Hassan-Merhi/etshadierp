@@ -27,11 +27,14 @@ for path in files:
     changed = False
     for index, line in enumerate(lines):
         for text in translations:
-            pattern = re.compile(r"(?P<icon><[A-Z][A-Za-z0-9]*\b[^>\n]*/>)\s+" + re.escape(text) + r"(?P<tail>\s*)$")
-            match = pattern.search(line)
+            patterns = [
+                re.compile(r"(?P<prefix><[A-Z][A-Za-z0-9]*\b[^>\n]*/>)\s+" + re.escape(text) + r"(?P<tail>\s*)$"),
+                re.compile(r"(?P<prefix>.*>)\s+" + re.escape(text) + r"(?P<tail>\s*)$"),
+            ]
+            match = next((pattern.search(line) for pattern in patterns if pattern.search(line)), None)
             if not match:
                 continue
-            lines[index] = line[: match.start()] + match.group("icon") + f"<span>{text}</span>" + match.group("tail")
+            lines[index] = line[: match.start()] + match.group("prefix") + f"<span>{text}</span>" + match.group("tail")
             changed = True
             break
     if changed:
