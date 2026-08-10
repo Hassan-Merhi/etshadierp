@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "One-way ratchet on type escapes, counted from the TypeScript AST by scripts/audit-type-escapes.mjs. Every file carrying escapes is frozen at its current count in scan.baseline as [explicitAny, asAny, suppressions]: counts may fall freely, any increase fails, and a file with no entry must introduce none. totals.typeEscapeCeiling is the backlog as a single number and may only fall. Lower a baseline in the same change that removes the escapes — leaving headroom lets it refill silently.",
+  "description": "One-way ratchet on type escapes, counted from the TypeScript AST by scripts/audit-type-escapes.mjs. Every file carrying escapes is frozen at its current count in scan.baseline as [explicitAny, asAny, suppressions]: counts may fall freely, any increase fails, and a file with no entry must introduce none. totals.typeEscapeCeiling is the backlog as a single number and may only fall. Lower a baseline in the same change that removes the escapes \u2014 leaving headroom lets it refill silently.",
   "scan": {
     "roots": [
       "server",
@@ -4025,7 +4025,7 @@
         0
       ],
       "server/routes/factory/customer-orders/finalize-loading/finalize.ts": [
-        10,
+        9,
         5,
         0
       ],
@@ -6757,6 +6757,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 11442
+    "typeEscapeCeiling": 11441
   }
 }
