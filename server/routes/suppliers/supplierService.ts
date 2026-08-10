@@ -56,15 +56,15 @@ function supplierAuditChanges(existing: any, updated: any) {
 }
 
 export const supplierService = {
-  async list(companyId: number, search: string) {
+  async list(companyId: number, search: string, allowParentFallback = false) {
     const suppliers = await supplierRepository.list(companyId, search);
-    if (suppliers.length > 0) return suppliers;
+    if (suppliers.length > 0 || !allowParentFallback) return suppliers;
 
-    // A newly created non-parent company can legitimately have no company-owned
-    // supplier rows yet. PO Import still needs access to the configured parent
-    // company's supplier master list so the first container can be imported.
-    // Only fall back when the active company has no suppliers at all; an empty
-    // search result in a populated company must remain empty.
+    // PO Import is the one compatibility flow that may intentionally resolve
+    // the configured parent supplier master when a new child company has no
+    // company-owned suppliers yet. Every normal supplier/accounting picker must
+    // remain strict to the active company so a foreign supplier ID can never be
+    // selected and then rejected by the central posting ownership guard.
     const companySuppliers = search ? await supplierRepository.listAll(companyId) : suppliers;
     if (companySuppliers.length > 0) return suppliers;
 
