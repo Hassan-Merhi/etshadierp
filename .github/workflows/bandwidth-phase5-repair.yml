@@ -1,6 +1,11 @@
 name: Bandwidth Phase 5 Repair
 
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/bandwidth-phase5-repair.yml
   push:
     branches:
       - claude/screen-load-input-issues-qdb6g7
