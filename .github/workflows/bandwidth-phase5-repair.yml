@@ -1,11 +1,6 @@
 name: Bandwidth Phase 5 Repair
 
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - .github/workflows/bandwidth-phase5-repair.yml
   push:
     branches:
       - claude/screen-load-input-issues-qdb6g7
@@ -76,10 +71,10 @@ jobs:
           )
           p = Path(engine)
           text = p.read_text()
-          needle = 'encoded?.dataUrl.startsWith("data:image/") &&\n      encoded.dataUrl.length <= MAX_DATA_URL_LEN'
+          needle = "encoded.dataUrl.length <= MAX_DATA_URL_LEN"
           if text.count(needle) != 2:
-              raise SystemExit(f"expected two fallback limit checks, found {text.count(needle)}")
-          p.write_text(text.replace(needle, 'encoded?.dataUrl.startsWith("data:image/") && encoded.dataUrl.length <= limit'))
+              raise SystemExit(f"expected two encode fallback limit checks, found {text.count(needle)}")
+          p.write_text(text.replace(needle, "encoded.dataUrl.length <= limit"))
 
           test = "client/src/hooks/screen-feed-capture-engine.test.ts"
           replace_once(
