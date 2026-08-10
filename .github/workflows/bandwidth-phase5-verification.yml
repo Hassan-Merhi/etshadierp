@@ -37,8 +37,10 @@ jobs:
       - name: Global request-pressure contract
         run: node scripts/verify-bandwidth-phase-4-global-pressure.mjs
 
-      - name: Focused backend regression
-        run: node node_modules/vitest/vitest.mjs run tests/trace-context-route-template.test.ts
+      - name: Focused route-template regression
+        run: >-
+          node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts
+          tests/trace-context-route-template.test.ts
 
       - name: Focused frontend bandwidth regressions
         run: >-
