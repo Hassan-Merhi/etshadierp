@@ -21,6 +21,16 @@
  * routes real tests; a route leaves the guard-only set as soon as any other
  * test names it.
  *
+ * Four worker-deduction routes left this list when
+ * server/routes/payroll/workerStatsAdvancesRoutes.ts was split. They were only
+ * ever classified sensitive because they shared a 936-line file with the
+ * advance routes that post vouchers and ledger accounts, and the audit
+ * classifies by owner file. They write factory_worker_deductions only, which is
+ * not in SENSITIVE_TABLES, so the smaller files describe them accurately. The
+ * cost is that those four no longer get this file's unauthenticated-rejection
+ * assertion; adding factory_worker_deductions to SENSITIVE_TABLES would bring
+ * them back, and that is a policy decision, not a refactor.
+ *
  * The inventory below is written out rather than derived from the manifest at
  * runtime, for two reasons: the coverage audit looks for path literals in test
  * sources, and an explicit list is reviewable in a diff. The first test keeps
@@ -69,13 +79,11 @@ const SENSITIVE_WRITE_ROUTES = [
   "DELETE /api/factory/v3/loads/:id/bales/:baleId",
   "DELETE /api/factory/waste-dispatch/:id",
   "DELETE /api/factory/worker-bonuses/:id",
-  "DELETE /api/factory/workers/:workerId/deductions/:id",
   "DELETE /api/insurance/members/:id",
   "DELETE /api/intercompany-links/:id",
   "DELETE /api/lookup/reference/:referenceNumber/delete-everywhere",
   "DELETE /api/orphaned-records/delete-all",
   "DELETE /api/payroll/runs/:id",
-  "DELETE /api/payroll/workers/:workerId/deductions/:id",
   "DELETE /api/purchase-orders/:id",
   "DELETE /api/salary-advances/:id",
   "DELETE /api/sp/migration/cutover",
@@ -285,7 +293,6 @@ const SENSITIVE_WRITE_ROUTES = [
   "POST /api/factory/worker-bonuses/:id/pay",
   "POST /api/factory/workers/:id/advances",
   "POST /api/factory/workers/:id/bulk-repay-advances",
-  "POST /api/factory/workers/:id/deductions",
   "POST /api/fix-old-po-credits",
   "POST /api/fix-parent-po-supplier-entries",
   "POST /api/insurance/admin/repair-reversed-journals",
@@ -309,7 +316,6 @@ const SENSITIVE_WRITE_ROUTES = [
   "POST /api/payroll/runs/:id/undo",
   "POST /api/payroll/runs/migrate-group-expenses",
   "POST /api/payroll/withdraw-employee",
-  "POST /api/payroll/workers/:id/deductions",
   "POST /api/pos-import/import",
   "POST /api/pos-import/parse",
   "POST /api/pos-import/validate",
