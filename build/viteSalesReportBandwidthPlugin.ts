@@ -1,6 +1,7 @@
 import type { Plugin } from "vite";
 
 const SALES_REPORT_SUFFIX = "/client/src/pages/SalesReportLegacy.tsx";
+const SALES_DETAIL_SUFFIX = "/client/src/pages/SalesReportDetail.tsx";
 const SALES_COMPARISON_SUFFIX = "/client/src/pages/SalesReportComparison.tsx";
 
 function replaceExactly(source: string, before: string, after: string, label: string): string {
@@ -71,6 +72,13 @@ function transformSalesReport(source: string): string {
 
   code = replaceExactly(
     code,
+    `    if (selectedStockGroups.length === 1) params.set("stockGroupId", selectedStockGroups[0]);`,
+    `    if (selectedStockGroups.length === 1) {\n      if (isMultiCompanyMode && selectedStockGroupNames.length === 1) {\n        params.set("stockGroupName", selectedStockGroupNames[0]);\n      } else {\n        params.set("stockGroupId", selectedStockGroups[0]);\n      }\n    }`,
+    "sales report drill-down stock group scope"
+  );
+
+  code = replaceExactly(
+    code,
     `  const handleExportExcel = async () => {\n    const workbook = new ExcelJS.Workbook();`,
     `  const handleExportExcel = async () => {\n    let salesData: SalesReportItem[];\n    try {\n      salesData = await fetchSalesReportRows(isMultiCompanyMode ? multiCompanyRawUrl : singleCompanyRawUrl);\n    } catch (error: any) {\n      toast({\n        title: "Export failed",\n        description: error?.message || "The detailed sales rows could not be loaded.",\n        variant: "destructive",\n      });\n      return;\n    }\n\n    const workbook = new ExcelJS.Workbook();`,
     "sales report raw rows only on explicit export"
@@ -83,6 +91,23 @@ function transformSalesReport(source: string): string {
     "sales report total item count"
   );
 
+  return code;
+}
+
+function transformSalesDetail(source: string): string {
+  let code = source;
+  code = replaceExactly(
+    code,
+    `  const stockGroupId = params.get("stockGroupId") || "";`,
+    `  const stockGroupId = params.get("stockGroupId") || "";\n  const stockGroupName = params.get("stockGroupName") || "";`,
+    "sales detail stock group name parameter"
+  );
+  code = replaceExactly(
+    code,
+    `  if (stockGroupId && stockGroupId !== "all") queryParams.append("stockGroupId", stockGroupId);\n  if (allCompanies && companyFilter) queryParams.append("companyFilter", companyFilter);`,
+    `  if (stockGroupId && stockGroupId !== "all") queryParams.append("stockGroupId", stockGroupId);\n  if (allCompanies && stockGroupName) queryParams.append("stockGroupName", stockGroupName);\n  if (allCompanies && companyFilter) queryParams.append("companyFilter", companyFilter);`,
+    "sales detail all-company stock group filter"
+  );
   return code;
 }
 
@@ -103,6 +128,9 @@ export function salesReportBandwidthPlugin(): Plugin {
       const normalizedId = id.replaceAll("\\", "/").split("?")[0];
       if (normalizedId.endsWith(SALES_REPORT_SUFFIX)) {
         return { code: transformSalesReport(source), map: null };
+      }
+      if (normalizedId.endsWith(SALES_DETAIL_SUFFIX)) {
+        return { code: transformSalesDetail(source), map: null };
       }
       if (normalizedId.endsWith(SALES_COMPARISON_SUFFIX)) {
         return { code: transformSalesComparison(source), map: null };
