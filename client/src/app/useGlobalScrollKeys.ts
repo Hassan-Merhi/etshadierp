@@ -33,9 +33,17 @@ export function useGlobalScrollKeys(handleGoBack: () => void): void {
       if (
         role &&
         [
-          "listbox", "option", "combobox", "menu", "menuitem",
-          "menuitemcheckbox", "menuitemradio", "slider", "spinbutton",
-          "treeitem", "tree",
+          "listbox",
+          "option",
+          "combobox",
+          "menu",
+          "menuitem",
+          "menuitemcheckbox",
+          "menuitemradio",
+          "slider",
+          "spinbutton",
+          "treeitem",
+          "tree",
         ].includes(role)
       )
         return true;
@@ -67,7 +75,7 @@ export function useGlobalScrollKeys(handleGoBack: () => void): void {
     function getScrollableAncestor(
       start: Element | null,
       axis: "x" | "y",
-      direction: number,
+      direction: number
     ): Element | null {
       let el: Element | null = start;
       while (el && el !== document.body && el !== document.documentElement) {
@@ -82,7 +90,7 @@ export function useGlobalScrollKeys(handleGoBack: () => void): void {
     function getBestScrollTarget(
       eventTarget: HTMLElement,
       axis: "x" | "y",
-      direction: number,
+      direction: number
     ): Element | null {
       // 1. Walk up from the element that received the keydown event
       const fromTarget = getScrollableAncestor(eventTarget, axis, direction);
@@ -97,9 +105,7 @@ export function useGlobalScrollKeys(handleGoBack: () => void): void {
 
       // 3. Try #main-content directly (the primary scroll container in all
       //    shells). Falls back to the first <main> for non-shell pages.
-      const main =
-        document.getElementById("main-content") ??
-        document.querySelector<HTMLElement>("main");
+      const main = document.getElementById("main-content") ?? document.querySelector<HTMLElement>("main");
       if (main && canScroll(main, axis, direction)) return main;
 
       // 4. Scan inside <main> (or body) for Tailwind overflow class elements
@@ -147,10 +153,7 @@ export function useGlobalScrollKeys(handleGoBack: () => void): void {
       // We intercept these only when we find a container that CAN scroll.
       // If nothing can scroll, we return early and let the browser / local
       // handlers handle the key (cursor movement, Radix navigation, etc.).
-      const scrollKeys = [
-        "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
-        "PageUp", "PageDown", "Home", "End",
-      ];
+      const scrollKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home", "End"];
       if (scrollKeys.includes(e.key)) {
         // Always let editable elements and ARIA widgets handle their own arrows
         if (isEditableTarget(target)) return;
@@ -158,10 +161,7 @@ export function useGlobalScrollKeys(handleGoBack: () => void): void {
         const isHorizontal = e.key === "ArrowLeft" || e.key === "ArrowRight";
         const axis: "x" | "y" = isHorizontal ? "x" : "y";
         const direction =
-          e.key === "ArrowDown" || e.key === "ArrowRight" ||
-          e.key === "PageDown" || e.key === "End"
-            ? 1
-            : -1;
+          e.key === "ArrowDown" || e.key === "ArrowRight" || e.key === "PageDown" || e.key === "End" ? 1 : -1;
 
         const scrollTarget = getBestScrollTarget(target, axis, direction);
         if (!scrollTarget) {
@@ -206,7 +206,7 @@ export function useGlobalScrollKeys(handleGoBack: () => void): void {
       if (hasActiveEscapeHandler()) return;
 
       const hasOpenOverlay = document.querySelector(
-        '[data-state="open"][role="dialog"], [data-state="open"][role="alertdialog"], [data-state="open"][data-radix-popper-content-wrapper], [data-state="open"][role="listbox"], [data-state="open"][role="menu"]',
+        '[data-state="open"][role="dialog"], [data-state="open"][role="alertdialog"], [data-state="open"][data-radix-popper-content-wrapper], [data-state="open"][role="listbox"], [data-state="open"][role="menu"]'
       );
       if (hasOpenOverlay) return;
 
