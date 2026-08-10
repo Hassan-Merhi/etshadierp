@@ -1,12 +1,14 @@
 import { useEffect } from "react";
 import { hasActiveEscapeHandler } from "@/hooks/use-escape-back";
+import { canGoBackToPreviousErpLocation } from "@/lib/erp-navigation-history";
 
 /**
  * Registers a global keydown listener that:
  *  1. Intercepts Arrow / PageUp / PageDown / Home / End keys and scrolls the
  *     nearest scrollable container in the requested direction.
- *  2. Handles Escape: defers to page-level handlers (useEscapeBack), blurs
- *     inputs, and falls back to calling `handleGoBack` when no overlay is open.
+ *  2. Handles Escape: defers to page-level handlers (useEscapeBack), lets open
+ *     overlays handle Escape first, prefers exact ERP Back history, and only
+ *     blurs inputs when there is no tracked ERP Back entry.
  *
  * RULE: never calls e.preventDefault() unless a scrollable element exists AND
  * can actually move in the requested direction. Violating this blocks cursor
@@ -195,13 +197,26 @@ export function useGlobalScrollKeys(handleGoBack: () => void): void {
         return;
       }
 
-      // ── Escape handling (preserved exactly) ──────────────────────────────
+      // ── Escape handling ──────────────────────────────────────────────────
       if (e.key !== "Escape") return;
 
       // If a page registered its own Esc handler (useEscapeBack), defer to it
-      // entirely — including its own input/overlay guards — so we don't
-      // accidentally blur an input or navigate before the page hook runs.
+      // entirely. The shared useEscapeBack listener now resolves tracked ERP
+      // history before page-specific fallbacks, so both paths stay in parity.
       if (hasActiveEscapeHandler()) return;
+
+      const hasOpenOverlay = document.querySelector(
+        '[data-state="open"][role="dialog"], [data-state="open"][role="alertdialog"], [data-state="open"][data-radix-popper-content-wrapper], [data-state="open"][role="listbox"], [data-state="open"][role="menu"]',
+      );
+      if (hasOpenOverlay) return;
+
+      // When ERP history knows the exact prior entry, Escape must behave like
+      // the visible Back control even if an input currently owns focus.
+      if (canGoBackToPreviousErpLocation()) {
+        e.preventDefault();
+        handleGoBack();
+        return;
+      }
 
       const isInput =
         target.tagName === "INPUT" ||
@@ -213,11 +228,6 @@ export function useGlobalScrollKeys(handleGoBack: () => void): void {
         (target as HTMLInputElement).blur();
         return;
       }
-
-      const hasOpenOverlay = document.querySelector(
-        '[data-state="open"][role="dialog"], [data-state="open"][role="alertdialog"], [data-state="open"][data-radix-popper-content-wrapper], [data-state="open"][role="listbox"], [data-state="open"][role="menu"]',
-      );
-      if (hasOpenOverlay) return;
 
       e.preventDefault();
       handleGoBack();
