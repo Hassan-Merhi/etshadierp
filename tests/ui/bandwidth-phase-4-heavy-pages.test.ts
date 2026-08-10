@@ -37,14 +37,8 @@ describe("Bandwidth Phase 4 request-pressure contracts", () => {
   });
 
   it("keeps language-specific Bale Products catalogs on the same long-lived policy", () => {
-    expect(staleTimeForQueryKey(["/api/factory/bale-products?lang=en", 42])).toBe(
-      QUERY_STALE_TIMES.referenceData
-    );
-    expect(staleTimeForQueryKey(["/api/factory/bale-products?lang=ar", 42])).toBe(
-      QUERY_STALE_TIMES.referenceData
-    );
-    expect(staleTimeForQueryKey(["/api/factory/bale-products?lang=fr", 42])).toBe(
-      QUERY_STALE_TIMES.referenceData
-    );
+    expect(staleTimeForQueryKey(["/api/factory/bale-products?lang=en", 42])).toBe(QUERY_STALE_TIMES.referenceData);
+    expect(staleTimeForQueryKey(["/api/factory/bale-products?lang=ar", 42])).toBe(QUERY_STALE_TIMES.referenceData);
+    expect(staleTimeForQueryKey(["/api/factory/bale-products?lang=fr", 42])).toBe(QUERY_STALE_TIMES.referenceData);
   });
 });
