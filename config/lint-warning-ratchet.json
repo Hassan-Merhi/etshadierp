@@ -11,12 +11,12 @@
     "step": 500
   },
   "totals": {
-    "warningCeiling": 9716,
+    "warningCeiling": 9704,
     "errorCeiling": 0
   },
   "perRule": {
     "@typescript-eslint/no-explicit-any": 9047,
-    "unused-imports/no-unused-vars": 546,
+    "unused-imports/no-unused-vars": 534,
     "react-hooks/exhaustive-deps": 118,
     "no-empty": 3,
     "no-useless-escape": 2,

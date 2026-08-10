@@ -141,7 +141,6 @@
       "client/src/components/ERPWorkerDetail.tsx": 1075,
       "client/src/components/StockItemDetailsDialog.tsx": 950,
       "client/src/pages/AccountsLegacy.tsx": 1325,
-      "client/src/pages/AnalyticsLegacy.tsx": 2625,
       "client/src/pages/BaleProducts.tsx": 2100,
       "client/src/pages/BarcodeLookup.tsx": 1625,
       "client/src/pages/ContainerDetail.tsx": 1950,

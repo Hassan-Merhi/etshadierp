@@ -2,6 +2,14 @@ import type { Phase3SharedUiEntry } from "./sharedUiPhase3TranslationTypes";
 
 export const phase3SharedUiTranslationsPart6: readonly Phase3SharedUiEntry[] = [
   { en: "Items / Names", ar: "الأصناف / الأسماء", fr: "Articles / noms" },
+  // Statement/ledger column header — "البيان" and "Libellé" are the standard
+  // accounting terms in Arabic and French for a transaction description column.
+  { en: "Particulars", ar: "البيان", fr: "Libellé" },
+  {
+    en: "Adjust your filters and try again",
+    ar: "عدّل عوامل التصفية وحاول مرة أخرى",
+    fr: "Ajustez vos filtres et réessayez",
+  },
   {
     en: "Need to create brand-new stock items?",
     ar: "هل تحتاج إلى إنشاء أصناف مخزون جديدة بالكامل؟",
