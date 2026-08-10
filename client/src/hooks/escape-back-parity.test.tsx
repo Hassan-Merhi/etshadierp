@@ -71,13 +71,17 @@ describe("Escape / Back parity", () => {
     expect(fallback).not.toHaveBeenCalled();
   });
 
-  it("lets the global Escape path invoke Back before blurring a focused input", () => {
+  it("keeps app-level Escape on exact ERP Back even with a focused input", () => {
     const handleGoBack = vi.fn();
+    const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
     const input = document.createElement("input");
     document.body.appendChild(input);
     input.focus();
 
-    renderHook(() => useGlobalScrollKeys(handleGoBack));
+    renderHook(() => {
+      useEscapeBack(handleGoBack);
+      useGlobalScrollKeys(handleGoBack);
+    });
 
     const event = new KeyboardEvent("keydown", {
       key: "Escape",
@@ -87,7 +91,8 @@ describe("Escape / Back parity", () => {
     input.dispatchEvent(event);
 
     expect(event.defaultPrevented).toBe(true);
-    expect(handleGoBack).toHaveBeenCalledTimes(1);
+    expect(back).toHaveBeenCalledTimes(1);
+    expect(handleGoBack).not.toHaveBeenCalled();
     expect(document.activeElement).toBe(input);
   });
 });
