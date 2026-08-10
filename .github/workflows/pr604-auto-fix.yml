@@ -62,6 +62,7 @@ jobs:
         run: |
           python <<'PY'
           from pathlib import Path
+          import json
           import re
 
           for filename in [
@@ -78,12 +79,25 @@ jobs:
               s = s.replace("baleRows.map((b: any) =>", "baleRows.map((b) =>")
               p.write_text(s)
 
+          # The loading transaction callback is newly introduced by Phase 3 and
+          # Drizzle already infers its transaction type; do not spend an any escape.
+          p = Path("server/routes/factory/customer-orders/finalize-loading/loading.ts")
+          s = p.read_text().replace("db.transaction(async (tx: any) =>", "db.transaction(async (tx) =>")
+          p.write_text(s)
+
           p = Path("server/services/scheduler/maintenance.ts")
           s = p.read_text().replace(
               'throw new Error(`Unable to inspect mix-batch references`, { cause: error as Error });',
               'throw new Error("mix_batch_reference_inspection_failed", { cause: error as Error });',
           )
           p.write_text(s)
+
+          # Lock in the one type-escape reduction already achieved in finalize.ts.
+          p = Path("config/type-escape-boundaries.json")
+          data = json.loads(p.read_text())
+          data["scan"]["baseline"]["server/routes/factory/customer-orders/finalize-loading/finalize.ts"] = [9, 5, 0]
+          data["totals"]["typeEscapeCeiling"] = 11441
+          p.write_text(json.dumps(data, indent=2) + "\n")
 
           for filename in [
               "tests/factory-phase3-query-efficiency.test.ts",
@@ -100,6 +114,7 @@ jobs:
             client/src/components/RemoteSupportRuntime.tsx \
             client/src/lib/operationalPhase4BandwidthFetch.ts \
             client/src/main.tsx \
+            config/type-escape-boundaries.json \
             server/auth.ts \
             server/middleware/operationalBandwidthCompactResponse.ts \
             server/routes/factory/customer-orders/finalize-loading/finalize.ts \
