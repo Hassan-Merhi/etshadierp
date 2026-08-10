@@ -35,10 +35,11 @@ import {
   LabelBannersSettings, LedgerMonthlySummary, LedgerVouchers, MergeBaleProducts,
   MySettings, OrphanedRecords, Payroll, ProductionRawStock,
   ProformaAddLine, RawStockRecalculate, Settings, SpreadsheetEditor, StockQuery,
-  VoucherDetail, VoucherEdit, WasteDispatchPage, WipersReEntry,
+  VoucherDetail, VoucherEdit, WipersReEntry,
 } from "@/lazyPages";
 
 const FactoryInvoiceDetailBilingual = lazy(() => import("@/pages/factory/FactoryInvoiceDetailBilingual"));
+const WasteDispatchPage = lazy(() => import("@/pages/factory/WasteDispatchOptimized"));
 
 interface FactoryRoutesProps {
   user: any;
