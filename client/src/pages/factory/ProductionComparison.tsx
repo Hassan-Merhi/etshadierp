@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import {} from "@/components/ui/command";
@@ -32,6 +31,7 @@ import {
 import { MultiSelectFilter } from "./productioncomparison/components/MultiSelectFilter";
 import { DiffCell } from "./productioncomparison/components/DiffCell";
 import { StatCard } from "./productioncomparison/components/StatCard";
+import { buildWorkerSummaryByArticle, WorkerSummaryHover } from "./productioncomparison/components/WorkerSummaryHover";
 // ── Date helpers ─────────────────────────────────────────────────────────────
 
 export default function ProductionComparison() {
@@ -171,41 +171,10 @@ export default function ProductionComparison() {
     return { categories: [...catSet].sort(), grades: [...gradeSet].sort() };
   }, [qA.data, qB.data]);
 
-  const workerSummaryByArticle = useMemo(() => {
-    type WorkerSummary = { name: string; aQty: number; bQty: number; total: number };
-    const byArticle = new Map<string, Map<string, { name: string; aQty: number; bQty: number }>>();
-
-    const tally = (row: ProductRow, period: "a" | "b") => {
-      let workersForProduct = byArticle.get(row.articleCode);
-      if (!workersForProduct) {
-        workersForProduct = new Map();
-        byArticle.set(row.articleCode, workersForProduct);
-      }
-      for (const worker of row.workers ?? []) {
-        const name = (worker?.name || "").trim();
-        if (!name) continue;
-        const key = worker.id != null ? `id:${worker.id}` : `name:${name.toLowerCase()}`;
-        const existing = workersForProduct.get(key) ?? { name, aQty: 0, bQty: 0 };
-        if (period === "a") existing.aQty += worker.qty ?? 0;
-        else existing.bQty += worker.qty ?? 0;
-        workersForProduct.set(key, existing);
-      }
-    };
-
-    for (const row of qA.data?.production.byProduct ?? []) tally(row, "a");
-    for (const row of qB.data?.production.byProduct ?? []) tally(row, "b");
-
-    const result = new Map<string, WorkerSummary[]>();
-    for (const [articleCode, workersForProduct] of byArticle) {
-      result.set(
-        articleCode,
-        [...workersForProduct.values()]
-          .map((worker) => ({ ...worker, total: worker.aQty + worker.bQty }))
-          .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name))
-      );
-    }
-    return result;
-  }, [qA.data, qB.data]);
+  const workerSummaryByArticle = useMemo(
+    () => buildWorkerSummaryByArticle(qA.data?.production.byProduct ?? [], qB.data?.production.byProduct ?? []),
+    [qA.data, qB.data]
+  );
 
   const mergedAll = useMemo<MergedRow[]>(() => {
     const map = new Map<string, MergedRow>();
@@ -867,51 +836,7 @@ export default function ProductionComparison() {
                             )}
                           </td>
                           <td className="px-3 py-2.5 border-r border-border/30">
-                            {workerSummary.length > 0 ? (
-                              <HoverCard openDelay={150} closeDelay={100}>
-                                <HoverCardTrigger asChild>
-                                  <button
-                                    type="button"
-                                    className="inline-flex items-center rounded-md border border-border bg-background px-2 py-1 text-xs font-medium whitespace-nowrap hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                    aria-label={`${workerSummary.length} worker${workerSummary.length === 1 ? "" : "s"}. Hover for bale details.`}
-                                  >
-                                    {workerSummary.length} worker{workerSummary.length === 1 ? "" : "s"}
-                                  </button>
-                                </HoverCardTrigger>
-                                <HoverCardContent align="start" className="w-80 p-3">
-                                  <div className="mb-2 flex items-center justify-between gap-3">
-                                    <p className="text-sm font-semibold">
-                                      {workerSummary.length} worker{workerSummary.length === 1 ? "" : "s"}
-                                    </p>
-                                    <span className="text-xs text-muted-foreground">Bales by worker</span>
-                                  </div>
-                                  <div className="space-y-2">
-                                    {workerSummary.map((worker) => (
-                                      <div key={worker.name} className="rounded-md border bg-muted/20 px-2.5 py-2">
-                                        <div className="flex items-center justify-between gap-3">
-                                          <span className="min-w-0 truncate text-sm font-medium" dir="auto">
-                                            {worker.name}
-                                          </span>
-                                          <span className="shrink-0 text-sm font-semibold tabular-nums">
-                                            {fmtNum(worker.total)} bale{worker.total === 1 ? "" : "s"}
-                                          </span>
-                                        </div>
-                                        <div className="mt-1 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                                          <span>
-                                            {labelA}: {fmtNum(worker.aQty)}
-                                          </span>
-                                          <span>
-                                            {labelB}: {fmtNum(worker.bQty)}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </HoverCardContent>
-                              </HoverCard>
-                            ) : (
-                              <span className="text-muted-foreground text-xs">—</span>
-                            )}
+                            <WorkerSummaryHover workers={workerSummary} labelA={labelA} labelB={labelB} />
                           </td>
                           <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-foreground">
                             {fmtNum(row.aQty)}
