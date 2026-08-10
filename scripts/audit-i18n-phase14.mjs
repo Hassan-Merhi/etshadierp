@@ -55,6 +55,9 @@ const reviewedTechnicalValues = new Set([
   "fetchJson",
   // State-enum value used by ErpAccessBoundary; never rendered as user-facing copy.
   "error",
+  // Prettier can split adjacent translated JSX expressions so the scanner sees closing/opening
+  // JSX syntax as an object-property value. This sequence is never rendered as user-facing copy.
+  ")}</span>{",
   "seg.isSkip ? (",
   "text-success",
   "text-warning",
