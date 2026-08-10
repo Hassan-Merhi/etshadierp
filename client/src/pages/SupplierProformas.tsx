@@ -252,7 +252,7 @@ export default function SupplierProformas() {
         const data = new Uint8Array(evt.target?.result as ArrayBuffer);
         const wb = await XLSX.read(data, { type: "array" });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows: any[] = XLSX.utils.sheet_to_json(ws);
+        const rows = XLSX.utils.sheet_to_json(ws);
         /** Parse a human-entered decimal from Excel into a plain number, 0 on failure. */
         const parseExcelNum = (v: any): number => {
           const raw = String(v ?? "").trim();

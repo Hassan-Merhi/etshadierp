@@ -66,7 +66,7 @@ export async function getAllPurchasesForItem(
   fromDate?: string,
   toDate?: string
 ): Promise<any[]> {
-  const conditions: any[] = [
+  const conditions = [
     eq(schema.poLineItems.stockItemId, stockItemId),
     eq(schema.purchaseOrders.companyId, companyId),
     sql`(${schema.purchaseOrders.containerId} IS NULL OR ${schema.containers.status} NOT IN ('OFFLOADED', 'SOLD'))`,
@@ -98,7 +98,7 @@ export async function getAllSalesForItem(
   fromDate?: string,
   toDate?: string
 ): Promise<any[]> {
-  const conditions: any[] = [
+  const conditions = [
     eq(schema.salesItems.stockItemId, stockItemId),
     eq(schema.vouchers.companyId, companyId),
     eq(schema.vouchers.optional, false),

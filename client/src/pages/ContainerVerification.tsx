@@ -187,7 +187,7 @@ export default function ContainerVerification() {
         const data = new Uint8Array(evt.target?.result as ArrayBuffer);
         const wb = await XLSX.read(data, { type: "array" });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows: any[] = XLSX.utils.sheet_to_json(ws);
+        const rows = XLSX.utils.sheet_to_json(ws);
         const items = rows
           .map((r) => ({
             barcode: String(r.Barcode || r.barcode || "").trim(),

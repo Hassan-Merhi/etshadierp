@@ -27,14 +27,14 @@ export function registerStatsNetPositionRoutes(app: Express) {
       // ── 1. Accounts & voucher entries (cumulative up to toDate) ──────────
       const companyAccounts = await storage.getAllLedgerAccounts(companyId, true);
 
-      const voucherConds: any[] = [
+      const voucherConds = [
         eq(vouchers.companyId, companyId),
         eq(vouchers.optional, false),
         isNull(vouchers.deletedAt),
       ];
       if (toDate) voucherConds.push(lte(vouchers.voucherDate, toDate));
 
-      const voucherAcctConds: any[] = [eq(vouchers.optional, false), isNull(vouchers.deletedAt)];
+      const voucherAcctConds = [eq(vouchers.optional, false), isNull(vouchers.deletedAt)];
       if (toDate) voucherAcctConds.push(lte(vouchers.voucherDate, toDate));
 
       // Two separate queries — see net-profit route for rationale:
@@ -125,8 +125,8 @@ export function registerStatsNetPositionRoutes(app: Express) {
       });
       let forUsTotal = classified.forUsTotal;
       let onUsTotal = classified.onUsTotal;
-      const forUsAccounts: any[] = [...classified.forUsAccounts];
-      const onUsAccounts: any[] = [...classified.onUsAccounts];
+      const forUsAccounts = [...classified.forUsAccounts];
+      const onUsAccounts = [...classified.onUsAccounts];
 
       // ── 3. Stock In Hand — historical as of toDate ────────────────────────
       const activeLocsData = await db

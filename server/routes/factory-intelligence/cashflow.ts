@@ -39,7 +39,7 @@ export function registerFactoryCashflowRoutes(app: Express, requireAuth: any, db
         .from(containerFreightPayments)
         .where(eq(containerFreightPayments.companyId, companyId));
 
-      const upcomingFreight: any[] = [];
+      const upcomingFreight = [];
       let totalFreightOutgoing = 0;
 
       for (const f of freightEntries) {

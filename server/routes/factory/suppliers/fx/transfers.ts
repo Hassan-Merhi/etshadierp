@@ -241,7 +241,7 @@ export function registerSupplierFxTransferRoutes(app: Express) {
             (allocatedPerContainer[a.containerId] || 0) + parseFloat(a.allocatedAmount || "0");
 
         let rem = parseFloat(created.fromAmount);
-        const rows: any[] = [];
+        const rows = [];
         for (const c of allContainers) {
           if (rem <= 0.001) break;
           // Use totalKg (agreed weight) for FX allocation ceiling — same as supplier balance.

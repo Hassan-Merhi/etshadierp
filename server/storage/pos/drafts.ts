@@ -5,7 +5,7 @@ import * as schema from "@shared/schema";
 export async function getAllDraftPosSales(userId: string, locationId?: number): Promise<any[]> {
   const { pool } = await import("../../db");
   const locationFilter = locationId ? "AND d.location_id = $2" : "";
-  const params: any[] = locationId ? [userId, locationId] : [userId];
+  const params = locationId ? [userId, locationId] : [userId];
   const { rows } = await pool.query(
     `SELECT d.*,
             COALESCE(s.item_count, 0)::int  AS item_count,

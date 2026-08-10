@@ -81,7 +81,7 @@ export function registerFactoryWorkerListRoutes(app: Express, requireAuth: any, 
 
       const { active, search, position, department } = req.query;
 
-      const conditions: any[] = [eq(factoryWorkers.companyId, companyId)];
+      const conditions = [eq(factoryWorkers.companyId, companyId)];
 
       if (active === "true") {
         conditions.push(eq(factoryWorkers.active, true));

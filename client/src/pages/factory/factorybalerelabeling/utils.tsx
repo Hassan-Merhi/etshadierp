@@ -41,7 +41,7 @@ export function parseExcelFile(file: File): Promise<ParsedRow[]> {
         const data = e.target?.result;
         const wb = await XLSX.read(data, { type: "binary" });
         const sheet = wb.Sheets[wb.SheetNames[0]];
-        const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
         if (rows.length === 0) {
           reject(new Error("No rows found in file"));
           return;

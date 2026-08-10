@@ -13,13 +13,7 @@ import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth } from "../auth";
 import { getCompanyBusinessDate } from "../lib/dateUtils";
-import {
-  exchangeRates,
-  insertExchangeRateSchema,
-  ledgerAccounts,
-  voucherEntries,
-  vouchers,
-} from "@shared/schema";
+import { exchangeRates, insertExchangeRateSchema, ledgerAccounts, voucherEntries, vouchers } from "@shared/schema";
 
 export function registerExchangeRateRoutes(app: Express) {
   // Check if today's exchange rate exists
@@ -267,7 +261,7 @@ export function registerExchangeRateRoutes(app: Express) {
             .returning();
 
           // Build voucher entries for every adjusted cash account
-          const entryRows: any[] = [];
+          const entryRows = [];
           for (const { accountId, diff } of adjustments) {
             if (diff < 0) {
               // FX loss: Credit cash, Debit FX expense

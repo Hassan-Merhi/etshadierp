@@ -90,11 +90,11 @@ export function registerContainerLoadedItemSummaryRoutes(app: Express, requireAu
         }
 
         const allBarcodes = new Set([...proformaByBarcode.keys(), ...loadedByBarcode.keys()]);
-        const overloaded: any[] = [];
-        const lessLoaded: any[] = [];
-        const notRequested: any[] = [];
-        const priceDiffs: any[] = [];
-        const fullComparison: any[] = [];
+        const overloaded = [];
+        const lessLoaded = [];
+        const notRequested = [];
+        const priceDiffs = [];
+        const fullComparison = [];
 
         for (const barcode of allBarcodes) {
           const exp = proformaByBarcode.get(barcode);
@@ -169,13 +169,13 @@ export function registerContainerLoadedItemSummaryRoutes(app: Express, requireAu
           titleFont: "FFFFFF",
           summaryBg: "F5F5F5",
         };
-        const sThin: any = {
+        const sThin = {
           top: { style: "thin", color: { argb: "BDBDBD" } },
           left: { style: "thin", color: { argb: "BDBDBD" } },
           bottom: { style: "thin", color: { argb: "BDBDBD" } },
           right: { style: "thin", color: { argb: "BDBDBD" } },
         };
-        const dblBorder: any = {
+        const dblBorder = {
           top: { style: "double", color: { argb: "424242" } },
           bottom: { style: "double", color: { argb: "424242" } },
           left: sThin.left,

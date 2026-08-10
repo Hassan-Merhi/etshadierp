@@ -26,7 +26,7 @@ export function registerStockTransferReadRoutes(app: Express) {
       const endDate = req.query.endDate ? String(req.query.endDate) : null;
 
       // Fetch all stock transfer vouchers for this company via vouchers join
-      const voucherConditions: any[] = [
+      const voucherConditions = [
         eq(vouchers.companyId, companyId),
         eq(vouchers.voucherType, "Stock Transfer"),
         isNull(vouchers.deletedAt),

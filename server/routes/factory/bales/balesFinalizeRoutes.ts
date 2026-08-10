@@ -133,7 +133,7 @@ export function registerBalesFinalizeRoutes(app: Express) {
         }
 
         const now = new Date();
-        const updatedBales: any[] = [];
+        const updatedBales = [];
 
         for (const bale of balesToFinalize) {
           const weight = parseFloat(bale.weightKg);

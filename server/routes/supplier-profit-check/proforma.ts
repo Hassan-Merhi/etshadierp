@@ -33,7 +33,7 @@ export function registerSupplierProfitProformaRoutes(app: Express, requireAuth: 
       const proforma = proformaResult.rows[0];
 
       if (items.length > 0) {
-        const lineValues: any[] = [];
+        const lineValues = [];
         const linePlaceholders: string[] = [];
         let pIdx = 1;
         for (const item of items) {
@@ -84,7 +84,7 @@ export function registerSupplierProfitProformaRoutes(app: Express, requireAuth: 
       await pool.query(`DELETE FROM supplier_proforma_lines WHERE proforma_id = $1`, [proformaId]);
 
       if (items.length > 0) {
-        const lineValues: any[] = [];
+        const lineValues = [];
         const linePlaceholders: string[] = [];
         let pIdx = 1;
         for (const item of items) {

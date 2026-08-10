@@ -56,7 +56,7 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
           .from(factoryBales)
           .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, baleIds)));
 
-        const removedBales: any[] = [];
+        const removedBales = [];
         const now = new Date();
 
         const productIds: number[] = [];
@@ -189,7 +189,7 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
           throw new Error("No in-stock bales found for this product at this location");
         }
 
-        const removedBales: any[] = [];
+        const removedBales = [];
         const now = new Date();
         const [factoryProduct] = await tx
           .select()

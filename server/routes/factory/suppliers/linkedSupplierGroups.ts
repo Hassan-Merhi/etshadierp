@@ -34,7 +34,7 @@ export async function buildLinkedSupplierGroups(
     .from(factorySuppliers)
     .where(and(eq(factorySuppliers.parentId, supplierId), eq(factorySuppliers.companyId, companyId)));
 
-  const linkedSupplierGroups: any[] = [];
+  const linkedSupplierGroups = [];
   for (const linked of linkedSuppliers) {
     const linkedContainers = await db
       .select()

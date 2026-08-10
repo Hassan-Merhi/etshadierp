@@ -42,7 +42,7 @@ export function registerAdminInventoryValueRepairRoutes(app: Express) {
         return res.json({ rows: [] });
       }
 
-      const previewRows: any[] = [];
+      const previewRows = [];
       for (const row of corruptedRows as any[]) {
         const qty = parseFloat(row.quantity || "0");
         const oldRate = parseFloat(row.average_rate || "0");
@@ -114,7 +114,7 @@ export function registerAdminInventoryValueRepairRoutes(app: Express) {
         return res.json({ message: "No corrupted inventory rows found", corrected: 0, rows: [] });
       }
 
-      const correctedRows: any[] = [];
+      const correctedRows = [];
       for (const row of corruptedRows as any[]) {
         const qty = parseFloat(row.quantity || "0");
         const oldRate = parseFloat(row.average_rate || "0");

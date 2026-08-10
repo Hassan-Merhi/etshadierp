@@ -483,7 +483,7 @@ export default function FactoryDaybook() {
             const res = await fetch(`/api/vouchers/${entry.referenceId}/view-entries`, { credentials: "include" });
             if (res.ok) {
               const raw = await res.json();
-              const vEntries: any[] = Array.isArray(raw) ? raw : raw.entries || [];
+              const vEntries = Array.isArray(raw) ? raw : raw.entries || [];
               if (vEntries.length > 0) {
                 for (const ve of vEntries) {
                   detailedData.push({

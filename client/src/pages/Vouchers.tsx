@@ -356,7 +356,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     onError: (error: any, formData: VoucherFormData) => {
       if (error.name === "OfflineQueued") {
         const voucherType = activeTab === "payment" ? "Payment" : "Receipt";
-        const syntheticVoucher: any = {
+        const syntheticVoucher = {
           id: -Date.now(),
           voucherNumber: "PENDING",
           voucherType,

@@ -25,10 +25,7 @@ function wantsPagination(req: Request): boolean {
 }
 
 function parsePagination(req: Request): { page: number; limit: number; offset: number } {
-  const limit = Math.min(
-    MAX_PAGE_SIZE,
-    parsePositiveInt(req.query.limit ?? req.query.pageSize, DEFAULT_PAGE_SIZE)
-  );
+  const limit = Math.min(MAX_PAGE_SIZE, parsePositiveInt(req.query.limit ?? req.query.pageSize, DEFAULT_PAGE_SIZE));
   if (req.query.offset !== undefined) {
     const offset = Math.max(0, Number.parseInt(String(req.query.offset), 10) || 0);
     return { page: Math.floor(offset / limit) + 1, limit, offset };
@@ -51,7 +48,7 @@ async function deriveBaleStockEntryAmounts(rows: any[], companyId: number): Prom
   for (const row of baleRows) {
     try {
       const meta = JSON.parse(row.metaJson || "{}");
-      const bales: any[] = Array.isArray(meta.bales) ? meta.bales : [];
+      const bales = Array.isArray(meta.bales) ? meta.bales : [];
       for (const bale of bales) {
         const id = Number.parseInt(String(bale.id), 10);
         if (!Number.isInteger(id) || String(id) !== String(bale.id)) continue;
@@ -79,7 +76,7 @@ async function deriveBaleStockEntryAmounts(rows: any[], companyId: number): Prom
     ...new Set(baleRecords.map((row) => row.articleCode).filter((code): code is string => Boolean(code))),
   ];
 
-  const productMatches: any[] = [];
+  const productMatches = [];
   if (productIds.length > 0) productMatches.push(inArray(factoryBaleProducts.id, productIds));
   if (articleCodes.length > 0) productMatches.push(inArray(factoryBaleProducts.articleCode, articleCodes));
 
@@ -127,127 +124,122 @@ async function deriveBaleStockEntryAmounts(rows: any[], companyId: number): Prom
 }
 
 export function registerFactoryDaybookPaginationRoutes(app: Express): void {
-  app.get(
-    "/api/factory/daybook",
-    requireAuth,
-    async (req: Request, res: Response, next: NextFunction) => {
-      if (!wantsPagination(req)) return next();
+  app.get("/api/factory/daybook", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+    if (!wantsPagination(req)) return next();
 
-      try {
-        const session = req.session as any;
-        const companyId = session.factoryCompanyId || session.currentCompanyId;
-        if (!companyId) return res.status(400).json({ message: "No company selected" });
+    try {
+      const session = req.session as any;
+      const companyId = session.factoryCompanyId || session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-        const currentUserId = session.userId != null ? String(session.userId) : undefined;
-        const role = String(session.currentRole || session.role || "");
-        const elevatedRole = ["Admin", "Owner", "Developer", "View Only"].includes(role);
+      const currentUserId = session.userId != null ? String(session.userId) : undefined;
+      const role = String(session.currentRole || session.role || "");
+      const elevatedRole = ["Admin", "Owner", "Developer", "View Only"].includes(role);
 
-        let ownOnly = false;
-        if (currentUserId) {
-          const [profile] = await db
-            .select({ hiddenCostFields: factoryUserProfiles.hiddenCostFields })
-            .from(factoryUserProfiles)
-            .where(
-              and(eq(factoryUserProfiles.companyId, companyId), eq(factoryUserProfiles.userId, currentUserId))
-            );
-          ownOnly = Boolean(profile?.hiddenCostFields?.includes("daybook_own_only"));
-        }
+      let ownOnly = false;
+      if (currentUserId) {
+        const [profile] = await db
+          .select({ hiddenCostFields: factoryUserProfiles.hiddenCostFields })
+          .from(factoryUserProfiles)
+          .where(and(eq(factoryUserProfiles.companyId, companyId), eq(factoryUserProfiles.userId, currentUserId)));
+        ownOnly = Boolean(profile?.hiddenCostFields?.includes("daybook_own_only"));
+      }
 
-        let startDate = normalizeDateFilter(req.query.startDate);
-        let endDate = normalizeDateFilter(req.query.endDate);
-        if (req.query.startDate === undefined && req.query.endDate === undefined) {
-          const today = new Date().toISOString().slice(0, 10);
-          startDate = today;
-          endDate = today;
-        }
+      let startDate = normalizeDateFilter(req.query.startDate);
+      let endDate = normalizeDateFilter(req.query.endDate);
+      if (req.query.startDate === undefined && req.query.endDate === undefined) {
+        const today = new Date().toISOString().slice(0, 10);
+        startDate = today;
+        endDate = today;
+      }
 
-        const txType = typeof req.query.txType === "string" && req.query.txType !== "ALL" ? req.query.txType : undefined;
-        const currencyCode =
-          typeof req.query.currencyCode === "string" && req.query.currencyCode !== "ALL"
-            ? req.query.currencyCode
-            : undefined;
-        const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
-        const optionalStatus = String(req.query.optionalStatus ?? req.query.statusFilter ?? "all");
-        const minAmount = Number.parseFloat(String(req.query.minAmount ?? ""));
-        const maxAmount = Number.parseFloat(String(req.query.maxAmount ?? ""));
-        const sortDirection = req.query.sortOrder === "asc" ? "ASC" : "DESC";
-        const { page, limit, offset } = parsePagination(req);
+      const txType = typeof req.query.txType === "string" && req.query.txType !== "ALL" ? req.query.txType : undefined;
+      const currencyCode =
+        typeof req.query.currencyCode === "string" && req.query.currencyCode !== "ALL"
+          ? req.query.currencyCode
+          : undefined;
+      const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
+      const optionalStatus = String(req.query.optionalStatus ?? req.query.statusFilter ?? "all");
+      const minAmount = Number.parseFloat(String(req.query.minAmount ?? ""));
+      const maxAmount = Number.parseFloat(String(req.query.maxAmount ?? ""));
+      const sortDirection = req.query.sortOrder === "asc" ? "ASC" : "DESC";
+      const { page, limit, offset } = parsePagination(req);
 
-        const values: unknown[] = [];
-        const bind = (value: unknown): string => {
-          values.push(value);
-          return `$${values.length}`;
-        };
+      const values: unknown[] = [];
+      const bind = (value: unknown): string => {
+        values.push(value);
+        return `$${values.length}`;
+      };
 
-        const companyParam = bind(companyId);
-        const realConditions = [
-          `f.company_id = ${companyParam}`,
-          `f.tx_type NOT LIKE '%_VOIDED'`,
-          `f.tx_type NOT LIKE '%_DELETED'`,
-          `f.tx_type NOT IN ('LOADING_SUBMITTED','ORDER_VERIFIED','INVOICE_REVERTED','SUPPLIER_FX_TRANSFER_DELETE','WORKER_CREATED','ORDER_CANCELLED','CONTRACT_SETTLED','CONTRACT_REACTIVATED','CONTRACT_ENDED')`,
-          `NOT (f.tx_type = 'PAYROLL_PAYMENT' AND COALESCE(f.amount_currency, 0) = 0)`,
-          `(f.reference_table IS DISTINCT FROM 'vouchers' OR f.reference_id IS NULL OR live_voucher.id IS NOT NULL)`,
-          // Shared source-integrity conditions — generated from the central registry.
-          // Covers all source-backed txTypes (payrolls, advances, repayments, containers,
-          // mix batches, customer orders, commissions, raw stock, etc.).
-          ...buildPaginationIntegrityConditions(companyParam),
-        ];
-        const voucherConditions = [
-          `v.company_id = ${companyParam}`,
-          `v.deleted_at IS NULL`,
-          `v.voucher_type IN ('Payment','Receipt','Journal')`,
-        ];
+      const companyParam = bind(companyId);
+      const realConditions = [
+        `f.company_id = ${companyParam}`,
+        `f.tx_type NOT LIKE '%_VOIDED'`,
+        `f.tx_type NOT LIKE '%_DELETED'`,
+        `f.tx_type NOT IN ('LOADING_SUBMITTED','ORDER_VERIFIED','INVOICE_REVERTED','SUPPLIER_FX_TRANSFER_DELETE','WORKER_CREATED','ORDER_CANCELLED','CONTRACT_SETTLED','CONTRACT_REACTIVATED','CONTRACT_ENDED')`,
+        `NOT (f.tx_type = 'PAYROLL_PAYMENT' AND COALESCE(f.amount_currency, 0) = 0)`,
+        `(f.reference_table IS DISTINCT FROM 'vouchers' OR f.reference_id IS NULL OR live_voucher.id IS NOT NULL)`,
+        // Shared source-integrity conditions — generated from the central registry.
+        // Covers all source-backed txTypes (payrolls, advances, repayments, containers,
+        // mix batches, customer orders, commissions, raw stock, etc.).
+        ...buildPaginationIntegrityConditions(companyParam),
+      ];
+      const voucherConditions = [
+        `v.company_id = ${companyParam}`,
+        `v.deleted_at IS NULL`,
+        `v.voucher_type IN ('Payment','Receipt','Journal')`,
+      ];
 
-        if (startDate) {
-          const param = bind(startDate);
-          realConditions.push(`f.tx_date >= ${param}::date`);
-          voucherConditions.push(`COALESCE(v.effective_date, v.voucher_date) >= ${param}::date`);
-        }
-        if (endDate) {
-          const param = bind(endDate);
-          realConditions.push(`f.tx_date <= ${param}::date`);
-          voucherConditions.push(`COALESCE(v.effective_date, v.voucher_date) <= ${param}::date`);
-        }
-        if (txType) {
-          const param = bind(txType);
-          realConditions.push(`f.tx_type = ${param}`);
-          voucherConditions.push(
-            `(CASE v.voucher_type WHEN 'Payment' THEN 'PAYMENT' WHEN 'Receipt' THEN 'RECEIPT' ELSE 'JOURNAL' END) = ${param}`
-          );
-        }
-        if (currencyCode) {
-          const param = bind(currencyCode);
-          realConditions.push(`f.currency_code = ${param}`);
-          voucherConditions.push(`v.currency = ${param}`);
-        }
-
-        if (!elevatedRole && currentUserId) {
-          realConditions.push(`f.created_by = ${bind(currentUserId)}`);
-        } else if (ownOnly && currentUserId) {
-          const param = bind(currentUserId);
-          realConditions.push(`(f.created_by = ${param} OR f.created_by IS NULL)`);
-        }
-
-        const canSeeSynthetic = elevatedRole && !ownOnly;
-        voucherConditions.push(`${bind(canSeeSynthetic)}::boolean`);
+      if (startDate) {
+        const param = bind(startDate);
+        realConditions.push(`f.tx_date >= ${param}::date`);
+        voucherConditions.push(`COALESCE(v.effective_date, v.voucher_date) >= ${param}::date`);
+      }
+      if (endDate) {
+        const param = bind(endDate);
+        realConditions.push(`f.tx_date <= ${param}::date`);
+        voucherConditions.push(`COALESCE(v.effective_date, v.voucher_date) <= ${param}::date`);
+      }
+      if (txType) {
+        const param = bind(txType);
+        realConditions.push(`f.tx_type = ${param}`);
         voucherConditions.push(
-          `NOT EXISTS (SELECT 1 FROM factory_daybook_entries captured WHERE captured.company_id = v.company_id AND captured.reference_table = 'vouchers' AND captured.reference_id = v.id)`
+          `(CASE v.voucher_type WHEN 'Payment' THEN 'PAYMENT' WHEN 'Receipt' THEN 'RECEIPT' ELSE 'JOURNAL' END) = ${param}`
         );
+      }
+      if (currencyCode) {
+        const param = bind(currencyCode);
+        realConditions.push(`f.currency_code = ${param}`);
+        voucherConditions.push(`v.currency = ${param}`);
+      }
 
-        const outerConditions = [`dedup_rank = 1`];
-        if (search) {
-          const param = bind(`%${search}%`);
-          outerConditions.push(`(description ILIKE ${param} OR "txType" ILIKE ${param})`);
-        }
-        if (optionalStatus === "exclude") outerConditions.push(`optional = false`);
-        else if (optionalStatus === "only") outerConditions.push(`optional = true`);
-        if (Number.isFinite(minAmount)) outerConditions.push(`"amountCurrency"::numeric >= ${bind(minAmount)}`);
-        if (Number.isFinite(maxAmount)) outerConditions.push(`"amountCurrency"::numeric <= ${bind(maxAmount)}`);
+      if (!elevatedRole && currentUserId) {
+        realConditions.push(`f.created_by = ${bind(currentUserId)}`);
+      } else if (ownOnly && currentUserId) {
+        const param = bind(currentUserId);
+        realConditions.push(`(f.created_by = ${param} OR f.created_by IS NULL)`);
+      }
 
-        const limitParam = bind(limit);
-        const offsetParam = bind(offset);
+      const canSeeSynthetic = elevatedRole && !ownOnly;
+      voucherConditions.push(`${bind(canSeeSynthetic)}::boolean`);
+      voucherConditions.push(
+        `NOT EXISTS (SELECT 1 FROM factory_daybook_entries captured WHERE captured.company_id = v.company_id AND captured.reference_table = 'vouchers' AND captured.reference_id = v.id)`
+      );
 
-        const query = `
+      const outerConditions = [`dedup_rank = 1`];
+      if (search) {
+        const param = bind(`%${search}%`);
+        outerConditions.push(`(description ILIKE ${param} OR "txType" ILIKE ${param})`);
+      }
+      if (optionalStatus === "exclude") outerConditions.push(`optional = false`);
+      else if (optionalStatus === "only") outerConditions.push(`optional = true`);
+      if (Number.isFinite(minAmount)) outerConditions.push(`"amountCurrency"::numeric >= ${bind(minAmount)}`);
+      if (Number.isFinite(maxAmount)) outerConditions.push(`"amountCurrency"::numeric <= ${bind(maxAmount)}`);
+
+      const limitParam = bind(limit);
+      const offsetParam = bind(offset);
+
+      const query = `
           WITH real_rows AS (
             SELECT
               f.id,
@@ -370,30 +362,29 @@ export function registerFactoryDaybookPaginationRoutes(app: Express): void {
             ) AS items
         `;
 
-        const result = await pool.query(query, values);
-        const total = Number(result.rows[0]?.total || 0);
-        const items = Array.isArray(result.rows[0]?.items) ? result.rows[0].items : [];
-        await deriveBaleStockEntryAmounts(items, companyId);
+      const result = await pool.query(query, values);
+      const total = Number(result.rows[0]?.total || 0);
+      const items = Array.isArray(result.rows[0]?.items) ? result.rows[0].items : [];
+      await deriveBaleStockEntryAmounts(items, companyId);
 
-        const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
-        res.setHeader("X-Total-Count", String(total));
-        res.setHeader("X-Page", String(page));
-        res.setHeader("X-Page-Size", String(limit));
-        res.setHeader("X-Total-Pages", String(totalPages));
-        res.setHeader("Access-Control-Expose-Headers", "X-Total-Count, X-Page, X-Page-Size, X-Total-Pages");
+      const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
+      res.setHeader("X-Total-Count", String(total));
+      res.setHeader("X-Page", String(page));
+      res.setHeader("X-Page-Size", String(limit));
+      res.setHeader("X-Total-Pages", String(totalPages));
+      res.setHeader("Access-Control-Expose-Headers", "X-Total-Count, X-Page, X-Page-Size, X-Total-Pages");
 
-        return res.json({
-          items,
-          total,
-          page,
-          limit,
-          totalPages,
-          hasNextPage: page < totalPages,
-          hasPreviousPage: page > 1 && totalPages > 0,
-        });
-      } catch (error: unknown) {
-        return res.status(500).json({ message: getErrorMessage(error) });
-      }
+      return res.json({
+        items,
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1 && totalPages > 0,
+      });
+    } catch (error: unknown) {
+      return res.status(500).json({ message: getErrorMessage(error) });
     }
-  );
+  });
 }

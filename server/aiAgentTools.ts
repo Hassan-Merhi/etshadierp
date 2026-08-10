@@ -325,7 +325,7 @@ export async function runTool(
       }
 
       case "preparePurchaseOrderDraft": {
-        const items: any[] = Array.isArray(params.items) ? params.items : [];
+        const items = Array.isArray(params.items) ? params.items : [];
         const totalAmount = items.reduce(
           (s, i) => s + parseFloat(String(i.rate || "0")) * parseFloat(String(i.quantity || "0")),
           0
@@ -349,7 +349,7 @@ export async function runTool(
       }
 
       case "preparePriceUpdateDraft": {
-        const updates: any[] = Array.isArray(params.updates) ? params.updates : [];
+        const updates = Array.isArray(params.updates) ? params.updates : [];
         const preview = { updates, count: updates.length };
         return {
           ok: true,

@@ -26,7 +26,7 @@ export function registerFactoryAnalyticsRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { startDate, endDate } = req.query as Record<string, string>;
-      const conditions: any[] = [eq(containerSales.companyId, companyId)];
+      const conditions = [eq(containerSales.companyId, companyId)];
       if (startDate) conditions.push(sql`${containerSales.saleDate} >= ${startDate}`);
       if (endDate) conditions.push(sql`${containerSales.saleDate} <= ${endDate}`);
 
@@ -57,7 +57,7 @@ export function registerFactoryAnalyticsRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { startDate, endDate } = req.query as Record<string, string>;
-      const conditions: any[] = [eq(factoryPosSales.companyId, companyId), ne(factoryPosSales.status, "VOID")];
+      const conditions = [eq(factoryPosSales.companyId, companyId), ne(factoryPosSales.status, "VOID")];
       if (startDate) conditions.push(sql`${factoryPosSales.txDate} >= ${startDate}`);
       if (endDate) conditions.push(sql`${factoryPosSales.txDate} <= ${endDate}`);
 
@@ -107,7 +107,7 @@ export function registerFactoryAnalyticsRoutes(app: Express) {
 
       const { startDate, endDate, customerId, paymentStatus } = req.query as Record<string, string>;
 
-      const conditions: any[] = [eq(containerSales.companyId, companyId)];
+      const conditions = [eq(containerSales.companyId, companyId)];
       if (startDate) conditions.push(sql`${containerSales.saleDate} >= ${startDate}`);
       if (endDate) conditions.push(sql`${containerSales.saleDate} <= ${endDate}`);
       if (customerId && customerId !== "all") conditions.push(eq(containerSales.customerId, parseInt(customerId)));

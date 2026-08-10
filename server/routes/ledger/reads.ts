@@ -25,7 +25,7 @@ export function registerLedgerAccountReadRoutes(app: Express) {
       if (accountType && typeof accountType === "string" && accountType.trim()) {
         // Push accountType filter to SQL — avoids fetching all accounts then
         // discarding most of them in JS (e.g. 8 Cash accounts out of 400 total).
-        const conditions: any[] = [
+        const conditions = [
           eq(ledgerAccounts.companyId, effectiveCompanyId),
           isNull(ledgerAccounts.deletedAt),
           eq(ledgerAccounts.accountType, accountType.trim()),
@@ -39,7 +39,7 @@ export function registerLedgerAccountReadRoutes(app: Express) {
       } else if (search && typeof search === "string" && search.trim()) {
         // Push search to DB (ILIKE) instead of fetching all accounts and filtering in JS
         const q = `%${search.trim()}%`;
-        const searchConds: any[] = [
+        const searchConds = [
           eq(ledgerAccounts.companyId, effectiveCompanyId),
           isNull(ledgerAccounts.deletedAt),
           or(ilike(ledgerAccounts.name, q), ilike(ledgerAccounts.code, q)),

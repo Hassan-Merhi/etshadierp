@@ -11,14 +11,7 @@ import { eq, and, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireNonPOS, checkPOSLocation } from "../auth";
-import {
-  ledgerAccounts,
-  locations,
-  salesItems,
-  stockItems,
-  voucherEntries,
-  vouchers,
-} from "@shared/schema";
+import { ledgerAccounts, locations, salesItems, stockItems, voucherEntries, vouchers } from "@shared/schema";
 
 export function registerFinancialSalesRoutes(app: Express) {
   app.post("/api/fiscal-period/close", requireAuth, async (req, res) => {
@@ -125,7 +118,7 @@ export function registerFinancialSalesRoutes(app: Express) {
       const { startDate, endDate } = req.query;
 
       // Build query conditions (applied to vouchers via join)
-      const conditions: any[] = [
+      const conditions = [
         eq(vouchers.companyId, req.session.currentCompanyId),
         eq(vouchers.voucherType, "Sales"),
         isNull(vouchers.deletedAt),
@@ -307,7 +300,7 @@ export function registerFinancialSalesRoutes(app: Express) {
         const { startDate, endDate } = req.query;
 
         // Build query conditions — credit sales group uses isCreditSale flag, not locationId
-        const conditions: any[] = [
+        const conditions = [
           eq(vouchers.companyId, req.session.currentCompanyId),
           eq(vouchers.voucherType, "Sales"),
           isNull(vouchers.deletedAt),

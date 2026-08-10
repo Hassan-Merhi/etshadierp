@@ -90,7 +90,7 @@ export function registerBalesPressingRoutes(app: Express) {
           });
         }
 
-        const bales: any[] = [];
+        const bales = [];
         for (let i = 0; i < quantity; i++) {
           const refNum = `REF${String(nextNumber + i).padStart(6, "0")}`;
           const [bale] = await tx
@@ -180,7 +180,7 @@ export function registerBalesPressingRoutes(app: Express) {
           });
         }
 
-        const bales: any[] = [];
+        const bales = [];
         let baleIndex = 0;
 
         for (const [itemIndex, item] of items.entries()) {
@@ -286,7 +286,7 @@ export function registerBalesPressingRoutes(app: Express) {
           });
         }
 
-        const bales: any[] = [];
+        const bales = [];
         for (let i = 0; i < quantity; i++) {
           const refNum = `REF${String(nextNumber + i).padStart(6, "0")}`;
           const [bale] = await tx

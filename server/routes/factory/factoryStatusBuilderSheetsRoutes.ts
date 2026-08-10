@@ -208,7 +208,7 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
       const sheetId = parseOptionalId(req.query.sheetId as string | undefined);
       const limit = Math.min(parseInt((req.query.limit as string) || "200") || 200, 1000);
 
-      const params: any[] = [companyId];
+      const params = [companyId];
       const conditions = ["company_id = $1"];
       if (sheetId != null) {
         params.push(sheetId);

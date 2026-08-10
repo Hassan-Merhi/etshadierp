@@ -21,7 +21,7 @@ export function registerFactoryStockQueryRoutes(app: Express) {
 
       const { locationId } = req.query;
 
-      const conditions: any[] = [eq(factoryBales.companyId, companyId), eq(factoryBales.status, "IN_STOCK")];
+      const conditions = [eq(factoryBales.companyId, companyId), eq(factoryBales.status, "IN_STOCK")];
 
       if (locationId) {
         conditions.push(eq(factoryBales.erpLocationId, parseInt(locationId as string)));
@@ -95,7 +95,7 @@ export function registerFactoryStockQueryRoutes(app: Express) {
       const rawLocationId = req.query.locationId;
       const locationId = rawLocationId ? parseInt(rawLocationId as string) : null;
 
-      const conditions: any[] = [
+      const conditions = [
         eq(factoryBales.companyId, companyId),
         eq(factoryBales.status, "IN_STOCK"),
         isNull(factoryBales.deletedAt),
@@ -162,7 +162,7 @@ export function registerFactoryStockQueryRoutes(app: Express) {
       const rawLocationId = req.query.locationId;
       const locationId = rawLocationId ? parseInt(rawLocationId as string) : null;
 
-      const conditions: any[] = [
+      const conditions = [
         eq(factoryBales.companyId, companyId),
         eq(factoryBales.status, "IN_STOCK"),
         isNull(factoryBales.deletedAt),

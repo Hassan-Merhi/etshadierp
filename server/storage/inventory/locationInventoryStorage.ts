@@ -20,9 +20,7 @@ export async function getLocationById(id: number): Promise<schema.Location | und
   return location;
 }
 
-export async function createLocation(
-  location: schema.InsertLocation & { code: string }
-): Promise<schema.Location> {
+export async function createLocation(location: schema.InsertLocation & { code: string }): Promise<schema.Location> {
   const [created] = await db.insert(schema.locations).values(location).returning();
   return created;
 }
@@ -286,7 +284,7 @@ export async function getInventorySummary(companyId: number): Promise<any[]> {
 }
 
 export async function getStockItemsWithInventory(companyId: number, locationId?: number): Promise<any[]> {
-  const conditions: any[] = [eq(schema.inventory.companyId, companyId)];
+  const conditions = [eq(schema.inventory.companyId, companyId)];
   if (locationId) conditions.push(eq(schema.inventory.locationId, locationId));
   return await db
     .select({

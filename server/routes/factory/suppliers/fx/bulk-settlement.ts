@@ -273,7 +273,7 @@ export function registerSupplierBulkFxSettlementRoutes(app: Express) {
       // Create FX transfers and allocation rows in a transaction
       const settlementDate = date || getClientDate(req);
       const results = await db.transaction(async (tx: any) => {
-        const created: any[] = [];
+        const created = [];
         for (const alloc of allocations) {
           const [fxTransfer] = await tx
             .insert(factorySupplierFxTransfers)
@@ -298,7 +298,7 @@ export function registerSupplierBulkFxSettlementRoutes(app: Express) {
               : new Date(a.arrivalDate || a.createdAt).getTime() - new Date(b.arrivalDate || b.createdAt).getTime()
           );
           let allocRem = alloc.allocated;
-          const allocRows: any[] = [];
+          const allocRows = [];
           for (const c of sortedCont) {
             if (allocRem <= 0.001) break;
             const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");

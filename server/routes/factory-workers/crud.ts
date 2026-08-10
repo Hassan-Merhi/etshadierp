@@ -142,7 +142,7 @@ export function registerFactoryWorkerCrudRoutes(app: Express, requireAuth: any, 
       absentEnd.setDate(absentEnd.getDate() - 1);
 
       if (absentEnd >= yearStart) {
-        const absentRecords: any[] = [];
+        const absentRecords = [];
         const cursor = new Date(yearStart);
         while (cursor <= absentEnd) {
           absentRecords.push({

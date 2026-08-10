@@ -69,7 +69,7 @@ export function useVoucherHydration({
       if (needsCustomers && !customersFetched) return;
 
       const allEntries = voucherToEdit.entries;
-      let paymentEntry: any = null;
+      let paymentEntry = null;
 
       if (voucherToEdit.voucherType === "Payment") {
         paymentEntry = allEntries.find((entry: any) => {
@@ -213,9 +213,7 @@ export function useVoucherHydration({
           // same debit/credit direction as bank/ledger accounts, NOT the
           // supplier/employee liability path.
           const isLiabilityPayment =
-            paymentEntry.supplierId ||
-            paymentEntry.employeeId ||
-            paymentEntry.factorySupplierId;
+            paymentEntry.supplierId || paymentEntry.employeeId || paymentEntry.factorySupplierId;
           if (voucherToEdit.voucherType === "Payment") {
             amount = isLiabilityPayment ? entry.creditAmount || "0" : entry.debitAmount || "0";
           } else if (voucherToEdit.voucherType === "Receipt") {

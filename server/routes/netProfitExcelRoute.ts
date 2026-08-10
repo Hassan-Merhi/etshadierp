@@ -46,7 +46,7 @@ export function registerNetProfitExcelRoute(app: Express) {
       const companyAccounts = await storage.getAllLedgerAccounts(companyId, true);
 
       // Fetch period vouchers WITH their dates for monthly grouping
-      const voucherConditions: any[] = [
+      const voucherConditions = [
         eq(vouchers.companyId, companyId),
         isNull(vouchers.deletedAt),
         eq(vouchers.optional, false),
@@ -95,7 +95,7 @@ export function registerNetProfitExcelRoute(app: Express) {
       }
 
       // Fetch ALL sales with dates for the period
-      const salesConditions: any[] = [
+      const salesConditions = [
         eq(vouchers.companyId, companyId),
         isNull(vouchers.deletedAt),
         eq(vouchers.optional, false),
@@ -182,7 +182,7 @@ export function registerNetProfitExcelRoute(app: Express) {
       }
 
       // allTimeAccountBalances for Net Position (no startDate filter)
-      const allTimeConds: any[] = [
+      const allTimeConds = [
         eq(vouchers.companyId, companyId),
         isNull(vouchers.deletedAt),
         eq(vouchers.optional, false),

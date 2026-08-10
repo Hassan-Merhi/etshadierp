@@ -205,9 +205,9 @@ export function registerFactoryProductReadRoutes(app: Express) {
       const pressed = Array.from(pressedMap.values()).sort((a, b) => b.date.localeCompare(a.date));
 
       // 2. Sales: finalized orders for this article code
-      const sales: any[] = [];
+      const sales = [];
       // 3. Loaded/OTW: loading-status orders for this article code
-      const loaded: any[] = [];
+      const loaded = [];
 
       if (articleCode) {
         const orderBalesForProduct = await db

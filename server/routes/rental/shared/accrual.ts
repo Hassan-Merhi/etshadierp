@@ -450,7 +450,7 @@ export async function postRentAccrualForCompany(
           let totalExpense15 = 0;
           let totalAdvCredit15 = 0;
           let totalApCredit15 = 0;
-          const debitEntries15: any[] = [];
+          const debitEntries15 = [];
 
           for (const r of locked15) {
             const expected = Number(r.expected_amount);
@@ -483,7 +483,7 @@ export async function postRentAccrualForCompany(
             })
             .returning();
 
-          const allEntries15: any[] = debitEntries15.map((e) => ({ ...e, voucherId: v15.id }));
+          const allEntries15 = debitEntries15.map((e) => ({ ...e, voucherId: v15.id }));
           if (totalAdvCredit15 > 0.005) {
             allEntries15.push({
               voucherId: v15.id,
@@ -586,7 +586,7 @@ export async function postRentAccrualForCompany(
             .returning();
 
           // One debit line per row (Rent Expense = full expected)
-          const entries: any[] = duePrepaid.map((r) => {
+          const entries = duePrepaid.map((r) => {
             const rowLabel = `${unitNameById.get(r.unitId) ?? `unit${r.unitId}`} - ${String(r.month).padStart(2, "0")}/${r.year}`;
             return {
               voucherId: v.id,

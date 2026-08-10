@@ -88,7 +88,7 @@ export function registerFactoryDashboardWasteRoutes(app: Express, requireAuth: a
       const from = req.query.from as string;
       const to = req.query.to as string;
 
-      const conditions: any[] = [eq(factoryWasteEntries.companyId, companyId)];
+      const conditions = [eq(factoryWasteEntries.companyId, companyId)];
       if (from) conditions.push(gte(factoryWasteEntries.date, from));
       if (to) conditions.push(lte(factoryWasteEntries.date, to));
 

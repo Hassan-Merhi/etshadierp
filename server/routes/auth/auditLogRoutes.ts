@@ -124,7 +124,7 @@ export function registerAuthAuditLogRoutes(app: Express) {
         "settings_change",
         "approve",
       ];
-      const baseConditions: any[] = [
+      const baseConditions = [
         sql`${auditLog.userId} NOT IN (SELECT user_id FROM user_company_roles WHERE role = 'Developer')`,
         sql`${auditLog.tableName} != 'security_events'`,
         sql`lower(${auditLog.action}) NOT IN (${sql.join(
@@ -133,7 +133,7 @@ export function registerAuthAuditLogRoutes(app: Express) {
         )})`,
         ...(companyId ? [eq(auditLog.companyId, companyId)] : []),
       ];
-      const filterConditions: any[] = [];
+      const filterConditions = [];
       if (resolvedTable) filterConditions.push(eq(auditLog.tableName, resolvedTable));
       if (query.userId) filterConditions.push(eq(auditLog.userId, query.userId));
       if (query.action && query.action !== "all") {

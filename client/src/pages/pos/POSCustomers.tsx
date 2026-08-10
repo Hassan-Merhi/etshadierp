@@ -62,7 +62,7 @@ export default function POSCustomers() {
     queryFn: () => fetch(`/api/pos/customers/${statementCustomer!.id}/transactions`).then((r) => r.json()),
     enabled: !!statementCustomer?.id,
   });
-  const ledgerTxns: any[] = Array.isArray(ledgerTxnsRaw) ? ledgerTxnsRaw : [];
+  const ledgerTxns = Array.isArray(ledgerTxnsRaw) ? ledgerTxnsRaw : [];
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
