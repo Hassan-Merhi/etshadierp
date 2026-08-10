@@ -274,11 +274,6 @@
         0,
         0
       ],
-      "client/src/hooks/use-offline-queue.ts": [
-        1,
-        0,
-        0
-      ],
       "client/src/hooks/use-table-prefs.ts": [
         1,
         0,
@@ -1444,6 +1439,11 @@
         0,
         0
       ],
+      "client/src/pages/factory/dailyproductionreport/components/ProductionTabPanel.tsx": [
+        11,
+        0,
+        0
+      ],
       "client/src/pages/factory/daybook/ViewEntryModal.tsx": [
         23,
         0,
@@ -1757,6 +1757,16 @@
       "client/src/pages/factory/factoryotwtrackingtab/components/TrackingSettingsSheet.tsx": [
         1,
         1,
+        0
+      ],
+      "client/src/pages/factory/factorypayrolltab/components/PayrollRunDialogs.tsx": [
+        1,
+        1,
+        0
+      ],
+      "client/src/pages/factory/factorypayrolltab/useFactoryPayroll.tsx": [
+        2,
+        0,
         0
       ],
       "client/src/pages/factory/factorypendinginvoiceverify/types.ts": [
@@ -3225,7 +3235,7 @@
         0
       ],
       "server/routes/accountStatementRoutes.ts": [
-        13,
+        9,
         3,
         0
       ],
@@ -3254,18 +3264,13 @@
         4,
         0
       ],
-      "server/routes/accounts/whatsapp.ts": [
-        6,
-        0,
-        0
-      ],
       "server/routes/admin/accountMigrationControlReferences.ts": [
         9,
         0,
         0
       ],
       "server/routes/admin/accountMigrationSafeRoutes.ts": [
-        17,
+        15,
         0,
         0
       ],
@@ -3290,7 +3295,7 @@
         0
       ],
       "server/routes/admin/import-export/account-migration.ts": [
-        11,
+        1,
         0,
         0
       ],
@@ -3414,21 +3419,6 @@
         1,
         0
       ],
-      "server/routes/balance-repair/apply.ts": [
-        2,
-        0,
-        0
-      ],
-      "server/routes/balance-repair/scan.ts": [
-        2,
-        0,
-        0
-      ],
-      "server/routes/balance-repair/undo.ts": [
-        4,
-        0,
-        0
-      ],
       "server/routes/baleLookupRoutes.ts": [
         9,
         6,
@@ -3500,12 +3490,12 @@
         0
       ],
       "server/routes/container-loaded-items/crud.ts": [
-        10,
+        2,
         0,
         0
       ],
       "server/routes/container-loaded-items/import.ts": [
-        8,
+        4,
         0,
         0
       ],
@@ -3515,12 +3505,12 @@
         0
       ],
       "server/routes/container-loaded-items/reports.ts": [
-        25,
+        21,
         0,
         0
       ],
       "server/routes/container-loaded-items/summary.ts": [
-        19,
+        17,
         0,
         0
       ],
@@ -3634,11 +3624,6 @@
         2,
         0
       ],
-      "server/routes/debug/factoryOrderRepairRoutes.ts": [
-        2,
-        0,
-        0
-      ],
       "server/routes/debug/importCycleDiagnosticTypes.ts": [
         1,
         0,
@@ -3670,7 +3655,7 @@
         0
       ],
       "server/routes/erp-payroll/runs-lifecycle.ts": [
-        7,
+        1,
         0,
         0
       ],
@@ -3680,7 +3665,7 @@
         0
       ],
       "server/routes/erp-payroll/runs.ts": [
-        10,
+        4,
         0,
         0
       ],
@@ -3710,22 +3695,22 @@
         0
       ],
       "server/routes/factory-intelligence/alerts.ts": [
-        15,
+        9,
         6,
         0
       ],
       "server/routes/factory-intelligence/bale-trace-photos.ts": [
-        20,
+        10,
         9,
         0
       ],
       "server/routes/factory-intelligence/cashflow.ts": [
-        9,
+        7,
         2,
         0
       ],
       "server/routes/factory-intelligence/dashboard-waste.ts": [
-        11,
+        3,
         12,
         0
       ],
@@ -3735,27 +3720,27 @@
         0
       ],
       "server/routes/factory-intelligence/kpis.ts": [
-        18,
+        12,
         6,
         0
       ],
       "server/routes/factory-intelligence/mix-optimize.ts": [
-        19,
+        17,
         2,
         0
       ],
       "server/routes/factory-intelligence/profitability.ts": [
-        23,
+        19,
         4,
         0
       ],
       "server/routes/factory-intelligence/settings.ts": [
-        9,
+        5,
         7,
         0
       ],
       "server/routes/factory-intelligence/supplier-score.ts": [
-        13,
+        11,
         2,
         0
       ],
@@ -3765,17 +3750,17 @@
         0
       ],
       "server/routes/factory-payroll/delete.ts": [
-        5,
+        3,
         4,
         0
       ],
       "server/routes/factory-payroll/exports.ts": [
-        9,
+        5,
         0,
         0
       ],
       "server/routes/factory-payroll/generate.ts": [
-        10,
+        8,
         2,
         0
       ],
@@ -3785,17 +3770,17 @@
         0
       ],
       "server/routes/factory-payroll/production-bonuses.ts": [
-        10,
+        6,
         7,
         0
       ],
       "server/routes/factory-payroll/reads.ts": [
-        9,
+        5,
         2,
         0
       ],
       "server/routes/factory-payroll/update.ts": [
-        10,
+        6,
         5,
         0
       ],
@@ -3815,12 +3800,12 @@
         0
       ],
       "server/routes/factory-reports/supplier-usage.ts": [
-        20,
+        18,
         0,
         0
       ],
       "server/routes/factory-reports/whatsapp.ts": [
-        4,
+        2,
         3,
         0
       ],
@@ -3830,22 +3815,22 @@
         0
       ],
       "server/routes/factory-workers/bales-settle.ts": [
-        11,
+        7,
         3,
         0
       ],
       "server/routes/factory-workers/crud.ts": [
-        15,
+        5,
         4,
         0
       ],
       "server/routes/factory-workers/documents.ts": [
-        10,
+        2,
         0,
         0
       ],
       "server/routes/factory-workers/import-export.ts": [
-        24,
+        18,
         1,
         0
       ],
@@ -3855,7 +3840,7 @@
         0
       ],
       "server/routes/factory-workers/lists.ts": [
-        12,
+        4,
         0,
         0
       ],
@@ -3865,7 +3850,7 @@
         0
       ],
       "server/routes/factory-workers/photos.ts": [
-        6,
+        2,
         1,
         0
       ],
@@ -3885,22 +3870,22 @@
         0
       ],
       "server/routes/factory/bale-exports/daily-report.ts": [
-        7,
+        3,
         4,
         0
       ],
       "server/routes/factory/bale-exports/production-value-report.ts": [
-        19,
+        17,
         2,
         0
       ],
       "server/routes/factory/bale-exports/weekly-report-whatsapp.ts": [
-        6,
+        2,
         2,
         0
       ],
       "server/routes/factory/bale-exports/weekly-report.ts": [
-        4,
+        2,
         6,
         0
       ],
@@ -3910,17 +3895,17 @@
         0
       ],
       "server/routes/factory/bales/balesCrudRoutes.ts": [
-        33,
+        13,
         25,
         0
       ],
       "server/routes/factory/bales/balesExportRoutes.ts": [
-        10,
+        6,
         4,
         0
       ],
       "server/routes/factory/bales/balesFinalizeRoutes.ts": [
-        19,
+        15,
         5,
         0
       ],
@@ -3930,7 +3915,7 @@
         0
       ],
       "server/routes/factory/bales/balesPressingRoutes.ts": [
-        20,
+        10,
         10,
         0
       ],
@@ -3940,57 +3925,57 @@
         0
       ],
       "server/routes/factory/bales/balesReportRoutes.ts": [
-        23,
+        11,
         22,
         0
       ],
       "server/routes/factory/containers/create.ts": [
-        3,
+        1,
         15,
         0
       ],
       "server/routes/factory/containers/delete.ts": [
-        11,
+        5,
         7,
         0
       ],
       "server/routes/factory/containers/import-excel.ts": [
-        5,
+        3,
         2,
         0
       ],
       "server/routes/factory/containers/list.ts": [
-        4,
+        0,
         4,
         0
       ],
       "server/routes/factory/containers/move-supplier.ts": [
-        2,
+        0,
         2,
         0
       ],
       "server/routes/factory/containers/other-charges-currency-admin.ts": [
-        7,
+        3,
         4,
         0
       ],
       "server/routes/factory/containers/other-charges.ts": [
-        4,
+        0,
         6,
         0
       ],
       "server/routes/factory/containers/update.ts": [
-        7,
+        5,
         15,
         0
       ],
       "server/routes/factory/customer-orders/bale-scanning/bulk-import.ts": [
-        10,
+        8,
         9,
         0
       ],
       "server/routes/factory/customer-orders/bale-scanning/exchange.ts": [
-        5,
+        1,
         4,
         0
       ],
@@ -4000,7 +3985,7 @@
         0
       ],
       "server/routes/factory/customer-orders/bale-scanning/scan.ts": [
-        7,
+        5,
         7,
         0
       ],
@@ -4010,27 +3995,27 @@
         0
       ],
       "server/routes/factory/customer-orders/finalize-loading/cancel.ts": [
-        4,
+        0,
         11,
         0
       ],
       "server/routes/factory/customer-orders/finalize-loading/finalize.ts": [
-        10,
+        6,
         5,
         0
       ],
       "server/routes/factory/customer-orders/finalize-loading/loading.ts": [
-        5,
+        1,
         6,
         0
       ],
       "server/routes/factory/customer-orders/finalize-loading/unfinalize.ts": [
-        6,
+        2,
         3,
         0
       ],
       "server/routes/factory/customer-orders/orderChargesRoutes.ts": [
-        13,
+        5,
         8,
         0
       ],
@@ -4040,7 +4025,7 @@
         0
       ],
       "server/routes/factory/customer-orders/orderExcelExportRoutes.ts": [
-        30,
+        26,
         14,
         0
       ],
@@ -4050,62 +4035,62 @@
         0
       ],
       "server/routes/factory/customer-orders/orderPricingRoutes.ts": [
-        10,
+        0,
         10,
         0
       ],
       "server/routes/factory/customer-orders/orderTrackingRoutes.ts": [
-        4,
+        0,
         4,
         0
       ],
       "server/routes/factory/customer-orders/pdf-export/loading-status.ts": [
-        12,
+        10,
         2,
         0
       ],
       "server/routes/factory/customer-orders/pdf-export/order-pdf.ts": [
-        9,
+        7,
         5,
         0
       ],
       "server/routes/factory/customer-orders/pdf-export/pending.ts": [
-        6,
+        4,
         2,
         0
       ],
       "server/routes/factory/customer-orders/verify-recover/recover.ts": [
-        7,
+        3,
         2,
         0
       ],
       "server/routes/factory/customer-orders/verify-recover/verification-summary.ts": [
-        9,
+        7,
         2,
         0
       ],
       "server/routes/factory/customer-orders/verify-recover/verify.ts": [
-        4,
+        0,
         4,
         0
       ],
       "server/routes/factory/customer-proformas/bulk-and-pricing.ts": [
-        14,
+        6,
         10,
         0
       ],
       "server/routes/factory/customer-proformas/create-loading.ts": [
-        5,
+        3,
         4,
         0
       ],
       "server/routes/factory/customer-proformas/exports.ts": [
-        13,
+        9,
         6,
         0
       ],
       "server/routes/factory/customer-proformas/lines.ts": [
-        7,
+        1,
         6,
         0
       ],
@@ -4115,47 +4100,47 @@
         0
       ],
       "server/routes/factory/customer-proformas/proformas.ts": [
-        34,
+        24,
         15,
         0
       ],
       "server/routes/factory/customer-proformas/stock-allocation.ts": [
-        49,
+        43,
         6,
         0
       ],
       "server/routes/factory/customer-proformas/transfer.ts": [
-        4,
+        0,
         5,
         0
       ],
       "server/routes/factory/customers-core/crud.ts": [
-        12,
+        0,
         15,
         0
       ],
       "server/routes/factory/customers-core/logos.ts": [
-        20,
+        10,
         10,
         0
       ],
       "server/routes/factory/customers-core/migrations.ts": [
-        2,
+        0,
         2,
         0
       ],
       "server/routes/factory/customers-core/statement-excel.ts": [
-        11,
+        9,
         3,
         0
       ],
       "server/routes/factory/customers-core/statement-pdf.ts": [
-        14,
+        12,
         6,
         0
       ],
       "server/routes/factory/customers-core/statement.ts": [
-        16,
+        10,
         7,
         0
       ],
@@ -4165,37 +4150,27 @@
         0
       ],
       "server/routes/factory/dispatch-batches/bale-scans.ts": [
-        7,
-        0,
-        0
-      ],
-      "server/routes/factory/dispatch-batches/bale-search.ts": [
-        2,
+        3,
         0,
         0
       ],
       "server/routes/factory/dispatch-batches/batches.ts": [
-        19,
+        9,
         0,
         0
       ],
       "server/routes/factory/dispatch-batches/dispatch.ts": [
-        6,
+        2,
         0,
         0
       ],
       "server/routes/factory/dispatch-batches/invoicing.ts": [
-        18,
-        0,
-        0
-      ],
-      "server/routes/factory/dispatch-batches/reports.ts": [
-        4,
+        14,
         0,
         0
       ],
       "server/routes/factory/dispatch-batches/truck-rides.ts": [
-        6,
+        2,
         0,
         0
       ],
@@ -4205,32 +4180,32 @@
         0
       ],
       "server/routes/factory/docs-users/analyticsRoutes.ts": [
-        11,
+        3,
         4,
         0
       ],
       "server/routes/factory/docs-users/baleRelabelRoutes.ts": [
-        21,
+        15,
         7,
         0
       ],
       "server/routes/factory/docs-users/chatRoutes.ts": [
-        23,
+        5,
         8,
         0
       ],
       "server/routes/factory/docs-users/companyExportRoutes.ts": [
-        9,
+        7,
         2,
         0
       ],
       "server/routes/factory/docs-users/companyImportRoutes.ts": [
-        23,
+        21,
         1,
         0
       ],
       "server/routes/factory/docs-users/daybookEditRoutes.ts": [
-        16,
+        6,
         8,
         0
       ],
@@ -4240,7 +4215,7 @@
         0
       ],
       "server/routes/factory/docs-users/freightRoutes.ts": [
-        18,
+        6,
         17,
         0
       ],
@@ -4250,47 +4225,47 @@
         0
       ],
       "server/routes/factory/employee-pos/employee-crud/attendance.ts": [
-        9,
+        3,
         3,
         0
       ],
       "server/routes/factory/employee-pos/employee-crud/bulk-payroll.ts": [
-        6,
+        4,
         1,
         0
       ],
       "server/routes/factory/employee-pos/employee-crud/bulk-withdraw.ts": [
-        4,
+        2,
         1,
         0
       ],
       "server/routes/factory/employee-pos/employee-crud/cash.ts": [
-        4,
+        0,
         2,
         0
       ],
       "server/routes/factory/employee-pos/employee-crud/crud.ts": [
-        15,
+        3,
         6,
         0
       ],
       "server/routes/factory/employee-pos/employee-crud/payroll-preview.ts": [
-        6,
+        4,
         1,
         0
       ],
       "server/routes/factory/employee-pos/employee-crud/recalculate.ts": [
-        4,
+        0,
         4,
         0
       ],
       "server/routes/factory/employee-pos/employeeAdvancesBonusRoutes.ts": [
-        27,
+        3,
         17,
         0
       ],
       "server/routes/factory/employee-pos/employeeAttendanceRoutes.ts": [
-        10,
+        4,
         9,
         0
       ],
@@ -4300,7 +4275,7 @@
         0
       ],
       "server/routes/factory/employee-pos/employeeNetPositionRoutes.ts": [
-        27,
+        25,
         7,
         0
       ],
@@ -4310,27 +4285,27 @@
         0
       ],
       "server/routes/factory/employee-pos/pos-financial/financial-snapshot.ts": [
-        11,
+        9,
         8,
         0
       ],
       "server/routes/factory/employee-pos/pos-financial/production-positions.ts": [
-        17,
+        7,
         0,
         0
       ],
       "server/routes/factory/employee-pos/pos-financial/sale-delete.ts": [
-        4,
+        2,
         2,
         0
       ],
       "server/routes/factory/employee-pos/pos-financial/sale-write.ts": [
-        11,
+        7,
         5,
         0
       ],
       "server/routes/factory/employee-pos/pos-financial/sales-read.ts": [
-        4,
+        0,
         4,
         0
       ],
@@ -4375,12 +4350,12 @@
         0
       ],
       "server/routes/factory/factoryContainerReadAccessRoutes.ts": [
-        15,
+        11,
         0,
         0
       ],
       "server/routes/factory/factoryContainerTrackingRoutes.ts": [
-        16,
+        0,
         7,
         0
       ],
@@ -4410,7 +4385,7 @@
         0
       ],
       "server/routes/factory/factoryFxRatesRoutes.ts": [
-        11,
+        1,
         10,
         0
       ],
@@ -4420,12 +4395,12 @@
         0
       ],
       "server/routes/factory/factoryInsuranceRoutes.ts": [
-        15,
+        1,
         0,
         0
       ],
       "server/routes/factory/factoryProductionPlannerRoutes.ts": [
-        23,
+        13,
         2,
         0
       ],
@@ -4435,7 +4410,7 @@
         0
       ],
       "server/routes/factory/factorySheetsAndSacksRoutes.ts": [
-        18,
+        4,
         2,
         0
       ],
@@ -4450,12 +4425,12 @@
         0
       ],
       "server/routes/factory/factoryStockAllocationV2Routes.ts": [
-        27,
+        23,
         4,
         0
       ],
       "server/routes/factory/factoryStockAllocationV3Routes.ts": [
-        26,
+        4,
         2,
         0
       ],
@@ -4479,118 +4454,98 @@
         3,
         0
       ],
-      "server/routes/factory/invoice-loading/invoice-reports.ts": [
-        4,
-        0,
-        0
-      ],
-      "server/routes/factory/invoice-loading/lifecycle.ts": [
-        4,
-        0,
-        0
-      ],
       "server/routes/factory/invoice-loading/remaining-proforma.ts": [
-        3,
+        1,
         0,
         0
       ],
       "server/routes/factory/invoice-loading/scanning.ts": [
-        5,
-        0,
-        0
-      ],
-      "server/routes/factory/invoice-loading/session-reports.ts": [
-        4,
-        0,
-        0
-      ],
-      "server/routes/factory/invoice-loading/sessions.ts": [
-        4,
+        1,
         0,
         0
       ],
       "server/routes/factory/labelBannersRoutes.ts": [
-        21,
+        11,
         0,
         0
       ],
       "server/routes/factory/mix-batches/consume.ts": [
-        6,
+        2,
         6,
         0
       ],
       "server/routes/factory/mix-batches/create.ts": [
-        4,
+        2,
         4,
         0
       ],
       "server/routes/factory/mix-batches/finalize-delete.ts": [
-        4,
+        0,
         5,
         0
       ],
       "server/routes/factory/mix-batches/reads.ts": [
-        10,
+        6,
         4,
         0
       ],
       "server/routes/factory/mix-batches/sources.ts": [
-        4,
+        0,
         4,
         0
       ],
       "server/routes/factory/mix-batches/top-up.ts": [
-        4,
+        2,
         3,
         0
       ],
       "server/routes/factory/mix-batches/update.ts": [
-        6,
+        4,
         4,
         0
       ],
       "server/routes/factory/productionPositionPlannerRoutes.ts": [
-        14,
+        8,
         0,
         0
       ],
       "server/routes/factory/products/categoryRoutes.ts": [
-        8,
+        0,
         8,
         0
       ],
       "server/routes/factory/products/productBulkRoutes.ts": [
-        13,
+        1,
         13,
         0
       ],
       "server/routes/factory/products/productCascadeRoutes.ts": [
-        4,
+        2,
         3,
         0
       ],
       "server/routes/factory/products/productHistoryRoutes.ts": [
-        13,
+        5,
         8,
         0
       ],
       "server/routes/factory/products/productImageRoutes.ts": [
-        16,
+        10,
         6,
         0
       ],
       "server/routes/factory/products/productImportRoutes.ts": [
-        19,
+        13,
         6,
         0
       ],
       "server/routes/factory/products/productReadRoutes.ts": [
-        19,
+        9,
         14,
         0
       ],
       "server/routes/factory/products/productWriteRoutes.ts": [
-        5,
+        1,
         4,
         0
       ],
@@ -4630,7 +4585,7 @@
         0
       ],
       "server/routes/factory/raw-stock/opening-balance/crud.ts": [
-        14,
+        6,
         11,
         0
       ],
@@ -4640,7 +4595,7 @@
         0
       ],
       "server/routes/factory/raw-stock/opening-balance/unlinked-bales.ts": [
-        2,
+        0,
         2,
         0
       ],
@@ -4665,7 +4620,7 @@
         0
       ],
       "server/routes/factory/raw-stock/postOffloadPhase6SafetyRoutes.ts": [
-        5,
+        1,
         0,
         0
       ],
@@ -4675,27 +4630,22 @@
         0
       ],
       "server/routes/factory/raw-stock/rawStockAdjRoutes.ts": [
-        25,
+        7,
         20,
         0
       ],
-      "server/routes/factory/raw-stock/rawStockAvailableContainerRoutes.ts": [
-        2,
-        0,
-        0
-      ],
       "server/routes/factory/raw-stock/rawStockContainerRoutes.ts": [
-        28,
+        12,
         41,
         0
       ],
       "server/routes/factory/raw-stock/rawStockDiagnosticRoutes.ts": [
-        5,
+        1,
         2,
         0
       ],
       "server/routes/factory/raw-stock/rawStockOffloadRoutes.ts": [
-        6,
+        4,
         20,
         0
       ],
@@ -4705,7 +4655,7 @@
         0
       ],
       "server/routes/factory/raw-stock/rawStockReceiptRoutes.ts": [
-        11,
+        5,
         6,
         0
       ],
@@ -4720,7 +4670,7 @@
         0
       ],
       "server/routes/factory/raw-stock/recalc/audits.ts": [
-        4,
+        0,
         4,
         0
       ],
@@ -4735,7 +4685,7 @@
         0
       ],
       "server/routes/factory/raw-stock/recalc/partial-offload-scan.ts": [
-        11,
+        7,
         4,
         0
       ],
@@ -4750,7 +4700,7 @@
         0
       ],
       "server/routes/factory/raw-stock/recalc/undo.ts": [
-        4,
+        0,
         4,
         0
       ],
@@ -4770,82 +4720,77 @@
         0
       ],
       "server/routes/factory/shipping-containers/availability.ts": [
-        9,
+        1,
         0,
         0
       ],
       "server/routes/factory/shipping-containers/documents.ts": [
-        16,
+        0,
         4,
         0
       ],
       "server/routes/factory/shipping-containers/rows.ts": [
-        22,
+        4,
         3,
         0
       ],
       "server/routes/factory/shipping-containers/whatsapp-preview.ts": [
-        3,
-        0,
-        0
-      ],
-      "server/routes/factory/shipping-containers/zip-package.ts": [
-        2,
+        1,
         0,
         0
       ],
       "server/routes/factory/stock-allocation-v5/allocation.ts": [
-        15,
+        11,
         4,
         0
       ],
       "server/routes/factory/stock-allocation-v5/cancelled-containers.ts": [
-        8,
+        4,
         4,
         0
       ],
       "server/routes/factory/stock-allocation-v5/location-summary.ts": [
-        6,
+        4,
         2,
         0
       ],
       "server/routes/factory/stock-allocation-v5/proforma-create.ts": [
-        14,
+        10,
         4,
         0
       ],
       "server/routes/factory/stock-allocation-v5/proforma-update.ts": [
-        6,
+        2,
         5,
         0
       ],
       "server/routes/factory/stock-allocation-v5/unlinked-orders.ts": [
-        3,
+        1,
         2,
         0
       ],
       "server/routes/factory/stock/locationInventoryExportRoutes.ts": [
-        18,
+        16,
         5,
         0
       ],
       "server/routes/factory/stock/locationInventoryRoutes.ts": [
-        22,
+        16,
         15,
         0
       ],
       "server/routes/factory/stock/stockEntryRoutes.ts": [
-        23,
+        19,
         9,
         0
       ],
       "server/routes/factory/stock/stockQueryRoutes.ts": [
-        12,
+        4,
         8,
         0
       ],
       "server/routes/factory/stock/stockRemovalRoutes.ts": [
-        12,
+        8,
         4,
         0
       ],
@@ -4860,12 +4805,12 @@
         0
       ],
       "server/routes/factory/suppliers/balance/single.ts": [
-        14,
+        12,
         11,
         0
       ],
       "server/routes/factory/suppliers/balance/with-balances.ts": [
-        51,
+        49,
         20,
         0
       ],
@@ -4875,32 +4820,32 @@
         0
       ],
       "server/routes/factory/suppliers/broker/direct-containers.ts": [
-        2,
+        0,
         2,
         0
       ],
       "server/routes/factory/suppliers/broker/statement.ts": [
-        4,
+        0,
         10,
         0
       ],
       "server/routes/factory/suppliers/broker/visual-statement.ts": [
-        10,
+        8,
         6,
         0
       ],
       "server/routes/factory/suppliers/crud/categories.ts": [
-        8,
+        0,
         8,
         0
       ],
       "server/routes/factory/suppliers/crud/payments.ts": [
-        10,
+        4,
         9,
         0
       ],
       "server/routes/factory/suppliers/crud/suppliers.ts": [
-        16,
+        0,
         16,
         0
       ],
@@ -4910,17 +4855,17 @@
         0
       ],
       "server/routes/factory/suppliers/fx/bulk-prefetch.ts": [
-        6,
+        4,
         2,
         0
       ],
       "server/routes/factory/suppliers/fx/bulk-settlement.ts": [
-        12,
+        10,
         2,
         0
       ],
       "server/routes/factory/suppliers/fx/transfers.ts": [
-        19,
+        13,
         8,
         0
       ],
@@ -4935,12 +4880,12 @@
         0
       ],
       "server/routes/factory/suppliers/supplierStatementRoutes.ts": [
-        55,
+        53,
         12,
         0
       ],
       "server/routes/factoryAttendanceRoutes.ts": [
-        21,
+        11,
         2,
         0
       ],
@@ -4950,7 +4895,7 @@
         0
       ],
       "server/routes/factoryWhatsappRoutes.ts": [
-        7,
+        1,
         0,
         0
       ],
@@ -5025,7 +4970,7 @@
         0
       ],
       "server/routes/historicalCurrencyRepairCenterRoutes.ts": [
-        9,
+        1,
         0,
         0
       ],
@@ -5180,37 +5125,37 @@
         0
       ],
       "server/routes/payroll/advance-accounting/bulk-repay.ts": [
-        3,
+        1,
         1,
         0
       ],
       "server/routes/payroll/advance-accounting/cash.ts": [
-        5,
+        1,
         0,
         0
       ],
       "server/routes/payroll/advance-accounting/repay-by-month.ts": [
-        5,
+        3,
         1,
         0
       ],
       "server/routes/payroll/advance-accounting/repayment-audit.ts": [
-        12,
+        8,
         0,
         0
       ],
       "server/routes/payroll/advance-accounting/repayments.ts": [
-        5,
+        1,
         1,
         0
       ],
       "server/routes/payroll/advanceManagementRoutes.ts": [
-        33,
+        19,
         10,
         0
       ],
       "server/routes/payroll/centralFactoryPayrollGenerationRoute.ts": [
-        3,
+        1,
         0,
         0
       ],
@@ -5220,32 +5165,32 @@
         0
       ],
       "server/routes/payroll/core/generate.ts": [
-        7,
+        5,
         6,
         0
       ],
       "server/routes/payroll/core/mark-paid.ts": [
-        13,
+        5,
         3,
         0
       ],
       "server/routes/payroll/core/migrations.ts": [
-        17,
+        11,
         6,
         0
       ],
       "server/routes/payroll/core/payment-summary-pdf.ts": [
-        9,
+        7,
         2,
         0
       ],
       "server/routes/payroll/core/preview.ts": [
-        7,
+        3,
         1,
         0
       ],
       "server/routes/payroll/core/reads.ts": [
-        11,
+        3,
         0,
         0
       ],
@@ -5255,28 +5200,53 @@
         0
       ],
       "server/routes/payroll/worker-statement/backfill.ts": [
-        10,
+        8,
         1,
         0
       ],
       "server/routes/payroll/worker-statement/repair.ts": [
-        4,
+        2,
         1,
         0
       ],
       "server/routes/payroll/worker-statement/repayments.ts": [
-        3,
+        1,
         2,
         0
       ],
       "server/routes/payroll/worker-statement/statement.ts": [
-        14,
+        10,
         4,
         0
       ],
       "server/routes/payroll/worker-statement/worker-delete.ts": [
+        0,
         2,
+        0
+      ],
+      "server/routes/payroll/worker-stats-advances/advanceAdminRoutes.ts": [
+        6,
         2,
+        0
+      ],
+      "server/routes/payroll/worker-stats-advances/advancesRoutes.ts": [
+        6,
+        1,
+        0
+      ],
+      "server/routes/payroll/worker-stats-advances/deductionsRoutes.ts": [
+        0,
+        2,
+        0
+      ],
+      "server/routes/payroll/worker-stats-advances/helpers.ts": [
+        4,
+        5,
+        0
+      ],
+      "server/routes/payroll/worker-stats-advances/statsRoutes.ts": [
+        2,
+        0,
         0
       ],
       "server/routes/performance/bandwidthPhase3FactoryReads.ts": [
@@ -5425,27 +5395,27 @@
         0
       ],
       "server/routes/sp-migration/spMigrationReconciliationRoutes.ts": [
-        21,
+        19,
         8,
         0
       ],
       "server/routes/sp-migration/spMigrationRunRoutes.ts": [
-        22,
+        18,
         1,
         0
       ],
       "server/routes/sp-migration/spMigrationSalesRoutes.ts": [
-        28,
+        22,
         10,
         0
       ],
       "server/routes/sp-migration/spMigrationSetupRoutes.ts": [
-        22,
+        8,
         2,
         0
       ],
       "server/routes/sp-migration/spMigrationStockRoutes.ts": [
-        10,
+        6,
         5,
         0
       ],
@@ -5454,33 +5424,23 @@
         7,
         0
       ],
-      "server/routes/sp/spAliasRoutes.ts": [
-        6,
-        0,
-        0
-      ],
       "server/routes/sp/spChargeReconciliationRoutes.ts": [
-        4,
+        2,
         0,
         0
       ],
       "server/routes/sp/spContainerRoutes.ts": [
-        18,
         4,
-        0
-      ],
-      "server/routes/sp/spExportRoutes.ts": [
         4,
-        0,
         0
       ],
       "server/routes/sp/spFullReconciliationRoutes.ts": [
-        6,
+        2,
         0,
         0
       ],
       "server/routes/sp/spHelpers.ts": [
-        4,
+        2,
         2,
         0
       ],
@@ -5490,7 +5450,7 @@
         0
       ],
       "server/routes/sp/spLifecycleRoutes.ts": [
-        8,
+        4,
         0,
         0
       ],
@@ -5505,7 +5465,7 @@
         0
       ],
       "server/routes/sp/spMigrationCutoverRoutes.ts": [
-        38,
+        20,
         0,
         0
       ],
@@ -5520,7 +5480,7 @@
         0
       ],
       "server/routes/sp/spMigrationFinalVerification.ts": [
-        6,
+        4,
         0,
         0
       ],
@@ -5535,17 +5495,17 @@
         0
       ],
       "server/routes/sp/spMigrationPhase2Containers.ts": [
-        3,
+        1,
         0,
         0
       ],
       "server/routes/sp/spMigrationPhase2Routes.ts": [
-        11,
+        5,
         0,
         0
       ],
       "server/routes/sp/spMigrationPhase2Sales.ts": [
-        3,
+        1,
         0,
         0
       ],
@@ -5560,7 +5520,7 @@
         0
       ],
       "server/routes/sp/spMigrationPhase4Routes.ts": [
-        44,
+        26,
         10,
         0
       ],
@@ -5580,23 +5540,13 @@
         0
       ],
       "server/routes/sp/spOffloadLifecycleRoutes.ts": [
-        9,
+        5,
         0,
         0
       ],
       "server/routes/sp/spOffloadRoutes.ts": [
-        8,
-        2,
-        0
-      ],
-      "server/routes/sp/spOpeningStockRoutes.ts": [
         4,
-        0,
-        0
-      ],
-      "server/routes/sp/spPermissionRoutes.ts": [
-        6,
-        0,
+        2,
         0
       ],
       "server/routes/sp/spProductionClosureRoutes.ts": [
@@ -5610,16 +5560,11 @@
         0
       ],
       "server/routes/sp/spReportRoutes.ts": [
-        16,
+        4,
         0,
         0
       ],
       "server/routes/sp/spSalesRoutes.ts": [
-        12,
-        0,
-        0
-      ],
-      "server/routes/sp/spSetupRoutes.ts": [
         4,
         0,
         0
@@ -5690,13 +5635,8 @@
         0
       ],
       "server/routes/stock/groups-items/items.ts": [
-        5,
+        1,
         3,
-        0
-      ],
-      "server/routes/stock/groups-items/lookups.ts": [
-        4,
-        0,
         0
       ],
       "server/routes/stock/merge/bulk-merge.ts": [
@@ -5710,7 +5650,7 @@
         0
       ],
       "server/routes/stock/merge/merge-logs.ts": [
-        10,
+        2,
         2,
         0
       ],
@@ -5720,7 +5660,7 @@
         0
       ],
       "server/routes/stock/merge/reconcile.ts": [
-        3,
+        1,
         1,
         0
       ],
@@ -5735,12 +5675,12 @@
         0
       ],
       "server/routes/stock/stockPriceListImportRoutes.ts": [
-        16,
+        14,
         2,
         0
       ],
       "server/routes/stock/transfer-adj/imports.ts": [
-        9,
+        7,
         1,
         0
       ],
@@ -5765,22 +5705,22 @@
         0
       ],
       "server/routes/supplier-profit-check/add-stock-item.ts": [
-        3,
+        1,
         0,
         0
       ],
       "server/routes/supplier-profit-check/analyze.ts": [
-        6,
+        4,
         0,
         0
       ],
       "server/routes/supplier-profit-check/export.ts": [
-        11,
+        7,
         0,
         0
       ],
       "server/routes/supplier-profit-check/import-by-codes.ts": [
-        7,
+        5,
         0,
         0
       ],
@@ -5790,22 +5730,22 @@
         0
       ],
       "server/routes/supplier-profit-check/lookups.ts": [
-        5,
+        1,
         0,
         0
       ],
       "server/routes/supplier-profit-check/po-overrides.ts": [
-        5,
+        1,
         0,
         0
       ],
       "server/routes/supplier-profit-check/proforma.ts": [
-        7,
+        3,
         0,
         0
       ],
       "server/routes/supplierProformaRoutes.ts": [
-        33,
+        11,
         4,
         0
       ],
@@ -6738,50 +6678,10 @@
         0,
         3,
         0
-      ],
-      "client/src/pages/factory/dailyproductionreport/components/ProductionTabPanel.tsx": [
-        11,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factorypayrolltab/useFactoryPayroll.tsx": [
-        2,
-        0,
-        0
-      ],
-      "client/src/pages/factory/factorypayrolltab/components/PayrollRunDialogs.tsx": [
-        1,
-        1,
-        0
-      ],
-      "server/routes/payroll/worker-stats-advances/helpers.ts": [
-        4,
-        5,
-        0
-      ],
-      "server/routes/payroll/worker-stats-advances/statsRoutes.ts": [
-        4,
-        0,
-        0
-      ],
-      "server/routes/payroll/worker-stats-advances/advancesRoutes.ts": [
-        14,
-        1,
-        0
-      ],
-      "server/routes/payroll/worker-stats-advances/deductionsRoutes.ts": [
-        14,
-        2,
-        0
-      ],
-      "server/routes/payroll/worker-stats-advances/advanceAdminRoutes.ts": [
-        12,
-        2,
-        0
       ]
     }
   },
   "totals": {
-    "typeEscapeCeiling": 11441
+    "typeEscapeCeiling": 10088
   }
 }

@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../../auth";
 import { db } from "../../db";
@@ -236,21 +236,26 @@ export async function buildFinalSpVerification(sourceId: number, targetId: numbe
 }
 
 export function registerSpMigrationFinalVerificationRoutes(app: Express): void {
-  app.get("/api/sp/migration/final-verification", requireAuth, requireRole("Developer"), async (req: any, res: any) => {
-    try {
-      const sourceId = Number.parseInt(String(req.query.sourceCompanyId ?? ""), 10);
-      const targetId = Number.parseInt(String(req.query.targetCompanyId ?? ""), 10);
-      if (!sourceId || !targetId) {
-        return res.status(400).json({ message: "sourceCompanyId and targetCompanyId are required" });
+  app.get(
+    "/api/sp/migration/final-verification",
+    requireAuth,
+    requireRole("Developer"),
+    async (req: Request, res: Response) => {
+      try {
+        const sourceId = Number.parseInt(String(req.query.sourceCompanyId ?? ""), 10);
+        const targetId = Number.parseInt(String(req.query.targetCompanyId ?? ""), 10);
+        if (!sourceId || !targetId) {
+          return res.status(400).json({ message: "sourceCompanyId and targetCompanyId are required" });
+        }
+        if (sourceId === targetId) {
+          return res.status(400).json({ message: "Source and target companies must be different" });
+        }
+        const report = await buildFinalSpVerification(sourceId, targetId);
+        return res.status(report.overall === "FAIL" ? 409 : 200).json(report);
+      } catch (error: unknown) {
+        logger.error("[SP Migration] final verification error", { error });
+        return res.status(500).json({ message: "Final Supplier Partner verification failed" });
       }
-      if (sourceId === targetId) {
-        return res.status(400).json({ message: "Source and target companies must be different" });
-      }
-      const report = await buildFinalSpVerification(sourceId, targetId);
-      return res.status(report.overall === "FAIL" ? 409 : 200).json(report);
-    } catch (error: unknown) {
-      logger.error("[SP Migration] final verification error", { error });
-      return res.status(500).json({ message: "Final Supplier Partner verification failed" });
     }
-  });
+  );
 }

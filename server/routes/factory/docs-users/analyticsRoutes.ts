@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
@@ -20,7 +20,7 @@ import { eq, and, desc, sql, ne } from "drizzle-orm";
 
 export function registerFactoryAnalyticsRoutes(app: Express) {
   // ── Factory Analytics: Sales by Customer ─────────────────────────────────
-  app.get("/api/factory/analytics/sales-by-customer", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/analytics/sales-by-customer", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -51,7 +51,7 @@ export function registerFactoryAnalyticsRoutes(app: Express) {
   });
 
   // ── Factory Analytics: POS Sales Summary (by customer + grand total) ─────
-  app.get("/api/factory/analytics/pos-summary", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/analytics/pos-summary", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -100,7 +100,7 @@ export function registerFactoryAnalyticsRoutes(app: Express) {
   });
 
   // ── Factory Analytics: Container Sales Report (loaded containers by customer) ──
-  app.get("/api/factory/analytics/container-sales-report", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/analytics/container-sales-report", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -142,7 +142,7 @@ export function registerFactoryAnalyticsRoutes(app: Express) {
   });
 
   // ── Factory Analytics: Stock Summary (opening + closing stock) ───────────
-  app.get("/api/factory/analytics/stock-summary", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/analytics/stock-summary", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

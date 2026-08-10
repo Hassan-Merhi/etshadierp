@@ -3,7 +3,7 @@ import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { logAudit } from "../../helpers/auditHelpers";
 import { getClientDate } from "../../../lib/dateUtils";
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { applyOffloadMovingAverage } from "../../../services/factory/rawStockLockedRate";
@@ -26,7 +26,7 @@ import { computeOffloadCosting } from "./offloadCosting";
 import { applySubsequentReceipt } from "./subsequentReceipt";
 
 export function registerRawStockOffloadRoutes(app: Express) {
-  app.post("/api/factory/raw-stock/offload", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/raw-stock/offload", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

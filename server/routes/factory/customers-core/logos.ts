@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
@@ -38,7 +38,7 @@ export function registerFactoryCustomerLogoRoutes(app: Express) {
     },
   });
 
-  app.get("/api/factory/customers/:id/logos", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/customers/:id/logos", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -61,7 +61,7 @@ export function registerFactoryCustomerLogoRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/customers/:id/logos", requireAuth, (req: any, res: any) => {
+  app.post("/api/factory/customers/:id/logos", requireAuth, (req: Request, res: Response) => {
     customerLogoUpload.single("image")(req, res, async (err: any) => {
       try {
         if (err) return res.status(400).json({ message: err.message });
@@ -94,7 +94,7 @@ export function registerFactoryCustomerLogoRoutes(app: Express) {
     });
   });
 
-  app.patch("/api/factory/customer-logos/:id", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/customer-logos/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -118,7 +118,7 @@ export function registerFactoryCustomerLogoRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/factory/customer-logos/:id", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/customer-logos/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -140,7 +140,7 @@ export function registerFactoryCustomerLogoRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/customer-logos/:id/image", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/customer-logos/:id/image", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

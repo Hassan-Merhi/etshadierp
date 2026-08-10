@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { db } from "../../../db";
@@ -26,7 +26,7 @@ export function registerFactoryWeeklyReportExportRoutes(app: Express) {
   // ───────────────────────────────────────────────
   // Weekly pivot production report (by category × day)
   // ───────────────────────────────────────────────
-  app.get("/api/factory/weekly-report/export", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/weekly-report/export", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

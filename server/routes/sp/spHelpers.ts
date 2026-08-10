@@ -1,3 +1,4 @@
+import type { Request, Response } from "express";
 import { db } from "../../db";
 import { sql, eq, and, isNull } from "drizzle-orm";
 import { ledgerAccounts } from "@shared/schema";
@@ -11,7 +12,7 @@ export function getCompanyId(req: any): number | null {
   return (req.session as any)?.currentCompanyId ?? null;
 }
 
-export async function requireSpCompany(req: any, res: any): Promise<number | null> {
+export async function requireSpCompany(req: Request, res: Response): Promise<number | null> {
   const companyId = getCompanyId(req);
   if (!companyId) {
     res.status(400).json({ message: "No company selected" });

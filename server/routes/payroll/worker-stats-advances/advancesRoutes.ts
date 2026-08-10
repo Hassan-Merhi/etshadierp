@@ -2,7 +2,7 @@ import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { getClientDate } from "../../../lib/dateUtils";
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
@@ -17,7 +17,7 @@ import {
 import { getFactoryCompanyId, writeDaybookEntry } from "./helpers";
 
 export function registerWorkerAdvancesRoutes(app: Express) {
-  app.get("/api/factory/advance-repayments", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/advance-repayments", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -60,7 +60,7 @@ export function registerWorkerAdvancesRoutes(app: Express) {
   });
 
   // GET /api/factory/advances - List all advances for company
-  app.get("/api/factory/advances", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/advances", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -102,7 +102,7 @@ export function registerWorkerAdvancesRoutes(app: Express) {
   });
 
   // GET /api/factory/workers/:id/advances - List advances for a specific worker
-  app.get("/api/factory/workers/:id/advances", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/workers/:id/advances", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -123,7 +123,7 @@ export function registerWorkerAdvancesRoutes(app: Express) {
   });
 
   // POST /api/factory/workers/:id/advances - Record a new advance
-  app.post("/api/factory/workers/:id/advances", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/workers/:id/advances", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });

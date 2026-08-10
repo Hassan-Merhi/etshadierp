@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
@@ -23,7 +23,7 @@ function readString(row: QueryRecord | undefined, key: string): string {
 // ── Sales Form Excel Export (V1 legacy + V2) ─────────────────────────────────
 
 export function registerSpExportRoutes(app: Express) {
-  app.get("/api/sp/sales-form/export", requireAuth, async (req: any, res: any) => {
+  app.get("/api/sp/sales-form/export", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
@@ -76,7 +76,7 @@ export function registerSpExportRoutes(app: Express) {
   });
 
   // ── V2: from-scratch ExcelJS export (matches system inventory) ────────────
-  app.get("/api/sp/sales-form/export-v2", requireAuth, async (req: any, res: any) => {
+  app.get("/api/sp/sales-form/export-v2", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;

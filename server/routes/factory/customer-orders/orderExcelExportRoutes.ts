@@ -4,7 +4,7 @@ import { logger } from "../../../lib/logger";
 import { contentDisposition } from "../../../lib/contentDisposition";
 import { parseId } from "../../../lib/parseId";
 import { getExportPriceVisibility } from "../../../helpers/exportVisibility";
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import ExcelJS from "exceljs";
@@ -423,7 +423,7 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
 }
 
 export function registerOrderExcelExportRoutes(app: Express) {
-  app.get("/api/factory/customer-orders/:id/export/excel", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/customer-orders/:id/export/excel", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -587,7 +587,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/customer-orders/:id/export-excel", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/customer-orders/:id/export-excel", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

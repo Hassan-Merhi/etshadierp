@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { sql } from "drizzle-orm";
 import { db } from "../../db";
 import { logger } from "../../lib/logger";
@@ -8,7 +8,7 @@ import { importHistoricalSales } from "./spMigrationPhase2Sales";
 import { importContainers } from "./spMigrationPhase2Containers";
 import { resultRows, firstRow } from "../../lib/queryResult";
 
-async function rollbackMigrationRun(req: any, res: any): Promise<any> {
+async function rollbackMigrationRun(req: Request, res: Response): Promise<any> {
   const runId = String(req.body?.runId ?? "");
   if (!runId) return res.status(400).json({ message: "runId is required" });
   if (req.body?.confirmation && req.body.confirmation !== "ROLLBACK") {
@@ -152,22 +152,27 @@ export function registerSpMigrationPhase2Routes(app: Express): void {
   app.post("/api/sp/migration/gc-containers", requireAuth, requireRole("Developer"), importContainers);
   app.post("/api/sp/migration/rollback", requireAuth, requireRole("Developer"), rollbackMigrationRun);
 
-  app.get("/api/sp/migration/gc-suspense-review", requireAuth, requireRole("Developer"), async (req: any, res: any) => {
-    try {
-      const pair = await validateMigrationPair(req, res, false);
-      if (!pair) return;
-      return res.json(await getSuspenseReview(pair.sourceId, pair.targetId));
-    } catch (error) {
-      logger.error("[SP Phase 2] Suspense review failed", { error });
-      return res.status(500).json({ message: "Failed to load migration suspense review" });
+  app.get(
+    "/api/sp/migration/gc-suspense-review",
+    requireAuth,
+    requireRole("Developer"),
+    async (req: Request, res: Response) => {
+      try {
+        const pair = await validateMigrationPair(req, res, false);
+        if (!pair) return;
+        return res.json(await getSuspenseReview(pair.sourceId, pair.targetId));
+      } catch (error) {
+        logger.error("[SP Phase 2] Suspense review failed", { error });
+        return res.status(500).json({ message: "Failed to load migration suspense review" });
+      }
     }
-  });
+  );
 
   app.get(
     "/api/sp/migration/gc-container-charge-review",
     requireAuth,
     requireRole("Developer"),
-    async (req: any, res: any) => {
+    async (req: Request, res: Response) => {
       try {
         const pair = await validateMigrationPair(req, res, false);
         if (!pair) return;

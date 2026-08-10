@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { pool } from "../../db";
@@ -14,7 +14,7 @@ export function registerSupplierProfitImportRoutes(app: Express, requireAuth: an
   // ── Import by codes (Excel upload) ─────────────────────────────────────────
   // Accepts a list of item codes (from Excel). Looks up stock_items by code for
   // this company and runs the same profit analysis as /analyze.
-  app.post("/api/supplier-profit-check/import-by-codes", requireAuth, async (req: any, res: any) => {
+  app.post("/api/supplier-profit-check/import-by-codes", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

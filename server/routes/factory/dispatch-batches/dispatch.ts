@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
@@ -18,7 +18,7 @@ import { firstRow } from "../../../lib/queryResult";
 export function registerDispatchTruckRideDispatchRoutes(app: Express) {
   // ── POST /api/factory/dispatch-truck-rides/:id/dispatch ───────────────────
   // Mark a truck ride as DISPATCHED — locks bales for this ride
-  app.post("/api/factory/dispatch-truck-rides/:id/dispatch", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/dispatch-truck-rides/:id/dispatch", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -59,7 +59,7 @@ export function registerDispatchTruckRideDispatchRoutes(app: Express) {
 
   // ── POST /api/factory/dispatch-truck-rides/:id/reopen ────────────────────
   // Admin only: reopen a DISPATCHED ride before invoice generation
-  app.post("/api/factory/dispatch-truck-rides/:id/reopen", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/dispatch-truck-rides/:id/reopen", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });

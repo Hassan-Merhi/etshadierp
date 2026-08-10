@@ -1,6 +1,6 @@
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { eq, and, desc } from "drizzle-orm";
@@ -8,7 +8,7 @@ import { factoryWorkers, factoryWorkerDeductions } from "@shared/schema";
 import { getFactoryCompanyId, getErpCompanyId } from "./helpers";
 
 export function registerWorkerDeductionsRoutes(app: Express) {
-  app.get("/api/payroll/worker-deductions", requireAuth, async (req: any, res: any) => {
+  app.get("/api/payroll/worker-deductions", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getErpCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -35,7 +35,7 @@ export function registerWorkerDeductionsRoutes(app: Express) {
     }
   });
 
-  app.post("/api/payroll/workers/:id/deductions", requireAuth, async (req: any, res: any) => {
+  app.post("/api/payroll/workers/:id/deductions", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getErpCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -62,7 +62,7 @@ export function registerWorkerDeductionsRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/payroll/workers/:workerId/deductions/:id", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/payroll/workers/:workerId/deductions/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getErpCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -84,7 +84,7 @@ export function registerWorkerDeductionsRoutes(app: Express) {
   // ─── Worker Deductions CRUD ───────────────────────────────────────────────
 
   // GET /api/factory/worker-deductions - All deductions for company (joined with worker name)
-  app.get("/api/factory/worker-deductions", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/worker-deductions", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -112,7 +112,7 @@ export function registerWorkerDeductionsRoutes(app: Express) {
   });
 
   // GET /api/factory/workers/:id/deductions
-  app.get("/api/factory/workers/:id/deductions", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/workers/:id/deductions", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -130,7 +130,7 @@ export function registerWorkerDeductionsRoutes(app: Express) {
   });
 
   // POST /api/factory/workers/:id/deductions
-  app.post("/api/factory/workers/:id/deductions", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/workers/:id/deductions", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -159,7 +159,7 @@ export function registerWorkerDeductionsRoutes(app: Express) {
   });
 
   // DELETE /api/factory/workers/:workerId/deductions/:id
-  app.delete("/api/factory/workers/:workerId/deductions/:id", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/workers/:workerId/deductions/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });

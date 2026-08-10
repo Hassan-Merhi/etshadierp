@@ -1,7 +1,7 @@
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { eq, and, desc } from "drizzle-orm";
@@ -9,7 +9,7 @@ import { factoryWorkers, factoryBales, factoryPayrolls } from "@shared/schema";
 import { getFactoryCompanyId } from "./helpers";
 
 export function registerWorkerStatsRoutes(app: Express) {
-  app.get("/api/factory/workers/:id/stats", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/workers/:id/stats", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });

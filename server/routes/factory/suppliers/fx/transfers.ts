@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { parseId } from "../../../../lib/parseId";
 import { getErrorMessage } from "../../../../lib/httpHandlers";
 import { logger } from "../../../../lib/logger";
@@ -25,7 +25,7 @@ import {
 import { eq, and, desc, inArray } from "drizzle-orm";
 
 export function registerSupplierFxTransferRoutes(app: Express) {
-  app.get("/api/factory/supplier-fx-transfers", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/supplier-fx-transfers", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -41,7 +41,7 @@ export function registerSupplierFxTransferRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/supplier-fx-transfers", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/supplier-fx-transfers", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -290,7 +290,7 @@ export function registerSupplierFxTransferRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/factory/supplier-fx-transfers/:id", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/supplier-fx-transfers/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

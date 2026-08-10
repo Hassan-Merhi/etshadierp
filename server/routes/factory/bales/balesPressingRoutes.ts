@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { parseId } from "../../../lib/parseId";
@@ -39,7 +39,7 @@ export function registerBalesPressingRoutes(app: Express) {
   registerFactoryMixBatchRoutes(app);
   registerFactoryBaleExportRoutes(app);
   registerFactoryFxRatesRoutes(app);
-  app.post("/api/factory/pressing/create-and-print", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/pressing/create-and-print", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -130,7 +130,7 @@ export function registerBalesPressingRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/pressing/create-multi", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/pressing/create-multi", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -235,7 +235,7 @@ export function registerBalesPressingRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/bales/create-batch", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/bales/create-batch", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -320,7 +320,7 @@ export function registerBalesPressingRoutes(app: Express) {
   // 8. Factory Pressing Batches
   // ───────────────────────────────────────────────
 
-  app.get("/api/factory/pressing-batches", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/pressing-batches", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -369,7 +369,7 @@ export function registerBalesPressingRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/pressing-batches/:id", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/pressing-batches/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

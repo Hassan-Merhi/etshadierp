@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
@@ -17,7 +17,7 @@ import { getFactoryCompanyId } from "./_helpers";
 
 export function registerAdvanceCashRoutes(app: Express) {
   // GET /api/factory/cash-account-balance/:id — current DR-CR balance for a ledger account
-  app.get("/api/factory/cash-account-balance/:id", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/cash-account-balance/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -89,7 +89,7 @@ export function registerAdvanceCashRoutes(app: Express) {
   });
 
   // POST /api/factory/advances/cash-adjustment — post a correcting journal entry on a cash account
-  app.post("/api/factory/advances/cash-adjustment", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/advances/cash-adjustment", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });

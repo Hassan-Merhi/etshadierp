@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { parseId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
@@ -25,7 +25,7 @@ export function registerFactoryProductReadRoutes(app: Express) {
   // 3. Factory Bale Products CRUD + Import
   // ───────────────────────────────────────────────
 
-  app.get("/api/factory/bale-products", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/bale-products", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -43,7 +43,7 @@ export function registerFactoryProductReadRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/bale-products/generate-code", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/bale-products/generate-code", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -107,7 +107,7 @@ export function registerFactoryProductReadRoutes(app: Express) {
   });
 
   // GET /api/factory/bale-products/merge-stats — must be before /:id to avoid interception
-  app.get("/api/factory/bale-products/merge-stats", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/bale-products/merge-stats", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -136,7 +136,7 @@ export function registerFactoryProductReadRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/bale-products/:id", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/bale-products/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -158,7 +158,7 @@ export function registerFactoryProductReadRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/bale-product-detail/:productId", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/bale-product-detail/:productId", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

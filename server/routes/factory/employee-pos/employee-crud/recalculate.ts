@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../../lib/httpHandlers";
 import { logger } from "../../../../lib/logger";
 import { db } from "../../../../db";
@@ -17,7 +17,7 @@ export function registerFactoryEmployeeRecalculateRoutes(app: Express) {
   // POST /api/factory/employees/recalculate-balances
   // Rebuilds currentBalance, totalDeposits, totalWithdrawals for every employee from surviving voucher entries.
   // Useful after deletions that didn't reverse balances (legacy bug).
-  app.post("/api/factory/employees/recalculate-balances", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/employees/recalculate-balances", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -106,7 +106,7 @@ export function registerFactoryEmployeeRecalculateRoutes(app: Express) {
 
   // POST /api/factory/employees/:id/recalculate-balance
   // Rebuilds currentBalance, totalDeposits, totalWithdrawals for a single employee from surviving voucher entries.
-  app.post("/api/factory/employees/:id/recalculate-balance", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/employees/:id/recalculate-balance", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
@@ -23,7 +23,7 @@ import { getUserHideAllCosts } from "../factory/_helpers";
 import { generateEmptyExcel, generateEmptyPdf, generateExcel, generatePdf, writeDaybookEntry } from "./_helpers";
 
 export function registerFactorySupplierUsageReportRoutes(app: Express, requireAuth: any, db: any) {
-  app.post("/api/factory/reports/supplier-usage", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/reports/supplier-usage", requireAuth, async (req: Request, res: Response) => {
     try {
       const hideAllCosts = await getUserHideAllCosts(req);
       const { companyId, supplierId, startDate, endDate, format } = req.body;

@@ -1,7 +1,7 @@
 /**
  * payrollCoreRoutes: PayrollPaymentSummaryPdf endpoints.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
@@ -13,7 +13,7 @@ import { getFactoryCompanyId } from "./_helpers";
 import { getProductionBonusTotalsForPayrollIds } from "../../../services/payroll/productionBonusPayrollService";
 
 export function registerPayrollPaymentSummaryPdfRoutes(app: Express) {
-  app.post("/api/factory/payrolls/payment-summary-pdf", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/payrolls/payment-summary-pdf", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });

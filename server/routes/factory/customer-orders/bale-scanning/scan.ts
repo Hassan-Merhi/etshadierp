@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../../lib/httpHandlers";
 import { logger } from "../../../../lib/logger";
 import { EXPECTED_CLIENT_RESPONSE_CODES, markExpectedClientResponse } from "../../../../lib/expectedClientResponse";
@@ -23,7 +23,7 @@ import { eq, and, or, sql, inArray, ilike } from "drizzle-orm";
 import { firstRow } from "../../../../lib/queryResult";
 
 export function registerOrderBaleScanRoutes(app: Express) {
-  app.post("/api/factory/customer-orders/:id/bales", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/customer-orders/:id/bales", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

@@ -2,7 +2,7 @@ import { parseId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { getClientDate } from "../../../lib/dateUtils";
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { eq, and, sql, inArray } from "drizzle-orm";
@@ -18,7 +18,7 @@ import {
 import { getFactoryCompanyId, writeDaybookEntry } from "./helpers";
 
 export function registerWorkerAdvanceAdminRoutes(app: Express) {
-  app.post("/api/factory/advances/bulk", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/advances/bulk", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -154,7 +154,7 @@ export function registerWorkerAdvanceAdminRoutes(app: Express) {
   });
 
   // PATCH /api/factory/advances/:id - Edit advance (admin/owner only)
-  app.patch("/api/factory/advances/:id", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/advances/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const currentRole = (req.session as any).currentRole;
       if (currentRole !== "Admin" && currentRole !== "Owner" && currentRole !== "Developer") {
@@ -184,7 +184,7 @@ export function registerWorkerAdvanceAdminRoutes(app: Express) {
   });
 
   // GET /api/factory/advances/reconcile/preview - Dry-run reconciliation, returns what would change
-  app.get("/api/factory/advances/reconcile/preview", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/advances/reconcile/preview", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });

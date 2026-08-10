@@ -3,7 +3,7 @@ import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { getRentalBillingDay, getRentalPeriodDueDate } from "../../../services/rental/rentalPeriodService";
 import { pool } from "../../../db";
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts, type AccountLike } from "../../../netPositionHelper";
@@ -27,7 +27,7 @@ import { computeNetPositionSupplierBalances } from "./netPositionSupplierBalance
 import { resultRows } from "../../../lib/queryResult";
 
 export function registerEmployeeNetPositionRoutes(app: Express) {
-  app.get("/api/factory/net-position", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/net-position", requireAuth, async (req: Request, res: Response) => {
     try {
       // Resolve factory company ID the same way my-access does:
       // 1. pinned factoryCompanyId (if it's a factory-type company)

@@ -6,7 +6,7 @@ import { toArrayBuffer } from "../lib/bufferCompatibility";
  * rendering, and statement Excel export for a specific account. Extracted
  * from accountRoutes.ts as a sub-registrar; behaviour is unchanged.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import path from "path";
@@ -301,7 +301,7 @@ export function registerAccountStatementRoutes(app: Express) {
   });
 
   // ── Account Statement PDF export ──────────────────────────────────────────
-  app.get("/api/accounts/:type/:id/statement-pdf", requireAuth, async (req: any, res: any) => {
+  app.get("/api/accounts/:type/:id/statement-pdf", requireAuth, async (req: Request, res: Response) => {
     try {
       const accountType = req.params.type;
       const accountId = parseInt(req.params.id);
@@ -365,7 +365,7 @@ export function registerAccountStatementRoutes(app: Express) {
   });
 
   // ── Ledger / Account Statement — Excel export ────────────────────────────
-  app.get("/api/accounts/statement/export-excel", requireAuth, async (req: any, res: any) => {
+  app.get("/api/accounts/statement/export-excel", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId as number;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

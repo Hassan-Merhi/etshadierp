@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { getClientDate } from "../../../lib/dateUtils";
@@ -16,7 +16,7 @@ import { factoryWorkers, factoryPayrolls, ledgerAccounts, vouchers, voucherEntri
 import { getFactoryCompanyId } from "./_helpers";
 
 export function registerPayrollVoucherBackfillRoutes(app: Express) {
-  app.post("/api/admin/backfill-payroll-vouchers", requireAuth, async (req: any, res: any) => {
+  app.post("/api/admin/backfill-payroll-vouchers", requireAuth, async (req: Request, res: Response) => {
     try {
       const currentRole = (req.session as any).currentRole;
       if (currentRole !== "Admin" && currentRole !== "Owner" && currentRole !== "Developer") {

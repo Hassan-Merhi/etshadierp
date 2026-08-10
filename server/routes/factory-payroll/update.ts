@@ -1,7 +1,7 @@
 /**
  * factoryPayrollRoutes: FactoryPayrollUpdate endpoints.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { logAudit } from "../helpers/auditHelpers";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -25,7 +25,7 @@ import {
 import { writeDaybookEntry } from "./_helpers";
 
 export function registerFactoryPayrollUpdateRoutes(app: Express, requireAuth: any, db: any) {
-  app.patch("/api/factory/payroll/:id", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/payroll/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
@@ -229,7 +229,7 @@ export function registerFactoryPayrollUpdateRoutes(app: Express, requireAuth: an
     }
   });
 
-  app.post("/api/factory/payroll/:id/undo", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/payroll/:id/undo", requireAuth, async (req: Request, res: Response) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;
       const companyId = req.query.companyId

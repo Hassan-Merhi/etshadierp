@@ -1,5 +1,5 @@
 import { toArrayBuffer } from "../../lib/bufferCompatibility";
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { logAudit } from "../helpers/auditHelpers";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -34,7 +34,7 @@ async function auditExport(req: any, companyId: number, type: "PDF" | "Excel", s
 }
 
 export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: any, db: any) {
-  app.post("/api/factory/payroll/export-pdf", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/payroll/export-pdf", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = Number(req.body?.companyId);
       const startDate = String(req.body?.startDate ?? "");
@@ -207,7 +207,7 @@ export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: an
     }
   });
 
-  app.post("/api/factory/payroll/export-excel", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/payroll/export-excel", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = Number(req.body?.companyId);
       const startDate = String(req.body?.startDate ?? "");

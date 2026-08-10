@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { pool } from "../../db";
@@ -60,7 +60,7 @@ async function insertLog(
 export function registerFactorySheetsAndSacksRoutes(app: Express) {
   // ── GET /api/factory/sheets-sacks/log ─────────────────────────────────────
   // Must be before /:id routes
-  app.get("/api/factory/sheets-sacks/log", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/sheets-sacks/log", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -106,7 +106,7 @@ export function registerFactorySheetsAndSacksRoutes(app: Express) {
   });
 
   // ── GET /api/factory/sheets-sacks ─────────────────────────────────────────
-  app.get("/api/factory/sheets-sacks", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/sheets-sacks", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -126,7 +126,7 @@ export function registerFactorySheetsAndSacksRoutes(app: Express) {
   });
 
   // ── POST /api/factory/sheets-sacks ────────────────────────────────────────
-  app.post("/api/factory/sheets-sacks", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/sheets-sacks", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -144,20 +144,32 @@ export function registerFactorySheetsAndSacksRoutes(app: Express) {
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
            RETURNING ${SELECT_COLS}`,
           [
-            companyId, type, name, size || null,
-            quantity || 0, unitPrice || 0,
+            companyId,
+            type,
+            name,
+            size || null,
+            quantity || 0,
+            unitPrice || 0,
             packQty != null ? parseInt(packQty) : null,
             pcsPerPack != null ? parseInt(pcsPerPack) : null,
-            rowColor || null, notes || null,
+            rowColor || null,
+            notes || null,
           ]
         );
         const item = rows[0];
         const pcs = parseInt(quantity) || 0;
         if (pcs > 0) {
           await insertLog(
-            client, companyId, item.id, name, type, "IN",
-            pcs, packQty != null ? parseInt(packQty) : null,
-            parseFloat(unitPrice) || 0, "Initial stock"
+            client,
+            companyId,
+            item.id,
+            name,
+            type,
+            "IN",
+            pcs,
+            packQty != null ? parseInt(packQty) : null,
+            parseFloat(unitPrice) || 0,
+            "Initial stock"
           );
         }
         await client.query("COMMIT");
@@ -175,7 +187,7 @@ export function registerFactorySheetsAndSacksRoutes(app: Express) {
   });
 
   // ── PATCH /api/factory/sheets-sacks/:id ──────────────────────────────────
-  app.patch("/api/factory/sheets-sacks/:id", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/sheets-sacks/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getFactoryCompanyId(req);
       const id = parseInt(req.params.id);
@@ -198,12 +210,17 @@ export function registerFactorySheetsAndSacksRoutes(app: Express) {
          WHERE id = $10 AND company_id = $11
          RETURNING ${SELECT_COLS}`,
         [
-          type || null, name || null, size || null,
-          quantity ?? null, unitPrice ?? null,
+          type || null,
+          name || null,
+          size || null,
+          quantity ?? null,
+          unitPrice ?? null,
           packQty != null ? parseInt(packQty) : null,
           pcsPerPack != null ? parseInt(pcsPerPack) : null,
-          rowColor || null, notes || null,
-          id, companyId,
+          rowColor || null,
+          notes || null,
+          id,
+          companyId,
         ]
       );
       if (rows.length === 0) return res.status(404).json({ message: "Item not found" });
@@ -215,7 +232,7 @@ export function registerFactorySheetsAndSacksRoutes(app: Express) {
   });
 
   // ── PATCH /api/factory/sheets-sacks/:id/restock — add stock (IN) ─────────
-  app.patch("/api/factory/sheets-sacks/:id/restock", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/sheets-sacks/:id/restock", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getFactoryCompanyId(req);
       const id = parseInt(req.params.id);
@@ -254,9 +271,16 @@ export function registerFactorySheetsAndSacksRoutes(app: Express) {
           [newQty, newPackQty, id, companyId]
         );
         await insertLog(
-          client, companyId, id,
-          existing[0].name, existing[0].type, "IN",
-          pieces, packs, unitPrice, req.body.notes || null
+          client,
+          companyId,
+          id,
+          existing[0].name,
+          existing[0].type,
+          "IN",
+          pieces,
+          packs,
+          unitPrice,
+          req.body.notes || null
         );
         await client.query("COMMIT");
         res.json(rows[0]);
@@ -273,7 +297,7 @@ export function registerFactorySheetsAndSacksRoutes(app: Express) {
   });
 
   // ── PATCH /api/factory/sheets-sacks/:id/deduct — reduce stock (OUT) ──────
-  app.patch("/api/factory/sheets-sacks/:id/deduct", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/sheets-sacks/:id/deduct", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getFactoryCompanyId(req);
       const id = parseInt(req.params.id);
@@ -303,9 +327,7 @@ export function registerFactorySheetsAndSacksRoutes(app: Express) {
         const unitPrice = parseFloat(existing[0].unit_price || "0");
         const newQty = Math.max(0, currentQty - pieces);
         const newPackQty =
-          packs != null && currentPackQty != null
-            ? Math.max(0, currentPackQty - packs)
-            : currentPackQty;
+          packs != null && currentPackQty != null ? Math.max(0, currentPackQty - packs) : currentPackQty;
 
         const { rows } = await client.query(
           `UPDATE factory_sheets_sacks
@@ -315,9 +337,16 @@ export function registerFactorySheetsAndSacksRoutes(app: Express) {
           [newQty, newPackQty, id, companyId]
         );
         await insertLog(
-          client, companyId, id,
-          existing[0].name, existing[0].type, "OUT",
-          pieces, packs, unitPrice, req.body.notes || null
+          client,
+          companyId,
+          id,
+          existing[0].name,
+          existing[0].type,
+          "OUT",
+          pieces,
+          packs,
+          unitPrice,
+          req.body.notes || null
         );
         await client.query("COMMIT");
         res.json(rows[0]);
@@ -334,17 +363,17 @@ export function registerFactorySheetsAndSacksRoutes(app: Express) {
   });
 
   // ── DELETE /api/factory/sheets-sacks/:id ─────────────────────────────────
-  app.delete("/api/factory/sheets-sacks/:id", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/sheets-sacks/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getFactoryCompanyId(req);
       const id = parseInt(req.params.id);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       if (!(await hasWriteAccess(req, companyId))) return res.status(403).json({ message: "Access denied" });
 
-      const { rowCount } = await pool.query(
-        `DELETE FROM factory_sheets_sacks WHERE id = $1 AND company_id = $2`,
-        [id, companyId]
-      );
+      const { rowCount } = await pool.query(`DELETE FROM factory_sheets_sacks WHERE id = $1 AND company_id = $2`, [
+        id,
+        companyId,
+      ]);
       if (!rowCount) return res.status(404).json({ message: "Item not found" });
       res.json({ success: true });
     } catch (err: unknown) {

@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { db } from "../../../db";
 import { requireAuth, requireNonPOS } from "../../../auth";
@@ -15,7 +15,7 @@ export function registerStockItemReconcileRoutes(app: Express) {
   // ── Reconcile OTW Names: POST /api/stock-items/reconcile-otw-names ──────────
   // Re-points any po_line_items that still reference a merged/deleted stock item
   // to the kept item, updating both stockItemId and itemName in one pass.
-  app.post("/api/stock-items/reconcile-otw-names", requireAuth, requireNonPOS, async (req: any, res: any) => {
+  app.post("/api/stock-items/reconcile-otw-names", requireAuth, requireNonPOS, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

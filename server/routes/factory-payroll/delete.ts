@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { logAudit } from "../helpers/auditHelpers";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -18,7 +18,7 @@ import { factoryPayrolls, factoryWorkerAdvances, factoryAdvanceRepayments } from
 import { writeDaybookEntry } from "./_helpers";
 
 export function registerFactoryPayrollDeleteRoutes(app: Express, requireAuth: any, db: any) {
-  app.delete("/api/factory/payroll/:id", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/payroll/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.query.companyId
         ? parseOptionalId(req.query.companyId)

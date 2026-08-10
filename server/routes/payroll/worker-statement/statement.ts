@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { parseId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
@@ -19,7 +19,7 @@ import { factoryWorkers, factoryPayrolls, factoryWorkerAdvances, companies, comp
 import { getFactoryCompanyId } from "./_helpers";
 
 export function registerWorkerStatementReadRoutes(app: Express) {
-  app.get("/api/factory/workers/:id/statement", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/workers/:id/statement", requireAuth, async (req: Request, res: Response) => {
     try {
       const workerId = parseId(req.params.id);
       if (workerId === null) return res.status(400).json({ message: "Invalid id" });
@@ -108,7 +108,7 @@ export function registerWorkerStatementReadRoutes(app: Express) {
   });
 
   // ── Factory Worker Statement PDF ──────────────────────────────────────────
-  app.get("/api/factory/workers/:id/statement-pdf", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/workers/:id/statement-pdf", requireAuth, async (req: Request, res: Response) => {
     try {
       const workerId = parseId(req.params.id);
       if (workerId === null) return res.status(400).json({ message: "Invalid id" });

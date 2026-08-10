@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { parseId } from "../../../../lib/parseId";
 import { getErrorMessage } from "../../../../lib/httpHandlers";
 import { db } from "../../../../db";
@@ -24,7 +24,7 @@ import { eq, and, sql, inArray } from "drizzle-orm";
 import { isSupplierPaidFreight } from "./_helpers";
 
 export function registerSupplierBalanceSingleRoutes(app: Express) {
-  app.get("/api/factory/suppliers/:id/balance", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/suppliers/:id/balance", requireAuth, async (req: Request, res: Response) => {
     res.set("Cache-Control", "no-store");
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;

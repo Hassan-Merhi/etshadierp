@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -21,7 +21,7 @@ import { requireSpCompany, getSpAccount, parseNum } from "./spHelpers";
 // ── Containers + Prepaid Charges ─────────────────────────────────────────────
 
 export function registerSpContainerRoutes(app: Express) {
-  app.get("/api/sp/containers", requireAuth, async (req: any, res: any) => {
+  app.get("/api/sp/containers", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
@@ -46,7 +46,7 @@ export function registerSpContainerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/sp/containers", requireAuth, async (req: any, res: any) => {
+  app.post("/api/sp/containers", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
@@ -190,7 +190,7 @@ export function registerSpContainerRoutes(app: Express) {
   });
 
   // PATCH /api/sp/containers/:id — edit header fields + regenerate OTW voucher
-  app.patch("/api/sp/containers/:id", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/sp/containers/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
@@ -327,7 +327,7 @@ export function registerSpContainerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/sp/containers/:id", requireAuth, async (req: any, res: any) => {
+  app.get("/api/sp/containers/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
@@ -376,7 +376,7 @@ export function registerSpContainerRoutes(app: Express) {
   });
 
   // GET /api/sp/containers/:id/line-preview — enriched per-line preview with alias resolution
-  app.get("/api/sp/containers/:id/line-preview", requireAuth, async (req: any, res: any) => {
+  app.get("/api/sp/containers/:id/line-preview", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
@@ -450,7 +450,7 @@ export function registerSpContainerRoutes(app: Express) {
 
   // ── Prepaid Charges ───────────────────────────────────────────────────────
 
-  app.get("/api/sp/prepaid", requireAuth, async (req: any, res: any) => {
+  app.get("/api/sp/prepaid", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
@@ -472,7 +472,7 @@ export function registerSpContainerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/sp/prepaid", requireAuth, async (req: any, res: any) => {
+  app.post("/api/sp/prepaid", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
