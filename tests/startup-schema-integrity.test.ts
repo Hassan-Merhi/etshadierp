@@ -36,8 +36,15 @@ const EXPECTED_STATEMENT_COUNT = 1280;
  * added in the same change would have reported as three failures on every
  * re-run. The statement COUNT is unchanged at 1280 and no statement moved: the
  * three were wrapped in place, so only their text differs.
+ *
+ * Re-pinned again when the eleven baselined startup-migration failures were
+ * fixed: nine seed INSERTs became guarded SELECTs that check their company and
+ * ledger account exist, and two foreign keys targeting schema that no longer
+ * exists (supplier_containers, bales.erp_location_id) were guarded on the object
+ * being present. The count is still 1280 and nothing moved — every statement was
+ * guarded in place — and the migration ceiling fell from 11 to 0.
  */
-const EXPECTED_CONTENT_HASH = "27c73af949efe3de18ec7a4b21709befb000342abcfa3b2b7e1ef8e1c4bcffc9";
+const EXPECTED_CONTENT_HASH = "412c33005449a49ae8da9a90880abad22127c84037e48b1e5b7846166567b42c";
 
 function contentHash(statements: string[]): string {
   return crypto.createHash("sha256").update(JSON.stringify(statements)).digest("hex");
