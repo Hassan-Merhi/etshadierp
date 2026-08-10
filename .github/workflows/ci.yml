@@ -277,6 +277,48 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+      # The step above only proves the migration pass finished. It answered
+      # {"status":"ok"} whether or not migrations inside it had failed, so a
+      # broken migration reached the suite below and every test ran against a
+      # partly applied schema. This checks the failures the endpoint now reports
+      # against config/startup-migration-baseline.json: the known set is frozen,
+      # the count may only fall, and an unrecorded failure fails the build.
+      - name: Startup migration ratchet
+        id: startup_migration_ratchet
+        if: always() && steps.runtime_migrations.outcome == 'success'
+        run: |
+          set -o pipefail
+          node dist/index.js > startup-migrations-verify.txt 2>&1 &
+          app_pid=$!
+          cleanup() {
+            kill "$app_pid" 2>/dev/null || true
+            wait "$app_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          for attempt in $(seq 1 180); do
+            if curl --fail --silent http://127.0.0.1:${PORT}/api/health/db | grep -q '"status":"ok"'; then
+              break
+            fi
+            if ! kill -0 "$app_pid" 2>/dev/null; then
+              echo "Application exited before the migration report was readable."
+              cat startup-migrations-verify.txt
+              exit 1
+            fi
+            sleep 1
+          done
+
+          HEALTH_URL=http://127.0.0.1:${PORT} npm run verify:startup-migrations
+
+      - name: Upload startup migration ratchet log
+        if: always() && steps.startup_migration_ratchet.outcome == 'failure'
+        uses: actions/upload-artifact@v7
+        with:
+          name: startup-migration-ratchet
+          path: startup-migrations-verify.txt
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Backend tests
         id: backend_tests
         if: always() && steps.runtime_migrations.outcome == 'success'

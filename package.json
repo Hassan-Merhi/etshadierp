@@ -11,6 +11,7 @@
     "verify:lockfile": "node scripts/verify-lockfile-registry.mjs",
     "verify:dependency-audit": "node scripts/verify-dependency-audit.mjs",
     "verify:env-docs": "node scripts/verify-env-documentation.mjs",
+    "verify:startup-migrations": "node scripts/verify-startup-migrations.mjs",
     "verify:server-bundle": "node scripts/verify-server-bundle.mjs",
     "verify:runtime-dependencies": "node scripts/verify-runtime-dependencies.mjs",
     "verify:production-dependencies": "node scripts/verify-production-dependencies.mjs",

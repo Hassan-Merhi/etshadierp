@@ -19,6 +19,7 @@ audit fails instead of allowing the reference to drift.
 |---|---|---|
 | Type escapes (AST) | 11,441 total | `npm run audit:type-escapes` |
 | ESLint warnings | 12,108 total | `npm run lint` |
+| Startup migration failures | 11 on a fresh database | `npm run verify:startup-migrations` |
 | Backend coverage floor (lines) | 18% | `config/coverage-thresholds.json` |
 | Write routes with no test at all | 0 of 328 | `npm run audit:write-routes` |
 | Write routes covered only by the guard sweep | 0 of 328 | `npm run audit:write-routes` |
@@ -114,6 +115,43 @@ stronger than any repository total. Its `perRule` entry exists so the two cannot
 drift apart, and the audit fails if they disagree — the ESLint count must always
 equal the type-escape ceiling minus its ts-comment suppressions, which are not a
 rule (11,439 = 11,441 − 2).
+
+---
+
+### Startup migration ratchet
+
+`.github/workflows/ci.yml` gates the entire backend suite on the startup step:
+`node dist/index.js` runs, CI polls `/api/health/db`, and the tests only run
+`if: steps.runtime_migrations.outcome == 'success'`. That endpoint reported
+`{"status":"ok","message":"Database ready"}` as soon as the migration pass
+*finished*, whether or not migrations inside it had failed — so eleven failed
+migrations on a fresh database passed the gate every run, and the suite tested
+whatever schema survived.
+
+`server/startupMigrationReport.ts` now records the outcome and
+`server/health/dbHealthRoute.ts` publishes it, so the endpoint carries a
+`migrations` block with the failure count and the failing statements. Readiness
+semantics are unchanged: the response is still 200 with `status: "ok"` once the
+pass completes, because CI uses it to learn that startup is done and Render's
+own check is `/api/health/ready`.
+
+`scripts/verify-startup-migrations.mjs` turns that report into a gate against
+`config/startup-migration-baseline.json`. The known set is frozen,
+`totals.failureCeiling` may only fall, and any failure not already recorded
+fails the build.
+
+It is a baseline rather than a demand for zero because nine of the eleven are
+seed `INSERT`s whose `company_id` foreign keys cannot resolve until companies
+exist: they fail on an empty CI database and succeed in production. A gate that
+is permanently red is a gate that gets switched off. The remaining two are real
+ordering problems — `supplier_containers` and `bales.erp_location_id` do not
+exist when foreign keys are added to them — and are the entries worth fixing
+first.
+
+Three `factory_container_receipts` constraints were fixed in the same change:
+they lacked the `DO`/`duplicate_object` guard the rest of that file uses, so
+they failed on every startup after the first. A re-run against an
+already-migrated database now produces the same eleven rather than fourteen.
 
 ---
 
