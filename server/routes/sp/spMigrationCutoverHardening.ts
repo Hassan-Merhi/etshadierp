@@ -8,16 +8,20 @@ const installedApps = new WeakSet<object>();
 
 export async function ensureCutoverHardening(): Promise<void> {
   await ensureCutoverSchema();
-  await db.execute(sql.raw(`
+  await db.execute(
+    sql.raw(`
     CREATE UNIQUE INDEX IF NOT EXISTS sp_migration_cutovers_one_live_source
     ON sp_migration_cutovers(source_company_id)
     WHERE status IN ('prepared', 'active')
-  `));
-  await db.execute(sql.raw(`
+  `)
+  );
+  await db.execute(
+    sql.raw(`
     CREATE UNIQUE INDEX IF NOT EXISTS sp_migration_cutovers_one_live_target
     ON sp_migration_cutovers(target_company_id)
     WHERE status IN ('prepared', 'active')
-  `));
+  `)
+  );
 }
 
 function collectExplicitCompanyIds(req: Request): number[] {
@@ -81,7 +85,7 @@ export function installExplicitCompanyWriteGuard(app: Express): void {
   const stack = (app as any)?._router?.stack as any[] | undefined;
   if (!stack?.length) return;
   const layer = stack.pop();
-  const firstRouteIndex = stack.findIndex((entry: any) => Boolean(entry.route));
+  const firstRouteIndex = stack.findIndex((entry) => Boolean(entry.route));
   if (!layer || firstRouteIndex < 0) {
     if (layer) stack.push(layer);
     return;

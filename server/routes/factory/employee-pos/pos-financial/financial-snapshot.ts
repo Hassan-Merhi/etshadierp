@@ -137,7 +137,7 @@ export function registerFactoryFinancialSnapshotRoutes(app: Express) {
       // Get voucher entries for equity accounts
       let capitalTotal = 0;
       if ((equityAccounts as any[]).length > 0) {
-        const equityIds = (equityAccounts as any[]).map((a: any) => a.id);
+        const equityIds = (equityAccounts as any[]).map((a) => a.id);
         const equityEntries = await db
           .select({
             ledgerAccountId: voucherEntries.ledgerAccountId,
@@ -182,7 +182,7 @@ export function registerFactoryFinancialSnapshotRoutes(app: Express) {
         advanceCount,
         activeWorkerCount,
         capitalTotal: round2(capitalTotal),
-        equityAccounts: (equityAccounts as any[]).map((a: any) => ({
+        equityAccounts: (equityAccounts as any[]).map((a) => ({
           id: a.id,
           name: a.name,
           code: a.code,

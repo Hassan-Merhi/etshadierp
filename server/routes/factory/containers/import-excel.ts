@@ -35,7 +35,7 @@ export function registerFactoryContainerImportRoutes(app: Express) {
       const allSuppliers = await db.select().from(factorySuppliers).where(eq(factorySuppliers.companyId, companyId));
 
       const supplierMap = new Map<string, number>();
-      allSuppliers.forEach((s: any) => supplierMap.set(s.name.toLowerCase().trim(), s.id));
+      allSuppliers.forEach((s) => supplierMap.set(s.name.toLowerCase().trim(), s.id));
 
       const results: any[] = [];
       const errors: string[] = [];

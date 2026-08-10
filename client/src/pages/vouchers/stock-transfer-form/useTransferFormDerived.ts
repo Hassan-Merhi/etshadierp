@@ -29,7 +29,7 @@ export function useFilteredTransferInventory(transferInventory: any[], transferS
  * approve dialog previews the whole set rather than just the clicked row.
  */
 export function usePendingTransferRevisions(transferRevisions: any[]) {
-  return useMemo(() => transferRevisions.filter((rev: any) => rev.optional), [transferRevisions]);
+  return useMemo(() => transferRevisions.filter((rev) => rev.optional), [transferRevisions]);
 }
 
 /**

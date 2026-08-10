@@ -90,7 +90,7 @@ export const printLabels = async (
 ) => {
   try {
     modeApiRequest("POST", "/api/bale-label-prints", {
-      bales: bales.map((bale: any) => {
+      bales: bales.map((bale) => {
         const cartItem = cart.find((c) => c.productId === bale.productId);
         return {
           productionBaleId: bale.id,
@@ -102,7 +102,7 @@ export const printLabels = async (
       }),
     }).catch(() => {});
 
-    const labels: LabelData[] = bales.map((bale: any) => {
+    const labels: LabelData[] = bales.map((bale) => {
       const product = baleProducts?.find((p) => p.id === bale.productId);
       const cartItem = cart.find((c) => c.productId === bale.productId);
       const hasLogo = cartItem?.overrideLogoId || selectedLogoId;

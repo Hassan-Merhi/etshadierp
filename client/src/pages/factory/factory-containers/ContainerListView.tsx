@@ -84,7 +84,7 @@ export function ContainerListView({
           ? JSON.parse(c.preRegisteredChargesByCurrency)
           : c.preRegisteredChargesByCurrency || [];
       chargesByCcy = Array.isArray(raw)
-        ? raw.map((x: any) => ({ currencyCode: x.currencyCode || "USD", amount: parseFloat(x.amount || "0") }))
+        ? raw.map((x) => ({ currencyCode: x.currencyCode || "USD", amount: parseFloat(x.amount || "0") }))
         : [];
     } catch {
       // Malformed or absent payload — fall through to the default rather than surface a parse error.

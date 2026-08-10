@@ -117,7 +117,7 @@ export function registerPasskeyRoutes(app: Express) {
         if ((userRow.rows as any[]).length > 0) {
           const uid = (userRow.rows as any[])[0].id;
           const creds = await db.execute(sql`SELECT credential_id FROM passkey_credentials WHERE user_id = ${uid}`);
-          allowCredentials = (creds.rows as any[]).map((r: any) => ({
+          allowCredentials = (creds.rows as any[]).map((r) => ({
             id: r.credential_id as string,
             type: "public-key" as const,
           }));

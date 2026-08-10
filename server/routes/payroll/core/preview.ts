@@ -51,7 +51,7 @@ export function registerPayrollPreviewRoutes(app: Express) {
       }
 
       // Fetch all attendance records for the period in one query
-      const workerIdList = targetWorkers.map((w: any) => w.id);
+      const workerIdList = targetWorkers.map((w) => w.id);
       const attendanceRecords = workerIdList.length
         ? await db
             .select()
@@ -129,7 +129,7 @@ export function registerPayrollPreviewRoutes(app: Express) {
         return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
       })();
 
-      const result = targetWorkers.map((worker: any) => {
+      const result = targetWorkers.map((worker) => {
         const baseSal = parseFloat(worker.baseSalary || "0");
         const freq = worker.payFrequency || worker.salaryType || "Monthly";
         let base: number;

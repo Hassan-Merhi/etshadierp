@@ -83,7 +83,7 @@ export default function CustomerLogosSettings() {
     onError: (e: Error) => toast({ title: "Delete failed", description: e.message, variant: "destructive" }),
   });
 
-  const activeCustomers = allCustomers.filter((c: any) => c.active);
+  const activeCustomers = allCustomers.filter((c) => c.active);
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
@@ -112,7 +112,7 @@ export default function CustomerLogosSettings() {
               <SelectValue placeholder="Choose a customer to manage logos..." />
             </SelectTrigger>
             <SelectContent>
-              {activeCustomers.map((c: any) => (
+              {activeCustomers.map((c) => (
                 <SelectItem key={c.id} value={String(c.id)}>
                   {c.legalName}
                 </SelectItem>
@@ -127,7 +127,7 @@ export default function CustomerLogosSettings() {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <CardTitle className="text-base">
-                Logos for {activeCustomers.find((c: any) => String(c.id) === selectedCustomerId)?.legalName}
+                Logos for {activeCustomers.find((c) => String(c.id) === selectedCustomerId)?.legalName}
               </CardTitle>
               <Button
                 variant="outline"
@@ -163,7 +163,7 @@ export default function CustomerLogosSettings() {
               </div>
             ) : (
               <div className="space-y-2">
-                {logos.map((logo: any) => (
+                {logos.map((logo) => (
                   <div
                     key={logo.id}
                     className="flex items-center gap-3 p-3 rounded-md border"

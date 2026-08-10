@@ -1,11 +1,5 @@
 import { and, desc, eq, inArray, or } from "drizzle-orm";
-import {
-  auditLog,
-  interCompanyTransfers,
-  ledgerAccounts,
-  voucherEntries,
-  vouchers,
-} from "@shared/schema";
+import { auditLog, interCompanyTransfers, ledgerAccounts, voucherEntries, vouchers } from "@shared/schema";
 
 import { db } from "../../db";
 import { storage } from "../../storage";
@@ -13,10 +7,7 @@ import { storage } from "../../storage";
 const IDEMPOTENCY_TABLE = "accounting_posting_idempotency";
 
 function transferReversalKeys(transferId: number): string[] {
-  return [
-    `simple-company-transfer-reversal:${transferId}:from`,
-    `simple-company-transfer-reversal:${transferId}:to`,
-  ];
+  return [`simple-company-transfer-reversal:${transferId}:from`, `simple-company-transfer-reversal:${transferId}:to`];
 }
 
 export const transferRepository = {
@@ -54,10 +45,7 @@ export const transferRepository = {
       .select()
       .from(interCompanyTransfers)
       .where(
-        and(
-          eq(interCompanyTransfers.fromVoucherId, fromVoucherId),
-          eq(interCompanyTransfers.toVoucherId, toVoucherId),
-        ),
+        and(eq(interCompanyTransfers.fromVoucherId, fromVoucherId), eq(interCompanyTransfers.toVoucherId, toVoucherId))
       )
       .limit(1);
     return transfer ?? null;
@@ -76,12 +64,7 @@ export const transferRepository = {
     const rows = await db
       .select({ key: auditLog.recordIdentifier })
       .from(auditLog)
-      .where(
-        and(
-          eq(auditLog.tableName, IDEMPOTENCY_TABLE),
-          inArray(auditLog.recordIdentifier, keys),
-        ),
-      );
+      .where(and(eq(auditLog.tableName, IDEMPOTENCY_TABLE), inArray(auditLog.recordIdentifier, keys)));
     return new Set(rows.map((row) => row.key).filter(Boolean)).size === keys.length;
   },
 
@@ -110,20 +93,13 @@ export const transferRepository = {
     const transfers = await db
       .select()
       .from(interCompanyTransfers)
-      .where(
-        or(
-          eq(interCompanyTransfers.fromCompanyId, companyId),
-          eq(interCompanyTransfers.toCompanyId, companyId),
-        ),
-      )
+      .where(or(eq(interCompanyTransfers.fromCompanyId, companyId), eq(interCompanyTransfers.toCompanyId, companyId)))
       .orderBy(desc(interCompanyTransfers.createdAt));
 
     const accountIds = Array.from(
       new Set(
-        transfers
-          .flatMap((transfer: any) => [transfer.fromLedgerAccountId, transfer.toLedgerAccountId])
-          .filter(Boolean),
-      ),
+        transfers.flatMap((transfer) => [transfer.fromLedgerAccountId, transfer.toLedgerAccountId]).filter(Boolean)
+      )
     ) as number[];
     const [companies, accounts] = await Promise.all([
       storage.getAllCompanies(),
@@ -131,10 +107,10 @@ export const transferRepository = {
         ? db.select().from(ledgerAccounts).where(inArray(ledgerAccounts.id, accountIds))
         : Promise.resolve([] as any[]),
     ]);
-    const companyMap = new Map(companies.map((company: any) => [company.id, company]));
-    const accountMap = new Map(accounts.map((account: any) => [account.id, account]));
+    const companyMap = new Map(companies.map((company) => [company.id, company]));
+    const accountMap = new Map(accounts.map((account) => [account.id, account]));
 
-    return transfers.map((transfer: any) => ({
+    return transfers.map((transfer) => ({
       ...transfer,
       fromCompanyName: (companyMap.get(transfer.fromCompanyId) as any)?.name ?? "Unknown",
       toCompanyName: (companyMap.get(transfer.toCompanyId) as any)?.name ?? "Unknown",

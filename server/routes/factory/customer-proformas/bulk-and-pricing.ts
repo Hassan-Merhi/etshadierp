@@ -33,7 +33,7 @@ export function registerFactoryCustomerProformaBulkPricingRoutes(app: Express) {
         });
       }
 
-      const validLines = lines.filter((l: any) => l.articleCode && l.productName && parseInt(l.quantity) > 0);
+      const validLines = lines.filter((l) => l.articleCode && l.productName && parseInt(l.quantity) > 0);
       if (validLines.length === 0) {
         return res
           .status(400)
@@ -45,7 +45,7 @@ export function registerFactoryCustomerProformaBulkPricingRoutes(app: Express) {
       const result = await db.transaction(async (tx: any) => {
         const [proforma] = await tx.insert(customerProformas).values(parsed).returning();
 
-        const lineValues = validLines.map((l: any) => ({
+        const lineValues = validLines.map((l) => ({
           proformaId: proforma.id,
           articleCode: l.articleCode,
           productName: l.productName,
@@ -98,7 +98,7 @@ export function registerFactoryCustomerProformaBulkPricingRoutes(app: Express) {
         return res.status(400).json({ message: "At least one line is required" });
       }
 
-      const validLines = lines.filter((l: any) => l.articleCode && l.productName && parseInt(l.quantity) > 0);
+      const validLines = lines.filter((l) => l.articleCode && l.productName && parseInt(l.quantity) > 0);
       if (validLines.length === 0) {
         return res
           .status(400)
@@ -107,7 +107,7 @@ export function registerFactoryCustomerProformaBulkPricingRoutes(app: Express) {
 
       const result = await db.transaction(async (tx: any) => {
         await tx.delete(customerProformaLines).where(eq(customerProformaLines.proformaId, id));
-        const lineValues = validLines.map((l: any) => ({
+        const lineValues = validLines.map((l) => ({
           proformaId: id,
           articleCode: l.articleCode,
           productName: l.productName,

@@ -21,7 +21,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
       const toDate = req.query.toDate ? String(req.query.toDate) : null;
 
       const allCompanies = await storage.getAllCompanies();
-      const company = allCompanies.find((c: any) => c.id === companyId);
+      const company = allCompanies.find((c) => c.id === companyId);
       const companyName = company?.name || "Company";
 
       // ── 1. Accounts & voucher entries (cumulative up to toDate) ──────────
@@ -113,7 +113,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
       // SP formula: Cash + Stock (inventory) → What We Have; sp_payable only → What We Owe.
       const isSupplierPartner = (company as any)?.companyType === "supplier_partner";
       const accountsForClassify = isSupplierPartner
-        ? companyAccounts.filter((a: any) => a.accountType === "Cash" || a.subType === "sp_payable")
+        ? companyAccounts.filter((a) => a.accountType === "Cash" || a.subType === "sp_payable")
         : companyAccounts.filter(
             (a: any) =>
               a.subType !== "sp_stock" &&
@@ -134,7 +134,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
         .from(locations)
         .where(and(eq(locations.companyId, companyId), eq(locations.active, true), isNull(locations.deletedAt)))
         .execute();
-      const activeLocIds = activeLocsData.map((l: any) => l.id);
+      const activeLocIds = activeLocsData.map((l) => l.id);
       let stockOnFloor = 0;
       if (activeLocIds.length > 0) {
         if (toDate) {

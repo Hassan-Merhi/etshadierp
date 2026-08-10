@@ -213,7 +213,7 @@ export function registerRawStockSupplierRateRoutes(app: Express) {
           [companyId]
         );
 
-        const rows = result.rows.map((r: any) => {
+        const rows = result.rows.map((r) => {
           const changes = typeof r.changes === "string" ? JSON.parse(r.changes) : (r.changes ?? {});
           const oldRate = parseFloat(changes?.old?.currentRawMaterialCostPerKgUsd ?? 0) || 0;
           const recomputedRate = parseFloat(changes?.new?.currentRawMaterialCostPerKgUsd ?? 0) || 0;

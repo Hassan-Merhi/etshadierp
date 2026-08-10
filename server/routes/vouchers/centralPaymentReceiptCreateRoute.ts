@@ -1,11 +1,6 @@
 import type { Express, NextFunction, Request, Response } from "express";
 import { and, eq } from "drizzle-orm";
-import {
-  customers,
-  factoryDaybookEntries,
-  factorySettings,
-  ledgerAccounts,
-} from "@shared/schema";
+import { customers, factoryDaybookEntries, factorySettings, ledgerAccounts } from "@shared/schema";
 import { requireAuth, requireNonPOS } from "../../auth";
 import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
@@ -22,11 +17,7 @@ import { applyEmployeeBalanceDeltasTx } from "../../services/accounting/employee
 import { erpRateToDaybookFxRateToUsd } from "../../services/accounting/currencyAmounts";
 import { buildPaymentReceiptPostingRequest } from "../../services/accounting/paymentReceiptPosting";
 import { triggerIntercompanyNotifications } from "../intercompanyNotificationRoutes";
-import {
-  buildVoucherChangesForCreate,
-  logAudit,
-  snapshotVoucherEntries,
-} from "../_helpers";
+import { buildVoucherChangesForCreate, logAudit, snapshotVoucherEntries } from "../_helpers";
 import { checkAccountWhatsAppRule } from "../factoryWhatsappRoutes";
 
 const postingDependencies = createDatabasePostingDependencies();
@@ -114,10 +105,7 @@ async function resolvePaymentReceiptTargetTx(input: {
   return { [field]: accountId } as VoucherEntryInsertFields;
 }
 
-async function writeFactoryDaybookCompatibility(input: {
-  companyId: number;
-  voucher: any;
-}): Promise<void> {
+async function writeFactoryDaybookCompatibility(input: { companyId: number; voucher: any }): Promise<void> {
   const [settings] = await db
     .select({ id: factorySettings.id })
     .from(factorySettings)
@@ -128,9 +116,7 @@ async function writeFactoryDaybookCompatibility(input: {
   const currency = input.voucher.currency || "USD";
   const baseTotal = Number(input.voucher.totalAmount || 0);
   const storedRate = input.voucher.exchangeRate ? Number(input.voucher.exchangeRate) : 1;
-  const amountCurrency = currency !== "USD" && storedRate > 0
-    ? baseTotal * storedRate
-    : baseTotal;
+  const amountCurrency = currency !== "USD" && storedRate > 0 ? baseTotal * storedRate : baseTotal;
 
   await db.insert(factoryDaybookEntries).values({
     companyId: input.companyId,
@@ -138,27 +124,17 @@ async function writeFactoryDaybookCompatibility(input: {
     txType: input.voucher.voucherType === "Payment" ? "PAYMENT" : "RECEIPT",
     referenceId: input.voucher.id,
     referenceTable: "vouchers",
-    description:
-      input.voucher.description ||
-      `${input.voucher.voucherType} voucher #${input.voucher.voucherNumber}`,
+    description: input.voucher.description || `${input.voucher.voucherType} voucher #${input.voucher.voucherNumber}`,
     currencyCode: currency,
     amountCurrency: String(amountCurrency),
-    fxRateToUsd: erpRateToDaybookFxRateToUsd(
-      currency,
-      "USD",
-      input.voucher.exchangeRate
-    ),
+    fxRateToUsd: erpRateToDaybookFxRateToUsd(currency, "USD", input.voucher.exchangeRate),
     amountUsd: String(baseTotal),
     createdBy: null,
     effectiveDate: input.voucher.effectiveDate || null,
   });
 }
 
-async function createCentralPaymentReceipt(
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> {
+async function createCentralPaymentReceipt(req: Request, res: Response, next: NextFunction): Promise<void> {
   if (!supportsCentralPaymentReceipt(req.body)) {
     next();
     return;
@@ -197,11 +173,7 @@ async function createCentralPaymentReceipt(
           resolvePaymentReceiptTargetTx({ tx, companyId, accountType, accountId }),
       });
 
-      const posted = (await postBalancedVoucherTx(
-        tx,
-        built.request,
-        postingDependencies
-      )) as PersistedPostingResult;
+      const posted = (await postBalancedVoucherTx(tx, built.request, postingDependencies)) as PersistedPostingResult;
 
       if (!posted.replayed) {
         await applyEmployeeBalanceDeltasTx({
@@ -276,13 +248,13 @@ async function createCentralPaymentReceipt(
         posted.voucher.voucherDate,
         posted.voucher.totalAmount || "0",
         posted.voucher.description,
-        posted.entries.map((entry: any) => entry.ledgerAccountId),
+        posted.entries.map((entry) => entry.ledgerAccountId),
         posted.voucher.voucherType
       ).catch(() => {});
 
       autoReallocateLoansAccounts(
         companyId,
-        posted.entries.map((entry: any) => entry.ledgerAccountId)
+        posted.entries.map((entry) => entry.ledgerAccountId)
       ).catch(() => {});
     }
 

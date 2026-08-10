@@ -139,7 +139,7 @@ async function sendInvoiceExcel(req: Request, res: Response, data: NonNullable<A
   }
   sheet.addRow([]);
 
-  const hasPerKg = data.lines.some((line: any) => line.pricingMode === "per_kg");
+  const hasPerKg = data.lines.some((line) => line.pricingMode === "per_kg");
   const headers = [
     "#",
     labels.articleCode,
@@ -155,7 +155,7 @@ async function sendInvoiceExcel(req: Request, res: Response, data: NonNullable<A
   let qtyTotal = 0;
   let weightTotal = 0;
   let lineTotal = 0;
-  data.lines.forEach((line: any, index: number) => {
+  data.lines.forEach((line, index: number) => {
     const qty = safeNumber(line.qty);
     const totalWeight = safeNumber(line.totalWeight);
     const totalPrice = safeNumber(line.totalPrice);
@@ -326,7 +326,7 @@ async function loadBales(orderId: number) {
     .where(eq(customerOrderBales.orderId, orderId))
     .orderBy(customerOrderBales.id);
   const rows = await db.select().from(factoryBales).where(eq(factoryBales.companyId, -1));
-  const map = new Map<number, any>(rows.map((row: any) => [row.id, row]));
+  const map = new Map<number, any>(rows.map((row) => [row.id, row]));
   return { links, map };
 }
 
@@ -358,7 +358,7 @@ async function sendLoadingExcel(req: Request, res: Response, data: NonNullable<A
   ]);
   header.font = { bold: true };
   let cumulative = 0;
-  links.forEach((link: any, index: number) => {
+  links.forEach((link, index: number) => {
     const weight = safeNumber(link.weight);
     cumulative += weight;
     const row = sheet.addRow([

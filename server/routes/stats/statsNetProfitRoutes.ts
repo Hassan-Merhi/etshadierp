@@ -82,8 +82,8 @@ export function registerStatsNetProfitRoutes(app: Express) {
       // For non-SP: exclude sp_stock (inventory table is authoritative) and sp_cost_clearing (double-counts).
       const isSupplierPartner = (companyRecord as any)?.companyType === "supplier_partner";
       const accountsForClassify = isSupplierPartner
-        ? companyAccounts.filter((a: any) => a.accountType === "Cash" || a.subType === "sp_payable")
-        : companyAccounts.filter((a: any) => a.subType !== "sp_stock" && a.subType !== "sp_cost_clearing");
+        ? companyAccounts.filter((a) => a.accountType === "Cash" || a.subType === "sp_payable")
+        : companyAccounts.filter((a) => a.subType !== "sp_stock" && a.subType !== "sp_cost_clearing");
       const classified = classifyNetPositionAccounts(accountsForClassify, accountBalances, {
         includeSupplierTypeAccounts: shouldIncludeSuppliers,
       });

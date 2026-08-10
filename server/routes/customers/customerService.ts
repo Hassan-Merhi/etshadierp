@@ -64,7 +64,7 @@ async function nextCustomerCode(companyId: number): Promise<string> {
 export const customerService = {
   async forPos(companyId: number) {
     const customers = await storage.getAllCustomers(companyId);
-    return customers.map((customer: any) => ({ id: customer.id, legalName: customer.legalName }));
+    return customers.map((customer) => ({ id: customer.id, legalName: customer.legalName }));
   },
 
   list(companyId: number, search?: string) {
@@ -79,20 +79,10 @@ export const customerService = {
     return requireCustomer(customerId, companyId);
   },
 
-  async transactions(
-    customerId: number,
-    companyId: number,
-    startDate?: string,
-    endDate?: string,
-  ) {
+  async transactions(customerId: number, companyId: number, startDate?: string, endDate?: string) {
     const customer = await requireCustomer(customerId, companyId);
     if (customer.ledgerAccountId) {
-      return storage.getVoucherEntriesByLedger(
-        customer.ledgerAccountId,
-        startDate,
-        endDate,
-        companyId,
-      );
+      return storage.getVoucherEntriesByLedger(customer.ledgerAccountId, startDate, endDate, companyId);
     }
     return storage.getVoucherEntriesByCustomer(customerId, startDate, endDate);
   },
@@ -162,10 +152,7 @@ export const customerService = {
       changes: customerChanges(existing, updated),
     });
 
-    if (
-      updated.ledgerAccountId &&
-      (parsed.openingBalance !== undefined || parsed.openingBalanceSide !== undefined)
-    ) {
+    if (updated.ledgerAccountId && (parsed.openingBalance !== undefined || parsed.openingBalanceSide !== undefined)) {
       const ledgerUpdate: { openingBalance?: string; openingBalanceSide?: string } = {};
       if (parsed.openingBalance !== undefined) ledgerUpdate.openingBalance = updated.openingBalance ?? "0";
       if (parsed.openingBalanceSide !== undefined) {

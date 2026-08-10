@@ -185,12 +185,12 @@ export function CheckoutSidebar({
                   </SelectTrigger>
                   <SelectContent>
                     {paymentAccountType === "bank"
-                      ? (Array.isArray(bankAccounts) ? bankAccounts : []).map((acc: any) => (
+                      ? (Array.isArray(bankAccounts) ? bankAccounts : []).map((acc) => (
                           <SelectItem key={acc.id} value={String(acc.id)}>
                             {acc.name} ({acc.code})
                           </SelectItem>
                         ))
-                      : cashLedgerAccounts.map((acc: any) => (
+                      : cashLedgerAccounts.map((acc) => (
                           <SelectItem key={acc.id} value={String(acc.id)}>
                             {acc.name} ({acc.code})
                           </SelectItem>
@@ -228,7 +228,7 @@ export function CheckoutSidebar({
                       <User className="h-4 w-4 text-muted-foreground shrink-0" />
                       <span className="truncate">
                         {selectedCustomerId
-                          ? customerAccounts.find((a: any) => String(a.id) === selectedCustomerId)?.name || "Customer"
+                          ? customerAccounts.find((a) => String(a.id) === selectedCustomerId)?.name || "Customer"
                           : "Select customer…"}
                       </span>
                     </div>
@@ -241,7 +241,7 @@ export function CheckoutSidebar({
                     <CommandList>
                       <CommandEmpty>No customer found.</CommandEmpty>
                       <CommandGroup>
-                        {customerAccounts.map((acc: any) => (
+                        {customerAccounts.map((acc) => (
                           <CommandItem
                             key={acc.id}
                             value={acc.name}

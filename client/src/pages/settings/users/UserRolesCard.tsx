@@ -36,7 +36,7 @@ export function UserRolesCard({ userId, companies }: UserRolesCardProps) {
   // Collect unique companyIds that have POS roles (no hooks in loops)
   const posCompanyIds = useMemo(() => {
     const ids = new Set<number>();
-    companyRoles.forEach((r: any) => {
+    companyRoles.forEach((r) => {
       if (r.role === "POS" && r.companyId) ids.add(r.companyId);
     });
     return Array.from(ids);
@@ -54,7 +54,7 @@ export function UserRolesCard({ userId, companies }: UserRolesCardProps) {
         })
       );
       const map: Record<number, string> = {};
-      results.flat().forEach((loc: any) => {
+      results.flat().forEach((loc) => {
         map[loc.id] = loc.name;
       });
       return map;
@@ -64,7 +64,7 @@ export function UserRolesCard({ userId, companies }: UserRolesCardProps) {
 
   // POS roles that need user-location lookup
   const posRoleKeys = useMemo(
-    () => companyRoles.filter((r: any) => r.role === "POS").map((r: any) => `${r.id}:${r.companyId}`),
+    () => companyRoles.filter((r) => r.role === "POS").map((r) => `${r.id}:${r.companyId}`),
     [companyRoles]
   );
 
@@ -72,14 +72,14 @@ export function UserRolesCard({ userId, companies }: UserRolesCardProps) {
   const { data: userLocationsMap = {} } = useQuery<Record<number, number[]>>({
     queryKey: ["/api/user-locations/bulk", userId, posRoleKeys],
     queryFn: async () => {
-      const posRoles = companyRoles.filter((r: any) => r.role === "POS");
+      const posRoles = companyRoles.filter((r) => r.role === "POS");
       const result: Record<number, number[]> = {};
       await Promise.all(
         posRoles.map(async (r: any) => {
           const res = await fetch(`/api/user-locations/${userId}/${r.companyId}`, { credentials: "include" });
           if (res.ok) {
             const locs = await res.json();
-            result[r.id] = Array.isArray(locs) ? locs.map((l: any) => l.locationId) : [];
+            result[r.id] = Array.isArray(locs) ? locs.map((l) => l.locationId) : [];
           } else {
             result[r.id] = [];
           }
@@ -107,7 +107,7 @@ export function UserRolesCard({ userId, companies }: UserRolesCardProps) {
   const activeEditingRole =
     activeEditorRoleId === "new" || activeEditorRoleId === null
       ? null
-      : (companyRoles.find((r: any) => r.id === activeEditorRoleId) ?? null);
+      : (companyRoles.find((r) => r.id === activeEditorRoleId) ?? null);
 
   const showEditor = activeEditorRoleId !== null;
 
@@ -151,11 +151,11 @@ export function UserRolesCard({ userId, companies }: UserRolesCardProps) {
             <p className="text-sm text-muted-foreground">No company roles assigned yet.</p>
           )}
 
-          {companyRoles.map((role: any) => (
+          {companyRoles.map((role) => (
             <div key={role.id}>
               <RoleSummaryRow
                 role={role}
-                companyName={companies.find((c: any) => c.id === role.companyId)?.name || `Company ${role.companyId}`}
+                companyName={companies.find((c) => c.id === role.companyId)?.name || `Company ${role.companyId}`}
                 locationNames={getLocationNames(role)}
                 isEditing={activeEditorRoleId === role.id}
                 onEdit={() => setActiveEditorRoleId((prev) => (prev === role.id ? null : role.id))}
@@ -199,8 +199,7 @@ export function UserRolesCard({ userId, companies }: UserRolesCardProps) {
             <AlertDialogDescription>
               Remove the <strong>{roleToDelete?.role}</strong> role from{" "}
               <strong>
-                {companies.find((c: any) => c.id === roleToDelete?.companyId)?.name ||
-                  `Company ${roleToDelete?.companyId}`}
+                {companies.find((c) => c.id === roleToDelete?.companyId)?.name || `Company ${roleToDelete?.companyId}`}
               </strong>
               ?
             </AlertDialogDescription>

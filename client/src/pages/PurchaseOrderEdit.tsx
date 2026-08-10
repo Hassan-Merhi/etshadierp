@@ -226,7 +226,7 @@ export default function PurchaseOrderEdit() {
           // Normalize value to number for comparison
           const numericId = typeof value === "string" ? parseInt(value, 10) : value;
           // If stockItem is passed directly, use it; otherwise fallback to lookup
-          const foundItem = stockItem || stockItems?.find((si: any) => si.id === numericId);
+          const foundItem = stockItem || stockItems?.find((si) => si.id === numericId);
           if (foundItem) {
             newItems[index] = {
               ...existingItem,

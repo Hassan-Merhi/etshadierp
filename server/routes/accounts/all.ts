@@ -37,7 +37,7 @@ export function registerAccountListRoutes(app: Express) {
         storage.getAllCustomers(companyId),
       ]);
       // Strip internal system-only accounts (isHidden=true for a reason — never show in pickers)
-      const ledgers = ledgersAll.filter((a: any) => !["sp_stock", "sp_opnbal"].includes(a.subType ?? ""));
+      const ledgers = ledgersAll.filter((a) => !["sp_stock", "sp_opnbal"].includes(a.subType ?? ""));
       const isFactoryCompany = currentCompany?.companyType === "factory";
       const isPropertiesCompany = currentCompany?.companyType === "properties";
       const suppliers = isFactoryCompany || isPropertiesCompany ? [] : allSuppliers;

@@ -48,7 +48,7 @@ export function registerSpMigrationReconciliationRoutes(app: Express) {
             unlinkedItemRows.length === 0
               ? "All source stock items are linked to target."
               : `${unlinkedItemRows.length} source item(s) have no target stock item link (showing up to 50).`,
-          mismatches: unlinkedItemRows.map((r: any) => `${r.code} — ${r.name}`),
+          mismatches: unlinkedItemRows.map((r) => `${r.code} — ${r.name}`),
         });
 
         // 2. Stock in hand: per-item qty comparison via source links (source vs mapped target item),
@@ -63,7 +63,7 @@ export function registerSpMigrationReconciliationRoutes(app: Express) {
           WHERE si.company_id = ${sourceId} AND si.deleted_at IS NULL
         `)
         ).rows as any[];
-        const stockMismatches = perItemStock.filter((r: any) => Math.abs(pn(r.src_qty) - pn(r.tgt_qty)) > 0.01);
+        const stockMismatches = perItemStock.filter((r) => Math.abs(pn(r.src_qty) - pn(r.tgt_qty)) > 0.01);
         const srcStock = (
           await db.execute(
             sql`SELECT COALESCE(SUM(quantity),0) AS q, COALESCE(SUM(quantity*average_rate),0) AS v FROM inventory WHERE company_id = ${sourceId}`
@@ -80,7 +80,7 @@ export function registerSpMigrationReconciliationRoutes(app: Express) {
           detail: `Totals — source qty ${pn(srcStock.q).toFixed(3)} vs target qty ${pn(tgtStock.q).toFixed(3)} (value ${pn(srcStock.v).toFixed(2)} vs ${pn(tgtStock.v).toFixed(2)}). ${stockMismatches.length} linked item(s) have a qty mismatch.`,
           mismatches: stockMismatches
             .slice(0, 50)
-            .map((r: any) => `${r.code} — source ${pn(r.src_qty).toFixed(3)} vs target ${pn(r.tgt_qty).toFixed(3)}`),
+            .map((r) => `${r.code} — source ${pn(r.src_qty).toFixed(3)} vs target ${pn(r.tgt_qty).toFixed(3)}`),
         });
 
         // 3. Historical sales — per-voucher check that each source sale has a migrated read-only copy
@@ -136,8 +136,8 @@ export function registerSpMigrationReconciliationRoutes(app: Express) {
             `${unmigratedSales.length} source sale(s) have no migrated copy. ` +
             `${migratedVouchersWithoutItems.length} migrated voucher(s) have no item rows (accounting-only).`,
           mismatches: [
-            ...unmigratedSales.map((r: any) => `Not migrated: ${r.voucher_number}`),
-            ...migratedVouchersWithoutItems.map((r: any) => `No item rows: ${r.voucher_number}`),
+            ...unmigratedSales.map((r) => `Not migrated: ${r.voucher_number}`),
+            ...migratedVouchersWithoutItems.map((r) => `No item rows: ${r.voucher_number}`),
           ],
         });
 
@@ -166,7 +166,7 @@ export function registerSpMigrationReconciliationRoutes(app: Express) {
           area: "Containers",
           status: unmigratedContainers.length === 0 ? "PASS" : "WARN",
           detail: `Source: ${pn(srcContainers.cnt)} container(s). Migrated: ${pn(tgtContainers.cnt)}. ${unmigratedContainers.length} container(s) not yet migrated (showing up to 50).`,
-          mismatches: unmigratedContainers.map((r: any) => `${r.container_number} (${r.status})`),
+          mismatches: unmigratedContainers.map((r) => `${r.container_number} (${r.status})`),
         });
 
         // 4b. OTW containers must have a Goods-OTW accounting voucher posted
@@ -192,7 +192,7 @@ export function registerSpMigrationReconciliationRoutes(app: Express) {
             missingOtwVouchers.length === 0
               ? "All migrated OTW containers have a Goods-OTW voucher posted."
               : `${missingOtwVouchers.length} migrated OTW container(s) are missing their Goods-OTW voucher.`,
-          mismatches: missingOtwVouchers.map((r: any) => r.container_number),
+          mismatches: missingOtwVouchers.map((r) => r.container_number),
         });
 
         // 5. Accounting balance — verify all migrated vouchers in target are balanced
@@ -231,7 +231,7 @@ export function registerSpMigrationReconciliationRoutes(app: Express) {
             profitOpening.length > 0
               ? `${profitOpening.length} profit-opening voucher(s) posted.`
               : "No profit-share opening balance has been posted yet.",
-          mismatches: profitOpening.map((r: any) => `${r.voucher_number} — ${pn(r.total_amount).toFixed(2)}`),
+          mismatches: profitOpening.map((r) => `${r.voucher_number} — ${pn(r.total_amount).toFixed(2)}`),
         });
 
         const overall = areas.some((a) => a.status === "FAIL")

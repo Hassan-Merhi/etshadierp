@@ -232,7 +232,7 @@ export async function loadStockItemMap(sourceId: number, targetId: number): Prom
       AND l.target_table = 'stock_items'
     ORDER BY l.source_id, r.created_at DESC
   `);
-  return new Map(resultRows(result).map((row: any) => [pn(row.source_id), pn(row.target_id)]));
+  return new Map(resultRows(result).map((row) => [pn(row.source_id), pn(row.target_id)]));
 }
 
 export async function loadTargetAccounts(targetId: number): Promise<{
@@ -267,7 +267,7 @@ export async function loadSourceAccounts(sourceId: number): Promise<Map<number, 
     FROM ledger_accounts
     WHERE company_id = ${sourceId} AND deleted_at IS NULL
   `);
-  return new Map(resultRows(result).map((row: any) => [pn(row.id), row]));
+  return new Map(resultRows(result).map((row) => [pn(row.id), row]));
 }
 
 export function mapTargetAccount(

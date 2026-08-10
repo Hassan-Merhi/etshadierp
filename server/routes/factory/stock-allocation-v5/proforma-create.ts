@@ -27,7 +27,7 @@ export function registerV5ProformaCreateRoutes(app: Express) {
       if (!customerId || !name || !Array.isArray(lines) || lines.length === 0) {
         return res.status(400).json({ message: "customerId, name, and at least one line are required" });
       }
-      const validLines = lines.filter((l: any) => l.articleCode && l.productName && parseInt(l.quantity) > 0);
+      const validLines = lines.filter((l) => l.articleCode && l.productName && parseInt(l.quantity) > 0);
       if (validLines.length === 0) {
         return res
           .status(400)
@@ -42,7 +42,7 @@ export function registerV5ProformaCreateRoutes(app: Express) {
           .values({ companyId, customerId: Number(customerId), name, isActive: isActive ?? false })
           .returning();
 
-        const lineValues = validLines.map((l: any) => ({
+        const lineValues = validLines.map((l) => ({
           proformaId: proforma.id,
           articleCode: l.articleCode,
           productName: l.productName,
@@ -124,7 +124,7 @@ export function registerV5ProformaCreateRoutes(app: Express) {
       }
 
       // Trim names
-      containerNames = (containerNames as any[]).map((n: any) => String(n ?? "").trim());
+      containerNames = (containerNames as any[]).map((n) => String(n ?? "").trim());
 
       // Reject empty names
       if (containerNames.some((n: string) => !n)) {
@@ -156,9 +156,7 @@ export function registerV5ProformaCreateRoutes(app: Express) {
             WHERE proforma_id_used = ${proformaId}
               AND container_number IS NOT NULL`
       );
-      const existingNames = new Set(
-        resultRows(existingOrdersRaw).map((r: any) => String(r.container_number ?? "").trim())
-      );
+      const existingNames = new Set(resultRows(existingOrdersRaw).map((r) => String(r.container_number ?? "").trim()));
       const conflicting = containerNames.filter((n: string) => existingNames.has(n));
       if (conflicting.length > 0) {
         return res

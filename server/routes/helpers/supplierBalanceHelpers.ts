@@ -36,7 +36,7 @@ export async function resolveParentCompanyId(): Promise<number> {
     if (configured) return configured;
 
     const allCompanies = await storage.getAllCompanies();
-    const erpCompanies = allCompanies.filter((c: any) => !c.companyType || c.companyType === "erp");
+    const erpCompanies = allCompanies.filter((c) => !c.companyType || c.companyType === "erp");
     if (erpCompanies.length === 1) return erpCompanies[0].id;
 
     throw new ParentCompanyNotConfiguredError();

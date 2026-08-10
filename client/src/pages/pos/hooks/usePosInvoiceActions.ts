@@ -38,7 +38,7 @@ export function usePosInvoiceActions({
       toast({ title: "No location", description: "Select a location first.", variant: "destructive" });
       return;
     }
-    const exportData = (Array.isArray(apiInventory) ? apiInventory : []).map((item: any) => ({
+    const exportData = (Array.isArray(apiInventory) ? apiInventory : []).map((item) => ({
       Code: item.stockItemCode || "",
       "Item Name": item.stockItemName || "",
       UOM: item.stockItemUom || "",

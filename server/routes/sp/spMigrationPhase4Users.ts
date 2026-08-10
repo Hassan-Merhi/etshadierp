@@ -64,7 +64,7 @@ async function loadUserLocations(tx: any, userId: string, companyId: number): Pr
     WHERE user_id = ${userId} AND company_id = ${companyId}
     ORDER BY location_id ASC
   `);
-  return resultRows(result).map((row: any) => ({ locationId: pn(row.location_id) }));
+  return resultRows(result).map((row) => ({ locationId: pn(row.location_id) }));
 }
 
 async function loadCashMappings(tx: any, userId: string, companyId: number): Promise<any[]> {
@@ -74,7 +74,7 @@ async function loadCashMappings(tx: any, userId: string, companyId: number): Pro
     WHERE user_id = ${userId} AND company_id = ${companyId}
     ORDER BY location_id ASC
   `);
-  return resultRows(result).map((row: any) => ({
+  return resultRows(result).map((row) => ({
     locationId: pn(row.location_id),
     cashAccountId: pn(row.cash_account_id),
     posStation: row.pos_station ?? null,

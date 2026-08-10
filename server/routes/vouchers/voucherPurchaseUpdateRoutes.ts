@@ -96,7 +96,7 @@ export function registerVoucherPurchaseUpdateRoutes(app: Express) {
       // Calculate totals and prepare items data
       let totalAmount = 0;
 
-      const poItemsData = items.map((item: any) => {
+      const poItemsData = items.map((item) => {
         const quantity = parseFloat(item.quantity);
         const rate = parseFloat(item.rate);
         const lineTotal = quantity * rate;
@@ -308,7 +308,7 @@ export function registerVoucherPurchaseUpdateRoutes(app: Express) {
       // For Production/Consumption only: use absolute value
       let signedTotal = 0;
 
-      const adjustmentItemsData = items.map((item: any) => {
+      const adjustmentItemsData = items.map((item) => {
         const quantity = parseFloat(item.quantity);
         const rate = parseFloat(item.rate);
         const absItemTotal = Math.abs(quantity) * rate; // always positive (consistent with createStockAdjustment)

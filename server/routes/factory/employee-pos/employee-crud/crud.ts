@@ -78,7 +78,7 @@ export function registerFactoryEmployeeCrudRoutes(app: Express) {
           .select({ code: employees.code })
           .from(employees)
           .where(eq(employees.companyId, companyId));
-        const existingCodes = new Set(existing.map((e: any) => e.code));
+        const existingCodes = new Set(existing.map((e) => e.code));
         while (existingCodes.has(empCode)) {
           empCode = `${baseCode}${suffix}`;
           suffix++;
@@ -201,7 +201,7 @@ export function registerFactoryEmployeeCrudRoutes(app: Express) {
 
       // Build running balance
       let runningBalance = 0;
-      const rows = entries.map((e: any) => {
+      const rows = entries.map((e) => {
         const credit = parseFloat(e.creditAmount || "0");
         const debit = parseFloat(e.debitAmount || "0");
         runningBalance += credit - debit;

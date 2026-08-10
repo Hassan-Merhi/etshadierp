@@ -40,10 +40,10 @@ export function usePosAutosave({
       const s = autoSaveStateRef.current;
       if (!s.activeLocation) return;
       if (autoSaveInProgressRef.current || s.saveDraftIsPending) return;
-      const validItems = s.rows.filter((r: any) => r.stockItemId && r.quantity > 0 && r.rate > 0);
+      const validItems = s.rows.filter((r) => r.stockItemId && r.quantity > 0 && r.rate > 0);
       if (validItems.length === 0) return;
       const fingerprint = JSON.stringify({
-        items: validItems.map((r: any) => ({ id: r.stockItemId, qty: r.quantity, rate: r.rate })),
+        items: validItems.map((r) => ({ id: r.stockItemId, qty: r.quantity, rate: r.rate })),
         notes: s.notes,
         isCreditSale: s.isCreditSale,
         paymentAccountType: s.paymentAccountType,
@@ -65,7 +65,7 @@ export function usePosAutosave({
               : null,
           isCreditSale: s.isCreditSale,
           notes: s.notes,
-          items: validItems.map((row: any) => ({
+          items: validItems.map((row) => ({
             stockItemId: row.stockItemId,
             quantity: row.quantity.toString(),
             rate: row.rate.toString(),

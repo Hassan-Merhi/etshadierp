@@ -134,7 +134,7 @@ export function registerLocationInventoryRoutes(app: Express) {
       // Filter sensitive data for POS users (they should only see quantity)
       const isPOS = req.user?.role === "POS";
       if (isPOS) {
-        const filteredInventory = inventory.map((item: any) => ({
+        const filteredInventory = inventory.map((item) => ({
           ...item,
           averageRate: null,
           totalValue: null,
@@ -173,10 +173,10 @@ export function registerLocationInventoryRoutes(app: Express) {
       const inventory = await storage.getLocationInventory(req.session.currentCompanyId!, locationId);
 
       // Filter out zero-quantity items
-      const filteredInventory = inventory.filter((item: any) => parseFloat(item.quantity || "0") !== 0);
+      const filteredInventory = inventory.filter((item) => parseFloat(item.quantity || "0") !== 0);
 
       // Build Excel workbook data
-      const workbookData = filteredInventory.map((item: any) => ({
+      const workbookData = filteredInventory.map((item) => ({
         "Item Code": item.stockItemCode || "",
         "Item Name": item.stockItemName || "",
         "Group Code": item.stockGroupCode || "",

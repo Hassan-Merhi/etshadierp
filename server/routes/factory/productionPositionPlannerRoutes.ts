@@ -50,7 +50,7 @@ function parseMembers(value: unknown): ProductionBonusMemberSnapshot[] {
   }
   if (!Array.isArray(parsed)) return [];
   return parsed
-    .map((member: any) => ({
+    .map((member) => ({
       workerId: Number(member?.workerId),
       workerName: String(member?.workerName ?? ""),
     }))
@@ -98,7 +98,7 @@ async function loadEffectivePositionSnapshots(companyId: number, date: string): 
     ORDER BY p.name
   `);
 
-  return rows(result).map((row: any) => ({
+  return rows(result).map((row) => ({
     positionId: Number(row.positionId),
     positionName: String(row.positionName),
     targetBales: Number(row.targetBales ?? 0),
@@ -122,7 +122,7 @@ async function loadSavedPositionSnapshots(planId: number, companyId: number): Pr
     WHERE plan_id = ${planId} AND company_id = ${companyId}
     ORDER BY position_name_snapshot
   `);
-  return rows(result).map((row: any) => ({
+  return rows(result).map((row) => ({
     positionId: Number(row.positionId),
     positionName: String(row.positionName),
     targetBales: Number(row.targetBales ?? 0),
@@ -246,7 +246,7 @@ async function buildPlannerResponse(companyId: number, date: string) {
 function validateEntries(value: unknown): PositionPlanInput[] {
   if (!Array.isArray(value)) throw new Error("entries must be an array");
   const seen = new Set<number>();
-  return value.map((raw: any) => {
+  return value.map((raw) => {
     const positionId = Number(raw?.positionId);
     const targetBales = Number(raw?.targetBales);
     const bonusPerExtraBale = Number(raw?.bonusPerExtraBale);

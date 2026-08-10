@@ -81,7 +81,7 @@ export function registerBaleProductRoutes(app: Express) {
         return res.status(400).json({ message: "Invalid data format" });
       }
       const created = await storage.bulkCreatePendingBarcodes(
-        barcodes.map((b: any) => ({
+        barcodes.map((b) => ({
           companyId,
           barcode: b.barcode || b.code || b,
           category: b.category || null,

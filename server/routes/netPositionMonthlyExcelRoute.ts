@@ -10,10 +10,7 @@ import { requireAuth, requireNonPOS } from "../auth";
 import { storage } from "../storage";
 import { generateNetPositionExcel, generateMonthEnds } from "../helpers/generateNetPositionExcel";
 import { getClientDate } from "../lib/dateUtils";
-import {
-  resolveAuthorizedCompanyId,
-  sendCompanyAccessError,
-} from "../security/companyAccessBoundary";
+import { resolveAuthorizedCompanyId, sendCompanyAccessError } from "../security/companyAccessBoundary";
 
 export function registerNetPositionMonthlyExcelRoute(app: Express) {
   app.get("/api/reports/net-position-monthly-excel", requireAuth, requireNonPOS, async (req, res) => {
@@ -21,7 +18,7 @@ export function registerNetPositionMonthlyExcelRoute(app: Express) {
       const companyId = await resolveAuthorizedCompanyId(req, req.query.companyId);
 
       const allCompanies = await storage.getAllCompanies();
-      const company = allCompanies.find((candidate: any) => candidate.id === companyId);
+      const company = allCompanies.find((candidate) => candidate.id === companyId);
       if (!company) return res.status(404).json({ message: "Company not found" });
       const companyName = company.name || "Company";
 
@@ -38,7 +35,7 @@ export function registerNetPositionMonthlyExcelRoute(app: Express) {
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename="NetPosition_Monthly_${safeCompany}_${safeStart}_${safeEnd}.xlsx"`,
+        `attachment; filename="NetPosition_Monthly_${safeCompany}_${safeStart}_${safeEnd}.xlsx"`
       );
       await generateNetPositionExcel(companyId, companyName, startDate, endDate, res);
       res.end();

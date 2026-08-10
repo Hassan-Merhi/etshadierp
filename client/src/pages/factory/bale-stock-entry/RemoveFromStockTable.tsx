@@ -65,7 +65,7 @@ export function RemoveFromStockTable({
               </TableCell>
             </TableRow>
           ) : viewMode === "detailed" ? (
-            filteredBales?.map((bale: any) => (
+            filteredBales?.map((bale) => (
               <TableRow key={bale.id} className={selectedBaleIds.has(bale.id) ? "bg-primary/5" : ""}>
                 <TableCell>
                   <input

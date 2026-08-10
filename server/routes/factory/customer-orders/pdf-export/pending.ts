@@ -45,10 +45,10 @@ export function registerOrderPendingExportRoutes(app: Express) {
         .where(eq(customerOrderBales.orderId, orderId))
         .orderBy(customerOrderBales.id);
 
-      const baleIds = baleLinks.map((b: any) => b.baleId).filter(Boolean);
+      const baleIds = baleLinks.map((b) => b.baleId).filter(Boolean);
       const baleRows: any[] =
         baleIds.length > 0 ? await db.select().from(factoryBales).where(inArray(factoryBales.id, baleIds)) : [];
-      const baleMap = new Map<number, any>(baleRows.map((b: any) => [b.id, b]));
+      const baleMap = new Map<number, any>(baleRows.map((b) => [b.id, b]));
 
       const ExcelJS = (await import("exceljs")).default;
       const workbook = new ExcelJS.Workbook();

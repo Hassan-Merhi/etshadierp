@@ -28,7 +28,7 @@ export function registerFactoryMixBatchReadRoutes(app: Express) {
         .orderBy(desc(factoryMixBatches.createdAt));
 
       // ── Display-blend calculation (read-only, no DB writes) ──
-      const batchIds = results.map((b: any) => b.id);
+      const batchIds = results.map((b) => b.id);
       let sourceRows: any[] = [];
       if (batchIds.length > 0) {
         // Only read the fields needed to compute list display totals. The old
@@ -47,7 +47,7 @@ export function registerFactoryMixBatchReadRoutes(app: Express) {
       }
 
       const uniqueSupplierIds = [
-        ...new Set(sourceRows.filter((s: any) => s.supplierId != null).map((s: any) => Number(s.supplierId))),
+        ...new Set(sourceRows.filter((s) => s.supplierId != null).map((s) => Number(s.supplierId))),
       ].filter((id) => Number.isInteger(id) && id > 0);
 
       // Phase 3: persisted supplier locked rates are loaded in one query rather
@@ -61,7 +61,7 @@ export function registerFactoryMixBatchReadRoutes(app: Express) {
         sourcesByBatch.get(src.mixBatchId)!.push(src);
       }
 
-      const enriched = results.map((b: any) => {
+      const enriched = results.map((b) => {
         const total = parseFloat(b.totalWeightKg) || 0;
         const used = parseFloat(b.usedKg) || 0;
 

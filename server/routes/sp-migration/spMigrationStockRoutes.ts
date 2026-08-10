@@ -280,7 +280,7 @@ export function registerSpMigrationStockRoutes(app: Express) {
             SELECT COALESCE(SUM(quantity), 0) AS q FROM inventory WHERE company_id = ${targetId} AND location_id = ${tgtLocId}
           `)
           ).rows[0] as any;
-          const locNameRow = sourceLocs.find((l: any) => pn(l.id) === srcLocId);
+          const locNameRow = sourceLocs.find((l) => pn(l.id) === srcLocId);
           perLocationRecon.push({
             location: locNameRow?.name ?? `location #${srcLocId}`,
             sourceQty: Math.round(pn(srcTotal.q) * 1000) / 1000,

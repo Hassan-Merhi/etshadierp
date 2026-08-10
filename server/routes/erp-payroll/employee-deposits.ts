@@ -62,7 +62,7 @@ export function registerPayrollEmployeeDepositRoutes(app: Express) {
       const depExpName = depIsDefault ? "Salary Expense" : `Salary Expense - ${depGrp}`;
 
       const allDepAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
-      let depSalaryAccount = allDepAccounts.find((a: any) => a.code === depExpCode);
+      let depSalaryAccount = allDepAccounts.find((a) => a.code === depExpCode);
       if (!depSalaryAccount) {
         depSalaryAccount = await storage.createLedgerAccount({
           companyId: req.session.currentCompanyId!,
@@ -205,7 +205,7 @@ export function registerPayrollEmployeeDepositRoutes(app: Express) {
               .replace(/[^A-Z0-9]/g, "_")
               .substring(0, 25)}`;
         const expName = isDefault ? "Salary Expense" : `Salary Expense - ${grp}`;
-        let expAccount = bulkDepFreshAccounts.find((a: any) => a.code === expCode);
+        let expAccount = bulkDepFreshAccounts.find((a) => a.code === expCode);
         if (!expAccount) {
           expAccount = await storage.createLedgerAccount({
             companyId: req.session.currentCompanyId!,

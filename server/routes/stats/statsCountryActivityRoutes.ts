@@ -130,7 +130,7 @@ export function registerStatsCountryActivityRoutes(app: Express) {
             entry.offloads = parseInt(row.cnt);
             const rawContainers = typeof row.containers === "string" ? JSON.parse(row.containers) : row.containers;
             if (Array.isArray(rawContainers)) {
-              entry.containers = rawContainers.map((c: any) => ({
+              entry.containers = rawContainers.map((c) => ({
                 id: Number(c.id),
                 containerNumber: c.containerNumber || "",
                 supplierCode: c.supplierCode ?? null,
@@ -224,7 +224,7 @@ export function registerStatsCountryActivityRoutes(app: Express) {
             entry.purchases = parseInt(row.cnt);
             const rawContainers = typeof row.containers === "string" ? JSON.parse(row.containers) : row.containers;
             if (Array.isArray(rawContainers)) {
-              entry.importedContainers = rawContainers.map((c: any) => ({
+              entry.importedContainers = rawContainers.map((c) => ({
                 id: Number(c.id),
                 containerNumber: c.containerNumber || "",
                 supplierCode: c.supplierCode ?? null,

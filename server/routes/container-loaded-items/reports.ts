@@ -591,7 +591,7 @@ export function registerContainerLoadedItemReportRoutes(app: Express, requireAut
         summarySheet.getColumn(1).width = 28;
         summarySheet.getColumn(2).width = 18;
 
-        workbook.worksheets.forEach((ws: any, idx: number) => {
+        workbook.worksheets.forEach((ws, idx: number) => {
           if (idx > 0) return;
         });
 

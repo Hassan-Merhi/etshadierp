@@ -707,7 +707,7 @@ export function registerOrderChargesRoutes(app: Express) {
               })`
             )
           );
-        chargeVoucherIdsToDelete = legacyMatches.map((v: any) => v.id);
+        chargeVoucherIdsToDelete = legacyMatches.map((v) => v.id);
       }
 
       if (chargeVoucherIdsToDelete.length > 0) {

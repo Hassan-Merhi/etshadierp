@@ -61,9 +61,9 @@ export function registerFactoryContainerReadAccessRoutes(app: Express) {
       const requiredTypes = docTypes.filter(
         (docType: any) => docType.isRequired && (docType.companyId == null || docType.companyId === companyId)
       );
-      const uploadedTypeIds = new Set(rawDocs.map((doc: any) => doc.docTypeId));
+      const uploadedTypeIds = new Set(rawDocs.map((doc) => doc.docTypeId));
 
-      const documents = rawDocs.map((doc: any) => ({
+      const documents = rawDocs.map((doc) => ({
         ...doc,
         fileData: undefined,
         isGhost: !doc.storageKey && !doc.fileData,
@@ -71,11 +71,11 @@ export function registerFactoryContainerReadAccessRoutes(app: Express) {
 
       return res.json({
         documents,
-        docTypes: docTypes.filter((docType: any) => docType.companyId == null || docType.companyId === companyId),
+        docTypes: docTypes.filter((docType) => docType.companyId == null || docType.companyId === companyId),
         completeness: {
           total: requiredTypes.length,
-          uploaded: requiredTypes.filter((docType: any) => uploadedTypeIds.has(docType.id)).length,
-          complete: requiredTypes.every((docType: any) => uploadedTypeIds.has(docType.id)),
+          uploaded: requiredTypes.filter((docType) => uploadedTypeIds.has(docType.id)).length,
+          complete: requiredTypes.every((docType) => uploadedTypeIds.has(docType.id)),
         },
       });
     } catch (error: unknown) {
@@ -100,7 +100,7 @@ export function registerFactoryContainerReadAccessRoutes(app: Express) {
 
       if (freightRows.length === 0) return res.json([]);
 
-      const freightIds = freightRows.map((row: any) => row.id);
+      const freightIds = freightRows.map((row) => row.id);
       const payments = await db
         .select()
         .from(containerFreightPayments)
@@ -119,7 +119,7 @@ export function registerFactoryContainerReadAccessRoutes(app: Express) {
       }
 
       return res.json(
-        freightRows.map((freight: any) => {
+        freightRows.map((freight) => {
           const freightPayments = paymentsByFreight.get(freight.id) ?? [];
           const totalPaid = freightPayments.reduce((sum: number, payment: any) => sum + Number(payment.amount), 0);
           const freightAmount = Number(freight.freightAmount);

@@ -57,7 +57,7 @@ export function parseExcelFile(file: File): Promise<ParsedRow[]> {
           return;
         }
         const parsed: ParsedRow[] = rows
-          .map((r: any, i: number) => ({ currentRef: String(r[refCol] || "").trim(), rowNum: i + 2 }))
+          .map((r, i: number) => ({ currentRef: String(r[refCol] || "").trim(), rowNum: i + 2 }))
           .filter((r) => r.currentRef);
         resolve(parsed);
       } catch (err: any) {

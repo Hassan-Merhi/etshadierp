@@ -44,10 +44,10 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
         .select({ userId: userCompanyRoles.userId })
         .from(userCompanyRoles)
         .where(eq(userCompanyRoles.role, "Developer"));
-      const devUserIds = new Set(devRoles.map((r: any) => r.userId));
+      const devUserIds = new Set(devRoles.map((r) => r.userId));
       const requesterIsDeveloper = currentRole === "Developer" || globalRole === "Developer";
 
-      const visibleUsers = allUsers.filter((u: any) => requesterIsDeveloper || !devUserIds.has(u.id));
+      const visibleUsers = allUsers.filter((u) => requesterIsDeveloper || !devUserIds.has(u.id));
 
       const profiles = await db.select().from(factoryUserProfiles).where(eq(factoryUserProfiles.companyId, companyId));
 
@@ -56,14 +56,14 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
         .from(factoryUserPageAccess)
         .where(eq(factoryUserPageAccess.companyId, companyId));
 
-      const profileMap = new Map(profiles.map((p: any) => [p.userId, p]));
+      const profileMap = new Map(profiles.map((p) => [p.userId, p]));
       const accessMap = new Map<string, string[]>();
-      access.forEach((a: any) => {
+      access.forEach((a) => {
         if (!accessMap.has(a.userId)) accessMap.set(a.userId, []);
         accessMap.get(a.userId)!.push(a.pageKey);
       });
 
-      const result = visibleUsers.map((u: any) => {
+      const result = visibleUsers.map((u) => {
         const profile = profileMap.get(u.id);
         return {
           ...u,
@@ -427,7 +427,7 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
 
       res.json({
         fullAccess: false,
-        pageKeys: access.map((a: any) => a.pageKey),
+        pageKeys: access.map((a) => a.pageKey),
         hasErpAccess,
         hasFactoryAccess,
         hiddenCostFields,

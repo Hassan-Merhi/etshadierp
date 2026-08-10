@@ -16,7 +16,8 @@ export function registerSupplierRoutes(app: Express) {
       const companyId = getActiveSupplierCompanyId(req);
       enforceSupplierCompanyQuery(req, companyId);
       const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
-      return res.json(await supplierService.list(companyId, search));
+      const allowParentFallback = req.query.allowParentFallback === "true";
+      return res.json(await supplierService.list(companyId, search, allowParentFallback));
     } catch (error: unknown) {
       return sendSupplierRouteError(res, error, 500);
     }

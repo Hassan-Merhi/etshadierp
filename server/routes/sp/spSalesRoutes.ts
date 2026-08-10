@@ -274,7 +274,7 @@ export function registerSpSalesRoutes(app: Express) {
         });
 
         await tx.insert(spSaleLines).values(
-          postedLines.map((pl: any) => ({
+          postedLines.map((pl) => ({
             saleId: sale.id,
             companyId,
             movementId: pl.movementId,

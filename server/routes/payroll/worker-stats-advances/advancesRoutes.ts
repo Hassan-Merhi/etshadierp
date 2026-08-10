@@ -80,17 +80,17 @@ export function registerWorkerAdvancesRoutes(app: Express) {
         .where(and(...conditions))
         .orderBy(desc(factoryWorkerAdvances.advanceDate));
 
-      const workerIds = [...new Set(advances.map((a: any) => a.workerId))];
+      const workerIds = [...new Set(advances.map((a) => a.workerId))];
       let workerMap: Record<number, string> = {};
       if (workerIds.length > 0) {
         const workers = await db
           .select({ id: factoryWorkers.id, fullName: factoryWorkers.fullName })
           .from(factoryWorkers)
           .where(inArray(factoryWorkers.id, workerIds));
-        workerMap = Object.fromEntries(workers.map((w: any) => [w.id, w.fullName]));
+        workerMap = Object.fromEntries(workers.map((w) => [w.id, w.fullName]));
       }
 
-      const enriched = advances.map((a: any) => ({
+      const enriched = advances.map((a) => ({
         ...a,
         workerName: workerMap[a.workerId] || `Worker #${a.workerId}`,
       }));

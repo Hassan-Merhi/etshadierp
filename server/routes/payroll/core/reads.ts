@@ -74,7 +74,7 @@ export function registerPayrollCoreReadRoutes(app: Express) {
         if (payroll.status === "DRAFT") await attachProductionBonusesToPayroll(db, payroll.id);
       }
 
-      const workerIds = [...new Set(payrolls.map((payroll: any) => payroll.workerId))];
+      const workerIds = [...new Set(payrolls.map((payroll) => payroll.workerId))];
       const workers = workerIds.length
         ? await db
             .select({
@@ -86,12 +86,12 @@ export function registerPayrollCoreReadRoutes(app: Express) {
             .from(factoryWorkers)
             .where(inArray(factoryWorkers.id, workerIds))
         : [];
-      const workerMap = new Map(workers.map((worker: any) => [worker.id, worker]));
+      const workerMap = new Map(workers.map((worker) => [worker.id, worker]));
       const productionTotals = await getProductionBonusTotalsForPayrollIds(
         db,
         payrolls.map((payroll) => payroll.id)
       );
-      const result = payrolls.map((payroll: any) => {
+      const result = payrolls.map((payroll) => {
         const production = productionTotals.get(payroll.id) ?? emptyBonusTotals();
         return {
           ...payroll,

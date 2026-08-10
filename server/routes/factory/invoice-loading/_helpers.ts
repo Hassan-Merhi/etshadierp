@@ -60,7 +60,7 @@ export async function buildLoadingSummary(invoiceId: number, companyId: number, 
     sql`SELECT * FROM customer_order_bales WHERE order_id = ${invoiceId}`
   );
   const _invoiceBalesRows: any[] = resultRows(_invoiceBalesRawResult);
-  const invoiceBalesRaw = _invoiceBalesRows.map((r: any) => ({
+  const invoiceBalesRaw = _invoiceBalesRows.map((r) => ({
     id: r.id as number,
     baleId: r.bale_id as number,
     baleReference: String(r.bale_reference ?? ""),

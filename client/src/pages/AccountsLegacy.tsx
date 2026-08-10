@@ -1123,8 +1123,8 @@ export default function Accounts() {
                     control={editForm.control}
                     name="parentId"
                     render={({ field }) => {
-                      const filteredGroups = groupOptions.filter((g: any) => g.id !== alterSelectedAccount?.accountId);
-                      const selectedGroup = filteredGroups.find((g: any) => g.id === field.value);
+                      const filteredGroups = groupOptions.filter((g) => g.id !== alterSelectedAccount?.accountId);
+                      const selectedGroup = filteredGroups.find((g) => g.id === field.value);
                       return (
                         <FormItem className="flex flex-col">
                           <FormLabel>Parent Group</FormLabel>
@@ -1161,7 +1161,7 @@ export default function Accounts() {
                                     />
                                     — No group —
                                   </CommandItem>
-                                  {filteredGroups.map((g: any) => (
+                                  {filteredGroups.map((g) => (
                                     <CommandItem
                                       key={g.id}
                                       value={g.name}

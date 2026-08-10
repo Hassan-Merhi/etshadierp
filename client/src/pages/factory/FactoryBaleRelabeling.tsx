@@ -664,7 +664,7 @@ export default function FactoryBaleRelabeling() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sessions.map((s: any) => (
+                    {sessions.map((s) => (
                       <TableRow key={s.id} data-testid={`row-session-${s.id}`}>
                         <TableCell className="text-sm">{formatDisplayDate(s.createdAt?.split("T")[0] || "")}</TableCell>
                         <TableCell className="text-sm text-muted-foreground truncate max-w-40">

@@ -539,7 +539,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
             )
           );
         if (existingPreOffloadVouchers.length > 0) {
-          const vIds = existingPreOffloadVouchers.map((v: any) => v.id);
+          const vIds = existingPreOffloadVouchers.map((v) => v.id);
           await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
           await tx.delete(vouchers).where(inArray(vouchers.id, vIds));
         }

@@ -23,7 +23,7 @@ export function registerFactoryEmployeeBulkWithdrawRoutes(app: Express) {
       if (!date) return res.status(400).json({ message: "Date is required" });
       if (!cashAccountId) return res.status(400).json({ message: "Cash account is required" });
 
-      const validWithdrawals = withdrawals.filter((w: any) => {
+      const validWithdrawals = withdrawals.filter((w) => {
         const a = parseFloat(w.amount);
         return !isNaN(a) && a > 0 && w.employeeId;
       });

@@ -39,7 +39,7 @@ export function registerFactoryMixBatchesByDateRoutes(app: Express, requireAuth:
       );
 
       const batches = batchesResult.rows;
-      const batchIds = batches.map((b: any) => b.id);
+      const batchIds = batches.map((b) => b.id);
 
       let sources: any[] = [];
       if (batchIds.length > 0) {
@@ -116,8 +116,8 @@ export function registerFactoryMixBatchesByDateRoutes(app: Express, requireAuth:
         })
       );
 
-      const enriched = batches.map((b: any) => {
-        const batchSources = enrichedSources.filter((s: any) => s.mix_batch_id === b.id);
+      const enriched = batches.map((b) => {
+        const batchSources = enrichedSources.filter((s) => s.mix_batch_id === b.id);
         const totalWeight = parseFloat(b.total_weight_kg) || 0;
         const totalCost = batchSources.reduce((sum: number, s: any) => sum + (parseFloat(s.total_cost) || 0), 0);
         const costPerKg = totalWeight > 0 ? totalCost / totalWeight : 0;
@@ -131,7 +131,7 @@ export function registerFactoryMixBatchesByDateRoutes(app: Express, requireAuth:
           costPerKg,
           batchDate: b.batch_date,
           createdAt: b.created_at,
-          sources: batchSources.map((s: any) => ({
+          sources: batchSources.map((s) => ({
             id: s.id,
             sourceName: s.source_name,
             containerNumber: s.container_number,

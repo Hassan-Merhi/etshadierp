@@ -188,7 +188,7 @@ export function registerBalesReportRoutes(app: Express) {
         const total = parseInt(String((countResult.rows[0] as any)?.total ?? "0"), 10);
         const totalBales = parseInt(String((countResult.rows[0] as any)?.total_bales ?? "0"), 10);
         const totalWeight = parseFloat(String((countResult.rows[0] as any)?.total_weight ?? "0"));
-        const items = liteResult.rows.map((r: any) => ({ ...r, bales: [] }));
+        const items = liteResult.rows.map((r) => ({ ...r, bales: [] }));
         return res.json(buildPaginatedResponse(items, total, totalBales, totalWeight));
       }
 
@@ -523,7 +523,7 @@ export function registerBalesReportRoutes(app: Express) {
       }
 
       if (excludeIds.length > 0) {
-        results = results.filter((b: any) => !excludeIds.includes(b.id));
+        results = results.filter((b) => !excludeIds.includes(b.id));
       }
 
       if (results.length === 0) return res.status(404).json({ message: "Bale not found" });
@@ -676,7 +676,7 @@ export function registerBalesReportRoutes(app: Express) {
         kgsUsedToday: kgsUsedToday.toFixed(3),
         totalBaleWeightToday: totalBaleWeightToday.toFixed(3),
         categories,
-        balesDetail: todayBales.map((b: any) => ({ ...b, quantity: 1 })),
+        balesDetail: todayBales.map((b) => ({ ...b, quantity: 1 })),
       };
       _setKpiCached(_kpiKey, _kpiResult);
       res.json(_kpiResult);

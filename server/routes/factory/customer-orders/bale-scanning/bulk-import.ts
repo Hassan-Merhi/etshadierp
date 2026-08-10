@@ -72,7 +72,7 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
         .select({ baleId: customerOrderBales.baleId })
         .from(customerOrderBales)
         .where(eq(customerOrderBales.orderId, orderId));
-      const alreadyAddedBaleIds = new Set(existingOrderBales.map((b: any) => b.baleId));
+      const alreadyAddedBaleIds = new Set(existingOrderBales.map((b) => b.baleId));
 
       let totalAdded = 0;
       const notFound: Array<{ articleCode: string; requestedQty: number; foundQty: number }> = [];
@@ -156,11 +156,11 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
               }
             }
             if (priceUsed === "0" && bale.productId) {
-              const product = allProducts.find((p: any) => p.id === bale.productId);
+              const product = allProducts.find((p) => p.id === bale.productId);
               if (product?.sellingPrice) priceUsed = product.sellingPrice;
             }
 
-            const baleProductForName1 = bale.productId ? allProducts.find((p: any) => p.id === bale.productId) : null;
+            const baleProductForName1 = bale.productId ? allProducts.find((p) => p.id === bale.productId) : null;
 
             await tx.insert(customerOrderBales).values({
               orderId,
@@ -322,11 +322,11 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
               }
             }
             if (priceUsed === "0" && bale.productId) {
-              const product = allProducts.find((p: any) => p.id === bale.productId);
+              const product = allProducts.find((p) => p.id === bale.productId);
               if (product?.sellingPrice) priceUsed = product.sellingPrice;
             }
 
-            const baleProductForName2 = bale.productId ? allProducts.find((p: any) => p.id === bale.productId) : null;
+            const baleProductForName2 = bale.productId ? allProducts.find((p) => p.id === bale.productId) : null;
 
             await tx.insert(customerOrderBales).values({
               orderId,

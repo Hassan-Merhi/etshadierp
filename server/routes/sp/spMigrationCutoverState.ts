@@ -135,7 +135,7 @@ async function loadActiveLocks(): Promise<ActiveCutoverLock[]> {
     WHERE status IN ('prepared', 'active')
     ORDER BY id DESC
   `);
-  const locks = resultRows(result).map((row: any) => ({
+  const locks = resultRows(result).map((row) => ({
     id: Number(row.id),
     sourceCompanyId: Number(row.source_company_id),
     targetCompanyId: Number(row.target_company_id),
@@ -222,7 +222,7 @@ export function installCutoverWriteGuard(app: Express): void {
     return;
   }
   const guardLayer = routerStack.pop();
-  const firstRouteIndex = routerStack.findIndex((layer: any) => Boolean(layer.route));
+  const firstRouteIndex = routerStack.findIndex((layer) => Boolean(layer.route));
   if (!guardLayer || firstRouteIndex < 0) {
     if (guardLayer) routerStack.push(guardLayer);
     logger.warn("[SP Cutover Guard] Could not reposition guard before the first route");

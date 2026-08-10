@@ -79,7 +79,7 @@ export async function calculateIncomeStatementForPeriod(
   }
 
   // Build account lookup
-  const accountMap = new Map(companyAccounts.map((a: any) => [a.id, a]));
+  const accountMap = new Map(companyAccounts.map((a) => [a.id, a]));
 
   const revenueLines: IncomeLineItem[] = [];
   const directExpLines: IncomeLineItem[] = [];

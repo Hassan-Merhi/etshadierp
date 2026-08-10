@@ -3,16 +3,16 @@
  *
  * Extracted from AccountingCreate.tsx during the Phase 4 god-file split.
  */
-import {useEffect} from "react";
-import {Card} from "@/components/ui/card";
-import {Form, FormControl, FormField, FormItem, FormLabel, FormMessage} from "@/components/ui/form";
-import {Input} from "@/components/ui/input";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Checkbox} from "@/components/ui/checkbox";
-import {useQuery} from "@tanstack/react-query";
-import {formatNumber} from "@/lib/formatNumber";
+import { useEffect } from "react";
+import { Card } from "@/components/ui/card";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useQuery } from "@tanstack/react-query";
+import { formatNumber } from "@/lib/formatNumber";
 
-import {FormButtons} from "./FormButtons";
+import { FormButtons } from "./FormButtons";
 
 export // Stock Item Form Component
 function StockItemForm({
@@ -90,7 +90,7 @@ function StockItemForm({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {stockGroups.map((grp: any) => (
+                      {stockGroups.map((grp) => (
                         <SelectItem key={grp.id} value={grp.id.toString()}>
                           {grp.name} ({grp.code})
                         </SelectItem>

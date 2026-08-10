@@ -18,7 +18,7 @@ async function getOrCreateInterCompanyAccount(params: {
   accountType: "Asset" | "Liability";
   accounts: any[];
 }) {
-  const existing = params.accounts.find((account: any) => account.code === params.code);
+  const existing = params.accounts.find((account) => account.code === params.code);
   if (existing) return existing;
   return transferRepository.createLedgerAccount({
     companyId: params.companyId,
@@ -118,7 +118,7 @@ export const interCompanyTransferService = {
       const existingTransfer = await transferRepository.findTransferByVoucherIdsTx(
         tx,
         Number((fromPosted.voucher as any).id),
-        Number((toPosted.voucher as any).id),
+        Number((toPosted.voucher as any).id)
       );
       if (existingTransfer) return existingTransfer;
 
