@@ -18,8 +18,11 @@ function positiveInt(value: unknown, fallback: number, max: number): number {
   return Math.min(Math.floor(parsed), max);
 }
 
+type FactorySession = Request["session"] & { factoryCompanyId?: number };
+
 function getCompanyId(req: Request): number | null {
-  const value = req.session?.factoryCompanyId || req.session?.currentCompanyId;
+  const session = req.session as FactorySession;
+  const value = session.factoryCompanyId || session.currentCompanyId;
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }

@@ -23,10 +23,7 @@ function wantsPagination(req: Request): boolean {
 }
 
 function parsePagination(req: Request): { page: number; limit: number; offset: number } {
-  const limit = Math.min(
-    MAX_PAGE_SIZE,
-    parsePositiveInt(req.query.limit ?? req.query.pageSize, DEFAULT_PAGE_SIZE)
-  );
+  const limit = Math.min(MAX_PAGE_SIZE, parsePositiveInt(req.query.limit ?? req.query.pageSize, DEFAULT_PAGE_SIZE));
   if (req.query.offset !== undefined) {
     const offset = Math.max(0, Number.parseInt(String(req.query.offset), 10) || 0);
     return { page: Math.floor(offset / limit) + 1, limit, offset };

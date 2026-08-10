@@ -31,6 +31,7 @@ import { printDispatchDocument } from "./wastedispatch/optimizedPrint";
 import type {
   GroupSummary,
   HistoryBale,
+  HistoryItem,
   HistoryResponse,
   PrintDispatch,
   SummaryResponse,
@@ -96,7 +97,7 @@ export default function WasteDispatchOptimized() {
 
   const { data: summary, isLoading: summaryLoading } = useQuery<SummaryResponse>({
     queryKey: ["/api/factory/waste-dispatch/summary", balePage, debouncedSearch],
-    queryFn: () => readJson(`/api/factory/waste-dispatch/summary?${summaryParams.toString()}`),
+    queryFn: () => readWasteJson(`/api/factory/waste-dispatch/summary?${summaryParams.toString()}`),
     staleTime: 30_000,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
@@ -106,7 +107,7 @@ export default function WasteDispatchOptimized() {
   const { data: history, isLoading: historyLoading } = useQuery<HistoryResponse>({
     queryKey: ["/api/factory/waste-dispatch/history-summary", historyPage],
     queryFn: () =>
-      readJson(`/api/factory/waste-dispatch/history-summary?page=${historyPage}&limit=${HISTORY_PAGE_SIZE}`),
+      readWasteJson(`/api/factory/waste-dispatch/history-summary?page=${historyPage}&limit=${HISTORY_PAGE_SIZE}`),
     staleTime: 30_000,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
