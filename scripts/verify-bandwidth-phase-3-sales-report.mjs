@@ -80,8 +80,8 @@ assert.match(
 assert.match(bandwidthPlugin, /debouncedSearchTerm/, "search must be debounced before server requests");
 assert.match(
   bandwidthPlugin,
-  /\/api\/dashboard\/sales-report-comparison\?\$\{queryString\}/,
-  "comparison filters must be present in the actual first-element request URL"
+  /\/api\/dashboard\/sales-report-comparison\?\\\$\{queryString\}/,
+  "comparison filters must be encoded into the transformed first-element request URL"
 );
 assert.match(
   bandwidthPlugin,
