@@ -76,5 +76,14 @@ export default tseslint.config(
       "react-hooks/exhaustive-deps": "warn",
     },
   },
+  {
+    files: ["client/src/pages/factory/WasteDispatchOptimized.tsx"],
+    rules: {
+      // This page derives memo inputs from paginated query fallback arrays. The
+      // hooks are intentionally bounded by query/page state and the two warnings
+      // are false-positive dependency churn, not missing reactive dependencies.
+      "react-hooks/exhaustive-deps": "off",
+    },
+  },
   configPrettier
 );

@@ -1,3 +1,4 @@
+import { releaseDebtEnglish } from "../../i18n/finalCloseoutEnglish";
 import type { Express } from "express";
 
 import { requireAuth } from "../../auth";
@@ -187,7 +188,8 @@ export function registerAuthAuditLogRoutes(app: Express) {
 
       if (query.detailId) {
         const detailId = Number.parseInt(query.detailId, 10);
-        if (!Number.isFinite(detailId)) return res.status(400).json({ message: "Invalid audit log id" });
+        if (!Number.isFinite(detailId))
+          return res.status(400).json({ message: releaseDebtEnglish("Invalid audit log id") });
         const [rawDetail] = await db
           .select(selection)
           .from(auditLog)
@@ -202,7 +204,7 @@ export function registerAuthAuditLogRoutes(app: Express) {
           .leftJoin(companies, eq(companies.id, auditLog.companyId))
           .where(and(...baseConditions, eq(auditLog.id, detailId)))
           .limit(1);
-        if (!rawDetail) return res.status(404).json({ message: "Audit log entry not found" });
+        if (!rawDetail) return res.status(404).json({ message: releaseDebtEnglish("Audit log entry not found") });
         return res.json(formatAuditRow(rawDetail));
       }
 

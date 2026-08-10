@@ -1,5 +1,6 @@
 import "./bandwidthPhase1HotspotGuard";
 import "./bandwidthPhase2PayloadGuard";
+import "./heavyListPaginationClient";
 import {
   attachAccountingRequestIdentity,
   isProtectedAccountingRequest,
@@ -22,9 +23,7 @@ function parseJsonBody(init?: RequestInit): Record<string, unknown> | null {
   if (typeof init?.body !== "string" || !init.body.trim()) return null;
   try {
     const parsed = JSON.parse(init.body);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>)
-      : null;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null;
   } catch {
     return null;
   }

@@ -1,6 +1,7 @@
 import { pool } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
+import { chooseActiveCompanyRole } from "../security/activeCompanyPermissionPolicy";
 import {
   deliverLocationStockWhatsApp,
   recordLocationStockDeliveryFailure,
@@ -95,28 +96,40 @@ function permissionAllowed(role: string, explicit: boolean | undefined): boolean
 
 async function scheduleAuthorStillAuthorized(row: ScheduleRow): Promise<boolean> {
   if (!row.updated_by_user_id) return false;
-  const userResult = await pool.query<{ active: boolean; role: string }>(
-    `SELECT u.active, ucr.role
+
+  // Match the same canonical company-role selection used by request permission
+  // middleware. In particular, a Developer role grants the intentional global
+  // developer bypass even when there is no explicit role row for this company.
+  // The old scheduler queried only the target company, so schedules saved by a
+  // developer could work manually but fail later with "owner no longer has permission".
+  const userResult = await pool.query<{ active: boolean; company_id: number; role: string }>(
+    `SELECT u.active, ucr.company_id, ucr.role
        FROM users u
        JOIN user_company_roles ucr ON ucr.user_id = u.id
-      WHERE u.id = $1 AND ucr.company_id = $2
-      ORDER BY ucr.id DESC
-      LIMIT 1`,
-    [row.updated_by_user_id, row.company_id]
+      WHERE u.id = $1
+      ORDER BY ucr.id DESC`,
+    [row.updated_by_user_id]
   );
-  const user = userResult.rows[0];
-  if (!user?.active || !user.role || user.role === "POS" || user.role === "View Only") return false;
-  if (user.role === "Developer" || user.role === "Admin") return true;
+  const rows = userResult.rows;
+  if (!rows.length || rows[0].active !== true) return false;
 
+  const selected = chooseActiveCompanyRole(
+    row.company_id,
+    rows.map((userRole) => ({ companyId: userRole.company_id, role: userRole.role }))
+  );
+  if (!selected || selected.role === "POS" || selected.role === "View Only") return false;
+  if (selected.developerBypass || selected.role === "Admin") return true;
+
+  const role = selected.role;
   const keys = row.include_cost ? ["exp_whatsapp_send", "fld_cost_price", "fld_total_value"] : ["exp_whatsapp_send"];
   const permissions = await pool.query<{ feature_key: string; enabled: boolean }>(
     `SELECT feature_key, enabled
        FROM role_feature_permissions
       WHERE company_id = $1 AND role = $2 AND feature_key = ANY($3::text[])`,
-    [row.company_id, user.role, keys]
+    [row.company_id, role, keys]
   );
   const permissionMap = new Map(permissions.rows.map((permission) => [permission.feature_key, permission.enabled]));
-  return keys.every((key) => permissionAllowed(user.role, permissionMap.get(key)));
+  return keys.every((key) => permissionAllowed(role, permissionMap.get(key)));
 }
 
 async function finishSchedule(locationId: number, status: string, error: string | null, sent: boolean): Promise<void> {

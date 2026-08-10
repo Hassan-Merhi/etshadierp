@@ -23,6 +23,7 @@ const FULL_INVALIDATION_WRITE_PATHS: readonly RegExp[] = [
   /^\/api\/stock-items(?:\/|$)/,
   /^\/api\/employees(?:\/|$)/,
   /^\/api\/factory\/(?:employees|workers|users)(?:\/|$)/,
+  /^\/api\/factory\/(?:bale-products|categories)(?:\/|$)/,
   /^\/api\/(?:customers|suppliers)(?:\/|$)/,
   /^\/api\/factory\/(?:customers|suppliers)(?:\/|$)/,
   /(?:^|\/)(?:set|switch|select|current)[-_]?(?:company|location)(?:\/|$)/i,
