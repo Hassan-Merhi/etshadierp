@@ -167,6 +167,17 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     // ledger_accounts, so a paid worker bonus blocks the ledger delete below.
     await pool.query("DELETE FROM worker_bonuses WHERE company_id = $1", [company.id]);
     await db.delete(schema.vouchers).where(eq(schema.vouchers.companyId, company.id));
+    // stock_adjustment_items.stock_item_id is a foreign key against stock_items,
+    // so any adjustment line left by a test blocks the stock_items delete below
+    // with 'update or delete on table "stock_items" violates foreign key
+    // constraint stock_adjustment_items_stock_item_id_stock_items_id_fk'. It does
+    // not bite on a fresh CI database because the ordering happens to work out,
+    // which is exactly what makes it worth deleting explicitly rather than
+    // relying on that.
+    await pool.query(
+      `DELETE FROM stock_adjustment_items WHERE stock_item_id IN (SELECT id FROM stock_items WHERE company_id = $1)`,
+      [company.id]
+    );
     await db.delete(schema.stockItems).where(eq(schema.stockItems.companyId, company.id));
     await db.delete(schema.stockGroups).where(eq(schema.stockGroups.companyId, company.id));
     await db.delete(schema.locations).where(eq(schema.locations.companyId, company.id));
