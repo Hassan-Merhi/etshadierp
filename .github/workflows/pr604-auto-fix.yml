@@ -79,12 +79,26 @@ jobs:
               s = s.replace("baleRows.map((b: any) =>", "baleRows.map((b) =>")
               p.write_text(s)
 
+          # finalize.ts uses an existing broadly typed transaction, so retain the
+          # ratchet improvement with narrow row shapes rather than implicit/explicit any.
+          p = Path("server/routes/factory/customer-orders/finalize-loading/finalize.ts")
+          s = p.read_text()
+          s = s.replace(
+              ".map((b) => Number(b.baleId))",
+              ".map((b: { baleId: number | null }) => Number(b.baleId))",
+              1,
+          )
+          s = s.replace(
+              "factoryBaleRows.map((b) =>",
+              "factoryBaleRows.map((b: { id: number; status: string | null }) =>",
+              1,
+          )
+          p.write_text(s)
+
           p = Path("server/routes/factory/customer-orders/finalize-loading/loading.ts")
           s = p.read_text().replace("db.transaction(async (tx: any) =>", "db.transaction(async (tx) =>")
           p.write_text(s)
 
-          # This error is an internal maintenance diagnostic. Keep it as a stable
-          # technical identifier so it is not treated as user-facing copy.
           p = Path("server/services/scheduler/maintenance.ts")
           s = p.read_text()
           s = s.replace(
