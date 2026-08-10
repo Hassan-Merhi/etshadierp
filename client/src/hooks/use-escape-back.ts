@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import { goBackToPreviousErpLocation } from "@/lib/erp-navigation-history";
 
 type EscapeHandler = () => void;
 
@@ -29,6 +30,15 @@ function handleDocumentEscape(event: KeyboardEvent) {
   // Radix and other layered controls own the first Escape press. Because this
   // listener runs in capture phase, their open state is still observable here.
   if (hasAnyOpenDialog()) return;
+
+  // A tracked ERP browser entry is the canonical Back action. Resolve it
+  // before page-specific Escape callbacks or editable-field blur behavior so
+  // Esc returns to the exact same URL/state as the visible Back control.
+  if (goBackToPreviousErpLocation()) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    return;
+  }
 
   const activeElement = document.activeElement as HTMLElement | null;
   if (
@@ -68,8 +78,9 @@ function detachListenerWhenUnused() {
  *
  * Escape priority is global and deterministic:
  * 1. Open dialog, menu, select, command palette, or drawer handles Escape.
- * 2. Focused editable field is blurred.
- * 3. The most recently mounted page/inline handler runs.
+ * 2. Tracked ERP history uses the exact same browser Back entry as the UI Back control.
+ * 3. Focused editable field is blurred when there is no tracked ERP Back entry.
+ * 4. The most recently mounted page/inline handler runs as the fallback.
  *
  * A single document listener prevents nested page hooks from navigating twice.
  */
