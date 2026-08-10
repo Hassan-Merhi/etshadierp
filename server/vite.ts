@@ -8,7 +8,6 @@ import { type Server } from "http";
 import viteConfig from "../vite.config";
 
 const viteLogger = createLogger();
-const LABEL_BANNER_PATH = /[\\/]labels[\\/]hmd-[a-z0-9-]+\.jpg$/i;
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -78,19 +77,7 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(
-    express.static(distPath, {
-      setHeaders(res, filePath) {
-        // Built-in HMD banner artwork is versioned by the deployed build. It is
-        // large (roughly 2 MB per image in the supplied production logs) and was
-        // previously revalidated on repeat printing. Keep it browser-resident for
-        // the life of the build; a new deploy changes the application asset cache.
-        if (LABEL_BANNER_PATH.test(filePath)) {
-          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-        }
-      },
-    })
-  );
+  app.use(express.static(distPath));
 
   // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {

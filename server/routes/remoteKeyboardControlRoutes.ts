@@ -66,7 +66,8 @@ function writeHeartbeat(res: Response): void {
   (res as FlushableResponse).flush?.();
 }
 
-function serializeAuthorization(authorization: RemoteKeyboardAuthorization) {
+function serializeAuthorization(authorization: RemoteKeyboardAuthorization | null) {
+  if (!authorization) return null;
   return {
     ...authorization,
     authorizedAt: new Date(authorization.authorizedAt).toISOString(),

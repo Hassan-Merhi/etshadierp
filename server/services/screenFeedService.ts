@@ -1,4 +1,10 @@
-import type { ScreenFeedCaptureInfo, ScreenFeedCursor, ScreenFeedViewport } from "../screenFeedStore";
+import type {
+  ScreenFeedCaptureInfo,
+  ScreenFeedCursor,
+  ScreenFeedFailureInfo,
+  ScreenFeedFailureStage,
+  ScreenFeedViewport,
+} from "../screenFeedStore";
 
 export interface ScreenFeedClick {
   x: number;
@@ -14,6 +20,16 @@ const MAX_VIEWPORT_DIMENSION = 20_000;
 const MAX_CAPTURE_DIMENSION = 8_000;
 const MAX_CAPTURE_DURATION_MS = 30_000;
 const MAX_ENCODED_BYTES = 1_500_000;
+const MAX_FAILURE_REASON_LENGTH = 180;
+const URL_LIKE_RE = /(?:https?:\/\/|blob:|data:)[^\s)\]}]+/gi;
+const EMAIL_LIKE_RE = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
+const ALLOWED_FAILURE_STAGES = new Set<ScreenFeedFailureStage>([
+  "capture",
+  "encode",
+  "upload",
+  "capture-or-upload",
+  "pipeline",
+]);
 
 function finiteNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -31,6 +47,34 @@ function normalizedCoordinate(value: unknown): number | null {
 
 export function isValidScreenFeedDataUrl(value: unknown): value is string {
   return typeof value === "string" && value.startsWith("data:image/");
+}
+
+export function sanitizeScreenFeedFailureReason(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const sanitized = value
+    .replace(URL_LIKE_RE, "[url]")
+    .replace(EMAIL_LIKE_RE, "[email]")
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, MAX_FAILURE_REASON_LENGTH);
+  return sanitized || undefined;
+}
+
+export function sanitizeScreenFeedFailure(value: unknown): Omit<ScreenFeedFailureInfo, "occurredAt"> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const failure = value as Record<string, unknown>;
+  const stage = failure.stage;
+  const reason = sanitizeScreenFeedFailureReason(failure.reason);
+  const durationMs = boundedNumber(failure.durationMs, 0, MAX_CAPTURE_DURATION_MS);
+  if (typeof stage !== "string" || !ALLOWED_FAILURE_STAGES.has(stage as ScreenFeedFailureStage) || !reason) {
+    return null;
+  }
+  return {
+    stage: stage as ScreenFeedFailureStage,
+    reason,
+    ...(durationMs !== null ? { durationMs: Math.round(durationMs) } : {}),
+  };
 }
 
 export function sanitizeScreenFeedClicks(value: unknown, now = Date.now()): ScreenFeedClick[] {
@@ -129,6 +173,7 @@ export function sanitizeScreenFeedCapture(value: unknown): ScreenFeedCaptureInfo
     return undefined;
   }
 
+  const failureReason = sanitizeScreenFeedFailureReason(capture.failureReason);
   return {
     width: Math.round(width),
     height: Math.round(height),
@@ -136,6 +181,7 @@ export function sanitizeScreenFeedCapture(value: unknown): ScreenFeedCaptureInfo
     quality,
     encodedBytes: Math.round(encodedBytes),
     durationMs: Math.round(durationMs),
+    ...(failureReason ? { failureReason } : {}),
   };
 }
 
