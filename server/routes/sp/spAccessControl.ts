@@ -181,12 +181,10 @@ async function enforceSpAccess(req: Request, res: Response, next: NextFunction):
         INSERT INTO sp_audit_events(company_id, user_id, username, role, permission, action, method, path, status_code, request_body)
         VALUES (${companyId}, ${userId || null}, ${req.session.username ?? null}, ${role || null}, ${permission}, 'ACCESS_DENIED', ${req.method}, ${req.originalUrl}, 403, ${JSON.stringify(sanitizedBody(req.body))}::jsonb)
       `);
-      res
-        .status(403)
-        .json({
-          code: "SP_PERMISSION_DENIED",
-          message: releaseDebtEnglish(`Missing Supplier Partner permission: ${permission}`),
-        });
+      res.status(403).json({
+        code: "SP_PERMISSION_DENIED",
+        message: releaseDebtEnglish(`Missing Supplier Partner permission: ${permission}`),
+      });
       return;
     }
 
@@ -196,21 +194,17 @@ async function enforceSpAccess(req: Request, res: Response, next: NextFunction):
     let idempotencyKey: string | null = null;
     if (sensitive) {
       if (confirmation !== sensitive.confirmation) {
-        res
-          .status(400)
-          .json({
-            code: "SP_EXACT_CONFIRMATION_REQUIRED",
-            message: releaseDebtEnglish(`Type exactly: ${sensitive.confirmation}`),
-          });
+        res.status(400).json({
+          code: "SP_EXACT_CONFIRMATION_REQUIRED",
+          message: releaseDebtEnglish(`Type exactly: ${sensitive.confirmation}`),
+        });
         return;
       }
       if (sensitive.requireReason && reason.length < 5) {
-        res
-          .status(400)
-          .json({
-            code: "SP_REASON_REQUIRED",
-            message: releaseDebtEnglish("A meaningful reason of at least 5 characters is required."),
-          });
+        res.status(400).json({
+          code: "SP_REASON_REQUIRED",
+          message: releaseDebtEnglish("A meaningful reason of at least 5 characters is required."),
+        });
         return;
       }
       idempotencyKey = String(req.header("Idempotency-Key") ?? (req.body as any)?.idempotencyKey ?? "").trim();
@@ -228,12 +222,10 @@ async function enforceSpAccess(req: Request, res: Response, next: NextFunction):
         `);
       } catch (error: any) {
         if (error?.code === "23505") {
-          res
-            .status(409)
-            .json({
-              code: "SP_DUPLICATE_REQUEST",
-              message: releaseDebtEnglish("This sensitive request has already been submitted."),
-            });
+          res.status(409).json({
+            code: "SP_DUPLICATE_REQUEST",
+            message: releaseDebtEnglish("This sensitive request has already been submitted."),
+          });
           return;
         }
         throw error;

@@ -38,12 +38,10 @@ export function registerSpPermissionRoutes(app: Express): void {
       }
       const confirmation = String(req.body?.confirmation ?? "");
       if (confirmation !== "CHANGE SP PERMISSION") {
-        return res
-          .status(400)
-          .json({
-            code: "SP_EXACT_CONFIRMATION_REQUIRED",
-            message: releaseDebtEnglish("Type exactly: CHANGE SP PERMISSION"),
-          });
+        return res.status(400).json({
+          code: "SP_EXACT_CONFIRMATION_REQUIRED",
+          message: releaseDebtEnglish("Type exactly: CHANGE SP PERMISSION"),
+        });
       }
       const reason = String(req.body?.reason ?? "").trim();
       if (reason.length < 5)
