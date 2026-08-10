@@ -57,32 +57,34 @@ jobs:
           if end < 0:
               raise SystemExit('worker summary end not found')
           end += len(end_marker)
-          replacement = '''  const workerSummaryByArticle = useMemo(
-            () =>
-              buildWorkerSummaryByArticle(
-                qA.data?.production.byProduct ?? [],
-                qB.data?.production.byProduct ?? []
-              ),
-            [qA.data, qB.data]
-          );
-'''
+          replacement = (
+              '  const workerSummaryByArticle = useMemo(\n'
+              '    () =>\n'
+              '      buildWorkerSummaryByArticle(\n'
+              '        qA.data?.production.byProduct ?? [],\n'
+              '        qB.data?.production.byProduct ?? []\n'
+              '      ),\n'
+              '    [qA.data, qB.data]\n'
+              '  );\n'
+          )
           s = s[:start] + replacement + s[end:]
 
-          cell_start = '''                          <td className="px-3 py-2.5 border-r border-border/30">
-                            {workerSummary.length > 0 ? (
-'''
+          cell_start = (
+              '                          <td className="px-3 py-2.5 border-r border-border/30">\n'
+              '                            {workerSummary.length > 0 ? (\n'
+          )
           start = s.find(cell_start)
           if start < 0:
               raise SystemExit('worker hover cell start not found')
-          next_cell = '''                          <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-foreground">
-'''
+          next_cell = '                          <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-foreground">\n'
           end = s.find(next_cell, start)
           if end < 0:
               raise SystemExit('worker hover cell end not found')
-          replacement = '''                          <td className="px-3 py-2.5 border-r border-border/30">
-                            <WorkerSummaryHover workers={workerSummary} labelA={labelA} labelB={labelB} />
-                          </td>
-'''
+          replacement = (
+              '                          <td className="px-3 py-2.5 border-r border-border/30">\n'
+              '                            <WorkerSummaryHover workers={workerSummary} labelA={labelA} labelB={labelB} />\n'
+              '                          </td>\n'
+          )
           s = s[:start] + replacement + s[end:]
 
           path.write_text(s)
