@@ -144,7 +144,9 @@ export function registerLocationInventoryRoutes(app: Express) {
         res.json(inventory);
       }
     } catch (error: unknown) {
-      logger.error(`[inventory] ERROR locationId=${req.params.locationId}:`, { error: getErrorMessage(error) ?? error });
+      logger.error(`[inventory] ERROR locationId=${req.params.locationId}:`, {
+        error: getErrorMessage(error) ?? error,
+      });
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
@@ -247,7 +249,7 @@ export function registerLocationInventoryRoutes(app: Express) {
       const { buffer } = await generateStockPdf(companyId, companyName, locationId, location.name, includeCost);
 
       const safeDate = getClientDate(req).replace(/-/g, "");
-      const safeName = location.name.replace(/[^\w\s.\-]/g, "_").replace(/\s+/g, "_");
+      const safeName = location.name.replace(/[^\w\s.-]/g, "_").replace(/\s+/g, "_");
       const suffix = includeCost ? "with_cost" : "no_cost";
       const fileName = `${safeName}_Godown_${safeDate}_${suffix}.pdf`;
 
@@ -311,10 +313,10 @@ export function registerLocationInventoryRoutes(app: Express) {
             .from(stockGroups)
             .where(eq(stockGroups.id, stockGroupId))
             .limit(1);
-          groupNameForFile = (grp?.name || String(stockGroupId)).replace(/[^\w\s.\-]/g, "_").replace(/\s+/g, "_");
+          groupNameForFile = (grp?.name || String(stockGroupId)).replace(/[^\w\s.-]/g, "_").replace(/\s+/g, "_");
         }
         const safeDate = getClientDate(req).replace(/-/g, "");
-        const safeName = location.name.replace(/[^\w\s.\-]/g, "_").replace(/\s+/g, "_");
+        const safeName = location.name.replace(/[^\w\s.-]/g, "_").replace(/\s+/g, "_");
         const suffix = includeCost ? "with_cost" : "no_cost";
         const fileName = `${safeName}_${groupNameForFile}_${safeDate}_${suffix}.pdf`;
 

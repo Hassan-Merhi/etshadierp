@@ -116,8 +116,8 @@ async function fetchAllPages(
 ): Promise<{ rows: DailyScanRow[]; response: Response }> {
   const rows: DailyScanRow[] = [];
   let page = 1;
-  let totalPages = 1;
-  let lastResponse: Response | null = null;
+  let totalPages: number;
+  let lastResponse: Response;
 
   do {
     const url = new URL(sourceUrl.toString());

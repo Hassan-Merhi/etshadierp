@@ -118,7 +118,9 @@ export function registerOrderPdfRoutes(app: Express) {
             height: LOGO_H,
             fit: [LOGO_W, LOGO_H],
           });
-        } catch {}
+        } catch {
+          // Failure here is non-fatal and the surrounding flow continues deliberately.
+        }
       }
       const afterLogo = LOGO_TOP + LOGO_H + 10;
 

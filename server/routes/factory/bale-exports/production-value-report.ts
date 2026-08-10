@@ -318,8 +318,8 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
         if (displayWeightKg.gt(0)) {
           displayCostPerKg = displayCost.dividedBy(displayWeightKg);
         } else {
-          // No source rows — fall back to stored batch values
-          displayWeightKg = new Decimal(b.totalWeightKg || 0);
+          // No source rows — fall back to stored batch values. Only cost and
+          // cost/kg are read past this branch; the weight is not projected out.
           displayCost = new Decimal(b.totalCost || 0);
           displayCostPerKg = new Decimal(b.costPerKg || 0);
         }

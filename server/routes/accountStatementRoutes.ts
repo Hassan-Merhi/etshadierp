@@ -348,8 +348,10 @@ export function registerAccountStatementRoutes(app: Express) {
             .where(eq(employees.id, accountId));
           if (r) resolvedName = `${r.firstName} ${r.lastName}`.trim();
         }
-      } catch {}
-      const safeAccName = resolvedName.replace(/[^\w\s.()\-]/g, "_").replace(/\s+/g, "_");
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
+      const safeAccName = resolvedName.replace(/[^\w\s.()-]/g, "_").replace(/\s+/g, "_");
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename=statement_${safeAccName}.pdf`);
       res.end(pdfBuf);
@@ -492,7 +494,9 @@ export function registerAccountStatementRoutes(app: Express) {
           sheet.addImage(logoId, { tl: { col: 2.5, row: 0 }, ext: { width: 260, height: 80 } });
           sheet.mergeCells(`A1:F1`);
         }
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
 
       // Header block
       const rComp = sheet.addRow([company?.name || "Company"]);
@@ -643,7 +647,7 @@ export function registerAccountStatementRoutes(app: Express) {
       cbRow.getCell(5).alignment = { horizontal: "right" };
       cbRow.getCell(6).alignment = { horizontal: "right" };
 
-      const safeAccName = accountName.replace(/[^\w\s.()\-]/g, "_").replace(/\s+/g, "_");
+      const safeAccName = accountName.replace(/[^\w\s.()-]/g, "_").replace(/\s+/g, "_");
       const buf = Buffer.from(await workbook.xlsx.writeBuffer());
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="${safeAccName}_Statement.xlsx"`);

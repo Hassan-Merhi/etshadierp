@@ -284,7 +284,9 @@ export function registerPayrollPreviewRoutes(app: Express) {
           const buf = fs.readFileSync(logoPath);
           logoId = wb.addImage({ buffer: toArrayBuffer(buf), extension: "jpeg" });
         }
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
 
       const NUM_COLS = 13;
 

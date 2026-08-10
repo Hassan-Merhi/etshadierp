@@ -227,7 +227,9 @@ export default function FactoryLocationInventory() {
     for (const row of reprintBales) {
       try {
         await modeApiRequest("POST", "/api/bale-label-prints/reprint", { baleId: row.bale.id });
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
     }
 
     setReprintDialogOpen(false);
@@ -867,7 +869,9 @@ export default function FactoryLocationInventory() {
     setProformaAutoSave(next);
     try {
       localStorage.setItem("proforma-inventory-autosave", String(next));
-    } catch {}
+    } catch {
+      // Storage is unavailable in private mode and can throw on quota; the value is a convenience, not state we need.
+    }
     if (!next && autoSaveTimerRef.current) {
       clearTimeout(autoSaveTimerRef.current);
       autoSaveTimerRef.current = null;

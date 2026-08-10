@@ -212,7 +212,9 @@ export function registerOrderLoadingStatusExportRoutes(app: Express) {
           const lid = workbook.addImage({ buffer: toArrayBuffer(fs.readFileSync(lp)), extension: "jpeg" });
           sheet.addImage(lid, { tl: { col: 0, row: 0 }, ext: { width: 180, height: 110 } });
         }
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
 
       const r1 = sheet.addRow(["HMD INTERNATIONAL GROUP"]);
       r1.height = 26;

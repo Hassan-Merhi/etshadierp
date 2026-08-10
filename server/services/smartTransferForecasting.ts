@@ -125,9 +125,7 @@ function classifyTrend(sales7: number, sales30: number): { trend: SmartTransferD
   const recentRate = sales7 / 7;
   const priorRate = prior23Sales / 23;
   if (priorRate <= 0.01) {
-    return recentRate > 0.15
-      ? { trend: "accelerating", ratio: null }
-      : { trend: "stable", ratio: null };
+    return recentRate > 0.15 ? { trend: "accelerating", ratio: null } : { trend: "stable", ratio: null };
   }
   const ratio = recentRate / priorRate;
   if (ratio >= 1.25) return { trend: "accelerating", ratio: roundNumber(ratio, 2) };
@@ -320,9 +318,13 @@ function urgencyBand(score: number): SmartTransferUrgencyBand {
   return "low";
 }
 
-function historicalNeedFloor(line: SmartTransferPreviewLine, trend: SmartTransferDemandTrend, coverageIsAlreadyEnough: boolean): number {
+function historicalNeedFloor(
+  line: SmartTransferPreviewLine,
+  trend: SmartTransferDemandTrend,
+  coverageIsAlreadyEnough: boolean
+): number {
   if (coverageIsAlreadyEnough) return 0;
-  let multiplier = 0;
+  let multiplier: number;
   switch (line.classification) {
     case "strong_seller":
       multiplier = 0.75;
@@ -342,27 +344,36 @@ function historicalNeedFloor(line: SmartTransferPreviewLine, trend: SmartTransfe
   return wholeNonNegative(Math.ceil(line.calculatedNeed * multiplier));
 }
 
-function buildForecastReason(candidate: ForecastCandidate, source: SmartTransferSourceStock, sourceQty: number, itemTotal: number): string {
+function buildForecastReason(
+  candidate: ForecastCandidate,
+  source: SmartTransferSourceStock,
+  sourceQty: number,
+  itemTotal: number
+): string {
   const score = candidate.itemScore;
   const urgency = candidate.urgencyBand.charAt(0).toUpperCase() + candidate.urgencyBand.slice(1);
-  const stockoutText = candidate.daysUntilStockout === null
-    ? "stockout timing unavailable"
-    : `${roundNumber(candidate.daysUntilStockout, 1)} days of destination stock remain before weighted OTW`;
-  const otwText = candidate.otw.rawQty > 0
-    ? `${roundNumber(candidate.otw.rawQty, 0)} OTW recorded, ${roundNumber(candidate.otw.weightedQty, 0)} counted after ETA/shop reliability weighting`
-    : "no destination OTW recorded";
+  const stockoutText =
+    candidate.daysUntilStockout === null
+      ? "stockout timing unavailable"
+      : `${roundNumber(candidate.daysUntilStockout, 1)} days of destination stock remain before weighted OTW`;
+  const otwText =
+    candidate.otw.rawQty > 0
+      ? `${roundNumber(candidate.otw.rawQty, 0)} OTW recorded, ${roundNumber(candidate.otw.weightedQty, 0)} counted after ETA/shop reliability weighting`
+      : "no destination OTW recorded";
   const trendText = candidate.sales.trend.replace("_", " ");
 
-  return [
-    `Priority ${score}/100 (${urgency})`,
-    `forecast ${roundNumber(candidate.sales.forecastRate, 2)}/day from 7/30/90-day sales (${roundNumber(candidate.sales.sales7, 0)}/${roundNumber(candidate.sales.sales30, 0)}/${roundNumber(candidate.sales.sales90, 0)})`,
-    `trend ${trendText}`,
-    stockoutText,
-    otwText,
-    `calculated need ${candidate.calculatedNeed}`,
-    `${source.sourceLocationName} has ${source.availableQty} available after reserving ${source.reserveQty}`,
-    `${sourceQty} allocated here (${itemTotal} total for this item)`,
-  ].join("; ") + ".";
+  return (
+    [
+      `Priority ${score}/100 (${urgency})`,
+      `forecast ${roundNumber(candidate.sales.forecastRate, 2)}/day from 7/30/90-day sales (${roundNumber(candidate.sales.sales7, 0)}/${roundNumber(candidate.sales.sales30, 0)}/${roundNumber(candidate.sales.sales90, 0)})`,
+      `trend ${trendText}`,
+      stockoutText,
+      otwText,
+      `calculated need ${candidate.calculatedNeed}`,
+      `${source.sourceLocationName} has ${source.availableQty} available after reserving ${source.reserveQty}`,
+      `${sourceQty} allocated here (${itemTotal} total for this item)`,
+    ].join("; ") + "."
+  );
 }
 
 /**
@@ -389,13 +400,7 @@ export async function buildSmartTransferForecastPreview(
   // Ask the existing engine for its full auto-sized candidate set first. This
   // prevents an explicit target from hiding lower-ranked candidates before the
   // Phase 1 score has a chance to compare and re-rank them.
-  const base = await buildSmartTransferPreview(
-    companyId,
-    sourceLocationIds,
-    destinationLocationId,
-    0,
-    options
-  );
+  const base = await buildSmartTransferPreview(companyId, sourceLocationIds, destinationLocationId, 0, options);
 
   if (base.lines.length === 0) {
     const requestedTarget = autoTarget ? base.targetQuantity : wholeNonNegative(targetQuantity);
@@ -511,9 +516,7 @@ export async function buildSmartTransferForecastPreview(
     if (currentStock <= 0) continue;
     const sourceSalesQty = sourceSalesMap.get(`${row.stockItemId}:${row.locationId}`) ?? 0;
     const sourceDailyRate = sourceSalesQty / 30;
-    const reserveQty = sourceDailyRate > 0.1
-      ? Math.ceil(sourceDailyRate * Math.min(targetCoverageDays, 14))
-      : 0;
+    const reserveQty = sourceDailyRate > 0.1 ? Math.ceil(sourceDailyRate * Math.min(targetCoverageDays, 14)) : 0;
     const availableQty = Math.max(0, currentStock - reserveQty);
     if (availableQty <= 0) continue;
     const list = sourceStocksByItem.get(row.stockItemId) ?? [];
@@ -541,9 +544,7 @@ export async function buildSmartTransferForecastPreview(
 
   for (const [stockItemId, representative] of representativeByItem.entries()) {
     const itemSales = salesByItem.get(stockItemId) ?? [];
-    const sales7 = itemSales
-      .filter((sale) => sale.date >= sevenDayStart)
-      .reduce((sum, sale) => sum + sale.quantity, 0);
+    const sales7 = itemSales.filter((sale) => sale.date >= sevenDayStart).reduce((sum, sale) => sum + sale.quantity, 0);
     const sales30 = itemSales
       .filter((sale) => sale.date >= thirtyDayStart)
       .reduce((sum, sale) => sum + sale.quantity, 0);
@@ -556,9 +557,7 @@ export async function buildSmartTransferForecastPreview(
       representative.averageSalesPerDay
     );
 
-    const daysUntilStockout = sales.forecastRate > 0
-      ? representative.destinationStock / sales.forecastRate
-      : null;
+    const daysUntilStockout = sales.forecastRate > 0 ? representative.destinationStock / sales.forecastRate : null;
     const otw = calculateOtwMetrics(
       otwResult.otwDetailsByItem.get(stockItemId) ?? [],
       asOfDate,
@@ -566,12 +565,11 @@ export async function buildSmartTransferForecastPreview(
       targetCoverageDays
     );
     const weightedEffectiveDestinationStock = Math.max(0, representative.destinationStock + otw.weightedQty);
-    const forecastCoverageDays = sales.forecastRate > 0
-      ? weightedEffectiveDestinationStock / sales.forecastRate
-      : null;
-    const forecastNeed = sales.forecastRate > 0
-      ? Math.max(0, Math.ceil(sales.forecastRate * targetCoverageDays - weightedEffectiveDestinationStock))
-      : 0;
+    const forecastCoverageDays = sales.forecastRate > 0 ? weightedEffectiveDestinationStock / sales.forecastRate : null;
+    const forecastNeed =
+      sales.forecastRate > 0
+        ? Math.max(0, Math.ceil(sales.forecastRate * targetCoverageDays - weightedEffectiveDestinationStock))
+        : 0;
     const historicalFloor = historicalNeedFloor(
       representative,
       sales.trend,
@@ -644,9 +642,7 @@ export async function buildSmartTransferForecastPreview(
     : wholeNonNegative(targetQuantity);
   const totalCapacity = candidates.reduce((sum, candidate) => sum + candidate.allocationCapacity, 0);
   requestedTarget = Math.max(0, requestedTarget);
-  const fairShareCap = candidates.length > 0
-    ? Math.ceil((requestedTarget / candidates.length) * 3)
-    : requestedTarget;
+  const fairShareCap = candidates.length > 0 ? Math.ceil((requestedTarget / candidates.length) * 3) : requestedTarget;
 
   const itemAllocations = allocateWholeUnitsByWeight(
     candidates.map((candidate) => ({
@@ -704,8 +700,7 @@ export async function buildSmartTransferForecastPreview(
         forecastTrendRatio: candidate.sales.trendRatio,
         weightedOtwQty: candidate.otw.weightedQty,
         reliableOtwBeforeStockoutQty: candidate.otw.reliableBeforeStockoutQty,
-        daysUntilStockout:
-          candidate.daysUntilStockout === null ? null : roundNumber(candidate.daysUntilStockout, 1),
+        daysUntilStockout: candidate.daysUntilStockout === null ? null : roundNumber(candidate.daysUntilStockout, 1),
         itemScore: candidate.itemScore,
         urgencyBand: candidate.urgencyBand,
         scoreBreakdown: candidate.scoreBreakdown,

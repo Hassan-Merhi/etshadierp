@@ -42,11 +42,15 @@ export function registerSpExportRoutes(app: Express) {
       try {
         const locRows = await db.execute(sql`SELECT name FROM locations WHERE id = ${locId} LIMIT 1`);
         locationName = readString(firstQueryRow(locRows), "name");
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
       try {
         const coRows = await db.execute(sql`SELECT name FROM companies WHERE id = ${companyId} LIMIT 1`);
         companyName = readString(firstQueryRow(coRows), "name");
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
 
       const buffer = await generateSpSalesFormExcel({
         companyId,
@@ -112,11 +116,15 @@ export function registerSpExportRoutes(app: Express) {
           const r = await db.execute(sql`SELECT name FROM locations WHERE id = ${locId} LIMIT 1`);
           locationName = readString(firstQueryRow(r), "name");
         }
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
       try {
         const r = await db.execute(sql`SELECT name FROM companies WHERE id = ${companyId} LIMIT 1`);
         companyName = readString(firstQueryRow(r), "name");
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
 
       const buffer = await generateSpSalesFormExcelV2({
         companyId,

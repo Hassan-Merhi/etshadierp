@@ -1457,7 +1457,9 @@ END $mig$`;
       try {
         const { execSync } = require("child_process");
         execSync(`fuser -k ${port}/tcp`, { stdio: "ignore" });
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
       setTimeout(() => {
         server.removeAllListeners("error");
         server.on("error", (e: any) => {

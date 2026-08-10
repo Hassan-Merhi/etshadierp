@@ -73,7 +73,9 @@ export function registerOrderPendingExportRoutes(app: Express) {
           ldRow.height = 90;
           sheet.addImage(ldId, { tl: { col: 2.4, row: 0 }, ext: { width: 300, height: 90 } });
         }
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
       const ldTitle = sheet.addRow([`Loading List — ${customerName}`]);
       ldTitle.getCell(1).font = { bold: true, size: 13 };
       ldTitle.getCell(1).alignment = { horizontal: "center" };

@@ -215,7 +215,9 @@ export function registerShippingContainerDocumentRoutes(app: Express) {
         try {
           const diskPath = path.join(process.cwd(), "uploads", "shipping-container-docs", doc.fileName);
           if (fs.existsSync(diskPath)) fs.unlinkSync(diskPath);
-        } catch {}
+        } catch {
+          // Failure here is non-fatal and the surrounding flow continues deliberately.
+        }
       }
 
       res.json({ success: true, deletedId: docId });
@@ -359,7 +361,9 @@ export function registerShippingContainerDocumentRoutes(app: Express) {
           if (relative.startsWith("..") || path.isAbsolute(relative))
             return res.status(400).json({ message: "Invalid file path" });
           if (fs.existsSync(target)) fs.unlinkSync(target);
-        } catch {}
+        } catch {
+          // Failure here is non-fatal and the surrounding flow continues deliberately.
+        }
       }
 
       await db

@@ -214,7 +214,9 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
       let meta: any = {};
       try {
         meta = JSON.parse(entry.metaJson || "{}");
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
 
       // Resolve containerId from metaJson or txType + referenceId fallback
       let containerId: number | null = meta.containerId ?? null;

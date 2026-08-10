@@ -99,7 +99,7 @@ export async function ensureChromiumInstalled(): Promise<void> {
   if (process.env.NODE_ENV === "production") {
     logger.info(
       "[Puppeteer] Production environment — skipping Chrome download. " +
-      "Scraper will be disabled. Set PUPPETEER_EXECUTABLE_PATH to enable it."
+        "Scraper will be disabled. Set PUPPETEER_EXECUTABLE_PATH to enable it."
     );
     return;
   }
@@ -221,7 +221,7 @@ export async function scrapeTracking(containerNumber: string): Promise<ScraperRe
   // Acquire global slot — ensures at most 1 Puppeteer operation server-wide.
   // Rejects immediately with PUPPETEER_QUEUE_FULL when too many callers are waiting.
   logger.info(`[ParcelsAppScraper] ${containerNumber}: waiting for Puppeteer slot…`);
-  let release: (() => void) | null = null;
+  let release: () => void;
   try {
     release = await acquirePuppeteerSlot();
   } catch (err: unknown) {

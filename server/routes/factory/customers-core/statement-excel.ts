@@ -207,7 +207,9 @@ export function registerFactoryCustomerStatementExcelRoutes(app: Express) {
           sheet.addImage(slId, { tl: { col: 1.9, row: 0 }, ext: { width: 300, height: 90 } });
           sheet.mergeCells(`A1:G1`);
         }
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
       const r1 = sheet.addRow(["HMD INTERNATIONAL GROUP"]);
       r1.getCell(1).font = { bold: true, size: 14, color: { argb: "FF1F3864" } };
       sheet.mergeCells(`A${r1.number}:G${r1.number}`);

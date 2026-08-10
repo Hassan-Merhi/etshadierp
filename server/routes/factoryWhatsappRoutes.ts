@@ -160,7 +160,7 @@ export function registerFactoryWhatsappRoutes(app: Express, requireAuth: any) {
         endDate = format(endOfMonth(now), "yyyy-MM-dd");
       }
 
-      const safeAccName = acct.name.replace(/[^\w\s.()\-]/g, "_");
+      const safeAccName = acct.name.replace(/[^\w\s.()-]/g, "_");
       const monthLabel = month ?? format(new Date(), "yyyy-MM");
       const fileName = `${safeAccName} Statement ${monthLabel}.pdf`;
       const caption = `${acct.name} — Statement ${monthLabel}`;
@@ -290,7 +290,7 @@ export async function triggerAccountWhatsAppStatement(opts: {
       .from(ledgerAccounts)
       .where(eq(ledgerAccounts.id, accountId));
     const accName = acct?.name ?? `Account #${accountId}`;
-    const safeAccName = accName.replace(/[^\w\s.()\-]/g, "_");
+    const safeAccName = accName.replace(/[^\w\s.()-]/g, "_");
     const fileName = `${safeAccName} Statement ${monthLabel}.pdf`;
     const caption = `${accName} — Statement ${monthLabel}`;
 

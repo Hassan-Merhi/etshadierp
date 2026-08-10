@@ -23,7 +23,9 @@ function getSavedPos(): { x: number; y: number } {
       const p = JSON.parse(raw);
       if (typeof p.x === "number" && typeof p.y === "number") return p;
     }
-  } catch {}
+  } catch {
+    // Storage is unavailable in private mode and can throw on quota; the value is a convenience, not state we need.
+  }
   return { x: 20, y: window.innerHeight - 120 };
 }
 

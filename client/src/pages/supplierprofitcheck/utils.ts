@@ -4,7 +4,7 @@
  * Extracted from SupplierProfitCheck.tsx during the Phase 4 god-file split.
  */
 
-import type {ColVisibility} from "./types";
+import type { ColVisibility } from "./types";
 
 export // ─── Column definitions ───────────────────────────────────────────────────────
 const ALL_COLUMNS = [
@@ -34,7 +34,9 @@ export function loadColVisibility(): ColVisibility {
   try {
     const saved = localStorage.getItem(STORAGE_KEY_COLS);
     if (saved) return { ...DEFAULT_COL_VISIBILITY, ...JSON.parse(saved) };
-  } catch {}
+  } catch {
+    // Storage is unavailable in private mode and can throw on quota; the value is a convenience, not state we need.
+  }
   return { ...DEFAULT_COL_VISIBILITY };
 }
 

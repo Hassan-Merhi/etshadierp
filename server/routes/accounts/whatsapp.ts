@@ -146,7 +146,7 @@ export function registerAccountWhatsappRoutes(app: Express) {
         endDate = format(endOfMonth(now), "yyyy-MM-dd");
       }
 
-      const safeAccName = acct.name.replace(/[^\w\s.()\-]/g, "_");
+      const safeAccName = acct.name.replace(/[^\w\s.()-]/g, "_");
       const monthLabel = month ?? format(new Date(), "yyyy-MM");
       const fileName = `${safeAccName} Statement ${monthLabel}.pdf`;
       const caption = `${acct.name} — Statement ${monthLabel}`;

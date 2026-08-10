@@ -2981,7 +2981,7 @@
       ],
       "server/chat/reports/implementations/phase4ReportShard.ts": [
         10,
-        3,
+        2,
         0
       ],
       "server/chat/reports/implementations/phase5ReportShard.ts": [
@@ -6757,6 +6757,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 11442
+    "typeEscapeCeiling": 11441
   }
 }

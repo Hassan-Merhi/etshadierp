@@ -557,7 +557,9 @@ export function registerFactoryWeeklyReportExportRoutes(app: Express) {
           if (hasLogo) {
             try {
               doc.image(wpLogoPath, (doc.page.width - 220) / 2, 10, { width: 220 });
-            } catch {}
+            } catch {
+              // Failure here is non-fatal and the surrounding flow continues deliberately.
+            }
             if (doc.y < 130) (doc as any).y = 130;
             doc.moveDown(0.5);
           }

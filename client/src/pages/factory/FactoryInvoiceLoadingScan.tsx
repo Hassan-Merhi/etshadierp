@@ -82,7 +82,9 @@ export default function FactoryInvoiceLoadingScan() {
           }
         })();
         localStorage.setItem(lsKey, JSON.stringify({ ...current, ...updates }));
-      } catch {}
+      } catch {
+        // Storage is unavailable in private mode and can throw on quota; the value is a convenience, not state we need.
+      }
     },
     [lsKey]
   );

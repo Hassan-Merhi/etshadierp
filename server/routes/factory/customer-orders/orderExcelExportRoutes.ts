@@ -124,12 +124,16 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
   const merge = (r: number, c1: number, c2: number) => {
     try {
       sheet.mergeCells(r, c1, r, c2);
-    } catch {}
+    } catch {
+      // Failure here is non-fatal and the surrounding flow continues deliberately.
+    }
   };
   const setFill = (cell: any, argb: string) => {
     try {
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb } };
-    } catch {}
+    } catch {
+      // Failure here is non-fatal and the surrounding flow continues deliberately.
+    }
   };
   const setBorder = (row: any) => {
     try {
@@ -141,7 +145,9 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
           right: { style: "thin", color: { argb: "FFDDDDDD" } },
         };
       });
-    } catch {}
+    } catch {
+      // Failure here is non-fatal and the surrounding flow continues deliberately.
+    }
   };
 
   // Currency formatting
@@ -174,7 +180,9 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
     r1.getCell(1).font = { bold: true, size: 16, color: { argb: DARK_BLUE } };
     r1.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
     merge(r1.number, 1, COL);
-  } catch {}
+  } catch {
+    // Failure here is non-fatal and the surrounding flow continues deliberately.
+  }
 
   // ── "Commercial Invoice" title ──
   const r2 = sheet.addRow(["Commercial Invoice"]);
@@ -183,7 +191,9 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
     r2.getCell(1).font = { bold: true, size: 14, color: { argb: DARK_BLUE } };
     r2.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
     merge(r2.number, 1, COL);
-  } catch {}
+  } catch {
+    // Failure here is non-fatal and the surrounding flow continues deliberately.
+  }
   sheet.addRow([]);
 
   // ── Invoice details block ──
@@ -208,7 +218,9 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
       dr.getCell(8).alignment = { horizontal: "left" };
       merge(dr.number, 6, 7);
     }
-  } catch {}
+  } catch {
+    // Failure here is non-fatal and the surrounding flow continues deliberately.
+  }
   sheet.addRow([]);
 
   // ── Table header ──
@@ -236,7 +248,9 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
         right: { style: "thin", color: { argb: WHITE } },
       };
     });
-  } catch {}
+  } catch {
+    // Failure here is non-fatal and the surrounding flow continues deliberately.
+  }
 
   // ── Data rows ──
   logger.info(`[ExcelExport] orderId=${orderId} stage=writing-rows count=${params.lines.length}`);
@@ -286,7 +300,9 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
         dr.getCell(8).alignment = { horizontal: "right" };
       }
       setBorder(dr);
-    } catch {}
+    } catch {
+      // Failure here is non-fatal and the surrounding flow continues deliberately.
+    }
   });
 
   // ── Totals row ──
@@ -307,7 +323,9 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
     totRow.getCell(4).alignment = { horizontal: "right" };
     totRow.getCell(6).alignment = { horizontal: "right" };
     if (!hideSelling) totRow.getCell(8).alignment = { horizontal: "right" };
-  } catch {}
+  } catch {
+    // Failure here is non-fatal and the surrounding flow continues deliberately.
+  }
 
   sheet.addRow([]);
 

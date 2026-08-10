@@ -490,7 +490,9 @@ export default function BalesHistory() {
     try {
       await modeApiRequest("POST", "/api/bale-label-prints/reprint", { baleId: baleRow.bale.id });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
-    } catch {}
+    } catch {
+      // Cache invalidation is best-effort; the next fetch corrects it and a failure here is not worth surfacing.
+    }
 
     if (isZebraMode()) {
       try {

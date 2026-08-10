@@ -254,7 +254,9 @@ export function registerFactoryAttendanceRoutes(app: Express, requireAuth: any, 
         try {
           doc.image(attLogoPath, (doc.page.width - 220) / 2, doc.y, { width: 220 });
           doc.moveDown(0.4);
-        } catch {}
+        } catch {
+          // Failure here is non-fatal and the surrounding flow continues deliberately.
+        }
       }
       doc.fontSize(18).font("Helvetica-Bold").text("Attendance Report", { align: "center" });
       doc.moveDown(0.3);

@@ -92,8 +92,8 @@ export function ImportBalesTab() {
           if (!val && val !== 0) return "";
           const raw = String(val).trim();
           if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
-          if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$/.test(raw)) {
-            const parts = raw.split(/[\/\-]/);
+          if (/^\d{1,2}[/-]\d{1,2}[/-]\d{4}$/.test(raw)) {
+            const parts = raw.split(/[/-]/);
             return `${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
           }
           const serial = parseFloat(raw);

@@ -136,7 +136,7 @@ export function registerShippingZipPackageRoutes(app: Express) {
             }
 
             if (pdfBuf) {
-              const safeClient = (row.clientName || "client").replace(/[^\w\-]/g, "_");
+              const safeClient = (row.clientName || "client").replace(/[^\w-]/g, "_");
               archive.append(pdfBuf, { name: `Customer_Statement_${safeClient}.pdf` });
             }
 

@@ -338,7 +338,9 @@ export function registerBalesReportRoutes(app: Express) {
       if (fs.existsSync(sehLogoPath)) {
         try {
           doc.image(sehLogoPath, (doc.page.width - 200) / 2, 10, { width: 200 });
-        } catch {}
+        } catch {
+          // Failure here is non-fatal and the surrounding flow continues deliberately.
+        }
       }
 
       // ── Header bar ──────────────────────────────────────────────────────

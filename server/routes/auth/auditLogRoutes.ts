@@ -62,7 +62,7 @@ function deriveModuleLabel(name: string): string {
     name
       .replace(/^(factory_|payroll_|rental_|pos_)/, "")
       .replace(/_/g, " ")
-      .replace(/\w/g, (character) => character.toUpperCase()) ||
+      .replace(/\b\w/g, (character) => character.toUpperCase()) ||
     "Unknown"
   );
 }
@@ -75,7 +75,7 @@ function summarizeChanges(changes: unknown): string | null {
     field
       .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
       .replace(/_/g, " ")
-      .replace(/\w/g, (character) => character.toUpperCase())
+      .replace(/\b\w/g, (character) => character.toUpperCase())
   );
   return `${labels.join(", ")}${fields.length > labels.length ? ` and ${fields.length - labels.length} more` : ""}`;
 }
@@ -94,7 +94,7 @@ function formatAuditRow(row: any) {
       (rest.action
         ? String(rest.action)
             .replace(/_/g, " ")
-            .replace(/\w/g, (character) => character.toUpperCase())
+            .replace(/\b\w/g, (character) => character.toUpperCase())
         : "Unknown"),
     targetUrl: null as string | null,
   };

@@ -19,7 +19,7 @@ import { supplierProformas, supplierProformaLines, suppliers } from "@shared/sch
 function sanitizeDecimal(v: any): string {
   const raw = String(v ?? "").trim();
   // Strip leading/trailing currency symbols and whitespace
-  const stripped = raw.replace(/^[^0-9\-\(]+/, "").replace(/[^0-9\.]+$/, "");
+  const stripped = raw.replace(/^[^0-9\-(]+/, "").replace(/[^0-9.]+$/, "");
   // Remove thousands commas: only valid when pattern is NNN,NNN,...
   const noCommas = stripped.replace(/,(?=\d{3}(?:[,.]|$))/g, "");
   // Must match: optional minus, digits, optional .digits — nothing else

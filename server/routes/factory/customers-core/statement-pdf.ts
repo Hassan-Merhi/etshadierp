@@ -247,7 +247,9 @@ export function registerFactoryCustomerStatementPdfRoutes(app: Express) {
       if (!logoBuffer && fs.existsSync(custHmdLogoPath)) {
         try {
           logoBuffer = fs.readFileSync(custHmdLogoPath);
-        } catch {}
+        } catch {
+          // Failure here is non-fatal and the surrounding flow continues deliberately.
+        }
       }
 
       // ── PDF document ──
@@ -271,7 +273,9 @@ export function registerFactoryCustomerStatementPdfRoutes(app: Express) {
       try {
         custConvAr = (require("arabic-reshaper") as any).convertArabic;
         custBidi = (require("bidi-js") as any)();
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
       const custHasAr = (t: string) => /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/.test(t);
       const custShape = (t: string): string => {
         if (!t || !custConvAr) return t;

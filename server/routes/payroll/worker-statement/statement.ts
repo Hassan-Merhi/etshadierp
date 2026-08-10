@@ -239,7 +239,9 @@ export function registerWorkerStatementReadRoutes(app: Express) {
         wConvertArabic = reshaperMod.convertArabic;
         const bidiFactory = require("bidi-js") as () => typeof wBidiInst;
         wBidiInst = (bidiFactory as any)();
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
 
       const wContainsArabic = (text: string) => /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text);
       const wShapeText = (text: string): string => {
@@ -270,7 +272,9 @@ export function registerWorkerStatementReadRoutes(app: Express) {
       if (fs.existsSync(wHmdLogoPath)) {
         try {
           doc.image(wHmdLogoPath, (doc.page.width - 220) / 2, 20, { width: 220 });
-        } catch {}
+        } catch {
+          // Failure here is non-fatal and the surrounding flow continues deliberately.
+        }
       }
       const wNameHasAr = hasArabicFont && wContainsArabic(workerName);
       doc

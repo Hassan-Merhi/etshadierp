@@ -78,7 +78,9 @@ export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: an
         try {
           doc.image(hmdLogoPath, (doc.page.width - 220) / 2, doc.y, { width: 220 });
           doc.moveDown(0.5);
-        } catch {}
+        } catch {
+          // Failure here is non-fatal and the surrounding flow continues deliberately.
+        }
       }
       doc
         .fontSize(12)
@@ -241,7 +243,9 @@ export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: an
           const buffer = fs.readFileSync(logoPath);
           logoId = workbook.addImage({ buffer: toArrayBuffer(buffer), extension: "jpeg" });
         }
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
 
       function addSheetHeader(sheet: ExcelJS.Worksheet, title: string, numCols: number, logoCenterCol = 0) {
         const logoRow = sheet.addRow([]);

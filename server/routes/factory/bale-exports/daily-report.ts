@@ -164,7 +164,9 @@ export function registerFactoryDailyReportRoutes(app: Express) {
           try {
             doc.image(logoPath, (doc.page.width - 220) / 2, doc.y, { width: 220 });
             doc.moveDown(0.4);
-          } catch {}
+          } catch {
+            // Failure here is non-fatal and the surrounding flow continues deliberately.
+          }
         }
         doc
           .fontSize(16)
