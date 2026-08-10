@@ -79,20 +79,20 @@ jobs:
               s = s.replace("baleRows.map((b: any) =>", "baleRows.map((b) =>")
               p.write_text(s)
 
-          # The loading transaction callback is newly introduced by Phase 3 and
-          # Drizzle already infers its transaction type; do not spend an any escape.
           p = Path("server/routes/factory/customer-orders/finalize-loading/loading.ts")
           s = p.read_text().replace("db.transaction(async (tx: any) =>", "db.transaction(async (tx) =>")
           p.write_text(s)
 
+          # This error is an internal maintenance diagnostic. Keep it as a stable
+          # technical identifier so it is not treated as user-facing copy.
           p = Path("server/services/scheduler/maintenance.ts")
-          s = p.read_text().replace(
-              'throw new Error(`Unable to inspect mix-batch references`, { cause: error as Error });',
-              'throw new Error("mix_batch_reference_inspection_failed", { cause: error as Error });',
+          s = p.read_text()
+          s = s.replace(
+              'throw new Error(`Unable to inspect references for mix batch ${candidate.id}`);',
+              'throw new Error("mix_batch_reference_inspection_failed");',
           )
           p.write_text(s)
 
-          # Lock in the one type-escape reduction already achieved in finalize.ts.
           p = Path("config/type-escape-boundaries.json")
           data = json.loads(p.read_text())
           data["scan"]["baseline"]["server/routes/factory/customer-orders/finalize-loading/finalize.ts"] = [9, 5, 0]
