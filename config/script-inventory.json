@@ -14,7 +14,5 @@
     "audit-coverage-ratchet.mjs": "Reads coverage/ — requires a coverage run.",
     "audit-god-file-boundaries.mjs": "Reports reviewed growth allowances as failures; the gate is tests/god-file-boundaries.test.ts, which consults config/ci-ratchet-allowances.json."
   },
-  "knownFailing": {
-    "verify-phase9-final-i18n-baseline.mjs": "Manual release-only translation coverage debt. Two must-remain-zero modules still contain untranslated user-facing literals and two additional modules exceed their reviewed caps. This may remain visible as a manual release finding, but the inventory now forbids promoting it into automatic CI while it is failing. The final verification phase must either fix the untranslated strings or keep the release blocked; raising the caps is not an acceptable repair."
-  }
+  "knownFailing": {}
 }
