@@ -26,6 +26,6 @@ describe("remote support fast viewer", () => {
     expect(viewer).toContain("pollAbortRef.current?.abort()");
     expect(viewer).toContain("eventSource?.close()");
     expect(viewer).toContain("window.clearInterval(intervalId)");
-    expect(viewer).toContain("stateRef.current = { etag: null, frame: null }");
+    expect(viewer).toContain("stateRef.current = { etag: null, frame: null, failure: null }");
   });
 });
