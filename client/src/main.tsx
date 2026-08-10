@@ -1,6 +1,7 @@
 import "./lib/requestStormGuard";
 import "./lib/accountingRequestFetchGuard";
 import "./lib/v5AllocationPaginationClient";
+import "./lib/operationalPhase4BandwidthFetch";
 import "./lib/phase4BandwidthFetch";
 import { createRoot } from "react-dom/client";
 import App from "./App";
