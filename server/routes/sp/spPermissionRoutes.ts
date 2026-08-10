@@ -1,3 +1,4 @@
+import { releaseDebtEnglish } from "../../i18n/finalCloseoutEnglish";
 import type { Express } from "express";
 import { sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../../auth";
@@ -33,17 +34,22 @@ export function registerSpPermissionRoutes(app: Express): void {
       await ensureSpAccessControlStorage();
       const permission = String(req.params.permission);
       if (!(SP_PERMISSIONS as readonly string[]).includes(permission)) {
-        return res.status(400).json({ message: "Unknown Supplier Partner permission" });
+        return res.status(400).json({ message: releaseDebtEnglish("Unknown Supplier Partner permission") });
       }
       const confirmation = String(req.body?.confirmation ?? "");
       if (confirmation !== "CHANGE SP PERMISSION") {
         return res
           .status(400)
-          .json({ code: "SP_EXACT_CONFIRMATION_REQUIRED", message: "Type exactly: CHANGE SP PERMISSION" });
+          .json({
+            code: "SP_EXACT_CONFIRMATION_REQUIRED",
+            message: releaseDebtEnglish("Type exactly: CHANGE SP PERMISSION"),
+          });
       }
       const reason = String(req.body?.reason ?? "").trim();
       if (reason.length < 5)
-        return res.status(400).json({ code: "SP_REASON_REQUIRED", message: "A meaningful reason is required." });
+        return res
+          .status(400)
+          .json({ code: "SP_REASON_REQUIRED", message: releaseDebtEnglish("A meaningful reason is required.") });
       const userId = String(req.params.userId).trim();
       const enabled = req.body?.enabled === true;
       await db.execute(sql`

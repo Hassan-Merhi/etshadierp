@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import type { ApplicationLanguage } from "@shared/applicationLanguageContract";
 import { translateApplicationLiteral } from "@/i18n/applicationTranslations";
+import { isFinalCloseoutText, translateFinalCloseoutText } from "@/i18n/finalCloseoutTranslations";
 import { translateSharedInterfaceText } from "@/i18n/sharedInterfaceTranslations";
 import { translateTabsFiltersText } from "@/i18n/tabsFiltersTranslations";
 import { translateVoucherKpiText } from "@/i18n/voucherKpiTranslations";
@@ -88,6 +89,7 @@ function isEligibleTextElement(element: Element): boolean {
 
 function isApprovedNonVisualText(value: string): boolean {
   return (
+    isFinalCloseoutText(value) ||
     isPhase3SharedUiText(value) ||
     isPhase4SupplierPartnerText(value) ||
     isPhase5PropertiesRentalsText(value) ||
@@ -98,6 +100,7 @@ function isApprovedNonVisualText(value: string): boolean {
 
 export function translateApprovedInterfaceText(value: string, language: ApplicationLanguage): string | null {
   return (
+    translateFinalCloseoutText(value, language) ??
     translateApplicationLiteral(value, language) ??
     translateTabsFiltersText(value, language) ??
     translateVoucherKpiText(value, language) ??
