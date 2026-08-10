@@ -10,14 +10,7 @@
     "client/src/pages/factory/FactoryShippingContainers.tsx": 913,
     "client/src/pages/vouchers/StockTransferForm.tsx": 2388
   },
-  "routeManifestAdditions": [
-    "GET /api/factory/waste-dispatch/summary [requireAuth > <anonymous>]",
-    "GET /api/factory/waste-dispatch/group-bales/:productId [requireAuth > <anonymous>]",
-    "GET /api/factory/waste-dispatch/scan [requireAuth > <anonymous>]",
-    "GET /api/factory/waste-dispatch/select-all [requireAuth > <anonymous>]",
-    "GET /api/factory/waste-dispatch/history-summary [requireAuth > <anonymous>]",
-    "GET /api/factory/waste-dispatch/history/:id/bales [requireAuth > <anonymous>]"
-  ],
+  "routeManifestAdditions": [],
   "routeManifestMountAdditions": [],
   "sourceTextAssertionDelta": {
     "additionalSourceCoupledTests": [
