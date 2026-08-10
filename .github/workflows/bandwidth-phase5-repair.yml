@@ -99,8 +99,7 @@ jobs:
 
           allowances_path = Path("config/ci-ratchet-allowances.json")
           allowances = json.loads(allowances_path.read_text())
-          rental_path = Path("server/routes/rental/rentalPaymentPostingService.ts")
-          allowances["godFileLineCaps"][str(rental_path)] = len(rental_path.read_text().splitlines())
+          allowances["godFileLineCaps"].pop("server/routes/rental/rentalPaymentPostingService.ts", None)
           source_delta = allowances["sourceTextAssertionDelta"]
           reviewed_test = "tests/remote-support-phase4-hardening.test.ts"
           if reviewed_test not in source_delta["additionalSourceCoupledTests"]:
