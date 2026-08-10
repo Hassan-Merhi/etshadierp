@@ -27,6 +27,8 @@ describe("Bandwidth Phase 1 invalidation policy", () => {
       "/api/factory/settings",
       "/api/factory/workers/9",
       "/api/factory/customers/31",
+      "/api/factory/bale-products/12",
+      "/api/factory/categories/7",
       "/api/stock-items/55",
     ];
 
