@@ -539,11 +539,6 @@
         2,
         0
       ],
-      "client/src/pages/Dashboard.tsx": [
-        4,
-        4,
-        0
-      ],
       "client/src/pages/Daybook.tsx": [
         5,
         3,
@@ -6567,6 +6562,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 9049
+    "typeEscapeCeiling": 9041
   }
 }
