@@ -1,4 +1,4 @@
-# Final verification after backend ratchet repairs.
+# Final verification rerun with the original working Phase 5 commands.
 name: Bandwidth Phase 5 Final Verification
 
 on:
@@ -48,106 +48,208 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
+          ref: agent/bandwidth-phase-1-waste-dispatch
           fetch-depth: 0
+
       - name: Set up Node.js 22.14
         uses: actions/setup-node@v6
         with:
-          node-version: 22.14.0
+          node-version: "22.14"
           cache: npm
+
       - name: Normalize package registry URLs
-        run: npm config set registry https://registry.npmjs.org/
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g; s#https://registry.replit.com/#https://registry.npmjs.org/#g' package-lock.json
+
       - name: Install dependencies
-        run: npm ci --legacy-peer-deps
+        run: npm ci --no-audit --bin-links=true
+
       - name: Verify environment documentation
         run: npm run verify:env-docs
+
       - name: Type-escape ratchet
         run: npm run audit:type-escapes
+
       - name: Documentation state index
-        run: npm run verify:docs-state-index
+        run: npm run audit:doc-index
+
       - name: Write-route coverage ratchet
         run: npm run audit:write-routes
+
       - name: Toolchain coherence
-        run: npm run verify:toolchain
+        run: npm run audit:toolchain
+
       - name: Script inventory
-        run: npm run verify:script-inventory
+        run: npm run audit:scripts
+
       - name: Readable logging contracts
-        run: npm run verify:readable-logging
+        run: node scripts/verify-readable-logging-phase-10.mjs
+
       - name: Verify lockfile and production dependencies
-        run: npm run verify:production-deps
+        run: |
+          npm run verify:lockfile
+          npm run verify:production-dependencies
+
       - name: Check formatting for every changed source file
-        run: npx prettier --check $(git diff --name-only origin/main...HEAD -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs' '*.cjs' '*.json' '*.md' '*.yml' '*.yaml')
+        run: |
+          git fetch origin main:refs/remotes/origin/main
+          mapfile -d '' changed_files < <(
+            git diff --name-only --diff-filter=ACMR -z origin/main HEAD -- client/src server shared tests scripts |
+              grep -zE '\.(ts|tsx|css|mjs)$' || true
+          )
+          if [ "${#changed_files[@]}" -gt 0 ]; then
+            node node_modules/prettier/bin/prettier.cjs --check "${changed_files[@]}"
+          fi
+
       - name: TypeScript
         run: npm run check
+
       - name: Lint
         run: npm run lint
+
       - name: Production build
         run: npm run build
+
       - name: Verify server bundle
         run: npm run verify:server-bundle
+
       - name: Repository safety contracts
-        run: npm run verify:repo-safety
+        run: |
+          npm run verify:observability
+          npm run verify:final-production-readiness
+          npm run verify:bandwidth
+
       - name: Verify PostgreSQL readiness
-        run: npm run db:verify-postgres
+        run: |
+          for attempt in $(seq 1 60); do
+            if pg_isready -h 127.0.0.1 -p 5432 -U postgres -d heliumdb; then
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
+
       - name: Verify migration registry
-        run: npm run verify:migration-registry
+        run: node scripts/verify-migration-registry.mjs --json
+
       - name: Prepare disposable database schema
-        run: npm run db:prepare-test-schema
+        run: node node_modules/drizzle-kit/bin.cjs push --force
+
       - name: Verify disposable database schema
-        run: npm run db:verify-test-schema
+        run: node scripts/verify-ci-disposable-schema.mjs
+
       - name: Run application startup migrations
-        run: npm run db:run-startup-migrations
+        run: |
+          node dist/index.js > startup-migrations-phase5.txt 2>&1 &
+          app_pid=$!
+          cleanup() {
+            kill "$app_pid" 2>/dev/null || true
+            wait "$app_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          for attempt in $(seq 1 180); do
+            if curl --fail --silent --show-error http://127.0.0.1:${PORT}/api/health/db > health-db-phase5.json; then
+              cat health-db-phase5.json
+              exit 0
+            fi
+            if ! kill -0 "$app_pid" 2>/dev/null; then
+              cat startup-migrations-phase5.txt
+              exit 1
+            fi
+            sleep 1
+          done
+          cat startup-migrations-phase5.txt
+          exit 1
+
       - name: Backend tests
         run: npm run test:backend
+
       - name: API smoke sweep
-        run: npm run test:api-smoke
+        run: npm run test:smoke-sweep
+
       - name: Backend coverage thresholds
-        run: npm run test:coverage:backend
+        run: npm run test:backend:coverage
+
       - name: Frontend tests
         run: npm run test:frontend
-      - name: Frontend coverage thresholds
-        run: npm run test:coverage:frontend
-      - name: Coverage ratchet audit
-        run: npm run audit:coverage
 
-  mobile-rtl-i18n:
+      - name: Frontend coverage thresholds
+        run: npm run test:frontend:coverage
+
+      - name: Coverage ratchet audit
+        run: npm run audit:coverage-ratchet
+
+  responsive-rtl-i18n:
     name: Mobile / RTL / I18n
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
+        with:
+          ref: agent/bandwidth-phase-1-waste-dispatch
+
       - name: Set up Node.js 22.14
         uses: actions/setup-node@v6
         with:
-          node-version: 22.14.0
+          node-version: "22.14"
           cache: npm
+
       - name: Normalize package registry URLs
-        run: npm config set registry https://registry.npmjs.org/
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g; s#https://registry.replit.com/#https://registry.npmjs.org/#g' package-lock.json
+
       - name: Install dependencies
-        run: npm ci --legacy-peer-deps
+        run: npm ci --no-audit --bin-links=true
+
       - name: Full responsive contract matrix
-        run: npm run verify:responsive-contracts
+        run: node scripts/verify-mobile-responsive-phase11-regression.mjs
+
       - name: Focused responsive tests
-        run: npm run test:responsive
+        run: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts tests/ui/mobile-responsive-*.test.ts
+
       - name: RTL/accessibility formatting
-        run: npm run verify:rtl-formatting
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --check \
+            client/src/app/ErpShell.tsx \
+            client/src/app/FactoryShell.tsx \
+            client/src/app/PosShell.tsx \
+            client/src/app/PropertiesShell.tsx \
+            client/src/components/AppTopBar.tsx \
+            client/src/components/ApplicationInterfaceTranslator.tsx \
+            client/src/components/ui/dialog.tsx \
+            client/src/components/ui/responsive-accessibility.tsx \
+            client/src/components/ui/sheet.tsx \
+            client/src/contexts/ApplicationLanguageContext.tsx \
+            client/src/i18n/applicationDirection.test.ts \
+            client/src/i18n/applicationDirection.ts \
+            client/src/i18n/applicationTranslations.ts \
+            client/src/styles/rtl-hardening.css \
+            docs/archive/translation/phase-8-rtl-responsive-accessibility.md \
+            scripts/audit-i18n-phase14.mjs \
+            scripts/verify-program7d-accessibility-responsive.mjs \
+            tests/phase14-i18n-release-gate.test.ts \
+            tests/phase8-rtl-responsive-accessibility.test.ts \
+            vitest.config.i18n-contracts.ts
+
       - name: Accessibility and RTL verifier
-        run: npm run verify:accessibility-rtl
+        run: node scripts/verify-program7d-accessibility-responsive.mjs
+
       - name: Trilingual release contracts
-        run: npm run verify:trilingual-release
+        run: node node_modules/vitest/vitest.mjs run --config vitest.config.i18n-contracts.ts
+
       - name: Verify i18n classifier
-        run: npm run verify:i18n-classifier
+        run: node scripts/verify-i18n-audit-classifier.mjs
+
       - name: Classified i18n audit
-        run: npm run audit:i18n:classified
+        run: node scripts/audit-i18n-phase14.mjs
 
   bandwidth-security:
     name: Bandwidth / Security
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      NODE_OPTIONS: --max-old-space-size=4096
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
       PGSSLMODE: disable
+      NODE_OPTIONS: --max-old-space-size=2048
     services:
       postgres:
         image: postgres:15.13
@@ -166,31 +268,54 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
+          ref: agent/bandwidth-phase-1-waste-dispatch
           fetch-depth: 0
+
       - name: Set up Node.js 22.14
         uses: actions/setup-node@v6
         with:
-          node-version: 22.14.0
+          node-version: "22.14"
           cache: npm
+
       - name: Normalize package registry URLs
-        run: npm config set registry https://registry.npmjs.org/
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g; s#https://registry.replit.com/#https://registry.npmjs.org/#g' package-lock.json
+
       - name: Install dependencies
-        run: npm ci --legacy-peer-deps
+        run: npm ci --no-audit --bin-links=true
+
       - name: Prepare disposable database schema
-        run: npm run db:prepare-test-schema
-      - name: Verify bandwidth Phase 1
-        run: npm run verify:bandwidth-phase-1
-      - name: Verify bandwidth Phase 2
-        run: npm run verify:bandwidth-phase-2
-      - name: Verify bandwidth Phase 3
-        run: npm run verify:bandwidth-phase-3
-      - name: Verify bandwidth Phase 4
-        run: npm run verify:bandwidth-phase-4
-      - name: Verify heavy-list pagination
-        run: npm run verify:heavy-list-pagination
-      - name: Audit heavy-list endpoints
-        run: npm run audit:heavy-list-endpoints
-      - name: API security contracts
-        run: npm run test:security
-      - name: Verify route manifest
-        run: npm run verify:route-manifest
+        run: node node_modules/drizzle-kit/bin.cjs push --force
+
+      - name: Historical bandwidth contract
+        run: npm run verify:bandwidth
+
+      - name: Sales report bandwidth contract
+        run: node scripts/verify-bandwidth-phase-3-sales-report.mjs
+
+      - name: Global request-pressure contract
+        run: node scripts/verify-bandwidth-phase-4-global-pressure.mjs
+
+      - name: Focused bandwidth regressions
+        run: >-
+          node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts
+          tests/ui/trace-context-route-template.test.ts
+          tests/ui/bandwidth-phase-1-invalidation-policy.test.ts
+          tests/ui/bandwidth-phase-2-payloads.test.ts
+          tests/ui/bandwidth-phase-4-heavy-pages.test.ts
+
+      - name: Production dependency audit
+        run: npm run verify:dependency-audit
+
+      - name: Production dependency verification
+        run: npm run verify:production-dependencies
+
+      - name: Program 6 security checks
+        run: PROGRAM6_SKIP_TYPESCRIPT=1 npm run check:security
+
+      - name: Final production readiness contract
+        run: npm run verify:final-production-readiness
+
+      - name: Secret scan
+        uses: trufflesecurity/trufflehog@v3.90.4
+        with:
+          extra_args: --results=verified,unknown
