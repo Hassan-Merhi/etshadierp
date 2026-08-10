@@ -216,7 +216,7 @@ export async function syncIntercoParentVoucher(
                 sourceModule: "ERP",
               })
               .returning();
-            const entriesToInsert: any[] = [
+            const entriesToInsert = [
               {
                 voucherId: newFV.id,
                 companyId: parentCompanyId,

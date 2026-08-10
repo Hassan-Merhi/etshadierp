@@ -218,7 +218,7 @@ export async function createPosSale(
         exchangeRate: exchangeRate ? String(exchangeRate) : null,
       });
 
-      const txSaleItems: any[] = [];
+      const txSaleItems = [];
 
       for (const validatedItem of inventoryValidation) {
         const { item } = validatedItem;

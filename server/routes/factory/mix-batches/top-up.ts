@@ -60,7 +60,7 @@ export function registerFactoryMixBatchTopUpRoutes(app: Express) {
         // DEFECT 15 FIX: use Decimal.js for cost accumulation (top-up route).
         let dAddedWeightKg = new Decimal(0);
         let dAddedCost = new Decimal(0);
-        const sourceRecords: any[] = [];
+        const sourceRecords = [];
 
         for (const source of supplierSources) {
           // costPerKg from the client is NEVER trusted for a real supplier.

@@ -204,7 +204,7 @@ export function ExportAccountsSection() {
         const acc = allAccounts.find((a) => a.accountId === accId);
         if (!acc) continue;
 
-        let txns: any[] = [];
+        let txns = [];
         try {
           const res = await fetch(getTransactionUrl(acc), { credentials: "include" });
           if (res.ok) txns = await res.json();

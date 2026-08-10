@@ -215,7 +215,7 @@ export async function buildOrderExcelBuffer(
     totalH += g.total;
     const unitPriceH =
       g.pricingMode === "per_kg" ? (g.totalWt > 0 ? g.total / g.totalWt : g.pricePerKg || 0) : g.pricePerBale;
-    const rowCells: any[] = [idx + 1, g.articleCode, g.productName, g.qty, fmtNum(g.wtPerBale), fmtNum(g.totalWt)];
+    const rowCells = [idx + 1, g.articleCode, g.productName, g.qty, fmtNum(g.wtPerBale), fmtNum(g.totalWt)];
     if (!hideSelling) {
       rowCells.push(fmtMoney(unitPriceH));
       rowCells.push(fmtMoney(g.total));
@@ -237,7 +237,7 @@ export async function buildOrderExcelBuffer(
     setBorderH(dr);
   });
 
-  const totRowCells: any[] = ["", "", "Totals", totalQtyH, "", fmtNum(totalWtH)];
+  const totRowCells = ["", "", "Totals", totalQtyH, "", fmtNum(totalWtH)];
   if (!hideSelling) {
     totRowCells.push("");
     totRowCells.push(fmtMoney(totalH));

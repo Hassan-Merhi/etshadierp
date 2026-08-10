@@ -54,7 +54,7 @@ export function registerFactoryContainerCreateRoutes(app: Express) {
       const fxRateNum = parseFloat(fxRate);
       const ratePerKgUsd = currencyCode === "USD" ? ratePerKg : ratePerKg * fxRateNum;
 
-      const values: any = {
+      const values = {
         ...parsed,
         currencyCode,
         fxRateToUsd: fxRate,

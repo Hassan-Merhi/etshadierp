@@ -65,7 +65,7 @@ export function registerShippingWhatsappPreviewRoutes(app: Express) {
           )
           .orderBy(factoryShippingContainerDocuments.uploadedAt);
 
-        const files: any[] = [
+        const files = [
           {
             id: "invoice_excel",
             name: `Commercial Invoice — ${row.invoiceNumber || ""}`,

@@ -167,7 +167,7 @@ export function registerStatsDataRoutes(app: Express) {
         });
       }
 
-      const allSalesData: any[] = [];
+      const allSalesData = [];
       for (const companyId of filteredCompanyIds) {
         const company = companyMap.get(companyId);
         const conditions = [

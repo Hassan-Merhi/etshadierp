@@ -33,7 +33,7 @@ export function registerFactoryMixOptimizeRoutes(app: Express, requireAuth: any,
         new Set(balesForProduct.map((b: any) => b.mixBatchId).filter(Boolean))
       ) as number[];
 
-      let suggestions: any[] = [];
+      let suggestions = [];
 
       if (mixBatchIds.length > 0) {
         const mixes = await db

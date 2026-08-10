@@ -72,7 +72,7 @@ async function runPhase1Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY la.account_type, la.name
       `);
       let grandTotal = 0;
-      const stats: any[] = (rows.rows as any[]).map((row) => {
+      const stats = (rows.rows as any[]).map((row) => {
         const ob = parseFloat(row.opening_balance || "0");
         const obAdj = row.opening_balance_side === "Cr" ? -ob : ob;
         const bal = obAdj + parseFloat(row.total_debit || "0") - parseFloat(row.total_credit || "0");
@@ -352,7 +352,7 @@ async function runPhase1Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         GROUP BY fa.status ORDER BY fa.status
       `);
       const totalRecords = (rows.rows as any[]).reduce((s: number, r: any) => s + parseInt(r.count || "0"), 0);
-      const stats: any[] = (rows.rows as any[]).map((r) => ({
+      const stats = (rows.rows as any[]).map((r) => ({
         label: r.status,
         value: `${r.count} records · ${r.workers} worker(s)`,
         highlight: r.status === "Present" ? "positive" : r.status === "Absent" ? "negative" : "muted",
@@ -378,10 +378,7 @@ async function runPhase1Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         GROUP BY fb.status ORDER BY count DESC
       `);
       const totalBales = (rows.rows as any[]).reduce((s: number, r: any) => s + parseInt(r.count || "0"), 0);
-      const totalWeight = (rows.rows as any[]).reduce(
-        (s: number, r: any) => s + parseFloat(r.total_weight || "0"),
-        0
-      );
+      const totalWeight = (rows.rows as any[]).reduce((s: number, r: any) => s + parseFloat(r.total_weight || "0"), 0);
       const tableRows = (rows.rows as any[]).map((r) => [
         String(r.status).replace(/_/g, " "),
         String(r.count),
@@ -427,12 +424,7 @@ async function runPhase1Report(ctx: DataQueryContext): Promise<DataQueryResult> 
           grandTotal: schema.containers.grandTotal,
         })
         .from(schema.containers)
-        .where(
-          and(
-            eq(schema.containers.companyId, companyId),
-            ilike(schema.containers.containerNumber, `%${num}%`)
-          )
-        )
+        .where(and(eq(schema.containers.companyId, companyId), ilike(schema.containers.containerNumber, `%${num}%`)))
         .limit(1);
       if (!container) {
         dataQueryResult = {
@@ -442,7 +434,7 @@ async function runPhase1Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         };
         break;
       }
-      const stats: any[] = [
+      const stats = [
         { label: "Container #", value: container.containerNumber, highlight: "neutral" },
         {
           label: "Status",

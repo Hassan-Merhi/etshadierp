@@ -33,7 +33,7 @@ export function registerSalesInventoryFixRoutes(app: Express) {
         .from(vouchers)
         .where(and(eq(vouchers.companyId, companyId), eq(vouchers.voucherType, "Sales")));
 
-      const fixes: any[] = [];
+      const fixes = [];
 
       for (const voucher of salesVouchers) {
         if (!voucher.locationId) continue;
@@ -80,7 +80,7 @@ export function registerSalesInventoryFixRoutes(app: Express) {
         .where(and(eq(inventory.companyId, companyId), sql`CAST(${inventory.quantity} AS DECIMAL) < 0`));
 
       // For each negative inventory, set it to 0 (cleanup orphaned deductions)
-      const cleaned: any[] = [];
+      const cleaned = [];
       for (const inv of negativeInventory) {
         // Check if there's actually a sale at this location that would cause this
         const salesAtLocation = await db

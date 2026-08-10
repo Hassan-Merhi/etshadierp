@@ -155,7 +155,7 @@ export function registerOrphanedVoucherRepairRoutes(app: Express) {
           const periodStart = v.voucherDate as string;
           const periodEnd = periodMatch ? periodMatch[2] : null;
 
-          const whereConditions: any[] = [
+          const whereConditions = [
             eq(factoryPayrolls.companyId, companyId),
             eq(factoryPayrolls.periodStart, periodStart),
           ];

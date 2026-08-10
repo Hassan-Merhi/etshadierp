@@ -464,7 +464,7 @@ export async function parseContainerImportFile(file: File): Promise<any[]> {
   const data = await file.arrayBuffer();
   const wb = await XLSX.read(data, { type: "array" });
   const ws = wb.Sheets[wb.SheetNames[0]];
-  const jsonRows: any[] = XLSX.utils.sheet_to_json(ws, { defval: "" });
+  const jsonRows = XLSX.utils.sheet_to_json(ws, { defval: "" });
   return jsonRows
     .map((row) => {
       const get = (keys: string[]) => {

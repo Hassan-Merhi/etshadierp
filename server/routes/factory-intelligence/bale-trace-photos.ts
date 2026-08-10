@@ -39,7 +39,7 @@ export function registerFactoryBaleTracePhotoRoutes(app: Express, requireAuth: a
       if (!bale) return res.status(404).json({ message: "Bale not found" });
 
       let mixBatch = null;
-      let sourcesData: any[] = [];
+      let sourcesData = [];
 
       if (bale.mixBatchId) {
         const [mb] = await db.select().from(factoryMixBatches).where(eq(factoryMixBatches.id, bale.mixBatchId));

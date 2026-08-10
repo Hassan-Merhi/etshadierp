@@ -87,10 +87,7 @@ export function registerV5StockAllocationRoutes(app: Express) {
       );
 
       // 3. Active proformas + lines (with optional date range filter on createdAt)
-      const proformaConditions: any[] = [
-        eq(customerProformas.companyId, companyId),
-        eq(customerProformas.isActive, true),
-      ];
+      const proformaConditions = [eq(customerProformas.companyId, companyId), eq(customerProformas.isActive, true)];
 
       if (fromDate) {
         const from = new Date(String(fromDate));

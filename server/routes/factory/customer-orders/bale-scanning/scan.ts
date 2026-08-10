@@ -202,7 +202,7 @@ export function registerOrderBaleScanRoutes(app: Express) {
         // fallback when bale.articleCode is null. Bales pressed before the
         // articleCode column was added (or imported without it) can otherwise
         // bypass the proforma overload check entirely.
-        let productForBale: any = null;
+        let productForBale = null;
         if (bale.productId) {
           const [p] = await tx.select().from(factoryBaleProducts).where(eq(factoryBaleProducts.id, bale.productId));
           productForBale = p || null;
@@ -225,7 +225,7 @@ export function registerOrderBaleScanRoutes(app: Express) {
                 eq(customerProformaLines.articleCode, effectiveArticleCode)
               )
             );
-          const proformaLine: any = pl || null;
+          const proformaLine = pl || null;
           if (proformaLine) {
             const pricingMode = (proformaLine as any).pricingMode ?? "per_bale";
             const perKgVal = (proformaLine as any).pricePerKg;

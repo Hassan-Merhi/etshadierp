@@ -371,7 +371,7 @@ export async function calculateHistoricalLocationInventory(
 
   const detailMap = new Map(itemDetails.map((d) => [d.id, d]));
 
-  const results: any[] = [];
+  const results = [];
   for (const [stockItemId, data] of Array.from(inventoryMap.entries())) {
     const detail = detailMap.get(stockItemId);
     results.push({

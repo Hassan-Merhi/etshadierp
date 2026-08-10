@@ -30,7 +30,7 @@ export async function runDevSeed() {
     { code: "MXWIN", articleCode: "HMD10000", name: "MIXED WINTER" },
   ];
 
-  const createdProducts: any[] = [];
+  const createdProducts = [];
   for (const p of productDefs) {
     const existing = await db
       .select()
@@ -85,7 +85,7 @@ export async function runDevSeed() {
     nextNum = 1;
   }
 
-  const createdBales: any[] = [];
+  const createdBales = [];
   const now = Date.now();
   for (let i = 0; i < 25; i++) {
     const product = createdProducts[i % createdProducts.length];
@@ -118,7 +118,7 @@ export async function runDevSeed() {
     .set({ nextNumber: nextNum + 25 })
     .where(eq(baleSequences.companyId, COMPANY_ID));
 
-  const createdLabels: any[] = [];
+  const createdLabels = [];
   const sampleRefs: string[] = [];
   const sampleArticles: string[] = [];
   let labelIdx = 0;

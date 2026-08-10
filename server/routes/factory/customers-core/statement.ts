@@ -108,7 +108,7 @@ export function registerFactoryCustomerStatementRoutes(app: Express) {
       // Also pull voucher entries for this customer (by ledgerAccountId or direct customerId link)
       // to include manual accounting vouchers that don't flow through customerBalances.
       // Exclude CHARGE-* vouchers (those are already included via invoices).
-      const voucherRows: any[] = [];
+      const voucherRows = [];
       const ledgerAccountId = (customer as any).ledgerAccountId;
       const voucherConditions = ledgerAccountId
         ? sql`(${voucherEntries.ledgerAccountId} = ${ledgerAccountId} OR ${voucherEntries.customerId} = ${customerId})`

@@ -108,7 +108,7 @@ export function registerExportRoutes(app: Express) {
         );
       } else {
         const setParts: string[] = [];
-        const params: any[] = [];
+        const params = [];
         let idx = 1;
         if (gmailUser !== undefined) {
           setParts.push(`gmail_user = $${idx++}`);

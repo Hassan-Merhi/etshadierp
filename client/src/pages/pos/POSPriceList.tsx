@@ -446,7 +446,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       const { read, utils } = await import("@/lib/excelHelper");
       const wb = await read(file);
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const rawRows: any[] = utils.sheet_to_json(ws, { defval: "" });
+      const rawRows = utils.sheet_to_json(ws, { defval: "" });
       if (rawRows.length === 0) {
         toast({ title: "Empty file", description: "The file has no data rows.", variant: "destructive" });
         return;

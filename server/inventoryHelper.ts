@@ -121,7 +121,7 @@ async function settleNegativeLayers(
     ORDER BY id ASC
     FOR UPDATE
   `);
-  const rows: any[] = result.rows ?? result;
+  const rows = result.rows ?? result;
 
   let remaining = incomingQty;
   let settled = ZERO;

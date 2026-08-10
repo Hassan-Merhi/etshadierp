@@ -39,7 +39,7 @@ export function registerStockTransferRevisionWriteRoutes(app: Express) {
       // If this is an optional (POS) revision, check if the SAME USER already has one pending
       // and update it in-place rather than creating a new revision.
       // Each POS user gets their own optional revision so multiple locations can coexist.
-      let revision: any = null;
+      let revision = null;
       if (isOptional && req.user?.id) {
         const [existingOptional] = await db
           .select()

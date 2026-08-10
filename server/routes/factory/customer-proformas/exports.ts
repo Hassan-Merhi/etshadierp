@@ -110,7 +110,7 @@ export function registerFactoryCustomerProformaExportRoutes(app: Express) {
       const sheet = workbook.addWorksheet("Proforma Invoice");
 
       const COL_COUNT = hideSellingExcel ? 6 : 8;
-      const baseCols: any[] = [
+      const baseCols = [
         { key: "num", width: 6 },
         { key: "articleCode", width: 18 },
         { key: "productName", width: 32 },
@@ -178,7 +178,7 @@ export function registerFactoryCustomerProformaExportRoutes(app: Express) {
         totalKgAll += totalKg;
         totalPriceAll += totalPrice;
 
-        const rowArr: any[] = [
+        const rowArr = [
           idx + 1,
           line.articleCode,
           nameMap.get(line.articleCode) || line.productName || "",
@@ -204,7 +204,7 @@ export function registerFactoryCustomerProformaExportRoutes(app: Express) {
       });
 
       sheet.addRow([]);
-      const totArr: any[] = ["", "", "GRAND TOTAL", totalQty, ""];
+      const totArr = ["", "", "GRAND TOTAL", totalQty, ""];
       if (!hideSellingExcel) totArr.push("");
       totArr.push(fmtKg(totalKgAll));
       if (!hideSellingExcel) totArr.push(fmtPrice(totalPriceAll));

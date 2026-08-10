@@ -179,7 +179,7 @@ export function registerInventoryMovementReportRoutes(app: Express) {
 
       monthMovements.sort((a, b) => a.date.localeCompare(b.date) || a.vchType.localeCompare(b.vchType));
 
-      const transactions: any[] = [];
+      const transactions = [];
       if (runQty !== 0 || runValue !== 0) {
         transactions.push({
           date: mStart,

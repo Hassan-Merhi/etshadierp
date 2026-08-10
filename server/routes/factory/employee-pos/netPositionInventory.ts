@@ -111,7 +111,7 @@ export async function computeNetPositionInventory(ctx: NetPositionInventoryConte
     AND  fc.deleted_at IS NULL
   GROUP  BY fc.supplier_id
 `);
-  const rawRows: any[] = resultRows(rawResult);
+  const rawRows = resultRows(rawResult);
 
   const adjResult = await db.execute(sql`
   SELECT supplier_id, type, kg::numeric AS kg, cost_per_kg::numeric AS cpk, material_label
@@ -119,7 +119,7 @@ export async function computeNetPositionInventory(ctx: NetPositionInventoryConte
   WHERE  company_id = ${ctx.companyId}
     AND  deleted_at IS NULL
 `);
-  const adjRows: any[] = resultRows(adjResult);
+  const adjRows = resultRows(adjResult);
 
   // Build per-supplier totals (same weighted-average logic as rawStockReceiptRoutes.ts)
   // cpkLocal = weighted avg of local-currency cost_per_kg (AUD/EUR/USD etc.)
@@ -212,7 +212,7 @@ export async function computeNetPositionInventory(ctx: NetPositionInventoryConte
     AND  fmb.status IN ('CLOSED', 'COMPLETED')
   GROUP  BY fms.supplier_id
 `);
-  const completedBatchRows: any[] = resultRows(completedBatchResult);
+  const completedBatchRows = resultRows(completedBatchResult);
   for (const r of completedBatchRows) {
     if (!r.supplier_id) continue;
     const key = `s${r.supplier_id}`;
@@ -243,7 +243,7 @@ export async function computeNetPositionInventory(ctx: NetPositionInventoryConte
     AND  fmb.status NOT IN ('CLOSED', 'COMPLETED')
   GROUP  BY fms.supplier_id
 `);
-  const openReservedRows: any[] = resultRows(openReservedResult);
+  const openReservedRows = resultRows(openReservedResult);
   const reservedBySupKey = new Map<string, number>();
   for (const r of openReservedRows) {
     if (r.supplier_id) reservedBySupKey.set(`s${r.supplier_id}`, parseFloat(String(r.reserved_kg ?? "0")) || 0);

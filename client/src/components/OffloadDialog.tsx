@@ -297,7 +297,7 @@ export function OffloadDialog({ open, onOpenChange, containerId, containerNumber
         const resolvedTransportAccountId =
           transportAmt > 0 ? (spTransportMethod === "prepaid_expenses" ? spPrepaidExpAcct.id : spHadiIcAcct.id) : null;
 
-        const agentChargeLines: any[] = [];
+        const agentChargeLines = [];
         if (dutiesAmt > 0 && spDutiesMethod === "parent_agent") {
           agentChargeLines.push({
             description: "Duties",

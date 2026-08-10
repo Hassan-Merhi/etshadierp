@@ -264,7 +264,7 @@ export function registerAccountStatementRoutes(app: Express) {
 
       // Sum all voucher entries before endDate (exclusive of period start)
       if (endDate) {
-        const conditions: any[] = [
+        const conditions = [
           eq(entryColumn, accountId),
           eq(vouchers.optional, false),
           isNull(vouchers.deletedAt),
@@ -420,7 +420,7 @@ export function registerAccountStatementRoutes(app: Express) {
       }
 
       // Fetch transactions
-      let txRows: any[] = [];
+      let txRows = [];
       if (accountType === "ledger") {
         txRows = await storage.getVoucherEntriesByLedger(accountId, startDate, endDate, companyId);
       } else if (accountType === "bank") {
@@ -432,7 +432,7 @@ export function registerAccountStatementRoutes(app: Express) {
       }
 
       // Compute brought-forward balance (entries before startDate when filtering)
-      let allTxForBF: any[] = [];
+      let allTxForBF = [];
       if (startDate && accountType === "ledger") {
         allTxForBF = await storage.getVoucherEntriesByLedger(accountId, undefined, undefined, companyId);
       }

@@ -109,7 +109,7 @@ export function registerFactoryPayrollGenerateRoutes(app: Express, requireAuth: 
       const periodDays = daysInPeriod(startDate, endDate);
       const weekdays = countWeekdays(startDate, endDate);
       const monthDays = daysInMonth(startDate);
-      const payrollRecords: any[] = [];
+      const payrollRecords = [];
 
       for (const worker of workers) {
         let basePay = 0;

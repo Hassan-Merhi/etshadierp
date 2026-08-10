@@ -16,7 +16,7 @@ export function registerInventoryReconcileRoutes(app: Express) {
   app.get("/api/inventory/reconcile", requireAuth, requireRole("Admin"), async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId!;
-      const issues: any[] = [];
+      const issues = [];
 
       const allInventory = await db.select().from(inventory).where(eq(inventory.companyId, companyId));
 

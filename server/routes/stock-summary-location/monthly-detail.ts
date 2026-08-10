@@ -33,8 +33,8 @@ export function registerLocationMonthlyDetailRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       if (!year || !month || month < 1 || month > 12) return res.status(400).json({ message: "Invalid year/month" });
 
-      const inTx: any[] = [];
-      const outTx: any[] = [];
+      const inTx = [];
+      const outTx = [];
 
       // ── Sales (Outward) ──────────────────────────────────────────────────────
       const saleRows = await db
