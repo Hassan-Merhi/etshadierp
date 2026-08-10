@@ -4,6 +4,7 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import { heavyListPaginationPlugin } from "./build/viteHeavyListPaginationPlugin";
+import { salesReportBandwidthPlugin } from "./build/viteSalesReportBandwidthPlugin";
 import { phase1PaginationPlugin } from "./build/vitePhase1PaginationGuardPlugin";
 import { lazyHeavyImportsPlugin } from "./build/viteLazyHeavyImportsPlugin";
 import { labelAssetExtractionPlugin } from "./build/viteLabelAssetExtractionPlugin";
@@ -11,6 +12,7 @@ import { labelAssetExtractionPlugin } from "./build/viteLabelAssetExtractionPlug
 export default defineConfig({
   plugins: [
     heavyListPaginationPlugin(),
+    salesReportBandwidthPlugin(),
     phase1PaginationPlugin(),
     lazyHeavyImportsPlugin(),
     labelAssetExtractionPlugin(),
