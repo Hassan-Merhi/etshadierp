@@ -1,3 +1,4 @@
+import { releaseDebtEnglish } from "@/i18n/finalCloseoutTranslations";
 import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, ChevronDown, Loader2, MessageCircle } from "lucide-react";
@@ -75,8 +76,10 @@ export function LocationInventoryHeader({
     if (!selectedLocation || sendMode || sendLockRef.current) return;
     if (includeCost && !canSendWithCost) {
       toast({
-        title: "Cost report restricted",
-        description: "Your role does not have permission to send cost price and total inventory value.",
+        title: releaseDebtEnglish("Cost report restricted"),
+        description: releaseDebtEnglish(
+          "Your role does not have permission to send cost price and total inventory value."
+        ),
         variant: "destructive",
       });
       return;
@@ -98,7 +101,7 @@ export function LocationInventoryHeader({
       });
     } catch (error: any) {
       toast({
-        title: "WhatsApp send failed",
+        title: releaseDebtEnglish("WhatsApp send failed"),
         description: error?.message || "Could not send the stock report.",
         variant: "destructive",
       });
@@ -153,8 +156,10 @@ export function LocationInventoryHeader({
                   >
                     <MessageCircle className="h-4 w-4 mr-2" />
                     <div>
-                      <div className="font-medium">Send WITHOUT COST</div>
-                      <div className="text-xs text-muted-foreground">Quantity-only Godown Summary PDF</div>
+                      <div className="font-medium">{releaseDebtEnglish("Send WITHOUT COST")}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {releaseDebtEnglish("Quantity-only Godown Summary PDF")}
+                      </div>
                     </div>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
@@ -165,7 +170,7 @@ export function LocationInventoryHeader({
                   >
                     <MessageCircle className="h-4 w-4 mr-2" />
                     <div>
-                      <div className="font-medium">Send WITH COST</div>
+                      <div className="font-medium">{releaseDebtEnglish("Send WITH COST")}</div>
                       <div className="text-xs text-muted-foreground">
                         {canSendWithCost
                           ? "Includes average rate and total value"
@@ -197,7 +202,8 @@ export function LocationInventoryHeader({
             onClick={() => setShowNegativeStock(!showNegativeStock)}
             data-testid="button-negative-stock"
           >
-            <AlertCircle className="h-4 w-4" /> Negative Stock
+            <AlertCircle className="h-4 w-4" />
+            <span>{releaseDebtEnglish("Negative Stock")}</span>
           </Button>
         </div>
       )}

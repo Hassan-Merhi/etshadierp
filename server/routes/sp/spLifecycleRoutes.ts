@@ -1,3 +1,4 @@
+import { releaseDebtEnglish } from "../../i18n/finalCloseoutEnglish";
 import type { Express, Request, Response } from "express";
 import { and, eq, sql } from "drizzle-orm";
 import {
@@ -51,7 +52,7 @@ export function registerSpLifecycleRoutes(app: Express) {
 
       const saleId = Number(req.params.id);
       if (!Number.isInteger(saleId) || saleId <= 0) {
-        return res.status(400).json({ message: "Invalid Supplier Partner sale ID" });
+        return res.status(400).json({ message: releaseDebtEnglish("Invalid Supplier Partner sale ID") });
       }
 
       const reason = normalizeSpLifecycleReason(req.body?.reason, "reverse this Supplier Partner sale");
@@ -148,7 +149,7 @@ export function registerSpLifecycleRoutes(app: Express) {
             voucherType: "Journal",
             voucherNumber: `SP-SALE-REV-${saleId}-${Date.now()}`,
             voucherDate: reversalDate,
-            description: `Supplier Partner sale reversal #${saleId} — ${reason}`,
+            description: releaseDebtEnglish(`Supplier Partner sale reversal #${saleId} — ${reason}`),
             totalAmount: String(sale.total_sale_price_usd),
             currency: SP_RELEASE_CURRENCY,
             exchangeRate: SP_RELEASE_EXCHANGE_RATE,
@@ -238,7 +239,7 @@ export function registerSpLifecycleRoutes(app: Express) {
 
       const containerId = Number(req.params.id);
       if (!Number.isInteger(containerId) || containerId <= 0) {
-        return res.status(400).json({ message: "Invalid Supplier Partner container ID" });
+        return res.status(400).json({ message: releaseDebtEnglish("Invalid Supplier Partner container ID") });
       }
 
       const reason = normalizeSpLifecycleReason(req.body?.reason, "cancel this Supplier Partner container");
@@ -315,7 +316,7 @@ export function registerSpLifecycleRoutes(app: Express) {
               voucherType: "Journal",
               voucherNumber: `SP-OTW-CANCEL-${containerId}-${Date.now()}`,
               voucherDate: cancellationDate,
-              description: `Supplier Partner container cancellation #${containerId} — ${reason}`,
+              description: releaseDebtEnglish(`Supplier Partner container cancellation #${containerId} — ${reason}`),
               totalAmount: String(originalVoucher.total_amount),
               currency: SP_RELEASE_CURRENCY,
               exchangeRate: SP_RELEASE_EXCHANGE_RATE,

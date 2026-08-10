@@ -1,3 +1,4 @@
+import { releaseDebtEnglish } from "@/i18n/finalCloseoutTranslations";
 import { useState } from "react";
 import { Link } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -98,7 +99,7 @@ export default function SpOverview() {
 
   const reverseSale = useMutation({
     mutationFn: async () => {
-      if (!selectedSale) throw new Error("No sale selected");
+      if (!selectedSale) throw new Error(releaseDebtEnglish("No sale selected"));
       const response = await apiRequest("POST", `/api/sp/sales/${selectedSale.id}/reverse`, { reason });
       return response.json();
     },
@@ -110,14 +111,16 @@ export default function SpOverview() {
         },
       });
       toast({
-        title: "Sale reversed",
-        description: `Stock and accounting were restored together. Reversal voucher #${data.reversalVoucherId}.`,
+        title: releaseDebtEnglish("Sale reversed"),
+        description: releaseDebtEnglish(
+          `Stock and accounting were restored together. Reversal voucher #${data.reversalVoucherId}.`
+        ),
       });
       setSelectedSale(null);
       setReason("");
     },
     onError: (error: any) => {
-      toast({ title: "Reversal failed", description: error.message, variant: "destructive" });
+      toast({ title: releaseDebtEnglish("Reversal failed"), description: error.message, variant: "destructive" });
     },
   });
 
@@ -159,7 +162,7 @@ export default function SpOverview() {
               id="sp-sales-history-heading"
               className="text-sm font-semibold uppercase tracking-wide text-muted-foreground"
             >
-              Recent Supplier Partner sales
+              {releaseDebtEnglish("Recent Supplier Partner sales")}
             </h2>
             <p className="mt-1 text-xs text-muted-foreground">
               Full reversals restore the original FIFO lots, ERP inventory, cash or bank, and supplier payable in one
@@ -172,10 +175,13 @@ export default function SpOverview() {
           <CardContent className="p-0">
             {salesLoading ? (
               <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" /> Loading sales…
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>{releaseDebtEnglish("Loading sales…")}</span>
               </div>
             ) : recentSales.length === 0 ? (
-              <p className="p-6 text-sm text-muted-foreground">No Supplier Partner sales have been posted yet.</p>
+              <p className="p-6 text-sm text-muted-foreground">
+                {releaseDebtEnglish("No Supplier Partner sales have been posted yet.")}
+              </p>
             ) : (
               <div className="divide-y">
                 {recentSales.map((sale) => (
@@ -207,7 +213,8 @@ export default function SpOverview() {
                           }}
                           data-testid={`button-reverse-sp-sale-${sale.id}`}
                         >
-                          <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Reverse
+                          <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                          <span>{releaseDebtEnglish("Reverse")}</span>
                         </Button>
                       )}
                     </div>
@@ -258,7 +265,7 @@ export default function SpOverview() {
           </DialogHeader>
           <div className="space-y-3">
             <label className="text-sm font-medium" htmlFor="sp-sale-reversal-reason">
-              Required reason
+              {releaseDebtEnglish("Required reason")}
             </label>
             <textarea
               id="sp-sale-reversal-reason"
@@ -267,12 +274,12 @@ export default function SpOverview() {
               rows={4}
               maxLength={500}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              placeholder="Explain why the full sale is being reversed…"
+              placeholder={releaseDebtEnglish("Explain why the full sale is being reversed…")}
               data-testid="input-sp-sale-reversal-reason"
             />
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setSelectedSale(null)} disabled={reverseSale.isPending}>
-                Keep sale
+                {releaseDebtEnglish("Keep sale")}
               </Button>
               <Button
                 variant="destructive"

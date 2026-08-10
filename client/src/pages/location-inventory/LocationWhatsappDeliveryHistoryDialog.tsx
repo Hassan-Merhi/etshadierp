@@ -1,3 +1,4 @@
+import { releaseDebtEnglish } from "@/i18n/finalCloseoutTranslations";
 import { useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { CheckCircle2, Clock3, History, Loader2, RefreshCw, RotateCcw, XCircle } from "lucide-react";
@@ -73,11 +74,16 @@ function sourceLabel(source: DeliveryEntry["source"]): string {
 }
 
 function statusPresentation(status: DeliveryEntry["status"]) {
-  if (status === "sent") return { label: "Sent", Icon: CheckCircle2, className: "text-green-600 dark:text-green-400" };
+  if (status === "sent")
+    return { label: releaseDebtEnglish("Sent"), Icon: CheckCircle2, className: "text-green-600 dark:text-green-400" };
   if (status === "failed") return { label: "Failed", Icon: XCircle, className: "text-destructive" };
   if (status === "skipped_empty")
-    return { label: "No matching stock", Icon: XCircle, className: "text-amber-600 dark:text-amber-400" };
-  return { label: "Sending", Icon: Clock3, className: "text-blue-600 dark:text-blue-400" };
+    return {
+      label: releaseDebtEnglish("No matching stock"),
+      Icon: XCircle,
+      className: "text-amber-600 dark:text-amber-400",
+    };
+  return { label: releaseDebtEnglish("Sending"), Icon: Clock3, className: "text-blue-600 dark:text-blue-400" };
 }
 
 function newIdempotencyToken(): string {
@@ -126,7 +132,7 @@ export function LocationWhatsappDeliveryHistoryDialog({ location, companyId, can
       });
     },
     onError: (error: Error) => {
-      toast({ title: "Retry failed", description: error.message, variant: "destructive" });
+      toast({ title: releaseDebtEnglish("Retry failed"), description: error.message, variant: "destructive" });
     },
     onSettled: async () => {
       retryLockRef.current = false;
@@ -142,8 +148,8 @@ export function LocationWhatsappDeliveryHistoryDialog({ location, companyId, can
     if (retryLockRef.current || retryMutation.isPending) return;
     if (delivery.includeCost && !canSendWithCost) {
       toast({
-        title: "Cost report restricted",
-        description: "Cost-price and total-value permission is required to retry this report.",
+        title: releaseDebtEnglish("Cost report restricted"),
+        description: releaseDebtEnglish("Cost-price and total-value permission is required to retry this report."),
         variant: "destructive",
       });
       return;
@@ -173,7 +179,8 @@ export function LocationWhatsappDeliveryHistoryDialog({ location, companyId, can
             <div className="flex items-start justify-between gap-3 pr-8">
               <div>
                 <DialogTitle className="flex items-center gap-2">
-                  <History className="h-5 w-5" /> WhatsApp Stock Delivery History
+                  <History className="h-5 w-5" />
+                  <span>{releaseDebtEnglish("WhatsApp Stock Delivery History")}</span>
                 </DialogTitle>
                 <DialogDescription className="mt-1">
                   Manual, automatic, and retry attempts for <strong>{location.name}</strong>.
@@ -200,23 +207,26 @@ export function LocationWhatsappDeliveryHistoryDialog({ location, companyId, can
           <div className="overflow-y-auto px-4 sm:px-5 py-4 space-y-4">
             {historyQuery.isLoading ? (
               <div className="py-12 flex items-center justify-center text-muted-foreground">
-                <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading delivery history…
+                <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                <span>{releaseDebtEnglish("Loading delivery history…")}</span>
               </div>
             ) : historyQuery.isError ? (
               <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
-                <p className="font-medium">Could not load delivery history.</p>
+                <p className="font-medium">{releaseDebtEnglish("Could not load delivery history.")}</p>
                 <p className="mt-1">
-                  {historyQuery.error instanceof Error ? historyQuery.error.message : "Unknown error"}
+                  {historyQuery.error instanceof Error
+                    ? historyQuery.error.message
+                    : releaseDebtEnglish("Unknown error")}
                 </p>
                 <Button variant="outline" size="sm" className="mt-3" onClick={() => historyQuery.refetch()}>
-                  Retry loading
+                  {releaseDebtEnglish("Retry loading")}
                 </Button>
               </div>
             ) : (
               <>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-md border p-3">
-                    <p className="text-xs text-muted-foreground">Last successful send</p>
+                    <p className="text-xs text-muted-foreground">{releaseDebtEnglish("Last successful send")}</p>
                     <p className="text-sm font-medium mt-1">{formatDateTime(summary?.lastSentAt ?? null)}</p>
                     {summary?.lastSentAt && (
                       <p className="text-xs text-muted-foreground mt-1">
@@ -228,9 +238,11 @@ export function LocationWhatsappDeliveryHistoryDialog({ location, companyId, can
                     )}
                   </div>
                   <div className="rounded-md border p-3">
-                    <p className="text-xs text-muted-foreground">Latest attempt</p>
+                    <p className="text-xs text-muted-foreground">{releaseDebtEnglish("Latest attempt")}</p>
                     <p className="text-sm font-medium mt-1">
-                      {summary?.latestStatus ? statusPresentation(summary.latestStatus).label : "No attempts yet"}
+                      {summary?.latestStatus
+                        ? statusPresentation(summary.latestStatus).label
+                        : releaseDebtEnglish("No attempts yet")}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">{formatDateTime(summary?.latestAt ?? null)}</p>
                   </div>
@@ -238,7 +250,7 @@ export function LocationWhatsappDeliveryHistoryDialog({ location, companyId, can
 
                 {deliveries.length === 0 ? (
                   <div className="rounded-md border border-dashed py-12 text-center text-sm text-muted-foreground">
-                    No WhatsApp stock reports have been attempted for this location yet.
+                    {releaseDebtEnglish("No WhatsApp stock reports have been attempted for this location yet.")}
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -307,47 +319,55 @@ export function LocationWhatsappDeliveryHistoryDialog({ location, companyId, can
 
                           <div className="grid gap-x-4 gap-y-2 text-xs sm:grid-cols-2 lg:grid-cols-3">
                             <div>
-                              <span className="text-muted-foreground">Destination:</span>{" "}
+                              <span className="text-muted-foreground">{releaseDebtEnglish("Destination:")}</span>{" "}
                               {delivery.destinationGroupName || "Linked WhatsApp group"}
                             </div>
                             <div>
-                              <span className="text-muted-foreground">User:</span>{" "}
+                              <span className="text-muted-foreground">{releaseDebtEnglish("User:")}</span>{" "}
                               {delivery.initiatedByUsername || delivery.initiatedByUserId || "System"}
                             </div>
                             <div>
-                              <span className="text-muted-foreground">Generated:</span>{" "}
+                              <span className="text-muted-foreground">{releaseDebtEnglish("Generated:")}</span>{" "}
                               {formatDateTime(delivery.reportGeneratedAt)}
                             </div>
                             <div>
-                              <span className="text-muted-foreground">Items:</span> {delivery.itemCount ?? "—"}
+                              <span className="text-muted-foreground">{releaseDebtEnglish("Items:")}</span>{" "}
+                              {delivery.itemCount ?? "—"}
                             </div>
                             <div>
-                              <span className="text-muted-foreground">Pages:</span> {delivery.pageCount ?? "—"}
+                              <span className="text-muted-foreground">{releaseDebtEnglish("Pages:")}</span>{" "}
+                              {delivery.pageCount ?? "—"}
                             </div>
                             <div>
-                              <span className="text-muted-foreground">Completed:</span>{" "}
+                              <span className="text-muted-foreground">{releaseDebtEnglish("Completed:")}</span>{" "}
                               {formatDateTime(delivery.completedAt)}
                             </div>
                             {delivery.scheduledFor && (
                               <div>
-                                <span className="text-muted-foreground">Scheduled day:</span> {delivery.scheduledFor}
+                                <span className="text-muted-foreground">{releaseDebtEnglish("Scheduled day:")}</span>{" "}
+                                {delivery.scheduledFor}
                               </div>
                             )}
                             {delivery.stockGroupName && (
                               <div>
-                                <span className="text-muted-foreground">Stock group:</span> {delivery.stockGroupName}
+                                <span className="text-muted-foreground">{releaseDebtEnglish("Stock group:")}</span>{" "}
+                                {delivery.stockGroupName}
                               </div>
                             )}
                             {delivery.categoryName && (
                               <div>
-                                <span className="text-muted-foreground">Category:</span> {delivery.categoryName}
+                                <span className="text-muted-foreground">{releaseDebtEnglish("Category:")}</span>{" "}
+                                {delivery.categoryName}
                               </div>
                             )}
                           </div>
 
                           {delivery.fileName && (
                             <p className="text-xs text-muted-foreground break-all">
-                              <span className="font-medium text-foreground/80">Report file:</span> {delivery.fileName}
+                              <span className="font-medium text-foreground/80">
+                                {releaseDebtEnglish("Report file:")}
+                              </span>{" "}
+                              {delivery.fileName}
                             </p>
                           )}
 
