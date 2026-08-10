@@ -13,6 +13,28 @@ jobs:
     if: ${{ !contains(github.event.head_commit.message, '[pr604-auto-fix]') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: etshadi_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d etshadi_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/etshadi_test
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/etshadi_test
+      PGSSLMODE: disable
+      SESSION_SECRET: pr604-final-verification-session-secret
+      CSRF_ENFORCE: "0"
+      ENABLE_SCHEDULERS: "false"
     steps:
       - uses: actions/checkout@v7
         with:
@@ -32,6 +54,9 @@ jobs:
 
       - run: npm ci --no-audit --bin-links=true
 
+      - name: Prepare disposable database schema
+        run: node node_modules/drizzle-kit/bin.cjs push --force
+
       - name: Apply deterministic Phase 5 repairs
         shell: bash
         run: |
@@ -39,8 +64,6 @@ jobs:
           from pathlib import Path
           import re
 
-          # Phase 3: preserve the set-based writes while removing the four new
-          # explicit-any escapes and making the ID collections unambiguously numeric.
           for filename in [
               "server/routes/factory/customer-orders/finalize-loading/finalize.ts",
               "server/routes/factory/customer-orders/finalize-loading/loading.ts",
@@ -55,7 +78,6 @@ jobs:
               s = s.replace("baleRows.map((b: any) =>", "baleRows.map((b) =>")
               p.write_text(s)
 
-          # Phase 1 maintenance diagnostics are internal identifiers, not UI copy.
           p = Path("server/services/scheduler/maintenance.ts")
           s = p.read_text().replace(
               'throw new Error(`Unable to inspect mix-batch references`, { cause: error as Error });',
@@ -63,10 +85,6 @@ jobs:
           )
           p.write_text(s)
 
-          # These four deferred tests asserted implementation source text and trip
-          # the repository's source-coupling ratchet. The full behavioral CI suite
-          # is the Phase 5 verification surface, so remove the brittle copies rather
-          # than widening the assertion ceiling.
           for filename in [
               "tests/factory-phase3-query-efficiency.test.ts",
               "tests/operational-phase4-bandwidth-safety.test.ts",
