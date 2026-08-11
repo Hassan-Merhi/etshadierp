@@ -25,7 +25,7 @@ describe("POS revision WhatsApp routing", () => {
     // or company fallback routing. Those settings can point at another group.
     expect(helper).not.toContain("transferWaGroupChatId: locations.transferWaGroupChatId");
     expect(helper).not.toContain("companies.transferWaGroupChatId");
-    expect(helper).not.toContain("routingSource = \"company fallback\"");
+    expect(helper).not.toContain('routingSource = "company fallback"');
     expect(helper).not.toContain(".where(eq(locations.id, destinationId))");
   });
 });
