@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { WorkspaceActions } from "@/components/ui/workspace-layout";
 import { ArrowLeft, ChevronUp, ChevronDown } from "lucide-react";
@@ -22,6 +23,18 @@ export interface PageHeaderProps {
   children?: React.ReactNode;
 }
 
+function isManualPageBackControl(element: HTMLElement): boolean {
+  const testId = element.getAttribute("data-testid")?.toLowerCase() || "";
+  if (testId.includes("button-back") || testId.startsWith("back-") || testId.endsWith("-back")) return true;
+
+  const label = (element.getAttribute("aria-label") || element.getAttribute("title") || element.textContent || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+
+  return /^back(?:\s+to\b|\s*$)/.test(label);
+}
+
 export function PageHeader({
   title,
   subtitle,
@@ -34,14 +47,54 @@ export function PageHeader({
   const { config } = useCursorNav();
   const [location] = useLocation();
   const mode = useAppMode();
+  const headerRef = useRef<HTMLElement>(null);
+  const [hasNearbyManualBack, setHasNearbyManualBack] = useState(false);
   const resolvedBackTarget = backTarget === undefined ? getParentRoute(location) : backTarget;
   const hasTrackedErpBack = mode === "erp" && canGoBackToPreviousErpLocation();
   const handleBack = useBackToParent(resolvedBackTarget);
-  const hasBack = showBackButton && (!!resolvedBackTarget || hasTrackedErpBack);
+
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+
+    // Some legacy pages still own a page-level Back control while they are being
+    // migrated to PageHeader. Suppress the shared control whenever one exists in
+    // the same page container. Using the nearest page/main container avoids
+    // unrelated Back controls rendered in dialogs, portals, tables, or sidebars.
+    const scope =
+      header.closest<HTMLElement>("[data-page-back-scope], main, [role='main'], .container") ??
+      header.parentElement ??
+      header;
+
+    const detectManualBack = () => {
+      const hasManualBack = Array.from(scope.querySelectorAll<HTMLElement>("button, a")).some((element) => {
+        if (header.contains(element)) return false;
+        return isManualPageBackControl(element);
+      });
+      setHasNearbyManualBack(hasManualBack);
+    };
+
+    detectManualBack();
+    const observer = new MutationObserver(detectManualBack);
+    observer.observe(scope, {
+      attributes: true,
+      attributeFilter: ["aria-label", "title", "data-testid"],
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+    return () => observer.disconnect();
+  }, [location]);
+
+  const hasBack = showBackButton && !hasNearbyManualBack && (!!resolvedBackTarget || hasTrackedErpBack);
   const hasNav = hasBack || (showCursorNavButtons && !!config);
 
   return (
-    <header className="mb-5 flex min-w-0 flex-col gap-3 border-b border-border pb-4" data-testid="page-header">
+    <header
+      ref={headerRef}
+      className="mb-5 flex min-w-0 flex-col gap-3 border-b border-border pb-4"
+      data-testid="page-header"
+    >
       {hasNav && (
         <nav className="-ml-2 flex flex-wrap items-center gap-1" aria-label="Page navigation">
           {hasBack && (
@@ -51,6 +104,7 @@ export function PageHeader({
               onClick={handleBack}
               className="gap-1 text-muted-foreground hover:text-foreground"
               data-testid="button-back"
+              data-page-back-owner="shared"
             >
               <ArrowLeft className="h-4 w-4" aria-hidden="true" />
               <span className="hidden sm:inline">Back</span>
