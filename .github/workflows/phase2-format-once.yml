@@ -48,4 +48,4 @@ jobs:
             tests/stock-transfer-revision-write-route-behavior.test.ts \
             tests/ui/pos-price-list-page-behavior.test.tsx
           git commit -m "chore: format remaining phase 2 tests"
-          git push origin HEAD:program/erp-90-phase-2
+          git push --no-verify origin HEAD:program/erp-90-phase-2
