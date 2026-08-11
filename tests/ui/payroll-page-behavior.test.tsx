@@ -15,8 +15,28 @@ vi.mock("@tanstack/react-query", () => ({
     if (root === "/api/employees") {
       return {
         data: [
-          { id: 1, firstName: "Alice", lastName: "Admin", code: "E1", employeeType: "Employee", monthlySalary: "1000", active: true, calculatedBalance: "250", salesBonusPct: "5", salesBonusPctLocationId: 11 },
-          { id: 2, firstName: "Will", lastName: "Worker", code: "W1", employeeType: "Worker", monthlySalary: "600", active: true, calculatedBalance: "0" },
+          {
+            id: 1,
+            firstName: "Alice",
+            lastName: "Admin",
+            code: "E1",
+            employeeType: "Employee",
+            monthlySalary: "1000",
+            active: true,
+            calculatedBalance: "250",
+            salesBonusPct: "5",
+            salesBonusPctLocationId: 11,
+          },
+          {
+            id: 2,
+            firstName: "Will",
+            lastName: "Worker",
+            code: "W1",
+            employeeType: "Worker",
+            monthlySalary: "600",
+            active: true,
+            calculatedBalance: "0",
+          },
         ],
         isLoading: false,
       };
@@ -47,10 +67,18 @@ vi.mock("@tanstack/react-query", () => ({
 
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: harness.toast }) }));
 vi.mock("@/contexts/CompanyContext", () => ({
-  useCompany: () => ({ selectedCompany: { id: 4, name: "GC Lshi" }, companies: [{ id: 4, name: "GC Lshi" }, { id: 5, name: "Partner" }] }),
+  useCompany: () => ({
+    selectedCompany: { id: 4, name: "GC Lshi" },
+    companies: [
+      { id: 4, name: "GC Lshi" },
+      { id: 5, name: "Partner" },
+    ],
+  }),
 }));
 vi.mock("@/contexts/AppModeContext", () => ({ useAppMode: () => "erp" }));
-vi.mock("@/contexts/CurrencyContext", () => ({ useCurrencyContext: () => ({ formatAmount: (value: unknown) => `$${value}` }) }));
+vi.mock("@/contexts/CurrencyContext", () => ({
+  useCurrencyContext: () => ({ formatAmount: (value: unknown) => `$${value}` }),
+}));
 vi.mock("@/lib/factoryApi", () => ({ getApiRequest: () => harness.apiRequest }));
 vi.mock("@/lib/queryClient", () => ({ queryClient: { invalidateQueries: harness.invalidateQueries } }));
 vi.mock("@hookform/resolvers/zod", () => ({ zodResolver: () => undefined }));
@@ -58,7 +86,14 @@ vi.mock("react-hook-form", () => ({
   useForm: () => {
     const reset = vi.fn();
     harness.formResets.push(reset);
-    return { reset, handleSubmit: (fn: any) => fn, register: vi.fn(), watch: vi.fn(), setValue: vi.fn(), formState: { errors: {} } };
+    return {
+      reset,
+      handleSubmit: (fn: any) => fn,
+      register: vi.fn(),
+      watch: vi.fn(),
+      setValue: vi.fn(),
+      formState: { errors: {} },
+    };
   },
 }));
 vi.mock("@/components/PageHeader", () => ({ PageHeader: ({ title }: any) => <h1>{title}</h1> }));
@@ -78,7 +113,14 @@ vi.mock("@/pages/payroll/EmployeesTab", () => ({
       <button onClick={() => props.handleWithdrawal(props.employeeStaff[0])}>Withdraw Alice</button>
       <button onClick={() => props.handleBonus(props.employeeStaff[0])}>Bonus Alice</button>
       <button onClick={() => props.setStatementEmployee(props.employeeStaff[0])}>Statement Alice</button>
-      <button onClick={() => { props.setEditingEmployee(props.employeeStaff[0]); props.setEditEmployeeDialogOpen(true); }}>Edit Alice</button>
+      <button
+        onClick={() => {
+          props.setEditingEmployee(props.employeeStaff[0]);
+          props.setEditEmployeeDialogOpen(true);
+        }}
+      >
+        Edit Alice
+      </button>
       <button onClick={() => props.setEmpSearch("missing")}>Filter missing</button>
     </div>
   ),
@@ -94,28 +136,92 @@ vi.mock("@/pages/payroll/WorkersTab", () => ({
   ),
 }));
 vi.mock("@/pages/payroll/GroupsTab", () => ({ GroupsTab: () => <div>Groups area</div> }));
-vi.mock("@/pages/payroll/AdvancesTab", () => ({ AdvancesTab: ({ cashAccounts }: any) => <div>Advances cash {cashAccounts.length}</div> }));
+vi.mock("@/pages/payroll/AdvancesTab", () => ({
+  AdvancesTab: ({ cashAccounts }: any) => <div>Advances cash {cashAccounts.length}</div>,
+}));
 
 vi.mock("@/pages/payroll/DepositDialog", () => ({
-  DepositDialog: ({ open, selectedEmployee, mutation }: any) => open ? <div data-testid="deposit-dialog"><span>{selectedEmployee?.firstName}</span><button onClick={() => mutation.mutate({ amount: "125", date: "2026-08-11", notes: "salary" })}>Submit deposit</button></div> : null,
+  DepositDialog: ({ open, selectedEmployee, mutation }: any) =>
+    open ? (
+      <div data-testid="deposit-dialog">
+        <span>{selectedEmployee?.firstName}</span>
+        <button onClick={() => mutation.mutate({ amount: "125", date: "2026-08-11", notes: "salary" })}>
+          Submit deposit
+        </button>
+      </div>
+    ) : null,
 }));
 vi.mock("@/pages/payroll/WithdrawalDialog", () => ({
-  WithdrawalDialog: ({ open, selectedEmployee, mutation }: any) => open ? <div data-testid="withdrawal-dialog"><span>{selectedEmployee?.firstName}</span><button onClick={() => mutation.mutate({ amount: "75", paymentAccountType: "cash", paymentAccountId: "40", date: "2026-08-11", notes: "cash out" })}>Submit withdrawal</button></div> : null,
+  WithdrawalDialog: ({ open, selectedEmployee, mutation }: any) =>
+    open ? (
+      <div data-testid="withdrawal-dialog">
+        <span>{selectedEmployee?.firstName}</span>
+        <button
+          onClick={() =>
+            mutation.mutate({
+              amount: "75",
+              paymentAccountType: "cash",
+              paymentAccountId: "40",
+              date: "2026-08-11",
+              notes: "cash out",
+            })
+          }
+        >
+          Submit withdrawal
+        </button>
+      </div>
+    ) : null,
 }));
 vi.mock("@/pages/payroll/BonusDialog", () => ({
-  BonusDialog: ({ open, selectedEmployee, bonusSalesCustomPct, bonusSalesLocationId }: any) => open ? <div data-testid="bonus-dialog">{selectedEmployee?.firstName}:{bonusSalesCustomPct}:{bonusSalesLocationId}</div> : null,
+  BonusDialog: ({ open, selectedEmployee, bonusSalesCustomPct, bonusSalesLocationId }: any) =>
+    open ? (
+      <div data-testid="bonus-dialog">
+        {selectedEmployee?.firstName}:{bonusSalesCustomPct}:{bonusSalesLocationId}
+      </div>
+    ) : null,
 }));
 vi.mock("@/pages/payroll/EmployeeStatementDialog", () => ({
-  EmployeeStatementDialog: ({ statementEmployee, cleanTxnDesc }: any) => statementEmployee ? <div data-testid="statement-dialog">{statementEmployee.firstName}:{cleanTxnDesc("SAL-DEP-ABC Salary payment")}</div> : null,
+  EmployeeStatementDialog: ({ statementEmployee, cleanTxnDesc }: any) =>
+    statementEmployee ? (
+      <div data-testid="statement-dialog">
+        {statementEmployee.firstName}:{cleanTxnDesc("SAL-DEP-ABC Salary payment")}
+      </div>
+    ) : null,
 }));
-vi.mock("@/pages/payroll/EditEmployeeDialog", () => ({ EditEmployeeDialog: ({ open }: any) => open ? <div data-testid="edit-dialog">editing</div> : null }));
+vi.mock("@/pages/payroll/EditEmployeeDialog", () => ({
+  EditEmployeeDialog: ({ open }: any) => (open ? <div data-testid="edit-dialog">editing</div> : null),
+}));
 vi.mock("@/pages/payroll/PayrollDialogs", () => ({
-  WorkerDeductionDialog: ({ target, setAmount, setReason, mutation }: any) => target ? <div data-testid="deduction-dialog"><button onClick={() => { setAmount("25"); setReason("uniform"); }}>Fill deduction</button><button onClick={() => mutation.mutate()}>Submit deduction</button></div> : null,
+  WorkerDeductionDialog: ({ target, setAmount, setReason, mutation }: any) =>
+    target ? (
+      <div data-testid="deduction-dialog">
+        <button
+          onClick={() => {
+            setAmount("25");
+            setReason("uniform");
+          }}
+        >
+          Fill deduction
+        </button>
+        <button onClick={() => mutation.mutate()}>Submit deduction</button>
+      </div>
+    ) : null,
 }));
 vi.mock("@/pages/payroll/BulkDialogs", () => ({
-  BulkDialogs: ({ handleSelectAllEmployees, bulkDepositTotal }: any) => <div><span data-testid="bulk-total">{bulkDepositTotal}</span><button onClick={() => handleSelectAllEmployees(true)}>Select all salaries</button></div>,
+  BulkDialogs: ({ handleSelectAllEmployees, bulkDepositTotal }: any) => (
+    <div>
+      <span data-testid="bulk-total">{bulkDepositTotal}</span>
+      <button onClick={() => handleSelectAllEmployees(true)}>Select all salaries</button>
+    </div>
+  ),
 }));
-vi.mock("@/pages/payroll/BulkPaymentDialog", () => ({ BulkPaymentDialog: ({ selectedPayments, totalAmount }: any) => <div data-testid="worker-payment-summary">{selectedPayments.length}:{totalAmount}</div> }));
+vi.mock("@/pages/payroll/BulkPaymentDialog", () => ({
+  BulkPaymentDialog: ({ selectedPayments, totalAmount }: any) => (
+    <div data-testid="worker-payment-summary">
+      {selectedPayments.length}:{totalAmount}
+    </div>
+  ),
+}));
 vi.mock("@/pages/payroll/WorkerDialogs", () => ({ WorkerDialogs: () => null }));
 vi.mock("@/pages/payroll/EmployeeCrudDialogs", () => ({ EmployeeCrudDialogs: () => null }));
 
@@ -126,7 +232,10 @@ describe("ERP payroll page behavior", () => {
     vi.clearAllMocks();
     harness.formResets.splice(0);
     harness.apiRequest.mockResolvedValue({ json: async () => ({ results: [] }) });
-    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => [], text: async () => "" })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: true, json: async () => [], text: async () => "" }))
+    );
   });
 
   it("separates employee/worker views and drives deposit, withdrawal, statement, bonus, and edit state", async () => {
@@ -140,17 +249,31 @@ describe("ERP payroll page behavior", () => {
     fireEvent.click(screen.getByRole("button", { name: "Deposit Alice" }));
     expect(screen.getByTestId("deposit-dialog")).toHaveTextContent("Alice");
     fireEvent.click(screen.getByRole("button", { name: "Submit deposit" }));
-    await waitFor(() => expect(harness.apiRequest).toHaveBeenCalledWith("POST", "/api/payroll/deposit-employee", {
-      employeeId: 1, amount: "125", date: "2026-08-11", notes: "salary",
-    }));
-    expect(harness.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Success", description: "Deposit recorded successfully" }));
+    await waitFor(() =>
+      expect(harness.apiRequest).toHaveBeenCalledWith("POST", "/api/payroll/deposit-employee", {
+        employeeId: 1,
+        amount: "125",
+        date: "2026-08-11",
+        notes: "salary",
+      })
+    );
+    expect(harness.toast).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Success", description: "Deposit recorded successfully" })
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Withdraw Alice" }));
     expect(screen.getByTestId("withdrawal-dialog")).toHaveTextContent("Alice");
     fireEvent.click(screen.getByRole("button", { name: "Submit withdrawal" }));
-    await waitFor(() => expect(harness.apiRequest).toHaveBeenCalledWith("POST", "/api/payroll/withdraw-employee", {
-      employeeId: 1, amount: "75", paymentAccountType: "cash", paymentAccountId: "40", date: "2026-08-11", notes: "cash out",
-    }));
+    await waitFor(() =>
+      expect(harness.apiRequest).toHaveBeenCalledWith("POST", "/api/payroll/withdraw-employee", {
+        employeeId: 1,
+        amount: "75",
+        paymentAccountType: "cash",
+        paymentAccountId: "40",
+        date: "2026-08-11",
+        notes: "cash out",
+      })
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Bonus Alice" }));
     expect(screen.getByTestId("bonus-dialog")).toHaveTextContent("Alice:5:11");
@@ -184,11 +307,13 @@ describe("ERP payroll page behavior", () => {
     fireEvent.click(screen.getByRole("button", { name: "Fill deduction" }));
     fireEvent.click(screen.getByRole("button", { name: "Submit deduction" }));
 
-    await waitFor(() => expect(harness.apiRequest).toHaveBeenCalledWith(
-      "POST",
-      "/api/factory/workers/2/deductions",
-      expect.objectContaining({ amount: "25", reason: "uniform" })
-    ));
+    await waitFor(() =>
+      expect(harness.apiRequest).toHaveBeenCalledWith(
+        "POST",
+        "/api/factory/workers/2/deductions",
+        expect.objectContaining({ amount: "25", reason: "uniform" })
+      )
+    );
     expect(harness.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Deduction added" }));
   });
 });
