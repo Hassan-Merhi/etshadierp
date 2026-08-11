@@ -8,7 +8,10 @@ on:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Superseded pull-request runs are cancelled for fast feedback, but every
+  # commit on main must complete: the group key is the same for consecutive
+  # pushes, so cancelling there lets a commit land without ever being gated.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   ci:
