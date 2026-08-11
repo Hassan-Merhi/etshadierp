@@ -223,7 +223,7 @@ export default function StockInSalesReport() {
 
 function StockInSalesReportSummary() {
   const { selectedCompany } = useCompany();
-  const { formatAmount, selectedCurrency, convertToDisplay } = useCurrencyContext();
+  const { formatAmount } = useCurrencyContext();
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("all_time"));
@@ -279,8 +279,6 @@ function StockInSalesReportSummary() {
   const reconciliation = data?.reconciliation;
   const formatSignedAmount = (value: number) => (value < 0 ? `-${formatAmount(Math.abs(value))}` : formatAmount(value));
   const formatSignedQty = (value: number) => `${value > 0 ? "+" : ""}${formatNumber(value, 3)}`;
-  const formatRate = (value: number) =>
-    selectedCurrency === "CFA" ? `CFA ${formatNumber(convertToDisplay(value), 2)}` : `$ ${formatNumber(value, 6)}`;
   const formatPeriodLabel = (row: StockInSalesRow) => {
     if (grouping === "yearly") return row.periodKey;
     if (grouping === "monthly") {
