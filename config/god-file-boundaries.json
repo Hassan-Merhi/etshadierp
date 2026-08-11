@@ -164,7 +164,6 @@
       "client/src/pages/factory/FactoryStatusBuilder.tsx": 975,
       "client/src/pages/factory/FactoryStockAllocationV5.tsx": 1875,
       "client/src/pages/factory/FactorySuppliers.tsx": 1350,
-      "client/src/pages/factory/FactoryWorkerDetail.tsx": 2075,
       "client/src/pages/factory/WasteDispatch.tsx": 1000,
       "client/src/pages/factory/WipersReEntry.tsx": 925,
       "client/src/pages/Payroll.tsx": 1325,

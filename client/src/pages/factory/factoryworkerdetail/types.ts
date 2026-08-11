@@ -3,7 +3,7 @@
  *
  * Extracted from FactoryWorkerDetail.tsx during the Phase 4 god-file split.
  */
-import type {FactoryWorker, FactoryWorkerAdvance} from "@shared/schema";
+import type { FactoryWorker, FactoryWorkerAdvance } from "@shared/schema";
 
 export interface WorkerWithStats extends FactoryWorker {
   stats?: {
@@ -23,7 +23,7 @@ export interface WorkerStats {
   estimatedEarnings: string;
   totalPaid: string;
   payrollCount: number;
-  recentPayrolls: any[];
+  recentPayrolls: unknown[];
 }
 
 export interface PayrollRecord {
@@ -40,6 +40,7 @@ export interface PayrollRecord {
   cashAccountId: number | null;
   paidAt: string | null;
   notes: string | null;
+  transport?: string | null;
 }
 
 export interface CashAccount {
