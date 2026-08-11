@@ -639,11 +639,6 @@
         0,
         0
       ],
-      "client/src/pages/Payroll.tsx": [
-        62,
-        9,
-        0
-      ],
       "client/src/pages/PendingInvoiceVerify.tsx": [
         1,
         8,
@@ -1194,11 +1189,6 @@
         0,
         0
       ],
-      "client/src/pages/factory/FactoryPayroll.tsx": [
-        11,
-        0,
-        0
-      ],
       "client/src/pages/factory/FactoryPayrollHub.tsx": [
         1,
         0,
@@ -1627,11 +1617,6 @@
       "client/src/pages/factory/factory-worker-detail/dialogs/PayrollDetailDialog.tsx": [
         5,
         15,
-        0
-      ],
-      "client/src/pages/factory/factoryadvancestab/components/AdvancesView.tsx": [
-        0,
-        5,
         0
       ],
       "client/src/pages/factory/factoryadvancestab/components/DeductionsView.tsx": [
@@ -6522,6 +6507,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 8923
+    "typeEscapeCeiling": 8836
   }
 }

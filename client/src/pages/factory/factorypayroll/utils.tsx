@@ -5,6 +5,11 @@
  */
 import { Badge } from "@/components/ui/badge";
 
+export function amount(value: string | number | null | undefined): number {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 export function getStatusBadge(status: string) {
   switch (status) {
     case "DRAFT":
