@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express, RequestHandler } from "express";
+import type { Express } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { storage } from "../../storage";
@@ -13,7 +13,6 @@ import { logger } from "../../lib/logger";
 import { vouchers, updateStockTransferSchema } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { registerStockAdjustmentWasteRoutes } from "../stockAdjustmentWasteRoutes";
-import { stockAdjustmentCreateHandler } from "../stockAdjustmentCreateHandler";
 
 export function registerStockTransferUpdateRoutes(app: Express) {
   // Stock Transfers - PUT endpoint (update)
@@ -72,26 +71,5 @@ export function registerStockTransferUpdateRoutes(app: Express) {
     }
   });
 
-  // Keep the public POST /api/stock-adjustments route and its guard chain
-  // exactly where they have always been registered, but replace only the
-  // legacy anonymous create callback while this sub-registrar runs. This
-  // avoids a duplicate Express route (and keeps the route-manifest stable)
-  // while fixing non-USD/native-currency stock-adjustment creation.
-  const originalPost = app.post;
-  const boundPost = app.post.bind(app);
-  const registerPost = boundPost as (path: string, ...handlers: RequestHandler[]) => Express;
-  app.post = ((path: string, ...handlers: RequestHandler[]) => {
-    if (path === "/api/stock-adjustments" && handlers.length > 0) {
-      const correctedHandlers = [...handlers];
-      correctedHandlers[correctedHandlers.length - 1] = (req, res) => stockAdjustmentCreateHandler(req, res);
-      return registerPost(path, ...correctedHandlers);
-    }
-    return registerPost(path, ...handlers);
-  }) as typeof app.post;
-
-  try {
-    registerStockAdjustmentWasteRoutes(app);
-  } finally {
-    app.post = originalPost;
-  }
+  registerStockAdjustmentWasteRoutes(app);
 }
