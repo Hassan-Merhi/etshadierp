@@ -1619,11 +1619,6 @@
         15,
         0
       ],
-      "client/src/pages/factory/factoryadvancestab/components/AdvancesView.tsx": [
-        0,
-        5,
-        0
-      ],
       "client/src/pages/factory/factoryadvancestab/components/DeductionsView.tsx": [
         0,
         2,
@@ -6512,6 +6507,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 8841
+    "typeEscapeCeiling": 8836
   }
 }
