@@ -34,6 +34,10 @@ export function SkipLink({
     if (targetWindow && targetWindow.location.hash !== href) {
       targetWindow.history.replaceState(targetWindow.history.state, "", href);
     }
+
+    targetWindow?.requestAnimationFrame(() => {
+      getHashTarget(event.currentTarget.ownerDocument, href)?.focus({ preventScroll: true });
+    });
   };
 
   return (
