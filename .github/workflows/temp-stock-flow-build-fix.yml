@@ -1,0 +1,50 @@
+name: Temporary Stock Flow Build Fix
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.event.pull_request.head.ref == 'agent/stock-in-sales-phase-1-inventory-flow'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.14'
+          cache: npm
+      - run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+      - run: npm ci --no-audit --bin-links=true
+      - name: Restore lazy Excel transform target
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('client/src/pages/StockInSalesReportDetail.tsx')
+          text = path.read_text()
+          start = '''    try {\n      const exportParams = new URLSearchParams(baseParams);'''
+          replacement = '''    try {\n      const workbook = new ExcelJS.Workbook();\n      const exportParams = new URLSearchParams(baseParams);'''
+          if start not in text:
+              raise SystemExit('detail export start target missing')
+          text = text.replace(start, replacement, 1)
+          later = '''      const exportMovements = (await movementResponse.json()) as MovementResponse;\n      const workbook = new ExcelJS.Workbook();'''
+          if later not in text:
+              raise SystemExit('later workbook target missing')
+          text = text.replace(later, '''      const exportMovements = (await movementResponse.json()) as MovementResponse;''', 1)
+          path.write_text(text)
+          PY
+          npx prettier --write client/src/pages/StockInSalesReportDetail.tsx
+      - name: Commit build fix
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add client/src/pages/StockInSalesReportDetail.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m 'Restore stock flow lazy Excel build target'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
