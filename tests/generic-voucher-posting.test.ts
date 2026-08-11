@@ -16,8 +16,18 @@ function payload() {
       optional: false,
     },
     entries: [
-      { ledgerAccountId: 10, debitAmount: "25.00", creditAmount: "0", narration: "Insurance charge" },
-      { ledgerAccountId: 20, debitAmount: "0", creditAmount: "25.00", narration: "Insurance charge" },
+      {
+        ledgerAccountId: 10,
+        debitAmount: "25.00",
+        creditAmount: "0",
+        narration: "Insurance charge",
+      },
+      {
+        ledgerAccountId: 20,
+        debitAmount: "0",
+        creditAmount: "25.00",
+        narration: "Insurance charge",
+      },
     ],
   };
 }
@@ -33,46 +43,60 @@ describe("supportsCentralGenericVoucher", () => {
     expect(supportsCentralGenericVoucher({ ...payload(), voucher: null })).toBe(false);
     expect(supportsCentralGenericVoucher({ ...payload(), entries: null })).toBe(false);
     expect(supportsCentralGenericVoucher({ ...payload(), clientRequestId: "   " })).toBe(false);
-    expect(supportsCentralGenericVoucher({ ...payload(), entries: payload().entries.slice(0, 1) })).toBe(false);
+    expect(
+      supportsCentralGenericVoucher({ ...payload(), entries: payload().entries.slice(0, 1) }),
+    ).toBe(false);
   });
 
   it("keeps optional, non-USD, dual-currency, and high-precision payloads on legacy", () => {
-    expect(supportsCentralGenericVoucher({
-      ...payload(),
-      voucher: { ...payload().voucher, optional: true },
-    })).toBe(false);
+    expect(
+      supportsCentralGenericVoucher({
+        ...payload(),
+        voucher: { ...payload().voucher, optional: true },
+      }),
+    ).toBe(false);
 
-    expect(supportsCentralGenericVoucher({
-      ...payload(),
-      voucher: { ...payload().voucher, currency: "CFA" },
-    })).toBe(false);
+    expect(
+      supportsCentralGenericVoucher({
+        ...payload(),
+        voucher: { ...payload().voucher, currency: "CFA" },
+      }),
+    ).toBe(false);
 
-    expect(supportsCentralGenericVoucher({
-      ...payload(),
-      entries: [
-        { ...payload().entries[0], transactionCurrency: "USD" },
-        payload().entries[1],
-      ],
-    })).toBe(false);
+    expect(
+      supportsCentralGenericVoucher({
+        ...payload(),
+        entries: [
+          { ...payload().entries[0], transactionCurrency: "USD" },
+          payload().entries[1],
+        ],
+      }),
+    ).toBe(false);
 
-    expect(supportsCentralGenericVoucher({
-      ...payload(),
-      entries: [
-        { ...payload().entries[0], debitAmount: "25.001" },
-        { ...payload().entries[1], creditAmount: "25.001" },
-      ],
-    })).toBe(false);
+    expect(
+      supportsCentralGenericVoucher({
+        ...payload(),
+        entries: [
+          { ...payload().entries[0], debitAmount: "25.001" },
+          { ...payload().entries[1], creditAmount: "25.001" },
+        ],
+      }),
+    ).toBe(false);
   });
 
   it("rejects structurally invalid entries and negative amounts from central eligibility", () => {
-    expect(supportsCentralGenericVoucher({ ...payload(), entries: [null, payload().entries[1]] })).toBe(false);
-    expect(supportsCentralGenericVoucher({
-      ...payload(),
-      entries: [
-        { ...payload().entries[0], debitAmount: "-1" },
-        payload().entries[1],
-      ],
-    })).toBe(false);
+    expect(
+      supportsCentralGenericVoucher({ ...payload(), entries: [null, payload().entries[1]] }),
+    ).toBe(false);
+    expect(
+      supportsCentralGenericVoucher({
+        ...payload(),
+        entries: [
+          { ...payload().entries[0], debitAmount: "-1" },
+          payload().entries[1],
+        ],
+      }),
+    ).toBe(false);
   });
 });
 
@@ -137,7 +161,12 @@ describe("buildGenericVoucherPostingRequest", () => {
           creditAmount: "0",
           narration: "  debit note  ",
         },
-        { ledgerAccountId: 20, debitAmount: "0", creditAmount: "25", narration: "   " },
+        {
+          ledgerAccountId: 20,
+          debitAmount: "0",
+          creditAmount: "25",
+          narration: "   ",
+        },
       ],
       exchangeRate: null,
     });
@@ -198,19 +227,29 @@ describe("buildGenericVoucherPostingRequest", () => {
     expect(() => buildGenericVoucherPostingRequest({ ...base, companyId: 0 })).toThrowError(
       expect.objectContaining<PostingValidationError>({ code: "POSTING_COMPANY_INVALID" }),
     );
-    expect(() => buildGenericVoucherPostingRequest({ ...base, clientRequestId: "" })).toThrowError(
+    expect(() =>
+      buildGenericVoucherPostingRequest({ ...base, clientRequestId: "" }),
+    ).toThrowError(
       expect.objectContaining<PostingValidationError>({ code: "POSTING_REQUEST_ID_REQUIRED" }),
     );
-    expect(() => buildGenericVoucherPostingRequest({ ...base, clientRequestId: "bad request id" })).toThrowError(
+    expect(() =>
+      buildGenericVoucherPostingRequest({ ...base, clientRequestId: "bad request id" }),
+    ).toThrowError(
       expect.objectContaining<PostingValidationError>({ code: "POSTING_REQUEST_ID_INVALID" }),
     );
-    expect(() => buildGenericVoucherPostingRequest({ ...base, entries: [payload().entries[0]] })).toThrowError(
+    expect(() =>
+      buildGenericVoucherPostingRequest({ ...base, entries: [payload().entries[0]] }),
+    ).toThrowError(
       expect.objectContaining<PostingValidationError>({ code: "POSTING_ENTRIES_REQUIRED" }),
     );
-    expect(() => buildGenericVoucherPostingRequest({
-      ...base,
-      voucher: { ...payload().voucher, currency: "CFA" },
-    })).toThrowError(expect.objectContaining<PostingValidationError>({ code: "POSTING_CURRENCY_INVALID" }));
+    expect(() =>
+      buildGenericVoucherPostingRequest({
+        ...base,
+        voucher: { ...payload().voucher, currency: "CFA" },
+      }),
+    ).toThrowError(
+      expect.objectContaining<PostingValidationError>({ code: "POSTING_CURRENCY_INVALID" }),
+    );
   });
 
   it("rejects invalid amounts and excessive precision before writes", () => {
@@ -221,29 +260,43 @@ describe("buildGenericVoucherPostingRequest", () => {
       exchangeRate: null,
     };
 
-    expect(() => buildGenericVoucherPostingRequest({
-      ...base,
-      entries: [
-        { ledgerAccountId: 10, debitAmount: "not-a-number", creditAmount: "0" },
-        { ledgerAccountId: 20, debitAmount: "0", creditAmount: "25" },
-      ],
-    })).toThrowError(expect.objectContaining<PostingValidationError>({ code: "POSTING_AMOUNT_INVALID" }));
+    expect(() =>
+      buildGenericVoucherPostingRequest({
+        ...base,
+        entries: [
+          { ledgerAccountId: 10, debitAmount: "not-a-number", creditAmount: "0" },
+          { ledgerAccountId: 20, debitAmount: "0", creditAmount: "25" },
+        ],
+      }),
+    ).toThrowError(
+      expect.objectContaining<PostingValidationError>({ code: "POSTING_AMOUNT_INVALID" }),
+    );
 
-    expect(() => buildGenericVoucherPostingRequest({
-      ...base,
-      entries: [
-        { ledgerAccountId: 10, debitAmount: "-1", creditAmount: "0" },
-        { ledgerAccountId: 20, debitAmount: "0", creditAmount: "1" },
-      ],
-    })).toThrowError(expect.objectContaining<PostingValidationError>({ code: "POSTING_AMOUNT_INVALID" }));
+    expect(() =>
+      buildGenericVoucherPostingRequest({
+        ...base,
+        entries: [
+          { ledgerAccountId: 10, debitAmount: "-1", creditAmount: "0" },
+          { ledgerAccountId: 20, debitAmount: "0", creditAmount: "1" },
+        ],
+      }),
+    ).toThrowError(
+      expect.objectContaining<PostingValidationError>({ code: "POSTING_AMOUNT_INVALID" }),
+    );
 
-    expect(() => buildGenericVoucherPostingRequest({
-      ...base,
-      entries: [
-        { ledgerAccountId: 10, debitAmount: "25.001", creditAmount: "0" },
-        { ledgerAccountId: 20, debitAmount: "0", creditAmount: "25.001" },
-      ],
-    })).toThrowError(expect.objectContaining<PostingValidationError>({ code: "POSTING_COMPATIBILITY_UNSUPPORTED" }));
+    expect(() =>
+      buildGenericVoucherPostingRequest({
+        ...base,
+        entries: [
+          { ledgerAccountId: 10, debitAmount: "25.001", creditAmount: "0" },
+          { ledgerAccountId: 20, debitAmount: "0", creditAmount: "25.001" },
+        ],
+      }),
+    ).toThrowError(
+      expect.objectContaining<PostingValidationError>({
+        code: "POSTING_COMPATIBILITY_UNSUPPORTED",
+      }),
+    );
   });
 
   it("rejects invalid target ids and required voucher text", () => {
@@ -255,57 +308,79 @@ describe("buildGenericVoucherPostingRequest", () => {
       exchangeRate: null,
     };
 
-    expect(() => buildGenericVoucherPostingRequest({
-      ...base,
-      voucher: { ...payload().voucher, locationId: -1 },
-    })).toThrowError(expect.objectContaining<PostingValidationError>({ code: "POSTING_TARGET_ID_INVALID" }));
+    expect(() =>
+      buildGenericVoucherPostingRequest({
+        ...base,
+        voucher: { ...payload().voucher, locationId: -1 },
+      }),
+    ).toThrowError(
+      expect.objectContaining<PostingValidationError>({ code: "POSTING_TARGET_ID_INVALID" }),
+    );
 
-    expect(() => buildGenericVoucherPostingRequest({
-      ...base,
-      entries: [
-        { ...payload().entries[0], ledgerAccountId: "abc" },
-        payload().entries[1],
-      ],
-    })).toThrowError(expect.objectContaining<PostingValidationError>({ code: "POSTING_TARGET_ID_INVALID" }));
+    expect(() =>
+      buildGenericVoucherPostingRequest({
+        ...base,
+        entries: [
+          { ...payload().entries[0], ledgerAccountId: "abc" },
+          payload().entries[1],
+        ],
+      }),
+    ).toThrowError(
+      expect.objectContaining<PostingValidationError>({ code: "POSTING_TARGET_ID_INVALID" }),
+    );
 
-    expect(() => buildGenericVoucherPostingRequest({
-      ...base,
-      voucher: { ...payload().voucher, voucherNumber: "   " },
-    })).toThrowError(expect.objectContaining<PostingValidationError>({ code: "POSTING_SOURCE_REQUIRED" }));
+    expect(() =>
+      buildGenericVoucherPostingRequest({
+        ...base,
+        voucher: { ...payload().voucher, voucherNumber: "   " },
+      }),
+    ).toThrowError(
+      expect.objectContaining<PostingValidationError>({ code: "POSTING_SOURCE_REQUIRED" }),
+    );
   });
 
   it("rejects unbalanced or invalid-side entries before writes", () => {
-    expect(() => buildGenericVoucherPostingRequest({
-      companyId: 1,
-      clientRequestId: "bad-1",
-      voucher: payload().voucher,
-      entries: [
-        { ledgerAccountId: 10, debitAmount: "25", creditAmount: "0" },
-        { ledgerAccountId: 20, debitAmount: "0", creditAmount: "24" },
-      ],
-      exchangeRate: null,
-    })).toThrowError(expect.objectContaining<PostingValidationError>({ code: "POSTING_UNBALANCED" }));
+    expect(() =>
+      buildGenericVoucherPostingRequest({
+        companyId: 1,
+        clientRequestId: "bad-1",
+        voucher: payload().voucher,
+        entries: [
+          { ledgerAccountId: 10, debitAmount: "25", creditAmount: "0" },
+          { ledgerAccountId: 20, debitAmount: "0", creditAmount: "24" },
+        ],
+        exchangeRate: null,
+      }),
+    ).toThrowError(expect.objectContaining<PostingValidationError>({ code: "POSTING_UNBALANCED" }));
 
-    expect(() => buildGenericVoucherPostingRequest({
-      companyId: 1,
-      clientRequestId: "bad-2",
-      voucher: payload().voucher,
-      entries: [
-        { ledgerAccountId: 10, debitAmount: "25", creditAmount: "1" },
-        { ledgerAccountId: 20, debitAmount: "0", creditAmount: "24" },
-      ],
-      exchangeRate: null,
-    })).toThrowError(expect.objectContaining<PostingValidationError>({ code: "POSTING_ENTRY_SIDE_INVALID" }));
+    expect(() =>
+      buildGenericVoucherPostingRequest({
+        companyId: 1,
+        clientRequestId: "bad-2",
+        voucher: payload().voucher,
+        entries: [
+          { ledgerAccountId: 10, debitAmount: "25", creditAmount: "1" },
+          { ledgerAccountId: 20, debitAmount: "0", creditAmount: "24" },
+        ],
+        exchangeRate: null,
+      }),
+    ).toThrowError(
+      expect.objectContaining<PostingValidationError>({ code: "POSTING_ENTRY_SIDE_INVALID" }),
+    );
 
-    expect(() => buildGenericVoucherPostingRequest({
-      companyId: 1,
-      clientRequestId: "bad-3",
-      voucher: payload().voucher,
-      entries: [
-        { ledgerAccountId: 10, debitAmount: "0", creditAmount: "0" },
-        { ledgerAccountId: 20, debitAmount: "0", creditAmount: "0" },
-      ],
-      exchangeRate: null,
-    })).toThrowError(expect.objectContaining<PostingValidationError>({ code: "POSTING_ENTRY_SIDE_INVALID" }));
+    expect(() =>
+      buildGenericVoucherPostingRequest({
+        companyId: 1,
+        clientRequestId: "bad-3",
+        voucher: payload().voucher,
+        entries: [
+          { ledgerAccountId: 10, debitAmount: "0", creditAmount: "0" },
+          { ledgerAccountId: 20, debitAmount: "0", creditAmount: "0" },
+        ],
+        exchangeRate: null,
+      }),
+    ).toThrowError(
+      expect.objectContaining<PostingValidationError>({ code: "POSTING_ENTRY_SIDE_INVALID" }),
+    );
   });
 });
