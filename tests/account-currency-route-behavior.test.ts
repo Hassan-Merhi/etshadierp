@@ -36,7 +36,8 @@ vi.mock("../server/services/accounting/cashBankRevaluationService", () => ({
   getCashBankRevaluation: harness.getCashBankRevaluation,
 }));
 vi.mock("../server/lib/httpHandlers", () => ({
-  getErrorMessage: (error: unknown) => (error instanceof Error ? error.message : String(error)),
+  getErrorMessage: (error: unknown) =>
+    error instanceof Error ? error.message : String(error),
 }));
 vi.mock("../server/db", () => ({
   db: {
@@ -281,10 +282,10 @@ describe("account currency and historical opening behavior", () => {
         totalsProvisional: true,
       }),
     );
-    expect(harness.poolQuery).toHaveBeenCalledWith(expect.stringContaining("v.company_id = $2"), [
-      7,
-      4,
-    ]);
+    expect(harness.poolQuery).toHaveBeenCalledWith(
+      expect.stringContaining("v.company_id = $2"),
+      [7, 4],
+    );
   });
 
   it("returns native debit/credit buckets without losing historical translation evidence", async () => {
