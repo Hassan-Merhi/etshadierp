@@ -137,8 +137,6 @@
       "client/src/components/ui/sidebar.tsx"
     ],
     "grandfathered": {
-      "client/src/components/ERPRunPayroll.tsx": 1450,
-      "client/src/components/ERPWorkerDetail.tsx": 1075,
       "client/src/components/StockItemDetailsDialog.tsx": 950,
       "client/src/pages/AccountsLegacy.tsx": 1325,
       "client/src/pages/BaleProducts.tsx": 2100,
@@ -166,8 +164,6 @@
       "client/src/pages/factory/FactoryStatusBuilder.tsx": 975,
       "client/src/pages/factory/FactoryStockAllocationV5.tsx": 1875,
       "client/src/pages/factory/FactorySuppliers.tsx": 1350,
-      "client/src/pages/factory/FactoryWorkerDetail.tsx": 2075,
-      "client/src/pages/factory/FactoryWorkers.tsx": 2225,
       "client/src/pages/factory/WasteDispatch.tsx": 1000,
       "client/src/pages/factory/WipersReEntry.tsx": 925,
       "client/src/pages/Payroll.tsx": 1325,

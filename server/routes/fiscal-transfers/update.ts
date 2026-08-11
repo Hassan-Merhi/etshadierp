@@ -4,8 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
-import type { PathParams, RequestHandlerParams } from "express-serve-static-core";
+import type { Express, RequestHandler } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { storage } from "../../storage";
@@ -80,13 +79,14 @@ export function registerStockTransferUpdateRoutes(app: Express) {
   // while fixing non-USD/native-currency stock-adjustment creation.
   const originalPost = app.post;
   const boundPost = app.post.bind(app);
-  app.post = ((path: PathParams, ...handlers: RequestHandlerParams[]) => {
+  const registerPost = boundPost as (path: string, ...handlers: RequestHandler[]) => Express;
+  app.post = ((path: string, ...handlers: RequestHandler[]) => {
     if (path === "/api/stock-adjustments" && handlers.length > 0) {
       const correctedHandlers = [...handlers];
-      correctedHandlers[correctedHandlers.length - 1] = stockAdjustmentCreateHandler;
-      return boundPost(path, ...correctedHandlers);
+      correctedHandlers[correctedHandlers.length - 1] = (req, res) => stockAdjustmentCreateHandler(req, res);
+      return registerPost(path, ...correctedHandlers);
     }
-    return boundPost(path, ...handlers);
+    return registerPost(path, ...handlers);
   }) as typeof app.post;
 
   try {

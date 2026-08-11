@@ -1349,7 +1349,7 @@
     "DELETE /api/stock-transfer-revisions/:id [requireAuth > requireNonPOS > <anonymous>]",
     "PUT /api/stock-transfers/:id [requireAuth > <anonymous>]",
     "GET /api/stock-adjustments [requireAuth > requireNonPOS > <anonymous>]",
-    "POST /api/stock-adjustments [requireAuth > requireNonPOS > stockAdjustmentCreateHandler]",
+    "POST /api/stock-adjustments [requireAuth > requireNonPOS > <anonymous>]",
     "PUT /api/stock-adjustments/:id [requireAuth > requireNonPOS > <anonymous>]",
     "GET /api/waste-dispatches [requireAuth > requireNonPOS > <anonymous>]",
     "GET /api/waste-dispatches/:id [requireAuth > requireNonPOS > <anonymous>]",
