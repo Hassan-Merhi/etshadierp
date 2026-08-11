@@ -64,8 +64,9 @@ function actualAdjustmentTotal(
 /**
  * Corrected POST /api/stock-adjustments handler.
  *
- * It is installed in place of the legacy anonymous handler by
- * fiscal-transfers/update.ts so the public route and guard chain stay stable.
+ * Registered directly as the POST /api/stock-adjustments callback by
+ * stockAdjustmentWasteRoutes.ts, so the public route position and its
+ * requireAuth/requireNonPOS guard chain are unchanged.
  */
 export async function stockAdjustmentCreateHandler(req: Request, res: Response) {
   const startedAt = Date.now();
@@ -138,10 +139,7 @@ export async function stockAdjustmentCreateHandler(req: Request, res: Response) 
     // Stock adjustment item rates/totals are native inventory values. Keep the
     // voucher currency aligned with the company's native/base currency instead
     // of the user's temporary UI display-currency toggle.
-    await db
-      .update(vouchers)
-      .set({ currency: nativeCurrency, locationId })
-      .where(eq(vouchers.id, voucherId));
+    await db.update(vouchers).set({ currency: nativeCurrency, locationId }).where(eq(vouchers.id, voucherId));
 
     logger.info("stock adjustment create started", {
       module: "stockAdjustment",
