@@ -78,7 +78,7 @@ describe("POS transfer WhatsApp routing", () => {
     harness.sendWhatsAppTextToChatIdPos.mockResolvedValue({ success: true });
   });
 
-  it("routes a POS transfer to its assigned location while preserving the inventory destination", async () => {
+  it("uses an explicit recipient location while preserving the inventory destination", async () => {
     harness.queryResults.push(
       [{ companyId: 4, transferWaGroupChatId: "assigned-location-chat" }],
       [{ id: 5, name: "Blue Widget", uom: "pcs" }]
