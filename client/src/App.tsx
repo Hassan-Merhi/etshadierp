@@ -121,24 +121,22 @@ function AuthenticatedRoot() {
   if (isLoading || !user) return <AppLoadingState />;
 
   return (
-    <ApplicationLanguageProvider>
-      <CompanyProvider>
-        <LocationProvider>
-          <DateFormatProvider>
-            <CurrencyProvider>
-              <CursorNavProvider>
-                <ServerRestartWatcher />
-                <AuthenticatedApp user={user} handleLogout={handleLogout} />
-                <AuthenticatedChatWidget />
-                <DateJumpDialog />
-                <AuthenticatedUserNotesPanel />
-                <KeyboardShortcuts />
-              </CursorNavProvider>
-            </CurrencyProvider>
-          </DateFormatProvider>
-        </LocationProvider>
-      </CompanyProvider>
-    </ApplicationLanguageProvider>
+    <CompanyProvider>
+      <LocationProvider>
+        <DateFormatProvider>
+          <CurrencyProvider>
+            <CursorNavProvider>
+              <ServerRestartWatcher />
+              <AuthenticatedApp user={user} handleLogout={handleLogout} />
+              <AuthenticatedChatWidget />
+              <DateJumpDialog />
+              <AuthenticatedUserNotesPanel />
+              <KeyboardShortcuts />
+            </CursorNavProvider>
+          </CurrencyProvider>
+        </DateFormatProvider>
+      </LocationProvider>
+    </CompanyProvider>
   );
 }
 
@@ -148,12 +146,14 @@ export default function App() {
       <TooltipProvider>
         <ThemeProvider>
           <ConnectivityProvider>
-            <Switch>
-              <Route path="/login" component={Login} />
-              <Route>
-                <AuthenticatedRoot />
-              </Route>
-            </Switch>
+            <ApplicationLanguageProvider>
+              <Switch>
+                <Route path="/login" component={Login} />
+                <Route>
+                  <AuthenticatedRoot />
+                </Route>
+              </Switch>
+            </ApplicationLanguageProvider>
             <Toaster />
             <UpdateBanner />
           </ConnectivityProvider>
