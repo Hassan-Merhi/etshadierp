@@ -83,7 +83,7 @@ export function registerStockTransferUpdateRoutes(app: Express) {
   app.post = ((path: string, ...handlers: RequestHandler[]) => {
     if (path === "/api/stock-adjustments" && handlers.length > 0) {
       const correctedHandlers = [...handlers];
-      correctedHandlers[correctedHandlers.length - 1] = stockAdjustmentCreateHandler;
+      correctedHandlers[correctedHandlers.length - 1] = (req, res) => stockAdjustmentCreateHandler(req, res);
       return registerPost(path, ...correctedHandlers);
     }
     return registerPost(path, ...handlers);
