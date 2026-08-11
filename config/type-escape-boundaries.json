@@ -104,11 +104,6 @@
         1,
         0
       ],
-      "client/src/components/ERPRunPayroll.tsx": [
-        2,
-        2,
-        0
-      ],
       "client/src/components/EditMixBatchDialog.tsx": [
         2,
         3,
@@ -6542,6 +6537,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 8990
+    "typeEscapeCeiling": 8986
   }
 }
