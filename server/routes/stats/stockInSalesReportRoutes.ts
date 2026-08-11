@@ -14,6 +14,10 @@ import {
   applyOutboundBreakdown,
   getStockInSalesOutboundBreakdown,
 } from "../../services/reports/stockInSalesOutboundBreakdown";
+import {
+  attachStockInSalesReconciliation,
+  getStockInSalesReconciliation,
+} from "../../services/reports/stockInSalesReconciliation";
 import { getStockInSalesReport } from "../../services/reports/stockInSalesReportService";
 
 const isoDateSchema = z
@@ -111,9 +115,7 @@ export function registerStockInSalesReportRoutes(app: Express) {
 
   app.get("/api/reports/stock-in-sales", requireAuth, requireNonPOS, reportPageAccess, async (req, res) => {
     const companyId = req.session.currentCompanyId;
-    if (!companyId) {
-      return res.status(400).json({ message: "No company selected" });
-    }
+    if (!companyId) return res.status(400).json({ message: "No company selected" });
 
     const parsed = reportQuerySchema.safeParse({
       startDate: firstQueryValue(req.query.startDate),
@@ -124,14 +126,9 @@ export function registerStockInSalesReportRoutes(app: Express) {
       stockGroupIds: req.query.stockGroupIds ?? req.query.stockGroupId,
       search: firstQueryValue(req.query.search),
     });
-
     if (!parsed.success) {
-      return res.status(400).json({
-        message: "Invalid stock in and sales report filters",
-        errors: parsed.error.flatten(),
-      });
+      return res.status(400).json({ message: "Invalid stock in and sales report filters", errors: parsed.error.flatten() });
     }
-
     if (invalidRange(parsed.data.startDate, parsed.data.endDate)) {
       return res.status(400).json({ message: "Start date cannot be after end date" });
     }
@@ -152,27 +149,22 @@ export function registerStockInSalesReportRoutes(app: Express) {
         getStockInSalesReport(reportFilters),
         getStockInSalesOutboundBreakdown(reportFilters),
       ]);
-      const result = applyOutboundBreakdown(baseResult, outboundBreakdown);
+      const outboundResult = applyOutboundBreakdown(baseResult, outboundBreakdown);
+      const reconciliation = await getStockInSalesReconciliation(reportFilters, outboundResult);
+      const result = attachStockInSalesReconciliation(outboundResult, reconciliation);
 
       res.setHeader("Cache-Control", "private, no-store");
       return res.json(result);
     } catch (error: unknown) {
       if (locationAccessResponse(error, res)) return;
-      logger.error("Stock in and sales report error", {
-        module: "reports",
-        action: "stock-in-sales",
-        companyId,
-        error,
-      });
+      logger.error("Stock in and sales report error", { module: "reports", action: "stock-in-sales", companyId, error });
       return res.status(500).json({ message: "Failed to generate stock in and sales report" });
     }
   });
 
   app.get("/api/reports/stock-in-sales/detail", requireAuth, requireNonPOS, reportPageAccess, async (req, res) => {
     const companyId = req.session.currentCompanyId;
-    if (!companyId) {
-      return res.status(400).json({ message: "No company selected" });
-    }
+    if (!companyId) return res.status(400).json({ message: "No company selected" });
 
     const parsed = detailQuerySchema.safeParse({
       startDate: firstQueryValue(req.query.startDate),
@@ -185,14 +177,9 @@ export function registerStockInSalesReportRoutes(app: Express) {
       limit: firstQueryValue(req.query.limit),
       exportAll: req.query.exportAll,
     });
-
     if (!parsed.success) {
-      return res.status(400).json({
-        message: "Invalid stock in and sales detail filters",
-        errors: parsed.error.flatten(),
-      });
+      return res.status(400).json({ message: "Invalid stock in and sales detail filters", errors: parsed.error.flatten() });
     }
-
     if (invalidRange(parsed.data.startDate, parsed.data.endDate)) {
       return res.status(400).json({ message: "Start date cannot be after end date" });
     }
@@ -211,26 +198,18 @@ export function registerStockInSalesReportRoutes(app: Express) {
         limit: parsed.data.limit,
         exportAll: parsed.data.exportAll,
       });
-
       res.setHeader("Cache-Control", "private, no-store");
       return res.json(result);
     } catch (error: unknown) {
       if (locationAccessResponse(error, res)) return;
-      logger.error("Stock in and sales detail error", {
-        module: "reports",
-        action: "stock-in-sales-detail",
-        companyId,
-        error,
-      });
+      logger.error("Stock in and sales detail error", { module: "reports", action: "stock-in-sales-detail", companyId, error });
       return res.status(500).json({ message: "Failed to load stock in and sales details" });
     }
   });
 
   app.get("/api/reports/stock-in-sales/comparison", requireAuth, requireNonPOS, reportPageAccess, async (req, res) => {
     const companyId = req.session.currentCompanyId;
-    if (!companyId) {
-      return res.status(400).json({ message: "No company selected" });
-    }
+    if (!companyId) return res.status(400).json({ message: "No company selected" });
 
     const parsed = comparisonQuerySchema.safeParse({
       startDate: firstQueryValue(req.query.startDate),
@@ -242,14 +221,9 @@ export function registerStockInSalesReportRoutes(app: Express) {
       sideBLocationId: firstQueryValue(req.query.sideBLocationId),
       sideBStockGroupIds: req.query.sideBStockGroupIds,
     });
-
     if (!parsed.success) {
-      return res.status(400).json({
-        message: "Invalid stock in and sales comparison filters",
-        errors: parsed.error.flatten(),
-      });
+      return res.status(400).json({ message: "Invalid stock in and sales comparison filters", errors: parsed.error.flatten() });
     }
-
     if (invalidRange(parsed.data.startDate, parsed.data.endDate)) {
       return res.status(400).json({ message: "Start date cannot be after end date" });
     }
@@ -262,26 +236,14 @@ export function registerStockInSalesReportRoutes(app: Express) {
         endDate: parsed.data.endDate,
         grouping: parsed.data.grouping,
         search: parsed.data.search || undefined,
-        sideA: {
-          locationId: parsed.data.sideALocationId,
-          stockGroupIds: parsed.data.sideAStockGroupIds,
-        },
-        sideB: {
-          locationId: parsed.data.sideBLocationId,
-          stockGroupIds: parsed.data.sideBStockGroupIds,
-        },
+        sideA: { locationId: parsed.data.sideALocationId, stockGroupIds: parsed.data.sideAStockGroupIds },
+        sideB: { locationId: parsed.data.sideBLocationId, stockGroupIds: parsed.data.sideBStockGroupIds },
       });
-
       res.setHeader("Cache-Control", "private, no-store");
       return res.json(result);
     } catch (error: unknown) {
       if (locationAccessResponse(error, res)) return;
-      logger.error("Stock in and sales comparison error", {
-        module: "reports",
-        action: "stock-in-sales-comparison",
-        companyId,
-        error,
-      });
+      logger.error("Stock in and sales comparison error", { module: "reports", action: "stock-in-sales-comparison", companyId, error });
       return res.status(500).json({ message: "Failed to compare stock in and sales" });
     }
   });
