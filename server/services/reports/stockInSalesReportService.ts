@@ -96,6 +96,16 @@ interface InventoryBalance {
   value: Decimal;
 }
 
+interface HistoricalInventoryRow {
+  stockGroupId: number | null;
+  stockItemCode: string;
+  stockItemName: string;
+  stockGroupName: string;
+  stockGroupCode: string;
+  quantity: string | number | null;
+  totalValue: string | number | null;
+}
+
 const ZERO = new Decimal(0);
 
 function decimal(value: string | number | null | undefined): Decimal {
@@ -443,7 +453,7 @@ function mergeAggregateRows(
   }
 }
 
-function historicalRowMatchesFilters(row: any, filters: StockInSalesReportFilters): boolean {
+function historicalRowMatchesFilters(row: HistoricalInventoryRow, filters: StockInSalesReportFilters): boolean {
   if (filters.stockGroupIds.length > 0 && !filters.stockGroupIds.includes(Number(row.stockGroupId))) return false;
   if (!filters.search) return true;
   const needle = filters.search.toLocaleLowerCase();
@@ -453,7 +463,7 @@ function historicalRowMatchesFilters(row: any, filters: StockInSalesReportFilter
 }
 
 async function getOpeningBalance(filters: StockInSalesReportFilters, asOfDate: string): Promise<InventoryBalance> {
-  const balances = await Promise.all(
+  const balances: HistoricalInventoryRow[][] = await Promise.all(
     filters.locationIds.map((locationId) =>
       calculateHistoricalLocationInventory(locationId, filters.companyId, asOfDate)
     )
