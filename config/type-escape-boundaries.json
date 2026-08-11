@@ -109,11 +109,6 @@
         2,
         0
       ],
-      "client/src/components/ERPWorkerDetail.tsx": [
-        6,
-        0,
-        0
-      ],
       "client/src/components/EditMixBatchDialog.tsx": [
         2,
         3,
@@ -6547,6 +6542,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 8996
+    "typeEscapeCeiling": 8990
   }
 }

@@ -138,7 +138,6 @@
     ],
     "grandfathered": {
       "client/src/components/ERPRunPayroll.tsx": 1450,
-      "client/src/components/ERPWorkerDetail.tsx": 1075,
       "client/src/components/StockItemDetailsDialog.tsx": 950,
       "client/src/pages/AccountsLegacy.tsx": 1325,
       "client/src/pages/BaleProducts.tsx": 2100,
