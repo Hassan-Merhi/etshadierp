@@ -473,7 +473,7 @@ export function useRawStockRecalculate() {
         includeCompletedBatches,
       });
       if (!dryRun.ok) throw new Error((await dryRun.json()).message || "Failed to prepare apply-all-safe");
-      const dryRunData = await dryRun.json();
+      const dryRunData = (await dryRun.json()) as RecalcApplyResponse & { confirmationToken?: string };
       if (!dryRunData.confirmationToken) {
         return dryRunData; // 0 safe containers — nothing to do
       }
