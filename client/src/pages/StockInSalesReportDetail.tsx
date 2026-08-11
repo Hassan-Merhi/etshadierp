@@ -237,6 +237,7 @@ export default function StockInSalesReportDetail() {
   const exportExcel = async () => {
     setIsExporting(true);
     try {
+      const workbook = new ExcelJS.Workbook();
       const exportParams = new URLSearchParams(baseParams);
       exportParams.set("exportAll", "true");
       const [detailResponse, movementResponse] = await Promise.all([
@@ -246,7 +247,6 @@ export default function StockInSalesReportDetail() {
       if (!detailResponse.ok || !movementResponse.ok) throw new Error("Failed to load export details");
       const exportData = (await detailResponse.json()) as DetailResponse;
       const exportMovements = (await movementResponse.json()) as MovementResponse;
-      const workbook = new ExcelJS.Workbook();
 
       const summarySheet = workbook.addWorksheet("Summary");
       summarySheet.columns = [
