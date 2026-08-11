@@ -1,6 +1,6 @@
 {
-  "version": 18,
-  "description": "Repository-wide god-file architecture boundaries plus a one-way size ratchet. Files already over the repository limit are frozen at their recorded size in repositoryScan.grandfathered: they may shrink but never grow, and any new file crossing the limit fails until it is split or explicitly baselined. Version 18 records the reviewed Phase 3-5 Factory Proformas lazy-detail and bandwidth integration at the next 25-line ratchet bucket; future growth remains blocked.",
+  "version": 19,
+  "description": "Repository-wide god-file architecture boundaries plus a one-way size ratchet. Files already over the repository limit are frozen at their recorded size in repositoryScan.grandfathered: they may shrink but never grow, and any new file crossing the limit fails until it is split or explicitly baselined. Version 19 permanently retires rentalPaymentPostingService.ts from the grandfathered backlog after the Wave 5 allocation extraction reduced it below the 900-line repository limit.",
   "retiredFiles": [
     "server/routesLegacy.ts",
     "server/routes/reportsRoutesLegacy.ts",
@@ -182,7 +182,6 @@
       "server/chatService.ts": 2000,
       "server/index.ts": 1725,
       "server/services/factory/postOffloadPhase6Safety.ts": 927,
-      "server/services/rental/rentalPaymentPostingService.ts": 925,
       "tests/excel-export-v2.test.ts": 1425,
       "tests/inventory.test.ts": 1450,
       "tests/workflow.test.ts": 1025,
