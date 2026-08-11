@@ -137,7 +137,9 @@ export function registerStockInSalesReportRoutes(app: Express) {
       search: firstQueryValue(req.query.search),
     });
     if (!parsed.success) {
-      return res.status(400).json({ message: "Invalid stock in and sales report filters", errors: parsed.error.flatten() });
+      return res
+        .status(400)
+        .json({ message: "Invalid stock in and sales report filters", errors: parsed.error.flatten() });
     }
     if (invalidRange(parsed.data.startDate, parsed.data.endDate)) {
       return res.status(400).json({ message: "Start date cannot be after end date" });
@@ -167,7 +169,12 @@ export function registerStockInSalesReportRoutes(app: Express) {
       return res.json(result);
     } catch (error: unknown) {
       if (locationAccessResponse(error, res)) return;
-      logger.error("Stock in and sales report error", { module: "reports", action: "stock-in-sales", companyId, error });
+      logger.error("Stock in and sales report error", {
+        module: "reports",
+        action: "stock-in-sales",
+        companyId,
+        error,
+      });
       return res.status(500).json({ message: "Failed to generate stock in and sales report" });
     }
   });
@@ -188,7 +195,9 @@ export function registerStockInSalesReportRoutes(app: Express) {
       exportAll: req.query.exportAll,
     });
     if (!parsed.success) {
-      return res.status(400).json({ message: "Invalid stock in and sales detail filters", errors: parsed.error.flatten() });
+      return res
+        .status(400)
+        .json({ message: "Invalid stock in and sales detail filters", errors: parsed.error.flatten() });
     }
     if (invalidRange(parsed.data.startDate, parsed.data.endDate)) {
       return res.status(400).json({ message: "Start date cannot be after end date" });
@@ -219,9 +228,10 @@ export function registerStockInSalesReportRoutes(app: Express) {
         }),
       ]);
       const costProfit = Number((result.summary.totalSales - result.summary.costOfSales).toFixed(2));
-      const avgProfitPerBale = outboundBreakdown.summary.netSalesQty === 0
-        ? 0
-        : Number((costProfit / outboundBreakdown.summary.netSalesQty).toFixed(6));
+      const avgProfitPerBale =
+        outboundBreakdown.summary.netSalesQty === 0
+          ? 0
+          : Number((costProfit / outboundBreakdown.summary.netSalesQty).toFixed(6));
       const enrichedResult = {
         ...result,
         summary: {
@@ -235,7 +245,12 @@ export function registerStockInSalesReportRoutes(app: Express) {
       return res.json(enrichedResult);
     } catch (error: unknown) {
       if (locationAccessResponse(error, res)) return;
-      logger.error("Stock in and sales detail error", { module: "reports", action: "stock-in-sales-detail", companyId, error });
+      logger.error("Stock in and sales detail error", {
+        module: "reports",
+        action: "stock-in-sales-detail",
+        companyId,
+        error,
+      });
       return res.status(500).json({ message: "Failed to load stock in and sales details" });
     }
   });
@@ -274,7 +289,12 @@ export function registerStockInSalesReportRoutes(app: Express) {
       return res.json(result);
     } catch (error: unknown) {
       if (locationAccessResponse(error, res)) return;
-      logger.error("Stock in and sales movement detail error", { module: "reports", action: "stock-in-sales-movements", companyId, error });
+      logger.error("Stock in and sales movement detail error", {
+        module: "reports",
+        action: "stock-in-sales-movements",
+        companyId,
+        error,
+      });
       return res.status(500).json({ message: "Failed to load inventory movements" });
     }
   });
@@ -294,7 +314,9 @@ export function registerStockInSalesReportRoutes(app: Express) {
       sideBStockGroupIds: req.query.sideBStockGroupIds,
     });
     if (!parsed.success) {
-      return res.status(400).json({ message: "Invalid stock in and sales comparison filters", errors: parsed.error.flatten() });
+      return res
+        .status(400)
+        .json({ message: "Invalid stock in and sales comparison filters", errors: parsed.error.flatten() });
     }
     if (invalidRange(parsed.data.startDate, parsed.data.endDate)) {
       return res.status(400).json({ message: "Start date cannot be after end date" });
@@ -315,7 +337,12 @@ export function registerStockInSalesReportRoutes(app: Express) {
       return res.json(result);
     } catch (error: unknown) {
       if (locationAccessResponse(error, res)) return;
-      logger.error("Stock in and sales comparison error", { module: "reports", action: "stock-in-sales-comparison", companyId, error });
+      logger.error("Stock in and sales comparison error", {
+        module: "reports",
+        action: "stock-in-sales-comparison",
+        companyId,
+        error,
+      });
       return res.status(500).json({ message: "Failed to compare stock in and sales" });
     }
   });

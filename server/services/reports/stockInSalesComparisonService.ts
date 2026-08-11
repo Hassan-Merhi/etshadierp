@@ -414,9 +414,7 @@ export async function getStockInSalesComparison(
 
   const sideARows = indexRows(sideAReport.rows);
   const sideBRows = indexRows(sideBReport.rows);
-  const periodKeys = Array.from(new Set([...sideARows.keys(), ...sideBRows.keys()])).sort((a, b) =>
-    b.localeCompare(a)
-  );
+  const periodKeys = Array.from(new Set([...sideARows.keys(), ...sideBRows.keys()])).sort((a, b) => b.localeCompare(a));
 
   const rows = periodKeys.map((periodKey): StockInSalesComparisonRow => {
     const sideARow = sideARows.get(periodKey);
