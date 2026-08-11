@@ -6,10 +6,11 @@ on:
       - program/erp-90-phase-2
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   format:
+    if: github.event.head_commit.message != 'style: format remaining phase 2 tests'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -26,13 +27,18 @@ jobs:
             tests/ui/factory-container-loading-scan-behavior.test.tsx \
             tests/ui/payroll-page-behavior.test.tsx \
             tests/ui/stock-transfer-form-revision-behavior.test.tsx
-      - name: Upload formatted files
-        uses: actions/upload-artifact@v7
-        with:
-          name: phase2-formatted-tests
-          path: |
-            tests/ui/daybook-page-behavior.test.tsx
-            tests/ui/factory-container-loading-scan-behavior.test.tsx
-            tests/ui/payroll-page-behavior.test.tsx
+      - name: Commit formatting
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            tests/ui/daybook-page-behavior.test.tsx \
+            tests/ui/factory-container-loading-scan-behavior.test.tsx \
+            tests/ui/payroll-page-behavior.test.tsx \
             tests/ui/stock-transfer-form-revision-behavior.test.tsx
-          if-no-files-found: error
+          if git diff --cached --quiet; then
+            echo "No formatting changes remain."
+            exit 0
+          fi
+          git commit -m "style: format remaining phase 2 tests"
+          git push origin HEAD:program/erp-90-phase-2
