@@ -392,10 +392,10 @@ function StockInSalesReportSummary() {
       rows.forEach((row) => sheet.addRow({ period: formatPeriodLabel(row), ...row }));
       sheet.getRow(1).font = { bold: true };
       await writeFile(workbook, `stock-in-sales-report-${format(new Date(), "yyyy-MM-dd")}.xlsx`);
-    } catch (exportError: any) {
+    } catch (exportError: unknown) {
       toast({
         title: "Export failed",
-        description: exportError?.message || "Unable to create the Excel file.",
+        description: (exportError instanceof Error ? exportError.message : "") || "Unable to create the Excel file.",
         variant: "destructive",
       });
     } finally {

@@ -375,10 +375,10 @@ export default function StockInSalesReportDetail() {
           variant: "destructive",
         });
       }
-    } catch (exportError: any) {
+    } catch (exportError: unknown) {
       toast({
         title: "Export failed",
-        description: exportError?.message || "Unable to create the Excel file.",
+        description: (exportError instanceof Error ? exportError.message : "") || "Unable to create the Excel file.",
         variant: "destructive",
       });
     } finally {

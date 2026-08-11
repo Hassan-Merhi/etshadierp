@@ -29,7 +29,16 @@ function toNumber(value: Decimal, places: number): number {
   return Number(value.toDecimalPlaces(places, Decimal.ROUND_HALF_UP).toString());
 }
 
-function matchesFilters(row: any, filters: StockInSalesReportFilters): boolean {
+function matchesFilters(
+  row: {
+    stockGroupId?: unknown;
+    stockItemCode?: unknown;
+    stockItemName?: unknown;
+    stockGroupName?: unknown;
+    stockGroupCode?: unknown;
+  },
+  filters: StockInSalesReportFilters
+): boolean {
   if (filters.stockGroupIds.length > 0 && !filters.stockGroupIds.includes(Number(row.stockGroupId))) return false;
   if (!filters.search) return true;
   const needle = filters.search.toLocaleLowerCase();
