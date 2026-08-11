@@ -141,13 +141,8 @@ describe("stock transfer revision write routes", () => {
   });
 
   it("creates a numbered revision and persists its changed items", async () => {
-    harness.selectResults.push(
-      [{ revisionNumber: 2 }],
-      [{ id: 401, revisionId: 41, stockItemId: 7 }],
-    );
-    harness.returningResults.push([
-      { id: 41, transferId: 9, revisionNumber: 3, optional: false },
-    ]);
+    harness.selectResults.push([{ revisionNumber: 2 }], [{ id: 401, revisionId: 41, stockItemId: 7 }]);
+    harness.returningResults.push([{ id: 41, transferId: 9, revisionNumber: 3, optional: false }]);
     const req = {
       params: { transferId: "9" },
       body: {
@@ -195,14 +190,14 @@ describe("stock transfer revision write routes", () => {
             }),
           ],
         }),
-      ]),
+      ])
     );
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
         id: 41,
         revisionNumber: 3,
         items: [expect.objectContaining({ id: 401 })],
-      }),
+      })
     );
   });
 
@@ -232,7 +227,7 @@ describe("stock transfer revision write routes", () => {
       ],
       [{ companyId: 4 }],
       [{ id: 300, stockItemId: 7, sourceLocationId: 2, quantity: "5", rate: "10" }],
-      [{ qty: "8", rate: "10" }],
+      [{ qty: "8", rate: "10" }]
     );
     const req = { params: { id: "41" }, session: { currentCompanyId: 999 } };
     const res = { status: vi.fn(), json: vi.fn() };
@@ -254,7 +249,7 @@ describe("stock transfer revision write routes", () => {
           table: harness.tables.stockTransferRevisions,
           values: { optional: false },
         }),
-      ]),
+      ])
     );
     expect(harness.adjustInventory).toHaveBeenNthCalledWith(1, harness.db, 2, 7, -3, 4);
     expect(harness.adjustInventory).toHaveBeenNthCalledWith(2, harness.db, 8, 7, 3, 4, 10);
@@ -278,7 +273,7 @@ describe("stock transfer revision write routes", () => {
       [{ companyId: 6 }],
       [],
       [{ averageRate: "12.50" }],
-      [{ qty: "4", rate: "12.50" }],
+      [{ qty: "4", rate: "12.50" }]
     );
     const req = { params: { id: "51" }, session: { currentCompanyId: 6 } };
     const res = { status: vi.fn(), json: vi.fn() };
@@ -310,7 +305,7 @@ describe("stock transfer revision write routes", () => {
     patchRes.status.mockReturnValue(patchRes);
     await harness.handlers.get("PATCH /api/stock-transfer-revisions/:id/optional")!(
       { params: { id: "41" }, body: { optional: 0 } },
-      patchRes,
+      patchRes
     );
     expect(harness.updates).toContainEqual({
       table: harness.tables.stockTransferRevisions,
@@ -320,14 +315,8 @@ describe("stock transfer revision write routes", () => {
 
     const deleteRes = { status: vi.fn(), json: vi.fn() };
     deleteRes.status.mockReturnValue(deleteRes);
-    await harness.handlers.get("DELETE /api/stock-transfer-revisions/:id")!(
-      { params: { id: "41" } },
-      deleteRes,
-    );
-    expect(harness.deletes).toEqual([
-      harness.tables.stockTransferRevisionItems,
-      harness.tables.stockTransferRevisions,
-    ]);
+    await harness.handlers.get("DELETE /api/stock-transfer-revisions/:id")!({ params: { id: "41" } }, deleteRes);
+    expect(harness.deletes).toEqual([harness.tables.stockTransferRevisionItems, harness.tables.stockTransferRevisions]);
     expect(deleteRes.json).toHaveBeenCalledWith({ success: true });
   });
 
@@ -336,7 +325,7 @@ describe("stock transfer revision write routes", () => {
     res.status.mockReturnValue(res);
     await harness.handlers.get("POST /api/stock-transfers/:transferId/revisions")!(
       { params: { transferId: "0" }, body: {} },
-      res,
+      res
     );
     expect(res.status).toHaveBeenCalledWith(400);
 
@@ -344,7 +333,7 @@ describe("stock transfer revision write routes", () => {
     res2.status.mockReturnValue(res2);
     await harness.handlers.get("POST /api/stock-transfers/:transferId/revisions")!(
       { params: { transferId: "9" }, body: { items: [] } },
-      res2,
+      res2
     );
     expect(res2.status).toHaveBeenCalledWith(400);
     expect(harness.inserts).toHaveLength(0);

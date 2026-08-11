@@ -19,8 +19,7 @@ vi.mock("../server/lib/logger", () => ({
   logger: { info: harness.loggerInfo, error: harness.loggerError },
 }));
 vi.mock("../server/lib/httpHandlers", () => ({
-  getErrorMessage: (error: unknown) =>
-    error instanceof Error ? error.message : String(error),
+  getErrorMessage: (error: unknown) => (error instanceof Error ? error.message : String(error)),
 }));
 vi.mock("../server/services/pos/createSaleService", () => ({
   createPosSale: harness.createPosSale,
@@ -99,7 +98,7 @@ describe("POS sales route behavior", () => {
         voucherDateFallback: "2026-08-11",
         body: req.body,
       },
-      { isSpCompany: false },
+      { isSpCompany: false }
     );
     expect(harness.logAudit).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -110,7 +109,7 @@ describe("POS sales route behavior", () => {
         tableName: "vouchers",
         recordId: 501,
         recordIdentifier: "POS-501",
-      }),
+      })
     );
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({
@@ -132,7 +131,7 @@ describe("POS sales route behavior", () => {
 
     expect(harness.createPosSale).toHaveBeenCalledWith(
       expect.objectContaining({ currentCompanyId: 9, canSellNegativeStock: false }),
-      { isSpCompany: true },
+      { isSpCompany: true }
     );
     expect(res.status).toHaveBeenCalledWith(201);
     expect(harness.logAudit).not.toHaveBeenCalled();
@@ -153,13 +152,13 @@ describe("POS sales route behavior", () => {
         user: { id: "u1" },
         body: {},
       },
-      res,
+      res
     );
 
     expect(res.status).toHaveBeenCalledWith(200);
     expect(harness.loggerError).toHaveBeenCalledWith(
       "[POS create audit] non-fatal:",
-      expect.objectContaining({ error: expect.any(Error) }),
+      expect.objectContaining({ error: expect.any(Error) })
     );
   });
 
@@ -179,7 +178,7 @@ describe("POS sales route behavior", () => {
         user: { id: "u1" },
         body: {},
       },
-      res,
+      res
     );
 
     expect(res.status).toHaveBeenCalledWith(expectedStatus);
@@ -188,10 +187,7 @@ describe("POS sales route behavior", () => {
 
   it("rejects a sale when no company is selected before calling the sale service", async () => {
     const res = makeRes();
-    await harness.handlers.get("/api/pos/sales")!(
-      { session: {}, user: { id: "u1" }, body: {} },
-      res,
-    );
+    await harness.handlers.get("/api/pos/sales")!({ session: {}, user: { id: "u1" }, body: {} }, res);
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({ message: "No company selected" });
     expect(harness.createPosSale).not.toHaveBeenCalled();

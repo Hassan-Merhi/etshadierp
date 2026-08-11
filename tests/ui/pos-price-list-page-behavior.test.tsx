@@ -112,17 +112,15 @@ vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: harness.toast })
 vi.mock("@/lib/utils", () => ({ cn: (...values: any[]) => values.filter(Boolean).join(" ") }));
 
 vi.mock("@/components/ui/input", () => ({
-  Input: React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
-    (props, ref) => <input ref={ref} {...props} />,
-  ),
+  Input: React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>((props, ref) => (
+    <input ref={ref} {...props} />
+  )),
 }));
 vi.mock("@/components/ui/badge", () => ({
   Badge: ({ children }: any) => <span>{children}</span>,
 }));
 vi.mock("@/components/ui/button", () => ({
-  Button: ({ children, variant: _v, size: _s, ...props }: any) => (
-    <button {...props}>{children}</button>
-  ),
+  Button: ({ children, variant: _v, size: _s, ...props }: any) => <button {...props}>{children}</button>,
 }));
 vi.mock("@/components/ui/table", () => ({
   Table: ({ children }: any) => <table>{children}</table>,
@@ -190,11 +188,10 @@ describe("POS price list page behavior", () => {
     fireEvent.keyDown(input, { key: "Enter" });
 
     await waitFor(() =>
-      expect(harness.apiRequest).toHaveBeenCalledWith(
-        "POST",
-        "/api/stock-items/101/location-prices",
-        { locationId: 11, sellingPrice: "25" },
-      ),
+      expect(harness.apiRequest).toHaveBeenCalledWith("POST", "/api/stock-items/101/location-prices", {
+        locationId: 11,
+        sellingPrice: "25",
+      })
     );
     expect(harness.invalidateQueries).toHaveBeenCalledWith({
       queryKey: ["/api/pos/price-list", 11],
@@ -221,11 +218,10 @@ describe("POS price list page behavior", () => {
     fireEvent.change(input, { target: { value: "24.5" } });
     fireEvent.click(screen.getByTestId("button-save-price-101-12"));
     await waitFor(() =>
-      expect(harness.apiRequest).toHaveBeenCalledWith(
-        "POST",
-        "/api/stock-items/101/location-prices",
-        { locationId: 12, sellingPrice: "24.5" },
-      ),
+      expect(harness.apiRequest).toHaveBeenCalledWith("POST", "/api/stock-items/101/location-prices", {
+        locationId: 12,
+        sellingPrice: "24.5",
+      })
     );
     expect(harness.invalidateQueries).toHaveBeenCalledWith({
       queryKey: ["/api/pos/price-list-by-masters"],

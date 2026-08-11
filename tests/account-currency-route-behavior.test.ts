@@ -36,8 +36,7 @@ vi.mock("../server/services/accounting/cashBankRevaluationService", () => ({
   getCashBankRevaluation: harness.getCashBankRevaluation,
 }));
 vi.mock("../server/lib/httpHandlers", () => ({
-  getErrorMessage: (error: unknown) =>
-    error instanceof Error ? error.message : String(error),
+  getErrorMessage: (error: unknown) => (error instanceof Error ? error.message : String(error)),
 }));
 vi.mock("../server/db", () => ({
   db: {
@@ -56,10 +55,7 @@ vi.mock("../server/db", () => ({
   pool: { query: harness.poolQuery },
 }));
 
-import {
-  normalizeAccountOpeningBalance,
-  registerAccountCurrencyRoutes,
-} from "../server/routes/accountCurrencyRoutes";
+import { normalizeAccountOpeningBalance, registerAccountCurrencyRoutes } from "../server/routes/accountCurrencyRoutes";
 
 function resHarness() {
   const res = { status: vi.fn(), json: vi.fn() };
@@ -76,8 +72,7 @@ describe("account currency and historical opening behavior", () => {
     harness.getCashBankRevaluation.mockReset();
     harness.normalizeOpeningBalanceCurrency.mockReset();
     registerAccountCurrencyRoutes({
-      get: (path: string, ...callbacks: any[]) =>
-        harness.handlers.set(path, callbacks.at(-1)!),
+      get: (path: string, ...callbacks: any[]) => harness.handlers.set(path, callbacks.at(-1)!),
     } as never);
   });
 
@@ -134,7 +129,7 @@ describe("account currency and historical opening behavior", () => {
         openingBalanceCurrency: "EUR",
         openingBalanceHistoricalRate: "1.2",
         baseCurrency: "USD",
-      }),
+      })
     );
     expect(req.body).toMatchObject({
       openingBalance: "120",
@@ -158,7 +153,7 @@ describe("account currency and historical opening behavior", () => {
           openingBalanceHistoricalRate: "1.2",
           openingBalanceBaseAmount: "120",
         },
-      ],
+      ]
     );
     const req: any = {
       method: "PATCH",
@@ -194,7 +189,7 @@ describe("account currency and historical opening behavior", () => {
           openingBalanceHistoricalRate: "1.2",
           openingBalanceBaseAmount: "120",
         },
-      ],
+      ]
     );
     const req: any = {
       method: "PATCH",
@@ -242,12 +237,10 @@ describe("account currency and historical opening behavior", () => {
     const res = resHarness();
     await harness.handlers.get("/api/accounts/ledger/:id/balance")!(
       { session: { currentCompanyId: 4 }, params: { id: "7" } },
-      res,
+      res
     );
     expect(harness.getCashBankAccountSummary).toHaveBeenCalledWith(4, "ledger", 7);
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ balance: 125, totalsProvisional: true }),
-    );
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ balance: 125, totalsProvisional: true }));
   });
 
   it("falls back to historical ledger accounting and flags unresolved legacy values as provisional", async () => {
@@ -270,7 +263,7 @@ describe("account currency and historical opening behavior", () => {
 
     await harness.handlers.get("/api/accounts/ledger/:id/balance")!(
       { session: { currentCompanyId: 4 }, params: { id: "7" } },
-      res,
+      res
     );
 
     expect(res.json).toHaveBeenCalledWith(
@@ -280,12 +273,9 @@ describe("account currency and historical opening behavior", () => {
         unresolvedOpeningBalanceRaw: "-30.000000",
         unresolvedLegacyNetRaw: "5.000000",
         totalsProvisional: true,
-      }),
+      })
     );
-    expect(harness.poolQuery).toHaveBeenCalledWith(
-      expect.stringContaining("v.company_id = $2"),
-      [7, 4],
-    );
+    expect(harness.poolQuery).toHaveBeenCalledWith(expect.stringContaining("v.company_id = $2"), [7, 4]);
   });
 
   it("returns native debit/credit buckets without losing historical translation evidence", async () => {
@@ -299,7 +289,7 @@ describe("account currency and historical opening behavior", () => {
     const res = resHarness();
     await harness.handlers.get("/api/accounts/ledger/:id/currency-balances")!(
       { session: { currentCompanyId: 4 }, params: { id: "7" } },
-      res,
+      res
     );
     expect(res.json).toHaveBeenCalledWith([
       {
@@ -331,10 +321,7 @@ describe("account currency and historical opening behavior", () => {
       totalCurrent: "110",
     });
     const res = resHarness();
-    await harness.handlers.get("/api/bank-accounts/revaluation")!(
-      { session: { currentCompanyId: 4 } },
-      res,
-    );
+    await harness.handlers.get("/api/bank-accounts/revaluation")!({ session: { currentCompanyId: 4 } }, res);
     expect(harness.getCashBankRevaluation).toHaveBeenCalledWith(4);
     expect(res.json).toHaveBeenCalledWith({ totalHistorical: "100", totalCurrent: "110" });
 
