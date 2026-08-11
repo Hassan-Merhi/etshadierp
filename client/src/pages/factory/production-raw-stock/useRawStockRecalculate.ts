@@ -401,7 +401,7 @@ export function useRawStockRecalculate() {
         includeHistoricalContainers,
       });
       if (!dryRun.ok) throw new Error((await dryRun.json()).message || "Failed to prepare recalculation");
-      const dryRunData = await dryRun.json();
+      const dryRunData: RecalcApplyResponse & { confirmationToken?: string } = await dryRun.json();
       const res = await modeApiRequest("POST", "/api/factory/raw-stock/recalc/apply", {
         containerIds,
         includeCompletedBatches,
