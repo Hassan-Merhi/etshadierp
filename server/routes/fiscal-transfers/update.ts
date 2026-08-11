@@ -5,6 +5,7 @@
  * first-match, so that order is behaviour.
  */
 import type { Express } from "express";
+import type { PathParams, RequestHandlerParams } from "express-serve-static-core";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { storage } from "../../storage";
@@ -79,10 +80,10 @@ export function registerStockTransferUpdateRoutes(app: Express) {
   // while fixing non-USD/native-currency stock-adjustment creation.
   const originalPost = app.post;
   const boundPost = app.post.bind(app);
-  app.post = ((path: any, ...handlers: any[]) => {
+  app.post = ((path: PathParams, ...handlers: RequestHandlerParams[]) => {
     if (path === "/api/stock-adjustments" && handlers.length > 0) {
       const correctedHandlers = [...handlers];
-      correctedHandlers[correctedHandlers.length - 1] = (req: any, res: any) => stockAdjustmentCreateHandler(req, res);
+      correctedHandlers[correctedHandlers.length - 1] = stockAdjustmentCreateHandler;
       return boundPost(path, ...correctedHandlers);
     }
     return boundPost(path, ...handlers);
