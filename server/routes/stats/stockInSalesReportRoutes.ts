@@ -196,20 +196,43 @@ export function registerStockInSalesReportRoutes(app: Express) {
 
     try {
       const locationIds = await resolveRequestLocationIds(req, parsed.data.locationIds);
-      const result = await getStockInSalesDetail({
+      const detailFilters = {
         companyId,
         startDate: parsed.data.startDate,
         endDate: parsed.data.endDate,
         locationIds,
         stockGroupIds: parsed.data.stockGroupIds,
         search: parsed.data.search || undefined,
-        stockInPage: parsed.data.stockInPage,
-        stockOutPage: parsed.data.stockOutPage,
-        limit: parsed.data.limit,
-        exportAll: parsed.data.exportAll,
-      });
+      };
+      const [result, outboundBreakdown] = await Promise.all([
+        getStockInSalesDetail({
+          ...detailFilters,
+          stockInPage: parsed.data.stockInPage,
+          stockOutPage: parsed.data.stockOutPage,
+          limit: parsed.data.limit,
+          exportAll: parsed.data.exportAll,
+        }),
+        getStockInSalesOutboundBreakdown({
+          ...detailFilters,
+          grouping: "daily",
+          profitFilter: "all",
+        }),
+      ]);
+      const costProfit = Number((result.summary.totalSales - result.summary.costOfSales).toFixed(2));
+      const avgProfitPerBale = outboundBreakdown.summary.netSalesQty === 0
+        ? 0
+        : Number((costProfit / outboundBreakdown.summary.netSalesQty).toFixed(6));
+      const enrichedResult = {
+        ...result,
+        summary: {
+          ...result.summary,
+          ...outboundBreakdown.summary,
+          costProfit,
+          avgProfitPerBale,
+        },
+      };
       res.setHeader("Cache-Control", "private, no-store");
-      return res.json(result);
+      return res.json(enrichedResult);
     } catch (error: unknown) {
       if (locationAccessResponse(error, res)) return;
       logger.error("Stock in and sales detail error", { module: "reports", action: "stock-in-sales-detail", companyId, error });
