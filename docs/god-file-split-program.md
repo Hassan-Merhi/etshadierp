@@ -8,7 +8,7 @@ those splits verifiable rather than hopeful.
 Phases 0, 1 and 2 are complete. Phases 3 and 4 are in progress; 3b and 5 have
 not been started.
 
-**Backlog: 58 files, 30,904 lines over the limit** (from 162 and 102,337).
+**Backlog: 57 files, 29,393 lines over the limit** (from 162 and 102,337).
 `npm run audit:god-files` prints the current figure; the ceiling is asserted in
 `tests/god-file-boundaries.test.ts` and is lowered with each split. This line is
 bound to the audit in `config/doc-index.json`, so it now fails the build instead
@@ -86,25 +86,26 @@ distinct signal rather than one red line inside a two-thousand-test run.
 
 ### 0.3 Source-text assertion triage (`config/source-text-assertion-baseline.json`)
 
-69 tests read source files. The audit separates two kinds:
+82 tests read source files. The audit separates two kinds:
 
-- **8 structural guards** deliberately assert repository shape (a retired file
+- **14 structural guards** deliberately assert repository shape (a retired file
   stays deleted, a composition root contains no route handlers). Code motion is
   exactly what they exist to constrain, so they are correct as written.
-- **61 source-coupled tests** assert literal code substrings as a proxy for
-  behaviour — 713 such assertions. They fail when code moves even though
+- **68 source-coupled tests** assert literal code substrings as a proxy for
+  behaviour — 893 such assertions. They fail when code moves even though
   behaviour is unchanged, which trains reviewers to ignore red builds.
 
-The audit's exact and actionable output is the reverse index: **4 god files are
+The audit's exact and actionable output is the reverse index: **5 god files are
 pinned by source-coupled tests** and must have those tests rewritten before they
 are split.
 
 | Lines | File | Pinned by |
 |---|---|---|
-| 2479 | `client/src/pages/factory/production-raw-stock/RawStockRecalculate.tsx` | `factory-historical-replay-typed-confirmation` |
-| 2174 | `client/src/pages/factory/FactoryWorkers.tsx` | `frontend-layout` |
+| 2098 | `client/src/pages/factory/FactoryWorkers.tsx` | `frontend-layout` |
 | 1976 | `server/chatService.ts` | `phase6-chat-report-domains` |
-| 1701 | `client/src/pages/vouchers/JournalForm.tsx` | `frontend-layout` |
+| 1906 | `client/src/pages/factory/FactoryContainerLoadingScan.tsx` | `ui/bandwidth-phase-1-page-polling` |
+| 1626 | `client/src/pages/vouchers/JournalForm.tsx` | `frontend-layout` |
+| 1133 | `client/src/pages/ContainerLoadingScan.tsx` | `ui/bandwidth-phase-1-page-polling` |
 
 ```bash
 npm run audit:source-text-assertions
@@ -113,7 +114,7 @@ npm run audit:source-text-assertions
 Classification is heuristic — a test reading source files that also asserts on
 parsed JSON can be reported as source-coupled. The reverse index is exact.
 
-### 0.4 Size ratchet (`config/god-file-boundaries.json`, v16)
+### 0.4 Size ratchet (`config/god-file-boundaries.json`, v18)
 
 Extends the existing boundary system rather than adding a competing ESLint rule.
 

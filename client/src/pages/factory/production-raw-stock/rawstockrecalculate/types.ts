@@ -183,9 +183,76 @@ export interface ReplaySummary {
 export interface HistoricalReplayResult {
   summary: ReplaySummary;
   supplierRows: ReplaySupplierRow[];
-  containerRows: any[];
-  sourceRows: any[];
-  batchRows: any[];
+  containerRows: unknown[];
+  sourceRows: unknown[];
+  batchRows: unknown[];
+}
+
+export interface PreparedReplayData {
+  confirmationToken: string;
+  summary: Record<string, unknown>;
+  safeSupplierIds: number[];
+  suppliersToApply: unknown[];
+  fingerprint?: string;
+  expiresInMs: number;
+  algorithmVersion: string;
+  scope?: {
+    suppliers: number;
+    containers: number;
+    rawStockRows: number;
+    supplierSources: number;
+    batches: number;
+    availableBales: number;
+    finalizedBales: number;
+    blockedBatches: number;
+  };
+}
+
+export interface HistoricalReplayApplyResponse {
+  suppliersApplied: number;
+  sourcesUpdated: number;
+  batchesUpdated: number;
+  balesUpdated: number;
+}
+
+export interface UndoApplyResponse {
+  containersRestored: number;
+  mixBatchesRestored: number;
+  balesRestored: number;
+}
+
+export interface RecalcApplyResultRow {
+  applied: boolean;
+  affectedBatches: number;
+  affectedBales: number;
+  completedBatchesRewritten?: number;
+  skippedReason?: string;
+}
+
+export interface RecalcApplyResponse {
+  results?: RecalcApplyResultRow[];
+}
+
+export interface SupplierRatePreviewResponse {
+  results: SupplierRatePreviewRow[];
+}
+
+export interface RestoreRatesResponse {
+  restored: number;
+}
+
+export interface SourceMismatchApplyResultRow {
+  applied: boolean;
+  affectedBales?: number;
+}
+
+export interface SourceMismatchApplyResponse {
+  results?: SourceMismatchApplyResultRow[];
+}
+
+export interface PartialOffloadApplyResponse {
+  applied: number;
+  skipped: number;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────

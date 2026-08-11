@@ -1874,18 +1874,8 @@
         0,
         0
       ],
-      "client/src/pages/factory/production-raw-stock/RawStockRecalculate.tsx": [
-        23,
-        2,
-        0
-      ],
       "client/src/pages/factory/production-raw-stock/StockAdjustmentDialog.tsx": [
         5,
-        0,
-        0
-      ],
-      "client/src/pages/factory/production-raw-stock/rawstockrecalculate/types.ts": [
-        3,
         0,
         0
       ],
@@ -6562,6 +6552,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 9041
+    "typeEscapeCeiling": 9013
   }
 }
