@@ -10,6 +10,10 @@ import {
   resolveStockInSalesLocationIds,
   StockInSalesLocationAccessError,
 } from "../../services/reports/stockInSalesLocationAccess";
+import {
+  applyOutboundBreakdown,
+  getStockInSalesOutboundBreakdown,
+} from "../../services/reports/stockInSalesOutboundBreakdown";
 import { getStockInSalesReport } from "../../services/reports/stockInSalesReportService";
 
 const isoDateSchema = z
@@ -134,7 +138,7 @@ export function registerStockInSalesReportRoutes(app: Express) {
 
     try {
       const locationIds = await resolveRequestLocationIds(req, parsed.data.locationIds);
-      const result = await getStockInSalesReport({
+      const reportFilters = {
         companyId,
         startDate: parsed.data.startDate,
         endDate: parsed.data.endDate,
@@ -143,7 +147,12 @@ export function registerStockInSalesReportRoutes(app: Express) {
         locationIds,
         stockGroupIds: parsed.data.stockGroupIds,
         search: parsed.data.search || undefined,
-      });
+      };
+      const [baseResult, outboundBreakdown] = await Promise.all([
+        getStockInSalesReport(reportFilters),
+        getStockInSalesOutboundBreakdown(reportFilters),
+      ]);
+      const result = applyOutboundBreakdown(baseResult, outboundBreakdown);
 
       res.setHeader("Cache-Control", "private, no-store");
       return res.json(result);
