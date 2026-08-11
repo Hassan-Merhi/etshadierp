@@ -639,11 +639,6 @@
         0,
         0
       ],
-      "client/src/pages/Payroll.tsx": [
-        62,
-        9,
-        0
-      ],
       "client/src/pages/PendingInvoiceVerify.tsx": [
         1,
         8,
@@ -6517,6 +6512,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 8912
+    "typeEscapeCeiling": 8841
   }
 }

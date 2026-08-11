@@ -165,7 +165,6 @@
       "client/src/pages/factory/FactorySuppliers.tsx": 1350,
       "client/src/pages/factory/WasteDispatch.tsx": 1000,
       "client/src/pages/factory/WipersReEntry.tsx": 925,
-      "client/src/pages/Payroll.tsx": 1325,
       "client/src/pages/PendingInvoiceVerify.tsx": 1050,
       "client/src/pages/pos/POSImport.tsx": 1100,
       "client/src/pages/pos/POSPriceList.tsx": 1425,
