@@ -99,6 +99,37 @@ async function login(page) {
   await waitForSettledUi(page);
 }
 
+async function completeLanguageOnboarding(page, language) {
+  const dialogSelector = '[data-testid="language-onboarding-dialog"]';
+  const dialogOpen = await page.evaluate(
+    (selector) => {
+      const dialog = document.querySelector(selector);
+      if (!(dialog instanceof HTMLElement)) return false;
+      const style = window.getComputedStyle(dialog);
+      return style.display !== "none" && style.visibility !== "hidden";
+    },
+    dialogSelector,
+  );
+
+  if (!dialogOpen) return false;
+
+  const optionSelector = `[data-testid="language-onboarding-${language}"]`;
+  await page.click(optionSelector);
+  await page.waitForFunction(
+    (selector) => document.querySelector(selector)?.getAttribute("aria-checked") === "true",
+    { timeout: Math.min(TIMEOUT_MS, 5_000) },
+    optionSelector,
+  );
+  await page.waitForFunction(
+    () => !document.querySelector('[data-testid="language-onboarding-continue"]')?.hasAttribute("disabled"),
+    { timeout: TIMEOUT_MS },
+  );
+  await page.click('[data-testid="language-onboarding-continue"]');
+  await page.waitForSelector(dialogSelector, { hidden: true, timeout: TIMEOUT_MS });
+  await waitForSettledUi(page);
+  return true;
+}
+
 async function activateSkipNavigation(page) {
   const selector = '[data-slot="skip-link"]';
   const available = await page.evaluate(
@@ -326,6 +357,7 @@ try {
         if (AUTHENTICATED) {
           await login(page);
           await applyLanguage(page, language.code);
+          const languageOnboardingCompleted = await completeLanguageOnboarding(page, language.code);
           for (const route of AUTHENTICATED_ROUTES) {
             const status = await openRoute(page, route);
             await applyLanguage(page, language.code);
@@ -355,6 +387,7 @@ try {
               requestedRoute: route,
               status,
               state,
+              languageOnboardingCompleted,
               skipNavigation,
               screenshot,
               failures,

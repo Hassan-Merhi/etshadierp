@@ -13,6 +13,7 @@ import { logger } from "../../lib/logger";
 import { vouchers, updateStockTransferSchema } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { registerStockAdjustmentWasteRoutes } from "../stockAdjustmentWasteRoutes";
+import { stockAdjustmentCreateHandler } from "../stockAdjustmentCreateHandler";
 
 export function registerStockTransferUpdateRoutes(app: Express) {
   // Stock Transfers - PUT endpoint (update)
@@ -71,5 +72,25 @@ export function registerStockTransferUpdateRoutes(app: Express) {
     }
   });
 
-  registerStockAdjustmentWasteRoutes(app);
+  // Keep the public POST /api/stock-adjustments route and its guard chain
+  // exactly where they have always been registered, but replace only the
+  // legacy anonymous create callback while this sub-registrar runs. This
+  // avoids a duplicate Express route (and keeps the route-manifest stable)
+  // while fixing non-USD/native-currency stock-adjustment creation.
+  const originalPost = app.post;
+  const boundPost = app.post.bind(app);
+  app.post = ((path: any, ...handlers: any[]) => {
+    if (path === "/api/stock-adjustments" && handlers.length > 0) {
+      const correctedHandlers = [...handlers];
+      correctedHandlers[correctedHandlers.length - 1] = (req: any, res: any) => stockAdjustmentCreateHandler(req, res);
+      return boundPost(path, ...correctedHandlers);
+    }
+    return boundPost(path, ...handlers);
+  }) as typeof app.post;
+
+  try {
+    registerStockAdjustmentWasteRoutes(app);
+  } finally {
+    app.post = originalPost;
+  }
 }
