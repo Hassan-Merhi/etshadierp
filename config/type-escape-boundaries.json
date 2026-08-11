@@ -1319,11 +1319,6 @@
         12,
         0
       ],
-      "client/src/pages/factory/FactoryWorkers.tsx": [
-        5,
-        38,
-        0
-      ],
       "client/src/pages/factory/FactoryWorkersHub.tsx": [
         2,
         0,
@@ -6537,6 +6532,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 8986
+    "typeEscapeCeiling": 8943
   }
 }

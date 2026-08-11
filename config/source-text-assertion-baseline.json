@@ -92,13 +92,6 @@
   ],
   "godFileHotspots": [
     {
-      "path": "client/src/pages/factory/FactoryWorkers.tsx",
-      "lines": 2098,
-      "pinnedBy": [
-        "tests/frontend-layout.test.ts"
-      ]
-    },
-    {
       "path": "server/chatService.ts",
       "lines": 1976,
       "pinnedBy": [
