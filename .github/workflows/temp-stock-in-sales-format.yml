@@ -35,12 +35,16 @@ jobs:
             server/services/reports/stockInSalesComparisonService.ts \
             server/services/reports/stockInSalesOutboundBreakdown.ts \
             server/services/reports/stockInSalesReportService.ts
-          rm .github/workflows/temp-stock-in-sales-format.yml
       - name: Commit formatting
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
+          git add client/src/pages/StockInSalesReport.tsx \
+            client/src/pages/StockInSalesReportDetail.tsx \
+            server/routes/stats/stockInSalesReportRoutes.ts \
+            server/services/reports/stockInSalesComparisonService.ts \
+            server/services/reports/stockInSalesOutboundBreakdown.ts \
+            server/services/reports/stockInSalesReportService.ts
           git diff --cached --quiet && exit 0
           git commit -m 'Format stock flow report files'
           git push origin HEAD:${{ github.event.pull_request.head.ref }}
