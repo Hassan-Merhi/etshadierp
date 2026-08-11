@@ -2,8 +2,8 @@
   "description": "Triage baseline for tests that assert on source text. structuralGuardTests intentionally constrain repository shape and survive code motion. sourceCoupledTests pin literal code substrings and will fail when code moves even if behaviour is unchanged, so they must be reviewed before splitting the files they pin. This list is a ratchet: it may shrink, never grow.",
   "regenerate": "UPDATE_SOURCE_TEXT_BASELINE=1 npm run test:backend -- source-text-assertions",
   "classificationCaveat": "Classification is heuristic: a test that reads source files and also asserts substrings on parsed JSON can be reported as source-coupled. The godFileHotspots reverse index below is exact and is the actionable output.",
-  "maxSourceCoupledTests": 69,
-  "maxTotalTextAssertions": 895,
+  "maxSourceCoupledTests": 68,
+  "maxTotalTextAssertions": 893,
   "sourceCoupledTests": [
     "server/routes/location/commonInventoryPerformanceRoutes.test.ts",
     "tests/account-migration-control-reference-safety.test.ts",
@@ -33,7 +33,6 @@
     "tests/factory-historical-replay-review-token.test.ts",
     "tests/factory-historical-replay-source-only-parent.test.ts",
     "tests/factory-historical-replay-token-required.test.ts",
-    "tests/factory-historical-replay-typed-confirmation.test.ts",
     "tests/factory-historical-replay-undo-stale.test.ts",
     "tests/factory-historical-replay-user-binding.test.ts",
     "tests/factory-historical-replay-v7-final-safety.test.ts",
@@ -92,13 +91,6 @@
     "tests/tenant-control-migration-safety.test.ts"
   ],
   "godFileHotspots": [
-    {
-      "path": "client/src/pages/factory/production-raw-stock/RawStockRecalculate.tsx",
-      "lines": 2411,
-      "pinnedBy": [
-        "tests/factory-historical-replay-typed-confirmation.test.ts"
-      ]
-    },
     {
       "path": "client/src/pages/factory/FactoryWorkers.tsx",
       "lines": 2098,
