@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 
 import { db } from "../../db";
-import { userLocations } from "@shared/schema";
+import { locations, userLocations } from "@shared/schema";
 
 const UNRESTRICTED_ROLES = new Set(["Developer", "Admin", "Owner", "Manager"]);
 
@@ -39,7 +39,20 @@ export async function resolveStockInSalesLocationIds(params: {
   currentLocationId?: number | null;
   requestedLocationIds: number[];
 }): Promise<number[]> {
-  if (UNRESTRICTED_ROLES.has(params.role)) return params.requestedLocationIds;
+  if (UNRESTRICTED_ROLES.has(params.role)) {
+    if (params.requestedLocationIds.length > 0) return params.requestedLocationIds;
+
+    const companyLocations = await db
+      .select({ locationId: locations.id })
+      .from(locations)
+      .where(eq(locations.companyId, params.companyId));
+
+    const locationIds = companyLocations.map((row) => row.locationId);
+    if (locationIds.length === 0) {
+      throw new StockInSalesLocationAccessError("No report locations are available for this company");
+    }
+    return locationIds;
+  }
 
   const assignments = await db
     .select({ locationId: userLocations.locationId })
