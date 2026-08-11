@@ -1,0 +1,59 @@
+name: Temporary Stock Flow Lint Fix
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.event.pull_request.head.ref == 'agent/stock-in-sales-phase-1-inventory-flow'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.14'
+          cache: npm
+      - run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+      - run: npm ci --no-audit --bin-links=true
+      - name: Remove three report any warnings
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          for path in [
+              Path('client/src/pages/StockInSalesReport.tsx'),
+              Path('client/src/pages/StockInSalesReportDetail.tsx'),
+          ]:
+              text = path.read_text()
+              old = '''    } catch (exportError: any) {\n      toast({\n        title: "Export failed",\n        description: exportError?.message || "'''
+              new = '''    } catch (exportError: unknown) {\n      toast({\n        title: "Export failed",\n        description: (exportError instanceof Error ? exportError.message : "") || "'''
+              if old not in text:
+                  raise SystemExit(f'export catch target missing in {path}')
+              path.write_text(text.replace(old, new, 1))
+
+          path = Path('server/services/reports/stockInSalesReconciliation.ts')
+          text = path.read_text()
+          old = 'function matchesFilters(row: any, filters: StockInSalesReportFilters): boolean {'
+          new = '''function matchesFilters(\n  row: {\n    stockGroupId?: unknown;\n    stockItemCode?: unknown;\n    stockItemName?: unknown;\n    stockGroupName?: unknown;\n    stockGroupCode?: unknown;\n  },\n  filters: StockInSalesReportFilters\n): boolean {'''
+          if old not in text:
+              raise SystemExit('reconciliation any target missing')
+          path.write_text(text.replace(old, new, 1))
+          PY
+          npx prettier --write \
+            client/src/pages/StockInSalesReport.tsx \
+            client/src/pages/StockInSalesReportDetail.tsx \
+            server/services/reports/stockInSalesReconciliation.ts
+      - name: Commit lint fix
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add client/src/pages/StockInSalesReport.tsx client/src/pages/StockInSalesReportDetail.tsx server/services/reports/stockInSalesReconciliation.ts
+          git diff --cached --quiet && exit 0
+          git commit -m 'Remove stock flow lint warnings'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
