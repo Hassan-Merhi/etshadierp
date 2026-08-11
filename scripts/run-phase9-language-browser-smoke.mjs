@@ -100,21 +100,27 @@ async function login(page) {
 }
 
 async function activateSkipNavigation(page) {
-  const available = await page.evaluate(() => {
-    const link = document.querySelector('[data-slot="skip-link"]');
-    if (!(link instanceof HTMLAnchorElement)) {
-      return false;
-    }
-    link.focus();
-    link.click();
-    return true;
-  });
+  const selector = '[data-slot="skip-link"]';
+  const available = await page.evaluate(
+    (skipLinkSelector) => document.querySelector(skipLinkSelector) instanceof HTMLAnchorElement,
+    selector,
+  );
 
   if (!available) {
     return { available: false, activeElementId: "", hash: await page.evaluate(() => window.location.hash) };
   }
 
-  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+  await page.focus(selector);
+  await page.keyboard.press("Enter");
+  try {
+    await page.waitForFunction(
+      () => document.activeElement?.id === "main-content" && window.location.hash === "#main-content",
+      { timeout: Math.min(TIMEOUT_MS, 5_000) },
+    );
+  } catch {
+    // Return the observed state below so the release report exposes the exact failure.
+  }
+
   return page.evaluate(() => ({
     available: true,
     activeElementId: document.activeElement instanceof HTMLElement ? document.activeElement.id : "",
