@@ -1,0 +1,38 @@
+name: Phase 2 Format Helper
+
+on:
+  push:
+    branches:
+      - program/erp-90-phase-2
+
+permissions:
+  contents: read
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.14
+          cache: npm
+      - run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+      - run: npm ci --no-audit --bin-links=true
+      - name: Format remaining Phase 2 tests
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            tests/ui/daybook-page-behavior.test.tsx \
+            tests/ui/factory-container-loading-scan-behavior.test.tsx \
+            tests/ui/payroll-page-behavior.test.tsx \
+            tests/ui/stock-transfer-form-revision-behavior.test.tsx
+      - name: Upload formatted files
+        uses: actions/upload-artifact@v7
+        with:
+          name: phase2-formatted-tests
+          path: |
+            tests/ui/daybook-page-behavior.test.tsx
+            tests/ui/factory-container-loading-scan-behavior.test.tsx
+            tests/ui/payroll-page-behavior.test.tsx
+            tests/ui/stock-transfer-form-revision-behavior.test.tsx
+          if-no-files-found: error
