@@ -1,5 +1,5 @@
 import Decimal from "decimal.js";
-import { and, desc, eq, gte, ilike, inArray, isNull, lte, or, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, isNull, lte, or, type SQL } from "drizzle-orm";
 
 import { db } from "../../db";
 import {
@@ -28,7 +28,7 @@ export interface StockInSalesMovementRow {
   movementType: "Transfer In" | "Transfer Out" | "Adjustment";
   voucherId: number;
   voucherNumber: string;
-  locationId: number;
+  locationId: number | null;
   counterpartyLocationId: number | null;
   stockItemId: number;
   stockItemCode: string;
@@ -45,7 +45,11 @@ const EXPORT_LIMIT = 20_000;
 
 function number(value: unknown, places: number): number {
   try {
-    return Number(new Decimal(value === null || value === undefined || value === "" ? 0 : String(value)).toDecimalPlaces(places).toString());
+    return Number(
+      new Decimal(value === null || value === undefined || value === "" ? 0 : String(value))
+        .toDecimalPlaces(places, Decimal.ROUND_HALF_UP)
+        .toString()
+    );
   } catch {
     return 0;
   }
@@ -156,6 +160,7 @@ export async function getStockInSalesMovementDetails(filters: StockInSalesMoveme
         stockGroupName: stockGroups.name,
         quantity: stockAdjustmentItems.quantity,
         rate: stockAdjustmentItems.rate,
+        value: stockAdjustmentItems.totalAmount,
         adjustmentType: stockAdjustmentVouchers.adjustmentType,
       })
       .from(stockAdjustmentItems)
@@ -182,9 +187,9 @@ export async function getStockInSalesMovementDetails(filters: StockInSalesMoveme
       stockItemName: row.stockItemName,
       stockGroupId: row.stockGroupId,
       stockGroupName: row.stockGroupName || "Unassigned",
-      quantity: number(row.quantity, 3),
+      quantity: Math.abs(number(row.quantity, 3)),
       unitRate: number(row.rate, 6),
-      value: number(row.value, 2),
+      value: Math.abs(number(row.value, 2)),
       adjustmentType: null,
     })),
     ...transferOut.map((row) => ({
@@ -205,28 +210,24 @@ export async function getStockInSalesMovementDetails(filters: StockInSalesMoveme
       value: -Math.abs(number(row.value, 2)),
       adjustmentType: null,
     })),
-    ...adjustments.map((row) => {
-      const quantity = number(row.quantity, 3);
-      const unitRate = number(row.rate, 6);
-      return {
-        key: `adjustment-${row.id}-${row.locationId}`,
-        activityDate: String(row.activityDate),
-        movementType: "Adjustment" as const,
-        voucherId: row.voucherId,
-        voucherNumber: row.voucherNumber,
-        locationId: row.locationId,
-        counterpartyLocationId: null,
-        stockItemId: row.stockItemId,
-        stockItemCode: row.stockItemCode,
-        stockItemName: row.stockItemName,
-        stockGroupId: row.stockGroupId,
-        stockGroupName: row.stockGroupName || "Unassigned",
-        quantity,
-        unitRate,
-        value: number(new Decimal(quantity).times(unitRate), 2),
-        adjustmentType: row.adjustmentType,
-      };
-    }),
+    ...adjustments.map((row) => ({
+      key: `adjustment-${row.id}-${row.locationId}`,
+      activityDate: String(row.activityDate),
+      movementType: "Adjustment" as const,
+      voucherId: row.voucherId,
+      voucherNumber: row.voucherNumber,
+      locationId: row.locationId,
+      counterpartyLocationId: null,
+      stockItemId: row.stockItemId,
+      stockItemCode: row.stockItemCode,
+      stockItemName: row.stockItemName,
+      stockGroupId: row.stockGroupId,
+      stockGroupName: row.stockGroupName || "Unassigned",
+      quantity: number(row.quantity, 3),
+      unitRate: number(row.rate, 6),
+      value: number(row.value, 2),
+      adjustmentType: row.adjustmentType,
+    })),
   ].sort((a, b) => {
     const date = b.activityDate.localeCompare(a.activityDate);
     if (date !== 0) return date;
@@ -235,7 +236,8 @@ export async function getStockInSalesMovementDetails(filters: StockInSalesMoveme
     return a.key.localeCompare(b.key);
   });
 
-  const truncated = transferIn.length >= EXPORT_LIMIT || transferOut.length >= EXPORT_LIMIT || adjustments.length >= EXPORT_LIMIT;
+  const truncated =
+    transferIn.length >= EXPORT_LIMIT || transferOut.length >= EXPORT_LIMIT || adjustments.length >= EXPORT_LIMIT;
   return {
     generatedAt: new Date().toISOString(),
     rows,
