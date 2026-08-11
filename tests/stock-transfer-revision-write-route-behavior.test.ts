@@ -104,7 +104,9 @@ vi.mock("../server/auth", () => ({
 }));
 vi.mock("../server/db", () => ({ db: harness.db }));
 vi.mock("@shared/schema", () => harness.tables);
-vi.mock("../server/inventoryHelper", () => ({ adjustInventory: harness.adjustInventory }));
+vi.mock("../server/inventoryHelper", () => ({
+  adjustInventory: harness.adjustInventory,
+}));
 vi.mock("../server/helpers/sendRevisedTransferWhatsApp", () => ({
   sendRevisedTransferWhatsApp: harness.sendRevisedTransferWhatsApp,
 }));
@@ -139,8 +141,13 @@ describe("stock transfer revision write routes", () => {
   });
 
   it("creates a numbered revision and persists its changed items", async () => {
-    harness.selectResults.push([{ revisionNumber: 2 }], [{ id: 401, revisionId: 41, stockItemId: 7 }]);
-    harness.returningResults.push([{ id: 41, transferId: 9, revisionNumber: 3, optional: false }]);
+    harness.selectResults.push(
+      [{ revisionNumber: 2 }],
+      [{ id: 401, revisionId: 41, stockItemId: 7 }],
+    );
+    harness.returningResults.push([
+      { id: 41, transferId: 9, revisionNumber: 3, optional: false },
+    ]);
     const req = {
       params: { transferId: "9" },
       body: {
@@ -191,7 +198,11 @@ describe("stock transfer revision write routes", () => {
       ]),
     );
     expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 41, revisionNumber: 3, items: [expect.objectContaining({ id: 401 })] }),
+      expect.objectContaining({
+        id: 41,
+        revisionNumber: 3,
+        items: [expect.objectContaining({ id: 401 })],
+      }),
     );
   });
 
@@ -199,10 +210,25 @@ describe("stock transfer revision write routes", () => {
     harness.selectResults.push(
       [{ id: 41, transferId: 9 }],
       [{ id: 9, voucherId: 90, destinationLocationId: 8, inventoryApplied: true }],
-      [{ id: 41, revisionNumber: 1 }, { id: 42, revisionNumber: 2 }],
       [
-        { revisionId: 41, stockItemId: 7, sourceLocationId: 2, originalQuantity: "5", newQuantity: "6" },
-        { revisionId: 42, stockItemId: 7, sourceLocationId: 2, originalQuantity: "5", newQuantity: "8" },
+        { id: 41, revisionNumber: 1 },
+        { id: 42, revisionNumber: 2 },
+      ],
+      [
+        {
+          revisionId: 41,
+          stockItemId: 7,
+          sourceLocationId: 2,
+          originalQuantity: "5",
+          newQuantity: "6",
+        },
+        {
+          revisionId: 42,
+          stockItemId: 7,
+          sourceLocationId: 2,
+          originalQuantity: "5",
+          newQuantity: "8",
+        },
       ],
       [{ companyId: 4 }],
       [{ id: 300, stockItemId: 7, sourceLocationId: 2, quantity: "5", rate: "10" }],
@@ -220,7 +246,10 @@ describe("stock transfer revision write routes", () => {
           table: harness.tables.stockTransferItems,
           values: { quantity: "8", totalAmount: "80.00" },
         }),
-        expect.objectContaining({ table: harness.tables.vouchers, values: { totalAmount: "80.00" } }),
+        expect.objectContaining({
+          table: harness.tables.vouchers,
+          values: { totalAmount: "80.00" },
+        }),
         expect.objectContaining({
           table: harness.tables.stockTransferRevisions,
           values: { optional: false },
@@ -237,7 +266,15 @@ describe("stock transfer revision write routes", () => {
       [{ id: 51, transferId: 12 }],
       [{ id: 12, voucherId: 120, destinationLocationId: 18, inventoryApplied: true }],
       [{ id: 51, revisionNumber: 1 }],
-      [{ revisionId: 51, stockItemId: 17, sourceLocationId: 22, originalQuantity: "0", newQuantity: "4" }],
+      [
+        {
+          revisionId: 51,
+          stockItemId: 17,
+          sourceLocationId: 22,
+          originalQuantity: "0",
+          newQuantity: "4",
+        },
+      ],
       [{ companyId: 6 }],
       [],
       [{ averageRate: "12.50" }],
@@ -283,7 +320,10 @@ describe("stock transfer revision write routes", () => {
 
     const deleteRes = { status: vi.fn(), json: vi.fn() };
     deleteRes.status.mockReturnValue(deleteRes);
-    await harness.handlers.get("DELETE /api/stock-transfer-revisions/:id")!({ params: { id: "41" } }, deleteRes);
+    await harness.handlers.get("DELETE /api/stock-transfer-revisions/:id")!(
+      { params: { id: "41" } },
+      deleteRes,
+    );
     expect(harness.deletes).toEqual([
       harness.tables.stockTransferRevisionItems,
       harness.tables.stockTransferRevisions,
