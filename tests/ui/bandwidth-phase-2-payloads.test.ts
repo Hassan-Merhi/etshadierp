@@ -55,7 +55,7 @@ describe("Bandwidth Phase 2 payload contracts", () => {
 
   it("uses compact workers by default while worker management opts into full records", () => {
     const server = read("server/routes/factory-workers/lists.ts");
-    const management = read("client/src/pages/factory/FactoryWorkers.tsx");
+    const management = read("client/src/pages/factory/factoryworkers/useFactoryWorkersModel.tsx");
     expect(server).toContain('req.query.profile !== "full"');
     expect(server).toContain("pendingAdvanceBalance");
     expect(management).toContain("/api/factory/workers?profile=full");
