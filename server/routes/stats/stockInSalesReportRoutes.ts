@@ -10,6 +10,7 @@ import {
   resolveStockInSalesLocationIds,
   StockInSalesLocationAccessError,
 } from "../../services/reports/stockInSalesLocationAccess";
+import { getStockInSalesMovementDetails } from "../../services/reports/stockInSalesMovementDetailService";
 import {
   applyOutboundBreakdown,
   getStockInSalesOutboundBreakdown,
@@ -64,6 +65,15 @@ const detailQuerySchema = z.object({
   stockOutPage: z.coerce.number().int().positive().max(100_000).default(1),
   limit: z.coerce.number().int().min(25).max(250).default(100),
   exportAll: z.preprocess((value) => value === "true" || value === "1" || value === true, z.boolean()).default(false),
+});
+
+const movementQuerySchema = detailQuerySchema.pick({
+  startDate: true,
+  endDate: true,
+  locationIds: true,
+  stockGroupIds: true,
+  search: true,
+  exportAll: true,
 });
 
 const comparisonQuerySchema = z.object({
@@ -204,6 +214,45 @@ export function registerStockInSalesReportRoutes(app: Express) {
       if (locationAccessResponse(error, res)) return;
       logger.error("Stock in and sales detail error", { module: "reports", action: "stock-in-sales-detail", companyId, error });
       return res.status(500).json({ message: "Failed to load stock in and sales details" });
+    }
+  });
+
+  app.get("/api/reports/stock-in-sales/movements", requireAuth, requireNonPOS, reportPageAccess, async (req, res) => {
+    const companyId = req.session.currentCompanyId;
+    if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+    const parsed = movementQuerySchema.safeParse({
+      startDate: firstQueryValue(req.query.startDate),
+      endDate: firstQueryValue(req.query.endDate),
+      locationIds: req.query.locationIds ?? req.query.locationId,
+      stockGroupIds: req.query.stockGroupIds ?? req.query.stockGroupId,
+      search: firstQueryValue(req.query.search),
+      exportAll: req.query.exportAll,
+    });
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid inventory movement filters", errors: parsed.error.flatten() });
+    }
+    if (invalidRange(parsed.data.startDate, parsed.data.endDate)) {
+      return res.status(400).json({ message: "Start date cannot be after end date" });
+    }
+
+    try {
+      const locationIds = await resolveRequestLocationIds(req, parsed.data.locationIds);
+      const result = await getStockInSalesMovementDetails({
+        companyId,
+        startDate: parsed.data.startDate,
+        endDate: parsed.data.endDate,
+        locationIds,
+        stockGroupIds: parsed.data.stockGroupIds,
+        search: parsed.data.search || undefined,
+        exportAll: parsed.data.exportAll,
+      });
+      res.setHeader("Cache-Control", "private, no-store");
+      return res.json(result);
+    } catch (error: unknown) {
+      if (locationAccessResponse(error, res)) return;
+      logger.error("Stock in and sales movement detail error", { module: "reports", action: "stock-in-sales-movements", companyId, error });
+      return res.status(500).json({ message: "Failed to load inventory movements" });
     }
   });
 
