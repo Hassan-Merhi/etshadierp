@@ -351,7 +351,9 @@ describe("buildGenericVoucherPostingRequest", () => {
         ],
         exchangeRate: null,
       }),
-    ).toThrowError(expect.objectContaining<PostingValidationError>({ code: "POSTING_UNBALANCED" }));
+    ).toThrowError(
+      expect.objectContaining<PostingValidationError>({ code: "POSTING_UNBALANCED" }),
+    );
 
     expect(() =>
       buildGenericVoucherPostingRequest({
