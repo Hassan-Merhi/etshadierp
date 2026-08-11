@@ -2,7 +2,7 @@ import Decimal from "decimal.js";
 import { and, eq, gte, ilike, inArray, isNull, lte, or, sql, type SQL } from "drizzle-orm";
 
 import { db } from "../../db";
-import { calculateHistoricalLocationInventory } from "../../routes/_helpers";
+import { calculateHistoricalLocationInventory } from "../../routes/helpers/inventoryHistoryHelpers";
 import {
   containers,
   containerOffloads,
