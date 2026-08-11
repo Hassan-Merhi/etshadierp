@@ -30,13 +30,14 @@ export function SkipLink({
     target.focus({ preventScroll: true });
     target.scrollIntoView({ block: "start" });
 
-    const targetWindow = event.currentTarget.ownerDocument.defaultView;
+    const ownerDocument = event.currentTarget.ownerDocument;
+    const targetWindow = ownerDocument.defaultView;
     if (targetWindow && targetWindow.location.hash !== href) {
       targetWindow.history.replaceState(targetWindow.history.state, "", href);
     }
 
     targetWindow?.requestAnimationFrame(() => {
-      getHashTarget(event.currentTarget.ownerDocument, href)?.focus({ preventScroll: true });
+      getHashTarget(ownerDocument, href)?.focus({ preventScroll: true });
     });
   };
 
