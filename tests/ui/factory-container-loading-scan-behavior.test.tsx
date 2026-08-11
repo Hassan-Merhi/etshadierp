@@ -26,9 +26,19 @@ vi.mock("@tanstack/react-query", () => ({
     if (root === "/api/factory/customers") return { data: [{ id: 1, legalName: "Buyer One" }] };
     if (root === "/api/locations") return { data: [{ id: 11, name: "Dock" }] };
     if (typeof root === "string" && root.startsWith("/api/factory/customer-proformas")) {
-      return { data: [{ id: 5, name: "PF-5", isActive: true, lines: [{ id: 1, articleCode: "A1", productName: "Shirts", quantity: 2 }] }] };
+      return {
+        data: [
+          {
+            id: 5,
+            name: "PF-5",
+            isActive: true,
+            lines: [{ id: 1, articleCode: "A1", productName: "Shirts", quantity: 2 }],
+          },
+        ],
+      };
     }
-    if (root === "/api/factory/customer-orders" && queryKey?.[1] === 77 && queryKey?.length === 2) return { data: orderDetail };
+    if (root === "/api/factory/customer-orders" && queryKey?.[1] === 77 && queryKey?.length === 2)
+      return { data: orderDetail };
     if (root === "/api/factory/bale-stock-count") return { data: { A1: 5 } };
     if (root === "/api/factory/customer-orders" && queryKey?.[2] === "bale-removals") return { data: [] };
     return { data: [] };
@@ -59,32 +69,56 @@ vi.mock("@/lib/queryClient", () => ({
   keyStartsWith: () => () => true,
 }));
 vi.mock("@/lib/excelHelper", () => ({
-  utils: { book_new: vi.fn(() => ({})), aoa_to_sheet: vi.fn(() => ({})), book_append_sheet: vi.fn(), sheet_to_json: vi.fn(() => []) },
-  writeFile: vi.fn(), read: vi.fn(),
+  utils: {
+    book_new: vi.fn(() => ({})),
+    aoa_to_sheet: vi.fn(() => ({})),
+    book_append_sheet: vi.fn(),
+    sheet_to_json: vi.fn(() => []),
+  },
+  writeFile: vi.fn(),
+  read: vi.fn(),
 }));
-vi.mock("@/components/ui/button", () => ({ Button: ({ children, size: _s, variant: _v, ...props }: any) => <button {...props}>{children}</button> }));
-vi.mock("@/components/ui/input", () => ({ Input: React.forwardRef<HTMLInputElement, any>((props, ref) => <input ref={ref} {...props} />) }));
+vi.mock("@/components/ui/button", () => ({
+  Button: ({ children, size: _s, variant: _v, ...props }: any) => <button {...props}>{children}</button>,
+}));
+vi.mock("@/components/ui/input", () => ({
+  Input: React.forwardRef<HTMLInputElement, any>((props, ref) => <input ref={ref} {...props} />),
+}));
 vi.mock("@/components/ui/textarea", () => ({ Textarea: (props: any) => <textarea {...props} /> }));
-vi.mock("@/components/ui/badge", () => ({ Badge: ({ children, ...props }: any) => <span {...props}>{children}</span> }));
+vi.mock("@/components/ui/badge", () => ({
+  Badge: ({ children, ...props }: any) => <span {...props}>{children}</span>,
+}));
 vi.mock("@/components/ui/select", () => ({
-  Select: ({ children }: any) => <div>{children}</div>, SelectContent: ({ children }: any) => <div>{children}</div>,
-  SelectItem: ({ children }: any) => <div>{children}</div>, SelectTrigger: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  Select: ({ children }: any) => <div>{children}</div>,
+  SelectContent: ({ children }: any) => <div>{children}</div>,
+  SelectItem: ({ children }: any) => <div>{children}</div>,
+  SelectTrigger: ({ children, ...props }: any) => <div {...props}>{children}</div>,
   SelectValue: ({ placeholder }: any) => <span>{placeholder}</span>,
 }));
 vi.mock("@/components/ui/table", () => ({
-  Table: ({ children }: any) => <table>{children}</table>, TableBody: ({ children }: any) => <tbody>{children}</tbody>,
-  TableCell: ({ children, ...props }: any) => <td {...props}>{children}</td>, TableHead: ({ children, ...props }: any) => <th {...props}>{children}</th>,
-  TableHeader: ({ children, ...props }: any) => <thead {...props}>{children}</thead>, TableRow: ({ children, ...props }: any) => <tr {...props}>{children}</tr>,
+  Table: ({ children }: any) => <table>{children}</table>,
+  TableBody: ({ children }: any) => <tbody>{children}</tbody>,
+  TableCell: ({ children, ...props }: any) => <td {...props}>{children}</td>,
+  TableHead: ({ children, ...props }: any) => <th {...props}>{children}</th>,
+  TableHeader: ({ children, ...props }: any) => <thead {...props}>{children}</thead>,
+  TableRow: ({ children, ...props }: any) => <tr {...props}>{children}</tr>,
 }));
 vi.mock("@/components/ui/dialog", () => ({
-  Dialog: ({ children, open }: any) => open ? <div>{children}</div> : null, DialogContent: ({ children }: any) => <div>{children}</div>,
-  DialogFooter: ({ children }: any) => <div>{children}</div>, DialogHeader: ({ children }: any) => <div>{children}</div>, DialogTitle: ({ children }: any) => <div>{children}</div>,
+  Dialog: ({ children, open }: any) => (open ? <div>{children}</div> : null),
+  DialogContent: ({ children }: any) => <div>{children}</div>,
+  DialogFooter: ({ children }: any) => <div>{children}</div>,
+  DialogHeader: ({ children }: any) => <div>{children}</div>,
+  DialogTitle: ({ children }: any) => <div>{children}</div>,
 }));
 vi.mock("@/components/ui/alert-dialog", () => ({
-  AlertDialog: ({ children, open }: any) => open ? <div>{children}</div> : null, AlertDialogAction: ({ children, onClick }: any) => <button onClick={onClick}>{children}</button>,
-  AlertDialogCancel: ({ children }: any) => <button>{children}</button>, AlertDialogContent: ({ children }: any) => <div>{children}</div>,
-  AlertDialogDescription: ({ children }: any) => <div>{children}</div>, AlertDialogFooter: ({ children }: any) => <div>{children}</div>,
-  AlertDialogHeader: ({ children }: any) => <div>{children}</div>, AlertDialogTitle: ({ children }: any) => <div>{children}</div>,
+  AlertDialog: ({ children, open }: any) => (open ? <div>{children}</div> : null),
+  AlertDialogAction: ({ children, onClick }: any) => <button onClick={onClick}>{children}</button>,
+  AlertDialogCancel: ({ children }: any) => <button>{children}</button>,
+  AlertDialogContent: ({ children }: any) => <div>{children}</div>,
+  AlertDialogDescription: ({ children }: any) => <div>{children}</div>,
+  AlertDialogFooter: ({ children }: any) => <div>{children}</div>,
+  AlertDialogHeader: ({ children }: any) => <div>{children}</div>,
+  AlertDialogTitle: ({ children }: any) => <div>{children}</div>,
 }));
 
 class FakeAudioContext {
@@ -94,11 +128,17 @@ class FakeAudioContext {
     return {
       frequency: { value: 0, setValueAtTime: vi.fn(), linearRampToValueAtTime: vi.fn() },
       type: "sine",
-      connect: vi.fn(), start: vi.fn(), stop: vi.fn(),
+      connect: vi.fn(),
+      start: vi.fn(),
+      stop: vi.fn(),
     };
   }
-  resume() { return Promise.resolve(); }
-  close() { return Promise.resolve(); }
+  resume() {
+    return Promise.resolve();
+  }
+  close() {
+    return Promise.resolve();
+  }
 }
 
 import FactoryContainerLoadingScan from "@/pages/factory/FactoryContainerLoadingScan";
@@ -107,15 +147,29 @@ describe("factory container loading scan behavior", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
-    localStorage.setItem("lastScannedBale_77", JSON.stringify({ baleReference: "REF-1", baleName: "Shirts", articleCode: "A1" }));
+    localStorage.setItem(
+      "lastScannedBale_77",
+      JSON.stringify({ baleReference: "REF-1", baleName: "Shirts", articleCode: "A1" })
+    );
     Object.defineProperty(window, "AudioContext", { configurable: true, value: FakeAudioContext });
     harness.apiRequest.mockImplementation(async (method: string, url: string, body: any) => {
       if (method === "POST" && url === "/api/factory/customer-orders/77/bales") {
-        return { json: async () => ({ ...orderDetail, bales: [...orderDetail.bales, { id: 11, baleReference: body.scanCode, baleName: "Shirts", articleCode: "A1", weight: "48" }] }) };
+        return {
+          json: async () => ({
+            ...orderDetail,
+            bales: [
+              ...orderDetail.bales,
+              { id: 11, baleReference: body.scanCode, baleName: "Shirts", articleCode: "A1", weight: "48" },
+            ],
+          }),
+        };
       }
       return { json: async () => ({ success: true }) };
     });
-    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => [], text: async () => "" })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: true, json: async () => [], text: async () => "" }))
+    );
   });
 
   it("resumes an in-progress loading with bale totals, proforma progress, and last scan evidence", async () => {
@@ -136,11 +190,14 @@ describe("factory container loading scan behavior", () => {
     fireEvent.change(input, { target: { value: " REF-2 " } });
     fireEvent.keyDown(input, { key: "Enter" });
 
-    await waitFor(() => expect(harness.apiRequest).toHaveBeenCalledWith(
-      "POST",
-      "/api/factory/customer-orders/77/bales",
-      { scanCode: "REF-2", locationId: 11, allowBypassProforma: undefined, allowBypassOverload: undefined }
-    ));
+    await waitFor(() =>
+      expect(harness.apiRequest).toHaveBeenCalledWith("POST", "/api/factory/customer-orders/77/bales", {
+        scanCode: "REF-2",
+        locationId: 11,
+        allowBypassProforma: undefined,
+        allowBypassOverload: undefined,
+      })
+    );
     expect(harness.setQueryData).toHaveBeenCalledWith(
       ["/api/factory/customer-orders", 77],
       expect.objectContaining({ bales: expect.arrayContaining([expect.objectContaining({ baleReference: "REF-2" })]) })
@@ -155,11 +212,14 @@ describe("factory container loading scan behavior", () => {
     const input = screen.getByTestId("input-scan-code");
     fireEvent.change(input, { target: { value: "EXTRA-1" } });
     fireEvent.keyDown(input, { key: "Enter" });
-    await waitFor(() => expect(harness.apiRequest).toHaveBeenCalledWith(
-      "POST",
-      "/api/factory/customer-orders/77/bales",
-      { scanCode: "EXTRA-1", locationId: 11, allowBypassProforma: true, allowBypassOverload: undefined }
-    ));
+    await waitFor(() =>
+      expect(harness.apiRequest).toHaveBeenCalledWith("POST", "/api/factory/customer-orders/77/bales", {
+        scanCode: "EXTRA-1",
+        locationId: 11,
+        allowBypassProforma: true,
+        allowBypassOverload: undefined,
+      })
+    );
   });
 
   it("persists a loading note and navigates from the proforma stock count to the exact bale list", async () => {
@@ -167,11 +227,11 @@ describe("factory container loading scan behavior", () => {
     const note = await screen.findByTestId("input-loading-note");
     fireEvent.change(note, { target: { value: "handle carefully" } });
     fireEvent.click(screen.getByTestId("button-save-note"));
-    await waitFor(() => expect(harness.apiRequest).toHaveBeenCalledWith(
-      "PATCH",
-      "/api/factory/customer-orders/77/loading-note",
-      { note: "handle carefully" }
-    ));
+    await waitFor(() =>
+      expect(harness.apiRequest).toHaveBeenCalledWith("PATCH", "/api/factory/customer-orders/77/loading-note", {
+        note: "handle carefully",
+      })
+    );
     expect(harness.toast).toHaveBeenCalledWith({ title: "Note saved" });
 
     fireEvent.click(screen.getByTestId("button-stock-detail-A1"));
