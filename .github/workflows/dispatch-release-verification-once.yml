@@ -4,9 +4,7 @@ on:
   push:
     branches:
       - main
-      - agent/release-verification-gate-diagnostics
-    paths:
-      - .github/workflows/dispatch-release-verification-once.yml
+      - "program/erp-90-phase-*"
 
 permissions:
   actions: write

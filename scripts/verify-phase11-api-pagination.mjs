@@ -41,7 +41,9 @@ async function get(path) {
 try {
   const legacy = await get("/api/factory/daybook");
   assert.equal(Array.isArray(legacy.body), true, "Legacy heavy endpoint response must stay an array");
-  assert.deepEqual(legacy.body, rows);
+  assert.deepEqual(legacy.body, rows.slice(0, 2));
+  assert.equal(legacy.response.headers.get("x-total-count"), "5");
+  assert.equal(legacy.response.headers.get("x-default-limit-applied"), "true");
 
   const firstPage = await get("/api/factory/daybook?pagination=1");
   assert.deepEqual(firstPage.body.items, rows.slice(0, 2));
@@ -85,7 +87,7 @@ try {
       {
         ok: true,
         checks: [
-          "legacy array compatibility",
+          "legacy array shape with safe default limit",
           "default pagination",
           "page and limit pagination",
           "offset pagination",

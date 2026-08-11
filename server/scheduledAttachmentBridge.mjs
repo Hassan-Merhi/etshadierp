@@ -46,20 +46,8 @@ if (!globalThis[INSTALL_KEY]) {
     payload.cleanupTimer.unref?.();
   }
 
-  function createMarker(payload, length = 0) {
+  function createMarker(payload) {
     const marker = Buffer.alloc(0);
-    Object.defineProperty(marker, "length", {
-      configurable: false,
-      enumerable: false,
-      writable: false,
-      value: length,
-    });
-    Object.defineProperty(marker, "byteLength", {
-      configurable: false,
-      enumerable: false,
-      writable: false,
-      value: length,
-    });
     Object.defineProperty(marker, EXPORT_MARKER_KEY, {
       configurable: false,
       enumerable: false,
@@ -80,7 +68,7 @@ if (!globalThis[INSTALL_KEY]) {
       cleanupDelayMs,
       cleanupTimer: undefined,
     };
-    const marker = createMarker(payload, length);
+    const marker = createMarker(payload);
     armCleanup(payload, orphanCleanupDelayMs);
     return marker;
   }
@@ -93,8 +81,8 @@ if (!globalThis[INSTALL_KEY]) {
   }
 
   function isKnownAttachmentConcat() {
-    if (forceBridge) return true;
     const lines = applicationStack();
+    if (forceBridge) return Boolean(lines[0] && !lines[0].includes("node_modules"));
     const firstOwner = lines.find((line) => !line.includes("node_modules"));
     if (!firstOwner) return false;
     return /schedulerService|buildFullExportZip|generateStockPdf|exportRoutes/i.test(lines.join("\n"));
@@ -127,9 +115,7 @@ if (!globalThis[INSTALL_KEY]) {
     let written = 0;
     try {
       for (const part of list) {
-        const buffer = Buffer.isBuffer(part)
-          ? part
-          : Buffer.from(part.buffer, part.byteOffset, part.byteLength);
+        const buffer = Buffer.isBuffer(part) ? part : Buffer.from(part.buffer, part.byteOffset, part.byteLength);
         let offset = 0;
         while (offset < buffer.length) {
           const count = writeSync(fd, buffer, offset, buffer.length - offset);
@@ -161,9 +147,7 @@ if (!globalThis[INSTALL_KEY]) {
       isKnownAttachmentConcat() &&
       looksLikeZipOrPdf(list)
     ) {
-      const length = Number.isFinite(totalLength)
-        ? totalLength
-        : list.reduce((sum, part) => sum + part.byteLength, 0);
+      const length = Number.isFinite(totalLength) ? totalLength : list.reduce((sum, part) => sum + part.byteLength, 0);
       if (length >= minimumBytes) {
         return writeChunksToManagedFile(list, length, "scheduled-buffer-concat");
       }
@@ -252,7 +236,7 @@ if (!globalThis[INSTALL_KEY]) {
         return payload && payload.kind !== "deferred-form";
       });
       if (!containsManagedAttachment) return originalFormGetBuffer.call(this);
-      return createMarker({ kind: "deferred-form", form: this }, 0);
+      return createMarker({ kind: "deferred-form", form: this });
     };
     Object.defineProperty(patchedGetBuffer, PATCH_KEY, { value: true });
     formPrototype.getBuffer = patchedGetBuffer;

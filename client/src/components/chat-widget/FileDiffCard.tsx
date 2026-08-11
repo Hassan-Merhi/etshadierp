@@ -7,7 +7,7 @@ import { FilePatchDraft } from "./chatWidgetTypes";
 // in the bundle. Written inline it would end the enclosing script block early
 // wherever this bundle is inlined into a document; written as `<\/script>` it
 // is the same string but reads to ESLint as a pointless escape.
-const SCRIPT_CLOSE = `</${"script"}>`;
+const SCRIPT_CLOSE = ["</", "scr", "ipt>"].join("");
 
 // ── Provider display helpers ─────────────────────────────────────────
 export const PROVIDER_LABELS: Record<string, string> = {

@@ -2,6 +2,44 @@ import type { Phase3SharedUiEntry } from "./sharedUiPhase3TranslationTypes";
 
 export const phase3SharedUiTranslationsPart6: readonly Phase3SharedUiEntry[] = [
   { en: "Items / Names", ar: "الأصناف / الأسماء", fr: "Articles / noms" },
+  { en: "Start date", ar: "تاريخ البدء", fr: "Date de début" },
+  { en: "End date", ar: "تاريخ الانتهاء", fr: "Date de fin" },
+  { en: "Date range:", ar: "النطاق الزمني:", fr: "Plage de dates :" },
+  { en: "Factory OS — By Customer", ar: "مبيعات المصنع — حسب العميل", fr: "Ventes usine — par client" },
+  {
+    en: "Container sales from the factory system, grouped by customer",
+    ar: "مبيعات الحاويات من نظام المصنع، مجمّعة حسب العميل",
+    fr: "Ventes de conteneurs du système usine, regroupées par client",
+  },
+  {
+    en: "No factory OS sales data available",
+    ar: "لا تتوفر بيانات مبيعات من نظام المصنع",
+    fr: "Aucune donnée de vente usine disponible",
+  },
+  { en: "Factory POS", ar: "نقطة بيع المصنع", fr: "Point de vente usine" },
+  {
+    en: "Point-of-sale transactions, by customer",
+    ar: "معاملات نقطة البيع، حسب العميل",
+    fr: "Transactions du point de vente, par client",
+  },
+  {
+    en: "No factory POS sales data available",
+    ar: "لا تتوفر بيانات مبيعات لنقطة بيع المصنع",
+    fr: "Aucune donnée de vente du point de vente usine disponible",
+  },
+  { en: "Total Sales", ar: "إجمالي المبيعات", fr: "Ventes totales" },
+  { en: "Cash Sales", ar: "المبيعات النقدية", fr: "Ventes au comptant" },
+  { en: "Credit Sales", ar: "المبيعات الآجلة", fr: "Ventes à crédit" },
+  { en: "Deposit Collected", ar: "العربون المحصّل", fr: "Acompte encaissé" },
+  { en: "Sales by Location", ar: "المبيعات حسب الموقع", fr: "Ventes par site" },
+  { en: "to", ar: "إلى", fr: "au" },
+  { en: "No sales data available", ar: "لا تتوفر بيانات مبيعات", fr: "Aucune donnée de vente disponible" },
+  { en: "Bales Sold", ar: "البالات المباعة", fr: "Balles vendues" },
+  { en: "No transactions found", ar: "لم يتم العثور على معاملات", fr: "Aucune transaction trouvée" },
+  { en: "Cash Account", ar: "حساب النقدية", fr: "Compte de caisse" },
+  { en: "Total Transactions:", ar: "إجمالي المعاملات:", fr: "Total des transactions :" },
+  { en: "Total Quantity:", ar: "إجمالي الكمية:", fr: "Quantité totale :" },
+  { en: "Total Amount:", ar: "إجمالي المبلغ:", fr: "Montant total :" },
   // Statement/ledger column header — "البيان" and "Libellé" are the standard
   // accounting terms in Arabic and French for a transaction description column.
   { en: "Particulars", ar: "البيان", fr: "Libellé" },

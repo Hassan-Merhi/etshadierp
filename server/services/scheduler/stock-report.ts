@@ -5,7 +5,7 @@ import { pool } from "../../db";
 import { getWaSettings, sendWhatsAppFileToChatId } from "../whatsappService";
 import { generateNetPositionExcel } from "../../helpers/generateNetPositionExcel";
 import { generateStockPdf } from "../../helpers/generateStockPdf";
-import { releaseManagedExportAttachment } from "../../helpers/exportAttachmentSource";
+import { getExportAttachmentSize, releaseManagedExportAttachment } from "../../helpers/exportAttachmentSource";
 import { storage } from "../../storage";
 import { buildNetPositionZip, getTodayLabel } from "./daily-export";
 import { shouldSendStockReport } from "./whatsapp-send";
@@ -15,7 +15,7 @@ export async function checkAndRunStockReport(): Promise<void> {
     const r = await pool.query(
       `SELECT company_id, recipient_id, auto_send, enabled,
               frequency, send_hour, send_day_of_week, last_sent_at
-       FROM whatsapp_stock_settings WHERE id = 1`,
+       FROM whatsapp_stock_settings WHERE id = 1`
     );
     if (!r.rows.length) return;
     const row = r.rows[0];
@@ -64,7 +64,7 @@ export async function checkAndRunStockReport(): Promise<void> {
       if (pdfPageCount > maxAllowedPages) {
         logger.error(
           `[StockReport] SAFETY GUARD: PDF has ${pdfPageCount} pages for ${pdfRowCount} rows ` +
-            `(max allowed: ${maxAllowedPages}). company="${company.name}". Skipping WhatsApp send.`,
+            `(max allowed: ${maxAllowedPages}). company="${company.name}". Skipping WhatsApp send.`
         );
         return;
       }
@@ -72,7 +72,7 @@ export async function checkAndRunStockReport(): Promise<void> {
       const pdfName = `Stock_${company.name.replace(/[^a-z0-9]/gi, "_")}_${today}.pdf`;
       logger.info(
         `[StockReport] Uploading stock PDF — chatId=${chatId} file=${pdfName} ` +
-          `size=${pdfBuf.length} pageCount=${pdfPageCount} rowCount=${pdfRowCount}`,
+          `size=${getExportAttachmentSize(pdfBuf)} pageCount=${pdfPageCount} rowCount=${pdfRowCount}`
       );
       const pdfRes = await sendWhatsAppFileToChatId(chatId, pdfBuf, pdfName, "", "application/pdf");
       if (pdfRes.success) {
@@ -80,8 +80,8 @@ export async function checkAndRunStockReport(): Promise<void> {
       } else {
         logger.error(
           `[StockReport] PDF upload failed — chatId=${chatId} file=${pdfName} ` +
-            `size=${pdfBuf.length} pageCount=${pdfPageCount} rowCount=${pdfRowCount} ` +
-            `greenApiError="${pdfRes.error}"`,
+            `size=${getExportAttachmentSize(pdfBuf)} pageCount=${pdfPageCount} rowCount=${pdfRowCount} ` +
+            `greenApiError="${pdfRes.error}"`
         );
       }
     } finally {
@@ -96,7 +96,7 @@ export async function checkAndRunStockReport(): Promise<void> {
         xlsBuf,
         xlsName,
         "",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       );
       logger.info(`[StockReport] Net Position Excel: ${xlsRes.success ? "sent" : xlsRes.error}`);
     } finally {
@@ -117,7 +117,7 @@ export async function checkAndRunNetPositionExport(): Promise<void> {
     const r = await pool.query(
       `SELECT recipient_id, frequency, send_hour, send_day_of_week,
               enabled, auto_send, last_sent_at
-       FROM net_position_export_settings WHERE id = 1`,
+       FROM net_position_export_settings WHERE id = 1`
     );
     if (!r.rows.length) return;
     const row = r.rows[0];
@@ -145,7 +145,7 @@ export async function checkAndRunNetPositionExport(): Promise<void> {
     const npEnd = today;
 
     logger.info(
-      `[NetPositionExport] Building net position ZIP for ${companies.length} companies (${npStart}→${npEnd})…`,
+      `[NetPositionExport] Building net position ZIP for ${companies.length} companies (${npStart}→${npEnd})…`
     );
     const zipBuf = await buildNetPositionZip(companies, npStart, npEnd);
 
@@ -165,7 +165,7 @@ export async function checkAndRunNetPositionExport(): Promise<void> {
               zipBuf,
               `NetPosition_AllCompanies_${today}.zip`,
               "",
-              "application/zip",
+              "application/zip"
             );
             logger.info(`[NetPositionExport] WhatsApp: ${waRes.success ? "sent" : waRes.error}`);
           } else {
@@ -179,7 +179,7 @@ export async function checkAndRunNetPositionExport(): Promise<void> {
       const emailResult = await sendExportEmail(
         zipBuf,
         today,
-        companies.map((company) => company.name),
+        companies.map((company) => company.name)
       );
       logger.info(`[NetPositionExport] Email: ${emailResult.success ? "sent" : emailResult.error}`);
 

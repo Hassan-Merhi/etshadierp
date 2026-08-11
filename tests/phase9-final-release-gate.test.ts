@@ -35,7 +35,7 @@ describe("Phase 9 final verification and release contract", () => {
     expect(smoke).toContain('{ name: "desktop", width: 1440, height: 900');
     expect(smoke).toContain("state.ltrViolations.length > 0");
     expect(smoke).toContain("state.horizontalOverflow");
-    expect(smoke).toContain("activateSkipNavigation");
+    expect(smoke).toContain('await page.keyboard.press("Enter");');
     expect(smoke).toContain('activeElementId !== "main-content"');
     expect(smoke).toContain("assertSidebarEdge");
     expect(smoke).toContain("ERP_SMOKE_REQUIRE_AUTHENTICATED");
@@ -55,6 +55,7 @@ describe("Phase 9 final verification and release contract", () => {
       "Lint",
       "Current-main multilingual reconciliation",
       "Prepare disposable PostgreSQL schema",
+      "Prepare disposable authenticated browser fixture",
       "Application startup and multilingual browser smoke",
       "Full backend tests",
       "Backend coverage thresholds",
@@ -71,8 +72,10 @@ describe("Phase 9 final verification and release contract", () => {
       "scripts/verify-phase9-current-main-release.mjs",
       'ERP_SMOKE_REQUIRE_AUTHENTICATED: "1"',
       'ERP_SMOKE_REQUIRE_EXACT_ROUTES: "1"',
+      "BROWSER_FIXTURE: ${{ steps.browser_fixture.outcome }}",
       "PHASE9_ERP_SMOKE_USERNAME",
       "PHASE9_ERP_SMOKE_PASSWORD",
+      "scripts/prepare-phase9-browser-smoke-fixture.mjs",
     ]) {
       expect(workflow).toContain(token);
     }

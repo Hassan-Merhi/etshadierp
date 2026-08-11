@@ -7,6 +7,7 @@ import {} from "../whatsappService";
 import { buildFullExportZip } from "../../helpers/buildFullExportZip";
 import { retryAsync, isWaConfigError } from "../../helpers/retryAsync";
 import { createExportRun, updateExportRun, finishExportRun } from "../../helpers/exportRunTracker";
+import { getExportAttachmentSize } from "../../helpers/exportAttachmentSource";
 
 import { getTodayLabel, runDailyExport } from "./daily-export";
 import { runDailyWhatsAppSend } from "./whatsapp-send";
@@ -351,7 +352,7 @@ export async function triggerDailyWhatsAppSendNow(fromDate?: string, toDate?: st
   await updateExportRun(runId, {
     companiesCount: companies.length,
     companyFilesCount: names.length,
-    zipSizeBytes: zip.length,
+    zipSizeBytes: getExportAttachmentSize(zip),
     skippedCompanies: skipped.join(", ") || null,
     whatsappAttempted: true,
   });

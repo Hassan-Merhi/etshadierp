@@ -99,22 +99,64 @@ async function login(page) {
   await waitForSettledUi(page);
 }
 
+async function completeLanguageOnboarding(page, language) {
+  const dialogSelector = '[data-testid="language-onboarding-dialog"]';
+  const dialogOpen = await page.evaluate(
+    (selector) => {
+      const dialog = document.querySelector(selector);
+      if (!(dialog instanceof HTMLElement)) return false;
+      const style = window.getComputedStyle(dialog);
+      return style.display !== "none" && style.visibility !== "hidden";
+    },
+    dialogSelector,
+  );
+
+  if (!dialogOpen) return false;
+
+  const optionSelector = `[data-testid="language-onboarding-${language}"]`;
+  await page.click(optionSelector);
+  await page.waitForFunction(
+    (selector) => document.querySelector(selector)?.getAttribute("aria-checked") === "true",
+    { timeout: Math.min(TIMEOUT_MS, 5_000) },
+    optionSelector,
+  );
+  await page.waitForFunction(
+    () => !document.querySelector('[data-testid="language-onboarding-continue"]')?.hasAttribute("disabled"),
+    { timeout: TIMEOUT_MS },
+  );
+  await page.click('[data-testid="language-onboarding-continue"]');
+  await page.waitForSelector(dialogSelector, { hidden: true, timeout: TIMEOUT_MS });
+  await waitForSettledUi(page);
+  return true;
+}
+
 async function activateSkipNavigation(page) {
-  const result = await page.evaluate(() => {
-    const link = document.querySelector('[data-slot="skip-link"]');
-    if (!(link instanceof HTMLAnchorElement)) {
-      return { available: false, activeElementId: "", hash: window.location.hash };
-    }
-    link.focus();
-    link.click();
-    return {
-      available: true,
-      activeElementId: document.activeElement instanceof HTMLElement ? document.activeElement.id : "",
-      hash: window.location.hash,
-    };
-  });
-  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
-  return result;
+  const selector = '[data-slot="skip-link"]';
+  const available = await page.evaluate(
+    (skipLinkSelector) => document.querySelector(skipLinkSelector) instanceof HTMLAnchorElement,
+    selector,
+  );
+
+  if (!available) {
+    return { available: false, activeElementId: "", hash: await page.evaluate(() => window.location.hash) };
+  }
+
+  await page.focus(selector);
+  await page.keyboard.press("Enter");
+  try {
+    await page.waitForFunction(
+      () => document.activeElement?.id === "main-content" && window.location.hash === "#main-content",
+      { timeout: Math.min(TIMEOUT_MS, 5_000) },
+    );
+  } catch {
+    // Return the observed state below so the release report exposes the exact failure.
+  }
+
+  return page.evaluate(() => ({
+    available: true,
+    activeElementId: document.activeElement instanceof HTMLElement ? document.activeElement.id : "",
+    hash: window.location.hash,
+  }));
 }
 
 async function readPageState(page) {
@@ -315,6 +357,7 @@ try {
         if (AUTHENTICATED) {
           await login(page);
           await applyLanguage(page, language.code);
+          const languageOnboardingCompleted = await completeLanguageOnboarding(page, language.code);
           for (const route of AUTHENTICATED_ROUTES) {
             const status = await openRoute(page, route);
             await applyLanguage(page, language.code);
@@ -344,6 +387,7 @@ try {
               requestedRoute: route,
               status,
               state,
+              languageOnboardingCompleted,
               skipNavigation,
               screenshot,
               failures,

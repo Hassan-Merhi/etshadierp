@@ -17,23 +17,40 @@ export function SkipLink({
   children = "Skip to main content",
   href = "#main-content",
   onClick,
+  onKeyDown,
   ...props
 }: SkipLinkProps) {
+  const activateTarget = (link: HTMLAnchorElement) => {
+    const target = getHashTarget(link.ownerDocument, href);
+    if (!target) return false;
+
+    target.focus({ preventScroll: true });
+    target.scrollIntoView({ block: "start" });
+
+    const ownerDocument = link.ownerDocument;
+    const targetWindow = ownerDocument.defaultView;
+    if (targetWindow && targetWindow.location.hash !== href) {
+      targetWindow.history.replaceState(targetWindow.history.state, "", href);
+    }
+
+    targetWindow?.requestAnimationFrame(() => {
+      getHashTarget(ownerDocument, href)?.focus({ preventScroll: true });
+    });
+    return true;
+  };
+
   const handleClick: React.MouseEventHandler<HTMLAnchorElement> = (event) => {
     onClick?.(event);
     if (event.defaultPrevented) return;
 
-    const target = getHashTarget(event.currentTarget.ownerDocument, href);
-    if (!target) return;
+    if (activateTarget(event.currentTarget)) event.preventDefault();
+  };
 
-    event.preventDefault();
-    target.focus({ preventScroll: true });
-    target.scrollIntoView({ block: "start" });
+  const handleKeyDown: React.KeyboardEventHandler<HTMLAnchorElement> = (event) => {
+    onKeyDown?.(event);
+    if (event.defaultPrevented || event.key !== "Enter") return;
 
-    const targetWindow = event.currentTarget.ownerDocument.defaultView;
-    if (targetWindow && targetWindow.location.hash !== href) {
-      targetWindow.history.replaceState(targetWindow.history.state, "", href);
-    }
+    if (activateTarget(event.currentTarget)) event.preventDefault();
   };
 
   return (
@@ -45,6 +62,7 @@ export function SkipLink({
         className
       )}
       onClick={handleClick}
+      onKeyDown={handleKeyDown}
       {...props}
     >
       {children}

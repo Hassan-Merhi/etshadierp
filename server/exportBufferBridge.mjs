@@ -63,7 +63,9 @@ if (!globalThis[BRIDGE_FLAG]) {
       const timeout = setTimeout(() => {
         const index = coordinatorState.queue.findIndex((entry) => entry.timeout === timeout);
         if (index >= 0) coordinatorState.queue.splice(index, 1);
-        reject(new Error(`Timed out waiting for export capacity after ${Math.round(waitTimeoutMs() / 60000)} minutes.`));
+        reject(
+          new Error(`Timed out waiting for export capacity after ${Math.round(waitTimeoutMs() / 60000)} minutes.`)
+        );
       }, waitTimeoutMs());
       timeout.unref?.();
       coordinatorState.queue.push({ label, enqueuedAt: Date.now(), resolve, reject, timeout });
@@ -158,20 +160,6 @@ if (!globalThis[BRIDGE_FLAG]) {
 
   function createMarker(payload) {
     const marker = Buffer.alloc(0);
-    if (Number.isFinite(payload.length) && payload.length >= 0) {
-      Object.defineProperty(marker, "length", {
-        configurable: false,
-        enumerable: false,
-        writable: false,
-        value: payload.length,
-      });
-      Object.defineProperty(marker, "byteLength", {
-        configurable: false,
-        enumerable: false,
-        writable: false,
-        value: payload.length,
-      });
-    }
     Object.defineProperty(marker, EXPORT_MARKER_KEY, {
       configurable: false,
       enumerable: false,
@@ -183,6 +171,23 @@ if (!globalThis[BRIDGE_FLAG]) {
 
   function markerPayload(value) {
     return value && typeof value === "object" ? value[EXPORT_MARKER_KEY] : undefined;
+  }
+
+  // A number of legacy export routes normalize ExcelJS results with
+  // `Buffer.from(await workbook.xlsx.writeBuffer())`. Large workbooks are
+  // represented by zero-backed deferred markers, so the native Buffer.from
+  // implementation would turn those markers into ordinary empty buffers and
+  // discard the deferred payload. Preserve only our private marker while
+  // delegating every normal Buffer conversion to Node unchanged.
+  const originalBufferFrom = Buffer.from;
+  if (!Buffer.from[BRIDGE_FLAG]) {
+    const bridgedBufferFrom = function exportMarkerBufferFrom(value, ...args) {
+      const payload = markerPayload(value);
+      if (payload) return createMarker(payload);
+      return originalBufferFrom.call(Buffer, value, ...args);
+    };
+    Object.defineProperty(bridgedBufferFrom, BRIDGE_FLAG, { value: true });
+    Buffer.from = bridgedBufferFrom;
   }
 
   async function cleanupStaleFiles() {
@@ -239,7 +244,12 @@ if (!globalThis[BRIDGE_FLAG]) {
       payload.started = true;
 
       const done = typeof encoding === "function" ? encoding : typeof callback === "function" ? callback : undefined;
-      if (!this.headersSent && !this.getHeader("Content-Length") && Number.isFinite(payload.length)) {
+      const declaredLength = this.getHeader("Content-Length");
+      if (
+        !this.headersSent &&
+        Number.isFinite(payload.length) &&
+        (declaredLength == null || Number(declaredLength) === 0)
+      ) {
         this.setHeader("Content-Length", String(payload.length));
       }
       if (!this.headersSent) this.setHeader("X-Accel-Buffering", "no");
@@ -324,9 +334,7 @@ if (!globalThis[BRIDGE_FLAG]) {
       list.length > 0 &&
       list.every((part) => Buffer.isBuffer(part) || part instanceof Uint8Array)
     ) {
-      const length = Number.isFinite(totalLength)
-        ? totalLength
-        : list.reduce((sum, part) => sum + part.byteLength, 0);
+      const length = Number.isFinite(totalLength) ? totalLength : list.reduce((sum, part) => sum + part.byteLength, 0);
       if (length >= chunkBridgeThreshold) {
         return createMarker({
           kind: "chunks",
