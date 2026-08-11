@@ -190,8 +190,7 @@ vi.mock("@/components/ui/dropdown-menu", () => ({
   DropdownMenuItem: ({ children, onClick }: any) => <button onClick={onClick}>{children}</button>,
 }));
 vi.mock("@/components/ui/alert-dialog", () => ({
-  AlertDialog: ({ children, open }: any) =>
-    open ? <div data-testid="delete-dialog">{children}</div> : null,
+  AlertDialog: ({ children, open }: any) => (open ? <div data-testid="delete-dialog">{children}</div> : null),
   AlertDialogAction: ({ children, onClick }: any) => <button onClick={onClick}>{children}</button>,
   AlertDialogCancel: ({ children }: any) => <button>{children}</button>,
   AlertDialogContent: ({ children }: any) => <div>{children}</div>,
@@ -235,8 +234,7 @@ vi.mock("@/pages/daybook/VoucherDetailsDialog", () => ({
     open ? <div data-testid="details-dialog">{selectedVoucher?.voucherNumber}</div> : null,
 }));
 vi.mock("@/pages/daybook/VoucherEditDialog", () => ({
-  VoucherEditDialog: ({ open }: any) =>
-    open ? <div data-testid="edit-dialog">edit voucher</div> : null,
+  VoucherEditDialog: ({ open }: any) => (open ? <div data-testid="edit-dialog">edit voucher</div> : null),
 }));
 
 import Daybook from "@/pages/Daybook";
@@ -257,7 +255,7 @@ describe("Daybook page behavior", () => {
     ]);
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => ({ ok: true, json: async () => ({}), text: async () => "" })),
+      vi.fn(async () => ({ ok: true, json: async () => ({}), text: async () => "" }))
     );
   });
 
@@ -297,9 +295,7 @@ describe("Daybook page behavior", () => {
     fireEvent.click(screen.getByRole("button", { name: "Delete 2" }));
     expect(screen.getByTestId("delete-dialog")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
-    await waitFor(() =>
-      expect(harness.apiRequest).toHaveBeenCalledWith("DELETE", "/api/vouchers/2"),
-    );
+    await waitFor(() => expect(harness.apiRequest).toHaveBeenCalledWith("DELETE", "/api/vouchers/2"));
     expect(harness.invalidateCompanyApiFamily).toHaveBeenCalled();
   });
 });
