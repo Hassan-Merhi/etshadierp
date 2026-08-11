@@ -27,6 +27,27 @@ describe("responsive accessibility primitives", () => {
     expect(main.scrollIntoView).toHaveBeenCalledWith({ block: "start" });
   });
 
+  it("focuses the main workspace when activated with Enter", () => {
+    render(
+      <>
+        <SkipLink />
+        <main id="main-content" tabIndex={-1}>
+          Workspace
+        </main>
+      </>
+    );
+    const skipLink = screen.getByRole("link", { name: "Skip to main content" });
+    const main = screen.getByRole("main");
+    main.scrollIntoView = vi.fn();
+
+    skipLink.focus();
+    fireEvent.keyDown(skipLink, { key: "Enter" });
+
+    expect(document.activeElement).toBe(main);
+    expect(window.location.hash).toBe("#main-content");
+    expect(main.scrollIntoView).toHaveBeenCalledWith({ block: "start" });
+  });
+
   it("restores main-workspace focus after hash listeners update the route", () => {
     let refocus: FrameRequestCallback | undefined;
     const requestAnimationFrame = vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
