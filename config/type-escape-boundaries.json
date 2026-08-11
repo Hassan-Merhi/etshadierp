@@ -1194,11 +1194,6 @@
         0,
         0
       ],
-      "client/src/pages/factory/FactoryPayroll.tsx": [
-        11,
-        0,
-        0
-      ],
       "client/src/pages/factory/FactoryPayrollHub.tsx": [
         1,
         0,
@@ -6522,6 +6517,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 8923
+    "typeEscapeCeiling": 8912
   }
 }

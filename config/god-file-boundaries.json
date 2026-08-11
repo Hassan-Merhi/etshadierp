@@ -155,7 +155,6 @@
       "client/src/pages/factory/FactoryInvoiceLoadingScan.tsx": 1100,
       "client/src/pages/factory/FactoryLocationInventory.tsx": 2200,
       "client/src/pages/factory/FactoryOtwTrackingTab.tsx": 1025,
-      "client/src/pages/factory/FactoryPayroll.tsx": 1050,
       "client/src/pages/factory/FactoryPendingInvoiceVerify.tsx": 1850,
       "client/src/pages/factory/FactoryPOS.tsx": 1775,
       "client/src/pages/factory/FactoryProformas.tsx": 1475,
