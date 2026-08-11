@@ -27,6 +27,32 @@ describe("responsive accessibility primitives", () => {
     expect(main.scrollIntoView).toHaveBeenCalledWith({ block: "start" });
   });
 
+  it("restores main-workspace focus after hash listeners update the route", () => {
+    let refocus: FrameRequestCallback | undefined;
+    const requestAnimationFrame = vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      refocus = callback;
+      return 1;
+    });
+
+    render(
+      <>
+        <SkipLink />
+        <main id="main-content" tabIndex={-1}>
+          Workspace
+        </main>
+      </>
+    );
+    const main = screen.getByRole("main");
+    main.scrollIntoView = vi.fn();
+
+    fireEvent.click(screen.getByRole("link", { name: "Skip to main content" }));
+    main.blur();
+    refocus?.(0);
+
+    expect(document.activeElement).toBe(main);
+    requestAnimationFrame.mockRestore();
+  });
+
   it("uses the requested live-region urgency", () => {
     const { rerender } = render(<LiveRegion>Saved</LiveRegion>);
     expect(screen.getByRole("status")).toHaveAttribute("aria-live", "polite");
