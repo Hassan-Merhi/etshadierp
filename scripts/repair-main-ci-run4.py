@@ -117,9 +117,19 @@ if old not in text:
     raise SystemExit('historical net-position registration block not found')
 p.write_text(text.replace(old, new, 1))
 
+# Keep the repaired validation message inside the reviewed backend translation registry.
+p = root / 'client/src/i18n/backendMessagesPhase7Translations.part11.ts'
+text = p.read_text()
+if 'en: "Invalid voucherId"' not in text:
+    marker = '  {\n    en: "Voucher has no location",'
+    entry = '''  {\n    en: "Invalid voucherId",\n    ar: "voucherId غير صالح",\n    fr: "voucherId invalide",\n  },\n'''
+    if marker not in text:
+        raise SystemExit('translation insertion marker not found')
+    p.write_text(text.replace(marker, entry + marker, 1))
+
 # Synchronize the exact reviewed translation registry count.
 p = root / 'tests/phase7-backend-messages-translations.test.ts'
-text = p.read_text().replace('toHaveLength(581)', 'toHaveLength(592)').replace('toBe(581);', 'toBe(592);')
+text = p.read_text().replace('toHaveLength(581)', 'toHaveLength(593)').replace('toHaveLength(592)', 'toHaveLength(593)').replace('toBe(581);', 'toBe(593);').replace('toBe(592);', 'toBe(593);')
 p.write_text(text)
 
 # Remove imports made unused by deleting the legacy endpoint bodies.
@@ -134,6 +144,7 @@ subprocess.run([
 ], check=True)
 subprocess.run([
     'npx', 'prettier', '--write',
+    'client/src/i18n/backendMessagesPhase7Translations.part11.ts',
     'server/routes/pos/posPrintRoutes.ts',
     'server/routes/pos/posWhatsAppRoutes.ts',
     'server/routes/accounts/whatsapp.ts',
