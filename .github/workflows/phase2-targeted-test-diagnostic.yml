@@ -9,6 +9,22 @@ on:
 
 jobs:
   diagnose:
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - tests/pos-create-sale-service-validation.test.ts
+          - tests/stats-net-position-excel-behavior.test.ts
+          - tests/production-bale-routes-behavior.test.ts
+          - tests/account-statement-routes-behavior.test.ts
+          - tests/bank-asset-routes-behavior.test.ts
+          - tests/voucher-journal-routes-behavior.test.ts
+          - tests/factory-bale-ledger-routes-behavior.test.ts
+          - tests/factory-weekly-report-export-behavior.test.ts
+          - tests/supplier-proforma-routes-behavior.test.ts
+          - tests/customer-order-excel-export-behavior.test.ts
+          - tests/bale-product-routes-behavior.test.ts
+          - tests/immutable-stock-transfer-revision-lifecycle-behavior.test.ts
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -18,39 +34,5 @@ jobs:
           cache: npm
       - run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
       - run: npm ci --no-audit --bin-links=true
-      - name: POS create sale service
-        continue-on-error: true
-        run: node node_modules/vitest/vitest.mjs run tests/pos-create-sale-service-validation.test.ts
-      - name: Net position Excel
-        continue-on-error: true
-        run: node node_modules/vitest/vitest.mjs run tests/stats-net-position-excel-behavior.test.ts
-      - name: Production bale routes
-        continue-on-error: true
-        run: node node_modules/vitest/vitest.mjs run tests/production-bale-routes-behavior.test.ts
-      - name: Account statement routes
-        continue-on-error: true
-        run: node node_modules/vitest/vitest.mjs run tests/account-statement-routes-behavior.test.ts
-      - name: Bank asset routes
-        continue-on-error: true
-        run: node node_modules/vitest/vitest.mjs run tests/bank-asset-routes-behavior.test.ts
-      - name: Voucher journal routes
-        continue-on-error: true
-        run: node node_modules/vitest/vitest.mjs run tests/voucher-journal-routes-behavior.test.ts
-      - name: Factory bale ledger
-        continue-on-error: true
-        run: node node_modules/vitest/vitest.mjs run tests/factory-bale-ledger-routes-behavior.test.ts
-      - name: Weekly report export
-        continue-on-error: true
-        run: node node_modules/vitest/vitest.mjs run tests/factory-weekly-report-export-behavior.test.ts
-      - name: Supplier proforma routes
-        continue-on-error: true
-        run: node node_modules/vitest/vitest.mjs run tests/supplier-proforma-routes-behavior.test.ts
-      - name: Customer order Excel
-        continue-on-error: true
-        run: node node_modules/vitest/vitest.mjs run tests/customer-order-excel-export-behavior.test.ts
-      - name: Bale product routes
-        continue-on-error: true
-        run: node node_modules/vitest/vitest.mjs run tests/bale-product-routes-behavior.test.ts
-      - name: Immutable transfer lifecycle
-        continue-on-error: true
-        run: node node_modules/vitest/vitest.mjs run tests/immutable-stock-transfer-revision-lifecycle-behavior.test.ts
+      - name: Run ${{ matrix.test }}
+        run: node node_modules/vitest/vitest.mjs run "${{ matrix.test }}"
