@@ -21,7 +21,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fmt } from "../utils";
 
-import type { AuditAdvance } from "../components/AdvancesView";
+import type { AuditAdvance } from "../types";
 export function RepaymentAuditDialog({
   auditCashBalance,
   auditData,

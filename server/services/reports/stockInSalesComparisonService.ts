@@ -95,10 +95,18 @@ interface MutableItemMetrics {
 
 const ZERO = new Decimal(0);
 const EMPTY_METRICS: StockInSalesReportMetrics = {
+  openingStockQty: 0,
+  openingStockValue: 0,
   stockInQty: 0,
   stockInValue: 0,
   stockInAvgRate: 0,
+  stockAdjustmentQty: 0,
+  stockAdjustmentValue: 0,
+  totalAvailableQty: 0,
   stockOutQty: 0,
+  stockOutValue: 0,
+  closingStockQty: 0,
+  closingStockValue: 0,
   totalSales: 0,
   costOfSales: 0,
   costProfit: 0,
@@ -127,10 +135,18 @@ function subtractMetrics(
   sideB: StockInSalesReportMetrics
 ): StockInSalesReportMetrics {
   return {
+    openingStockQty: sideA.openingStockQty - sideB.openingStockQty,
+    openingStockValue: sideA.openingStockValue - sideB.openingStockValue,
     stockInQty: sideA.stockInQty - sideB.stockInQty,
     stockInValue: sideA.stockInValue - sideB.stockInValue,
     stockInAvgRate: sideA.stockInAvgRate - sideB.stockInAvgRate,
+    stockAdjustmentQty: sideA.stockAdjustmentQty - sideB.stockAdjustmentQty,
+    stockAdjustmentValue: sideA.stockAdjustmentValue - sideB.stockAdjustmentValue,
+    totalAvailableQty: sideA.totalAvailableQty - sideB.totalAvailableQty,
     stockOutQty: sideA.stockOutQty - sideB.stockOutQty,
+    stockOutValue: sideA.stockOutValue - sideB.stockOutValue,
+    closingStockQty: sideA.closingStockQty - sideB.closingStockQty,
+    closingStockValue: sideA.closingStockValue - sideB.closingStockValue,
     totalSales: sideA.totalSales - sideB.totalSales,
     costOfSales: sideA.costOfSales - sideB.costOfSales,
     costProfit: sideA.costProfit - sideB.costProfit,
@@ -327,14 +343,28 @@ function mergeItemRows(target: Map<number, MutableItemMetrics>, rows: ItemAggreg
 }
 
 function itemMetricsToReportMetrics(item: MutableItemMetrics): StockInSalesReportMetrics {
+  const stockInQty = toNumber(item.stockInQty, 3);
+  const stockInValue = toNumber(item.stockInValue, 2);
+  const stockOutQty = toNumber(item.stockOutQty, 3);
+  const totalSales = toNumber(item.totalSales, 2);
+  const costOfSales = toNumber(item.costOfSales, 2);
+  const costProfit = toNumber(item.costProfit, 2);
   return {
-    stockInQty: toNumber(item.stockInQty, 3),
-    stockInValue: toNumber(item.stockInValue, 2),
+    openingStockQty: 0,
+    openingStockValue: 0,
+    stockInQty,
+    stockInValue,
     stockInAvgRate: toNumber(divideOrZero(item.stockInValue, item.stockInQty), 6),
-    stockOutQty: toNumber(item.stockOutQty, 3),
-    totalSales: toNumber(item.totalSales, 2),
-    costOfSales: toNumber(item.costOfSales, 2),
-    costProfit: toNumber(item.costProfit, 2),
+    stockAdjustmentQty: 0,
+    stockAdjustmentValue: 0,
+    totalAvailableQty: stockInQty,
+    stockOutQty,
+    stockOutValue: costOfSales,
+    closingStockQty: toNumber(new Decimal(stockInQty).minus(stockOutQty), 3),
+    closingStockValue: toNumber(new Decimal(stockInValue).minus(costOfSales), 2),
+    totalSales,
+    costOfSales,
+    costProfit,
     avgProfitPerBale: toNumber(divideOrZero(item.costProfit, item.stockOutQty), 6),
   };
 }

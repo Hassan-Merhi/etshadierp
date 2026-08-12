@@ -117,14 +117,7 @@ describe("repository-wide god-file architecture boundaries", () => {
     // limit. It exists to be driven down, so it is asserted as a ceiling and
     // should be lowered as the split phases land.
     //
-    // The ceiling last moved UP rather than down, which is worth explaining: CI
-    // runs `prettier --check` over every changed source file, and the splits in
-    // this branch touched 49 files that main had never formatted. Normalizing
-    // them added ~800 lines of pure line-wrapping - no logic moved - and pushed
-    // AdvancesView.tsx (868 -> 973) and rentalPaymentPostingService.ts
-    // (852 -> 909) over the 900-line limit for the first time, hence 66 -> 68
-    // files. Both were already within a bucket of the limit before reformatting.
-    expect(report.summary.grandfatheredFiles).toBeLessThanOrEqual(68);
-    expect(report.summary.grandfatheredExcessLines).toBeLessThanOrEqual(36354);
+    expect(report.summary.grandfatheredFiles).toBeLessThanOrEqual(49);
+    expect(report.summary.grandfatheredExcessLines).toBeLessThanOrEqual(25437);
   });
 });

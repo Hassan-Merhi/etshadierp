@@ -51,24 +51,37 @@ interface LocationOption {
   id: number;
   name: string;
 }
-
 interface StockGroupOption {
   id: number;
   name: string;
 }
-
 type GroupingType = "daily" | "monthly" | "yearly";
 type ProfitFilter = "all" | "positive" | "negative";
 
 interface StockInSalesMetrics {
+  openingStockQty: number;
+  openingStockValue: number;
   stockInQty: number;
   stockInValue: number;
   stockInAvgRate: number;
+  stockAdjustmentQty: number;
+  stockAdjustmentValue: number;
+  totalAvailableQty: number;
   stockOutQty: number;
+  stockOutValue: number;
+  closingStockQty: number;
+  closingStockValue: number;
   totalSales: number;
   costOfSales: number;
   costProfit: number;
   avgProfitPerBale: number;
+  salesOutQty?: number;
+  salesOutValue?: number;
+  transferOutQty?: number;
+  transferOutValue?: number;
+  otherStockOutQty?: number;
+  otherStockOutValue?: number;
+  netSalesQty?: number;
 }
 
 interface StockInSalesRow extends StockInSalesMetrics {
@@ -76,21 +89,22 @@ interface StockInSalesRow extends StockInSalesMetrics {
   periodStart: string;
   periodEnd: string;
 }
-
+interface StockInSalesReconciliation {
+  asOfDate: string;
+  expectedClosingQty: number;
+  expectedClosingValue: number;
+  actualStockQty: number;
+  actualStockValue: number;
+  differenceQty: number;
+  differenceValue: number;
+  matches: boolean;
+}
 interface StockInSalesResponse {
   generatedAt: string;
   summary: StockInSalesMetrics;
+  reconciliation: StockInSalesReconciliation;
   rows: StockInSalesRow[];
   rowCount: number;
-}
-
-interface MultiSelectFilterProps<T extends { id: number; name: string }> {
-  label: string;
-  singularLabel: string;
-  items: T[];
-  selectedIds: string[];
-  onChange: (ids: string[]) => void;
-  testId: string;
 }
 
 function MultiSelectFilter<T extends { id: number; name: string }>({
@@ -100,7 +114,14 @@ function MultiSelectFilter<T extends { id: number; name: string }>({
   selectedIds,
   onChange,
   testId,
-}: MultiSelectFilterProps<T>) {
+}: {
+  label: string;
+  singularLabel: string;
+  items: T[];
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
+  testId: string;
+}) {
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -164,7 +185,7 @@ function SummaryPill({
         ? "text-red-600 dark:text-red-400"
         : "text-foreground";
   return (
-    <div className="flex items-center gap-1.5 rounded-lg border bg-muted/40 px-3 py-1.5 text-sm">
+    <div className="flex min-h-9 items-center gap-1.5 rounded-lg border bg-muted/40 px-3 py-1.5 text-sm">
       <Icon className={`h-3.5 w-3.5 ${tone === "default" ? "text-muted-foreground" : toneClass}`} />
       <span className="text-xs text-muted-foreground">{label}</span>
       <span className={`font-mono text-sm font-semibold ${toneClass}`} data-testid={testId}>
@@ -175,44 +196,36 @@ function SummaryPill({
 }
 
 const EMPTY_METRICS: StockInSalesMetrics = {
+  openingStockQty: 0,
+  openingStockValue: 0,
   stockInQty: 0,
   stockInValue: 0,
   stockInAvgRate: 0,
+  stockAdjustmentQty: 0,
+  stockAdjustmentValue: 0,
+  totalAvailableQty: 0,
   stockOutQty: 0,
+  stockOutValue: 0,
+  closingStockQty: 0,
+  closingStockValue: 0,
   totalSales: 0,
   costOfSales: 0,
   costProfit: 0,
   avgProfitPerBale: 0,
 };
 
-/**
- * Routes between the three views this screen serves, all of which live at the
- * same path and differ only by `?view=`.
- *
- * This dispatch deliberately calls no hooks of its own. It used to sit at the
- * top of the summary component, ahead of its ~20 hooks: switching `?view=` while
- * the component stayed mounted then changed how many hooks ran between renders,
- * which React fails on with "rendered fewer hooks than expected". Splitting the
- * dispatch out makes each view its own component, so a view change mounts and
- * unmounts rather than reshaping one component's hook list.
- */
 export default function StockInSalesReport() {
   const view = new URLSearchParams(window.location.search).get("view");
-  if (view === "detail") {
-    return <StockInSalesReportDetail />;
-  }
-  if (view === "comparison") {
-    return <StockInSalesReportComparison />;
-  }
+  if (view === "detail") return <StockInSalesReportDetail />;
+  if (view === "comparison") return <StockInSalesReportComparison />;
   return <StockInSalesReportSummary />;
 }
 
 function StockInSalesReportSummary() {
   const { selectedCompany } = useCompany();
-  const { formatAmount, selectedCurrency, convertToDisplay } = useCurrencyContext();
+  const { formatAmount } = useCurrencyContext();
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
-
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("all_time"));
   const [grouping, setGrouping] = useState<GroupingType>("yearly");
   const [profitFilter, setProfitFilter] = useState<ProfitFilter>("all");
@@ -226,7 +239,6 @@ function StockInSalesReportSummary() {
     const timer = window.setTimeout(() => setDebouncedSearch(searchTerm.trim()), 300);
     return () => window.clearTimeout(timer);
   }, [searchTerm]);
-
   useEffect(() => {
     setSelectedLocations([]);
     setSelectedStockGroups([]);
@@ -242,7 +254,6 @@ function StockInSalesReportSummary() {
     enabled: !!selectedCompany?.id,
     staleTime: 5 * 60 * 1000,
   });
-
   const sortedLocations = useMemo(() => [...locations].sort((a, b) => a.name.localeCompare(b.name)), [locations]);
   const sortedStockGroups = useMemo(() => [...stockGroups].sort((a, b) => a.name.localeCompare(b.name)), [stockGroups]);
 
@@ -263,12 +274,11 @@ function StockInSalesReportSummary() {
     enabled: !!selectedCompany?.id,
     staleTime: 30_000,
   });
-
   const summary = data?.summary ?? EMPTY_METRICS;
   const rows = data?.rows ?? [];
+  const reconciliation = data?.reconciliation;
   const formatSignedAmount = (value: number) => (value < 0 ? `-${formatAmount(Math.abs(value))}` : formatAmount(value));
-  const formatRate = (value: number) =>
-    selectedCurrency === "CFA" ? `CFA ${formatNumber(convertToDisplay(value), 2)}` : `$ ${formatNumber(value, 6)}`;
+  const formatSignedQty = (value: number) => `${value > 0 ? "+" : ""}${formatNumber(value, 3)}`;
   const formatPeriodLabel = (row: StockInSalesRow) => {
     if (grouping === "yearly") return row.periodKey;
     if (grouping === "monthly") {
@@ -294,7 +304,6 @@ function StockInSalesReportSummary() {
     setSearchTerm("");
     setDebouncedSearch("");
   };
-
   const openDetail = (row: StockInSalesRow) => {
     const params = new URLSearchParams({
       view: "detail",
@@ -307,7 +316,6 @@ function StockInSalesReportSummary() {
     if (debouncedSearch) params.set("search", debouncedSearch);
     window.location.assign(`/stock-in-sales-report?${params.toString()}`);
   };
-
   const openComparison = () => {
     const params = new URLSearchParams({ view: "comparison", grouping });
     if (periodFilter.fromDate) params.set("startDate", periodFilter.fromDate);
@@ -329,54 +337,63 @@ function StockInSalesReportSummary() {
       const workbook = new ExcelJS.Workbook();
       const summarySheet = workbook.addWorksheet("Summary");
       summarySheet.columns = [
-        { header: "Metric", key: "metric", width: 28 },
-        { header: "Value", key: "value", width: 20 },
+        { header: "Metric", key: "metric", width: 30 },
+        { header: "Value", key: "value", width: 22 },
       ];
       [
         ["Company", selectedCompany?.name || "Current Company"],
-        [
-          "Period",
-          periodFilter.preset === "all_time" ? "All Time" : `${periodFilter.fromDate} to ${periodFilter.toDate}`,
-        ],
         ["Grouping", grouping],
+        ["Opening Stock Qty", summary.openingStockQty],
+        ["Opening Stock Value", summary.openingStockValue],
         ["Stock In Qty", summary.stockInQty],
         ["Stock In Value", summary.stockInValue],
-        ["Average In Rate", summary.stockInAvgRate],
+        ["Stock Adjustment Qty", summary.stockAdjustmentQty],
+        ["Stock Adjustment Value", summary.stockAdjustmentValue],
+        ["Total Available Qty", summary.totalAvailableQty],
         ["Stock Out Qty", summary.stockOutQty],
+        ["Sales Out Qty", summary.salesOutQty || 0],
+        ["Transfer Out Qty", summary.transferOutQty || 0],
+        ["Other Stock Out Qty", summary.otherStockOutQty || 0],
+        ["Closing Stock Qty", summary.closingStockQty],
+        ["Closing Stock Value", summary.closingStockValue],
         ["Total Sales", summary.totalSales],
         ["Cost of Sales", summary.costOfSales],
-        ["Cost Profit", summary.costProfit],
+        ["Gross Profit", summary.costProfit],
         ["Average Profit / Bale", summary.avgProfitPerBale],
+        ["Actual Inventory Qty", reconciliation?.actualStockQty || 0],
+        ["Actual Inventory Value", reconciliation?.actualStockValue || 0],
+        ["Inventory Difference Qty", reconciliation?.differenceQty || 0],
+        ["Inventory Difference Value", reconciliation?.differenceValue || 0],
       ].forEach(([metric, value]) => summarySheet.addRow({ metric, value }));
       summarySheet.getRow(1).font = { bold: true };
 
-      const periodsSheet = workbook.addWorksheet("Periods");
-      periodsSheet.columns = [
+      const sheet = workbook.addWorksheet("Stock Flow");
+      sheet.columns = [
         { header: "Period", key: "period", width: 20 },
+        { header: "Opening Qty", key: "openingStockQty", width: 16 },
+        { header: "Opening Value", key: "openingStockValue", width: 18 },
         { header: "Stock In Qty", key: "stockInQty", width: 16 },
         { header: "Stock In Value", key: "stockInValue", width: 18 },
-        { header: "Avg In Rate", key: "stockInAvgRate", width: 16 },
-        { header: "Stock Out Qty", key: "stockOutQty", width: 16 },
-        { header: "Total Sales", key: "totalSales", width: 18 },
-        { header: "Cost", key: "costOfSales", width: 18 },
-        { header: "Cost Profit", key: "costProfit", width: 18 },
+        { header: "Adjustment Qty", key: "stockAdjustmentQty", width: 16 },
+        { header: "Adjustment Value", key: "stockAdjustmentValue", width: 18 },
+        { header: "Available", key: "totalAvailableQty", width: 16 },
+        { header: "Stock Out", key: "stockOutQty", width: 16 },
+        { header: "Sales Out", key: "salesOutQty", width: 16 },
+        { header: "Transfer Out", key: "transferOutQty", width: 16 },
+        { header: "Closing Qty", key: "closingStockQty", width: 16 },
+        { header: "Closing Value", key: "closingStockValue", width: 18 },
+        { header: "Sales", key: "totalSales", width: 18 },
+        { header: "Cost of Sales", key: "costOfSales", width: 18 },
+        { header: "Gross Profit", key: "costProfit", width: 18 },
         { header: "Avg Profit / Bale", key: "avgProfitPerBale", width: 18 },
       ];
-      rows.forEach((row) => periodsSheet.addRow({ period: formatPeriodLabel(row), ...row }));
-      periodsSheet.getRow(1).font = { bold: true };
-      periodsSheet.getColumn("stockInQty").numFmt = "#,##0.000";
-      periodsSheet.getColumn("stockOutQty").numFmt = "#,##0.000";
-      periodsSheet.getColumn("stockInAvgRate").numFmt = "#,##0.000000";
-      periodsSheet.getColumn("avgProfitPerBale").numFmt = "#,##0.000000";
-      ["stockInValue", "totalSales", "costOfSales", "costProfit"].forEach((key) => {
-        periodsSheet.getColumn(key).numFmt = "#,##0.00";
-      });
-
+      rows.forEach((row) => sheet.addRow({ period: formatPeriodLabel(row), ...row }));
+      sheet.getRow(1).font = { bold: true };
       await writeFile(workbook, `stock-in-sales-report-${format(new Date(), "yyyy-MM-dd")}.xlsx`);
-    } catch (exportError: any) {
+    } catch (exportError: unknown) {
       toast({
         title: "Export failed",
-        description: exportError?.message || "Unable to create the Excel file.",
+        description: (exportError instanceof Error ? exportError.message : "") || "Unable to create the Excel file.",
         variant: "destructive",
       });
     } finally {
@@ -384,9 +401,63 @@ function StockInSalesReportSummary() {
     }
   };
 
+  const exportCsv = () => {
+    if (rows.length === 0) return;
+    const headers = [
+      "Period",
+      "Opening Qty",
+      "Opening Value",
+      "Stock In Qty",
+      "Stock In Value",
+      "Adjustment Qty",
+      "Adjustment Value",
+      "Available",
+      "Stock Out",
+      "Sales Out",
+      "Transfer Out",
+      "Closing Qty",
+      "Closing Value",
+      "Sales",
+      "Cost of Sales",
+      "Gross Profit",
+      "Avg Profit/Bale",
+    ];
+    const values = rows.map((row) => [
+      formatPeriodLabel(row),
+      row.openingStockQty,
+      row.openingStockValue,
+      row.stockInQty,
+      row.stockInValue,
+      row.stockAdjustmentQty,
+      row.stockAdjustmentValue,
+      row.totalAvailableQty,
+      row.stockOutQty,
+      row.salesOutQty || 0,
+      row.transferOutQty || 0,
+      row.closingStockQty,
+      row.closingStockValue,
+      row.totalSales,
+      row.costOfSales,
+      row.costProfit,
+      row.avgProfitPerBale,
+    ]);
+    const escape = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+    const csv = [headers, ...values].map((row) => row.map(escape).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `stock-in-sales-report-${format(new Date(), "yyyy-MM-dd")}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(link.href);
+  };
+
   const profitTone = summary.costProfit > 0 ? "positive" : summary.costProfit < 0 ? "negative" : "default";
   const avgProfitTone =
     summary.avgProfitPerBale > 0 ? "positive" : summary.avgProfitPerBale < 0 ? "negative" : "default";
+  const adjustmentTone =
+    summary.stockAdjustmentQty > 0 ? "positive" : summary.stockAdjustmentQty < 0 ? "negative" : "default";
 
   return (
     <div className="container mx-auto space-y-6 p-6">
@@ -404,7 +475,7 @@ function StockInSalesReportSummary() {
           <div>
             <PageHeader title="Stock In & Sales Report" />
             <p className="text-sm text-muted-foreground">
-              Compare landed container stock with net sales, cost, and profit
+              Opening stock → inventory movements → stock in hand, sales, cost and profit
               {selectedCompany?.name ? ` · ${selectedCompany.name}` : ""}
             </p>
           </div>
@@ -415,22 +486,19 @@ function StockInSalesReportSummary() {
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                disabled={rows.length === 0 || isExporting}
-                data-testid="button-stock-in-sales-export"
-              >
-                {isExporting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                Export <ChevronDown className="h-4 w-4" />
+              <Button variant="outline" size="sm" className="gap-2" disabled={rows.length === 0 || isExporting}>
+                {isExporting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Export{" "}
+                <ChevronDown className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={exportExcel} data-testid="menu-stock-in-sales-export-excel">
+              <DropdownMenuItem onClick={exportExcel}>
                 <FileSpreadsheet className="mr-2 h-4 w-4" /> Export Excel
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => window.print()} data-testid="menu-stock-in-sales-export-pdf">
+              <DropdownMenuItem onClick={exportCsv}>
+                <FileText className="mr-2 h-4 w-4" /> Export CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => window.print()}>
                 <FileText className="mr-2 h-4 w-4" /> Export PDF
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -440,9 +508,21 @@ function StockInSalesReportSummary() {
 
       <div className="flex flex-wrap gap-2" aria-busy={isLoading || isFetching}>
         {isLoading ? (
-          Array.from({ length: 8 }).map((_, index) => <Skeleton key={index} className="h-9 w-40 rounded-lg" />)
+          Array.from({ length: 13 }).map((_, index) => <Skeleton key={index} className="h-9 w-40 rounded-lg" />)
         ) : (
           <>
+            <SummaryPill
+              label="Opening Stock Qty"
+              value={formatNumber(summary.openingStockQty, 3)}
+              icon={PackagePlus}
+              testId="text-opening-stock-qty"
+            />
+            <SummaryPill
+              label="Opening Stock Value"
+              value={formatAmount(summary.openingStockValue)}
+              icon={Coins}
+              testId="text-opening-stock-value"
+            />
             <SummaryPill
               label="Stock In Qty"
               value={formatNumber(summary.stockInQty, 3)}
@@ -456,16 +536,35 @@ function StockInSalesReportSummary() {
               testId="text-stock-in-value"
             />
             <SummaryPill
-              label="Avg In Rate"
-              value={formatRate(summary.stockInAvgRate)}
+              label="Stock Adjustments"
+              value={formatSignedQty(summary.stockAdjustmentQty)}
+              icon={Scale}
+              tone={adjustmentTone}
+              testId="text-stock-adjustments"
+            />
+            <SummaryPill
+              label="Total Available Qty"
+              value={formatNumber(summary.totalAvailableQty, 3)}
               icon={Gauge}
-              testId="text-stock-in-avg-rate"
+              testId="text-total-available-qty"
             />
             <SummaryPill
               label="Stock Out Qty"
               value={formatNumber(summary.stockOutQty, 3)}
               icon={PackageMinus}
               testId="text-stock-out-qty"
+            />
+            <SummaryPill
+              label="Stock in Hand Qty"
+              value={formatNumber(summary.closingStockQty, 3)}
+              icon={PackageMinus}
+              testId="text-stock-in-hand-qty"
+            />
+            <SummaryPill
+              label="Stock in Hand Value"
+              value={formatAmount(summary.closingStockValue)}
+              icon={Coins}
+              testId="text-stock-in-hand-value"
             />
             <SummaryPill
               label="Total Sales"
@@ -480,7 +579,7 @@ function StockInSalesReportSummary() {
               testId="text-stock-in-sales-cost"
             />
             <SummaryPill
-              label="Cost Profit"
+              label="Gross Profit"
               value={formatSignedAmount(summary.costProfit)}
               icon={summary.costProfit < 0 ? TrendingDown : TrendingUp}
               tone={profitTone}
@@ -497,6 +596,66 @@ function StockInSalesReportSummary() {
         )}
       </div>
 
+      <div className="rounded-xl border bg-muted/20 p-3 text-sm">
+        <span className="font-medium">Stock Out breakdown:</span> Sales/returns{" "}
+        <span className="font-mono font-semibold">{formatNumber(summary.salesOutQty || 0, 3)}</span> · Transfer out{" "}
+        <span className="font-mono font-semibold">{formatNumber(summary.transferOutQty || 0, 3)}</span> · Other out{" "}
+        <span className="font-mono font-semibold">{formatNumber(summary.otherStockOutQty || 0, 3)}</span>. Only
+        sales/returns feed Cost of Sales and Gross Profit.
+      </div>
+
+      {reconciliation && (
+        <div
+          className={`rounded-xl border p-4 ${reconciliation.matches ? "bg-emerald-500/5" : "bg-red-500/5"}`}
+          data-testid="stock-in-sales-reconciliation"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                {reconciliation.matches ? (
+                  <TrendingUp className="h-4 w-4 text-emerald-600" />
+                ) : (
+                  <TrendingDown className="h-4 w-4 text-red-600" />
+                )}
+                <p className="text-sm font-semibold">Inventory Reconciliation</p>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Expected closing stock is compared with Location Inventory as of {reconciliation.asOfDate}. Click a
+                period row below to inspect its stock, transfers, adjustments, sales and returns.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+              <div>
+                <span className="text-muted-foreground">Expected</span>{" "}
+                <span className="ml-1 font-mono font-semibold">
+                  {formatNumber(reconciliation.expectedClosingQty, 3)}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Actual</span>{" "}
+                <span className="ml-1 font-mono font-semibold">{formatNumber(reconciliation.actualStockQty, 3)}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Difference</span>{" "}
+                <span
+                  className={`ml-1 font-mono font-semibold ${reconciliation.matches ? "text-emerald-600" : "text-red-600"}`}
+                >
+                  {formatSignedQty(reconciliation.differenceQty)}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Value Difference</span>{" "}
+                <span
+                  className={`ml-1 font-mono font-semibold ${reconciliation.matches ? "text-emerald-600" : "text-red-600"}`}
+                >
+                  {formatSignedAmount(reconciliation.differenceValue)}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-2 print:hidden">
         <PeriodFilter
           value={periodFilter}
@@ -511,7 +670,7 @@ function StockInSalesReportSummary() {
         </div>
         <div className="h-5 w-px bg-border" />
         <Select value={grouping} onValueChange={(value) => setGrouping(value as GroupingType)}>
-          <SelectTrigger className="h-9 w-28" data-testid="select-stock-in-sales-grouping">
+          <SelectTrigger className="h-9 w-28">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -521,7 +680,7 @@ function StockInSalesReportSummary() {
           </SelectContent>
         </Select>
         <Select value={profitFilter} onValueChange={(value) => setProfitFilter(value as ProfitFilter)}>
-          <SelectTrigger className="h-9 w-36" data-testid="select-stock-in-sales-profit-filter">
+          <SelectTrigger className="h-9 w-36">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -554,9 +713,8 @@ function StockInSalesReportSummary() {
           value={searchTerm}
           onChange={(event) => setSearchTerm(event.target.value)}
           className="h-9 w-44"
-          data-testid="input-stock-in-sales-search"
         />
-        <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-stock-in-sales-clear">
+        <Button variant="ghost" size="sm" onClick={clearFilters}>
           Clear
         </Button>
         {isFetching && !isLoading && (
@@ -566,22 +724,27 @@ function StockInSalesReportSummary() {
 
       <div>
         <p className="mb-3 text-xs text-muted-foreground">
-          Stock in and sales by {grouping.charAt(0).toUpperCase() + grouping.slice(1)}
+          Inventory flow and profitability by {grouping.charAt(0).toUpperCase() + grouping.slice(1)}
           {rows.length > 0 && ` · ${rows.length} row${rows.length === 1 ? "" : "s"}`} · Click any row to drill in
         </p>
         <div className="overflow-hidden rounded-xl border">
           <div className="overflow-x-auto">
-            <Table className="min-w-[1180px]">
+            <Table className="min-w-[1900px]">
               <TableHeader>
                 <TableRow className="bg-muted/40 hover:bg-muted/40">
                   <TableHead>Date</TableHead>
-                  <TableHead className="text-right">Stock In Qty</TableHead>
+                  <TableHead className="text-right">Opening Qty</TableHead>
+                  <TableHead className="text-right">Opening Value</TableHead>
+                  <TableHead className="text-right">Stock In</TableHead>
                   <TableHead className="text-right">Stock In Value</TableHead>
-                  <TableHead className="text-right">Avg In Rate</TableHead>
-                  <TableHead className="text-right">Stock Out Qty</TableHead>
-                  <TableHead className="text-right">Total Sales</TableHead>
-                  <TableHead className="text-right">Cost</TableHead>
-                  <TableHead className="text-right">Cost Profit</TableHead>
+                  <TableHead className="text-right">Adjustments</TableHead>
+                  <TableHead className="text-right">Available</TableHead>
+                  <TableHead className="text-right">Stock Out</TableHead>
+                  <TableHead className="text-right">Closing Qty</TableHead>
+                  <TableHead className="text-right">Closing Value</TableHead>
+                  <TableHead className="text-right">Sales</TableHead>
+                  <TableHead className="text-right">Cost of Sales</TableHead>
+                  <TableHead className="text-right">Gross Profit</TableHead>
                   <TableHead className="text-right">Avg Profit/Bale</TableHead>
                   <TableHead className="w-8" />
                 </TableRow>
@@ -590,7 +753,7 @@ function StockInSalesReportSummary() {
                 {isLoading ? (
                   Array.from({ length: 6 }).map((_, index) => (
                     <TableRow key={index}>
-                      {Array.from({ length: 10 }).map((__, cellIndex) => (
+                      {Array.from({ length: 15 }).map((__, cellIndex) => (
                         <TableCell key={cellIndex}>
                           <Skeleton className={`h-4 ${cellIndex === 0 ? "w-24" : "ml-auto w-20"}`} />
                         </TableCell>
@@ -599,7 +762,7 @@ function StockInSalesReportSummary() {
                   ))
                 ) : isError ? (
                   <TableRow>
-                    <TableCell colSpan={10}>
+                    <TableCell colSpan={15}>
                       <div className="flex flex-col items-center gap-3 py-10 text-center">
                         <TrendingDown className="h-6 w-6 text-destructive" />
                         <p className="text-sm font-medium">Unable to load the report</p>
@@ -612,8 +775,8 @@ function StockInSalesReportSummary() {
                   </TableRow>
                 ) : rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">
-                      No stock-in or sales activity found. Try adjusting the filters.
+                    <TableCell colSpan={15} className="py-10 text-center text-sm text-muted-foreground">
+                      No stock or sales activity found for these filters.
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -625,42 +788,40 @@ function StockInSalesReportSummary() {
                           : row.costProfit < 0
                             ? "text-red-600 dark:text-red-400"
                             : "text-muted-foreground";
-                      const avgClass =
-                        row.avgProfitPerBale > 0
-                          ? "text-emerald-600 dark:text-emerald-400"
-                          : row.avgProfitPerBale < 0
-                            ? "text-red-600 dark:text-red-400"
-                            : "text-muted-foreground";
                       return (
                         <TableRow
                           key={row.periodKey}
                           className="cursor-pointer hover:bg-muted/40"
                           onClick={() => openDetail(row)}
-                          data-testid={`row-stock-in-sales-${row.periodKey}`}
                         >
                           <TableCell className="py-3 font-medium">{formatPeriodLabel(row)}</TableCell>
-                          <TableCell className="py-3 text-right font-mono text-sm">
-                            {formatNumber(row.stockInQty, 3)}
+                          <TableCell className="text-right font-mono">{formatNumber(row.openingStockQty, 3)}</TableCell>
+                          <TableCell className="text-right font-mono">{formatAmount(row.openingStockValue)}</TableCell>
+                          <TableCell className="text-right font-mono">{formatNumber(row.stockInQty, 3)}</TableCell>
+                          <TableCell className="text-right font-mono">{formatAmount(row.stockInValue)}</TableCell>
+                          <TableCell
+                            className={`text-right font-mono ${row.stockAdjustmentQty < 0 ? "text-red-600" : row.stockAdjustmentQty > 0 ? "text-emerald-600" : ""}`}
+                          >
+                            {formatSignedQty(row.stockAdjustmentQty)}
                           </TableCell>
-                          <TableCell className="py-3 text-right font-mono text-sm">
-                            {formatAmount(row.stockInValue)}
+                          <TableCell className="text-right font-mono">
+                            {formatNumber(row.totalAvailableQty, 3)}
                           </TableCell>
-                          <TableCell className="py-3 text-right font-mono text-sm text-muted-foreground">
-                            {formatRate(row.stockInAvgRate)}
+                          <TableCell className="text-right font-mono">{formatNumber(row.stockOutQty, 3)}</TableCell>
+                          <TableCell className="text-right font-mono font-semibold">
+                            {formatNumber(row.closingStockQty, 3)}
                           </TableCell>
-                          <TableCell className="py-3 text-right font-mono text-sm">
-                            {formatNumber(row.stockOutQty, 3)}
+                          <TableCell className="text-right font-mono font-semibold">
+                            {formatAmount(row.closingStockValue)}
                           </TableCell>
-                          <TableCell className="py-3 text-right font-mono text-sm">
-                            {formatAmount(row.totalSales)}
-                          </TableCell>
-                          <TableCell className="py-3 text-right font-mono text-sm text-muted-foreground">
+                          <TableCell className="text-right font-mono">{formatAmount(row.totalSales)}</TableCell>
+                          <TableCell className="text-right font-mono text-muted-foreground">
                             {formatAmount(row.costOfSales)}
                           </TableCell>
-                          <TableCell className={`py-3 text-right font-mono text-sm font-semibold ${profitClass}`}>
+                          <TableCell className={`text-right font-mono font-semibold ${profitClass}`}>
                             {formatSignedAmount(row.costProfit)}
                           </TableCell>
-                          <TableCell className={`py-3 text-right font-mono text-sm font-semibold ${avgClass}`}>
+                          <TableCell className={`text-right font-mono font-semibold ${profitClass}`}>
                             {formatSignedAmount(row.avgProfitPerBale)}
                           </TableCell>
                           <TableCell>
@@ -670,13 +831,20 @@ function StockInSalesReportSummary() {
                       );
                     })}
                     <TableRow className="bg-muted/40 font-semibold hover:bg-muted/40">
-                      <TableCell className="py-3 text-xs uppercase tracking-wide text-muted-foreground">
-                        Total
-                      </TableCell>
+                      <TableCell className="text-xs uppercase tracking-wide text-muted-foreground">Total</TableCell>
+                      <TableCell className="text-right font-mono">{formatNumber(summary.openingStockQty, 3)}</TableCell>
+                      <TableCell className="text-right font-mono">{formatAmount(summary.openingStockValue)}</TableCell>
                       <TableCell className="text-right font-mono">{formatNumber(summary.stockInQty, 3)}</TableCell>
                       <TableCell className="text-right font-mono">{formatAmount(summary.stockInValue)}</TableCell>
-                      <TableCell className="text-right font-mono">{formatRate(summary.stockInAvgRate)}</TableCell>
+                      <TableCell className="text-right font-mono">
+                        {formatSignedQty(summary.stockAdjustmentQty)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {formatNumber(summary.totalAvailableQty, 3)}
+                      </TableCell>
                       <TableCell className="text-right font-mono">{formatNumber(summary.stockOutQty, 3)}</TableCell>
+                      <TableCell className="text-right font-mono">{formatNumber(summary.closingStockQty, 3)}</TableCell>
+                      <TableCell className="text-right font-mono">{formatAmount(summary.closingStockValue)}</TableCell>
                       <TableCell className="text-right font-mono">{formatAmount(summary.totalSales)}</TableCell>
                       <TableCell className="text-right font-mono">{formatAmount(summary.costOfSales)}</TableCell>
                       <TableCell className="text-right font-mono">{formatSignedAmount(summary.costProfit)}</TableCell>

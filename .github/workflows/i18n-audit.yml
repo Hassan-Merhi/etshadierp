@@ -8,7 +8,8 @@ on:
 
 concurrency:
   group: i18n-audit-${{ github.ref }}
-  cancel-in-progress: true
+  # Cancel superseded pull-request runs only; every commit on main is gated.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   audit:
