@@ -4,22 +4,34 @@ This branch and pull request intentionally aggregate ERP 90/100 Phases 3 through
 
 ## Phase 3 — Tenant Isolation
 
-Status: **in progress**
+Status: **implementation complete — final verification deferred to Phase 6**
 
-Acceptance scope:
+Implemented scope:
 
-- Mandatory authenticated company context for tenant-scoped API access.
-- Request-supplied company identifiers are treated only as requested targets, never as authorization evidence.
-- Cross-company targets require both an explicitly privileged role and verified company membership; Developer synthetic access remains the only deliberate all-company exception.
-- Company metadata routes are membership-scoped.
-- Runtime company-scope context is propagated so high-risk database access can be audited.
-- Unscoped high-risk database access is surfaced through structured audit telemetry and an offline static audit script.
-- Defence-in-depth PostgreSQL RLS support is provided for compatible high-risk tables without enabling a policy until the application has established a transaction-local company context.
-- Negative isolation regression tests cover same-company, cross-company, forged request-company, and unauthenticated cases. Tests are authored now and run only during the final Phase 6 certification.
+- A pre-route `tenantIsolationBoundary` now sits ahead of every API registrar and resolves the authoritative company from canonical session/company-role state.
+- Caller-supplied primary `companyId` values are treated only as requested targets and must match the server-owned active company. Admin, Owner, Manager, POS, normal users, and Developer do not receive a role-only primary-company override through this boundary.
+- Intentional intercompany secondary fields (`sourceCompanyId`, `destinationCompanyId`, etc.) are membership-checked for every referenced company; their existing route-level business permission gates remain authoritative for who may execute the operation.
+- Express routes that explicitly use `:companyId` receive a parameter-level tenant check after route matching, closing the path-parameter timing gap in global middleware.
+- Factory requests preserve the existing authorized factory-company selection policy; Properties keeps its existing pinned-company/fallback semantics instead of being forced through Factory company-type selection.
+- The only deliberate synthetic all-company exception remains the established account-level Developer selector behavior. Admin/Owner/Manager active companies require real company membership.
+- `/api/companies` and individual company metadata routes are membership-scoped. Company update/delete operations cannot target a company merely because its ID was supplied by the caller.
+- AsyncLocalStorage propagates authenticated request company/user/role context for downstream tenant-aware services and audit instrumentation.
+- `scripts/audit-company-scope.mjs` inventories high-risk direct SQL, Drizzle access, and request-company use that lacks a company/auth marker. It is authored for final certification but intentionally not executed during this intermediate phase.
+- Versioned migration `0016_company_scope_rls_readiness` adds staged PostgreSQL RLS readiness for vouchers, voucher entries, customers, ledger/bank/fixed-asset tables, stock groups/items, and inventory. It is registered but **not applied**.
+- The staged RLS policies preserve compatibility only when `app.current_company_id` is genuinely absent. A malformed/non-positive asserted company context fails closed. When Phase 4 central transaction services begin using `SET LOCAL app.current_company_id`, the same policies become company-restrictive without a policy rewrite.
+- Negative tenant-isolation regression coverage was authored for same-company access, forged cross-company primary targets across privileged and non-privileged roles, invalid/unauthenticated context, conflicting request company sources, and unauthorized Factory pins.
+- The older company-boundary contract was ratcheted so it no longer expects the removed Admin active-company bypass.
+
+Safety / deferred evidence:
+
+- No test suite, type-check, build, lint, coverage run, GitHub Actions rerun, CircleCI run, smoke test, or release verification was executed for Phase 3, per the combined-PR workflow.
+- No database migration was applied.
+- No production database, production deployment, repair, backfill, delete, restore, or provider action was performed.
+- All Phase 3 changes remain on the shared `program/erp-90-phases-3-6` branch and combined PR. They will receive the full exact-head verification matrix only after Phase 6 implementation is complete.
 
 ## Phase 4 — Accounting & Inventory Convergence
 
-Status: pending Phase 3 completion.
+Status: **next**.
 
 ## Phase 5 — Production Resilience
 
