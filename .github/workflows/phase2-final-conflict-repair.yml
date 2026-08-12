@@ -78,7 +78,8 @@ jobs:
         run: |
           node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 \
             tests/ui/journal-form-page-behavior.test.tsx \
-            tests/ui/stock-entry-history-page-behavior.test.tsx
+            tests/ui/stock-entry-history-page-behavior.test.tsx \
+            tests/ui/supplier-profit-check-page-behavior.test.tsx
       - name: Quality verification
         run: |
           npm run check
@@ -88,6 +89,7 @@ jobs:
           node node_modules/prettier/bin/prettier.cjs --check \
             tests/ui/journal-form-page-behavior.test.tsx \
             tests/ui/stock-entry-history-page-behavior.test.tsx \
+            tests/ui/supplier-profit-check-page-behavior.test.tsx \
             .github/workflows/mobile-responsive.yml
       - name: Full frontend regression with fresh process per file
         env:
