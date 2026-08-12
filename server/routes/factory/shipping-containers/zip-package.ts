@@ -36,6 +36,7 @@ export function registerShippingZipPackageRoutes(app: Express) {
         .split(",")
         .map((s: string) => s.trim())
         .filter(Boolean);
+      if (fileIds.length === 0) return res.status(400).json({ message: "No files selected" });
 
       const [row] = await db
         .select({
@@ -61,6 +62,16 @@ export function registerShippingZipPackageRoutes(app: Express) {
           .replace(/\s+/g, "_")
           .trim();
       }
+
+      function safeZipEntryName(name: string | null | undefined, fallback: string): string {
+        const leaf = (name || "")
+          .split(/[\\/]/)
+          .pop()
+          ?.replace(/[\r\n]/g, "")
+          .trim();
+        return leaf || fallback;
+      }
+
       function buildZipFilename(parts: (string | null | undefined)[], ext: string): string {
         const joined = parts.map(safeFilePart).filter(Boolean).join("_") || "export";
         return ext ? `${joined}.${ext}` : joined;
@@ -79,10 +90,9 @@ export function registerShippingZipPackageRoutes(app: Express) {
         archive.on("end", () => resolve(Buffer.concat(chunks)));
         archive.on("error", (err) => reject(err));
 
-        // Kick off all fetches in parallel, then append and finalize.
-        // Previously the Excel fetch and PDF fetch were awaited sequentially — each
-        // can take 5-15 s, so sequential = 10-30 s total. Running them concurrently
-        // means total wait ≈ max(Excel, PDF, DB) instead of sum.
+        // Fetch generated files and stored documents in parallel. Every selected
+        // item must resolve to non-empty bytes; otherwise we fail instead of
+        // returning a valid-looking ZIP with no files inside it.
         (async () => {
           try {
             const docIdNumbers = fileIds
@@ -90,25 +100,20 @@ export function registerShippingZipPackageRoutes(app: Express) {
               .map((f) => parseInt(f.slice(4)))
               .filter((n) => !isNaN(n));
 
-            // Fan out all slow operations simultaneously
             const [excelBuf, pdfBuf, docs] = await Promise.all([
-              // 1. Commercial invoice Excel
               fileIds.includes("invoice_excel")
                 ? fetchInternalBuffer(req, `/api/factory/customer-orders/${row.customerOrderId}/export-excel`)
                 : Promise.resolve(null),
-
-              // 2. Customer statement PDF
               fileIds.includes("statement_pdf") && row.customerId
                 ? fetchInternalBuffer(req, `/api/factory/customers/${row.customerId}/statement/export-pdf`)
                 : Promise.resolve(null),
-
-              // 3. Uploaded documents from DB
               docIdNumbers.length > 0
                 ? db
                     .select({
                       id: factoryShippingContainerDocuments.id,
                       fileName: factoryShippingContainerDocuments.fileName,
                       originalName: factoryShippingContainerDocuments.originalName,
+                      displayName: factoryShippingContainerDocuments.displayName,
                       fileData: factoryShippingContainerDocuments.fileData,
                     })
                     .from(factoryShippingContainerDocuments)
@@ -124,31 +129,80 @@ export function registerShippingZipPackageRoutes(app: Express) {
                       id: number;
                       fileName: string | null;
                       originalName: string | null;
+                      displayName: string | null;
                       fileData: string | null;
                     }>
                   ),
             ]);
 
-            // Append results into the archive (order doesn't matter for ZIP)
-            if (excelBuf) {
-              const excelName = buildZipFilename([row.containerNumber, row.clientName, row.destination], "xlsx");
-              archive.append(excelBuf, { name: excelName });
-            }
+            const missingFiles: string[] = [];
+            let appendedEntries = 0;
 
-            if (pdfBuf) {
-              const safeClient = (row.clientName || "client").replace(/[^\w-]/g, "_");
-              archive.append(pdfBuf, { name: `Customer_Statement_${safeClient}.pdf` });
-            }
-
-            for (const doc of docs) {
-              const entryName = doc.originalName?.trim() || doc.fileName?.trim() || `document_${doc.id}`;
-              const diskPath = path.join(process.cwd(), "uploads", "shipping-container-docs", doc.fileName || "");
-              if (doc.fileName && fs.existsSync(diskPath)) {
-                archive.file(diskPath, { name: entryName });
-              } else if (doc.fileData) {
-                const buf = Buffer.from(doc.fileData, "base64");
-                archive.append(buf, { name: entryName });
+            if (fileIds.includes("invoice_excel")) {
+              if (excelBuf && excelBuf.length > 0) {
+                const excelName = buildZipFilename([row.containerNumber, row.clientName, row.destination], "xlsx");
+                archive.append(excelBuf, { name: excelName });
+                appendedEntries += 1;
+              } else {
+                missingFiles.push("Commercial Invoice");
               }
+            }
+
+            if (fileIds.includes("statement_pdf")) {
+              if (pdfBuf && pdfBuf.length > 0) {
+                const safeClient = (row.clientName || "client").replace(/[^\w-]/g, "_");
+                archive.append(pdfBuf, { name: `Customer_Statement_${safeClient}.pdf` });
+                appendedEntries += 1;
+              } else {
+                missingFiles.push("Customer Statement");
+              }
+            }
+
+            const docsById = new Map(docs.map((doc) => [doc.id, doc]));
+            for (const docId of docIdNumbers) {
+              const doc = docsById.get(docId);
+              if (!doc) {
+                missingFiles.push(`Uploaded document ${docId}`);
+                continue;
+              }
+
+              const entryName = safeZipEntryName(
+                doc.originalName?.trim() || doc.displayName?.trim() || doc.fileName?.trim(),
+                `document_${doc.id}`
+              );
+
+              let fileBuffer: Buffer | null = null;
+              if (doc.fileData?.trim()) {
+                const decoded = Buffer.from(doc.fileData, "base64");
+                if (decoded.length > 0) fileBuffer = decoded;
+              }
+
+              // Disk is only a cache in production, but keeping this fallback lets
+              // older rows still download if their cache happens to be present.
+              if (!fileBuffer && doc.fileName?.trim()) {
+                const diskPath = path.join(process.cwd(), "uploads", "shipping-container-docs", doc.fileName);
+                if (fs.existsSync(diskPath)) {
+                  const diskBuffer = fs.readFileSync(diskPath);
+                  if (diskBuffer.length > 0) fileBuffer = diskBuffer;
+                }
+              }
+
+              if (!fileBuffer) {
+                missingFiles.push(entryName);
+                continue;
+              }
+
+              archive.append(fileBuffer, { name: entryName });
+              appendedEntries += 1;
+            }
+
+            if (missingFiles.length > 0) {
+              throw new Error(
+                `Selected files are unavailable or empty: ${missingFiles.join(", ")}. Refresh the file list and re-upload any broken documents.`
+              );
+            }
+            if (appendedEntries === 0) {
+              throw new Error("No selected files contained downloadable data. Refresh the file list and try again.");
             }
 
             await archive.finalize();
@@ -159,7 +213,7 @@ export function registerShippingZipPackageRoutes(app: Express) {
         })();
       });
 
-      // Only send response after the ZIP is fully built — clean, no partial writes
+      // Only send response after the ZIP is fully built — clean, no partial writes.
       res.setHeader("Content-Type", "application/zip");
       res.setHeader("Content-Disposition", `attachment; filename="${zipFilename}"`);
       res.setHeader("Content-Length", zipBuffer.length);
