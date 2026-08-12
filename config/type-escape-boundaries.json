@@ -689,16 +689,6 @@
         0,
         0
       ],
-      "client/src/pages/StockInSalesReport.tsx": [
-        1,
-        0,
-        0
-      ],
-      "client/src/pages/StockInSalesReportDetail.tsx": [
-        1,
-        0,
-        0
-      ],
       "client/src/pages/StockItems.tsx": [
         3,
         9,
@@ -6507,6 +6497,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 8836
+    "typeEscapeCeiling": 8834
   }
 }
