@@ -1,0 +1,40 @@
+name: Main CI Run4 Repair
+
+on:
+  push:
+    branches:
+      - agent/main-ci-green-20260812-run4
+    paths:
+      - .github/workflows/main-ci-run4-repair.yml
+      - scripts/repair-main-ci-run4.py
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/main-ci-green-20260812-run4
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Apply and verify focused repairs
+        run: python3 scripts/repair-main-ci-run4.py
+
+      - name: Commit repaired CI state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: restore main CI regressions"
+          git push origin HEAD:agent/main-ci-green-20260812-run4
