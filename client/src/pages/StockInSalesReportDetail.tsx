@@ -58,13 +58,16 @@ interface Metrics {
   netSalesQty?: number;
 }
 
+interface Location {
+  id: number;
+  name: string;
+}
+
 interface StockInRow {
   id: number;
   activityDate: string;
   containerNumber: string;
   locationName: string;
-  stockGroupName: string;
-  stockItemCode: string;
   stockItemName: string;
   quantity: number;
   avgRate: number;
@@ -75,11 +78,8 @@ interface StockOutRow {
   id: number;
   sourceType: "Sale" | "Credit Note" | "Debit Note";
   activityDate: string;
-  voucherNumber: string;
   isCreditSale: boolean | null;
   locationName: string;
-  stockGroupName: string;
-  stockItemCode: string;
   stockItemName: string;
   quantity: number;
   totalSales: number;
@@ -92,12 +92,9 @@ interface MovementRow {
   key: string;
   activityDate: string;
   movementType: "Transfer In" | "Transfer Out" | "Adjustment";
-  voucherNumber: string;
-  locationId: number;
+  locationId: number | null;
   counterpartyLocationId: number | null;
-  stockItemCode: string;
   stockItemName: string;
-  stockGroupName: string;
   quantity: number;
   unitRate: number;
   value: number;
@@ -158,7 +155,10 @@ function Pagination({
   total: number;
   onChange: (page: number) => void;
 }) {
-  if (totalPages <= 1) return <p className="px-3 py-2 text-xs text-muted-foreground">{formatNumber(total, 0)} rows</p>;
+  if (totalPages <= 1) {
+    return <p className="px-3 py-2 text-xs text-muted-foreground">{formatNumber(total, 0)} rows</p>;
+  }
+
   return (
     <div className="flex items-center justify-between gap-3 border-t px-3 py-2 print:hidden">
       <p className="text-xs text-muted-foreground">
@@ -174,6 +174,17 @@ function Pagination({
       </div>
     </div>
   );
+}
+
+function compareDateLocationItem(
+  a: { activityDate: string; locationName: string; stockItemName: string },
+  b: { activityDate: string; locationName: string; stockItemName: string }
+): number {
+  const date = b.activityDate.localeCompare(a.activityDate);
+  if (date !== 0) return date;
+  const location = a.locationName.localeCompare(b.locationName, undefined, { numeric: true, sensitivity: "base" });
+  if (location !== 0) return location;
+  return a.stockItemName.localeCompare(b.stockItemName, undefined, { numeric: true, sensitivity: "base" });
 }
 
 export default function StockInSalesReportDetail() {
@@ -220,6 +231,51 @@ export default function StockInSalesReportDetail() {
     enabled: !!selectedCompany?.id && !!startDate && !!endDate,
     staleTime: 30_000,
   });
+  const { data: locations = [] } = useQuery<Location[]>({
+    queryKey: ["/api/locations", selectedCompany?.id],
+    enabled: !!selectedCompany?.id,
+    staleTime: 60_000,
+  });
+
+  const locationNameById = useMemo(() => new Map(locations.map((location) => [location.id, location.name])), [locations]);
+  const locationName = (id: number | null) => (id ? locationNameById.get(id) || `Location #${id}` : "—");
+  const sourceLocationName = (row: MovementRow) =>
+    row.movementType === "Transfer In" ? locationName(row.counterpartyLocationId) : locationName(row.locationId);
+  const destinationLocationName = (row: MovementRow) =>
+    row.movementType === "Transfer In"
+      ? locationName(row.locationId)
+      : row.movementType === "Transfer Out"
+        ? locationName(row.counterpartyLocationId)
+        : "—";
+
+  const sortedMovements = useMemo(
+    () =>
+      [...(movements?.rows || [])].sort((a, b) => {
+        const date = b.activityDate.localeCompare(a.activityDate);
+        if (date !== 0) return date;
+        const source = sourceLocationName(a).localeCompare(sourceLocationName(b), undefined, {
+          numeric: true,
+          sensitivity: "base",
+        });
+        if (source !== 0) return source;
+        const destination = destinationLocationName(a).localeCompare(destinationLocationName(b), undefined, {
+          numeric: true,
+          sensitivity: "base",
+        });
+        if (destination !== 0) return destination;
+        return a.stockItemName.localeCompare(b.stockItemName, undefined, { numeric: true, sensitivity: "base" });
+      }),
+    [movements?.rows, locationNameById]
+  );
+
+  const sortedStockIn = useMemo(
+    () => [...(data?.stockIn.rows || [])].sort(compareDateLocationItem),
+    [data?.stockIn.rows]
+  );
+  const sortedStockOut = useMemo(
+    () => [...(data?.stockOut.rows || [])].sort(compareDateLocationItem),
+    [data?.stockOut.rows]
+  );
 
   const summary = data?.summary ?? EMPTY_METRICS;
   const money = (value: number) => (value < 0 ? `-${formatAmount(Math.abs(value))}` : formatAmount(value));
@@ -245,6 +301,7 @@ export default function StockInSalesReportDetail() {
         fetch(`/api/reports/stock-in-sales/movements?${exportParams.toString()}`, { credentials: "include" }),
       ]);
       if (!detailResponse.ok || !movementResponse.ok) throw new Error("Failed to load export details");
+
       const exportData = (await detailResponse.json()) as DetailResponse;
       const exportMovements = (await movementResponse.json()) as MovementResponse;
 
@@ -277,21 +334,17 @@ export default function StockInSalesReportDetail() {
       stockInSheet.columns = [
         { header: "Date", key: "date", width: 14 },
         { header: "Container", key: "container", width: 18 },
-        { header: "Location", key: "location", width: 18 },
-        { header: "Group", key: "group", width: 16 },
-        { header: "Item Code", key: "code", width: 16 },
-        { header: "Item", key: "item", width: 32 },
+        { header: "Location", key: "location", width: 20 },
+        { header: "Item", key: "item", width: 34 },
         { header: "Qty", key: "qty", width: 14 },
         { header: "Avg Rate", key: "rate", width: 16 },
         { header: "Value", key: "value", width: 18 },
       ];
-      exportData.stockIn.rows.forEach((row) =>
+      [...exportData.stockIn.rows].sort(compareDateLocationItem).forEach((row) =>
         stockInSheet.addRow({
           date: row.activityDate,
           container: row.containerNumber,
           location: row.locationName,
-          group: row.stockGroupName,
-          code: row.stockItemCode,
           item: row.stockItemName,
           qty: row.quantity,
           rate: row.avgRate,
@@ -304,58 +357,55 @@ export default function StockInSalesReportDetail() {
       movementSheet.columns = [
         { header: "Date", key: "date", width: 14 },
         { header: "Type", key: "type", width: 18 },
-        { header: "Voucher", key: "voucher", width: 18 },
-        { header: "Location ID", key: "location", width: 14 },
-        { header: "Other Location ID", key: "otherLocation", width: 18 },
-        { header: "Group", key: "group", width: 16 },
-        { header: "Item Code", key: "code", width: 16 },
-        { header: "Item", key: "item", width: 32 },
+        { header: "Source Location", key: "source", width: 22 },
+        { header: "Destination Location", key: "destination", width: 22 },
+        { header: "Item", key: "item", width: 34 },
         { header: "Qty +/-", key: "qty", width: 14 },
         { header: "Rate", key: "rate", width: 16 },
         { header: "Value +/-", key: "value", width: 18 },
-        { header: "Adjustment Type", key: "adjustmentType", width: 20 },
       ];
-      exportMovements.rows.forEach((row) =>
-        movementSheet.addRow({
-          date: row.activityDate,
-          type: row.movementType,
-          voucher: row.voucherNumber,
-          location: row.locationId,
-          otherLocation: row.counterpartyLocationId || "",
-          group: row.stockGroupName,
-          code: row.stockItemCode,
-          item: row.stockItemName,
-          qty: row.quantity,
-          rate: row.unitRate,
-          value: row.value,
-          adjustmentType: row.adjustmentType || "",
+      [...exportMovements.rows]
+        .sort((a, b) => {
+          const date = b.activityDate.localeCompare(a.activityDate);
+          if (date !== 0) return date;
+          const source = sourceLocationName(a).localeCompare(sourceLocationName(b), undefined, {
+            numeric: true,
+            sensitivity: "base",
+          });
+          if (source !== 0) return source;
+          return a.stockItemName.localeCompare(b.stockItemName, undefined, { numeric: true, sensitivity: "base" });
         })
-      );
+        .forEach((row) =>
+          movementSheet.addRow({
+            date: row.activityDate,
+            type: row.adjustmentType ? `${row.movementType} · ${row.adjustmentType}` : row.movementType,
+            source: sourceLocationName(row),
+            destination: destinationLocationName(row),
+            item: row.stockItemName,
+            qty: row.quantity,
+            rate: row.unitRate,
+            value: row.value,
+          })
+        );
       movementSheet.getRow(1).font = { bold: true };
 
       const salesSheet = workbook.addWorksheet("Sales and Returns");
       salesSheet.columns = [
         { header: "Date", key: "date", width: 14 },
         { header: "Type", key: "type", width: 16 },
-        { header: "Voucher", key: "voucher", width: 18 },
-        { header: "Location", key: "location", width: 18 },
-        { header: "Group", key: "group", width: 16 },
-        { header: "Item Code", key: "code", width: 16 },
-        { header: "Item", key: "item", width: 32 },
+        { header: "Location", key: "location", width: 20 },
+        { header: "Item", key: "item", width: 34 },
         { header: "Qty", key: "qty", width: 14 },
         { header: "Sales", key: "sales", width: 18 },
         { header: "Cost", key: "cost", width: 18 },
         { header: "Profit", key: "profit", width: 18 },
         { header: "Profit / Bale", key: "profitPerBale", width: 18 },
       ];
-      exportData.stockOut.rows.forEach((row) =>
+      [...exportData.stockOut.rows].sort(compareDateLocationItem).forEach((row) =>
         salesSheet.addRow({
           date: row.activityDate,
           type: row.sourceType === "Sale" && row.isCreditSale ? "Credit Sale" : row.sourceType,
-          voucher: row.voucherNumber,
           location: row.locationName,
-          group: row.stockGroupName,
-          code: row.stockItemCode,
           item: row.stockItemName,
           qty: row.quantity,
           sales: row.totalSales,
@@ -461,8 +511,7 @@ export default function StockInSalesReportDetail() {
         <span className="font-medium">Outbound breakdown:</span> Sales/returns{" "}
         <span className="font-mono font-semibold">{formatNumber(summary.salesOutQty || 0, 3)}</span> · Transfer out{" "}
         <span className="font-mono font-semibold">{formatNumber(summary.transferOutQty || 0, 3)}</span> · Other out{" "}
-        <span className="font-mono font-semibold">{formatNumber(summary.otherStockOutQty || 0, 3)}</span>. Transfers
-        reduce stock but do not create sales or profit.
+        <span className="font-mono font-semibold">{formatNumber(summary.otherStockOutQty || 0, 3)}</span>. Transfers reduce stock but do not create sales or profit.
       </div>
 
       {isFetching && !isLoading && (
@@ -492,15 +541,13 @@ export default function StockInSalesReportDetail() {
             </div>
             <div className="overflow-hidden rounded-xl border">
               <div className="max-h-[520px] overflow-auto">
-                <Table className="min-w-[1250px]">
+                <Table className="min-w-[980px]">
                   <TableHeader>
                     <TableRow className="bg-muted/40 hover:bg-muted/40">
                       <TableHead>Date</TableHead>
                       <TableHead>Type</TableHead>
-                      <TableHead>Voucher</TableHead>
-                      <TableHead>Location</TableHead>
-                      <TableHead>Other Location</TableHead>
-                      <TableHead>Group</TableHead>
+                      <TableHead>Source Location</TableHead>
+                      <TableHead>Destination Location</TableHead>
                       <TableHead>Item</TableHead>
                       <TableHead className="text-right">Qty +/-</TableHead>
                       <TableHead className="text-right">Rate</TableHead>
@@ -511,35 +558,28 @@ export default function StockInSalesReportDetail() {
                     {movementsLoading ? (
                       Array.from({ length: 4 }).map((_, i) => (
                         <TableRow key={i}>
-                          <TableCell colSpan={10}>
+                          <TableCell colSpan={8}>
                             <Skeleton className="h-5 w-full" />
                           </TableCell>
                         </TableRow>
                       ))
-                    ) : (movements?.rows.length || 0) === 0 ? (
+                    ) : sortedMovements.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={10} className="py-8 text-center text-sm text-muted-foreground">
+                        <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
                           No transfers or stock adjustments found.
                         </TableCell>
                       </TableRow>
                     ) : (
-                      movements?.rows.map((row) => (
+                      sortedMovements.map((row) => (
                         <TableRow key={row.key}>
                           <TableCell>{displayDate(row.activityDate)}</TableCell>
                           <TableCell>
                             {row.movementType}
                             {row.adjustmentType ? ` · ${row.adjustmentType}` : ""}
                           </TableCell>
-                          <TableCell className="font-mono">{row.voucherNumber}</TableCell>
-                          <TableCell className="font-mono">#{row.locationId}</TableCell>
-                          <TableCell className="font-mono">
-                            {row.counterpartyLocationId ? `#${row.counterpartyLocationId}` : "—"}
-                          </TableCell>
-                          <TableCell>{row.stockGroupName}</TableCell>
-                          <TableCell>
-                            <div className="font-medium">{row.stockItemName}</div>
-                            <div className="text-xs text-muted-foreground">{row.stockItemCode}</div>
-                          </TableCell>
+                          <TableCell>{sourceLocationName(row)}</TableCell>
+                          <TableCell>{destinationLocationName(row)}</TableCell>
+                          <TableCell className="font-medium">{row.stockItemName}</TableCell>
                           <TableCell
                             className={`text-right font-mono ${row.quantity < 0 ? "text-red-600" : row.quantity > 0 ? "text-emerald-600" : ""}`}
                           >
@@ -573,13 +613,12 @@ export default function StockInSalesReportDetail() {
             </div>
             <div className="overflow-hidden rounded-xl border">
               <div className="overflow-x-auto">
-                <Table className="min-w-[1050px]">
+                <Table className="min-w-[850px]">
                   <TableHeader>
                     <TableRow className="bg-muted/40 hover:bg-muted/40">
                       <TableHead>Date</TableHead>
                       <TableHead>Container</TableHead>
                       <TableHead>Location</TableHead>
-                      <TableHead>Group</TableHead>
                       <TableHead>Item</TableHead>
                       <TableHead className="text-right">Qty</TableHead>
                       <TableHead className="text-right">Avg Rate</TableHead>
@@ -590,28 +629,24 @@ export default function StockInSalesReportDetail() {
                     {isLoading ? (
                       Array.from({ length: 4 }).map((_, i) => (
                         <TableRow key={i}>
-                          <TableCell colSpan={8}>
+                          <TableCell colSpan={7}>
                             <Skeleton className="h-5 w-full" />
                           </TableCell>
                         </TableRow>
                       ))
-                    ) : (data?.stockIn.rows.length || 0) === 0 ? (
+                    ) : sortedStockIn.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
+                        <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
                           No direct container offloads found.
                         </TableCell>
                       </TableRow>
                     ) : (
-                      data?.stockIn.rows.map((row) => (
+                      sortedStockIn.map((row) => (
                         <TableRow key={row.id}>
                           <TableCell>{displayDate(row.activityDate)}</TableCell>
                           <TableCell className="font-mono">{row.containerNumber}</TableCell>
                           <TableCell>{row.locationName}</TableCell>
-                          <TableCell>{row.stockGroupName}</TableCell>
-                          <TableCell>
-                            <div className="font-medium">{row.stockItemName}</div>
-                            <div className="text-xs text-muted-foreground">{row.stockItemCode}</div>
-                          </TableCell>
+                          <TableCell className="font-medium">{row.stockItemName}</TableCell>
                           <TableCell className="text-right font-mono">{formatNumber(row.quantity, 3)}</TableCell>
                           <TableCell className="text-right font-mono">{rate(row.avgRate)}</TableCell>
                           <TableCell className="text-right font-mono">{formatAmount(row.totalValue)}</TableCell>
@@ -642,14 +677,12 @@ export default function StockInSalesReportDetail() {
             </div>
             <div className="overflow-hidden rounded-xl border">
               <div className="overflow-x-auto">
-                <Table className="min-w-[1350px]">
+                <Table className="min-w-[1050px]">
                   <TableHeader>
                     <TableRow className="bg-muted/40 hover:bg-muted/40">
                       <TableHead>Date</TableHead>
                       <TableHead>Type</TableHead>
-                      <TableHead>Voucher</TableHead>
                       <TableHead>Location</TableHead>
-                      <TableHead>Group</TableHead>
                       <TableHead>Item</TableHead>
                       <TableHead className="text-right">Qty</TableHead>
                       <TableHead className="text-right">Sales</TableHead>
@@ -662,36 +695,29 @@ export default function StockInSalesReportDetail() {
                     {isLoading ? (
                       Array.from({ length: 4 }).map((_, i) => (
                         <TableRow key={i}>
-                          <TableCell colSpan={11}>
+                          <TableCell colSpan={9}>
                             <Skeleton className="h-5 w-full" />
                           </TableCell>
                         </TableRow>
                       ))
-                    ) : (data?.stockOut.rows.length || 0) === 0 ? (
+                    ) : sortedStockOut.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={11} className="py-8 text-center text-sm text-muted-foreground">
+                        <TableCell colSpan={9} className="py-8 text-center text-sm text-muted-foreground">
                           No sales, credit notes, or debit notes found.
                         </TableCell>
                       </TableRow>
                     ) : (
-                      data?.stockOut.rows.map((row) => (
+                      sortedStockOut.map((row) => (
                         <TableRow key={`${row.sourceType}-${row.id}`}>
                           <TableCell>{displayDate(row.activityDate)}</TableCell>
                           <TableCell>
                             {row.sourceType === "Sale" && row.isCreditSale ? "Credit Sale" : row.sourceType}
                           </TableCell>
-                          <TableCell className="font-mono">{row.voucherNumber}</TableCell>
                           <TableCell>{row.locationName}</TableCell>
-                          <TableCell>{row.stockGroupName}</TableCell>
-                          <TableCell>
-                            <div className="font-medium">{row.stockItemName}</div>
-                            <div className="text-xs text-muted-foreground">{row.stockItemCode}</div>
-                          </TableCell>
+                          <TableCell className="font-medium">{row.stockItemName}</TableCell>
                           <TableCell className="text-right font-mono">{formatNumber(row.quantity, 3)}</TableCell>
                           <TableCell className="text-right font-mono">{money(row.totalSales)}</TableCell>
-                          <TableCell className="text-right font-mono text-muted-foreground">
-                            {money(row.totalCost)}
-                          </TableCell>
+                          <TableCell className="text-right font-mono text-muted-foreground">{money(row.totalCost)}</TableCell>
                           <TableCell
                             className={`text-right font-mono font-semibold ${row.costProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}
                           >
