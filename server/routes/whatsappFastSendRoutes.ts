@@ -185,7 +185,7 @@ async function resolvePosLocationId(req: Request, companyId: number): Promise<nu
   const requested = Number(req.body?.locationId);
   if (Number.isInteger(requested) && requested > 0) return requested;
 
-  const userId = Number(req.session.userId);
+  const userId = req.session.userId;
   if (!userId) return null;
   const [role] = await db
     .select({ assignedLocationId: userCompanyRoles.assignedLocationId })
