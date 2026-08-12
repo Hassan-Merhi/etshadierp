@@ -1,0 +1,32 @@
+name: Phase 2 Sync Current Main
+
+on:
+  push:
+    branches: [program/erp-90-phase-2]
+    paths:
+      - ".github/workflows/phase2-sync-current-main.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: phase2-sync-current-main
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Phase 2 branch
+        uses: actions/checkout@v7
+        with:
+          ref: program/erp-90-phase-2
+          fetch-depth: 0
+
+      - name: Merge current main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git merge --no-edit origin/main
+          git push origin HEAD:program/erp-90-phase-2
