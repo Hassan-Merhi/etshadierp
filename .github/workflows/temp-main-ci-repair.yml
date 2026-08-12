@@ -1,27 +1,31 @@
-name: Temporary main CI repair
+name: Temporary Main CI Repair
 
 on:
-  push:
-    branches:
-      - ci/main-green-20260812-1102
-  workflow_dispatch:
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: write
 
 jobs:
   repair:
-    if: github.actor != 'github-actions[bot]'
-    runs-on: ubuntu-latest
+    if: github.event.pull_request.head.ref == 'ci/main-green-20260812-1102'
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout head branch
+        uses: actions/checkout@v7
         with:
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
+          ref: ${{ github.event.pull_request.head.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v6
         with:
-          node-version: '22.14.0'
+          node-version: '22.14'
           cache: npm
-      - run: npm ci
+      - name: Normalize package registry URLs
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
       - name: Repair hook dependencies
         run: |
           node <<'NODE'
@@ -68,16 +72,21 @@ jobs:
           fs.writeFileSync(path, source);
           NODE
       - name: Apply repository formatting
-        run: npx prettier --write client/src/pages/StockInSalesReport.tsx client/src/pages/StockInSalesReportDetail.tsx
+        run: |
+          npx prettier --write \
+            client/src/pages/StockInSalesReport.tsx \
+            client/src/pages/StockInSalesReportDetail.tsx
       - name: Verify lint and types
         run: |
           npm run lint
           npm run check
+      - name: Remove temporary workflow
+        run: rm .github/workflows/temp-main-ci-repair.yml
       - name: Commit repair
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add client/src/pages/StockInSalesReport.tsx client/src/pages/StockInSalesReportDetail.tsx
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
           git diff --cached --quiet && exit 0
-          git commit -m "Fix main report formatting and hook lint"
-          git push origin HEAD:ci/main-green-20260812-1102
+          git commit -m 'Fix main report formatting and hook lint'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
