@@ -1,6 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { sql } from "drizzle-orm";
 
+import { requireAuth } from "../../../auth";
 import { db } from "../../../db";
 import { getClientDate } from "../../../lib/dateUtils";
 import { resultRows } from "../../../lib/queryResult";
@@ -142,7 +143,7 @@ async function computeHistoricalOperationalValues(companyId: number, asOf: strin
 }
 
 export function registerNetPositionHistoricalCorrection(app: Express) {
-  app.get("/api/factory/net-position", (req: Request, res: Response, next: NextFunction) => {
+  app.get("/api/factory/net-position", requireAuth, (req: Request, res: Response, next: NextFunction) => {
     const asOf =
       typeof req.query.asOf === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.asOf) ? req.query.asOf : null;
     if (!asOf || asOf === getClientDate(req)) return next();
