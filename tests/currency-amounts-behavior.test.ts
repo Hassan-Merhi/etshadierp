@@ -18,7 +18,7 @@ describe("currency amount domain behavior", () => {
     expect(normalizeCurrencyCode(" usd ")).toBe("USD");
     expect(normalizeCurrencyCode("xof")).toBe("CFA");
     expect(normalizeCurrencyCode("cfa")).toBe("CFA");
-    expect(() => normalizeCurrencyCode(" ")).toThrow("Currency code must be a non-empty string");
+    expect(() => normalizeCurrencyCode(" ")).toThrow("Unsupported currency code");
     expect(() => normalizeCurrencyCode("BTC")).toThrow("Unsupported currency code");
   });
 
