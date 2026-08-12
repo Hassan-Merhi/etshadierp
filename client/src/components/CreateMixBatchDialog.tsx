@@ -82,12 +82,15 @@ export function CreateMixBatchDialog({ open, onOpenChange, onCreated }: CreateMi
     enabled: open,
   });
 
-  // Show all suppliers with a valid supplierId regardless of remaining stock
-  // (negative/zero remaining allowed — over-use is permitted)
-  const availableSuppliers = supplierStock?.filter(
-    (s) =>
-      s.supplierId !== null && !selectedSources.some((sel) => sel.type === "supplier" && sel.sourceId === s.supplierId!)
-  );
+  // Only show suppliers that still have raw stock available to add to a mix batch.
+  const availableSuppliers = supplierStock?.filter((s) => {
+    const remaining = parseFloat(s.remainingKg);
+    return (
+      s.supplierId !== null &&
+      remaining > 0 &&
+      !selectedSources.some((sel) => sel.type === "supplier" && sel.sourceId === s.supplierId!)
+    );
+  });
 
   const availableBatchesForSource = existingBatches?.filter((b) => {
     const remaining = parseFloat(b.totalWeightKg) - parseFloat(b.usedKg);
