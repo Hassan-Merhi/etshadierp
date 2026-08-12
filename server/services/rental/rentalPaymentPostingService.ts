@@ -358,9 +358,7 @@ async function postGroupCore(
     const pd = new Date(paymentDate + "T00:00:00Z");
     const payYear = pd.getUTCFullYear();
     const payMonth = pd.getUTCMonth() + 1;
-    const futureAllocs = allocs.filter(
-      (a) => a.forYear > payYear || (a.forYear === payYear && a.forMonth > payMonth)
-    );
+    const futureAllocs = allocs.filter((a) => a.forYear > payYear || (a.forYear === payYear && a.forMonth > payMonth));
     const deferredChunk = futureAllocs.reduce((s, a) => s + Number(a.chunk), 0);
     const totalAmountNum = parseFloat(totalAmountStr);
     const earnedChunk = totalAmountNum - deferredChunk;
@@ -523,10 +521,7 @@ export async function createRentalPaymentGroup(
           forMonth: alloc.month,
           currency: currency || "USD",
           exchangeRate: exchangeRate || "1",
-          notes:
-            allocations.length > 1
-              ? `${notes ? notes + " | " : ""}Split from ${amount} payment`
-              : (notes ?? null),
+          notes: allocations.length > 1 ? `${notes ? notes + " | " : ""}Split from ${amount} payment` : (notes ?? null),
           postingStatus: "SCHEDULED",
           paymentGroupId,
         } as any)
@@ -671,10 +666,7 @@ async function postScheduledGroup(
       .select()
       .from(propertyPayments)
       .where(
-        and(
-          eq(propertyPayments.paymentGroupId, groupId),
-          sql`${propertyPayments.postingStatus} = 'SCHEDULED'` as any
-        )
+        and(eq(propertyPayments.paymentGroupId, groupId), sql`${propertyPayments.postingStatus} = 'SCHEDULED'` as any)
       );
 
     if (groupRows.length === 0) return;
