@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import type { Express } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
