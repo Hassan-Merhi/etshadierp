@@ -11,18 +11,18 @@
     "step": 500
   },
   "totals": {
-    "warningCeiling": 9461,
+    "warningCeiling": 9457,
     "errorCeiling": 0
   },
   "perRule": {
-    "@typescript-eslint/no-explicit-any": 8834,
+    "@typescript-eslint/no-explicit-any": 8830,
     "unused-imports/no-unused-vars": 505,
     "react-hooks/exhaustive-deps": 118,
     "no-useless-escape": 2,
     "no-empty": 2
   },
   "notes": {
-    "@typescript-eslint/no-explicit-any": "Exactly the type-escape backlog seen from ESLint: 8834 = the 8836 in config/type-escape-boundaries.json minus its 2 suppressions, which are not an ESLint rule. The binding gate for this rule stays config/type-escape-boundaries.json, which freezes every file individually and is therefore strictly stronger than a repository total. This ceiling exists so the two cannot disagree - it must be lowered whenever the type-escape ceiling is.",
+    "@typescript-eslint/no-explicit-any": "Exactly the type-escape backlog seen from ESLint: 8830 = the 8832 in config/type-escape-boundaries.json minus its 2 suppressions, which are not an ESLint rule. The binding gate for this rule stays config/type-escape-boundaries.json, which freezes every file individually and is therefore strictly stronger than a repository total. This ceiling exists so the two cannot disagree - it must be lowered whenever the type-escape ceiling is.",
     "errorCeiling": "Zero and permanent. ESLint errors are not part of the drawdown; the ratchet governs warnings only.",
     "no-empty": "The 3 that remain are in client/src/pages/Payroll.tsx, client/src/pages/StockEntryHistory.tsx and client/src/pages/factory/FactoryShippingContainers.tsx. Documenting an empty catch costs two lines under this Prettier config, which pushes each of those files past its frozen god-file cap, so the cleanup is blocked until they are split - see Phase 4 of docs/god-file-split-program.md. Raising a god-file baseline to absorb it is what working rule 1 forbids.",
     "no-useless-escape": "The 2 that remain are the deliberate <\\/script> escapes in client/src/pages/StockEntryHistory.tsx. Removing the backslash lets the literal end an enclosing script block early; the fix used elsewhere - a SCRIPT_CLOSE constant - adds lines that file has no room for under its god-file cap."
