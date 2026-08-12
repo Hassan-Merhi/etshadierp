@@ -81,11 +81,16 @@ export function registerPosContainerTrackingRoutes(app: Express): void {
         .map((row) => ({
           id: row.id,
           containerNumber: row.containerNumber,
+          supplierName: row.supplierName,
+          supplierCode: row.supplierCode,
+          status: row.status,
           eta: row.eta,
           numberPlate: row.numberPlate,
           trackingLocation: row.trackingLocation,
           agent: row.agent,
           transporter: row.transporter,
+          docReceived: row.docReceived,
+          docsSentDate: row.docsSentDate,
         }));
 
       res.setHeader("Cache-Control", "private, max-age=30, stale-while-revalidate=30");
@@ -127,6 +132,7 @@ export function registerPosContainerTrackingRoutes(app: Express): void {
                 itemName: poLineItems.itemName,
                 quantity: poLineItems.quantity,
                 stockItemName: stockItems.name,
+                stockItemCode: stockItems.code,
               })
               .from(poLineItems)
               .leftJoin(
@@ -138,6 +144,7 @@ export function registerPosContainerTrackingRoutes(app: Express): void {
 
       const items = lineItems.map((item) => ({
         itemName: item.stockItemName || item.itemName || "Item",
+        itemCode: item.stockItemCode || "",
         quantity: String(item.quantity ?? "0"),
       }));
       const totalQty = items.reduce((sum, item) => {
@@ -150,6 +157,16 @@ export function registerPosContainerTrackingRoutes(app: Express): void {
         container: {
           id: container.id,
           containerNumber: container.containerNumber,
+          supplierName: container.supplierName,
+          supplierCode: container.supplierCode,
+          status: container.status,
+          eta: container.eta,
+          numberPlate: container.numberPlate,
+          trackingLocation: container.trackingLocation,
+          agent: container.agent,
+          transporter: container.transporter,
+          docReceived: container.docReceived,
+          docsSentDate: container.docsSentDate,
         },
         items,
         totalQty,
