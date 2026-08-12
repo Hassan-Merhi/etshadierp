@@ -61,13 +61,16 @@ jobs:
           from pathlib import Path
           path = Path('.github/workflows/mobile-responsive.yml')
           text = path.read_text()
-          old = '''      - name: Frontend regression suite\n        env:\n          NODE_OPTIONS: --max-old-space-size=6144\n        run: npm run test:frontend -- --maxWorkers=1\n'''
-          new = '''      - name: Frontend regression suite\n        env:\n          NODE_OPTIONS: --max-old-space-size=4096\n        run: |\n          mapfile -t frontend_test_files < <(\n            find tests/ui client/src -type f \\( -name '*.test.ts' -o -name '*.test.tsx' \\) -print | sort\n          )\n          echo "Running ${#frontend_test_files[@]} frontend test files with a fresh Vitest process per file."\n          test "${#frontend_test_files[@]}" -gt 0\n          for test_file in "${frontend_test_files[@]}"; do\n            echo "::group::$test_file"\n            node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 "$test_file"\n            echo "::endgroup::"\n          done\n'''
-          if old not in text:
-              if new not in text:
-                  raise SystemExit('Expected mobile frontend regression block not found')
-          else:
-              path.write_text(text.replace(old, new))
+          old_single = '''      - name: Frontend regression suite\n        env:\n          NODE_OPTIONS: --max-old-space-size=6144\n        run: npm run test:frontend -- --maxWorkers=1\n'''
+          old_isolated = '''      - name: Frontend regression suite\n        env:\n          NODE_OPTIONS: --max-old-space-size=4096\n        run: |\n          mapfile -t frontend_test_files < <(\n            find tests/ui client/src -type f \\( -name '*.test.ts' -o -name '*.test.tsx' \\) -print | sort\n          )\n          echo "Running ${#frontend_test_files[@]} frontend test files with a fresh Vitest process per file."\n          test "${#frontend_test_files[@]}" -gt 0\n          for test_file in "${frontend_test_files[@]}"; do\n            echo "::group::$test_file"\n            node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 "$test_file"\n            echo "::endgroup::"\n          done\n'''
+          new = '''      - name: Frontend regression suite\n        env:\n          NODE_OPTIONS: --max-old-space-size=4096\n        run: |\n          mapfile -t frontend_test_files < <(\n            find tests/ui client/src -type f \\( -name '*.test.ts' -o -name '*.test.tsx' \\) -print | sort\n          )\n          echo "Running ${#frontend_test_files[@]} frontend test files with a fresh Vitest process per file."\n          test "${#frontend_test_files[@]}" -gt 0\n          for test_file in "${frontend_test_files[@]}"; do\n            echo "::group::$test_file"\n            timeout 90s node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 "$test_file"\n            echo "::endgroup::"\n          done\n'''
+          if old_single in text:
+              text = text.replace(old_single, new)
+          elif old_isolated in text:
+              text = text.replace(old_isolated, new)
+          elif new not in text:
+              raise SystemExit('Expected mobile frontend regression block not found')
+          path.write_text(text)
           PY
       - name: Targeted Phase 2 frontend repairs
         env:
@@ -97,7 +100,7 @@ jobs:
           test "${#frontend_test_files[@]}" -gt 0
           for test_file in "${frontend_test_files[@]}"; do
             echo "::group::$test_file"
-            node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 "$test_file"
+            timeout 90s node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 "$test_file"
             echo "::endgroup::"
           done
       - name: Commit resolved main and remove temporary workflow
