@@ -53,6 +53,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Prepare test database schema
+        run: node node_modules/drizzle-kit/bin.cjs push --force
+
       - name: Apply and verify focused repairs
         run: python3 scripts/repair-main-ci-run4.py
 
