@@ -4,6 +4,12 @@ import { requireAuth, requireRole } from "../../auth";
 import { db, pool } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
+import {
+  CompanyAccessError,
+  getAccessibleCompanyIds,
+  resolveAuthorizedCompanyId,
+  sendCompanyAccessError,
+} from "../../security/companyAccessBoundary";
 import { storage } from "../../storage";
 import { companies } from "@shared/schema";
 import { eq } from "drizzle-orm";
@@ -24,10 +30,14 @@ function saveSession(req: Request): Promise<void> {
 }
 
 export function registerCompanyAccessRoutes(app: Express) {
-  app.get("/api/companies", requireAuth, async (_req, res) => {
+  app.get("/api/companies", requireAuth, async (req, res) => {
     try {
-      res.json(await storage.getAllCompanies());
+      if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+      const accessible = await getAccessibleCompanyIds(req.user.id);
+      const allCompanies = await storage.getAllCompanies();
+      res.json(allCompanies.filter((company) => accessible.has(Number(company.id))));
     } catch (error: unknown) {
+      if (error instanceof CompanyAccessError) return sendCompanyAccessError(res, error);
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
@@ -100,27 +110,33 @@ export function registerCompanyAccessRoutes(app: Express) {
 
   app.get("/api/companies/:id", requireAuth, async (req, res) => {
     try {
-      const company = await storage.getCompanyById(parseInt(req.params.id));
+      const companyId = await resolveAuthorizedCompanyId(req, req.params.id);
+      const company = await storage.getCompanyById(companyId);
       if (!company) return res.status(404).json({ message: "Company not found" });
       res.json(company);
     } catch (error: unknown) {
+      if (error instanceof CompanyAccessError) return sendCompanyAccessError(res, error);
       res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
   app.patch("/api/companies/:id", requireAuth, requireRole("Admin"), async (req, res) => {
     try {
-      res.json(await storage.updateCompany(parseInt(req.params.id), req.body));
+      const companyId = await resolveAuthorizedCompanyId(req, req.params.id);
+      res.json(await storage.updateCompany(companyId, req.body));
     } catch (error: unknown) {
+      if (error instanceof CompanyAccessError) return sendCompanyAccessError(res, error);
       res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
   app.delete("/api/companies/:id", requireAuth, requireRole("Admin"), async (req, res) => {
     try {
-      await storage.deleteCompany(parseInt(req.params.id));
+      const companyId = await resolveAuthorizedCompanyId(req, req.params.id);
+      await storage.deleteCompany(companyId);
       res.json({ message: "Company deleted successfully" });
     } catch (error: unknown) {
+      if (error instanceof CompanyAccessError) return sendCompanyAccessError(res, error);
       res.status(400).json({ message: getErrorMessage(error) });
     }
   });
