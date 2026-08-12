@@ -60,7 +60,10 @@ function isContextOptionalPath(path: string): boolean {
 
 async function ensurePinnedFactoryCompany(req: Request): Promise<void> {
   const path = req.originalUrl.split("?", 1)[0] || req.path;
-  if (!isPinnedCompanyRoute(path)) return;
+  const normalizedPath = path.toLowerCase();
+  if (!isPinnedCompanyRoute(path) || !(normalizedPath === "/api/factory" || normalizedPath.startsWith("/api/factory/"))) {
+    return;
+  }
 
   const session = req.session as any;
   if (positiveId(session.factoryCompanyId)) return;
