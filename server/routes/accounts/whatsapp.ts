@@ -10,9 +10,6 @@ import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { factoryAccountWhatsappRules, ledgerAccounts } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
-import { generateAccountStatementPdf } from "../../lib/accountStatementPdfGenerator";
-import { sendWhatsAppFileByUploadPos } from "../../services/whatsappService";
-import { format, startOfMonth, endOfMonth } from "date-fns";
 import { parseId } from "../../lib/parseId";
 import { logger } from "../../lib/logger";
 
