@@ -62,8 +62,16 @@ type Handler = (req: any, res: any) => unknown;
 
 function buildRoutes() {
   const routes = new Map<string, Handler>();
-  const register = (method: string) => (path: string, ...handlers: any[]) => routes.set(`${method} ${path}`, handlers.at(-1));
-  const app: any = { get: register("GET"), post: register("POST"), patch: register("PATCH"), delete: register("DELETE") };
+  const register =
+    (method: string) =>
+    (path: string, ...handlers: any[]) =>
+      routes.set(`${method} ${path}`, handlers.at(-1));
+  const app: any = {
+    get: register("GET"),
+    post: register("POST"),
+    patch: register("PATCH"),
+    delete: register("DELETE"),
+  };
   registerEmployeeLedgerWasteRoutes(app);
   return routes;
 }
@@ -107,8 +115,24 @@ describe("factory bale ledger route behavior", () => {
     harness.executeResults.push(
       {
         rows: [
-          { id: 1, productId: 1, productName: "Shirts", articleCode: "SH-1", status: "IN_STOCK", referenceNumber: "R1", weightKg: 40 },
-          { id: 2, productId: 2, productName: "Wipers", articleCode: "WP-1", status: "IN_STOCK", referenceNumber: "R2", weightKg: 20 },
+          {
+            id: 1,
+            productId: 1,
+            productName: "Shirts",
+            articleCode: "SH-1",
+            status: "IN_STOCK",
+            referenceNumber: "R1",
+            weightKg: 40,
+          },
+          {
+            id: 2,
+            productId: 2,
+            productName: "Wipers",
+            articleCode: "WP-1",
+            status: "IN_STOCK",
+            referenceNumber: "R2",
+            weightKg: 20,
+          },
           { id: 3, productId: 1, status: "SOLD", referenceNumber: "R3", weightKg: 40 },
           { id: 4, productId: 1, status: "SOLD", referenceNumber: "R4", weightKg: 40 },
           { id: 5, productId: 1, status: "FINALIZED", referenceNumber: "R5", weightKg: 40 },
@@ -116,11 +140,19 @@ describe("factory bale ledger route behavior", () => {
           { id: 7, productId: 1, status: "RESERVED_FOR_ORDER", referenceNumber: "R7", weightKg: 40 },
           { id: 8, productId: 1, status: "IN_STOCK", referenceNumber: "R8", weightKg: 40 },
           { id: 9, productId: 1, status: "IN_STOCK", referenceNumber: "R9", weightKg: 40 },
-          { id: 10, productId: null, productName: "Waste", articleCode: "HMD16001", status: "IN_STOCK", referenceNumber: "R10", weightKg: 15 },
+          {
+            id: 10,
+            productId: null,
+            productName: "Waste",
+            articleCode: "HMD16001",
+            status: "IN_STOCK",
+            referenceNumber: "R10",
+            weightKg: 15,
+          },
         ],
       },
       { rows: [{ baleId: 3 }, { baleId: 8 }] },
-      { rows: [{ baleId: 9 }] },
+      { rows: [{ baleId: 9 }] }
     );
     harness.selectResults.push(
       [
@@ -130,7 +162,7 @@ describe("factory bale ledger route behavior", () => {
       [
         { id: 10, name: "Clothing" },
         { id: 20, name: "Wiper Waste" },
-      ],
+      ]
     );
 
     const res = resHarness();
@@ -158,9 +190,20 @@ describe("factory bale ledger route behavior", () => {
 
   it("treats HMD16 article codes as waste even when there is no catalog product", async () => {
     harness.executeResults.push(
-      { rows: [{ id: 1, productId: null, productName: "Loose Waste", articleCode: "HMD16099", status: "IN_STOCK", weightKg: 12 }] },
+      {
+        rows: [
+          {
+            id: 1,
+            productId: null,
+            productName: "Loose Waste",
+            articleCode: "HMD16099",
+            status: "IN_STOCK",
+            weightKg: 12,
+          },
+        ],
+      },
       { rows: [] },
-      { rows: [] },
+      { rows: [] }
     );
     harness.selectResults.push([], []);
     const res = resHarness();
@@ -178,7 +221,10 @@ describe("factory bale ledger route behavior", () => {
     expect(noCompany.body).toEqual({ message: "No company selected" });
 
     const invalidSection = resHarness();
-    await routes.get("GET /api/factory/bale-ledger/details")!(req({ query: { section: "other", productId: "1" } }), invalidSection);
+    await routes.get("GET /api/factory/bale-ledger/details")!(
+      req({ query: { section: "other", productId: "1" } }),
+      invalidSection
+    );
     expect(invalidSection.statusCode).toBe(400);
     expect(invalidSection.body).toEqual({ message: "Invalid section" });
   });
