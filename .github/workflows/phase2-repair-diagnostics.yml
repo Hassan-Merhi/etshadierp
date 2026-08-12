@@ -6,24 +6,68 @@ on:
       - program/erp-90-phase-2
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  diagnostics:
+  repair:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: program/erp-90-phase-2
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.14
           cache: npm
       - run: npm ci
-      - name: Type escape diagnostics
-        run: npm run audit:type-escapes
-        continue-on-error: true
-      - name: Script inventory diagnostics
-        run: npm run audit:scripts
-        continue-on-error: true
-      - name: Formatting diagnostics
-        run: npx prettier --check client/src/pages/StockInSalesReport.tsx
-        continue-on-error: true
+      - name: Apply exact Phase 2 repairs
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+
+          const indexPath = 'server/index.ts';
+          let index = fs.readFileSync(indexPath, 'utf8');
+          if (!index.includes('factoryCompanyId?: number;')) {
+            const needle = '    currentCompanyId?: number;\n';
+            if (!index.includes(needle)) throw new Error('SessionData insertion point not found');
+            index = index.replace(needle, `${needle}    factoryCompanyId?: number;\n`);
+            fs.writeFileSync(indexPath, index);
+          }
+
+          const correctionPath = 'server/routes/factory/employee-pos/netPositionHistoricalCorrection.ts';
+          let correction = fs.readFileSync(correctionPath, 'utf8');
+          const oldExpr = '(req.session as any).factoryCompanyId || (req.session as any).currentCompanyId || 0';
+          const newExpr = 'req.session.factoryCompanyId || req.session.currentCompanyId || 0';
+          if (correction.includes(oldExpr)) {
+            correction = correction.replace(oldExpr, newExpr);
+            fs.writeFileSync(correctionPath, correction);
+          } else if (!correction.includes(newExpr)) {
+            throw new Error('Historical net-position session expression not found');
+          }
+
+          const ratchetPath = 'config/type-escape-boundaries.json';
+          const ratchet = JSON.parse(fs.readFileSync(ratchetPath, 'utf8'));
+          delete ratchet.scan.baseline['client/src/pages/StockInSalesReport.tsx'];
+          delete ratchet.scan.baseline['client/src/pages/StockInSalesReportDetail.tsx'];
+          if (ratchet.totals.typeEscapeCeiling > 8834) ratchet.totals.typeEscapeCeiling = 8834;
+          if (ratchet.totals.typeEscapeCeiling !== 8834) {
+            throw new Error(`Unexpected type-escape ceiling: ${ratchet.totals.typeEscapeCeiling}`);
+          }
+          fs.writeFileSync(ratchetPath, `${JSON.stringify(ratchet, null, 2)}\n`);
+          NODE
+          npx prettier --write server/index.ts server/routes/factory/employee-pos/netPositionHistoricalCorrection.ts client/src/pages/StockInSalesReport.tsx config/type-escape-boundaries.json
+      - name: Verify repaired ratchets
+        run: |
+          npm run audit:type-escapes
+          npm run audit:scripts
+          npx prettier --check server/index.ts server/routes/factory/employee-pos/netPositionHistoricalCorrection.ts client/src/pages/StockInSalesReport.tsx config/type-escape-boundaries.json
+      - name: Commit repairs and remove temporary workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/phase2-repair-diagnostics.yml
+          git add server/index.ts server/routes/factory/employee-pos/netPositionHistoricalCorrection.ts client/src/pages/StockInSalesReport.tsx config/type-escape-boundaries.json
+          git diff --cached --check
+          git commit -m "fix: close Phase 2 quality ratchets"
+          git push origin HEAD:program/erp-90-phase-2
