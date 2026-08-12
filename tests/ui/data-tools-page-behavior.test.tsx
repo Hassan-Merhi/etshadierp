@@ -80,7 +80,7 @@ vi.mock("@/lib/excelHelper", () => ({
 }));
 vi.mock("wouter", () => ({ Link: ({ children }: any) => <>{children}</> }));
 vi.mock("@/pages/settings/BulkRenameTab", () => ({
-  BulkRenameTab: ({ open }: any) => (open ? <div data-testid="bulk-rename-dialog">Bulk rename open</div> : null),
+  BulkRenameTab: () => <div data-testid="bulk-rename-dialog">Bulk rename open</div>,
 }));
 vi.mock("@/pages/settings/datatoolstab/components/ReconcileOTWNamesCard", () => ({
   ReconcileOTWNamesCard: () => <div>Reconcile OTW</div>,
@@ -112,9 +112,14 @@ import { DataToolsTab } from "@/pages/settings/DataToolsTab";
 describe("ERP data tools behavior", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    harness.apiRequest.mockResolvedValue({
-      ok: true,
-      json: async () => ({ applied: 1, updatedCount: 4, totalChecked: 5 }),
+    harness.apiRequest.mockImplementation(async (_method: string, url: string) => {
+      if (url === "/api/sales-report/recalculate-costs") {
+        return { updatedCount: 4, totalChecked: 5 };
+      }
+      return {
+        ok: true,
+        json: async () => ({ applied: 1, updatedCount: 4, totalChecked: 5 }),
+      };
     });
     harness.modeApiRequest.mockResolvedValue({
       ok: true,
