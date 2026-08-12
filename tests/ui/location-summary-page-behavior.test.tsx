@@ -71,7 +71,14 @@ vi.mock("@/contexts/CurrencyContext", () => ({
   useCurrencyContext: () => ({ formatAmount: (value: unknown) => `$${Number(value).toFixed(2)}` }),
 }));
 vi.mock("@/hooks/use-date-jump", () => ({ useDateJump: vi.fn() }));
-vi.mock("@/components/PageHeader", () => ({ PageHeader: ({ title, subtitle }: any) => <div><h1>{title}</h1><p>{subtitle}</p></div> }));
+vi.mock("@/components/PageHeader", () => ({
+  PageHeader: ({ title, subtitle }: any) => (
+    <div>
+      <h1>{title}</h1>
+      <p>{subtitle}</p>
+    </div>
+  ),
+}));
 vi.mock("@/components/ui/period-filter", () => ({
   getDefaultPeriodValue: () => ({ fromDate: "2026-08-12", toDate: "2026-08-12", preset: "today" }),
   PeriodFilter: ({ value }: any) => <div data-testid="period-filter">{value.fromDate}</div>,
@@ -92,7 +99,7 @@ describe("location summary page behavior", () => {
     localStorage.setItem("locationSummary_selectedLocations", JSON.stringify([11, 12]));
     sessionStorage.setItem(
       "locationSummary_pageState",
-      JSON.stringify({ expandedGroups: [1], selectedLocationIndex: 0, highlightedRows: [], hiddenRows: [] }),
+      JSON.stringify({ expandedGroups: [1], selectedLocationIndex: 0, highlightedRows: [], hiddenRows: [] })
     );
   });
 
