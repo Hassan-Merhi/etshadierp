@@ -187,6 +187,40 @@ function compareDateLocationItem(
   return a.stockItemName.localeCompare(b.stockItemName, undefined, { numeric: true, sensitivity: "base" });
 }
 
+type LocationNames = Map<number, string>;
+
+function resolveLocationName(names: LocationNames, id: number | null): string {
+  return id ? names.get(id) || `Location #${id}` : "—";
+}
+
+function movementSourceName(names: LocationNames, row: MovementRow): string {
+  return row.movementType === "Transfer In"
+    ? resolveLocationName(names, row.counterpartyLocationId)
+    : resolveLocationName(names, row.locationId);
+}
+
+function movementDestinationName(names: LocationNames, row: MovementRow): string {
+  if (row.movementType === "Transfer In") return resolveLocationName(names, row.locationId);
+  if (row.movementType === "Transfer Out") return resolveLocationName(names, row.counterpartyLocationId);
+  return "—";
+}
+
+function compareMovements(names: LocationNames, a: MovementRow, b: MovementRow): number {
+  const date = b.activityDate.localeCompare(a.activityDate);
+  if (date !== 0) return date;
+  const source = movementSourceName(names, a).localeCompare(movementSourceName(names, b), undefined, {
+    numeric: true,
+    sensitivity: "base",
+  });
+  if (source !== 0) return source;
+  const destination = movementDestinationName(names, a).localeCompare(movementDestinationName(names, b), undefined, {
+    numeric: true,
+    sensitivity: "base",
+  });
+  if (destination !== 0) return destination;
+  return a.stockItemName.localeCompare(b.stockItemName, undefined, { numeric: true, sensitivity: "base" });
+}
+
 export default function StockInSalesReportDetail() {
   const { selectedCompany } = useCompany();
   const { formatAmount, selectedCurrency, convertToDisplay } = useCurrencyContext();
@@ -238,33 +272,11 @@ export default function StockInSalesReportDetail() {
   });
 
   const locationNameById = useMemo(() => new Map(locations.map((location) => [location.id, location.name])), [locations]);
-  const locationName = (id: number | null) => (id ? locationNameById.get(id) || `Location #${id}` : "—");
-  const sourceLocationName = (row: MovementRow) =>
-    row.movementType === "Transfer In" ? locationName(row.counterpartyLocationId) : locationName(row.locationId);
-  const destinationLocationName = (row: MovementRow) =>
-    row.movementType === "Transfer In"
-      ? locationName(row.locationId)
-      : row.movementType === "Transfer Out"
-        ? locationName(row.counterpartyLocationId)
-        : "—";
+  const sourceLocationName = (row: MovementRow) => movementSourceName(locationNameById, row);
+  const destinationLocationName = (row: MovementRow) => movementDestinationName(locationNameById, row);
 
   const sortedMovements = useMemo(
-    () =>
-      [...(movements?.rows || [])].sort((a, b) => {
-        const date = b.activityDate.localeCompare(a.activityDate);
-        if (date !== 0) return date;
-        const source = sourceLocationName(a).localeCompare(sourceLocationName(b), undefined, {
-          numeric: true,
-          sensitivity: "base",
-        });
-        if (source !== 0) return source;
-        const destination = destinationLocationName(a).localeCompare(destinationLocationName(b), undefined, {
-          numeric: true,
-          sensitivity: "base",
-        });
-        if (destination !== 0) return destination;
-        return a.stockItemName.localeCompare(b.stockItemName, undefined, { numeric: true, sensitivity: "base" });
-      }),
+    () => [...(movements?.rows || [])].sort((a, b) => compareMovements(locationNameById, a, b)),
     [movements?.rows, locationNameById]
   );
 
@@ -365,16 +377,7 @@ export default function StockInSalesReportDetail() {
         { header: "Value +/-", key: "value", width: 18 },
       ];
       [...exportMovements.rows]
-        .sort((a, b) => {
-          const date = b.activityDate.localeCompare(a.activityDate);
-          if (date !== 0) return date;
-          const source = sourceLocationName(a).localeCompare(sourceLocationName(b), undefined, {
-            numeric: true,
-            sensitivity: "base",
-          });
-          if (source !== 0) return source;
-          return a.stockItemName.localeCompare(b.stockItemName, undefined, { numeric: true, sensitivity: "base" });
-        })
+        .sort((a, b) => compareMovements(locationNameById, a, b))
         .forEach((row) =>
           movementSheet.addRow({
             date: row.activityDate,
