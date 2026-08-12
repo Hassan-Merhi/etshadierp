@@ -34,9 +34,7 @@ describe("generic voucher validation coverage", () => {
     expect(supportsCentralGenericVoucher(null)).toBe(false);
     expect(supportsCentralGenericVoucher({})).toBe(false);
     expect(supportsCentralGenericVoucher({ clientRequestId: "x" })).toBe(false);
-    expect(
-      supportsCentralGenericVoucher({ clientRequestId: "x", voucher, entries: null })
-    ).toBe(false);
+    expect(supportsCentralGenericVoucher({ clientRequestId: "x", voucher, entries: null })).toBe(false);
   });
 
   it("rejects invalid company and request identifiers", () => {
