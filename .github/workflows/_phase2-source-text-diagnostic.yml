@@ -1,0 +1,67 @@
+name: Phase 2 source-text diagnostic
+
+on:
+  push:
+    branches:
+      - program/erp-90-phase-2
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22.14"
+      - name: Compare source-text audit against main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          node scripts/audit-source-text-assertions.mjs --json > /tmp/head.json
+          git worktree add /tmp/main-tree origin/main
+          (cd /tmp/main-tree && node scripts/audit-source-text-assertions.mjs --json > /tmp/main.json)
+          node <<'NODE'
+          const fs = require('fs');
+          const head = JSON.parse(fs.readFileSync('/tmp/head.json', 'utf8'));
+          const base = JSON.parse(fs.readFileSync('/tmp/main.json', 'utf8'));
+          const baseByTest = new Map(base.entries.map((entry) => [entry.test, entry]));
+          const delta = head.entries
+            .map((entry) => ({
+              test: entry.test,
+              head: entry.textAssertions,
+              base: baseByTest.get(entry.test)?.textAssertions ?? 0,
+              delta: entry.textAssertions - (baseByTest.get(entry.test)?.textAssertions ?? 0),
+              pinnedSources: entry.pinnedSources,
+              classification: entry.classification,
+            }))
+            .filter((entry) => entry.delta !== 0)
+            .sort((a, b) => b.delta - a.delta || a.test.localeCompare(b.test));
+          const payload = {
+            headTotal: head.summary.totalTextAssertions,
+            baseTotal: base.summary.totalTextAssertions,
+            totalDelta: head.summary.totalTextAssertions - base.summary.totalTextAssertions,
+            delta,
+          };
+          fs.writeFileSync('source-text-delta.json', JSON.stringify(payload, null, 2) + '\n');
+          console.log(JSON.stringify(payload, null, 2));
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: phase2-source-text-delta
+          path: source-text-delta.json
+      - name: Remove diagnostic helper
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/_phase2-source-text-diagnostic.yml
+          git -c core.hooksPath=/dev/null commit -m 'chore: remove Phase 2 source-text diagnostic'
+          git -c core.hooksPath=/dev/null push origin HEAD:program/erp-90-phase-2
