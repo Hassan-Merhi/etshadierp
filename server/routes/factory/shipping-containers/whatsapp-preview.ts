@@ -15,7 +15,7 @@ import {
   factoryShippingContainerRows,
   factoryShippingContainerDocuments,
 } from "@shared/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { getCompanyId } from "./_helpers";
 
 export function registerShippingWhatsappPreviewRoutes(app: Express) {
@@ -55,6 +55,7 @@ export function registerShippingWhatsappPreviewRoutes(app: Express) {
             originalName: factoryShippingContainerDocuments.originalName,
             fileType: factoryShippingContainerDocuments.fileType,
             fileUrl: factoryShippingContainerDocuments.fileUrl,
+            hasFileData: sql<boolean>`${factoryShippingContainerDocuments.fileData} is not null and length(${factoryShippingContainerDocuments.fileData}) > 0`,
           })
           .from(factoryShippingContainerDocuments)
           .where(
@@ -83,10 +84,13 @@ export function registerShippingWhatsappPreviewRoutes(app: Express) {
           },
           ...docs.map((d) => ({
             id: `doc_${d.id}`,
-            name: d.displayName,
+            name: d.displayName?.trim() || d.originalName?.trim() || `Document ${d.id}`,
             fileType: (d.fileType || "application/octet-stream").split("/").pop()?.toUpperCase() || "FILE",
             source: "Uploaded Document",
-            available: true,
+            available: d.hasFileData,
+            unavailableReason: d.hasFileData
+              ? undefined
+              : "File content is no longer stored. Delete and re-upload this document.",
             fileUrl: d.fileUrl,
           })),
         ];
