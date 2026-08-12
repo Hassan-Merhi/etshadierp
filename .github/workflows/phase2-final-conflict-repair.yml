@@ -55,9 +55,23 @@ jobs:
             git commit --no-edit
           fi
       - run: npm ci --ignore-scripts
+      - name: Configure durable isolated frontend regression
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('.github/workflows/mobile-responsive.yml')
+          text = path.read_text()
+          old = '''      - name: Frontend regression suite\n        env:\n          NODE_OPTIONS: --max-old-space-size=6144\n        run: npm run test:frontend -- --maxWorkers=1\n'''
+          new = '''      - name: Frontend regression suite\n        env:\n          NODE_OPTIONS: --max-old-space-size=4096\n        run: |\n          mapfile -t frontend_test_files < <(\n            find tests/ui client/src -type f \\( -name '*.test.ts' -o -name '*.test.tsx' \\) -print | sort\n          )\n          echo "Running ${#frontend_test_files[@]} frontend test files with a fresh Vitest process per file."\n          test "${#frontend_test_files[@]}" -gt 0\n          for test_file in "${frontend_test_files[@]}"; do\n            echo "::group::$test_file"\n            node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 "$test_file"\n            echo "::endgroup::"\n          done\n'''
+          if old not in text:
+              if new not in text:
+                  raise SystemExit('Expected mobile frontend regression block not found')
+          else:
+              path.write_text(text.replace(old, new))
+          PY
       - name: Targeted Phase 2 frontend repairs
         env:
-          NODE_OPTIONS: --max-old-space-size=6144
+          NODE_OPTIONS: --max-old-space-size=4096
         run: |
           node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 \
             tests/ui/journal-form-page-behavior.test.tsx \
@@ -72,10 +86,20 @@ jobs:
             tests/ui/journal-form-page-behavior.test.tsx \
             tests/ui/stock-entry-history-page-behavior.test.tsx \
             .github/workflows/mobile-responsive.yml
-      - name: Full frontend regression with bounded memory
+      - name: Full frontend regression with fresh process per file
         env:
-          NODE_OPTIONS: --max-old-space-size=6144
-        run: npm run test:frontend -- --maxWorkers=1
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: |
+          mapfile -t frontend_test_files < <(
+            find tests/ui client/src -type f \( -name '*.test.ts' -o -name '*.test.tsx' \) -print | sort
+          )
+          echo "Running ${#frontend_test_files[@]} frontend test files with a fresh Vitest process per file."
+          test "${#frontend_test_files[@]}" -gt 0
+          for test_file in "${frontend_test_files[@]}"; do
+            echo "::group::$test_file"
+            node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 "$test_file"
+            echo "::endgroup::"
+          done
       - name: Commit resolved main and remove temporary workflow
         run: |
           git rm .github/workflows/phase2-final-conflict-repair.yml
