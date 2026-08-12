@@ -2,6 +2,7 @@ import express from "express";
 import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// Keep this regression behavior-based: validate the HTTP contract, not source text.
 vi.mock("../server/auth", () => ({
   requireAuth: (_req: unknown, _res: unknown, next: () => void) => next(),
 }));
