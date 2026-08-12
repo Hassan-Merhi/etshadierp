@@ -31,14 +31,14 @@ jobs:
       - name: Apply backend repairs
         run: node scripts/_phase2-backend-finalize.mjs
       - name: Format repaired files
-        run: npx prettier --write tests/customer-order-excel-export-behavior.test.ts tests/stats-net-position-excel-behavior.test.ts config/ci-ratchet-allowances.json
+        run: npx prettier --write tests/customer-order-excel-export-behavior.test.ts tests/stats-net-position-excel-behavior.test.ts tests/ui/authenticated-request-gating.test.ts config/ci-ratchet-allowances.json
       - name: Verify repaired backend gates
-        run: npx vitest run tests/customer-order-excel-export-behavior.test.ts tests/stats-net-position-excel-behavior.test.ts tests/source-text-assertions.test.ts
+        run: npx vitest run tests/customer-order-excel-export-behavior.test.ts tests/stats-net-position-excel-behavior.test.ts tests/ui/authenticated-request-gating.test.ts tests/source-text-assertions.test.ts
       - name: Verify source-text audit
         run: node scripts/audit-source-text-assertions.mjs
       - name: Commit verified repairs
         run: |
           git rm .github/workflows/_phase2-backend-finalize.yml scripts/_phase2-backend-finalize.mjs
-          git add tests/customer-order-excel-export-behavior.test.ts tests/stats-net-position-excel-behavior.test.ts config/ci-ratchet-allowances.json
+          git add tests/customer-order-excel-export-behavior.test.ts tests/stats-net-position-excel-behavior.test.ts tests/ui/authenticated-request-gating.test.ts config/ci-ratchet-allowances.json
           git -c core.hooksPath=/dev/null commit -m 'fix: close Phase 2 backend verification gaps'
           git -c core.hooksPath=/dev/null push origin HEAD:program/erp-90-phase-2
