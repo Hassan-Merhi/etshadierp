@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
-import { buildExactStockMovementReversal } from "../server/services/inventory/stockMovementReversal";
+import { describe, expect, it, vi } from "vitest";
+import {
+  buildExactStockMovementReversal,
+  postExactStockMovementReversalTx,
+  type ExactStockMovementReversalAdapter,
+} from "../server/services/inventory/stockMovementReversal";
 import type { StockMovementRecord } from "../server/services/inventory/stockMovementIntegrityService";
 
 const source = {
@@ -21,6 +25,31 @@ function original(overrides: Partial<StockMovementRecord> = {}): StockMovementRe
     sourceId: "77",
     reversalOfMovementId: null,
     ...overrides,
+  };
+}
+
+function adapter(locked: StockMovementRecord | null = original()): ExactStockMovementReversalAdapter {
+  return {
+    lockOriginalMovement: vi.fn().mockResolvedValue(locked),
+    findExisting: vi.fn().mockResolvedValue(null),
+    validateOwnership: vi.fn().mockResolvedValue(undefined),
+    lockBalances: vi.fn().mockResolvedValue({ 8: "20" }),
+    appendMovements: vi.fn(async ({ request, rows }) =>
+      rows.map((row, index) => ({
+        id: 1000 + index,
+        companyId: request.companyId,
+        stockItemId: request.stockItemId,
+        locationId: row.locationId,
+        quantityDelta: row.quantityDelta,
+        unitCost: row.unitCost,
+        movementKind: request.kind,
+        sourceType: request.source.sourceType,
+        sourceId: request.source.sourceId,
+        reversalOfMovementId: request.reversalOfMovementId,
+      }))
+    ),
+    recordIdempotency: vi.fn().mockResolvedValue(undefined),
+    recordAudit: vi.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -91,5 +120,74 @@ describe("buildExactStockMovementReversal", () => {
         source,
       })
     ).toThrowError(expect.objectContaining({ code: "STOCK_REVERSAL_CHAIN_INVALID" }));
+  });
+});
+
+describe("postExactStockMovementReversalTx", () => {
+  it("locks the original by company before posting its exact opposite", async () => {
+    const mock = adapter();
+    const tx = { marker: "same-transaction" };
+    const result = await postExactStockMovementReversalTx(
+      tx,
+      {
+        companyId: 12,
+        movementId: 901,
+        occurredAt: "2026-08-13T00:00:00.000Z",
+        source,
+        actor: { userId: 5, reason: "correct transfer" },
+      },
+      mock
+    );
+
+    expect(mock.lockOriginalMovement).toHaveBeenCalledWith({ tx, companyId: 12, movementId: 901 });
+    expect(mock.validateOwnership).toHaveBeenCalledWith({
+      tx,
+      companyId: 12,
+      stockItemId: 44,
+      locationIds: [8],
+    });
+    expect(result.movements[0]).toMatchObject({
+      companyId: 12,
+      stockItemId: 44,
+      locationId: 8,
+      quantityDelta: "5.5",
+      unitCost: "2.25",
+      movementKind: "reversal",
+      reversalOfMovementId: 901,
+    });
+  });
+
+  it("fails closed when the original movement is absent from the requested company", async () => {
+    const mock = adapter(null);
+    await expect(
+      postExactStockMovementReversalTx(
+        {},
+        {
+          companyId: 12,
+          movementId: 901,
+          occurredAt: "2026-08-13T00:00:00.000Z",
+          source,
+        },
+        mock
+      )
+    ).rejects.toMatchObject({ code: "STOCK_REVERSAL_ORIGINAL_NOT_FOUND" });
+    expect(mock.appendMovements).not.toHaveBeenCalled();
+  });
+
+  it("rejects an adapter result that crosses company boundaries", async () => {
+    const mock = adapter(original({ companyId: 99 }));
+    await expect(
+      postExactStockMovementReversalTx(
+        {},
+        {
+          companyId: 12,
+          movementId: 901,
+          occurredAt: "2026-08-13T00:00:00.000Z",
+          source,
+        },
+        mock
+      )
+    ).rejects.toMatchObject({ code: "STOCK_REVERSAL_COMPANY_MISMATCH" });
+    expect(mock.appendMovements).not.toHaveBeenCalled();
   });
 });
