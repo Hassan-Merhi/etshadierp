@@ -1,0 +1,113 @@
+name: Phase 2 Targeted Repair
+
+on:
+  push:
+    branches:
+      - program/erp-90-phase-2
+    paths:
+      - .github/workflows/phase2-targeted-repair.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: program/erp-90-phase-2
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+          cache: npm
+      - run: npm ci
+      - name: Apply deterministic repairs
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def rewrite(path, fn):
+              p = Path(path)
+              before = p.read_text()
+              after = fn(before)
+              if after == before:
+                  raise SystemExit(f"expected repair made no change: {path}")
+              p.write_text(after)
+
+          rewrite(
+              "server/routes/whatsappFastSendRoutes.ts",
+              lambda s: s.replace(
+                  'res.status(400).json({ message: "voucherId is required" });',
+                  'res.status(400).json({ message: "Invalid voucherId" });',
+                  1,
+              ),
+          )
+
+          def historical(s):
+              old = 'app.get("/api/factory/net-position", requireAuth, (req: Request, res: Response, next: NextFunction) => {\n    const asOf ='
+              new = 'app.use("/api/factory/net-position", requireAuth, (req: Request, res: Response, next: NextFunction) => {\n    if (req.method !== "GET") return next();\n    const asOf ='
+              if old not in s:
+                  raise SystemExit("historical net-position route pattern missing")
+              return s.replace(old, new, 1)
+          rewrite("server/routes/factory/employee-pos/netPositionHistoricalCorrection.ts", historical)
+
+          def pos_print(s):
+              start = s.index("  // ── Receive a frontend-generated PDF and forward to WhatsApp")
+              end = s.index("  // ── Direct invoice PDF download", start)
+              return s[:start] + s[end:]
+          rewrite("server/routes/pos/posPrintRoutes.ts", pos_print)
+
+          def pos_whatsapp(s):
+              start = s.index("  // ── POS Stock PDF → WhatsApp")
+              return s[:start] + "}\n"
+          rewrite("server/routes/pos/posWhatsAppRoutes.ts", pos_whatsapp)
+
+          def account_whatsapp(s):
+              start = s.index("  // ERP-mode WhatsApp statement send")
+              end = s.index("  // Get all vouchers with date filtering", start)
+              return s[:start] + s[end:]
+          rewrite("server/routes/accounts/whatsapp.ts", account_whatsapp)
+
+          def factory_whatsapp(s):
+              start = s.index("  // ── POST manual send")
+              end = s.index("// ─── Internal helpers", start)
+              return s[:start] + "}\n\n" + s[end:]
+          rewrite("server/routes/factoryWhatsappRoutes.ts", factory_whatsapp)
+          PY
+      - name: Format changed source
+        run: |
+          npx prettier --write \
+            server/routes/whatsappFastSendRoutes.ts \
+            server/routes/factory/employee-pos/netPositionHistoricalCorrection.ts \
+            server/routes/pos/posPrintRoutes.ts \
+            server/routes/pos/posWhatsAppRoutes.ts \
+            server/routes/accounts/whatsapp.ts \
+            server/routes/factoryWhatsappRoutes.ts \
+            tests/waste-dispatch-route-registration.test.ts \
+            tests/phase7-backend-messages-translations.test.ts \
+            scripts/verify-env-documentation.mjs \
+            docs/whatsapp.env.example
+      - name: Refresh measured route manifest
+        run: UPDATE_ROUTE_MANIFEST=1 npx vitest run tests/route-manifest.test.ts
+      - name: Verify deterministic failures
+        run: |
+          npx vitest run \
+            tests/route-manifest.test.ts \
+            tests/pdf-invoice.test.ts \
+            tests/phase7-backend-messages-translations.test.ts \
+            tests/source-text-assertions.test.ts \
+            tests/toolchain-and-script-inventory.test.ts \
+            tests/waste-dispatch-route-registration.test.ts
+      - name: TypeScript
+        run: npm run check
+      - name: Publish verified repair and remove runner
+        run: |
+          rm .github/workflows/phase2-targeted-repair.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "Repair Phase 2 deterministic CI failures"
+          git push origin HEAD:program/erp-90-phase-2
