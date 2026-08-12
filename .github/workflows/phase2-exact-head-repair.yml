@@ -49,6 +49,8 @@ jobs:
         run: |
           sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
           npm ci --no-audit --bin-links=true
+      - name: Prepare test database schema
+        run: node node_modules/drizzle-kit/bin.cjs push --force
       - name: Replace brittle assertions with behavior
         run: |
           python - <<'PY'
@@ -66,15 +68,105 @@ jobs:
           s = p.read_text()
           s = s.replace('import { afterEach, describe, expect, it, vi } from "vitest";', 'import { beforeEach, describe, expect, it, vi } from "vitest";')
           s = s.replace('afterEach(() => {', 'beforeEach(() => {')
-          p.write_text(s)
+          marker = '  vi.clearAllMocks();\n});'
+          replacement = '  vi.clearAllMocks();\n  vi.doUnmock("../server/routes/factory/employee-pos/index");\n});'
+          if marker not in s:
+              raise SystemExit('waste registrar reset marker not found')
+          p.write_text(s.replace(marker, replacement, 1))
 
           Path('tests/shipping-container-zip-package-regression.test.ts').write_text('''import express from "express";\nimport request from "supertest";\nimport { beforeEach, describe, expect, it, vi } from "vitest";\n\nvi.mock("../server/auth", () => ({\n  requireAuth: (_req: unknown, _res: unknown, next: () => void) => next(),\n}));\n\nvi.mock("../server/routes/factory/shipping-containers/_helpers", () => ({\n  getCompanyId: () => 1,\n  fetchInternalBuffer: vi.fn(),\n}));\n\ndescribe("shipping container ZIP package regression", () => {\n  beforeEach(() => {\n    vi.clearAllMocks();\n  });\n\n  it("rejects a ZIP request with no selected files before touching storage", async () => {\n    const { registerShippingZipPackageRoutes } = await import(\n      "../server/routes/factory/shipping-containers/zip-package"\n    );\n    const app = express();\n    registerShippingZipPackageRoutes(app);\n\n    const response = await request(app).get(\n      "/api/factory/shipping-container-rows/1/zip-package"\n    );\n\n    expect(response.status).toBe(400);\n    expect(response.body).toEqual({ message: "No files selected" });\n  });\n\n  it("rejects a non-numeric shipping-row id", async () => {\n    const { registerShippingZipPackageRoutes } = await import(\n      "../server/routes/factory/shipping-containers/zip-package"\n    );\n    const app = express();\n    registerShippingZipPackageRoutes(app);\n\n    const response = await request(app).get(\n      "/api/factory/shipping-container-rows/not-a-number/zip-package?fileIds=invoice_excel"\n    );\n\n    expect(response.status).toBe(400);\n    expect(response.body).toEqual({ message: "Invalid id" });\n  });\n});\n''')
           PY
           node node_modules/prettier/bin/prettier.cjs --write tests/pdf-invoice.test.ts tests/waste-dispatch-route-registration.test.ts tests/shipping-container-zip-package-regression.test.ts
-      - name: Regenerate route manifest from executable registration
+      - name: Remove only dead shadowed route registrations
         run: |
-          UPDATE_ROUTE_MANIFEST=1 npx vitest run tests/route-manifest.test.ts || true
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import ts from 'typescript';
+
+          const duplicateFastPaths = new Set([
+            '/api/pos/send-stock-pdf-backend',
+            '/api/pos/send-stock-pdf',
+            '/api/pos/send-invoice-pdf-backend',
+            '/api/pos/send-invoice-whatsapp',
+            '/api/pos/send-whatsapp-pdf-upload',
+            '/api/accounts/:accountId/send-statement-whatsapp',
+            '/api/factory/accounts/:accountId/send-statement-whatsapp',
+          ]);
+          const removed = new Map([...duplicateFastPaths].map((p) => [p, 0]));
+
+          function walk(dir) {
+            return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+              const full = path.join(dir, entry.name);
+              if (entry.isDirectory()) return walk(full);
+              return entry.isFile() && full.endsWith('.ts') ? [full] : [];
+            });
+          }
+
+          function removeMatchingStatements(file, predicate) {
+            const source = fs.readFileSync(file, 'utf8');
+            const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+            const spans = [];
+            function visit(node) {
+              if (ts.isExpressionStatement(node) && ts.isCallExpression(node.expression)) {
+                const call = node.expression;
+                const expr = call.expression;
+                if (
+                  ts.isPropertyAccessExpression(expr) &&
+                  ts.isIdentifier(expr.expression) &&
+                  expr.expression.text === 'app' &&
+                  call.arguments.length > 0 &&
+                  ts.isStringLiteral(call.arguments[0]) &&
+                  predicate(expr.name.text, call.arguments[0].text, file)
+                ) {
+                  spans.push([node.getFullStart(), node.end]);
+                }
+              }
+              ts.forEachChild(node, visit);
+            }
+            visit(sf);
+            if (!spans.length) return 0;
+            let next = source;
+            for (const [start, end] of spans.sort((a, b) => b[0] - a[0])) {
+              next = next.slice(0, start) + next.slice(end);
+            }
+            fs.writeFileSync(file, next);
+            return spans.length;
+          }
+
+          for (const file of walk('server/routes')) {
+            if (file.endsWith('whatsappFastSendRoutes.ts')) continue;
+            removeMatchingStatements(file, (method, routePath) => {
+              if (method !== 'post' || !duplicateFastPaths.has(routePath)) return false;
+              removed.set(routePath, (removed.get(routePath) ?? 0) + 1);
+              return true;
+            });
+          }
+
+          for (const [routePath, count] of removed) {
+            if (count !== 1) throw new Error(`Expected exactly one dead legacy registration for ${routePath}, found ${count}`);
+          }
+
+          const deadStockTransferFile = 'server/routes/fiscal-transfers/revisions-write.ts';
+          const deadCount = removeMatchingStatements(
+            deadStockTransferFile,
+            (method, routePath) => method === 'post' && routePath === '/api/stock-transfer-revisions/:id/approve'
+          );
+          if (deadCount !== 1) {
+            throw new Error(`Expected one documented dead stock-transfer approval registration, found ${deadCount}`);
+          }
+
+          console.log('Removed seven legacy WhatsApp shadows and one already-documented dead stock-transfer shadow.');
+          NODE
+          mapfile -t changed < <(git diff --name-only -- '*.ts')
+          if [ "${#changed[@]}" -gt 0 ]; then
+            node node_modules/prettier/bin/prettier.cjs --write "${changed[@]}"
+          fi
+      - name: Regenerate and verify route manifest
+        run: |
+          UPDATE_ROUTE_MANIFEST=1 npx vitest run tests/route-manifest.test.ts
           node node_modules/prettier/bin/prettier.cjs --write config/route-manifest.json
+          npx vitest run tests/route-manifest.test.ts
       - name: Verify repaired backend regressions
         run: |
           npx vitest run tests/pdf-invoice.test.ts tests/source-text-assertions.test.ts tests/waste-dispatch-route-registration.test.ts tests/shipping-container-zip-package-regression.test.ts
@@ -88,12 +180,23 @@ jobs:
           cat lint-ratchet.txt
           echo "lint_status=$lint_status ratchet_status=$ratchet_status"
           exit 0
+      - name: Upload lint ratchet measurement
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: phase2-lint-ratchet-measurement
+          path: |
+            lint-run.txt
+            lint-ratchet.txt
+          if-no-files-found: warn
+          retention-days: 2
       - name: Commit verified repairs and remove temporary workflow
         run: |
           rm .github/workflows/phase2-exact-head-repair.yml
+          rm -f lint-run.txt lint-ratchet.txt
           git config user.name "Hassan-Merhi"
           git config user.email "241374101+Hassan-Merhi@users.noreply.github.com"
-          git add tests/pdf-invoice.test.ts tests/waste-dispatch-route-registration.test.ts tests/shipping-container-zip-package-regression.test.ts config/route-manifest.json .github/workflows/phase2-exact-head-repair.yml
+          git add -A
           if git diff --cached --quiet; then
             echo "No repair changes to commit"
             exit 0
