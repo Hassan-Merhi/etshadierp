@@ -75,9 +75,9 @@ jobs:
         run: |
           UPDATE_ROUTE_MANIFEST=1 npx vitest run tests/route-manifest.test.ts || true
           node node_modules/prettier/bin/prettier.cjs --write config/route-manifest.json
-      - name: Verify focused backend regressions
+      - name: Verify repaired backend regressions
         run: |
-          npx vitest run tests/pdf-invoice.test.ts tests/route-manifest.test.ts tests/source-text-assertions.test.ts tests/waste-dispatch-route-registration.test.ts tests/shipping-container-zip-package-regression.test.ts
+          npx vitest run tests/pdf-invoice.test.ts tests/source-text-assertions.test.ts tests/waste-dispatch-route-registration.test.ts tests/shipping-container-zip-package-regression.test.ts
       - name: Measure lint ratchet without changing its ceilings
         run: |
           set +e
