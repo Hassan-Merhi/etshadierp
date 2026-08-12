@@ -87,8 +87,7 @@ jobs:
             server/routes/factoryWhatsappRoutes.ts \
             tests/waste-dispatch-route-registration.test.ts \
             tests/phase7-backend-messages-translations.test.ts \
-            scripts/verify-env-documentation.mjs \
-            docs/whatsapp.env.example
+            scripts/verify-env-documentation.mjs
       - name: Refresh measured route manifest
         run: UPDATE_ROUTE_MANIFEST=1 npx vitest run tests/route-manifest.test.ts
       - name: Verify deterministic failures
