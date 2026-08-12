@@ -237,7 +237,10 @@ export default function StockInSalesReportDetail() {
     staleTime: 60_000,
   });
 
-  const locationNameById = useMemo(() => new Map(locations.map((location) => [location.id, location.name])), [locations]);
+  const locationNameById = useMemo(
+    () => new Map(locations.map((location) => [location.id, location.name])),
+    [locations]
+  );
   const locationName = (id: number | null) => (id ? locationNameById.get(id) || `Location #${id}` : "—");
   const sourceLocationName = (row: MovementRow) =>
     row.movementType === "Transfer In" ? locationName(row.counterpartyLocationId) : locationName(row.locationId);
@@ -513,7 +516,8 @@ export default function StockInSalesReportDetail() {
         <span className="font-medium">Outbound breakdown:</span> Sales/returns{" "}
         <span className="font-mono font-semibold">{formatNumber(summary.salesOutQty || 0, 0)}</span> · Transfer out{" "}
         <span className="font-mono font-semibold">{formatNumber(summary.transferOutQty || 0, 0)}</span> · Other out{" "}
-        <span className="font-mono font-semibold">{formatNumber(summary.otherStockOutQty || 0, 0)}</span>. Transfers reduce stock but do not create sales or profit.
+        <span className="font-mono font-semibold">{formatNumber(summary.otherStockOutQty || 0, 0)}</span>. Transfers
+        reduce stock but do not create sales or profit.
       </div>
 
       {isFetching && !isLoading && (
@@ -719,7 +723,9 @@ export default function StockInSalesReportDetail() {
                           <TableCell className="font-medium">{row.stockItemName}</TableCell>
                           <TableCell className="text-right font-mono">{formatNumber(row.quantity, 0)}</TableCell>
                           <TableCell className="text-right font-mono">{money(row.totalSales)}</TableCell>
-                          <TableCell className="text-right font-mono text-muted-foreground">{money(row.totalCost)}</TableCell>
+                          <TableCell className="text-right font-mono text-muted-foreground">
+                            {money(row.totalCost)}
+                          </TableCell>
                           <TableCell
                             className={`text-right font-mono font-semibold ${row.costProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}
                           >
