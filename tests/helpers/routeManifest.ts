@@ -123,11 +123,15 @@ export function extractRouteManifest(app: Express): RouteManifest {
 
   for (const layer of stack) {
     if (layer.route) {
-      const path = layer.route.path;
-      // Express permits array and RegExp paths; this codebase uses strings, and
-      // a non-string would otherwise serialise unstably.
-      if (typeof path !== "string") {
-        throw new Error(`Unsupported non-string route path: ${String(path)}`);
+      const rawPath = layer.route.path;
+      const paths =
+        typeof rawPath === "string"
+          ? [rawPath]
+          : Array.isArray(rawPath) && rawPath.every((path) => typeof path === "string")
+            ? rawPath
+            : null;
+      if (!paths) {
+        throw new Error(`Unsupported non-string route path: ${String(rawPath)}`);
       }
 
       const routeStack = layer.route.stack ?? [];
@@ -145,7 +149,9 @@ export function extractRouteManifest(app: Express): RouteManifest {
           .filter((handlerLayer) => handlerLayer.method === undefined || handlerLayer.method.toUpperCase() === method)
           .map(handlerName);
 
-        routes.push({ method, path, guards });
+        for (const path of paths) {
+          routes.push({ method, path, guards });
+        }
       }
       continue;
     }
