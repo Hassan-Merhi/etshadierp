@@ -6,7 +6,7 @@ on:
       - fix/pos-container-tracking-modern-ui-export
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   format-and-audit:
@@ -14,6 +14,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref_name }}
 
       - uses: actions/setup-node@v6
         with:
@@ -34,9 +36,10 @@ jobs:
           text = path.read_text()
           old = "  const containers = data?.containers ?? [];"
           new = "  const containers = useMemo(() => data?.containers ?? [], [data?.containers]);"
-          if old not in text:
+          if old in text:
+              path.write_text(text.replace(old, new, 1))
+          elif new not in text:
               raise SystemExit("expected containers expression not found")
-          path.write_text(text.replace(old, new, 1))
           PY
 
       - name: Format changed client files
@@ -47,24 +50,22 @@ jobs:
 
       - name: Audit changed files with ESLint
         run: |
-          set +e
           node node_modules/eslint/bin/eslint.js \
             client/src/pages/pos/POSContainerTracking.tsx \
             client/src/pages/pos/POSContainerDetail.tsx \
             server/routes/pos/posContainerTrackingRoutes.ts \
-            --format stylish > changed-eslint.txt 2>&1
-          status=$?
-          cat changed-eslint.txt
-          echo "eslint_exit=$status" >> "$GITHUB_STEP_SUMMARY"
-          exit 0
+            --format stylish
 
-      - name: Upload formatted sources
-        uses: actions/upload-artifact@v7
-        with:
-          name: pos-container-formatted
-          path: |
-            client/src/pages/pos/POSContainerTracking.tsx
+      - name: Commit verified formatting
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            client/src/pages/pos/POSContainerTracking.tsx \
             client/src/pages/pos/POSContainerDetail.tsx
-            changed-eslint.txt
-          if-no-files-found: error
-          retention-days: 1
+          if git diff --cached --quiet; then
+            echo "No formatting changes to commit."
+            exit 0
+          fi
+          git commit -m "fix(pos): format container tracking UI"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
