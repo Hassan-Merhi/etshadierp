@@ -106,14 +106,22 @@ type Handler = (req: any, res: any) => unknown;
 
 function buildRoutes() {
   const routes = new Map<string, Handler>();
-  const register = (method: string) => (path: string, ...handlers: any[]) => routes.set(`${method} ${path}`, handlers.at(-1));
+  const register =
+    (method: string) =>
+    (path: string, ...handlers: any[]) =>
+      routes.set(`${method} ${path}`, handlers.at(-1));
   const app: any = { get: register("GET"), post: register("POST"), put: register("PUT"), delete: register("DELETE") };
   registerBankAssetRoutes(app);
   return routes;
 }
 
 function req(overrides: Record<string, unknown> = {}) {
-  return { session: { currentCompanyId: 4, userId: "admin-1", username: "admin" }, params: {}, body: {}, ...overrides } as any;
+  return {
+    session: { currentCompanyId: 4, userId: "admin-1", username: "admin" },
+    params: {},
+    body: {},
+    ...overrides,
+  } as any;
 }
 
 function resHarness() {
@@ -194,11 +202,15 @@ describe("bank and fixed-asset route behavior", () => {
     });
     const res = resHarness();
     await routes.get("POST /api/bank-accounts")!(
-      req({ body: { name: "Main Cash", code: "CASH1", openingBalance: "100", openingBalanceSide: "Dr", linkedLedgerId: 12 } }),
-      res,
+      req({
+        body: { name: "Main Cash", code: "CASH1", openingBalance: "100", openingBalanceSide: "Dr", linkedLedgerId: 12 },
+      }),
+      res
     );
     expect(res.statusCode).toBe(201);
-    expect(harness.logAudit).toHaveBeenCalledWith(expect.objectContaining({ companyId: 4, action: "create", recordId: 5 }));
+    expect(harness.logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({ companyId: 4, action: "create", recordId: 5 })
+    );
   });
 
   it("updates and deletes bank accounts through company-scoped storage methods", async () => {
@@ -230,7 +242,7 @@ describe("bank and fixed-asset route behavior", () => {
           openingBalanceBaseAmount: "0.2",
         },
       ],
-      [{ rate: "500" }],
+      [{ rate: "500" }]
     );
     harness.pool.query.mockResolvedValue({
       rows: [
@@ -286,7 +298,7 @@ describe("bank and fixed-asset route behavior", () => {
     const res = resHarness();
     await routes.get("POST /api/fixed-assets")!(
       req({ body: { code: "CAR", name: "Vehicle", depreciationMethod: "Straight Line", usefulLife: 0 } }),
-      res,
+      res
     );
     expect(res.statusCode).toBe(400);
     expect(res.body.message).toContain("Useful life");
