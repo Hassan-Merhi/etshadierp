@@ -19,9 +19,9 @@ const ROOT = resolve(process.cwd());
 const SERVER_DIR = join(ROOT, "server");
 const ENV_EXAMPLES = [
   join(ROOT, ".env.example"),
-  join(ROOT, "docs", "whatsapp.env.example"),
   join(ROOT, "docs", "remote-support.env.example"),
   join(ROOT, "docs", "observability", "render-logging.env.example"),
+  join(ROOT, "docs", "whatsapp.env.example"),
 ];
 
 /**

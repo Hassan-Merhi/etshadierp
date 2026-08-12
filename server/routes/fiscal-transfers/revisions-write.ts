@@ -10,16 +10,13 @@ import { db } from "../../db";
 import { requireAuth, requireNonPOS } from "../../auth";
 import { logger } from "../../lib/logger";
 import {
-  inventory,
   stockTransferVouchers,
-  stockTransferItems,
   stockTransferRevisions,
   stockTransferRevisionItems,
   vouchers,
   locations,
 } from "@shared/schema";
-import { eq, and, desc, asc, inArray } from "drizzle-orm";
-import { adjustInventory } from "../../inventoryHelper";
+import { eq, and, desc, asc } from "drizzle-orm";
 import { sendRevisedTransferWhatsApp } from "../../helpers/sendRevisedTransferWhatsApp";
 
 export function registerStockTransferRevisionWriteRoutes(app: Express) {
@@ -212,188 +209,6 @@ export function registerStockTransferRevisionWriteRoutes(app: Express) {
       await db.update(stockTransferRevisions).set({ optional: !!optional }).where(eq(stockTransferRevisions.id, id));
       res.json({ success: true });
     } catch (error: unknown) {
-      res.status(500).json({ message: getErrorMessage(error) });
-    }
-  });
-
-  // Revisions - APPROVE (apply deltas to transfer items and inventory)
-  app.post("/api/stock-transfer-revisions/:id/approve", requireAuth, requireNonPOS, async (req, res) => {
-    try {
-      const revisionId = parseInt(req.params.id);
-      if (!revisionId) return res.status(400).json({ message: "Revision ID required" });
-
-      await db.transaction(async (tx) => {
-        // Load revision
-        const [revision] = await tx
-          .select()
-          .from(stockTransferRevisions)
-          .where(eq(stockTransferRevisions.id, revisionId));
-        if (!revision) throw new Error("Revision not found");
-
-        // Load the transfer
-        const [transfer] = await tx
-          .select()
-          .from(stockTransferVouchers)
-          .where(eq(stockTransferVouchers.id, revision.transferId));
-        if (!transfer) throw new Error("Transfer not found");
-
-        // Load ALL optional revisions for this transfer and compute net delta per item
-        // (mirrors the merge logic in the GET endpoint so approval matches what admin sees)
-        const allOptionalRevs = await tx
-          .select()
-          .from(stockTransferRevisions)
-          .where(
-            and(eq(stockTransferRevisions.transferId, revision.transferId), eq(stockTransferRevisions.optional, true))
-          )
-          .orderBy(asc(stockTransferRevisions.revisionNumber));
-
-        const allOptionalRevIds = allOptionalRevs.map((r) => r.id);
-        const allOptionalItems =
-          allOptionalRevIds.length > 0
-            ? await tx
-                .select()
-                .from(stockTransferRevisionItems)
-                .where(inArray(stockTransferRevisionItems.revisionId, allOptionalRevIds))
-            : [];
-
-        if (allOptionalItems.length === 0) throw new Error("Revision has no items");
-
-        // Compute net delta per item (same key logic as GET endpoint)
-        const netMap = new Map<
-          string,
-          { stockItemId: number; sourceLocationId: number | null; originalQuantity: string; newQuantity: string }
-        >();
-        for (const rev of allOptionalRevs) {
-          const items = allOptionalItems.filter((i) => i.revisionId === rev.id);
-          for (const item of items) {
-            const key = `${item.stockItemId}:${item.sourceLocationId ?? ""}`;
-            const existing = netMap.get(key);
-            if (!existing) {
-              netMap.set(key, {
-                stockItemId: item.stockItemId,
-                sourceLocationId: item.sourceLocationId,
-                originalQuantity: item.originalQuantity,
-                newQuantity: item.newQuantity,
-              });
-            } else {
-              netMap.set(key, { ...existing, newQuantity: item.newQuantity });
-            }
-          }
-        }
-
-        // Use the transfer's own company (from its voucher) for inventory adjustments.
-        // Stock is always per-company — never use the destination location's company
-        // as that can cross company boundaries.
-        const [transferVoucherRow] = await tx
-          .select({ companyId: vouchers.companyId })
-          .from(vouchers)
-          .where(eq(vouchers.id, transfer.voucherId));
-        const companyId = transferVoucherRow?.companyId ?? req.session.currentCompanyId ?? null;
-
-        // Load existing transfer items
-        const existingItems = await tx
-          .select()
-          .from(stockTransferItems)
-          .where(eq(stockTransferItems.transferId, transfer.id));
-
-        for (const [, netItem] of netMap) {
-          const origQty = parseFloat(netItem.originalQuantity);
-          const newQty = parseFloat(netItem.newQuantity);
-          const netDelta = newQty - origQty;
-          if (netDelta === 0) continue;
-
-          // Find the matching transfer item by stockItemId (+ sourceLocationId if set)
-          const match = existingItems.find(
-            (i) =>
-              i.stockItemId === netItem.stockItemId &&
-              (!netItem.sourceLocationId || i.sourceLocationId === netItem.sourceLocationId)
-          );
-
-          if (match) {
-            const rate = parseFloat(match.rate ?? "0");
-            const newTotal = newQty * rate;
-
-            await tx
-              .update(stockTransferItems)
-              .set({ quantity: String(newQty), totalAmount: newTotal.toFixed(2) })
-              .where(eq(stockTransferItems.id, match.id));
-
-            // Apply inventory delta only if transfer was already applied to inventory
-            if (transfer.inventoryApplied && netItem.sourceLocationId) {
-              await adjustInventory(tx, netItem.sourceLocationId, netItem.stockItemId, -netDelta, companyId!);
-              await adjustInventory(
-                tx,
-                transfer.destinationLocationId,
-                netItem.stockItemId,
-                netDelta,
-                companyId!,
-                rate
-              );
-            }
-          } else if (newQty > 0) {
-            // New item added by POS user that doesn't exist in the original transfer — insert it.
-            // Look up rate from inventory.averageRate (same pattern as normal transfer creation
-            // auto-fill for POS users who don't send cost price). Falls back to 0 safely if
-            // the item has no inventory record at the source location.
-            let rate = 0;
-            if (netItem.sourceLocationId) {
-              const [invRow] = await tx
-                .select({ averageRate: inventory.averageRate })
-                .from(inventory)
-                .where(
-                  and(
-                    eq(inventory.locationId, netItem.sourceLocationId),
-                    eq(inventory.stockItemId, netItem.stockItemId)
-                  )
-                )
-                .limit(1);
-              const parsed = parseFloat(invRow?.averageRate ?? "0");
-              rate = isNaN(parsed) ? 0 : parsed;
-            }
-            const totalAmount = newQty * rate;
-
-            await tx.insert(stockTransferItems).values({
-              transferId: transfer.id,
-              stockItemId: netItem.stockItemId,
-              sourceLocationId: netItem.sourceLocationId ?? undefined,
-              quantity: String(newQty),
-              rate: rate.toFixed(2),
-              totalAmount: totalAmount.toFixed(2),
-            });
-
-            // Apply inventory adjustment for the new item if inventory was already applied
-            if (transfer.inventoryApplied && netItem.sourceLocationId) {
-              await adjustInventory(tx, netItem.sourceLocationId, netItem.stockItemId, -newQty, companyId!);
-              await adjustInventory(tx, transfer.destinationLocationId, netItem.stockItemId, newQty, companyId!, rate);
-            }
-          }
-        }
-
-        // Recalculate total from all items (including ones not in this revision)
-        const allItems = await tx
-          .select({ qty: stockTransferItems.quantity, rate: stockTransferItems.rate })
-          .from(stockTransferItems)
-          .where(eq(stockTransferItems.transferId, transfer.id));
-        const fullTotal = allItems.reduce((s, i) => s + parseFloat(i.qty) * parseFloat(i.rate ?? "0"), 0);
-
-        // Update voucher total
-        await tx
-          .update(vouchers)
-          .set({ totalAmount: fullTotal.toFixed(2) })
-          .where(eq(vouchers.id, transfer.voucherId));
-
-        // Mark ALL optional revisions for this transfer as approved (handles merged display case)
-        await tx
-          .update(stockTransferRevisions)
-          .set({ optional: false })
-          .where(
-            and(eq(stockTransferRevisions.transferId, revision.transferId), eq(stockTransferRevisions.optional, true))
-          );
-      });
-
-      res.json({ success: true });
-    } catch (error: unknown) {
-      logger.error("[Revision Approve] Error:", { error: getErrorMessage(error) });
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });

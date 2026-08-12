@@ -104,6 +104,7 @@ declare module "express-session" {
     userId?: string;
     username?: string;
     currentCompanyId?: number;
+    factoryCompanyId?: number;
     currentRole?: string;
     currentLocationId?: number | null;
     currentPOSStation?: number | null;

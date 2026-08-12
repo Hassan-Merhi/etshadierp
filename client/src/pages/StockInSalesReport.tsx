@@ -343,7 +343,16 @@ function StockInSalesReportSummary() {
 
   const exportCsv = () => {
     if (rows.length === 0) return;
-    const headers = ["Month", "Opening Qty", "Stock In", "Stock Out", "Closing Qty", "Closing Value", "Sales", "Gross Profit"];
+    const headers = [
+      "Month",
+      "Opening Qty",
+      "Stock In",
+      "Stock Out",
+      "Closing Qty",
+      "Closing Value",
+      "Sales",
+      "Gross Profit",
+    ];
     const values = rows.map((row) => [
       formatPeriodLabel(row),
       row.openingStockQty,

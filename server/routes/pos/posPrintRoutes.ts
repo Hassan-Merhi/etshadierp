@@ -1,13 +1,15 @@
-import { type Express } from "express";
+import type { Express } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
-import { vouchers, voucherEntries, ledgerAccounts } from "@shared/schema";
+import { locations, vouchers, voucherEntries, ledgerAccounts, posShifts, companies } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
-import { generateInvoicePdf } from "../../helpers/generateInvoicePdf";
+import { generateStockPdf } from "../../helpers/generateStockPdf";
+import { generateInvoicePdf, generateInvoicePdfMeta } from "../../helpers/generateInvoicePdf";
 import { getErpExportVisibility } from "../../helpers/exportVisibility";
+import { sendWhatsAppFileToChatIdPos, sendWhatsAppFileByUploadPos } from "../../services/whatsappService";
 import { tempPdfStore } from "./posHelpers";
 
 export function registerPosPrintRoutes(app: Express): void {

@@ -1,6 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { sql } from "drizzle-orm";
 
+import { requireAuth } from "../../../auth";
 import { db } from "../../../db";
 import { getClientDate } from "../../../lib/dateUtils";
 import { resultRows } from "../../../lib/queryResult";
@@ -20,8 +21,16 @@ type NetPositionResponse = {
   onUsTotal: number;
   netPosition: number;
   netPositionLabel: string;
-  forUs: { total: number; breakdown: Array<{ name: string; value: number }>; accounts: NetPositionAccount[] };
-  onUs: { total: number; breakdown: Array<{ name: string; value: number }>; accounts: NetPositionAccount[] };
+  forUs: {
+    total: number;
+    breakdown: Array<{ name: string; value: number }>;
+    accounts: NetPositionAccount[];
+  };
+  onUs: {
+    total: number;
+    breakdown: Array<{ name: string; value: number }>;
+    accounts: NetPositionAccount[];
+  };
   inventoryValue?: number;
   rawMaterialValue?: number;
   balanceOnTableValue?: number;
@@ -46,8 +55,6 @@ function replaceAccountValue(accounts: NetPositionAccount[], code: string, value
 }
 
 async function computeHistoricalOperationalValues(companyId: number, asOf: string, currentRawMaterialValue: number) {
-  // Finished stock must be reconstructed from timestamps, not today's status.
-  // A bale finalized after the selected date was still stock on the selected date.
   const stockResult = await db.execute(sql`
     SELECT COALESCE(SUM(p.production_price::numeric), 0) AS total
     FROM factory_bales b
@@ -62,9 +69,6 @@ async function computeHistoricalOperationalValues(companyId: number, asOf: strin
   const stockRow = resultRows(stockResult)[0] ?? {};
   const inventoryValue = round2(parseFloat(String(stockRow.total ?? "0")) || 0);
 
-  // Balance on Table is mix input accumulated up to the selected date less bale
-  // output accumulated up to that date. The old implementation used all-time totals,
-  // which made every historical day show today's value.
   const mixResult = await db.execute(sql`
     SELECT
       COALESCE(SUM(total_weight_kg::numeric), 0) AS total_mix_kg,
@@ -92,9 +96,6 @@ async function computeHistoricalOperationalValues(companyId: number, asOf: strin
   const totalBaleKg = parseFloat(String(baleRow.total_bale_kg ?? "0")) || 0;
   const balanceOnTableValue = round2(Math.max(totalMixKg - totalBaleKg, 0) * blendedCpk);
 
-  // Raw stock stores current cumulative received/used quantities. Rebuild an as-of
-  // value by reversing movements that happened AFTER the selected date. This keeps
-  // today's exact authoritative value while restoring historical movement.
   const consumedAfterResult = await db.execute(sql`
     SELECT COALESCE(SUM(fms.total_cost::numeric), 0) AS value_after
     FROM factory_mix_batch_sources fms
@@ -142,8 +143,7 @@ async function computeHistoricalOperationalValues(companyId: number, asOf: strin
 }
 
 export function registerNetPositionHistoricalCorrection(app: Express) {
-  app.use("/api/factory/net-position", (req: Request, res: Response, next: NextFunction) => {
-    if (req.method !== "GET") return next();
+  app.get("/api/factory/net-position", requireAuth, (req: Request, res: Response, next: NextFunction) => {
     const asOf =
       typeof req.query.asOf === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.asOf) ? req.query.asOf : null;
     if (!asOf || asOf === getClientDate(req)) return next();

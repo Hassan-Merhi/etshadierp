@@ -1,22 +1,63 @@
-import fs from "node:fs";
-import path from "node:path";
+import type { Express } from "express";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { describe, expect, it } from "vitest";
-
-const root = process.cwd();
-const manifest = JSON.parse(fs.readFileSync(path.join(root, "config/route-manifest.json"), "utf8")) as {
-  routes: string[];
-};
+beforeEach(() => {
+  vi.resetModules();
+  vi.clearAllMocks();
+  vi.doUnmock("../server/routes/factory/employee-pos/index");
+});
 
 describe("waste dispatch route registration", () => {
-  it("keeps the optimized waste dispatch read routes registered", () => {
-    const expected = [
-      "GET /api/factory/waste-dispatch/summary",
-      "GET /api/factory/waste-dispatch/group-bales/:productId",
-      "GET /api/factory/waste-dispatch/scan",
-    ];
-    for (const prefix of expected) {
-      expect(manifest.routes.some((route) => route.startsWith(prefix))).toBe(true);
-    }
+  it("delegates the compatibility registrar to the canonical registrar", async () => {
+    const canonicalRegistrar = vi.fn();
+    vi.doMock("../server/routes/factory/employee-pos/index", () => ({
+      registerFactoryEmployeesPosRoutes: canonicalRegistrar,
+    }));
+
+    const { registerFactoryEmployeesPosRoutes } = await import("../server/routes/factory/factoryEmployeesPosRoutes");
+    const app = {} as Express;
+
+    registerFactoryEmployeesPosRoutes(app);
+
+    expect(canonicalRegistrar).toHaveBeenCalledTimes(1);
+    expect(canonicalRegistrar).toHaveBeenCalledWith(app);
+  });
+
+  it("includes the optimized waste dispatch registrar in the canonical registrar", async () => {
+    const wasteDispatchRegistrar = vi.fn();
+    const noopRegistrar = vi.fn();
+
+    vi.doMock("../server/routes/factory/employee-pos/employee-crud", () => ({
+      registerEmployeeCrudRoutes: noopRegistrar,
+    }));
+    vi.doMock("../server/routes/factory/employee-pos/employeeAdvancesBonusRoutes", () => ({
+      registerEmployeeAdvancesBonusRoutes: noopRegistrar,
+    }));
+    vi.doMock("../server/routes/factory/employee-pos/employeeLedgerWasteRoutes", () => ({
+      registerEmployeeLedgerWasteRoutes: noopRegistrar,
+    }));
+    vi.doMock("../server/routes/factory/employee-pos/wasteDispatchBandwidthRoutes", () => ({
+      registerWasteDispatchBandwidthRoutes: wasteDispatchRegistrar,
+    }));
+    vi.doMock("../server/routes/factory/employee-pos/pos-financial", () => ({
+      registerEmployeePosFinancialRoutes: noopRegistrar,
+    }));
+    vi.doMock("../server/routes/factory/employee-pos/netPositionHistoricalCorrection", () => ({
+      registerNetPositionHistoricalCorrection: noopRegistrar,
+    }));
+    vi.doMock("../server/routes/factory/employee-pos/employeeNetPositionRoutes", () => ({
+      registerEmployeeNetPositionRoutes: noopRegistrar,
+    }));
+    vi.doMock("../server/routes/factory/employee-pos/employeeAttendanceRoutes", () => ({
+      registerEmployeeAttendanceRoutes: noopRegistrar,
+    }));
+
+    const { registerFactoryEmployeesPosRoutes } = await import("../server/routes/factory/employee-pos/index");
+    const app = {} as Express;
+
+    registerFactoryEmployeesPosRoutes(app);
+
+    expect(wasteDispatchRegistrar).toHaveBeenCalledTimes(1);
+    expect(wasteDispatchRegistrar).toHaveBeenCalledWith(app);
   });
 });

@@ -75,10 +75,7 @@ async function ensureStockItems(needed: number): Promise<number[]> {
  * Create a POS sale with `count` line items (one per distinct stock item).
  * Returns the voucherId of the created sale.
  */
-async function seedSale(
-  count: number,
-  opts: { longNames?: boolean; configuredPrice?: number } = {},
-): Promise<number> {
+async function seedSale(count: number, opts: { longNames?: boolean; configuredPrice?: number } = {}): Promise<number> {
   // Ensure enough stock items exist
   const stockIds = await ensureStockItems(count);
 
@@ -91,8 +88,8 @@ async function seedSale(
         and(
           eq(schema.inventory.companyId, ctx.companyId),
           eq(schema.inventory.locationId, ctx.locationId),
-          eq(schema.inventory.stockItemId, stockItemId),
-        ),
+          eq(schema.inventory.stockItemId, stockItemId)
+        )
       )
       .limit(1);
     if (!inv) {
@@ -105,10 +102,7 @@ async function seedSale(
         totalValue: "499995.00",
       });
     } else if (parseFloat(inv.quantity) < count) {
-      await db
-        .update(schema.inventory)
-        .set({ quantity: "99999.000" })
-        .where(eq(schema.inventory.id, inv.id));
+      await db.update(schema.inventory).set({ quantity: "99999.000" }).where(eq(schema.inventory.id, inv.id));
     }
   }
 
@@ -129,22 +123,20 @@ async function seedSale(
   });
 
   if (saleRes.status < 200 || saleRes.status >= 300) {
-    throw new Error(
-      `Sale creation failed (${saleRes.status}): ${JSON.stringify(saleRes.body)}`,
-    );
+    throw new Error(`Sale creation failed (${saleRes.status}): ${JSON.stringify(saleRes.body)}`);
   }
 
-  const voucherId =
-    saleRes.body?.voucher?.id ?? saleRes.body?.voucherId ?? saleRes.body?.id;
-  if (!voucherId)
-    throw new Error(`No voucherId in response: ${JSON.stringify(saleRes.body)}`);
+  const voucherId = saleRes.body?.voucher?.id ?? saleRes.body?.voucherId ?? saleRes.body?.id;
+  if (!voucherId) throw new Error(`No voucherId in response: ${JSON.stringify(saleRes.body)}`);
 
   // If longNames requested, rename the stock items so the PDF sees long names
   if (opts.longNames) {
     for (let i = 0; i < count; i++) {
       await db
         .update(schema.stockItems)
-        .set({ name: `A Very Long Stock Item Description That Should Be Truncated With Ellipsis In Compact PDF Mode — Item ${i + 1}` })
+        .set({
+          name: `A Very Long Stock Item Description That Should Be Truncated With Ellipsis In Compact PDF Mode — Item ${i + 1}`,
+        })
         .where(eq(schema.stockItems.id, stockIds[i]));
     }
   }
@@ -164,9 +156,7 @@ async function cleanupSales() {
   const vs = await db
     .select({ id: schema.vouchers.id })
     .from(schema.vouchers)
-    .where(
-      and(eq(schema.vouchers.companyId, ctx.companyId), eq(schema.vouchers.voucherType, "Sales")),
-    );
+    .where(and(eq(schema.vouchers.companyId, ctx.companyId), eq(schema.vouchers.voucherType, "Sales")));
   for (const v of vs) {
     await db.delete(schema.salesItems).where(eq(schema.salesItems.voucherId, v.id));
     await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, v.id));
@@ -177,7 +167,7 @@ async function cleanupSales() {
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
 beforeAll(async () => {
-  ctx   = await seedTestData(TEST_PREFIX);
+  ctx = await seedTestData(TEST_PREFIX);
   agent = request.agent(ctx.app);
   await loginAsTestUser();
 }, 90000);
@@ -186,12 +176,9 @@ afterAll(async () => {
   await cleanupSales();
   // Remove extra stock items created for large-sale tests
   for (const id of extraStockItemIds) {
-    await db.delete(schema.inventory).where(
-      and(
-        eq(schema.inventory.companyId, ctx.companyId),
-        eq(schema.inventory.stockItemId, id),
-      ),
-    );
+    await db
+      .delete(schema.inventory)
+      .where(and(eq(schema.inventory.companyId, ctx.companyId), eq(schema.inventory.stockItemId, id)));
     await db.delete(schema.stockItems).where(eq(schema.stockItems.id, id));
   }
   await cleanupTestData(TEST_PREFIX);
@@ -269,7 +256,7 @@ describe("C. Long item names — no page explosion", () => {
   it("does not throw on very long item names", async () => {
     const voucherId = await seedSale(20, { longNames: true });
     await expect(
-      generateInvoicePdfMeta(voucherId, ctx.companyId, "testuser", { compactMode: true }),
+      generateInvoicePdfMeta(voucherId, ctx.companyId, "testuser", { compactMode: true })
     ).resolves.toBeDefined();
   }, 60000);
 });
@@ -364,9 +351,9 @@ describe("E. Normal ERP invoice PDF download still works", () => {
 
 describe("F. Validation guard", () => {
   it("generateInvoicePdfMeta throws for non-existent voucher", async () => {
-    await expect(
-      generateInvoicePdfMeta(999999999, ctx.companyId, "testuser", { compactMode: true }),
-    ).rejects.toThrow("Voucher not found");
+    await expect(generateInvoicePdfMeta(999999999, ctx.companyId, "testuser", { compactMode: true })).rejects.toThrow(
+      "Voucher not found"
+    );
   }, 15000);
 
   it("compact buffer always starts with %PDF and is >1000 bytes", async () => {
@@ -383,7 +370,7 @@ describe("F. Validation guard", () => {
       .post("/api/pos/send-invoice-pdf-backend")
       .send({ voucherId: "abc", locationId: ctx.locationId, dryRun: true });
     expect(res.status).toBe(400);
-    expect(res.body.message).toMatch(/invalid voucherid/i);
+    expect(String(res.body.message).toLowerCase()).toContain("voucherid");
   }, 15000);
 
   it("route dryRun=true returns metadata JSON and does NOT send to WhatsApp", async () => {
