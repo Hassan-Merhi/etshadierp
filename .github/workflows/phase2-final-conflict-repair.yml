@@ -72,6 +72,35 @@ jobs:
               raise SystemExit('Expected mobile frontend regression block not found')
           path.write_text(text)
           PY
+      - name: Lock in current quality gains
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = 'config/type-escape-boundaries.json';
+          const config = JSON.parse(fs.readFileSync(path, 'utf8'));
+          const key = 'client/src/pages/StockEntryHistory.tsx';
+          const current = config.scan.baseline[key];
+          if (!Array.isArray(current) || current.length !== 3) throw new Error(`Missing baseline for ${key}`);
+          if (current[0] < 19 || current[1] !== 0 || current[2] !== 0) {
+            throw new Error(`Unexpected ${key} baseline: ${JSON.stringify(current)}`);
+          }
+          config.scan.baseline[key] = [19, 0, 0];
+          if (config.totals.typeEscapeCeiling > 8832) config.totals.typeEscapeCeiling = 8832;
+          if (config.totals.typeEscapeCeiling !== 8832) {
+            throw new Error(`Unexpected type escape ceiling: ${config.totals.typeEscapeCeiling}`);
+          }
+          fs.writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`);
+
+          for (const docPath of ['docs/god-file-split-program.md', 'docs/system-quality-program.md']) {
+            let text = fs.readFileSync(docPath, 'utf8');
+            text = text.replaceAll('25,438', '25,420').replaceAll('25,437', '25,420');
+            if (docPath === 'docs/system-quality-program.md') {
+              text = text.replaceAll('8,834', '8,832').replaceAll('8,836', '8,832');
+            }
+            fs.writeFileSync(docPath, text);
+          }
+          NODE
+          node node_modules/prettier/bin/prettier.cjs --write config/type-escape-boundaries.json
       - name: Targeted Phase 2 frontend repairs
         env:
           NODE_OPTIONS: --max-old-space-size=4096
@@ -90,7 +119,8 @@ jobs:
             tests/ui/journal-form-page-behavior.test.tsx \
             tests/ui/stock-entry-history-page-behavior.test.tsx \
             tests/ui/supplier-profit-check-page-behavior.test.tsx \
-            .github/workflows/mobile-responsive.yml
+            .github/workflows/mobile-responsive.yml \
+            config/type-escape-boundaries.json
       - name: Full frontend regression with fresh process per file
         env:
           NODE_OPTIONS: --max-old-space-size=4096
