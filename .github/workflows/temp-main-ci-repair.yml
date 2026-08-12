@@ -32,10 +32,12 @@ jobs:
           const fs = require('fs');
           const path = 'client/src/pages/StockInSalesReportDetail.tsx';
           let source = fs.readFileSync(path, 'utf8');
-          source = source.replace(
-            'import { useMemo, useState } from "react";',
-            'import { useCallback, useMemo, useState } from "react";'
-          );
+          if (source.includes('import { useMemo, useState } from "react";')) {
+            source = source.replace(
+              'import { useMemo, useState } from "react";',
+              'import { useCallback, useMemo, useState } from "react";'
+            );
+          }
           const oldBlock = `  const locationName = (id: number | null) => (id ? locationNameById.get(id) || \`Location #\${id}\` : "—");
   const sourceLocationName = (row: MovementRow) =>
     row.movementType === "Transfer In" ? locationName(row.counterpartyLocationId) : locationName(row.locationId);
@@ -63,12 +65,10 @@ jobs:
           : "—",
     [locationName]
   );`;
-          if (!source.includes(oldBlock)) throw new Error('Expected location helper block was not found');
-          source = source.replace(oldBlock, newBlock);
+          if (source.includes(oldBlock)) source = source.replace(oldBlock, newBlock);
           const oldDeps = '    [movements?.rows, locationNameById]\n  );';
           const newDeps = '    [movements?.rows, sourceLocationName, destinationLocationName]\n  );';
-          if (!source.includes(oldDeps)) throw new Error('Expected sortedMovements dependency list was not found');
-          source = source.replace(oldDeps, newDeps);
+          if (source.includes(oldDeps)) source = source.replace(oldDeps, newDeps);
           fs.writeFileSync(path, source);
           NODE
       - name: Apply repository formatting
@@ -80,8 +80,8 @@ jobs:
         run: |
           npm run lint
           npm run check
-      - name: Remove temporary workflow
-        run: rm .github/workflows/temp-main-ci-repair.yml
+      - name: Remove temporary workflow from head
+        run: rm -f .github/workflows/temp-main-ci-repair.yml
       - name: Commit repair
         run: |
           git config user.name 'github-actions[bot]'
