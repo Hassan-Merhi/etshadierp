@@ -1,41 +1,7 @@
-name: Temporary Report Formatter
-
-on:
-  push:
-    branches: [main]
-
-permissions:
-  contents: write
-
+name: Temporary CI Probe
+on: push
 jobs:
-  format:
-    runs-on: ubuntu-24.04
+  probe:
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout repair branch
-        uses: actions/checkout@v7
-        with:
-          ref: ci/main-green-20260812-1102
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Set up Node.js 22
-        uses: actions/setup-node@v6
-        with:
-          node-version: '22.14'
-          cache: npm
-      - name: Normalize package registry URLs
-        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
-      - name: Install dependencies
-        run: npm ci --no-audit --bin-links=true
-      - name: Format report files
-        run: |
-          npx prettier --write \
-            client/src/pages/StockInSalesReport.tsx \
-            client/src/pages/StockInSalesReportDetail.tsx
-          rm -f .github/workflows/temp-main-ci-repair.yml
-      - name: Commit formatting
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
-          git diff --cached --quiet && exit 0
-          git commit -m 'Format stock report files'
-          git push origin HEAD:ci/main-green-20260812-1102
+      - run: echo ok
