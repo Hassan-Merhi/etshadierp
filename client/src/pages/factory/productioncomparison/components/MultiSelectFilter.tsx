@@ -19,6 +19,7 @@ export function MultiSelectFilter({
   placeholder,
   allLabel,
   className,
+  testId,
 }: {
   options: MultiSelectOption[];
   selected: string[];
@@ -26,6 +27,7 @@ export function MultiSelectFilter({
   placeholder: string;
   allLabel: string;
   className?: string;
+  testId?: string;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -51,6 +53,7 @@ export function MultiSelectFilter({
       <PopoverTrigger asChild>
         <button
           type="button"
+          data-testid={testId}
           className={cn(
             "inline-flex items-center justify-between gap-2 rounded-md border bg-background px-3 py-2 text-sm shadow-sm hover:bg-accent transition-colors min-w-[140px]",
             selected.length > 0 && "border-primary/50",
