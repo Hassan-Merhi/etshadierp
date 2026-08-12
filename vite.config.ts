@@ -13,7 +13,12 @@ import { labelAssetExtractionPlugin } from "./build/viteLabelAssetExtractionPlug
 export default defineConfig({
   plugins: [
     heavyListPaginationPlugin(),
-    salesReportBandwidthPlugin(),
+    // The Phase 3 Sales Report bandwidth transform rewrites the working legacy
+    // report at build time. Keep the transform available for controlled testing,
+    // but fail safe to the proven legacy report until the compact path is
+    // production-hardened. This restores the ERP Sales Report immediately while
+    // preserving the bandwidth implementation and its verification markers.
+    ...(process.env.ENABLE_SALES_REPORT_BANDWIDTH === "true" ? [salesReportBandwidthPlugin()] : []),
     salesReportInvalidationPlugin(),
     phase1PaginationPlugin(),
     lazyHeavyImportsPlugin(),
