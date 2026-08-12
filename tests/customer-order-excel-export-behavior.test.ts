@@ -89,7 +89,9 @@ vi.mock("../server/lib/httpHandlers", () => ({
   getErrorStack: () => "stack",
 }));
 vi.mock("../server/lib/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
-vi.mock("../server/lib/contentDisposition", () => ({ contentDisposition: (name: string) => `attachment; filename=${name}` }));
+vi.mock("../server/lib/contentDisposition", () => ({
+  contentDisposition: (name: string) => `attachment; filename=${name}`,
+}));
 vi.mock("../server/lib/parseId", () => ({
   parseId: (value: unknown) => {
     const parsed = Number.parseInt(String(value), 10);
@@ -245,7 +247,7 @@ describe("customer order Excel export behavior", () => {
       [
         { articleCode: "SH-1", name: "Shirts", weightPerBaleKg: "45" },
         { articleCode: "PT-1", name: "Pants", weightPerBaleKg: "50" },
-      ],
+      ]
     );
 
     const res = responseHarness();
@@ -255,12 +257,12 @@ describe("customer order Excel export behavior", () => {
         params: { id: "20" },
         query: {},
       },
-      res,
+      res
     );
 
     expect(harness.getExportPriceVisibility).toHaveBeenCalled();
     expect(harness.logAudit).toHaveBeenCalledWith(
-      expect.objectContaining({ companyId: 4, action: "export", tableName: "factory_customer_orders", recordId: 20 }),
+      expect.objectContaining({ companyId: 4, action: "export", tableName: "factory_customer_orders", recordId: 20 })
     );
     expect(res.statusCode).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -314,13 +316,13 @@ describe("customer order Excel export behavior", () => {
           pricePerKg: "0",
         },
       ],
-      [{ articleCode: "SH-1", name: "Shirts", weightPerBaleKg: "45" }],
+      [{ articleCode: "SH-1", name: "Shirts", weightPerBaleKg: "45" }]
     );
 
     const res = responseHarness();
     await routes.get("/api/factory/customer-orders/:id/export-excel")!(
       { session: { factoryCompanyId: 4, userId: "admin-1" }, params: { id: "21" }, query: { noCharges: "1" } },
-      res,
+      res
     );
 
     const text = harness.workbooks[0].worksheets[0].rows
@@ -335,14 +337,14 @@ describe("customer order Excel export behavior", () => {
     const noCompany = responseHarness();
     await routes.get("/api/factory/customer-orders/:id/export-excel")!(
       { session: {}, params: { id: "20" }, query: {} },
-      noCompany,
+      noCompany
     );
     expect(noCompany.statusCode).toBe(400);
 
     const invalid = responseHarness();
     await routes.get("/api/factory/customer-orders/:id/export-excel")!(
       { session: { currentCompanyId: 4 }, params: { id: "bad" }, query: {} },
-      invalid,
+      invalid
     );
     expect(invalid.statusCode).toBe(400);
 
@@ -350,7 +352,7 @@ describe("customer order Excel export behavior", () => {
     const missing = responseHarness();
     await routes.get("/api/factory/customer-orders/:id/export-excel")!(
       { session: { currentCompanyId: 4 }, params: { id: "99" }, query: {} },
-      missing,
+      missing
     );
     expect(missing.statusCode).toBe(404);
     expect(harness.workbooks).toHaveLength(0);
