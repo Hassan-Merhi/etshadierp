@@ -9,7 +9,6 @@ permissions:
 
 jobs:
   repair:
-    if: github.event.head_commit.message == 'ci: activate temporary report repair runner'
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repair branch
