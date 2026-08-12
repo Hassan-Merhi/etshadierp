@@ -73,7 +73,9 @@ export async function findEarliestOutstandingMonth(
 
   const pd = new Date(paymentDate + "T00:00:00Z");
   const fallback = { year: pd.getUTCFullYear(), month: pd.getUTCMonth() + 1 };
-  return contractStartDate ? clampRentalPeriodToContractStart(fallback.year, fallback.month, contractStartDate) : fallback;
+  return contractStartDate
+    ? clampRentalPeriodToContractStart(fallback.year, fallback.month, contractStartDate)
+    : fallback;
 }
 
 /**
