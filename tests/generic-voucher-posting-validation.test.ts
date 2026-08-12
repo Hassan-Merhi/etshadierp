@@ -44,9 +44,9 @@ describe("generic voucher validation coverage", () => {
     expect(() => buildGenericVoucherPostingRequest(request({ clientRequestId: "" }) as never)).toThrowError(
       expect.objectContaining<PostingValidationError>({ code: "POSTING_REQUEST_ID_REQUIRED" }),
     );
-    expect(() =>
-      buildGenericVoucherPostingRequest(request({ clientRequestId: "bad request id" }) as never),
-    ).toThrowError(expect.objectContaining<PostingValidationError>({ code: "POSTING_REQUEST_ID_INVALID" }));
+    expect(() => buildGenericVoucherPostingRequest(request({ clientRequestId: "bad request id" }) as never)).toThrowError(
+      expect.objectContaining<PostingValidationError>({ code: "POSTING_REQUEST_ID_INVALID" }),
+    );
   });
 
   it("rejects invalid currency and target identifiers", () => {
