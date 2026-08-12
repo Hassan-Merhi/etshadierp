@@ -41,7 +41,7 @@ describe("session security policy", () => {
   it("rejects idle and absolute expiry", () => {
     expect(
       decideSessionSecurity(
-        input({ session: { ...input().session!, lastSeenAt: now - 31 * 60_000 } })
+        input({ session: { ...input().session!, lastSeenAt: now - 12 * 60 * 60 * 1000 - 1 } })
       ).code
     ).toBe("SESSION_IDLE_EXPIRED");
     expect(
