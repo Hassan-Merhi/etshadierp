@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 import os
 import subprocess
 
@@ -38,6 +39,15 @@ if old_push not in text:
     raise SystemExit('route manifest push target not found')
 p.write_text(text.replace(old_push, new_push, 1))
 
+# The stock-in-sales movement route is already in the committed snapshot, so its
+# former one-copy allowance is stale and now demands a duplicate registration.
+p = root / 'config/ci-ratchet-allowances.json'
+allowances = json.loads(p.read_text())
+stale_route = 'GET /api/reports/stock-in-sales/movements [requireAuth > requireNonPOS > <anonymous> > <anonymous>]'
+if stale_route in allowances.get('routeManifestAdditions', []):
+    allowances['routeManifestAdditions'] = [entry for entry in allowances['routeManifestAdditions'] if entry != stale_route]
+p.write_text(json.dumps(allowances, indent=2, ensure_ascii=False) + '\n')
+
 # Synchronize the exact reviewed backend translation registry count.
 p = root / 'tests/phase7-backend-messages-translations.test.ts'
 text = p.read_text().replace('toHaveLength(581)', 'toHaveLength(592)').replace('toBe(581);', 'toBe(592);')
@@ -58,6 +68,14 @@ subprocess.run(['npx', 'prettier', '--write',
     'tests/phase7-backend-messages-translations.test.ts',
     'server/routes/whatsappFastSendRoutes.ts',
 ], check=True)
+
+# Print exactly which route keys grew beyond the committed snapshot before
+# regenerating it, so shadowed registrations can be removed instead of raising
+# the one-way ceiling.
+diag = root / 'scripts/route-shadow-diagnostic-run4.ts'
+diag.write_text('''import fs from "node:fs";\nimport express from "express";\nimport { registerRoutes } from "../server/routes";\nimport { extractRouteManifest, serializeRouteManifest } from "../tests/helpers/routeManifest";\nconst snapshot = JSON.parse(fs.readFileSync("config/route-manifest.json", "utf8")) as { routes: string[] };\nconst app = express();\nconst server = await registerRoutes(app);\nserver.close();\nconst actual = serializeRouteManifest(extractRouteManifest(app));\nfunction counts(routes: string[]) {\n  const out = new Map<string, number>();\n  for (const entry of routes) {\n    const key = entry.slice(0, entry.lastIndexOf("[")).trim();\n    out.set(key, (out.get(key) ?? 0) + 1);\n  }\n  return out;\n}\nconst before = counts(snapshot.routes);\nconst after = counts(actual.routes);\nfor (const [key, count] of after) {\n  const old = before.get(key) ?? 0;\n  if (count > old) console.log(`SHADOW_GROWTH ${key}: ${old} -> ${count}`);\n}\n''')
+subprocess.run(['npx', 'tsx', str(diag)], check=True)
+diag.unlink()
 
 # Regenerate the canonical manifest with the now-supported array routes.
 subprocess.run(['npm', 'run', 'test:backend', '--', 'route-manifest'], env={**os.environ, 'UPDATE_ROUTE_MANIFEST': '1'}, check=True)
