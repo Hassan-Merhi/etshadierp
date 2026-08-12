@@ -1,9 +1,9 @@
 import Decimal from "decimal.js";
 import { eq } from "drizzle-orm";
-import { propertyMonthlyLedger } from "@shared/schema";
+import { propertyContracts, propertyMonthlyLedger } from "@shared/schema";
 
 import { db, pool } from "../../db";
-import { getRentalPeriodDueDate } from "./rentalPeriodService";
+import { clampRentalPeriodToContractStart, getRentalPeriodDueDate } from "./rentalPeriodService";
 
 /**
  * Billing-day-aware "earliest outstanding month" finder.
@@ -15,13 +15,20 @@ import { getRentalPeriodDueDate } from "./rentalPeriodService";
  *   2. SUM(POSTED payments for that month) < expectedAmount
  *
  * Falls back to the payment month (as the start of prepaid allocations) if
- * every due month is fully paid.
+ * every due month is fully paid, but never before the contract start month.
  */
 export async function findEarliestOutstandingMonth(
   contractId: number,
   billingDay: number,
   paymentDate: string
 ): Promise<{ year: number; month: number }> {
+  const [contractRow] = await db
+    .select({ startDate: propertyContracts.startDate })
+    .from(propertyContracts)
+    .where(eq(propertyContracts.id, contractId));
+
+  const contractStartDate = contractRow?.startDate as string | Date | undefined;
+
   const ledgerRows = await db
     .select({
       year: propertyMonthlyLedger.year,
@@ -50,6 +57,11 @@ export async function findEarliestOutstandingMonth(
   }
 
   for (const row of ledgerRows) {
+    if (contractStartDate) {
+      const clamped = clampRentalPeriodToContractStart(row.year, row.month, contractStartDate);
+      if (clamped.year !== row.year || clamped.month !== row.month) continue;
+    }
+
     const billingDate = getRentalPeriodDueDate(row.year, row.month, billingDay);
     if (billingDate > paymentDate) continue;
     const posted = postedByMonth.get(`${row.year}-${row.month}`) ?? 0;
@@ -60,7 +72,8 @@ export async function findEarliestOutstandingMonth(
   }
 
   const pd = new Date(paymentDate + "T00:00:00Z");
-  return { year: pd.getUTCFullYear(), month: pd.getUTCMonth() + 1 };
+  const fallback = { year: pd.getUTCFullYear(), month: pd.getUTCMonth() + 1 };
+  return contractStartDate ? clampRentalPeriodToContractStart(fallback.year, fallback.month, contractStartDate) : fallback;
 }
 
 /**

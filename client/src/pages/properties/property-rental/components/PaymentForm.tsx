@@ -76,8 +76,8 @@ export function PaymentForm({
     const total = parseFloat(form.amount);
     const monthly = parseFloat(contract.rentalAmount);
     if (!total || !monthly || total <= 0) return [];
-    return buildPaymentAllocations(total, monthly, form.paymentDate, ledger);
-  }, [form.amount, form.paymentDate, contract.rentalAmount, ledger]);
+    return buildPaymentAllocations(total, monthly, form.paymentDate, ledger, contract.startDate);
+  }, [form.amount, form.paymentDate, contract.rentalAmount, contract.startDate, ledger]);
 
   const isMultiMonth = allocations.length > 1;
 
