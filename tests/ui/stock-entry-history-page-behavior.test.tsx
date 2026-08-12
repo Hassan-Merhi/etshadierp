@@ -1,5 +1,5 @@
 import React, { createContext, useContext } from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => ({
@@ -156,8 +156,11 @@ describe("stock entry history page behavior", () => {
     render(<StockEntryHistory />);
 
     expect(screen.getByRole("heading", { name: "Stock Entry History" })).toBeInTheDocument();
-    expect(screen.getByRole("cell", { name: "Alice" })).toBeInTheDocument();
-    expect(screen.getByText("3")).toBeInTheDocument();
+    const workerCell = screen.getByRole("cell", { name: "Alice" });
+    expect(workerCell).toBeInTheDocument();
+    const workerRow = workerCell.closest("tr");
+    expect(workerRow).not.toBeNull();
+    expect(within(workerRow!).getByRole("cell", { name: "3" })).toBeInTheDocument();
     expect(screen.getByText("75.00")).toBeInTheDocument();
     expect(screen.getByText("-1")).toBeInTheDocument();
   });
