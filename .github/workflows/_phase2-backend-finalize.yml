@@ -13,6 +13,29 @@ jobs:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: heliumdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
+      PGSSLMODE: disable
+      NODE_ENV: test
+      SESSION_SECRET: ci-session-secret
+      CSRF_ENFORCE: "0"
+      ENABLE_SCHEDULERS: "false"
+      NODE_OPTIONS: --max-old-space-size=4096
+      PORT: "5000"
     steps:
       - uses: actions/checkout@v7
         with:
@@ -26,14 +49,18 @@ jobs:
         run: git config user.name 'github-actions[bot]' && git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
       - name: Merge current main
         run: git fetch origin main && git -c core.hooksPath=/dev/null merge --no-edit origin/main
+      - name: Normalize Replit registry URLs for CI
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
       - name: Install dependencies
-        run: npm ci --ignore-scripts
+        run: npm ci --no-audit --bin-links=true
+      - name: Prepare test database schema
+        run: node node_modules/drizzle-kit/bin.cjs push --force
       - name: Apply backend repairs
         run: node scripts/_phase2-backend-finalize.mjs
       - name: Format repaired files
         run: npx prettier --write tests/customer-order-excel-export-behavior.test.ts tests/stats-net-position-excel-behavior.test.ts tests/ui/authenticated-request-gating.test.ts config/ci-ratchet-allowances.json
       - name: Verify repaired backend gates
-        run: npx vitest run tests/customer-order-excel-export-behavior.test.ts tests/stats-net-position-excel-behavior.test.ts tests/ui/authenticated-request-gating.test.ts tests/source-text-assertions.test.ts
+        run: npm run test:backend -- tests/customer-order-excel-export-behavior.test.ts tests/stats-net-position-excel-behavior.test.ts tests/ui/authenticated-request-gating.test.ts tests/source-text-assertions.test.ts
       - name: Verify source-text audit
         run: node scripts/audit-source-text-assertions.mjs
       - name: Commit verified repairs
