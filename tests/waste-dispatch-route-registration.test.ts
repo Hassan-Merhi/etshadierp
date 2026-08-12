@@ -13,9 +13,7 @@ describe("waste dispatch route registration", () => {
       registerFactoryEmployeesPosRoutes: canonicalRegistrar,
     }));
 
-    const { registerFactoryEmployeesPosRoutes } = await import(
-      "../server/routes/factory/factoryEmployeesPosRoutes"
-    );
+    const { registerFactoryEmployeesPosRoutes } = await import("../server/routes/factory/factoryEmployeesPosRoutes");
     const app = {} as Express;
 
     registerFactoryEmployeesPosRoutes(app);

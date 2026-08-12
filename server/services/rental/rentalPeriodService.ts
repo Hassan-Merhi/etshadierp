@@ -39,12 +39,7 @@ export function getRentalPeriodDueDate(year: number, month: number, billingDay: 
  * that would incorrectly include e.g. July when today is July 16 and the
  * billing day is 20.
  */
-export function isRentalPeriodDue(
-  year: number,
-  month: number,
-  billingDay: number,
-  asOfDate: string
-): boolean {
+export function isRentalPeriodDue(year: number, month: number, billingDay: number, asOfDate: string): boolean {
   const dueDate = getRentalPeriodDueDate(year, month, billingDay);
   return asOfDate >= dueDate;
 }
