@@ -113,10 +113,10 @@ function registerWriteInvalidationSignal(app: Express): void {
 export async function registerApplicationRoutes(app: Express): Promise<Server> {
   installRemoteSupportSessionStopAudit();
   registerWriteInvalidationSignal(app);
-  // Register the faster WhatsApp file-delivery handlers before the legacy
-  // account/factory/POS routes so Express resolves these exact paths first.
-  registerWhatsAppFastSendRoutes(app);
   registerPermissionBoundaryRoutes(app);
+  // Register the faster WhatsApp file-delivery handlers after the normal module
+  // boundaries but before the legacy account/factory/POS route implementations.
+  registerWhatsAppFastSendRoutes(app);
 
   // The Bale Ledger aggregation accelerator must precede the legacy Factory
   // registrar. Other Phase 3 fixes live in their owned route modules directly.
