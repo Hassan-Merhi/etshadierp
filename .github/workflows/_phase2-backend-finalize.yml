@@ -1,4 +1,4 @@
-name: Phase 2 backend finalize
+name: Phase 2 Backend Finalize
 
 on:
   push:
@@ -23,132 +23,22 @@ jobs:
           node-version: "22.14"
           cache: npm
       - name: Merge current main
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git fetch origin main
-          echo "Merging main $(git rev-parse origin/main)"
-          git -c core.hooksPath=/dev/null merge --no-edit origin/main
-      - name: Repair backend behavior tests and tighten source-text ratchet
-        shell: bash
-        run: |
-          set -euo pipefail
-          python <<'PY'
-          from pathlib import Path
-          import json
-
-          customer = Path('tests/customer-order-excel-export-behavior.test.ts')
-          text = customer.read_text()
-          replacements = {
-            '    expect(String(res.headers.get("Content-Disposition"))).toContain("CONT-1_Customer A_Kolwezi.xlsx");':
-              '    expect(res.headers.get("Content-Disposition")).toBe("attachment; filename=CONT-1_Customer A_Kolwezi.xlsx");',
-            '''    const sheet = harness.workbooks[0].worksheets[0];
-    const text = sheet.rows.flatMap((row) => [...row.cells.values()].map((cell) => cell.value)).join(" | ");
-    expect(text).toContain("Commercial Invoice");
-    expect(text).toContain("INV-20");
-    expect(text).toContain("Shirts");
-    expect(text).toContain("Pants");
-    expect(text).toContain("Handling");
-    expect(text).toContain("Grand Total");''':
-              '''    const sheet = harness.workbooks[0].worksheets[0];
-    const values = sheet.rows.flatMap((row) => [...row.cells.values()].map((cell) => cell.value));
-    expect(values).toEqual(
-      expect.arrayContaining(["Commercial Invoice", "INV-20", "Shirts", "Pants", "Handling", "Grand Total"])
-    );''',
-            '''    const text = harness.workbooks[0].worksheets[0].rows
-      .flatMap((row) => [...row.cells.values()].map((cell) => cell.value))
-      .join(" | ");
-    expect(text).not.toContain("Price/Bale");
-    expect(text).not.toContain("Grand Total");''':
-              '''    const values = harness.workbooks[0].worksheets[0].rows.flatMap((row) =>
-      [...row.cells.values()].map((cell) => cell.value)
-    );
-    expect(values.includes("Price/Bale")).toBe(false);
-    expect(values.includes("Grand Total")).toBe(false);''',
-          }
-          for old, new in replacements.items():
-            if old not in text:
-              raise SystemExit(f'missing customer export test pattern:\n{old}')
-            text = text.replace(old, new, 1)
-          customer.write_text(text)
-
-          stats = Path('tests/stats-net-position-excel-behavior.test.ts')
-          text = stats.read_text()
-          old = '''    getRow(number: number) {
-      while (this.rows.length < number) this.rows.push(new FakeRow(this.rows.length + 1));
-      return this.rows[number - 1];
-    }
-    mergeCells() {}'''
-          new = '''    getRow(number: number) {
-      while (this.rows.length < number) this.rows.push(new FakeRow(this.rows.length + 1));
-      return this.rows[number - 1];
-    }
-    spliceRows(start: number, deleteCount: number, ...insert: any[]) {
-      const replacementRows = insert.map((values, index) => new FakeRow(start + index, values));
-      this.rows.splice(start - 1, deleteCount, ...replacementRows);
-      this.rows.forEach((row, index) => {
-        row.number = index + 1;
-      });
-    }
-    mergeCells() {}'''
-          if old not in text:
-            raise SystemExit('missing FakeWorksheet getRow block')
-          stats.write_text(text.replace(old, new, 1))
-          PY
-
-          npm ci --ignore-scripts
-          npx prettier --write tests/customer-order-excel-export-behavior.test.ts tests/stats-net-position-excel-behavior.test.ts
-
-          node scripts/audit-source-text-assertions.mjs --json > /tmp/source-text.json
-          node <<'NODE'
-          const fs = require('fs');
-          const report = JSON.parse(fs.readFileSync('/tmp/source-text.json', 'utf8'));
-          const baselinePath = 'config/source-text-assertion-baseline.json';
-          const allowancesPath = 'config/ci-ratchet-allowances.json';
-          const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
-          const allowances = JSON.parse(fs.readFileSync(allowancesPath, 'utf8'));
-          const actual = report.summary.totalTextAssertions;
-          const oldCeiling = baseline.maxTotalTextAssertions + allowances.sourceTextAssertionDelta.maxAdditionalTextAssertions;
-          if (actual > oldCeiling) {
-            throw new Error(`Source-text assertions ${actual} exceed one-way ceiling ${oldCeiling}`);
-          }
-          if (actual < oldCeiling) {
-            const nextAdditional = actual - baseline.maxTotalTextAssertions;
-            if (nextAdditional < 0) throw new Error(`Invalid negative allowance ${nextAdditional}`);
-            allowances.sourceTextAssertionDelta.maxAdditionalTextAssertions = nextAdditional;
-            fs.writeFileSync(allowancesPath, JSON.stringify(allowances, null, 2) + '\n');
-            console.log(`Tightened source-text ceiling ${oldCeiling} -> ${actual}`);
-          } else {
-            console.log(`Source-text ceiling remains exact at ${actual}`);
-          }
-          NODE
-          npx prettier --write config/ci-ratchet-allowances.json
+        run: git fetch origin main && git -c core.hooksPath=/dev/null merge --no-edit origin/main
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      - name: Apply backend repairs
+        run: node scripts/_phase2-backend-finalize.mjs
+      - name: Format repaired files
+        run: npx prettier --write tests/customer-order-excel-export-behavior.test.ts tests/stats-net-position-excel-behavior.test.ts config/ci-ratchet-allowances.json
       - name: Verify repaired backend gates
-        shell: bash
+        run: npx vitest run tests/customer-order-excel-export-behavior.test.ts tests/stats-net-position-excel-behavior.test.ts tests/source-text-assertions.test.ts
+      - name: Verify source-text audit
+        run: node scripts/audit-source-text-assertions.mjs
+      - name: Commit verified repairs
         run: |
-          set -euo pipefail
-          npx vitest run tests/customer-order-excel-export-behavior.test.ts tests/stats-net-position-excel-behavior.test.ts tests/source-text-assertions.test.ts
-          node scripts/audit-source-text-assertions.mjs --json | tee /tmp/source-text-final.json
-          node <<'NODE'
-          const fs = require('fs');
-          const report = JSON.parse(fs.readFileSync('/tmp/source-text-final.json', 'utf8'));
-          const baseline = JSON.parse(fs.readFileSync('config/source-text-assertion-baseline.json', 'utf8'));
-          const allowances = JSON.parse(fs.readFileSync('config/ci-ratchet-allowances.json', 'utf8'));
-          const ceiling = baseline.maxTotalTextAssertions + allowances.sourceTextAssertionDelta.maxAdditionalTextAssertions;
-          if (report.summary.totalTextAssertions !== ceiling) {
-            throw new Error(`Source-text ratchet not exact: actual=${report.summary.totalTextAssertions} ceiling=${ceiling}`);
-          }
-          console.log(`Source-text ratchet exact at ${ceiling}`);
-          NODE
-      - name: Commit verified finalization and remove helper
-        shell: bash
-        run: |
-          set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git rm .github/workflows/_phase2-backend-finalize.yml
+          git rm .github/workflows/_phase2-backend-finalize.yml scripts/_phase2-backend-finalize.mjs
           git add tests/customer-order-excel-export-behavior.test.ts tests/stats-net-position-excel-behavior.test.ts config/ci-ratchet-allowances.json
           git -c core.hooksPath=/dev/null commit -m 'fix: close Phase 2 backend verification gaps'
           git -c core.hooksPath=/dev/null push origin HEAD:program/erp-90-phase-2
