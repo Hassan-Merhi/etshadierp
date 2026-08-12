@@ -49,7 +49,7 @@ describe("ERP Daybook pagination route", () => {
     } as never);
   });
 
-  it("returns a server-filtered POS page with location scope, amount/search filters, and stable pagination metadata", async () => {
+  it("returns a server-filtered POS page with scoped filters and stable pagination metadata", async () => {
     const req = {
       session: { currentCompanyId: 4, currentRole: "POS" },
       user: { id: "user-7" },
