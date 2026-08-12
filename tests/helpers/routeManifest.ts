@@ -106,6 +106,12 @@ export function decodeMountPath(regexp: (RegExp & { fast_slash?: boolean }) | un
   return decoded === "" ? "/" : decoded;
 }
 
+function normalizeRoutePaths(path: unknown): string[] {
+  if (typeof path === "string") return [path];
+  if (Array.isArray(path) && path.every((entry) => typeof entry === "string")) return path;
+  throw new Error(`Unsupported non-string route path: ${String(path)}`);
+}
+
 /**
  * Extract the ordered route manifest from a fully configured Express app.
  *
@@ -123,12 +129,7 @@ export function extractRouteManifest(app: Express): RouteManifest {
 
   for (const layer of stack) {
     if (layer.route) {
-      const path = layer.route.path;
-      // Express permits array and RegExp paths; this codebase uses strings, and
-      // a non-string would otherwise serialise unstably.
-      if (typeof path !== "string") {
-        throw new Error(`Unsupported non-string route path: ${String(path)}`);
-      }
+      const paths = normalizeRoutePaths(layer.route.path);
 
       const routeStack = layer.route.stack ?? [];
       // Sorted so a multi-method registration cannot reorder between runs.
@@ -145,7 +146,7 @@ export function extractRouteManifest(app: Express): RouteManifest {
           .filter((handlerLayer) => handlerLayer.method === undefined || handlerLayer.method.toUpperCase() === method)
           .map(handlerName);
 
-        routes.push({ method, path, guards });
+        for (const path of paths) routes.push({ method, path, guards });
       }
       continue;
     }
