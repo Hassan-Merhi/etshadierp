@@ -20,6 +20,7 @@ const SERVER_DIR = join(ROOT, "server");
 const ENV_EXAMPLES = [
   join(ROOT, ".env.example"),
   join(ROOT, "docs", "remote-support.env.example"),
+  join(ROOT, "docs", "whatsapp-fast-send.env.example"),
   join(ROOT, "docs", "observability", "render-logging.env.example"),
 ];
 
