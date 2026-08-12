@@ -1,6 +1,6 @@
 {
-  "version": 19,
-  "description": "Repository-wide god-file architecture boundaries plus a one-way size ratchet. Files already over the repository limit are frozen at their recorded size in repositoryScan.grandfathered: they may shrink but never grow, and any new file crossing the limit fails until it is split or explicitly baselined. Version 19 permanently retires rentalPaymentPostingService.ts from the grandfathered backlog after the Wave 5 allocation extraction reduced it below the 900-line repository limit.",
+  "version": 20,
+  "description": "Repository-wide god-file architecture boundaries plus a one-way size ratchet. Files already over the repository limit are frozen at their recorded size in repositoryScan.grandfathered: they may shrink but never grow, and any new file crossing the limit fails until it is split or explicitly baselined. Version 20 permanently retires the four original Wave 5 inventory-core targets after their behavior-preserving splits reduced every authored replacement file below the 900-line repository limit while keeping the original import paths stable.",
   "retiredFiles": [
     "server/routesLegacy.ts",
     "server/routes/reportsRoutesLegacy.ts",
@@ -137,7 +137,6 @@
       "client/src/components/ui/sidebar.tsx"
     ],
     "grandfathered": {
-      "client/src/components/StockItemDetailsDialog.tsx": 950,
       "client/src/pages/AccountsLegacy.tsx": 1325,
       "client/src/pages/BaleProducts.tsx": 2100,
       "client/src/pages/BarcodeLookup.tsx": 1625,
@@ -152,7 +151,6 @@
       "client/src/pages/factory/FactoryDispatchBatchDetail.tsx": 925,
       "client/src/pages/factory/FactoryInvoiceDetail.tsx": 1625,
       "client/src/pages/factory/FactoryInvoiceLoadingScan.tsx": 1100,
-      "client/src/pages/factory/FactoryLocationInventory.tsx": 2200,
       "client/src/pages/factory/FactoryOtwTrackingTab.tsx": 1025,
       "client/src/pages/factory/FactoryPendingInvoiceVerify.tsx": 1850,
       "client/src/pages/factory/FactoryPOS.tsx": 1775,
@@ -171,8 +169,6 @@
       "client/src/pages/SalesReportLegacy.tsx": 1000,
       "client/src/pages/settings/DataToolsTab.tsx": 1825,
       "client/src/pages/sp/GcLshiMigration.tsx": 950,
-      "client/src/pages/StockEntryHistory.tsx": 1525,
-      "client/src/pages/StockItems.tsx": 1375,
       "client/src/pages/StockTransferOrder.tsx": 2150,
       "client/src/pages/SupplierProfitCheck.tsx": 1975,
       "client/src/pages/TransactionJournal.tsx": 1600,

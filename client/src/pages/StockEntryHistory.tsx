@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
-import * as XLSX from "@/lib/excelHelper";
+import { useQuery, useQueryClient, useQueries } from "@tanstack/react-query";
 import {
   ChevronDown,
   ChevronRight,
@@ -37,16 +36,22 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
 import type { Location } from "@shared/schema";
 
 import type { BaleDetail, GroupRow, StockEntryHistoryPage, StockEntryHistoryProps } from "./stockentryhistory/types";
+import { deriveStockEntryHistory } from "./stockentryhistory/derived";
+import { createStockEntryHistoryGroupBaleHelpers, groupKey } from "./stockentryhistory/groupBaleHelpers";
+import { createStockEntryHistoryReports } from "./stockentryhistory/reports";
+import { StockEntryHistoryEditableDateCell } from "./stockentryhistory/EditableDateCell";
+import { DetailedHistoryTable } from "./stockentryhistory/DetailedHistoryTable";
+import { useStockEntryHistoryMutations } from "./stockentryhistory/useStockEntryHistoryMutations";
 import {
   STATUS_COLORS,
   STATUS_OPTIONS,
-  buildWorkerMatrix,
   fetchAllStockEntryHistoryPages,
+  formatHistoryTime,
 } from "./stockentryhistory/utils";
+
 export default function StockEntryHistory({ onActiveDateChange }: StockEntryHistoryProps = {}) {
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
@@ -54,7 +59,6 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   const today = new Date().toLocaleDateString("en-CA");
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString("en-CA");
 
-  // fromActive: send startDate; toActive: send endDate (activating To deactivates From)
   const [fromActive, setFromActive] = useState(true);
   const [toActive, setToActive] = useState(true);
   const [fromDate, setFromDate] = useState(today);
@@ -63,7 +67,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   useEffect(() => {
     if (!onActiveDateChange) return;
     onActiveDateChange(fromActive ? fromDate : null);
-  }, [fromActive, fromDate]);
+  }, [fromActive, fromDate, onActiveDateChange]);
 
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
   const [productCategoryFilter, setProductCategoryFilter] = useState<string[]>([]);
@@ -82,14 +86,10 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   const [viewMode, setViewMode] = useState<"condensed" | "detailed">("condensed");
   const [editingDateKey, setEditingDateKey] = useState<string | null>(null);
 
-  // Condensed mode: use lite mode (no per-bale JSON_AGG) for a small initial payload (~95% smaller).
-  // Detailed mode fetches the full response so the flat bale list is populated.
   const useLite = viewMode === "condensed";
-
   const page = 1;
   const pageSize = 9999;
 
-  // (no pagination state — all records load in a single request)
   const filtersKey = useMemo(
     () =>
       [
@@ -121,7 +121,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
       useLite,
     ]
   );
-  // (page/pageSize reset removed — no pagination)
+  void filtersKey;
 
   const params = new URLSearchParams();
   if (fromActive) params.set("startDate", fromDate);
@@ -154,8 +154,6 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   });
   const groups: GroupRow[] = pagedGroups?.items ?? [];
 
-  // (page validity effect removed — no pagination)
-
   const { data: workers = [] } = useQuery<any[]>({
     queryKey: ["/api/factory/workers"],
     staleTime: 60_000,
@@ -174,7 +172,6 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     refetchOnWindowFocus: false,
   });
 
-  // Fetch production plan targets when viewing a single day
   const planDate = fromActive && toActive && fromDate === toDate ? fromDate : null;
   const { data: workerTargets = {} } = useQuery<Record<number, { targetBales: number; workerCount: number }>>({
     queryKey: ["/api/factory/production-planner", planDate, "worker-targets"],
@@ -185,7 +182,6 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     enabled: !!planDate,
   });
 
-  // Per-group bale queries: lazily loaded only when a sub-group row is expanded in condensed mode.
   const expandedGroupBaleKeys = useMemo(
     () => Array.from(expandedKeys).filter((k) => k.endsWith("-bales")),
     [expandedKeys]
@@ -212,201 +208,42 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     }),
   });
 
-  const selectedCategoryWorkerIds: number[] | null = useMemo(() => {
-    if (categoryFilter.length === 0) return null;
-    const selectedCategoryIds = new Set(categoryFilter);
-    const ids = new Set<number>();
-    for (const cat of categories) {
-      if (!selectedCategoryIds.has(String(cat.id))) continue;
-      for (const id of Array.isArray(cat.workerIds) ? (cat.workerIds as number[]) : []) {
-        ids.add(Number(id));
-      }
-    }
-    return workers.filter((w: any) => w.active && ids.has(w.id)).map((w: any) => w.id);
-  }, [categoryFilter, categories, workers]);
-
-  const filteredWorkers = useMemo(() => {
-    if (!selectedCategoryWorkerIds) return workers;
-    return workers.filter((w: any) => selectedCategoryWorkerIds.includes(w.id));
-  }, [workers, selectedCategoryWorkerIds]);
-
-  // Every history filter is applied by the API, so the screen, totals, and exports share one dataset.
-  const filteredGroups = groups;
-
-  const totalBales = useMemo(() => filteredGroups.reduce((s, g) => s + g.baleCount, 0), [filteredGroups]);
-  const totalWeight = useMemo(
-    () => filteredGroups.reduce((s, g) => s + parseFloat(g.totalWeight || "0"), 0),
-    [filteredGroups]
+  const { filteredWorkers, filteredGroups, totalBales, totalWeight, workerGroups, allBales } = useMemo(
+    () =>
+      deriveStockEntryHistory({
+        groups,
+        workers,
+        categories,
+        categoryFilter,
+        workerIdFilter,
+        workerTargets,
+      }),
+    [groups, workers, categories, categoryFilter, workerIdFilter, workerTargets]
   );
 
-  // Condensed view: group by worker
-  interface WorkerCondensed {
-    workerKey: string;
-    workerId: number | null;
-    workerName: string | null;
-    totalBales: number;
-    totalWeight: number;
-    groups: GroupRow[];
-  }
-  const workerGroups = useMemo<WorkerCondensed[]>(() => {
-    const map = new Map<string, WorkerCondensed>();
-    for (const g of filteredGroups) {
-      const key = g.workerId != null ? String(g.workerId) : "unassigned";
-      if (!map.has(key)) {
-        map.set(key, {
-          workerKey: key,
-          workerId: g.workerId,
-          workerName: g.workerName,
-          totalBales: 0,
-          totalWeight: 0,
-          groups: [],
-        });
-      }
-      const wg = map.get(key)!;
-      wg.totalBales += g.baleCount;
-      wg.totalWeight += parseFloat(g.totalWeight || "0");
-      wg.groups.push(g);
-    }
-    // Add zero-bale entries for workers in the production plan who haven't made any bales yet
-    if (Object.keys(workerTargets).length > 0) {
-      const workerNameById = new Map<number, string>(
-        (workers as any[]).map((w: any) => [w.id, w.fullName ?? w.full_name ?? ""])
-      );
-      const selectedWorkerIds = new Set(workerIdFilter.map(Number));
-      const categoryWorkerIds = selectedCategoryWorkerIds ? new Set(selectedCategoryWorkerIds) : null;
-      for (const workerIdStr of Object.keys(workerTargets)) {
-        const wid = Number(workerIdStr);
-        if (selectedWorkerIds.size > 0 && !selectedWorkerIds.has(wid)) continue;
-        if (categoryWorkerIds && !categoryWorkerIds.has(wid)) continue;
-        const key = String(wid);
-        if (!map.has(key)) {
-          const name = workerNameById.get(wid) ?? null;
-          map.set(key, { workerKey: key, workerId: wid, workerName: name, totalBales: 0, totalWeight: 0, groups: [] });
-        }
-      }
-    }
-    return Array.from(map.values()).sort((a, b) => b.totalBales - a.totalBales);
-  }, [filteredGroups, workerTargets, workers, workerIdFilter, selectedCategoryWorkerIds]);
-
-  // Detailed view: flat list of all bales
-  const allBales = useMemo(() => filteredGroups.flatMap((g) => g.bales), [filteredGroups]);
-
-  const updateDateMutation = useMutation({
-    mutationFn: async ({ ids, stockEntryDate }: { ids: number[]; stockEntryDate: string }) => {
-      const res = await apiRequest("PATCH", "/api/factory/bales/bulk-date", { ids, stockEntryDate });
-      return res.json();
-    },
-    onSuccess: (_, vars) => {
-      toast({ title: "Date updated", description: `Updated date for ${vars.ids.length} bale(s).` });
-      setEditingDateKey(null);
-      qc.invalidateQueries({ queryKey: ["/api/factory/bales/stock-entry-history"] });
-    },
-    onError: (err: any) => {
-      toast({ title: "Update failed", description: err.message, variant: "destructive" });
-    },
+  const { updateDateMutation, bulkAssignMutation, sendWorkerPdfWaMutation } = useStockEntryHistoryMutations({
+    fromActive,
+    fromDate,
+    today,
+    setEditingDateKey,
   });
 
-  const bulkAssignMutation = useMutation({
-    mutationFn: async ({ baleIds, workerId }: { baleIds: number[]; workerId: number }) => {
-      const res = await apiRequest("PATCH", "/api/factory/bales/bulk-assign-worker", { baleIds, workerId });
-      return res.json();
-    },
-    onSuccess: (_, vars) => {
-      toast({ title: "Worker assigned", description: `Worker updated for ${vars.baleIds.length} bale(s).` });
-      qc.invalidateQueries({ queryKey: ["/api/factory/bales/stock-entry-history"] });
-    },
-    onError: (err: any) => {
-      toast({ title: "Assignment failed", description: err.message, variant: "destructive" });
-    },
-  });
-
-  const sendWorkerPdfWaMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/factory/bales/send-worker-pdf-whatsapp", {
-        date: fromActive ? fromDate : today,
-      });
-      if (!res.ok) {
-        const e = await res.json();
-        throw new Error(e.message || "Send failed");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: "Sent", description: "Worker PDF sent to production WhatsApp group." });
-    },
-    onError: (err: any) => {
-      if (err?._handledGlobally) return;
-      toast({ title: "Send failed", description: err.message, variant: "destructive" });
-    },
-  });
-
-  function groupKey(g: GroupRow) {
-    return `${g.stockEntryDate}|${g.erpLocationId}|${g.workerId}|${g.productId}`;
-  }
+  const { getGroupBales, resolveGroupBaleIds, isGroupBalesLoading, fetchGroupsWithBales } =
+    createStockEntryHistoryGroupBaleHelpers({
+      useLite,
+      expandedGroupBaleKeys,
+      groupBaleQueries,
+      queryClient: qc,
+      params,
+    });
 
   function toggleExpand(key: string) {
-    setExpandedKeys((prev) => {
-      const next = new Set(prev);
+    setExpandedKeys((previous) => {
+      const next = new Set(previous);
       if (next.has(key)) next.delete(key);
       else next.add(key);
       return next;
     });
-  }
-
-  /** Returns loaded bales for a group. In condensed (lite) mode, fetched lazily on expand. */
-  function getGroupBales(g: GroupRow): BaleDetail[] {
-    if (!useLite) return g.bales;
-    const key = groupKey(g) + "-bales";
-    const idx = expandedGroupBaleKeys.indexOf(key);
-    if (idx < 0) return [];
-    return groupBaleQueries[idx]?.data ?? [];
-  }
-
-  /**
-   * Resolves the bale ids for a group for actions (like Reassign) that don't require the
-   * row to already be expanded. In condensed (lite) mode, getGroupBales() only has data once
-   * the user has expanded that specific group's bale-detail row — before that it returns []
-   * (which used to send an empty baleIds array to the server and fail with "baleIds array is
-   * required"). This fetches the group's bales on demand, reusing the same cache key/params
-   * as the lazy per-group query so a later expand just reads the cache.
-   */
-  async function resolveGroupBaleIds(g: GroupRow): Promise<number[]> {
-    const cached = getGroupBales(g);
-    if (cached.length > 0) return cached.map((b) => b.id);
-    if (!useLite) return g.bales.map((b) => b.id);
-
-    const gp = new URLSearchParams();
-    gp.set("startDate", g.stockEntryDate);
-    gp.set("endDate", g.stockEntryDate);
-    if (g.workerId) gp.set("workerId", String(g.workerId));
-    if (g.productId) gp.set("productId", String(g.productId));
-    if (g.erpLocationId) gp.set("locationId", String(g.erpLocationId));
-
-    const rows = await qc.fetchQuery<GroupRow[]>({
-      queryKey: ["/api/factory/bales/stock-entry-history/group", gp.toString()],
-      queryFn: () => fetchAllStockEntryHistoryPages(gp),
-      staleTime: 5 * 60 * 1000,
-    });
-    const bales = rows.flatMap((row) => row.bales ?? []);
-    return bales.map((b) => b.id);
-  }
-
-  /** True while the per-group bale query is in-flight for an expanded group. */
-  function isGroupBalesLoading(g: GroupRow): boolean {
-    if (!useLite) return false;
-    const key = groupKey(g) + "-bales";
-    const idx = expandedGroupBaleKeys.indexOf(key);
-    if (idx < 0) return false;
-    return groupBaleQueries[idx]?.isLoading ?? false;
-  }
-
-  /** Fetches all matching group data (with bales) across all pages for exports and print. */
-  async function fetchGroupsWithBales(): Promise<GroupRow[]> {
-    const fullParams = new URLSearchParams(params);
-    fullParams.delete("lite"); // ensure we get bale data
-    fullParams.delete("page"); // fetchAllStockEntryHistoryPages manages its own pagination
-    fullParams.delete("limit");
-    return fetchAllStockEntryHistoryPages(fullParams);
   }
 
   function resetFilters() {
@@ -424,415 +261,15 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     setIncludeUnassigned(true);
   }
 
-  function fmtTime(iso: string | null) {
-    if (!iso) return "—";
-    try {
-      return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    } catch {
-      return "—";
-    }
-  }
-
-  async function exportExcel() {
-    const wb = XLSX.utils.book_new();
-
-    const summaryRows = filteredGroups.map((g) => ({
-      "Stock Entry Date": g.stockEntryDate,
-      Location: g.locationName,
-      Worker: g.workerName || "Unassigned",
-      Product: g.productName || "—",
-      "Article Code": g.articleCode || "—",
-      "Bale Count": g.baleCount,
-      "Total Weight (kg)": parseFloat(g.totalWeight || "0"),
-      "Avg Weight (kg)": parseFloat(g.avgWeight || "0"),
-      "First Bale Time": g.firstFinalizedAt ? new Date(g.firstFinalizedAt).toLocaleString() : "—",
-      "Last Bale Time": g.lastFinalizedAt ? new Date(g.lastFinalizedAt).toLocaleString() : "—",
-    }));
-    const ws1 = XLSX.utils.json_to_sheet(summaryRows);
-    XLSX.utils.book_append_sheet(wb, ws1, "Summary");
-
-    // In lite mode, we need to fetch full bale data for the detail and matrix sheets.
-    const groupsWithBales = await fetchGroupsWithBales();
-
-    const detailRows = groupsWithBales.flatMap((g) =>
-      g.bales.map((b) => ({
-        "Stock Entry Date": b.stockEntryDate,
-        Location: b.locationName,
-        Worker: b.workerName || "Unassigned",
-        Product: b.productName || "—",
-        "Article Code": b.articleCode || "—",
-        "Reference Number": b.referenceNumber,
-        "Weight (kg)": parseFloat(b.weightKg || "0"),
-        Status: b.status,
-        "Finalized At": b.finalizedAt ? new Date(b.finalizedAt).toLocaleString() : "—",
-      }))
-    );
-    const ws2 = XLSX.utils.json_to_sheet(detailRows);
-    XLSX.utils.book_append_sheet(wb, ws2, "Bale Details");
-
-    const matrix = buildWorkerMatrix(groupsWithBales);
-    const ws3 = XLSX.utils.aoa_to_sheet([]);
-
-    XLSX.utils.sheet_add_aoa(ws3, [["Stock Entry History — Worker Matrix"]], { origin: "A1" });
-    XLSX.utils.sheet_add_aoa(ws3, [[`Period: ${fromDate}  →  ${toDate}`]], { origin: "A2" });
-
-    const matrixHeader = ["Bale / Product", ...matrix.workers, "Total"];
-    XLSX.utils.sheet_add_aoa(ws3, [matrixHeader], { origin: "A4" });
-
-    const matrixData = matrix.rows.map((row) => [
-      row.productLabel,
-      ...matrix.workers.map((w) => row.counts[w] || 0),
-      row.total,
-    ]);
-    if (matrixData.length > 0) {
-      XLSX.utils.sheet_add_aoa(ws3, matrixData, { origin: "A5" });
-    }
-
-    const totalsRow = ["TOTAL", ...matrix.workers.map((w) => matrix.workerTotals[w] || 0), matrix.grandTotal];
-    XLSX.utils.sheet_add_aoa(ws3, [totalsRow], { origin: { r: 4 + matrix.rows.length, c: 0 } });
-
-    const colWidths = [{ wch: 36 }, ...matrix.workers.map(() => ({ wch: 14 })), { wch: 10 }];
-    ws3["!cols"] = colWidths;
-    ws3["!freeze"] = { xSplit: 0, ySplit: 4 };
-
-    XLSX.utils.book_append_sheet(wb, ws3, "Worker Matrix");
-
-    await XLSX.writeFile(wb, `stock-entry-history-${fromDate}-to-${toDate}.xlsx`);
-  }
-
-  async function handlePrintMatrix() {
-    if (filteredGroups.length === 0) return;
-    const groupsWithBales = await fetchGroupsWithBales();
-    const matrix = buildWorkerMatrix(groupsWithBales);
-    const { workers: cols, rows, workerTotals, grandTotal } = matrix;
-
-    // Readable font — minimum 8.5 px regardless of column count
-    const fontSize = cols.length > 20 ? 8.5 : cols.length > 14 ? 9.5 : cols.length > 10 ? 10.5 : 11.5;
-
-    // Palette of vivid accent colors for worker columns (cycles if more workers than colors)
-    const palette = [
-      "#2563eb",
-      "#16a34a",
-      "#dc2626",
-      "#9333ea",
-      "#ea580c",
-      "#0891b2",
-      "#be185d",
-      "#65a30d",
-      "#7c3aed",
-      "#b45309",
-      "#0284c7",
-      "#15803d",
-      "#e11d48",
-      "#7e22ce",
-      "#c2410c",
-      "#0e7490",
-      "#9d174d",
-      "#4d7c0f",
-      "#6d28d9",
-      "#92400e",
-    ];
-    const colColor = (i: number) => palette[i % palette.length];
-
-    // Worker header — split on the last space so two short lines fit the narrow column
-    const headerCells = cols
-      .map((w, i) => {
-        const c = colColor(i);
-        const lastSpace = w.lastIndexOf(" ");
-        const label = lastSpace > 0 ? `${w.slice(0, lastSpace)}<br/>${w.slice(lastSpace + 1)}` : w;
-        return `<th class="wc" style="background:${c};">${label}</th>`;
-      })
-      .join("");
-
-    // Split "Product Name (CODE)" into two stacked lines to keep the cell narrow
-    const prodHtml = (label: string) => {
-      const m = label.match(/^(.*)\s\(([^)]+)\)$/);
-      if (m) return `${m[1]}<br/><span class="code">${m[2]}</span>`;
-      return label;
-    };
-
-    const dataRows = rows
-      .map((row, idx) => {
-        const rowBg = idx % 2 === 0 ? "#ffffff" : "#f1f5f9";
-        const cells = cols
-          .map((w, i) => {
-            const v = row.counts[w] || 0;
-            const accent = colColor(i);
-            const style =
-              v > 0
-                ? `style="color:${accent};font-weight:700;background:${rowBg};"`
-                : `style="background:${rowBg};color:#cbd5e1;"`;
-            return `<td class="num" ${style}>${v > 0 ? v : "&middot;"}</td>`;
-          })
-          .join("");
-        return `<tr>
-        <td class="prod" style="background:${rowBg};">${prodHtml(row.productLabel)}</td>
-        ${cells}
-        <td class="num total-col" style="background:${idx % 2 === 0 ? "#e0f2fe" : "#bae6fd"};">${row.total}</td>
-      </tr>`;
-      })
-      .join("");
-
-    const totalCells = cols
-      .map((w, i) => {
-        const c = colColor(i);
-        return `<td class="num" style="background:${c};color:#fff;">${workerTotals[w] || 0}</td>`;
-      })
-      .join("");
-
-    // Column widths: product = 12%, total = 7%, workers share the remaining 81%
-    const workerColPct = Math.max(2, Math.floor(81 / Math.max(cols.length, 1)));
-
-    const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8"/>
-  <title>Worker Matrix — ${fromDate} to ${toDate}</title>
-  <style>
-    @page { size: landscape; margin: 8mm 7mm; }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: ${fontSize}px; color: #1e293b; background: #fff; }
-
-    .header { margin-bottom: 5px; display: flex; align-items: flex-end; justify-content: space-between; border-bottom: 2px solid #2563eb; padding-bottom: 3px; }
-    .header-left h1 { font-size: ${fontSize + 2.5}px; font-weight: 800; color: #1e3a8a; letter-spacing: -0.3px; }
-    .header-left .sub { font-size: ${fontSize - 0.5}px; color: #475569; margin-top: 1px; }
-    .header-right { text-align: right; font-size: ${fontSize - 0.5}px; color: #64748b; line-height: 1.5; }
-    .header-right strong { color: #1e3a8a; }
-
-    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-    thead { display: table-header-group; }
-    th, td { border: 1px solid #e2e8f0; padding: 2px 3px; overflow: hidden; }
-    th { color: #fff; font-weight: 700; text-align: center; font-size: ${fontSize}px; line-height: 1.3; }
-    th.prod-h { background: #1e3a8a; text-align: left; width: 12%; }
-    th.wc { width: ${workerColPct}%; }
-    th.total-h { background: #0369a1; width: 7%; }
-
-    td.prod { text-align: left; font-weight: 500; word-break: break-word; color: #1e293b; font-size: ${fontSize}px; line-height: 1.3; }
-    .code { color: #64748b; font-size: ${Math.max(6.5, fontSize - 1.5)}px; font-weight: 400; }
-    td.num { text-align: center; font-size: ${fontSize}px; }
-    td.total-col { font-weight: 800; text-align: center; }
-
-    tr.totals-row td { font-weight: 800; border-color: #1e3a8a; }
-    tr.totals-row td.prod-total { background: #1e3a8a; color: #fff; text-align: left; }
-    tr.totals-row td.grand { background: #0369a1; color: #fff; text-align: center; font-weight: 800; }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <div class="header-left">
-      <h1>Worker Bale Matrix</h1>
-      <div class="sub">Stock Entry History &nbsp;&middot;&nbsp; ${fromDate} &rarr; ${toDate}</div>
-    </div>
-    <div class="header-right">
-      <strong>${cols.length}</strong> worker${cols.length !== 1 ? "s" : ""} &nbsp;|&nbsp;
-      <strong>${rows.length}</strong> product${rows.length !== 1 ? "s" : ""} &nbsp;|&nbsp;
-      <strong>${grandTotal}</strong> bales total
-    </div>
-  </div>
-  <table>
-    <thead>
-      <tr>
-        <th class="prod-h">Product / Article</th>
-        ${headerCells}
-        <th class="total-h">Total</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${dataRows}
-      <tr class="totals-row">
-        <td class="prod-total">TOTAL</td>
-        ${totalCells}
-        <td class="grand">${grandTotal}</td>
-      </tr>
-    </tbody>
-  </table>
-  <script>window.onload = function(){ window.print(); };<\/script>
-</body>
-</html>`;
-
-    const win = window.open("", "_blank", "width=1200,height=800");
-    if (!win) return;
-    win.document.write(html);
-    win.document.close();
-  }
-
-  async function handleExportWorkerPDF() {
-    if (filteredGroups.length === 0) return;
-
-    // In lite mode, fetch full bale data for the per-worker PDF.
-    const groupsWithBales = await fetchGroupsWithBales();
-
-    // Collect all bales across all groups
-    const allBales: BaleDetail[] = groupsWithBales.flatMap((g) => g.bales);
-
-    // Group bales by worker
-    const byWorker = new Map<string, BaleDetail[]>();
-    for (const b of allBales) {
-      const w = b.workerName || "Unassigned";
-      if (!byWorker.has(w)) byWorker.set(w, []);
-      byWorker.get(w)!.push(b);
-    }
-
-    // Sort workers alphabetically
-    const sortedWorkers = Array.from(byWorker.keys()).sort((a, b) => a.localeCompare(b, "ar"));
-
-    // Build detail rows (grouped by worker, bales sorted by product)
-    let detailRowsHtml = "";
-    for (const worker of sortedWorkers) {
-      const bales = byWorker.get(worker)!.sort((a, b) => (a.productName || "").localeCompare(b.productName || ""));
-      const workerBaleCount = bales.length;
-      const workerTotalKg = bales.reduce((s, b) => s + parseFloat(b.weightKg || "0"), 0);
-
-      bales.forEach((b, idx) => {
-        const isFirst = idx === 0;
-        const isLast = idx === bales.length - 1;
-        const productLabel = b.productName
-          ? b.articleCode
-            ? `${b.productName} (${b.articleCode})`
-            : b.productName
-          : "—";
-        const evenOdd = idx % 2 === 0 ? "#fff" : "#f8fafc";
-        detailRowsHtml += `<tr style="background:${evenOdd};">
-          <td class="ref">${b.referenceNumber || "—"}</td>
-          <td class="worker">${isFirst ? `<span class="worker-name">${worker}</span>` : ""}</td>
-          <td class="prod">${productLabel}</td>
-          <td class="wt">${parseFloat(b.weightKg || "0").toFixed(0)}</td>
-          <td class="total-pp">${isLast ? `<strong>${workerBaleCount}</strong><br/><span class="total-kg">${workerTotalKg.toFixed(0)} kg</span>` : ""}</td>
-        </tr>`;
-      });
-    }
-
-    // Summary — sorted by bale count descending
-    const summaryRows = sortedWorkers
-      .map((w) => {
-        const bales = byWorker.get(w)!;
-        const count = bales.length;
-        const totalKg = bales.reduce((s, b) => s + parseFloat(b.weightKg || "0"), 0);
-        return { worker: w, count, totalKg };
-      })
-      .sort((a, b) => b.count - a.count);
-
-    const grandBales = summaryRows.reduce((s, r) => s + r.count, 0);
-    const grandKg = summaryRows.reduce((s, r) => s + r.totalKg, 0);
-
-    const summaryRowsHtml = summaryRows
-      .map(
-        (r, idx) => `
-      <tr style="background:${idx % 2 === 0 ? "#fff" : "#f8fafc"};">
-        <td class="sum-worker">${r.worker}</td>
-        <td class="sum-num">${r.count}</td>
-        <td class="sum-num">${r.totalKg.toFixed(0)}</td>
-      </tr>`
-      )
-      .join("");
-
-    const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8"/>
-  <title>Worker Bales Report — ${fromDate} to ${toDate}</title>
-  <style>
-    @page { size: portrait; margin: 10mm 8mm; }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 9px; color: #1e293b; background: #fff; }
-
-    .page-header { display: flex; align-items: flex-end; justify-content: space-between; border-bottom: 2px solid #1e3a8a; padding-bottom: 4px; margin-bottom: 8px; }
-    .page-header h1 { font-size: 13px; font-weight: 800; color: #1e3a8a; }
-    .page-header .sub { font-size: 8.5px; color: #64748b; margin-top: 2px; }
-    .page-header .meta { text-align: right; font-size: 8px; color: #64748b; line-height: 1.6; }
-
-    table { width: 100%; border-collapse: collapse; }
-    th { background: #1e3a8a; color: #fff; font-weight: 700; padding: 3px 5px; text-align: left; font-size: 8.5px; border: 1px solid #c8d5e8; }
-    th.r { text-align: right; }
-    td { padding: 2px 5px; border: 1px solid #e2e8f0; vertical-align: middle; font-size: 8.5px; }
-
-    td.ref { font-family: monospace; font-size: 7.5px; color: #334155; white-space: nowrap; }
-    td.worker { min-width: 60px; }
-    .worker-name { font-weight: 700; color: #1e3a8a; }
-    td.prod { color: #334155; }
-    td.wt { text-align: right; font-variant-numeric: tabular-nums; }
-    td.total-pp { text-align: center; font-size: 8px; color: #0369a1; border-left: 2px solid #bae6fd; }
-    .total-kg { font-size: 7px; color: #64748b; }
-
-    .page-break { page-break-before: always; }
-    .section-title { font-size: 12px; font-weight: 700; color: #1e3a8a; margin-bottom: 6px; border-bottom: 1.5px solid #1e3a8a; padding-bottom: 3px; }
-
-    td.sum-worker { font-weight: 600; }
-    td.sum-num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
-    tr.grand-total td { background: #1e3a8a !important; color: #fff; font-weight: 700; }
-    tr.grand-total td.sum-num { text-align: right; }
-  </style>
-</head>
-<body>
-  <div class="page-header">
-    <div>
-      <h1>Worker Bales Report</h1>
-      <div class="sub">Stock Entry History &nbsp;&middot;&nbsp; ${fromDate} &rarr; ${toDate}</div>
-    </div>
-    <div class="meta">
-      ${sortedWorkers.length} workers &nbsp;|&nbsp; ${grandBales} bales &nbsp;|&nbsp; ${grandKg.toFixed(0)} kg total
-    </div>
-  </div>
-
-  <table>
-    <thead>
-      <tr>
-        <th style="width:16%">Reference</th>
-        <th style="width:18%">Worker</th>
-        <th>Product</th>
-        <th class="r" style="width:9%">Weight (kg)</th>
-        <th class="r" style="width:14%">Total / Person</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${detailRowsHtml}
-      <tr style="background:#1e3a8a;color:#fff;font-weight:800;">
-        <td colspan="3" style="color:#fff;padding:3px 5px;">TOTAL</td>
-        <td style="text-align:right;color:#fff;padding:3px 5px;">${grandKg.toFixed(0)}</td>
-        <td style="text-align:center;color:#fff;padding:3px 5px;">${grandBales}</td>
-      </tr>
-    </tbody>
-  </table>
-
-  <div class="page-break"></div>
-
-  <div class="page-header">
-    <div>
-      <h1>Worker Summary</h1>
-      <div class="sub">Stock Entry History &nbsp;&middot;&nbsp; ${fromDate} &rarr; ${toDate}</div>
-    </div>
-    <div class="meta">
-      ${sortedWorkers.length} workers &nbsp;|&nbsp; ${grandBales} bales &nbsp;|&nbsp; ${grandKg.toFixed(0)} kg
-    </div>
-  </div>
-
-  <table>
-    <thead>
-      <tr>
-        <th>Worker</th>
-        <th class="r" style="width:18%">Bales</th>
-        <th class="r" style="width:22%">Total Weight (kg)</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${summaryRowsHtml}
-      <tr class="grand-total">
-        <td></td>
-        <td class="sum-num">${grandBales}</td>
-        <td class="sum-num">${grandKg.toFixed(0)}</td>
-      </tr>
-    </tbody>
-  </table>
-
-  <script>window.onload = function(){ window.print(); };<\/script>
-</body>
-</html>`;
-
-    const win = window.open("", "_blank", "width=900,height=1000");
-    if (!win) return;
-    win.document.write(html);
-    win.document.close();
-  }
+  const { exportExcel, handlePrintMatrix, handleExportWorkerPDF } = createStockEntryHistoryReports({
+    filteredGroups,
+    fetchGroupsWithBales,
+    fromDate,
+    toDate,
+  });
+  void handlePrintMatrix;
+  void thirtyDaysAgo;
+  void formatHistoryTime;
 
   function EditableDateCell({
     dateStr,
@@ -843,44 +280,20 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     editKey: string;
     onSave: (newDate: string) => void;
   }) {
-    const isEditing = editingDateKey === editKey;
-    if (isEditing) {
-      return (
-        <input
-          autoFocus
-          type="date"
-          defaultValue={dateStr}
-          className="border rounded px-1 py-0.5 text-xs w-32"
-          onBlur={(e) => {
-            const val = e.target.value;
-            if (val && val !== dateStr) onSave(val);
-            else setEditingDateKey(null);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") setEditingDateKey(null);
-            if (e.key === "Enter") {
-              const val = (e.target as HTMLInputElement).value;
-              if (val && val !== dateStr) onSave(val);
-              else setEditingDateKey(null);
-            }
-          }}
-        />
-      );
-    }
     return (
-      <span
-        className="cursor-pointer hover:underline hover:text-primary"
-        title="Click to edit date"
-        onClick={() => setEditingDateKey(editKey)}
-      >
-        {dateStr ? formatDisplayDate(dateStr) : "—"}
-      </span>
+      <StockEntryHistoryEditableDateCell
+        dateStr={dateStr}
+        editKey={editKey}
+        onSave={onSave}
+        editingDateKey={editingDateKey}
+        setEditingDateKey={setEditingDateKey}
+        formatDisplayDate={formatDisplayDate}
+      />
     );
   }
 
   return (
     <div className="p-4 space-y-3">
-      {/* ── Toolbar ── */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           <div className="flex items-center justify-center h-8 w-8 rounded-xl bg-gradient-to-br from-sky-500/30 to-sky-600/10 border border-sky-500/25 shrink-0">
@@ -893,7 +306,6 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
         </div>
         <div className="flex items-center gap-2">
           <ProductionPlannerDialog />
-          {/* View toggle */}
           <div className="flex items-center bg-muted rounded-lg p-0.5 gap-0.5">
             <Button
               variant={viewMode === "condensed" ? "default" : "ghost"}
@@ -956,7 +368,6 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
         </div>
       </div>
 
-      {/* ── Filters panel ── */}
       <div className="rounded-xl border bg-muted/30 p-3">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
           <div className="space-y-1">
@@ -1067,7 +478,6 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
         </div>
       </div>
 
-      {/* ── Date + Search band ── */}
       <div className="flex items-center gap-2 px-3 py-2 rounded-xl border bg-muted/30 flex-wrap">
         <Button
           variant={fromActive ? "default" : "ghost"}
@@ -1094,7 +504,6 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
           onClick={() => {
             setToActive((prev) => {
               const next = !prev;
-              // Activating "To" ignores "From" — deactivate it automatically
               if (next) setFromActive(false);
               return next;
             });
@@ -1136,7 +545,6 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
         </div>
       </div>
 
-      {/* ── Summary pill-cards ── show dataset-level totals (all pages, full filter) ── */}
       <div className="flex items-center gap-2 flex-wrap">
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-slate-500/10 border-slate-500/20">
           <span className="text-xs font-semibold text-slate-500">Groups</span>
@@ -1159,7 +567,6 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
         </div>
       </div>
 
-      {/* ── CONDENSED VIEW: grouped by worker ── */}
       {viewMode === "condensed" && (
         <div className="rounded-xl border overflow-hidden">
           <table className="w-full text-sm">
@@ -1206,7 +613,6 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                 const workerCount = plan?.workerCount ?? 0;
                 const diff = wg.totalBales - target;
                 return [
-                  /* Worker header row */
                   <tr
                     key={wg.workerKey}
                     className="border-t hover-elevate cursor-pointer bg-muted/30"
@@ -1241,8 +647,6 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                     <td className="px-3 py-2 text-right font-semibold">{wg.totalBales}</td>
                     <td className="px-3 py-2 text-right font-semibold">{wg.totalWeight.toFixed(2)}</td>
                   </tr>,
-
-                  /* Expanded: sub-group rows per date+location+product */
                   wExpanded && (
                     <tr key={wg.workerKey + "-sub"} className="bg-muted/10">
                       <td colSpan={7} className="px-0 py-0">
@@ -1340,7 +744,6 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                                     </Select>
                                   </td>
                                 </tr>,
-                                /* Bale-level detail inside sub-group */
                                 gExpanded && (
                                   <tr key={gKey + "-bales-detail"} className="bg-muted/20">
                                     <td colSpan={10} className="px-12 py-2">
@@ -1408,76 +811,15 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
         </div>
       )}
 
-      {/* ── DETAILED VIEW: flat per-bale list ── */}
       {viewMode === "detailed" && (
-        <div className="rounded-xl border overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 z-30 bg-muted border-b-2 border-border/60">
-              <tr className="text-left">
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Reference</th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Date</th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Location</th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Worker</th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Product</th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Article</th>
-                <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground tracking-wide">
-                  Weight (kg)
-                </th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Status</th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Finalized At</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading && (
-                <tr>
-                  <td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">
-                    Loading…
-                  </td>
-                </tr>
-              )}
-              {!isLoading && allBales.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">
-                    No bales found for the selected filters.
-                  </td>
-                </tr>
-              )}
-              {allBales.map((b, idx) => (
-                <tr
-                  key={b.id}
-                  className={`border-t ${idx % 2 === 1 ? "bg-muted/20" : ""}`}
-                  data-testid={`row-bale-${b.id}`}
-                >
-                  <td className="px-3 py-1.5 font-mono text-xs">{b.referenceNumber}</td>
-                  <td className="px-3 py-1.5">
-                    <EditableDateCell
-                      dateStr={b.stockEntryDate || ""}
-                      editKey={`bale-${b.id}`}
-                      onSave={(newDate) => updateDateMutation.mutate({ ids: [b.id], stockEntryDate: newDate })}
-                    />
-                  </td>
-                  <td className="px-3 py-1.5">{b.locationName}</td>
-                  <td className="px-3 py-1.5">
-                    {b.workerName || <span className="italic text-muted-foreground text-xs">Unassigned</span>}
-                  </td>
-                  <td className="px-3 py-1.5">{b.productName || "—"}</td>
-                  <td className="px-3 py-1.5 text-muted-foreground text-xs">{b.articleCode || "—"}</td>
-                  <td className="px-3 py-1.5 text-right">{parseFloat(b.weightKg || "0").toFixed(2)}</td>
-                  <td className="px-3 py-1.5">
-                    <span
-                      className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold ${STATUS_COLORS[b.status] || "bg-muted text-muted-foreground"}`}
-                    >
-                      {b.status}
-                    </span>
-                  </td>
-                  <td className="px-3 py-1.5 text-muted-foreground text-xs">
-                    {b.finalizedAt ? new Date(b.finalizedAt).toLocaleString() : "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DetailedHistoryTable
+          isLoading={isLoading}
+          allBales={allBales}
+          editingDateKey={editingDateKey}
+          setEditingDateKey={setEditingDateKey}
+          formatDisplayDate={formatDisplayDate}
+          onUpdateDate={(baleId, stockEntryDate) => updateDateMutation.mutate({ ids: [baleId], stockEntryDate })}
+        />
       )}
     </div>
   );
