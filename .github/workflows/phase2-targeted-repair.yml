@@ -23,90 +23,29 @@ jobs:
           node-version: 22.14.0
           cache: npm
       - run: npm ci
-      - name: Apply deterministic repairs
+      - name: Format every changed source file checked by CI
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          def rewrite(path, fn):
-              p = Path(path)
-              before = p.read_text()
-              after = fn(before)
-              if after == before:
-                  raise SystemExit(f"expected repair made no change: {path}")
-              p.write_text(after)
-
-          rewrite(
-              "server/routes/whatsappFastSendRoutes.ts",
-              lambda s: s.replace(
-                  'res.status(400).json({ message: "voucherId is required" });',
-                  'res.status(400).json({ message: "Invalid voucherId" });',
-                  1,
-              ),
+          git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main
+          mapfile -d '' changed_files < <(
+            git diff --name-only --diff-filter=ACMR -z origin/main HEAD -- client/src server shared tests scripts |
+              grep -zE '\.(ts|tsx|css|mjs)$' || true
           )
-
-          def historical(s):
-              old = 'app.get("/api/factory/net-position", requireAuth, (req: Request, res: Response, next: NextFunction) => {\n    const asOf ='
-              new = 'app.use("/api/factory/net-position", requireAuth, (req: Request, res: Response, next: NextFunction) => {\n    if (req.method !== "GET") return next();\n    const asOf ='
-              if old not in s:
-                  raise SystemExit("historical net-position route pattern missing")
-              return s.replace(old, new, 1)
-          rewrite("server/routes/factory/employee-pos/netPositionHistoricalCorrection.ts", historical)
-
-          def pos_print(s):
-              start = s.index("  // ── Receive a frontend-generated PDF and forward to WhatsApp")
-              end = s.index("  // ── Direct invoice PDF download", start)
-              return s[:start] + s[end:]
-          rewrite("server/routes/pos/posPrintRoutes.ts", pos_print)
-
-          def pos_whatsapp(s):
-              start = s.index("  // ── POS Stock PDF → WhatsApp")
-              return s[:start] + "}\n"
-          rewrite("server/routes/pos/posWhatsAppRoutes.ts", pos_whatsapp)
-
-          def account_whatsapp(s):
-              start = s.index("  // ERP-mode WhatsApp statement send")
-              end = s.index("  // Get all vouchers with date filtering", start)
-              return s[:start] + s[end:]
-          rewrite("server/routes/accounts/whatsapp.ts", account_whatsapp)
-
-          def factory_whatsapp(s):
-              start = s.index("  // ── POST manual send")
-              end = s.index("// ─── Internal helpers", start)
-              return s[:start] + "}\n\n" + s[end:]
-          rewrite("server/routes/factoryWhatsappRoutes.ts", factory_whatsapp)
-          PY
-      - name: Format changed source
-        run: |
-          npx prettier --write \
-            server/routes/whatsappFastSendRoutes.ts \
-            server/routes/factory/employee-pos/netPositionHistoricalCorrection.ts \
-            server/routes/pos/posPrintRoutes.ts \
-            server/routes/pos/posWhatsAppRoutes.ts \
-            server/routes/accounts/whatsapp.ts \
-            server/routes/factoryWhatsappRoutes.ts \
-            tests/waste-dispatch-route-registration.test.ts \
-            tests/phase7-backend-messages-translations.test.ts \
-            scripts/verify-env-documentation.mjs
-      - name: Refresh measured route manifest
-        run: UPDATE_ROUTE_MANIFEST=1 npx vitest run tests/route-manifest.test.ts
-      - name: Verify deterministic failures
-        run: |
-          npx vitest run \
-            tests/route-manifest.test.ts \
-            tests/pdf-invoice.test.ts \
-            tests/phase7-backend-messages-translations.test.ts \
-            tests/source-text-assertions.test.ts \
-            tests/toolchain-and-script-inventory.test.ts \
-            tests/waste-dispatch-route-registration.test.ts
-      - name: TypeScript
+          if [ "${#changed_files[@]}" -eq 0 ]; then
+            echo "No changed source files require formatting."
+            exit 0
+          fi
+          printf 'Formatting %s changed source file(s):\n' "${#changed_files[@]}"
+          printf ' - %s\n' "${changed_files[@]}"
+          node node_modules/prettier/bin/prettier.cjs --write "${changed_files[@]}"
+          node node_modules/prettier/bin/prettier.cjs --check "${changed_files[@]}"
+      - name: Verify TypeScript after formatting
         run: npm run check
-      - name: Publish verified repair and remove runner
+      - name: Publish formatting repair and remove runner
         run: |
           rm .github/workflows/phase2-targeted-repair.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git diff --cached --check
-          git commit -m "Repair Phase 2 deterministic CI failures"
+          git commit -m "Format Phase 2 changed source files"
           git push origin HEAD:program/erp-90-phase-2
