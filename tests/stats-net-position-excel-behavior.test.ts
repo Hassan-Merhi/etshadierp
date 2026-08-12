@@ -47,6 +47,13 @@ const harness = vi.hoisted(() => {
       while (this.rows.length < number) this.rows.push(new FakeRow(this.rows.length + 1));
       return this.rows[number - 1];
     }
+    spliceRows(start: number, deleteCount: number, ...insert: any[]) {
+      const replacementRows = insert.map((values, index) => new FakeRow(start + index, values));
+      this.rows.splice(start - 1, deleteCount, ...replacementRows);
+      this.rows.forEach((row, index) => {
+        row.number = index + 1;
+      });
+    }
     mergeCells() {}
   }
   class FakeWorkbook {

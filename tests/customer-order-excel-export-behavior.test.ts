@@ -266,17 +266,14 @@ describe("customer order Excel export behavior", () => {
     );
     expect(res.statusCode).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    expect(String(res.headers.get("Content-Disposition"))).toContain("CONT-1_Customer A_Kolwezi.xlsx");
+    expect(res.headers.get("Content-Disposition")).toBe("attachment; filename=CONT-1_Customer A_Kolwezi.xlsx");
     expect(res.body).toEqual(Buffer.from("PKinvoice-workbook"));
 
     const sheet = harness.workbooks[0].worksheets[0];
-    const text = sheet.rows.flatMap((row) => [...row.cells.values()].map((cell) => cell.value)).join(" | ");
-    expect(text).toContain("Commercial Invoice");
-    expect(text).toContain("INV-20");
-    expect(text).toContain("Shirts");
-    expect(text).toContain("Pants");
-    expect(text).toContain("Handling");
-    expect(text).toContain("Grand Total");
+    const values = sheet.rows.flatMap((row) => [...row.cells.values()].map((cell) => cell.value));
+    expect(values).toEqual(
+      expect.arrayContaining(["Commercial Invoice", "INV-20", "Shirts", "Pants", "Handling", "Grand Total"])
+    );
   });
 
   it("hides selling columns and financial charges when export visibility and noCharges require it", async () => {
@@ -325,11 +322,11 @@ describe("customer order Excel export behavior", () => {
       res
     );
 
-    const text = harness.workbooks[0].worksheets[0].rows
-      .flatMap((row) => [...row.cells.values()].map((cell) => cell.value))
-      .join(" | ");
-    expect(text).not.toContain("Price/Bale");
-    expect(text).not.toContain("Grand Total");
+    const values = harness.workbooks[0].worksheets[0].rows.flatMap((row) =>
+      [...row.cells.values()].map((cell) => cell.value)
+    );
+    expect(values.includes("Price/Bale")).toBe(false);
+    expect(values.includes("Grand Total")).toBe(false);
     expect(res.body).toEqual(Buffer.from("PKinvoice-workbook"));
   });
 
