@@ -35,9 +35,19 @@ function parsePagination(req: Request): { page: number; limit: number; offset: n
   return { page, limit, offset: (page - 1) * limit };
 }
 
-function parseOptionalId(value: unknown): number | undefined {
-  const parsed = Number.parseInt(String(value ?? ""), 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+function parseCsvPositiveIds(value: unknown): number[] {
+  if (typeof value !== "string" || !value.trim()) return [];
+  const seen = new Set<number>();
+  for (const raw of value.split(",")) {
+    const parsed = Number.parseInt(raw.trim(), 10);
+    if (Number.isFinite(parsed) && parsed > 0) seen.add(parsed);
+  }
+  return [...seen];
+}
+
+function parseCsvStrings(value: unknown): string[] {
+  if (typeof value !== "string" || !value.trim()) return [];
+  return [...new Set(value.split(",").map((part) => part.trim()).filter(Boolean))];
 }
 
 export function registerFactoryStockEntryHistoryPaginationRoutes(app: Express): void {
@@ -57,18 +67,12 @@ export function registerFactoryStockEntryHistoryPaginationRoutes(app: Express): 
         const today = getClientDate(req);
         const startDate = typeof req.query.startDate === "string" && req.query.startDate ? req.query.startDate : today;
         const endDate = typeof req.query.endDate === "string" && req.query.endDate ? req.query.endDate : today;
-        const workerId = parseOptionalId(req.query.workerId);
-        const workerCategoryId = parseOptionalId(req.query.workerCategoryId);
-        const productId = parseOptionalId(req.query.productId);
-        const locationId = parseOptionalId(req.query.locationId);
-        const categoryIdRaw = typeof req.query.categoryId === "string" ? req.query.categoryId.trim() : "";
-        const categoryIds = categoryIdRaw
-          ? categoryIdRaw
-              .split(",")
-              .map((value) => Number.parseInt(value, 10))
-              .filter((value) => Number.isFinite(value) && value > 0)
-          : [];
-        const status = typeof req.query.status === "string" && req.query.status ? req.query.status : undefined;
+        const workerIds = parseCsvPositiveIds(req.query.workerId);
+        const workerCategoryIds = parseCsvPositiveIds(req.query.workerCategoryId);
+        const productIds = parseCsvPositiveIds(req.query.productId);
+        const locationIds = parseCsvPositiveIds(req.query.locationId);
+        const categoryIds = parseCsvPositiveIds(req.query.categoryId);
+        const statuses = parseCsvStrings(req.query.status);
         const search = typeof req.query.search === "string" ? req.query.search.trim().toLowerCase() : "";
         const includeUnassigned = req.query.includeUnassigned !== "false";
         const lite = req.query.lite === "1";
@@ -89,9 +93,12 @@ export function registerFactoryStockEntryHistoryPaginationRoutes(app: Express): 
         ];
 
         if (!(isPrivileged && search)) conditions.push(`fb.status NOT IN ('DELETED', 'REMOVED')`);
-        if (workerId) conditions.push(`fb.finalized_by = ${bind(workerId)}`);
-        if (workerCategoryId) {
-          const workerCategoryParam = bind(workerCategoryId);
+        if (workerIds.length > 0) {
+          const placeholders = workerIds.map((id) => bind(id)).join(", ");
+          conditions.push(`fb.finalized_by IN (${placeholders})`);
+        }
+        if (workerCategoryIds.length > 0) {
+          const workerCategoryPlaceholders = workerCategoryIds.map((id) => bind(id)).join(", ");
           conditions.push(`fb.finalized_by IN (
             SELECT category_worker.id
             FROM factory_worker_categories fwc
@@ -100,19 +107,28 @@ export function registerFactoryStockEntryHistoryPaginationRoutes(app: Express): 
               ON category_worker.id = category_ids.worker_id::int
               AND category_worker.company_id = ${companyParam}
               AND category_worker.active = TRUE
-            WHERE fwc.id = ${workerCategoryParam}
+            WHERE fwc.id IN (${workerCategoryPlaceholders})
               AND fwc.company_id = ${companyParam}
           )`);
         }
-        if (productId) conditions.push(`fb.product_id = ${bind(productId)}`);
-        if (locationId) conditions.push(`fb.erp_location_id = ${bind(locationId)}`);
+        if (productIds.length > 0) {
+          const placeholders = productIds.map((id) => bind(id)).join(", ");
+          conditions.push(`fb.product_id IN (${placeholders})`);
+        }
+        if (locationIds.length > 0) {
+          const placeholders = locationIds.map((id) => bind(id)).join(", ");
+          conditions.push(`fb.erp_location_id IN (${placeholders})`);
+        }
         if (categoryIds.length === 1) {
           conditions.push(`fbp.category_id = ${bind(categoryIds[0])}`);
         } else if (categoryIds.length > 1) {
           const placeholders = categoryIds.map((id) => bind(id)).join(", ");
           conditions.push(`fbp.category_id IN (${placeholders})`);
         }
-        if (status) conditions.push(`fb.status = ${bind(status)}`);
+        if (statuses.length > 0) {
+          const placeholders = statuses.map((status) => bind(status)).join(", ");
+          conditions.push(`fb.status IN (${placeholders})`);
+        }
         if (search) conditions.push(`LOWER(fb.reference_number) LIKE ${bind(`%${search}%`)}`);
         if (!includeUnassigned) conditions.push(`fb.finalized_by IS NOT NULL`);
 
