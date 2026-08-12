@@ -1,0 +1,29 @@
+name: Phase 2 Repair Diagnostics
+
+on:
+  push:
+    branches:
+      - program/erp-90-phase-2
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostics:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Type escape diagnostics
+        run: npm run audit:type-escapes
+        continue-on-error: true
+      - name: Script inventory diagnostics
+        run: npm run audit:scripts
+        continue-on-error: true
+      - name: Formatting diagnostics
+        run: npx prettier --check client/src/pages/StockInSalesReport.tsx
+        continue-on-error: true
