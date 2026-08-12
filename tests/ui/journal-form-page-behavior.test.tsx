@@ -91,7 +91,9 @@ vi.mock("@/lib/whatsapp-prompt", () => ({ resolveWhatsAppPrompt: () => null }));
 vi.mock("@/components/ExchangeRateInput", () => ({ ExchangeRateInput: () => null }));
 vi.mock("@/components/vouchers/CreateAccountModal", () => ({ CreateAccountModal: () => null }));
 vi.mock("@/components/DraftRestorePrompt", () => ({ DraftRestorePrompt: () => null }));
-vi.mock("@/components/vouchers/PrintTemplate", () => ({ parseDateLocal: (value: string) => new Date(`${value}T00:00:00`) }));
+vi.mock("@/components/vouchers/PrintTemplate", () => ({
+  parseDateLocal: (value: string) => new Date(`${value}T00:00:00`),
+}));
 vi.mock("@/lib/excelHelper", () => ({
   utils: { json_to_sheet: vi.fn(() => ({})), book_new: vi.fn(() => ({})), book_append_sheet: vi.fn() },
   writeFile: vi.fn(),
@@ -102,19 +104,31 @@ vi.mock("@/components/ui/select", () => ({
   Select: ({ children, onValueChange }: any) => (
     <SelectContext.Provider value={onValueChange}>{children}</SelectContext.Provider>
   ),
-  SelectTrigger: ({ children, ...props }: any) => <button type="button" {...props}>{children}</button>,
+  SelectTrigger: ({ children, ...props }: any) => (
+    <button type="button" {...props}>
+      {children}
+    </button>
+  ),
   SelectValue: ({ placeholder }: any) => <span>{placeholder ?? "selected"}</span>,
   SelectContent: ({ children }: any) => <div>{children}</div>,
   SelectItem: ({ children, value }: any) => {
     const onChange = useContext(SelectContext);
-    return <button type="button" onClick={() => onChange?.(value)}>{children}</button>;
+    return (
+      <button type="button" onClick={() => onChange?.(value)}>
+        {children}
+      </button>
+    );
   },
 }));
 vi.mock("@/components/ui/dropdown-menu", () => ({
   DropdownMenu: ({ children }: any) => <div>{children}</div>,
   DropdownMenuTrigger: ({ children }: any) => <>{children}</>,
   DropdownMenuContent: ({ children }: any) => <div>{children}</div>,
-  DropdownMenuItem: ({ children, onClick, ...props }: any) => <button type="button" onClick={onClick} {...props}>{children}</button>,
+  DropdownMenuItem: ({ children, onClick, ...props }: any) => (
+    <button type="button" onClick={onClick} {...props}>
+      {children}
+    </button>
+  ),
 }));
 vi.mock("@/components/ui/alert-dialog", () => ({
   AlertDialog: ({ children }: any) => <div>{children}</div>,
@@ -179,20 +193,34 @@ describe("journal voucher form behavior", () => {
 
     fireEvent.click(screen.getByTestId("button-save-journal-voucher"));
 
-    await waitFor(() => expect(harness.modeApiRequest).toHaveBeenCalledWith(
-      "POST",
-      "/api/vouchers/journal",
-      expect.objectContaining({
-        entries: [
-          expect.objectContaining({ type: "DR", accountType: "ledger", accountId: 1, accountName: "Cash", amount: "100" }),
-          expect.objectContaining({ type: "CR", accountType: "ledger", accountId: 2, accountName: "Sales Revenue", amount: "100" }),
-        ],
-        notes: "Balance correction",
-        optional: false,
-        currency: "USD",
-        effectiveDate: "2026-08-10",
-      }),
-    ));
+    await waitFor(() =>
+      expect(harness.modeApiRequest).toHaveBeenCalledWith(
+        "POST",
+        "/api/vouchers/journal",
+        expect.objectContaining({
+          entries: [
+            expect.objectContaining({
+              type: "DR",
+              accountType: "ledger",
+              accountId: 1,
+              accountName: "Cash",
+              amount: "100",
+            }),
+            expect.objectContaining({
+              type: "CR",
+              accountType: "ledger",
+              accountId: 2,
+              accountName: "Sales Revenue",
+              amount: "100",
+            }),
+          ],
+          notes: "Balance correction",
+          optional: false,
+          currency: "USD",
+          effectiveDate: "2026-08-10",
+        })
+      )
+    );
     expect(harness.discardDraft).toHaveBeenCalled();
     expect(harness.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Success" }));
     expect(harness.invalidateQueries).toHaveBeenCalledWith({ queryKey: ["/api/vouchers"] });
