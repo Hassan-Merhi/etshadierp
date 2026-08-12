@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -136,6 +136,7 @@ export default function ProductionComparison() {
   const qA = useQuery<ReportData>({
     queryKey: ["/api/factory/production-value-report", rangeA[0], rangeA[1], workerIdsParam],
     staleTime: 0,
+    placeholderData: keepPreviousData,
     queryFn: async () => {
       const params = new URLSearchParams({ from: rangeA[0], to: rangeA[1] });
       if (workerIdsParam) params.set("workerIds", workerIdsParam);
@@ -148,6 +149,7 @@ export default function ProductionComparison() {
   const qB = useQuery<ReportData>({
     queryKey: ["/api/factory/production-value-report", rangeB[0], rangeB[1], workerIdsParam],
     staleTime: 0,
+    placeholderData: keepPreviousData,
     queryFn: async () => {
       const params = new URLSearchParams({ from: rangeB[0], to: rangeB[1] });
       if (workerIdsParam) params.set("workerIds", workerIdsParam);
