@@ -68,7 +68,12 @@ vi.mock("@tanstack/react-query", () => ({
       };
     }
     if (root === "/api/factory/categories") {
-      return { data: [{ id: 10, name: "Tops" }, { id: 20, name: "Bottoms" }] };
+      return {
+        data: [
+          { id: 10, name: "Tops" },
+          { id: 20, name: "Bottoms" },
+        ],
+      };
     }
     if (root === "/api/factory/customers") return { data: [{ id: 1, legalName: "Customer A" }] };
     return { data: [], isLoading: false };
@@ -123,13 +128,27 @@ vi.mock("@/pages/factory/factorylocationinventory/utils", () => ({
   isSpecialFactoryCategory: () => false,
 }));
 vi.mock("@/pages/factory/factorylocationinventory/components/StatCard", () => ({
-  StatCard: ({ label, value, sub }: any) => <div data-testid={`stat-${label.replace(/\s+/g, "-").toLowerCase()}`}>{label}:{value}:{sub ?? ""}</div>,
+  StatCard: ({ label, value, sub }: any) => (
+    <div data-testid={`stat-${label.replace(/\s+/g, "-").toLowerCase()}`}>
+      {label}:{value}:{sub ?? ""}
+    </div>
+  ),
 }));
-vi.mock("@/pages/factory/factory-location-inventory/dialogs/FinalizeProformaDialog", () => ({ FinalizeProformaDialog: () => null }));
-vi.mock("@/pages/factory/factory-location-inventory/dialogs/RenameLocationDialog", () => ({ RenameLocationDialog: () => null }));
-vi.mock("@/pages/factory/factory-location-inventory/dialogs/StockOverloadWarningDialog", () => ({ StockOverloadWarningDialog: () => null }));
-vi.mock("@/pages/factory/factory-location-inventory/dialogs/RemoveBalesDialog", () => ({ RemoveBalesDialog: () => null }));
-vi.mock("@/pages/factory/factory-location-inventory/dialogs/PrintBarcodesDialog", () => ({ PrintBarcodesDialog: () => null }));
+vi.mock("@/pages/factory/factory-location-inventory/dialogs/FinalizeProformaDialog", () => ({
+  FinalizeProformaDialog: () => null,
+}));
+vi.mock("@/pages/factory/factory-location-inventory/dialogs/RenameLocationDialog", () => ({
+  RenameLocationDialog: () => null,
+}));
+vi.mock("@/pages/factory/factory-location-inventory/dialogs/StockOverloadWarningDialog", () => ({
+  StockOverloadWarningDialog: () => null,
+}));
+vi.mock("@/pages/factory/factory-location-inventory/dialogs/RemoveBalesDialog", () => ({
+  RemoveBalesDialog: () => null,
+}));
+vi.mock("@/pages/factory/factory-location-inventory/dialogs/PrintBarcodesDialog", () => ({
+  PrintBarcodesDialog: () => null,
+}));
 vi.mock("@/components/ui/popover", () => ({
   Popover: ({ children }: any) => <div>{children}</div>,
   PopoverTrigger: ({ children }: any) => <>{children}</>,
