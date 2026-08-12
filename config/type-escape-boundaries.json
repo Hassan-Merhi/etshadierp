@@ -685,7 +685,7 @@
         0
       ],
       "client/src/pages/StockEntryHistory.tsx": [
-        21,
+        19,
         0,
         0
       ],
@@ -6497,6 +6497,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 8834
+    "typeEscapeCeiling": 8832
   }
 }
