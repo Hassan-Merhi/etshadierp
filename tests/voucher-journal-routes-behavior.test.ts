@@ -6,10 +6,26 @@ const harness = vi.hoisted(() => {
   const tables = {
     vouchers: { id: "vouchers.id" },
     voucherEntries: { id: "entries.id", voucherId: "entries.voucherId" },
-    customerBalances: { companyId: "balances.companyId", referenceId: "balances.referenceId", referenceType: "balances.referenceType" },
+    customerBalances: {
+      companyId: "balances.companyId",
+      referenceId: "balances.referenceId",
+      referenceType: "balances.referenceType",
+    },
     interCompanyTransfers: { fromVoucherId: "ict.from", toVoucherId: "ict.to" },
-    customerOrderCharges: { id: "charges.id", orderId: "charges.orderId", amount: "charges.amount", chargeType: "charges.type", voucherId: "charges.voucherId", ledgerAccountId: "charges.ledgerId" },
-    customerOrders: { id: "orders.id", companyId: "orders.companyId", customerId: "orders.customerId", grandTotal: "orders.grandTotal" },
+    customerOrderCharges: {
+      id: "charges.id",
+      orderId: "charges.orderId",
+      amount: "charges.amount",
+      chargeType: "charges.type",
+      voucherId: "charges.voucherId",
+      ledgerAccountId: "charges.ledgerId",
+    },
+    customerOrders: {
+      id: "orders.id",
+      companyId: "orders.companyId",
+      customerId: "orders.customerId",
+      grandTotal: "orders.grandTotal",
+    },
     fSettings: { companyId: "settings.companyId" },
     fde: { referenceTable: "fde.table", referenceId: "fde.ref" },
   };
@@ -20,7 +36,8 @@ const harness = vi.hoisted(() => {
       innerJoin: vi.fn(() => builder),
       where: vi.fn(() => builder),
       limit: vi.fn(() => builder),
-      then: (resolve: (value: unknown[]) => unknown, reject: (reason: unknown) => unknown) => Promise.resolve(result).then(resolve, reject),
+      then: (resolve: (value: unknown[]) => unknown, reject: (reason: unknown) => unknown) =>
+        Promise.resolve(result).then(resolve, reject),
     };
     return builder;
   };
@@ -63,7 +80,9 @@ vi.mock("../server/routes/_helpers", () => ({
   buildVoucherChangesForCreate: harness.buildVoucherChangesForCreate,
   buildVoucherChangesForUpdate: harness.buildVoucherChangesForUpdate,
 }));
-vi.mock("../server/routes/factoryWhatsappRoutes", () => ({ checkAccountWhatsAppRule: harness.checkAccountWhatsAppRule }));
+vi.mock("../server/routes/factoryWhatsappRoutes", () => ({
+  checkAccountWhatsAppRule: harness.checkAccountWhatsAppRule,
+}));
 vi.mock("../server/routes/factory/_helpers", () => ({ recalculateOrderTotals: harness.recalculateOrderTotals }));
 vi.mock("../server/lib/migratedVoucherGuard", () => ({
   isReadonlyMigratedVoucher: () => false,
@@ -72,7 +91,12 @@ vi.mock("../server/lib/migratedVoucherGuard", () => ({
 vi.mock("../server/lib/httpHandlers", () => ({ getErrorMessage: (error: any) => error?.message || String(error) }));
 vi.mock("../server/lib/logger", () => ({ logger: { info: vi.fn(), error: vi.fn() } }));
 vi.mock("../server/services/accounting/currencyAmounts", () => ({
-  normalizeVoucherEntryAmounts: ({ transactionCurrency, transactionDebitAmount, transactionCreditAmount, historicalRate }: any) => {
+  normalizeVoucherEntryAmounts: ({
+    transactionCurrency,
+    transactionDebitAmount,
+    transactionCreditAmount,
+    historicalRate,
+  }: any) => {
     const rate = transactionCurrency === "USD" ? 1 : Number(historicalRate || 1);
     const debit = Number(transactionDebitAmount || 0) / rate;
     const credit = Number(transactionCreditAmount || 0) / rate;
@@ -88,7 +112,8 @@ vi.mock("../server/services/accounting/currencyAmounts", () => ({
       rateConvention: "TRANSACTION_PER_BASE",
     };
   },
-  erpRateToDaybookFxRateToUsd: (currency: string, _base: string, rate: unknown) => currency === "USD" ? 1 : 1 / Number(rate),
+  erpRateToDaybookFxRateToUsd: (currency: string, _base: string, rate: unknown) =>
+    currency === "USD" ? 1 : 1 / Number(rate),
 }));
 vi.mock("drizzle-orm", () => ({
   eq: (column: unknown, value: unknown) => ({ type: "eq", column, value }),
@@ -113,14 +138,22 @@ type Handler = (req: any, res: any) => unknown;
 
 function routesHarness() {
   const routes = new Map<string, Handler>();
-  const register = (method: string) => (path: string, ...handlers: any[]) => routes.set(`${method} ${path}`, handlers.at(-1));
+  const register =
+    (method: string) =>
+    (path: string, ...handlers: any[]) =>
+      routes.set(`${method} ${path}`, handlers.at(-1));
   const app: any = { post: register("POST"), patch: register("PATCH") };
   registerVoucherJournalRoutes(app);
   return routes;
 }
 
 function req(overrides: Record<string, unknown> = {}) {
-  return { session: { currentCompanyId: 4, userId: "admin-1", username: "admin" }, body: {}, params: {}, ...overrides } as any;
+  return {
+    session: { currentCompanyId: 4, userId: "admin-1", username: "admin" },
+    body: {},
+    params: {},
+    ...overrides,
+  } as any;
 }
 
 function resHarness() {
@@ -166,7 +199,7 @@ describe("journal voucher route behavior", () => {
           ],
         },
       }),
-      unbalanced,
+      unbalanced
     );
     expect(unbalanced.statusCode).toBe(400);
     expect(unbalanced.body).toEqual({ message: "Total debits must equal total credits" });
@@ -187,8 +220,25 @@ describe("journal voucher route behavior", () => {
       exchangeRate: "500",
     };
     const createdEntries = [
-      { id: 1, voucherId: 90, ledgerAccountId: 1, employeeId: null, customerId: null, debitAmount: "1.000000", creditAmount: "0.000000" },
-      { id: 2, voucherId: 90, bankAccountId: 2, ledgerAccountId: null, employeeId: null, customerId: null, debitAmount: "0.000000", creditAmount: "1.000000" },
+      {
+        id: 1,
+        voucherId: 90,
+        ledgerAccountId: 1,
+        employeeId: null,
+        customerId: null,
+        debitAmount: "1.000000",
+        creditAmount: "0.000000",
+      },
+      {
+        id: 2,
+        voucherId: 90,
+        bankAccountId: 2,
+        ledgerAccountId: null,
+        employeeId: null,
+        customerId: null,
+        debitAmount: "0.000000",
+        creditAmount: "1.000000",
+      },
     ];
     const voucherValues: unknown[] = [];
     const entryValues: unknown[] = [];
@@ -200,7 +250,7 @@ describe("journal voucher route behavior", () => {
             (isVoucher ? voucherValues : entryValues).push(values);
             return builder;
           }),
-          returning: vi.fn(async () => isVoucher ? [createdVoucher] : createdEntries),
+          returning: vi.fn(async () => (isVoucher ? [createdVoucher] : createdEntries)),
         };
         return builder;
       }),
@@ -224,7 +274,7 @@ describe("journal voucher route behavior", () => {
           ],
         },
       }),
-      res,
+      res
     );
 
     expect(voucherValues[0]).toMatchObject({
@@ -257,7 +307,7 @@ describe("journal voucher route behavior", () => {
         { ledgerAccountId: 1, employeeId: null, debitAmount: "1.000000", creditAmount: "0.000000" },
         { ledgerAccountId: null, employeeId: null, debitAmount: "0.000000", creditAmount: "1.000000" },
       ],
-      4,
+      4
     );
     expect(harness.daybookValues[0]).toMatchObject({
       values: expect.objectContaining({
@@ -271,10 +321,10 @@ describe("journal voucher route behavior", () => {
       }),
     });
     expect(harness.checkAccountWhatsAppRule).toHaveBeenCalledWith(
-      expect.objectContaining({ companyId: 4, accountId: 1, accountType: "ledger", voucherType: "Journal" }),
+      expect.objectContaining({ companyId: 4, accountId: 1, accountType: "ledger", voucherType: "Journal" })
     );
     expect(harness.logAudit).toHaveBeenCalledWith(
-      expect.objectContaining({ companyId: 4, action: "create", tableName: "vouchers", recordId: 90 }),
+      expect.objectContaining({ companyId: 4, action: "create", tableName: "vouchers", recordId: 90 })
     );
     expect(res.body).toMatchObject({ voucher: createdVoucher, entries: createdEntries, whatsapp: { prompt: true } });
   });
@@ -285,7 +335,20 @@ describe("journal voucher route behavior", () => {
         const isVoucher = table === harness.tables.vouchers;
         const builder: any = {
           values: vi.fn(() => builder),
-          returning: vi.fn(async () => isVoucher ? [{ id: 91, optional: true, totalAmount: "100.000000", currency: "USD", voucherDate: "2026-08-12", voucherNumber: "JOURNAL-91" }] : []),
+          returning: vi.fn(async () =>
+            isVoucher
+              ? [
+                  {
+                    id: 91,
+                    optional: true,
+                    totalAmount: "100.000000",
+                    currency: "USD",
+                    voucherDate: "2026-08-12",
+                    voucherNumber: "JOURNAL-91",
+                  },
+                ]
+              : []
+          ),
         };
         return builder;
       }),
@@ -294,8 +357,14 @@ describe("journal voucher route behavior", () => {
     harness.selectResults.push([]);
     const res = resHarness();
     await routes.get("POST /api/vouchers/journal")!(
-      req({ body: { voucherDate: "2026-08-12", optional: true, entries: [{ type: "DR", accountType: "ledger", accountId: 1, amount: "100" }] } }),
-      res,
+      req({
+        body: {
+          voucherDate: "2026-08-12",
+          optional: true,
+          entries: [{ type: "DR", accountType: "ledger", accountId: 1, amount: "100" }],
+        },
+      }),
+      res
     );
     expect(res.statusCode).toBe(200);
     expect(harness.syncEmployeeBalancesFromEntries).not.toHaveBeenCalled();
