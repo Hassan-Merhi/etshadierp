@@ -22,5 +22,14 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin main
+          set +e
           git merge --no-edit origin/main
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            echo "Merge conflicts:"
+            git diff --name-only --diff-filter=U
+            echo "Status:"
+            git status --short
+            exit "$status"
+          fi
           git push origin HEAD:program/erp-90-phase-2
