@@ -28,7 +28,7 @@ const harness = vi.hoisted(() => {
     }),
   }));
 
-  return { ...state, db: { select, insert } };
+  return { ...state, state, db: { select, insert } };
 });
 
 vi.mock("../server/db", () => ({ db: harness.db }));
@@ -94,7 +94,7 @@ describe("smart transfer feedback behavior", () => {
     vi.clearAllMocks();
     harness.selectResults.splice(0);
     harness.inserts.splice(0);
-    harness.failInsert = false;
+    harness.state.failInsert = false;
   });
 
   it("normalizes and merges preview lines before logging feedback", async () => {
@@ -149,7 +149,7 @@ describe("smart transfer feedback behavior", () => {
   });
 
   it("fails preview feedback closed to null without interrupting the transfer workflow", async () => {
-    harness.failInsert = true;
+    harness.state.failInsert = true;
     const sessionId = await createSmartTransferPreviewFeedback({
       companyId: 4,
       userId: "planner-1",
