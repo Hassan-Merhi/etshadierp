@@ -2,6 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { sql } from "drizzle-orm";
 
 import { db } from "../../../db";
+import { getClientDate } from "../../../lib/dateUtils";
 import { resultRows } from "../../../lib/queryResult";
 import { logger } from "../../../lib/logger";
 
@@ -139,16 +140,16 @@ async function computeHistoricalOperationalValues(companyId: number, asOf: strin
 }
 
 export function registerNetPositionHistoricalCorrection(app: Express) {
-  app.get("/api/factory/net-position", async (req: Request, res: Response, next: NextFunction) => {
+  app.get("/api/factory/net-position", (req: Request, res: Response, next: NextFunction) => {
     const asOf = typeof req.query.asOf === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.asOf) ? req.query.asOf : null;
-    if (!asOf) return next();
-
-    const companyId = Number((req.session as any).factoryCompanyId || (req.session as any).currentCompanyId || 0);
-    if (!companyId) return next();
+    if (!asOf || asOf === getClientDate(req)) return next();
 
     const originalJson = res.json.bind(res);
     res.json = ((body: NetPositionResponse) => {
       void (async () => {
+        const companyId = Number((req.session as any).factoryCompanyId || (req.session as any).currentCompanyId || 0);
+        if (!companyId) return originalJson(body);
+
         try {
           if (!body?.forUs?.accounts || typeof body.rawMaterialValue !== "number") {
             return originalJson(body);
