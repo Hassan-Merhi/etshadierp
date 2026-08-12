@@ -1,0 +1,33 @@
+{
+  "missingReport": false,
+  "summary": {
+    "lintedFiles": 2683,
+    "errorTotal": 0,
+    "warningTotal": 9453,
+    "warningCeiling": 9461,
+    "headroom": 8,
+    "step": 500,
+    "stepEarned": false,
+    "rules": 5,
+    "typeEscapeAgreement": {
+      "typeEscapeCeiling": 8832,
+      "suppressions": 2,
+      "expected": 8830,
+      "actual": 8834
+    }
+  },
+  "measured": {
+    "@typescript-eslint/no-explicit-any": 8827,
+    "react-hooks/exhaustive-deps": 117,
+    "unused-imports/no-unused-vars": 505,
+    "no-useless-escape": 2,
+    "no-empty": 2
+  },
+  "failures": [
+    "@typescript-eslint/no-explicit-any ceiling is 8834 but config/type-escape-boundaries.json implies 8830 (8832 escapes - 2 suppressions). Lower both in the same change, or the weaker of the two gates stops describing the backlog."
+  ],
+  "warnings": [
+    "@typescript-eslint/no-explicit-any: 8827 vs ceiling 8834 — lower it to 8827.",
+    "react-hooks/exhaustive-deps: 117 vs ceiling 118 — lower it to 117."
+  ]
+}
