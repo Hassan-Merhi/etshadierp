@@ -68,6 +68,7 @@ import { registerTransporterStatementRoutes } from "./transporterStatementRoutes
 import { registerUserNotesRoutes } from "./userNotesRoutes";
 import { registerVoucherEntryRoutes } from "./voucher-entries";
 import { registerVoucherRoutes } from "./voucherRoutes";
+import { registerWhatsAppFastSendRoutes } from "./whatsappFastSendRoutes";
 import { registerWhatsAppRoutes } from "./whatsappRoutes";
 import { registerDispatchBatchRoutes } from "./factory/dispatch-batches";
 import { registerFactoryInvoiceLoadingRoutes } from "./factory/invoice-loading";
@@ -112,6 +113,9 @@ function registerWriteInvalidationSignal(app: Express): void {
 export async function registerApplicationRoutes(app: Express): Promise<Server> {
   installRemoteSupportSessionStopAudit();
   registerWriteInvalidationSignal(app);
+  // Register the faster WhatsApp file-delivery handlers before the legacy
+  // account/factory/POS routes so Express resolves these exact paths first.
+  registerWhatsAppFastSendRoutes(app);
   registerPermissionBoundaryRoutes(app);
 
   // The Bale Ledger aggregation accelerator must precede the legacy Factory
