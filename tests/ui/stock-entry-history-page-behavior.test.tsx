@@ -161,7 +161,7 @@ describe("stock entry history page behavior", () => {
     const workerRow = workerCell.closest("tr");
     expect(workerRow).not.toBeNull();
     expect(within(workerRow!).getByRole("cell", { name: "3" })).toBeInTheDocument();
-    expect(screen.getByText("75.00")).toBeInTheDocument();
+    expect(within(workerRow!).getByRole("cell", { name: "75.00" })).toBeInTheDocument();
     expect(screen.getByText("-1")).toBeInTheDocument();
   });
 
