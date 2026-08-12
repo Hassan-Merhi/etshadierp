@@ -107,8 +107,8 @@ describe("location summary page behavior", () => {
     render(<LocationSummary />);
 
     expect(screen.getByRole("heading", { name: "Location Summary" })).toBeInTheDocument();
-    expect(screen.getByText("Main")).toBeInTheDocument();
-    expect(screen.getByText("Warehouse")).toBeInTheDocument();
+    expect(screen.getByTitle("Main")).toBeInTheDocument();
+    expect(screen.getByTitle("Warehouse")).toBeInTheDocument();
     expect(screen.getByText("Clothing")).toBeInTheDocument();
     expect(screen.getByText("Shirts")).toBeInTheDocument();
     expect(screen.getByText("Pants")).toBeInTheDocument();
