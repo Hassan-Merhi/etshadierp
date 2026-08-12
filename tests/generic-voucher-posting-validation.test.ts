@@ -34,29 +34,31 @@ describe("generic voucher validation coverage", () => {
     expect(supportsCentralGenericVoucher(null)).toBe(false);
     expect(supportsCentralGenericVoucher({})).toBe(false);
     expect(supportsCentralGenericVoucher({ clientRequestId: "x" })).toBe(false);
-    expect(supportsCentralGenericVoucher({ clientRequestId: "x", voucher, entries: null })).toBe(false);
+    expect(
+      supportsCentralGenericVoucher({ clientRequestId: "x", voucher, entries: null })
+    ).toBe(false);
   });
 
   it("rejects invalid company and request identifiers", () => {
     expect(() => buildGenericVoucherPostingRequest(request({ companyId: 0 }) as never)).toThrowError(
-      expect.objectContaining<PostingValidationError>({ code: "POSTING_COMPANY_INVALID" }),
+      expect.objectContaining<PostingValidationError>({ code: "POSTING_COMPANY_INVALID" })
     );
     expect(() => buildGenericVoucherPostingRequest(request({ clientRequestId: "" }) as never)).toThrowError(
-      expect.objectContaining<PostingValidationError>({ code: "POSTING_REQUEST_ID_REQUIRED" }),
+      expect.objectContaining<PostingValidationError>({ code: "POSTING_REQUEST_ID_REQUIRED" })
     );
-    expect(() => buildGenericVoucherPostingRequest(request({ clientRequestId: "bad request id" }) as never)).toThrowError(
-      expect.objectContaining<PostingValidationError>({ code: "POSTING_REQUEST_ID_INVALID" }),
-    );
+    expect(() =>
+      buildGenericVoucherPostingRequest(request({ clientRequestId: "bad request id" }) as never)
+    ).toThrowError(expect.objectContaining<PostingValidationError>({ code: "POSTING_REQUEST_ID_INVALID" }));
   });
 
   it("rejects invalid currency and target identifiers", () => {
     const cfaVoucher = { ...voucher, currency: "CFA" };
     expect(() => buildGenericVoucherPostingRequest(request({ voucher: cfaVoucher }) as never)).toThrowError(
-      expect.objectContaining<PostingValidationError>({ code: "POSTING_CURRENCY_INVALID" }),
+      expect.objectContaining<PostingValidationError>({ code: "POSTING_CURRENCY_INVALID" })
     );
     const badEntries = [{ ...entries[0], ledgerAccountId: "abc" }, entries[1]];
     expect(() => buildGenericVoucherPostingRequest(request({ entries: badEntries }) as never)).toThrowError(
-      expect.objectContaining<PostingValidationError>({ code: "POSTING_TARGET_ID_INVALID" }),
+      expect.objectContaining<PostingValidationError>({ code: "POSTING_TARGET_ID_INVALID" })
     );
   });
 
