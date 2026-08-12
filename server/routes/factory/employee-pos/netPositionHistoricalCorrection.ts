@@ -134,14 +134,17 @@ async function computeHistoricalOperationalValues(companyId: number, asOf: strin
   const adjustmentsAfterRow = resultRows(adjustmentsAfterResult)[0] ?? {};
   const adjustmentsAfter = parseFloat(String(adjustmentsAfterRow.value_after ?? "0")) || 0;
 
-  const rawMaterialValue = round2(Math.max(currentRawMaterialValue + consumedAfter - receiptsAfter - adjustmentsAfter, 0));
+  const rawMaterialValue = round2(
+    Math.max(currentRawMaterialValue + consumedAfter - receiptsAfter - adjustmentsAfter, 0)
+  );
 
   return { inventoryValue, rawMaterialValue, balanceOnTableValue };
 }
 
 export function registerNetPositionHistoricalCorrection(app: Express) {
   app.get("/api/factory/net-position", (req: Request, res: Response, next: NextFunction) => {
-    const asOf = typeof req.query.asOf === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.asOf) ? req.query.asOf : null;
+    const asOf =
+      typeof req.query.asOf === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.asOf) ? req.query.asOf : null;
     if (!asOf || asOf === getClientDate(req)) return next();
 
     const originalJson = res.json.bind(res);
