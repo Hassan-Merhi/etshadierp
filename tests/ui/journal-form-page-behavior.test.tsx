@@ -191,6 +191,8 @@ describe("journal voucher form behavior", () => {
     fireEvent.click(screen.getByTestId("input-journal-type-1"));
     fireEvent.click(screen.getAllByRole("button", { name: "CR" }).at(-1)!);
 
+    await waitFor(() => expect(screen.getByTestId("input-journal-amount-1")).toHaveValue(100));
+    expect(screen.getByText("Balanced")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("button-save-journal-voucher"));
 
     await waitFor(() =>
