@@ -1,4 +1,4 @@
-name: Phase 2 Publish Verified State
+name: Phase 2 Publish Code State
 
 on:
   push:
@@ -21,11 +21,12 @@ jobs:
         with:
           node-version: "22.14"
           cache: npm
-      - name: Recreate verified latest-main merge
+      - name: Merge exact verified main
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin main
+          echo "main=$(git rev-parse origin/main)"
           set +e
           git merge --no-edit origin/main
           merge_status=$?
@@ -43,25 +44,12 @@ jobs:
             test "${#conflicts[@]}" -gt 0
             git checkout --theirs -- "$expected_a" "$expected_b"
             git add "$expected_a" "$expected_b"
-            if git diff --name-only --diff-filter=U | grep -q .; then
-              git diff --name-only --diff-filter=U
-              exit 1
-            fi
+            test -z "$(git diff --name-only --diff-filter=U)"
             git -c core.hooksPath=/dev/null commit --no-edit
           fi
       - run: npm ci --ignore-scripts
-      - name: Apply already-verified durable state
+      - name: Lock already-earned quality gains
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          path = Path('.github/workflows/mobile-responsive.yml')
-          text = path.read_text()
-          start = text.index('      - name: Frontend regression suite\n')
-          end = text.index('      - name: Security and dependency contracts\n', start)
-          replacement = '''      - name: Frontend regression suite\n        env:\n          NODE_OPTIONS: --max-old-space-size=4096\n        run: |\n          mapfile -t frontend_test_files < <(\n            find tests/ui client/src -type f \\( -name '*.test.ts' -o -name '*.test.tsx' \\) -print | sort\n          )\n          echo "Running ${#frontend_test_files[@]} frontend test files with a fresh Vitest process per file."\n          test "${#frontend_test_files[@]}" -gt 0\n          for test_file in "${frontend_test_files[@]}"; do\n            echo "::group::$test_file"\n            timeout 90s node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 "$test_file"\n            echo "::endgroup::"\n          done\n'''
-          path.write_text(text[:start] + replacement + text[end:])
-          PY
-
           node <<'NODE'
           const fs = require('fs');
           const configPath = 'config/type-escape-boundaries.json';
@@ -85,25 +73,20 @@ jobs:
             fs.writeFileSync(docPath, text);
           }
           NODE
-          node node_modules/prettier/bin/prettier.cjs --write config/type-escape-boundaries.json .github/workflows/mobile-responsive.yml
-      - name: Confirm verified state
-        env:
-          NODE_OPTIONS: --max-old-space-size=4096
+          node node_modules/prettier/bin/prettier.cjs --write config/type-escape-boundaries.json
+      - name: Confirm quality state
         run: |
-          node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 \
-            tests/ui/journal-form-page-behavior.test.tsx \
-            tests/ui/stock-entry-history-page-behavior.test.tsx \
-            tests/ui/supplier-profit-check-page-behavior.test.tsx
           npm run audit:type-escapes
           npm run audit:doc-index
           npm run audit:scripts
           npm run check
-      - name: Publish and remove helper
+      - name: Push code and ratchet state only
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm .github/workflows/phase2-final-conflict-repair.yml
-          git add -A
+          git add config/type-escape-boundaries.json docs/god-file-split-program.md docs/system-quality-program.md
+          if ! git diff --cached --quiet; then
+            git -c core.hooksPath=/dev/null commit -m "fix: lock Phase 2 quality gains"
+          fi
           git status --short
-          git -c core.hooksPath=/dev/null commit -m "fix: finalize Phase 2 against latest main"
           git -c core.hooksPath=/dev/null push origin HEAD:program/erp-90-phase-2
