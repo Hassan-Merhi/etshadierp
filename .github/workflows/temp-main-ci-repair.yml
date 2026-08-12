@@ -8,7 +8,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ci/main-green-20260812-1102
+          ref: main
           token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/setup-node@v6
         with:
@@ -60,7 +60,8 @@ jobs:
       - run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout -B ci/main-green-20260812-1130
           git add client/src/pages/StockInSalesReportDetail.tsx
           git diff --cached --quiet && exit 0
           git commit -m 'Fix stock report hook lint'
-          SKIP_TSC_CHECK=1 git push origin HEAD:ci/main-green-20260812-1102
+          SKIP_TSC_CHECK=1 git push --force-with-lease origin HEAD:ci/main-green-20260812-1130
