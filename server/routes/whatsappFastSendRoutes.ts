@@ -171,7 +171,7 @@ function serveFastAttachment(req: Request, res: Response): void {
 
   res.setHeader("Content-Type", entry.contentType);
   res.setHeader("Content-Length", String(entry.buffer.length));
-  res.setHeader("Content-Disposition", `inline; filename="${entry.fileName.replace(/[\r\n\"]/g, "_")}"`);
+  res.setHeader("Content-Disposition", `inline; filename="${entry.fileName.replace(/[\r\n"]/g, "_")}"`);
   res.setHeader("Cache-Control", "private, no-store, max-age=0");
   res.setHeader("X-Content-Type-Options", "nosniff");
   if (req.method === "HEAD") {
