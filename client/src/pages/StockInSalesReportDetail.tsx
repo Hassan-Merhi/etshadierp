@@ -279,7 +279,9 @@ export default function StockInSalesReportDetail() {
 
   const summary = data?.summary ?? EMPTY_METRICS;
   const money = (value: number) => (value < 0 ? `-${formatAmount(Math.abs(value))}` : formatAmount(value));
-  const signedQty = (value: number) => `${value > 0 ? "+" : ""}${formatNumber(value, 3)}`;
+  const roundedMoney = (value: number) =>
+    value < 0 ? `-${formatAmount(Math.round(Math.abs(value)))}` : formatAmount(Math.round(value));
+  const signedQty = (value: number) => `${value > 0 ? "+" : ""}${formatNumber(value, 0)}`;
   const rate = (value: number) =>
     selectedCurrency === "CFA" ? `CFA ${formatNumber(convertToDisplay(value), 2)}` : `$ ${formatNumber(value, 6)}`;
   const displayDate = (value: string) => {
@@ -489,16 +491,16 @@ export default function StockInSalesReportDetail() {
         {isLoading
           ? Array.from({ length: 10 }).map((_, index) => <Skeleton key={index} className="h-20 rounded-xl" />)
           : [
-              ["Opening Qty", formatNumber(summary.openingStockQty, 3)],
-              ["Opening Value", formatAmount(summary.openingStockValue)],
-              ["Stock In Qty", formatNumber(summary.stockInQty, 3)],
+              ["Opening Qty", formatNumber(summary.openingStockQty, 0)],
+              ["Opening Value", roundedMoney(summary.openingStockValue)],
+              ["Stock In Qty", formatNumber(summary.stockInQty, 0)],
               ["Adjustments", signedQty(summary.stockAdjustmentQty)],
-              ["Available", formatNumber(summary.totalAvailableQty, 3)],
-              ["Stock Out", formatNumber(summary.stockOutQty, 3)],
-              ["Closing / In Hand", formatNumber(summary.closingStockQty, 3)],
-              ["Closing Value", formatAmount(summary.closingStockValue)],
-              ["Gross Profit", money(summary.costProfit)],
-              ["Avg Profit / Bale", money(summary.avgProfitPerBale)],
+              ["Available", formatNumber(summary.totalAvailableQty, 0)],
+              ["Stock Out", formatNumber(summary.stockOutQty, 0)],
+              ["Closing / In Hand", formatNumber(summary.closingStockQty, 0)],
+              ["Closing Value", roundedMoney(summary.closingStockValue)],
+              ["Gross Profit", roundedMoney(summary.costProfit)],
+              ["Avg Profit / Bale", roundedMoney(summary.avgProfitPerBale)],
             ].map(([label, value]) => (
               <div key={label} className="rounded-xl border bg-muted/30 p-3">
                 <p className="text-xs text-muted-foreground">{label}</p>
@@ -509,9 +511,9 @@ export default function StockInSalesReportDetail() {
 
       <div className="rounded-xl border bg-muted/20 p-3 text-sm">
         <span className="font-medium">Outbound breakdown:</span> Sales/returns{" "}
-        <span className="font-mono font-semibold">{formatNumber(summary.salesOutQty || 0, 3)}</span> · Transfer out{" "}
-        <span className="font-mono font-semibold">{formatNumber(summary.transferOutQty || 0, 3)}</span> · Other out{" "}
-        <span className="font-mono font-semibold">{formatNumber(summary.otherStockOutQty || 0, 3)}</span>. Transfers reduce stock but do not create sales or profit.
+        <span className="font-mono font-semibold">{formatNumber(summary.salesOutQty || 0, 0)}</span> · Transfer out{" "}
+        <span className="font-mono font-semibold">{formatNumber(summary.transferOutQty || 0, 0)}</span> · Other out{" "}
+        <span className="font-mono font-semibold">{formatNumber(summary.otherStockOutQty || 0, 0)}</span>. Transfers reduce stock but do not create sales or profit.
       </div>
 
       {isFetching && !isLoading && (
@@ -647,7 +649,7 @@ export default function StockInSalesReportDetail() {
                           <TableCell className="font-mono">{row.containerNumber}</TableCell>
                           <TableCell>{row.locationName}</TableCell>
                           <TableCell className="font-medium">{row.stockItemName}</TableCell>
-                          <TableCell className="text-right font-mono">{formatNumber(row.quantity, 3)}</TableCell>
+                          <TableCell className="text-right font-mono">{formatNumber(row.quantity, 0)}</TableCell>
                           <TableCell className="text-right font-mono">{rate(row.avgRate)}</TableCell>
                           <TableCell className="text-right font-mono">{formatAmount(row.totalValue)}</TableCell>
                         </TableRow>
@@ -715,7 +717,7 @@ export default function StockInSalesReportDetail() {
                           </TableCell>
                           <TableCell>{row.locationName}</TableCell>
                           <TableCell className="font-medium">{row.stockItemName}</TableCell>
-                          <TableCell className="text-right font-mono">{formatNumber(row.quantity, 3)}</TableCell>
+                          <TableCell className="text-right font-mono">{formatNumber(row.quantity, 0)}</TableCell>
                           <TableCell className="text-right font-mono">{money(row.totalSales)}</TableCell>
                           <TableCell className="text-right font-mono text-muted-foreground">{money(row.totalCost)}</TableCell>
                           <TableCell
