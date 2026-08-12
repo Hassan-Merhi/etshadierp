@@ -19,7 +19,8 @@ const harness = vi.hoisted(() => {
     constructor(number: number, values?: any) {
       this.number = number;
       if (Array.isArray(values)) values.forEach((value, i) => (this.getCell(i + 1).value = value));
-      else if (values && typeof values === "object") Object.entries(values).forEach(([key, value]) => (this.getCell(key).value = value));
+      else if (values && typeof values === "object")
+        Object.entries(values).forEach(([key, value]) => (this.getCell(key).value = value));
     }
     getCell(key: any) {
       if (!this.cells.has(key)) this.cells.set(key, new FakeCell());
@@ -120,16 +121,30 @@ vi.mock("drizzle-orm", () => ({
   sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values }),
 }));
 vi.mock("@shared/schema", () => ({
-  inventory: { locationId: "inventory.locationId", quantity: "inventory.quantity", averageRate: "inventory.averageRate" },
+  inventory: {
+    locationId: "inventory.locationId",
+    quantity: "inventory.quantity",
+    averageRate: "inventory.averageRate",
+  },
   containers: {
     companyId: "containers.companyId",
     importDate: "containers.importDate",
     status: "containers.status",
     offloadDate: "containers.offloadDate",
   },
-  vouchers: { companyId: "vouchers.companyId", optional: "vouchers.optional", deletedAt: "vouchers.deletedAt", voucherDate: "vouchers.date" },
+  vouchers: {
+    companyId: "vouchers.companyId",
+    optional: "vouchers.optional",
+    deletedAt: "vouchers.deletedAt",
+    voucherDate: "vouchers.date",
+  },
   suppliers: { id: "suppliers.id", deletedAt: "suppliers.deletedAt" },
-  locations: { id: "locations.id", companyId: "locations.companyId", active: "locations.active", deletedAt: "locations.deletedAt" },
+  locations: {
+    id: "locations.id",
+    companyId: "locations.companyId",
+    active: "locations.active",
+    deletedAt: "locations.deletedAt",
+  },
   factoryWorkerAdvances: { companyId: "adv.companyId", fullyPaid: "adv.fullyPaid" },
 }));
 
@@ -139,7 +154,9 @@ type Handler = (req: any, res: any) => unknown;
 
 function route() {
   let handler: Handler | undefined;
-  const app: any = { get: (path: string, ...handlers: any[]) => path === "/api/stats/net-position-excel" && (handler = handlers.at(-1)) };
+  const app: any = {
+    get: (path: string, ...handlers: any[]) => path === "/api/stats/net-position-excel" && (handler = handlers.at(-1)),
+  };
   registerStatsNetPositionRoutes(app);
   return handler!;
 }
@@ -194,7 +211,7 @@ describe("net position Excel behavior", () => {
   it("builds the consolidated net position from accounts, stock, worker advances, suppliers, and OTW stock", async () => {
     harness.poolResults.push(
       [{ ledger_account_id: "1", supplier_id: "7", debit_amount: "10", credit_amount: "40" }],
-      [{ ledger_account_id: "1", debit_amount: "120", credit_amount: "20" }],
+      [{ ledger_account_id: "1", debit_amount: "120", credit_amount: "20" }]
     );
     harness.selectResults.push(
       [{ id: 11 }],
@@ -204,18 +221,15 @@ describe("net position Excel behavior", () => {
       ],
       [{ total: "15" }],
       [{ id: 7, legalName: "Supplier A", code: "SUP-A", openingBalance: "10" }],
-      [{ id: 90, grandTotal: "25", itemsTotal: "20", status: "OTW" }],
+      [{ id: 90, grandTotal: "25", itemsTotal: "20", status: "OTW" }]
     );
 
     const res = responseHarness();
-    await route()(
-      { session: { currentCompanyId: 4, userId: "admin-1", username: "admin" }, query: {} },
-      res,
-    );
+    await route()({ session: { currentCompanyId: 4, userId: "admin-1", username: "admin" }, query: {} }, res);
 
     expect(harness.classifyNetPositionAccounts).toHaveBeenCalled();
     expect(harness.logAudit).toHaveBeenCalledWith(
-      expect.objectContaining({ companyId: 4, action: "export", tableName: "reports" }),
+      expect.objectContaining({ companyId: 4, action: "export", tableName: "reports" })
     );
     expect(res.headers.get("Content-Type")).toBe("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     expect(res.body).toEqual(Buffer.from("net-position-xlsx"));
@@ -236,10 +250,7 @@ describe("net position Excel behavior", () => {
     ]);
 
     const res = responseHarness();
-    await route()(
-      { session: { currentCompanyId: 4, userId: "admin-1" }, query: { toDate: "2026-07-31" } },
-      res,
-    );
+    await route()({ session: { currentCompanyId: 4, userId: "admin-1" }, query: { toDate: "2026-07-31" } }, res);
 
     expect(harness.calculateHistoricalLocationInventory).toHaveBeenCalledWith(11, 4, "2026-07-31");
     expect(res.body).toEqual(Buffer.from("net-position-xlsx"));
