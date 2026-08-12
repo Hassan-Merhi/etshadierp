@@ -28,7 +28,7 @@ jobs:
           if (start < 0 || end < 0) throw new Error('helper markers not found');
           const block = [
             '  const locationName = useCallback(',
-            '    (id: number | null) => (id ? locationNameById.get(id) || `Location #' + '${id}` + ' : "—"),',
+            '    (id: number | null) => (id ? locationNameById.get(id) || "Location #" + id : "—"),',
             '    [locationNameById]',
             '  );',
             '  const sourceLocationName = useCallback(',
