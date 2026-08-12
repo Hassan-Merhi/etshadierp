@@ -1,0 +1,30 @@
+name: Wave 5 Prettier Artifact
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  format-artifact:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+      - name: Set up Node.js 22.14
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.14"
+          cache: npm
+      - name: Normalize package registry URLs
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+      - name: Apply exact repository Prettier output
+        run: node node_modules/prettier/bin/prettier.cjs --write server/services/rental/rentalPaymentPostingService.ts
+      - name: Upload formatted service
+        uses: actions/upload-artifact@v7
+        with:
+          name: wave5-prettier-output
+          path: server/services/rental/rentalPaymentPostingService.ts
+          retention-days: 1
