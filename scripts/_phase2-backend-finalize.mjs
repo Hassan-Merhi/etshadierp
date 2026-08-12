@@ -75,6 +75,55 @@ stats = replaceExactly(
 );
 fs.writeFileSync(statsPath, stats);
 
+const authPath = "tests/ui/authenticated-request-gating.test.ts";
+let auth = fs.readFileSync(authPath, "utf8");
+auth = replaceExactly(
+  auth,
+  'import { describe, expect, it } from "vitest";',
+  'import { afterEach, describe, expect, it, vi } from "vitest";\n\nimport {\n  authenticatedUserQueryOptions,\n  fetchAuthenticatedUser,\n} from "../../client/src/contracts/sessionQueryContracts";',
+  "authenticated request gating imports"
+);
+auth = replaceExactly(
+  auth,
+  '    expect(app).not.toContain("loadingTimedOut ||");\n',
+  "",
+  "obsolete loading timeout source assertion"
+);
+auth = replaceExactly(
+  auth,
+  `  it("keeps transient auth failures recoverable instead of treating them as logout", () => {
+    const authHook = source("client/src/app/useAuthenticatedUser.ts");
+    const queryContracts = source("client/src/contracts/sessionQueryContracts.ts");
+
+    expect(authHook).not.toContain("setLoadingTimedOut");
+    expect(authHook).not.toContain("12000");
+    expect(queryContracts).toContain("if (response.status === 401) return null;");
+    expect(queryContracts).toContain("retry: 3");
+    expect(queryContracts).toContain("refetchOnReconnect: true");
+  });`,
+  `  it("keeps transient auth failures recoverable instead of treating them as logout", async () => {
+    const unauthorizedFetch = vi.fn().mockResolvedValue(new Response("", { status: 401 }));
+    vi.stubGlobal("fetch", unauthorizedFetch);
+    await expect(fetchAuthenticatedUser()).resolves.toBeNull();
+
+    const unavailableFetch = vi.fn().mockResolvedValue(new Response("", { status: 503 }));
+    vi.stubGlobal("fetch", unavailableFetch);
+    await expect(fetchAuthenticatedUser()).rejects.toThrow("Failed to load authenticated user (503)");
+
+    const options = authenticatedUserQueryOptions();
+    expect(options.retry).toBe(3);
+    expect(options.refetchOnReconnect).toBe(true);
+  });`,
+  "transient auth behavioral coverage"
+);
+auth = replaceExactly(
+  auth,
+  'describe("authenticated request gating", () => {',
+  'afterEach(() => {\n  vi.unstubAllGlobals();\n});\n\ndescribe("authenticated request gating", () => {',
+  "authenticated request gating cleanup"
+);
+fs.writeFileSync(authPath, auth);
+
 const { auditSourceTextAssertions } = await import("./audit-source-text-assertions.mjs");
 const report = auditSourceTextAssertions();
 const baselinePath = "config/source-text-assertion-baseline.json";
