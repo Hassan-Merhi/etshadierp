@@ -108,6 +108,9 @@ export function WhatsAppModal({
         throw new Error(err.message || "Download failed");
       }
       const blob = await res.blob();
+      if (blob.size === 0) {
+        throw new Error("The ZIP package was empty. Refresh the file list and try again.");
+      }
       const disposition = res.headers.get("Content-Disposition") || "";
       const nameMatch = disposition.match(/filename="([^"]+)"/);
       const filename = nameMatch ? nameMatch[1] : "shipping-package.zip";
@@ -118,7 +121,9 @@ export function WhatsAppModal({
       document.body.appendChild(a);
       a.click();
       a.remove();
-      URL.revokeObjectURL(blobUrl);
+      // Revoking synchronously can race Chrome's download hand-off and produce a
+      // zero-byte file on some machines. Keep the object URL alive briefly.
+      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 30_000);
     } catch (err: any) {
       toast({ title: "Download failed", description: err.message, variant: "destructive" });
     } finally {
