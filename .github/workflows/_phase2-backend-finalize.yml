@@ -22,6 +22,8 @@ jobs:
         with:
           node-version: "22.14"
           cache: npm
+      - name: Configure Git identity
+        run: git config user.name 'github-actions[bot]' && git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
       - name: Merge current main
         run: git fetch origin main && git -c core.hooksPath=/dev/null merge --no-edit origin/main
       - name: Install dependencies
@@ -36,8 +38,6 @@ jobs:
         run: node scripts/audit-source-text-assertions.mjs
       - name: Commit verified repairs
         run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git rm .github/workflows/_phase2-backend-finalize.yml scripts/_phase2-backend-finalize.mjs
           git add tests/customer-order-excel-export-behavior.test.ts tests/stats-net-position-excel-behavior.test.ts config/ci-ratchet-allowances.json
           git -c core.hooksPath=/dev/null commit -m 'fix: close Phase 2 backend verification gaps'
