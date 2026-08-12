@@ -1,0 +1,46 @@
+name: Phase 2 Final Sync
+
+on:
+  push:
+    branches:
+      - program/erp-90-phase-2
+
+permissions:
+  contents: write
+
+jobs:
+  sync-and-format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: program/erp-90-phase-2
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.14
+          cache: npm
+      - name: Sync current main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git merge --no-edit origin/main
+      - run: npm ci
+      - name: Format merge-context drift
+        run: |
+          npx prettier --write client/src/pages/StockInSalesReport.tsx client/src/pages/StockInSalesReportDetail.tsx server/index.ts server/routes/factory/employee-pos/netPositionHistoricalCorrection.ts config/type-escape-boundaries.json
+      - name: Verify final Phase 2 branch
+        run: |
+          npm run audit:type-escapes
+          npm run audit:doc-index
+          npm run audit:scripts
+          npm run check
+          npx prettier --check client/src/pages/StockInSalesReport.tsx client/src/pages/StockInSalesReportDetail.tsx server/index.ts server/routes/factory/employee-pos/netPositionHistoricalCorrection.ts config/type-escape-boundaries.json
+      - name: Commit final sync and remove temporary workflow
+        run: |
+          git rm .github/workflows/phase2-final-sync.yml
+          git add -A
+          git diff --cached --check
+          git commit -m "fix: finalize Phase 2 on current main"
+          SKIP_TSC_CHECK=1 git push origin HEAD:program/erp-90-phase-2
