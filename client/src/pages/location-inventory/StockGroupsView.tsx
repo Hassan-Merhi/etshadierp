@@ -184,9 +184,11 @@ export function StockGroupsView({
             <DropdownMenuItem onClick={handleExportInventory} data-testid="menu-export-excel">
               <FileSpreadsheet className="h-4 w-4 mr-2" /> Export to Excel
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handlePrintWithOption(true)} data-testid="menu-export-pdf-cost">
-              <Printer className="h-4 w-4 mr-2" /> Export to PDF (with cost)
-            </DropdownMenuItem>
+            {!posUser && (
+              <DropdownMenuItem onClick={() => handlePrintWithOption(true)} data-testid="menu-export-pdf-cost">
+                <Printer className="h-4 w-4 mr-2" /> Export to PDF (with cost)
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={() => handlePrintWithOption(false)} data-testid="menu-export-pdf-nocost">
               <Printer className="h-4 w-4 mr-2" /> Export to PDF (without cost)
             </DropdownMenuItem>
@@ -349,12 +351,14 @@ export function StockGroupsView({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => handlePrintGroup({ groupId: g.groupId, groupName: g.groupName }, true)}
-                          data-testid={`menu-export-group-pdf-cost-${g.groupId}`}
-                        >
-                          <Printer className="h-4 w-4 mr-2" /> Export PDF (with cost)
-                        </DropdownMenuItem>
+                        {!posUser && (
+                          <DropdownMenuItem
+                            onClick={() => handlePrintGroup({ groupId: g.groupId, groupName: g.groupName }, true)}
+                            data-testid={`menu-export-group-pdf-cost-${g.groupId}`}
+                          >
+                            <Printer className="h-4 w-4 mr-2" /> Export PDF (with cost)
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem
                           onClick={() => handlePrintGroup({ groupId: g.groupId, groupName: g.groupName }, false)}
                           data-testid={`menu-export-group-pdf-nocost-${g.groupId}`}
