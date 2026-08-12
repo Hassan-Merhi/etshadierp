@@ -156,7 +156,7 @@ describe("stock entry history page behavior", () => {
     render(<StockEntryHistory />);
 
     expect(screen.getByRole("heading", { name: "Stock Entry History" })).toBeInTheDocument();
-    expect(screen.getByText("Alice")).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "Alice" })).toBeInTheDocument();
     expect(screen.getByText("3")).toBeInTheDocument();
     expect(screen.getByText("75.00")).toBeInTheDocument();
     expect(screen.getByText("-1")).toBeInTheDocument();
@@ -168,7 +168,7 @@ describe("stock entry history page behavior", () => {
 
     expect(screen.getByText("REF-101")).toBeInTheDocument();
     expect(screen.getByText("SH-1")).toBeInTheDocument();
-    expect(screen.getByText("IN_STOCK")).toBeInTheDocument();
+    expect(screen.getAllByText("IN_STOCK")).not.toHaveLength(0);
   });
 
   it("reports the active date and deactivates it when the From toggle is cleared", async () => {
