@@ -1,0 +1,29 @@
+name: Repair stock entry build transform
+
+on:
+  push:
+    branches:
+      - agent/stock-entry-history-multiselect-filters
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/stock-entry-history-multiselect-filters
+          fetch-depth: 0
+      - name: Apply repair
+        run: python3 scripts/repair-stock-entry-build-transform.py
+      - name: Commit repair
+        run: |
+          rm scripts/repair-stock-entry-build-transform.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add build/viteHeavyListPaginationPlugin.ts scripts/repair-stock-entry-build-transform.py
+          git commit -m "fix: align stock entry build transform with multi-select filters"
+          git push origin HEAD:agent/stock-entry-history-multiselect-filters
