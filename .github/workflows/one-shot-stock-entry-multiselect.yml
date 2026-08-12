@@ -1,0 +1,33 @@
+name: Apply stock entry multi-select patch
+
+on:
+  push:
+    branches:
+      - agent/stock-entry-history-multiselect-filters
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/stock-entry-history-multiselect-filters
+          fetch-depth: 0
+
+      - name: Apply patch
+        run: python3 scripts/apply-stock-entry-history-multiselect.py
+
+      - name: Commit patch and remove helpers
+        run: |
+          rm scripts/apply-stock-entry-history-multiselect.py
+          rm .github/workflows/one-shot-stock-entry-multiselect.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: add multi-select filters to stock entry history"
+          git push origin HEAD:agent/stock-entry-history-multiselect-filters
