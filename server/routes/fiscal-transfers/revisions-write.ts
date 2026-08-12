@@ -10,16 +10,13 @@ import { db } from "../../db";
 import { requireAuth, requireNonPOS } from "../../auth";
 import { logger } from "../../lib/logger";
 import {
-  inventory,
   stockTransferVouchers,
-  stockTransferItems,
   stockTransferRevisions,
   stockTransferRevisionItems,
   vouchers,
   locations,
 } from "@shared/schema";
-import { eq, and, desc, asc, inArray } from "drizzle-orm";
-import { adjustInventory } from "../../inventoryHelper";
+import { eq, and, desc, asc } from "drizzle-orm";
 import { sendRevisedTransferWhatsApp } from "../../helpers/sendRevisedTransferWhatsApp";
 
 export function registerStockTransferRevisionWriteRoutes(app: Express) {
