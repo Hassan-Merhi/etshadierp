@@ -1,13 +1,13 @@
 import {useState, useMemo, useEffect} from "react";
 import {useQuery, useMutation, useQueryClient, useQueries} from "@tanstack/react-query";
 import * as XLSX from "@/lib/excelHelper";
-import {ChevronDown, ChevronRight, Download, Search, RotateCcw, List, AlignJustify, FileDown, MoreVertical, CalendarRange, MessageCircle, Loader2, History, Users, Package, MapPin, Tag, Layers, Check} from "lucide-react";
+import {ChevronDown, ChevronRight, Download, Search, RotateCcw, List, AlignJustify, FileDown, MoreVertical, CalendarRange, MessageCircle, Loader2, History, Users, Package, MapPin, Tag, Layers} from "lucide-react";
 import ProductionPlannerDialog from "./factory/ProductionPlannerDialog";
+import {MultiSelectFilter} from "./factory/productioncomparison/components/MultiSelectFilter";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {Label} from "@/components/ui/label";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
 import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
 import {Checkbox} from "@/components/ui/checkbox";
 import {useDateFormat} from "@/contexts/DateFormatContext";
@@ -35,12 +35,12 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     onActiveDateChange(fromActive ? fromDate : null);
   }, [fromActive, fromDate]);
 
-  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
   const [productCategoryFilter, setProductCategoryFilter] = useState<string[]>([]);
-  const [workerIdFilter, setWorkerIdFilter] = useState("all");
-  const [productIdFilter, setProductIdFilter] = useState("all");
-  const [locationIdFilter, setLocationIdFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [workerIdFilter, setWorkerIdFilter] = useState<string[]>([]);
+  const [productIdFilter, setProductIdFilter] = useState<string[]>([]);
+  const [locationIdFilter, setLocationIdFilter] = useState<string[]>([]);
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   useEffect(() => {
@@ -65,12 +65,12 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
       [
         fromActive ? fromDate : "",
         toActive ? toDate : "",
-        workerIdFilter,
-        productIdFilter,
-        locationIdFilter,
-        categoryFilter,
+        workerIdFilter.join(","),
+        productIdFilter.join(","),
+        locationIdFilter.join(","),
+        categoryFilter.join(","),
         productCategoryFilter.join(","),
-        statusFilter,
+        statusFilter.join(","),
         debouncedSearch,
         String(includeUnassigned),
         String(useLite),
@@ -96,11 +96,12 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   const params = new URLSearchParams();
   if (fromActive) params.set("startDate", fromDate);
   if (toActive) params.set("endDate", toDate);
-  if (workerIdFilter !== "all") params.set("workerId", workerIdFilter);
-  if (productIdFilter !== "all") params.set("productId", productIdFilter);
-  if (locationIdFilter !== "all") params.set("locationId", locationIdFilter);
+  if (workerIdFilter.length > 0) params.set("workerId", workerIdFilter.join(","));
+  if (productIdFilter.length > 0) params.set("productId", productIdFilter.join(","));
+  if (locationIdFilter.length > 0) params.set("locationId", locationIdFilter.join(","));
+  if (categoryFilter.length > 0) params.set("workerCategoryId", categoryFilter.join(","));
   if (productCategoryFilter.length > 0) params.set("categoryId", productCategoryFilter.join(","));
-  if (statusFilter !== "all") params.set("status", statusFilter);
+  if (statusFilter.length > 0) params.set("status", statusFilter.join(","));
   if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
   if (!includeUnassigned) params.set("includeUnassigned", "false");
   if (useLite) params.set("lite", "1");
@@ -182,11 +183,16 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   });
 
   const selectedCategoryWorkerIds: number[] | null = useMemo(() => {
-    if (categoryFilter === "all") return null;
-    const cat = categories.find((c: any) => String(c.id) === categoryFilter);
-    if (!cat) return null;
-    const ids = Array.isArray(cat.workerIds) ? (cat.workerIds as number[]) : [];
-    return workers.filter((w: any) => w.active && ids.includes(w.id)).map((w: any) => w.id);
+    if (categoryFilter.length === 0) return null;
+    const selectedCategoryIds = new Set(categoryFilter);
+    const ids = new Set<number>();
+    for (const cat of categories) {
+      if (!selectedCategoryIds.has(String(cat.id))) continue;
+      for (const id of Array.isArray(cat.workerIds) ? (cat.workerIds as number[]) : []) {
+        ids.add(Number(id));
+      }
+    }
+    return workers.filter((w: any) => w.active && ids.has(w.id)).map((w: any) => w.id);
   }, [categoryFilter, categories, workers]);
 
   const filteredWorkers = useMemo(() => {
@@ -194,10 +200,8 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     return workers.filter((w: any) => selectedCategoryWorkerIds.includes(w.id));
   }, [workers, selectedCategoryWorkerIds]);
 
-  const filteredGroups = useMemo(() => {
-    if (!selectedCategoryWorkerIds || workerIdFilter !== "all") return groups;
-    return groups.filter((g) => g.workerId !== null && selectedCategoryWorkerIds.includes(g.workerId));
-  }, [groups, selectedCategoryWorkerIds, workerIdFilter]);
+  // Every history filter is applied by the API, so the screen, totals, and exports share one dataset.
+  const filteredGroups = groups;
 
   const totalBales = useMemo(() => filteredGroups.reduce((s, g) => s + g.baleCount, 0), [filteredGroups]);
   const totalWeight = useMemo(
@@ -238,8 +242,12 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
       const workerNameById = new Map<number, string>(
         (workers as any[]).map((w: any) => [w.id, w.fullName ?? w.full_name ?? ""])
       );
+      const selectedWorkerIds = new Set(workerIdFilter.map(Number));
+      const categoryWorkerIds = selectedCategoryWorkerIds ? new Set(selectedCategoryWorkerIds) : null;
       for (const workerIdStr of Object.keys(workerTargets)) {
         const wid = Number(workerIdStr);
+        if (selectedWorkerIds.size > 0 && !selectedWorkerIds.has(wid)) continue;
+        if (categoryWorkerIds && !categoryWorkerIds.has(wid)) continue;
         const key = String(wid);
         if (!map.has(key)) {
           const name = workerNameById.get(wid) ?? null;
@@ -248,7 +256,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
       }
     }
     return Array.from(map.values()).sort((a, b) => b.totalBales - a.totalBales);
-  }, [filteredGroups, workerTargets, workers]);
+  }, [filteredGroups, workerTargets, workers, workerIdFilter, selectedCategoryWorkerIds]);
 
   // Detailed view: flat list of all bales
   const allBales = useMemo(() => filteredGroups.flatMap((g) => g.bales), [filteredGroups]);
@@ -376,12 +384,12 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     setToActive(false);
     setFromDate(today);
     setToDate(today);
-    setCategoryFilter("all");
+    setCategoryFilter([]);
     setProductCategoryFilter([]);
-    setWorkerIdFilter("all");
-    setProductIdFilter("all");
-    setLocationIdFilter("all");
-    setStatusFilter("all");
+    setWorkerIdFilter([]);
+    setProductIdFilter([]);
+    setLocationIdFilter([]);
+    setStatusFilter([]);
     setSearch("");
     setIncludeUnassigned(true);
   }
@@ -926,161 +934,105 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
               <Layers className="h-3 w-3" />
               Bale Category
             </div>
-            <Popover>
-              <PopoverTrigger asChild>
-                <button
-                  className="flex h-8 w-full items-center justify-between rounded-md border border-input bg-background px-2 text-xs shadow-sm hover:bg-accent focus:outline-none"
-                  data-testid="select-product-category"
-                >
-                  <span className="truncate text-left">
-                    {productCategoryFilter.length === 0
-                      ? "All Categories"
-                      : productCategoryFilter.length === 1
-                        ? (productCategories.find((c: any) => String(c.id) === productCategoryFilter[0])?.name ??
-                          "1 selected")
-                        : `${productCategoryFilter.length} selected`}
-                  </span>
-                  <ChevronDown className="ml-1 h-3 w-3 shrink-0 text-muted-foreground" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-52 p-1" align="start">
-                <div className="max-h-64 overflow-y-auto">
-                  {/* "All" shortcut */}
-                  <button
-                    className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-accent"
-                    onClick={() => setProductCategoryFilter([])}
-                  >
-                    <span
-                      className={`flex h-3.5 w-3.5 items-center justify-center rounded-sm border ${productCategoryFilter.length === 0 ? "bg-primary border-primary" : "border-muted-foreground"}`}
-                    >
-                      {productCategoryFilter.length === 0 && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
-                    </span>
-                    All Categories
-                  </button>
-                  {productCategories.map((c: any) => {
-                    const id = String(c.id);
-                    const checked = productCategoryFilter.includes(id);
-                    return (
-                      <button
-                        key={c.id}
-                        className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-accent"
-                        onClick={() =>
-                          setProductCategoryFilter((prev) => (checked ? prev.filter((x) => x !== id) : [...prev, id]))
-                        }
-                      >
-                        <span
-                          className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border ${checked ? "bg-primary border-primary" : "border-muted-foreground"}`}
-                        >
-                          {checked && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
-                        </span>
-                        {c.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              </PopoverContent>
-            </Popover>
+            <MultiSelectFilter
+              options={productCategories.map((c: any) => ({ value: String(c.id), label: c.name }))}
+              selected={productCategoryFilter}
+              onChange={setProductCategoryFilter}
+              placeholder="Bale categories"
+              allLabel="All Categories"
+              className="h-8 w-full min-w-0 px-2 py-0 text-xs"
+              testId="select-product-category"
+            />
           </div>
           <div className="space-y-1">
             <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
               <Users className="h-3 w-3" />
               Worker Group
             </div>
-            <Select
-              value={categoryFilter}
-              onValueChange={(v) => {
-                setCategoryFilter(v);
-                setWorkerIdFilter("all");
+            <MultiSelectFilter
+              options={categories.map((c: any) => ({ value: String(c.id), label: c.name }))}
+              selected={categoryFilter}
+              onChange={(next) => {
+                setCategoryFilter(next);
+                if (next.length === 0) return;
+                const selectedGroups = new Set(next);
+                const allowedWorkerIds = new Set<number>();
+                for (const category of categories) {
+                  if (!selectedGroups.has(String(category.id))) continue;
+                  for (const workerId of Array.isArray(category.workerIds) ? category.workerIds : []) {
+                    allowedWorkerIds.add(Number(workerId));
+                  }
+                }
+                setWorkerIdFilter((prev) => prev.filter((id) => allowedWorkerIds.has(Number(id))));
               }}
-            >
-              <SelectTrigger className="h-8 text-xs" data-testid="select-category">
-                <SelectValue placeholder="All groups" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Groups</SelectItem>
-                {categories.map((c: any) => (
-                  <SelectItem key={c.id} value={String(c.id)}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder="Worker groups"
+              allLabel="All Groups"
+              className="h-8 w-full min-w-0 px-2 py-0 text-xs"
+              testId="select-category"
+            />
           </div>
           <div className="space-y-1">
             <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
               <Users className="h-3 w-3" />
               Worker
             </div>
-            <Select value={workerIdFilter} onValueChange={setWorkerIdFilter}>
-              <SelectTrigger className="h-8 text-xs" data-testid="select-worker">
-                <SelectValue placeholder="All workers" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Workers</SelectItem>
-                {filteredWorkers.map((w: any) => (
-                  <SelectItem key={w.id} value={String(w.id)}>
-                    {w.fullName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <MultiSelectFilter
+              options={filteredWorkers.map((w: any) => ({
+                value: String(w.id),
+                label: w.fullName || w.full_name || w.name || String(w.id),
+              }))}
+              selected={workerIdFilter}
+              onChange={setWorkerIdFilter}
+              placeholder="Workers"
+              allLabel="All Workers"
+              className="h-8 w-full min-w-0 px-2 py-0 text-xs"
+              testId="select-worker"
+            />
           </div>
           <div className="space-y-1">
             <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
               <Package className="h-3 w-3" />
               Product
             </div>
-            <Select value={productIdFilter} onValueChange={setProductIdFilter}>
-              <SelectTrigger className="h-8 text-xs" data-testid="select-product">
-                <SelectValue placeholder="All products" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Products</SelectItem>
-                {products.map((p: any) => (
-                  <SelectItem key={p.id} value={String(p.id)}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <MultiSelectFilter
+              options={products.map((p: any) => ({ value: String(p.id), label: p.name }))}
+              selected={productIdFilter}
+              onChange={setProductIdFilter}
+              placeholder="Products"
+              allLabel="All Products"
+              className="h-8 w-full min-w-0 px-2 py-0 text-xs"
+              testId="select-product"
+            />
           </div>
           <div className="space-y-1">
             <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
               <MapPin className="h-3 w-3" />
               Location
             </div>
-            <Select value={locationIdFilter} onValueChange={setLocationIdFilter}>
-              <SelectTrigger className="h-8 text-xs" data-testid="select-location">
-                <SelectValue placeholder="All locations" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Locations</SelectItem>
-                {locations.map((l: any) => (
-                  <SelectItem key={l.id} value={String(l.id)}>
-                    {l.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <MultiSelectFilter
+              options={locations.map((l: any) => ({ value: String(l.id), label: l.name }))}
+              selected={locationIdFilter}
+              onChange={setLocationIdFilter}
+              placeholder="Locations"
+              allLabel="All Locations"
+              className="h-8 w-full min-w-0 px-2 py-0 text-xs"
+              testId="select-location"
+            />
           </div>
           <div className="space-y-1">
             <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
               <Tag className="h-3 w-3" />
               Status
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="h-8 text-xs" data-testid="select-status">
-                <SelectValue placeholder="All statuses" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                {STATUS_OPTIONS.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {s}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <MultiSelectFilter
+              options={STATUS_OPTIONS}
+              selected={statusFilter}
+              onChange={setStatusFilter}
+              placeholder="Statuses"
+              allLabel="All Statuses"
+              className="h-8 w-full min-w-0 px-2 py-0 text-xs"
+              testId="select-status"
+            />
           </div>
         </div>
       </div>
