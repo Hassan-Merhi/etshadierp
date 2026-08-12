@@ -163,7 +163,12 @@ export default function POSContainerDetail() {
       data.items.forEach((item, index) => {
         const rowNumber = index + 1;
         const isEven = rowNumber % 2 === 0;
-        const row = ws.addRow([rowNumber, item.itemCode || "", item.itemName || "", Number.parseFloat(item.quantity) || 0]);
+        const row = ws.addRow([
+          rowNumber,
+          item.itemCode || "",
+          item.itemName || "",
+          Number.parseFloat(item.quantity) || 0,
+        ]);
         row.eachCell({ includeEmpty: true }, (cell, colNum) => {
           if (isEven) {
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF2F6FC" } };
@@ -244,7 +249,10 @@ export default function POSContainerDetail() {
   const supplier = data.container.supplierCode || data.container.supplierName || "—";
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden p-3 sm:p-4 lg:p-5" data-testid="pos-container-detail-page">
+    <div
+      className="flex h-full min-h-0 flex-col gap-4 overflow-hidden p-3 sm:p-4 lg:p-5"
+      data-testid="pos-container-detail-page"
+    >
       <div className="flex shrink-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 items-start gap-2">
           <Button
@@ -263,7 +271,9 @@ export default function POSContainerDetail() {
               </h1>
               <Badge variant="outline">{data.container.status}</Badge>
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">Item quantities only — cost and freight stay hidden for POS users.</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Item quantities only — cost and freight stay hidden for POS users.
+            </p>
           </div>
         </div>
         <Button onClick={exportNoCostNoFreight} className="gap-2" data-testid="button-pos-container-no-cost-export">
@@ -300,7 +310,9 @@ export default function POSContainerDetail() {
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Truck</p>
             <Truck className="h-4 w-4 text-primary" aria-hidden="true" />
           </div>
-          <p className="mt-2 truncate font-mono text-base font-semibold">{data.container.numberPlate || "Not assigned"}</p>
+          <p className="mt-2 truncate font-mono text-base font-semibold">
+            {data.container.numberPlate || "Not assigned"}
+          </p>
         </div>
       </div>
 

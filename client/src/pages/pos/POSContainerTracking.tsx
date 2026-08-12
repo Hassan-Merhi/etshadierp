@@ -1,16 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import {
-  CheckCircle2,
-  Columns3,
-  FileClock,
-  FilterX,
-  MapPin,
-  PackageSearch,
-  Search,
-  Truck,
-} from "lucide-react";
+import { CheckCircle2, Columns3, FileClock, FilterX, MapPin, PackageSearch, Search, Truck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -121,8 +112,8 @@ function containsSearch(row: PosContainerRow, search: string): boolean {
 }
 
 function uniqueValues(rows: PosContainerRow[], selector: (row: PosContainerRow) => string | null): string[] {
-  return Array.from(new Set(rows.map(selector).filter((value): value is string => Boolean(value?.trim())))).sort((a, b) =>
-    a.localeCompare(b)
+  return Array.from(new Set(rows.map(selector).filter((value): value is string => Boolean(value?.trim())))).sort(
+    (a, b) => a.localeCompare(b)
   );
 }
 
@@ -140,7 +131,9 @@ export default function POSContainerTracking({ posUser }: { posUser?: PosUserCon
     try {
       const parsed = JSON.parse(window.localStorage.getItem(COLUMN_PREF_KEY) || "[]") as ColumnKey[];
       const valid = parsed.filter((key) => COLUMN_DEFS.some((column) => column.key === key));
-      return new Set<ColumnKey>(valid.length > 0 ? ["container", ...valid.filter((key) => key !== "container")] : DEFAULT_VISIBLE_COLUMNS);
+      return new Set<ColumnKey>(
+        valid.length > 0 ? ["container", ...valid.filter((key) => key !== "container")] : DEFAULT_VISIBLE_COLUMNS
+      );
     } catch {
       return new Set(DEFAULT_VISIBLE_COLUMNS);
     }
@@ -161,7 +154,7 @@ export default function POSContainerTracking({ posUser }: { posUser?: PosUserCon
     window.localStorage.setItem(COLUMN_PREF_KEY, JSON.stringify(Array.from(visibleColumns)));
   }, [visibleColumns]);
 
-  const containers = data?.containers ?? [];
+  const containers = useMemo(() => data?.containers ?? [], [data?.containers]);
   const normalizedSearch = search.trim().toLowerCase();
   const supplierOptions = useMemo(() => uniqueValues(containers, supplierLabel), [containers]);
   const statusOptions = useMemo(() => uniqueValues(containers, (row) => row.status), [containers]);
@@ -182,15 +175,7 @@ export default function POSContainerTracking({ posUser }: { posUser?: PosUserCon
         if (docsFilter === "ready-not-sent" && !(row.docReceived && !row.docsSentDate)) return false;
         return true;
       }),
-    [
-      agentFilter,
-      containers,
-      docsFilter,
-      normalizedSearch,
-      statusFilter,
-      supplierFilter,
-      transporterFilter,
-    ]
+    [agentFilter, containers, docsFilter, normalizedSearch, statusFilter, supplierFilter, transporterFilter]
   );
 
   const summary = useMemo(
@@ -445,7 +430,9 @@ export default function POSContainerTracking({ posUser }: { posUser?: PosUserCon
                 {isColumnVisible("truck") ? <TableHead className="whitespace-nowrap">Truck #</TableHead> : null}
                 {isColumnVisible("location") ? <TableHead className="whitespace-nowrap">Location</TableHead> : null}
                 {isColumnVisible("agent") ? <TableHead className="whitespace-nowrap">Agent</TableHead> : null}
-                {isColumnVisible("transporter") ? <TableHead className="whitespace-nowrap">Transporter</TableHead> : null}
+                {isColumnVisible("transporter") ? (
+                  <TableHead className="whitespace-nowrap">Transporter</TableHead>
+                ) : null}
                 {isColumnVisible("docs") ? <TableHead className="whitespace-nowrap">Docs</TableHead> : null}
                 {isColumnVisible("docsSent") ? <TableHead className="whitespace-nowrap">Docs Sent</TableHead> : null}
               </TableRow>
@@ -454,7 +441,9 @@ export default function POSContainerTracking({ posUser }: { posUser?: PosUserCon
               {visibleContainers.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={visibleColumns.size} className="h-32 text-center text-muted-foreground">
-                    {hasActiveFilters ? "No containers match the current filters" : "No active containers for your assigned location"}
+                    {hasActiveFilters
+                      ? "No containers match the current filters"
+                      : "No active containers for your assigned location"}
                   </TableCell>
                 </TableRow>
               ) : (
