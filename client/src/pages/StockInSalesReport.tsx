@@ -265,6 +265,9 @@ function StockInSalesReportSummary() {
   const summary = data?.summary ?? EMPTY_METRICS;
   const rows = data?.rows ?? [];
   const formatSignedAmount = (value: number) => (value < 0 ? `-${formatAmount(Math.abs(value))}` : formatAmount(value));
+  const formatRoundedAmount = (value: number) => formatAmount(Math.round(value));
+  const formatSignedRoundedAmount = (value: number) =>
+    value < 0 ? `-${formatAmount(Math.round(Math.abs(value)))}` : formatAmount(Math.round(value));
   const formatPeriodLabel = (row: StockInSalesRow) => {
     try {
       return format(parseISO(`${row.periodKey}-01`), "MMMM yyyy");
@@ -419,37 +422,37 @@ function StockInSalesReportSummary() {
           <>
             <SummaryPill
               label="Opening Stock"
-              value={formatNumber(summary.openingStockQty, 3)}
+              value={formatNumber(summary.openingStockQty, 0)}
               icon={PackagePlus}
               testId="text-opening-stock-qty"
             />
             <SummaryPill
               label="Stock In"
-              value={formatNumber(summary.stockInQty, 3)}
+              value={formatNumber(summary.stockInQty, 0)}
               icon={PackagePlus}
               testId="text-stock-in-qty"
             />
             <SummaryPill
               label="Stock in Hand"
-              value={formatNumber(summary.closingStockQty, 3)}
+              value={formatNumber(summary.closingStockQty, 0)}
               icon={PackageMinus}
               testId="text-stock-in-hand-qty"
             />
             <SummaryPill
               label="Stock Value"
-              value={formatAmount(summary.closingStockValue)}
+              value={formatRoundedAmount(summary.closingStockValue)}
               icon={Coins}
               testId="text-stock-in-hand-value"
             />
             <SummaryPill
               label="Sales"
-              value={formatAmount(summary.totalSales)}
+              value={formatRoundedAmount(summary.totalSales)}
               icon={TrendingUp}
               testId="text-stock-in-sales-total-sales"
             />
             <SummaryPill
               label="Gross Profit"
-              value={formatSignedAmount(summary.costProfit)}
+              value={formatSignedRoundedAmount(summary.costProfit)}
               icon={summary.costProfit < 0 ? TrendingDown : TrendingUp}
               tone={profitTone}
               testId="text-stock-in-sales-profit"
@@ -560,11 +563,11 @@ function StockInSalesReportSummary() {
                           onClick={() => openDetail(row)}
                         >
                           <TableCell className="py-3 font-medium">{formatPeriodLabel(row)}</TableCell>
-                          <TableCell className="text-right font-mono">{formatNumber(row.openingStockQty, 3)}</TableCell>
-                          <TableCell className="text-right font-mono">{formatNumber(row.stockInQty, 3)}</TableCell>
-                          <TableCell className="text-right font-mono">{formatNumber(row.stockOutQty, 3)}</TableCell>
+                          <TableCell className="text-right font-mono">{formatNumber(row.openingStockQty, 0)}</TableCell>
+                          <TableCell className="text-right font-mono">{formatNumber(row.stockInQty, 0)}</TableCell>
+                          <TableCell className="text-right font-mono">{formatNumber(row.stockOutQty, 0)}</TableCell>
                           <TableCell className="text-right font-mono font-semibold">
-                            {formatNumber(row.closingStockQty, 3)}
+                            {formatNumber(row.closingStockQty, 0)}
                           </TableCell>
                           <TableCell className="text-right font-mono">{formatAmount(row.closingStockValue)}</TableCell>
                           <TableCell className="text-right font-mono">{formatAmount(row.totalSales)}</TableCell>
@@ -579,10 +582,10 @@ function StockInSalesReportSummary() {
                     })}
                     <TableRow className="bg-muted/40 font-semibold hover:bg-muted/40">
                       <TableCell className="text-xs uppercase tracking-wide text-muted-foreground">Total</TableCell>
-                      <TableCell className="text-right font-mono">{formatNumber(summary.openingStockQty, 3)}</TableCell>
-                      <TableCell className="text-right font-mono">{formatNumber(summary.stockInQty, 3)}</TableCell>
-                      <TableCell className="text-right font-mono">{formatNumber(summary.stockOutQty, 3)}</TableCell>
-                      <TableCell className="text-right font-mono">{formatNumber(summary.closingStockQty, 3)}</TableCell>
+                      <TableCell className="text-right font-mono">{formatNumber(summary.openingStockQty, 0)}</TableCell>
+                      <TableCell className="text-right font-mono">{formatNumber(summary.stockInQty, 0)}</TableCell>
+                      <TableCell className="text-right font-mono">{formatNumber(summary.stockOutQty, 0)}</TableCell>
+                      <TableCell className="text-right font-mono">{formatNumber(summary.closingStockQty, 0)}</TableCell>
                       <TableCell className="text-right font-mono">{formatAmount(summary.closingStockValue)}</TableCell>
                       <TableCell className="text-right font-mono">{formatAmount(summary.totalSales)}</TableCell>
                       <TableCell className="text-right font-mono">{formatSignedAmount(summary.costProfit)}</TableCell>
