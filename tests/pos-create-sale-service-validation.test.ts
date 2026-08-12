@@ -61,9 +61,7 @@ vi.mock("../server/routes/_helpers", () => ({
 vi.mock("../server/lib/logger", () => ({
   logger: { info: harness.loggerInfo, error: harness.loggerError },
 }));
-vi.mock("../server/db", () => ({
-  db: { transaction: harness.transaction },
-}));
+vi.mock("../server/db", () => ({ db: { transaction: harness.transaction } }));
 vi.mock("../server/lib/inventoryMath", () => ({
   inventoryMoney: (value: unknown) => String(value),
   inventoryQuantity: (value: unknown) => String(value),
@@ -82,8 +80,6 @@ vi.mock("drizzle-orm", () => ({
   eq: (column: unknown, value: unknown) => ({ column, value }),
 }));
 
-import { createPosSale } from "../server/services/pos/createSaleService";
-
 const baseParams = {
   currentCompanyId: 4,
   userId: "user-1",
@@ -94,8 +90,14 @@ const baseParams = {
   voucherDateFallback: "2026-08-12",
 };
 
+async function loadCreatePosSale() {
+  const module = await import("../server/services/pos/createSaleService");
+  return module.createPosSale;
+}
+
 describe("POS create sale service validation and replay guards", () => {
   beforeEach(() => {
+    vi.resetModules();
     vi.clearAllMocks();
     harness.resolvePosEnforcedCashAccount.mockResolvedValue({ posEnforcedCashAccountId: 12 });
     harness.resolvePaymentAccount.mockResolvedValue({ accountType: "cash", accountId: 12, customerAccount: null });
@@ -103,6 +105,7 @@ describe("POS create sale service validation and replay guards", () => {
   });
 
   it("returns the POS cash-account enforcement error before resolving payment", async () => {
+    const createPosSale = await loadCreatePosSale();
     harness.resolvePosEnforcedCashAccount.mockResolvedValue({
       error: { status: 403, body: { message: "Cash account is not assigned" } },
     });
@@ -113,31 +116,34 @@ describe("POS create sale service validation and replay guards", () => {
           ...baseParams,
           body: { locationId: 2, items: [{ stockItemId: 7, quantity: "1", rate: "3" }] },
         } as any,
-        { isSpCompany: false }
-      )
+        { isSpCompany: false },
+      ),
     ).resolves.toEqual({ status: 403, body: { message: "Cash account is not assigned" } });
     expect(harness.resolvePaymentAccount).not.toHaveBeenCalled();
   });
 
   it("returns a committed idempotent response before re-validating the request body", async () => {
+    const createPosSale = await loadCreatePosSale();
     const committed = { status: 200, body: { voucher: { id: 90 }, _idempotent: true } };
     harness.checkIdempotentSale.mockResolvedValue(committed);
 
     await expect(
-      createPosSale({ ...baseParams, body: { clientSaleId: "offline-123" } } as any, { isSpCompany: false })
+      createPosSale({ ...baseParams, body: { clientSaleId: "offline-123" } } as any, { isSpCompany: false }),
     ).resolves.toBe(committed);
     expect(harness.checkIdempotentSale).toHaveBeenCalledWith(4, "offline-123");
   });
 
   it("rejects a missing location after account and replay checks", async () => {
+    const createPosSale = await loadCreatePosSale();
     await expect(
       createPosSale({ ...baseParams, body: { items: [{ stockItemId: 7, quantity: "1", rate: "3" }] } } as any, {
         isSpCompany: false,
-      })
+      }),
     ).resolves.toEqual({ status: 400, body: { message: "Location is required" } });
   });
 
   it("drops a mismatched open shift before continuing item validation", async () => {
+    const createPosSale = await loadCreatePosSale();
     harness.getShiftById.mockResolvedValue({
       id: 77,
       companyId: 99,
@@ -157,8 +163,8 @@ describe("POS create sale service validation and replay guards", () => {
             items: [{ stockItemId: 7, quantity: "0", rate: "3" }],
           },
         } as any,
-        { isSpCompany: false }
-      )
+        { isSpCompany: false },
+      ),
     ).resolves.toEqual({ status: 422, body: { message: "Invalid item quantity" } });
     expect(harness.getShiftById).toHaveBeenCalledWith(77);
     expect(harness.validateItemsBasic).toHaveBeenCalled();
