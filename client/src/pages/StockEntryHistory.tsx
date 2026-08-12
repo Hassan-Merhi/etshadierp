@@ -1,22 +1,52 @@
-import {useState, useMemo, useEffect} from "react";
-import {useQuery, useMutation, useQueryClient, useQueries} from "@tanstack/react-query";
+import { useState, useMemo, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
 import * as XLSX from "@/lib/excelHelper";
-import {ChevronDown, ChevronRight, Download, Search, RotateCcw, List, AlignJustify, FileDown, MoreVertical, CalendarRange, MessageCircle, Loader2, History, Users, Package, MapPin, Tag, Layers} from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Download,
+  Search,
+  RotateCcw,
+  List,
+  AlignJustify,
+  FileDown,
+  MoreVertical,
+  CalendarRange,
+  MessageCircle,
+  Loader2,
+  History,
+  Users,
+  Package,
+  MapPin,
+  Tag,
+  Layers,
+} from "lucide-react";
 import ProductionPlannerDialog from "./factory/ProductionPlannerDialog";
-import {MultiSelectFilter} from "./factory/productioncomparison/components/MultiSelectFilter";
-import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
-import {Label} from "@/components/ui/label";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
-import {Checkbox} from "@/components/ui/checkbox";
-import {useDateFormat} from "@/contexts/DateFormatContext";
-import {useToast} from "@/hooks/use-toast";
-import {apiRequest} from "@/lib/queryClient";
-import type {Location} from "@shared/schema";
+import { MultiSelectFilter } from "./factory/productioncomparison/components/MultiSelectFilter";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useDateFormat } from "@/contexts/DateFormatContext";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import type { Location } from "@shared/schema";
 
-import type {BaleDetail, GroupRow, StockEntryHistoryPage, StockEntryHistoryProps} from "./stockentryhistory/types";
-import {STATUS_COLORS, STATUS_OPTIONS, buildWorkerMatrix, fetchAllStockEntryHistoryPages} from "./stockentryhistory/utils";
+import type { BaleDetail, GroupRow, StockEntryHistoryPage, StockEntryHistoryProps } from "./stockentryhistory/types";
+import {
+  STATUS_COLORS,
+  STATUS_OPTIONS,
+  buildWorkerMatrix,
+  fetchAllStockEntryHistoryPages,
+} from "./stockentryhistory/utils";
 export default function StockEntryHistory({ onActiveDateChange }: StockEntryHistoryProps = {}) {
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();

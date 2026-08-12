@@ -47,7 +47,14 @@ function parseCsvPositiveIds(value: unknown): number[] {
 
 function parseCsvStrings(value: unknown): string[] {
   if (typeof value !== "string" || !value.trim()) return [];
-  return [...new Set(value.split(",").map((part) => part.trim()).filter(Boolean))];
+  return [
+    ...new Set(
+      value
+        .split(",")
+        .map((part) => part.trim())
+        .filter(Boolean)
+    ),
+  ];
 }
 
 export function registerFactoryStockEntryHistoryPaginationRoutes(app: Express): void {
