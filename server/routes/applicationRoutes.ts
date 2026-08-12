@@ -68,6 +68,7 @@ import { registerTransporterStatementRoutes } from "./transporterStatementRoutes
 import { registerUserNotesRoutes } from "./userNotesRoutes";
 import { registerVoucherEntryRoutes } from "./voucher-entries";
 import { registerVoucherRoutes } from "./voucherRoutes";
+import { registerWhatsAppFastSendRoutes } from "./whatsappFastSendRoutes";
 import { registerWhatsAppRoutes } from "./whatsappRoutes";
 import { registerDispatchBatchRoutes } from "./factory/dispatch-batches";
 import { registerFactoryInvoiceLoadingRoutes } from "./factory/invoice-loading";
@@ -113,6 +114,9 @@ export async function registerApplicationRoutes(app: Express): Promise<Server> {
   installRemoteSupportSessionStopAudit();
   registerWriteInvalidationSignal(app);
   registerPermissionBoundaryRoutes(app);
+  // Register the faster WhatsApp file-delivery handlers after the normal module
+  // boundaries but before the legacy account/factory/POS route implementations.
+  registerWhatsAppFastSendRoutes(app);
 
   // The Bale Ledger aggregation accelerator must precede the legacy Factory
   // registrar. Other Phase 3 fixes live in their owned route modules directly.
