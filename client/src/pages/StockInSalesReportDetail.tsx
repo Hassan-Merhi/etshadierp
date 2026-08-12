@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import {
@@ -241,15 +241,24 @@ export default function StockInSalesReportDetail() {
     () => new Map(locations.map((location) => [location.id, location.name])),
     [locations]
   );
-  const locationName = (id: number | null) => (id ? locationNameById.get(id) || `Location #${id}` : "—");
-  const sourceLocationName = (row: MovementRow) =>
-    row.movementType === "Transfer In" ? locationName(row.counterpartyLocationId) : locationName(row.locationId);
-  const destinationLocationName = (row: MovementRow) =>
-    row.movementType === "Transfer In"
-      ? locationName(row.locationId)
-      : row.movementType === "Transfer Out"
-        ? locationName(row.counterpartyLocationId)
-        : "—";
+  const locationName = useCallback(
+    (id: number | null) => (id ? locationNameById.get(id) || "Location #" + id : "—"),
+    [locationNameById]
+  );
+  const sourceLocationName = useCallback(
+    (row: MovementRow) =>
+      row.movementType === "Transfer In" ? locationName(row.counterpartyLocationId) : locationName(row.locationId),
+    [locationName]
+  );
+  const destinationLocationName = useCallback(
+    (row: MovementRow) =>
+      row.movementType === "Transfer In"
+        ? locationName(row.locationId)
+        : row.movementType === "Transfer Out"
+          ? locationName(row.counterpartyLocationId)
+          : "—",
+    [locationName]
+  );
 
   const sortedMovements = useMemo(
     () =>
@@ -268,7 +277,7 @@ export default function StockInSalesReportDetail() {
         if (destination !== 0) return destination;
         return a.stockItemName.localeCompare(b.stockItemName, undefined, { numeric: true, sensitivity: "base" });
       }),
-    [movements?.rows, locationNameById]
+    [movements?.rows, sourceLocationName, destinationLocationName]
   );
 
   const sortedStockIn = useMemo(
