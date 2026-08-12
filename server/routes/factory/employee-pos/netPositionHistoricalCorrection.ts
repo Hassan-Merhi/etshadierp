@@ -147,7 +147,11 @@ export function registerNetPositionHistoricalCorrection(app: Express) {
     const originalJson = res.json.bind(res);
     res.json = ((body: NetPositionResponse) => {
       void (async () => {
-        const companyId = Number((req.session as any).factoryCompanyId || (req.session as any).currentCompanyId || 0);
+        const session = req.session as typeof req.session & {
+  factoryCompanyId?: number;
+  currentCompanyId?: number;
+};
+const companyId = Number(session.factoryCompanyId || session.currentCompanyId || 0);
         if (!companyId) return originalJson(body);
 
         try {
