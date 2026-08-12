@@ -50,6 +50,7 @@ export function MultiSelectFilter({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
+          type="button"
           className={cn(
             "inline-flex items-center justify-between gap-2 rounded-md border bg-background px-3 py-2 text-sm shadow-sm hover:bg-accent transition-colors min-w-[140px]",
             selected.length > 0 && "border-primary/50",
