@@ -8,8 +8,16 @@ import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { requireAuth, requireRole } from "../../auth";
+import multer from "multer";
+
+const INVALID_IMAGE_PAYLOAD = "Invalid image payload. Only JPEG and PNG data URLs are accepted.";
 
 export function registerGitWhatsappRoutes(app: Express) {
+  const agentDutyImageUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 8 * 1024 * 1024 },
+  });
+
   // ── Stock Transfer WhatsApp Settings ────────────────────────────────────────
 
   app.get("/api/git/transfer-wa-settings", requireAuth, async (req: Request, res: Response) => {
@@ -80,10 +88,11 @@ export function registerGitWhatsappRoutes(app: Express) {
     "/api/git/send-agent-duty-whatsapp",
     requireAuth,
     requireRole("Admin", "Developer", "Owner"),
+    agentDutyImageUpload.single("image"),
     async (req: Request, res: Response) => {
       try {
         const { imageBase64, agentName, fileName } = req.body ?? {};
-        if (!imageBase64 || !agentName) {
+        if ((!req.file && !imageBase64) || !agentName) {
           return res.status(400).json({ message: "imageBase64 and agentName are required." });
         }
         const { getAgentDutyWaCredentials, sendWhatsAppFileToChatId } = await import("../../services/whatsappService");
@@ -101,12 +110,40 @@ export function registerGitWhatsappRoutes(app: Express) {
         if (!settings.enabled) {
           return res.status(400).json({ message: "WhatsApp sending is disabled." });
         }
-        const base64Data = String(imageBase64).replace(/^data:image\/\w+;base64,/, "");
-        const buffer = Buffer.from(base64Data, "base64");
+
+        let buffer: Buffer;
+        let mimeType: "image/jpeg" | "image/png" = "image/png";
+
+        if (req.file) {
+          const uploadedMime = String(req.file.mimetype || "").toLowerCase();
+          if (uploadedMime !== "image/jpeg" && uploadedMime !== "image/png") {
+            return res.status(400).json({ message: INVALID_IMAGE_PAYLOAD });
+          }
+          mimeType = uploadedMime;
+          buffer = req.file.buffer;
+        } else {
+          const dataUrl = String(imageBase64);
+          const match = dataUrl.match(/^data:(image\/(?:jpeg|jpg|png));base64,([A-Za-z0-9+/=]+)$/);
+          if (!match) {
+            return res.status(400).json({ message: INVALID_IMAGE_PAYLOAD });
+          }
+          mimeType = match[1] === "image/png" ? "image/png" : "image/jpeg";
+          buffer = Buffer.from(match[2], "base64");
+        }
+
+        if (buffer.length === 0) {
+          return res.status(400).json({ message: "Image payload is empty." });
+        }
+
         const today = new Date().toISOString().substring(0, 10);
-        const finalFileName = String(fileName || `AgentDuty_${agentName}_${today}.png`);
+        const ext = mimeType === "image/jpeg" ? "jpg" : "png";
+        const fallbackName = `AgentDuty_${agentName}_${today}.${ext}`;
+        let finalFileName = String(fileName || req.file?.originalname || fallbackName);
+        if (!finalFileName.toLowerCase().match(new RegExp(`\\.(?:${ext}|jpeg)$`))) {
+          finalFileName = finalFileName.replace(/\.[^.]+$/, "") + `.${ext}`;
+        }
         const caption = "";
-        const result = await sendWhatsAppFileToChatId(groupChatId, buffer, finalFileName, caption, "image/png");
+        const result = await sendWhatsAppFileToChatId(groupChatId, buffer, finalFileName, caption, mimeType);
         if (!result.success) return res.status(500).json({ message: result.error || "Failed to send" });
         res.json({ ok: true, message: `Sent to WhatsApp group for ${agentName}.` });
       } catch (err: unknown) {
@@ -186,9 +223,7 @@ export function registerGitWhatsappRoutes(app: Express) {
           // Require a well-formed data URL with a supported image MIME type.
           const mimeMatch = dataUrlStr.match(/^data:(image\/(?:jpeg|jpg|png));base64,([A-Za-z0-9+/=]+)$/);
           if (!mimeMatch) {
-            return res.status(400).json({
-              message: "Invalid image payload. Only JPEG and PNG data URLs are accepted.",
-            });
+            return res.status(400).json({ message: INVALID_IMAGE_PAYLOAD });
           }
 
           const detectedMime = mimeMatch[1].toLowerCase();
