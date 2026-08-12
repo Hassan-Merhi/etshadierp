@@ -25,18 +25,28 @@ const analysisRow = {
   status: "gaining",
 };
 
+// React Query preserves data references between renders when the cached value
+// has not changed. Keep the fixtures stable too, otherwise effects keyed to
+// query data references can be retriggered forever by the test harness itself.
+const suppliers = [{ id: 2, legalName: "Supplier A", stockGroupId: 5 }];
+const stockGroups = [{ id: 5, name: "Group A" }];
+const proformas = [{ id: 31, reference: "PF-31" }];
+const locationGroups = [{ id: 11, name: "Retail" }];
+const analysisRows = [analysisRow];
+const noRows: never[] = [];
+
 vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({ invalidateQueries: harness.invalidateQueries }),
   useQuery: ({ queryKey }: any) => {
     const root = queryKey?.[0];
-    if (root === "/api/suppliers-all-spc") return { data: [{ id: 2, legalName: "Supplier A", stockGroupId: 5 }] };
-    if (root === "/api/stock-groups") return { data: [{ id: 5, name: "Group A" }] };
-    if (root === "/api/suppliers") return { data: [{ id: 31, reference: "PF-31" }] };
-    if (root === "/api/supplier-profit-check/location-groups") return { data: [{ id: 11, name: "Retail" }] };
-    if (root === "/api/supplier-profit-check/otw-containers") return { data: [], isLoading: false };
-    if (root === "/api/supplier-profit-check/analyze") return { data: [analysisRow], isLoading: false };
-    if (root === "/api/supplier-profit-check/po-overrides") return { data: [] };
-    return { data: [] };
+    if (root === "/api/suppliers-all-spc") return { data: suppliers };
+    if (root === "/api/stock-groups") return { data: stockGroups };
+    if (root === "/api/suppliers") return { data: proformas };
+    if (root === "/api/supplier-profit-check/location-groups") return { data: locationGroups };
+    if (root === "/api/supplier-profit-check/otw-containers") return { data: noRows, isLoading: false };
+    if (root === "/api/supplier-profit-check/analyze") return { data: analysisRows, isLoading: false };
+    if (root === "/api/supplier-profit-check/po-overrides") return { data: noRows };
+    return { data: noRows };
   },
   useMutation: (config: any) => ({
     isPending: false,
