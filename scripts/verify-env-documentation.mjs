@@ -21,6 +21,7 @@ const ENV_EXAMPLES = [
   join(ROOT, ".env.example"),
   join(ROOT, "docs", "remote-support.env.example"),
   join(ROOT, "docs", "observability", "render-logging.env.example"),
+  join(ROOT, "docs", "whatsapp.env.example"),
 ];
 
 /**
