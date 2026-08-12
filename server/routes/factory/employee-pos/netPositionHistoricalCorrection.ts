@@ -1,7 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { sql } from "drizzle-orm";
 
-import { requireAuth } from "../../../auth";
 import { db } from "../../../db";
 import { getClientDate } from "../../../lib/dateUtils";
 import { resultRows } from "../../../lib/queryResult";
@@ -135,23 +134,24 @@ async function computeHistoricalOperationalValues(companyId: number, asOf: strin
   const adjustmentsAfterRow = resultRows(adjustmentsAfterResult)[0] ?? {};
   const adjustmentsAfter = parseFloat(String(adjustmentsAfterRow.value_after ?? "0")) || 0;
 
-  const rawMaterialValue = round2(
-    Math.max(currentRawMaterialValue + consumedAfter - receiptsAfter - adjustmentsAfter, 0)
-  );
+  const rawMaterialValue = round2(Math.max(currentRawMaterialValue + consumedAfter - receiptsAfter - adjustmentsAfter, 0));
 
   return { inventoryValue, rawMaterialValue, balanceOnTableValue };
 }
 
 export function registerNetPositionHistoricalCorrection(app: Express) {
-  app.get("/api/factory/net-position", requireAuth, (req: Request, res: Response, next: NextFunction) => {
-    const asOf =
-      typeof req.query.asOf === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.asOf) ? req.query.asOf : null;
+  app.get("/api/factory/net-position", (req: Request, res: Response, next: NextFunction) => {
+    const asOf = typeof req.query.asOf === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.asOf) ? req.query.asOf : null;
     if (!asOf || asOf === getClientDate(req)) return next();
 
     const originalJson = res.json.bind(res);
     res.json = ((body: NetPositionResponse) => {
       void (async () => {
-        const companyId = Number(req.session.factoryCompanyId || req.session.currentCompanyId || 0);
+        const session = req.session as typeof req.session & {
+  factoryCompanyId?: number;
+  currentCompanyId?: number;
+};
+const companyId = Number(session.factoryCompanyId || session.currentCompanyId || 0);
         if (!companyId) return originalJson(body);
 
         try {
