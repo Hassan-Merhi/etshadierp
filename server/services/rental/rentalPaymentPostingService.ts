@@ -21,24 +21,11 @@ import { eq, and, sql, inArray } from "drizzle-orm";
 import Decimal from "decimal.js";
 import type { RentalModule } from "../../routes/rental/shared";
 import { normalizeVoucherEntryAmounts } from "../accounting/currencyAmounts";
-import {
-  findOrCreateLedgerAccount,
-  maybeRunAutoTransfer,
-} from "../../routes/rental/shared";
-import {
-  isRentalPeriodDue,
-  getRentalBillingDay,
-  getRentalPeriodDueDate,
-} from "./rentalPeriodService";
-import {
-  buildAllocationsForPayment,
-  findEarliestOutstandingMonth,
-} from "./rentalPaymentAllocationService";
+import { findOrCreateLedgerAccount, maybeRunAutoTransfer } from "../../routes/rental/shared";
+import { isRentalPeriodDue, getRentalBillingDay, getRentalPeriodDueDate } from "./rentalPeriodService";
+import { buildAllocationsForPayment, findEarliestOutstandingMonth } from "./rentalPaymentAllocationService";
 
-export {
-  buildAllocationsForPayment,
-  findEarliestOutstandingMonth,
-} from "./rentalPaymentAllocationService";
+export { buildAllocationsForPayment, findEarliestOutstandingMonth } from "./rentalPaymentAllocationService";
 
 export interface RentalPaymentGroupOptions {
   companyId: number;
@@ -149,9 +136,7 @@ async function postGroupCore(
   const isShop = isSharedPayment || unit?.unitType === "SHOP";
 
   if (isShop) {
-    const billingDay = contract
-      ? getRentalBillingDay(contract.startDate as string)
-      : 1;
+    const billingDay = contract ? getRentalBillingDay(contract.startDate as string) : 1;
 
     let accrualAmt = new Decimal(0);
     let advanceAmt = new Decimal(0);
@@ -163,12 +148,7 @@ async function postGroupCore(
 
     for (const alloc of allocs) {
       const chunk = new Decimal(alloc.chunk);
-      const due = isRentalPeriodDue(
-        alloc.forYear,
-        alloc.forMonth,
-        billingDay,
-        paymentDate
-      );
+      const due = isRentalPeriodDue(alloc.forYear, alloc.forMonth, billingDay, paymentDate);
 
       if (due) {
         let wasAccrued = false;
@@ -216,12 +196,7 @@ async function postGroupCore(
       .returning();
 
     const payEntries: any[] = [
-      {
-        voucherId: v.id,
-        ledgerAccountId: cashAccountId,
-        ...normEntry("0", totalAmountStr),
-        narration,
-      },
+      { voucherId: v.id, ledgerAccountId: cashAccountId, ...normEntry("0", totalAmountStr), narration },
     ];
 
     if (accrualAmt.gt(0.005)) {
@@ -241,13 +216,7 @@ async function postGroupCore(
     }
 
     if (advanceAmt.gt(0.005)) {
-      const advId = await findOrCreateLedgerAccount(
-        tx,
-        companyId,
-        "Advance Rent Paid",
-        "Asset",
-        "ADV-RENT-PAID"
-      );
+      const advId = await findOrCreateLedgerAccount(tx, companyId, "Advance Rent Paid", "Asset", "ADV-RENT-PAID");
       payEntries.push({
         voucherId: v.id,
         ledgerAccountId: advId,
@@ -257,13 +226,7 @@ async function postGroupCore(
     }
 
     if (prepaidAmt.gt(0.005)) {
-      const prepId = await findOrCreateLedgerAccount(
-        tx,
-        companyId,
-        "Prepaid Rent",
-        "Asset",
-        "PREPAID-RENT"
-      );
+      const prepId = await findOrCreateLedgerAccount(tx, companyId, "Prepaid Rent", "Asset", "PREPAID-RENT");
       payEntries.push({
         voucherId: v.id,
         ledgerAccountId: prepId,
@@ -299,13 +262,7 @@ async function postGroupCore(
         "Indirect Expense",
         "SHOP-RENT-EXP"
       );
-      const advId = await findOrCreateLedgerAccount(
-        tx,
-        companyId,
-        "Advance Rent Paid",
-        "Asset",
-        "ADV-RENT-PAID"
-      );
+      const advId = await findOrCreateLedgerAccount(tx, companyId, "Advance Rent Paid", "Asset", "ADV-RENT-PAID");
       await tx.insert(voucherEntries).values([
         {
           voucherId: rv.id,
@@ -387,9 +344,7 @@ async function postGroupCore(
         },
       ]);
 
-      const landlordLedgerIds = allocs
-        .map((a) => a.ledgerRowId)
-        .filter(Boolean) as number[];
+      const landlordLedgerIds = allocs.map((a) => a.ledgerRowId).filter(Boolean) as number[];
       if (landlordLedgerIds.length > 0) {
         await tx
           .update(propertyMonthlyLedger)
@@ -404,14 +359,9 @@ async function postGroupCore(
     const payYear = pd.getUTCFullYear();
     const payMonth = pd.getUTCMonth() + 1;
     const futureAllocs = allocs.filter(
-      (a) =>
-        a.forYear > payYear ||
-        (a.forYear === payYear && a.forMonth > payMonth)
+      (a) => a.forYear > payYear || (a.forYear === payYear && a.forMonth > payMonth)
     );
-    const deferredChunk = futureAllocs.reduce(
-      (s, a) => s + Number(a.chunk),
-      0
-    );
+    const deferredChunk = futureAllocs.reduce((s, a) => s + Number(a.chunk), 0);
     const totalAmountNum = parseFloat(totalAmountStr);
     const earnedChunk = totalAmountNum - deferredChunk;
 
@@ -460,9 +410,7 @@ async function postGroupCore(
         ...normEntry("0", deferredChunk.toFixed(2)),
         narration,
       });
-      const futureIds = futureAllocs
-        .map((a) => a.ledgerRowId)
-        .filter(Boolean) as number[];
+      const futureIds = futureAllocs.map((a) => a.ledgerRowId).filter(Boolean) as number[];
       if (futureIds.length > 0) {
         await tx
           .update(propertyMonthlyLedger)
@@ -501,9 +449,7 @@ export async function createRentalPaymentGroup(
   } = opts;
 
   if (paymentDate > clientDate && !scheduleFuturePayment) {
-    const err: any = new Error(
-      "Future payment dates require Schedule future payment."
-    );
+    const err: any = new Error("Future payment dates require Schedule future payment.");
     err.status = 400;
     throw err;
   }
@@ -512,11 +458,7 @@ export async function createRentalPaymentGroup(
   const totalAmountNum = parseFloat(amount);
   const rentalAmountNum = parseFloat(contract.rentalAmount as string);
 
-  const { year: startY, month: startM } = await findEarliestOutstandingMonth(
-    contract.id,
-    billingDay,
-    paymentDate
-  );
+  const { year: startY, month: startM } = await findEarliestOutstandingMonth(contract.id, billingDay, paymentDate);
 
   const allocations = await buildAllocationsForPayment(
     contract.id,
@@ -532,11 +474,7 @@ export async function createRentalPaymentGroup(
 
   const scheduledRows = await db.transaction(async (tx) => {
     for (const alloc of allocations) {
-      const allocDueDate = getRentalPeriodDueDate(
-        alloc.year,
-        alloc.month,
-        billingDay
-      );
+      const allocDueDate = getRentalPeriodDueDate(alloc.year, alloc.month, billingDay);
       const allocIsDue = allocDueDate <= paymentDate;
       const expectedForAlloc = allocIsDue ? contract.rentalAmount : "0";
       await tx.execute(sql`
@@ -671,16 +609,10 @@ export async function postDueScheduledRentalPayments(
       if (groupRows.length === 0) continue;
       const firstRow = groupRows[0];
 
-      const [contract] = await db
-        .select()
-        .from(propertyContracts)
-        .where(eq(propertyContracts.id, firstRow.contractId));
+      const [contract] = await db.select().from(propertyContracts).where(eq(propertyContracts.id, firstRow.contractId));
 
       const [unit] = contract
-        ? await db
-            .select()
-            .from(propertyUnits)
-            .where(eq(propertyUnits.id, contract.unitId))
+        ? await db.select().from(propertyUnits).where(eq(propertyUnits.id, contract.unitId))
         : [null];
 
       const isShared = !!contract?.linkedCompanyId;
@@ -704,12 +636,9 @@ export async function postDueScheduledRentalPayments(
       );
       if (didPost) posted++;
     } catch (err: unknown) {
-      logger.error(
-        `[rentalPostingService] Failed to post group ${row.payment_group_id}:`,
-        {
-          error: getErrorMessage(err).split("\n")[0],
-        }
-      );
+      logger.error(`[rentalPostingService] Failed to post group ${row.payment_group_id}:`, {
+        error: getErrorMessage(err).split("\n")[0],
+      });
     }
   }
   return posted;
@@ -750,10 +679,7 @@ async function postScheduledGroup(
 
     if (groupRows.length === 0) return;
 
-    const totalAmount = groupRows.reduce(
-      (s, r) => s + parseFloat(r.amount as string),
-      0
-    );
+    const totalAmount = groupRows.reduce((s, r) => s + parseFloat(r.amount as string), 0);
     const totalAmountStr = new Decimal(totalAmount).toFixed(2);
 
     const allocs = groupRows.map((r) => ({
@@ -763,18 +689,14 @@ async function postScheduledGroup(
       ledgerRowId: r.ledgerRowId,
     }));
 
-    const unitLabel = unit
-      ? `${unit.locationGroup}/${unit.unitNumber}`
-      : `Unit#${groupRows[0].unitId}`;
+    const unitLabel = unit ? `${unit.locationGroup}/${unit.unitNumber}` : `Unit#${groupRows[0].unitId}`;
     const monthSpan =
       allocs.length > 1
         ? `${String(allocs[0].forMonth).padStart(2, "0")}/${allocs[0].forYear}–${String(allocs[allocs.length - 1].forMonth).padStart(2, "0")}/${allocs[allocs.length - 1].forYear}`
         : `${String(allocs[0].forMonth).padStart(2, "0")}/${allocs[0].forYear}`;
     const narration = `Rent paid - ${unitLabel} - ${monthSpan}`;
 
-    const groupExchangeRate = String(
-      (groupRows[0] as any)?.exchangeRate || exchangeRate || "1"
-    );
+    const groupExchangeRate = String((groupRows[0] as any)?.exchangeRate || exchangeRate || "1");
 
     const voucherId = await postGroupCore(tx, {
       companyId,
@@ -822,10 +744,7 @@ async function postScheduledGroup(
     const firstRow = groupRows[0];
     if (firstRow.cashAccountId && unit) {
       const unitLabel = `${unit.locationGroup}/${unit.unitNumber}`;
-      const totalAmount = groupRows.reduce(
-        (s, r) => s + parseFloat(r.amount as string),
-        0
-      );
+      const totalAmount = groupRows.reduce((s, r) => s + parseFloat(r.amount as string), 0);
       await maybeRunAutoTransfer(
         companyId,
         module,
