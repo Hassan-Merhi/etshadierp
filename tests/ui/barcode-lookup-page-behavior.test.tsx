@@ -129,7 +129,11 @@ describe("barcode lookup page behavior", () => {
       if (method === "POST" && path.endsWith("/scan")) {
         return {
           ok: true,
-          json: async () => ({ scannedAt: "2026-08-12T08:00:00.000Z", scannedByUserId: "admin-1", scannedByName: "Admin" }),
+          json: async () => ({
+            scannedAt: "2026-08-12T08:00:00.000Z",
+            scannedByUserId: "admin-1",
+            scannedByName: "Admin",
+          }),
         };
       }
       return { ok: true, json: async () => ({}) };
