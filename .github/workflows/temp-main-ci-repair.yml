@@ -16,46 +16,43 @@ jobs:
           cache: npm
       - run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
       - run: npm ci --no-audit --bin-links=true
-      - name: Stabilize report helper dependencies
+      - name: Fix hook dependencies
         run: |
-          python3 <<'PY'
-          from pathlib import Path
-          p = Path('client/src/pages/StockInSalesReportDetail.tsx')
-          s = p.read_text()
-          s = s.replace('import { useMemo, useState } from "react";', 'import { useCallback, useMemo, useState } from "react";')
-          old = '''  const locationName = (id: number | null) => (id ? locationNameById.get(id) || `Location #${id}` : "—");
-          const sourceLocationName = (row: MovementRow) =>
-            row.movementType === "Transfer In" ? locationName(row.counterpartyLocationId) : locationName(row.locationId);
-          const destinationLocationName = (row: MovementRow) =>
-            row.movementType === "Transfer In"
-              ? locationName(row.locationId)
-              : row.movementType === "Transfer Out"
-                ? locationName(row.counterpartyLocationId)
-                : "—";'''
-          new = '''  const locationName = useCallback(
-            (id: number | null) => (id ? locationNameById.get(id) || `Location #${id}` : "—"),
-            [locationNameById]
-          );
-          const sourceLocationName = useCallback(
-            (row: MovementRow) =>
-              row.movementType === "Transfer In" ? locationName(row.counterpartyLocationId) : locationName(row.locationId),
-            [locationName]
-          );
-          const destinationLocationName = useCallback(
-            (row: MovementRow) =>
-              row.movementType === "Transfer In"
-                ? locationName(row.locationId)
-                : row.movementType === "Transfer Out"
-                  ? locationName(row.counterpartyLocationId)
-                  : "—",
-            [locationName]
-          );'''
-          if old not in s:
-              raise SystemExit('expected helper block not found')
-          s = s.replace(old, new)
-          s = s.replace('    [movements?.rows, locationNameById]\n  );', '    [movements?.rows, sourceLocationName, destinationLocationName]\n  );')
-          p.write_text(s)
-          PY
+          node - <<'NODE'
+          const fs = require('fs');
+          const p = 'client/src/pages/StockInSalesReportDetail.tsx';
+          const lines = fs.readFileSync(p, 'utf8').split('\n');
+          lines[0] = lines[0].replace('useMemo, useState', 'useCallback, useMemo, useState');
+          const start = lines.findIndex((line) => line.trim().startsWith('const locationName ='));
+          const end = lines.findIndex((line, i) => i > start && line.trim().startsWith('const sortedMovements ='));
+          if (start < 0 || end < 0) throw new Error('helper markers not found');
+          const block = [
+            '  const locationName = useCallback(',
+            '    (id: number | null) => (id ? locationNameById.get(id) || `Location #' + '${id}` + ' : "—"),',
+            '    [locationNameById]',
+            '  );',
+            '  const sourceLocationName = useCallback(',
+            '    (row: MovementRow) =>',
+            '      row.movementType === "Transfer In" ? locationName(row.counterpartyLocationId) : locationName(row.locationId),',
+            '    [locationName]',
+            '  );',
+            '  const destinationLocationName = useCallback(',
+            '    (row: MovementRow) =>',
+            '      row.movementType === "Transfer In"',
+            '        ? locationName(row.locationId)',
+            '        : row.movementType === "Transfer Out"',
+            '          ? locationName(row.counterpartyLocationId)',
+            '          : "—",',
+            '    [locationName]',
+            '  );',
+            '',
+          ];
+          lines.splice(start, end - start, ...block);
+          const dep = lines.findIndex((line) => line.trim() === '[movements?.rows, locationNameById]');
+          if (dep < 0) throw new Error('dependency line not found');
+          lines[dep] = '    [movements?.rows, sourceLocationName, destinationLocationName]';
+          fs.writeFileSync(p, lines.join('\n'));
+          NODE
           npx prettier --write client/src/pages/StockInSalesReportDetail.tsx
       - run: |
           npm run lint
