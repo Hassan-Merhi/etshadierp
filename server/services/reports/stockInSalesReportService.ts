@@ -112,7 +112,10 @@ function buildPeriodKeyExpression(dateExpression: SQL, grouping: StockInSalesGro
   return sql<string>`TO_CHAR(${dateExpression}, 'YYYY-MM-DD')`;
 }
 
-function getPeriodBounds(periodKey: string, grouping: StockInSalesGrouping): { periodStart: string; periodEnd: string } {
+function getPeriodBounds(
+  periodKey: string,
+  grouping: StockInSalesGrouping
+): { periodStart: string; periodEnd: string } {
   if (grouping === "yearly") {
     return {
       periodStart: `${periodKey}-01-01`,
@@ -219,9 +222,7 @@ async function getSalesRows(filters: StockInSalesReportFilters): Promise<Aggrega
     conditions,
     filters,
     filters.locationIds.length > 0 ? inArray(vouchers.locationId, filters.locationIds) : undefined,
-    searchPattern
-      ? [ilike(vouchers.voucherNumber, searchPattern), ilike(vouchers.locationName, searchPattern)]
-      : []
+    searchPattern ? [ilike(vouchers.voucherNumber, searchPattern), ilike(vouchers.locationName, searchPattern)] : []
   );
 
   return db
@@ -235,10 +236,7 @@ async function getSalesRows(filters: StockInSalesReportFilters): Promise<Aggrega
     .from(salesItems)
     .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
     .innerJoin(stockItems, eq(salesItems.stockItemId, stockItems.id))
-    .leftJoin(
-      locations,
-      and(eq(vouchers.locationId, locations.id), eq(locations.companyId, filters.companyId))
-    )
+    .leftJoin(locations, and(eq(vouchers.locationId, locations.id), eq(locations.companyId, filters.companyId)))
     .leftJoin(stockGroups, eq(stockItems.stockGroupId, stockGroups.id))
     .where(and(...conditions))
     .groupBy(periodKey)
@@ -317,9 +315,7 @@ function toMetrics(metrics: MutableMetrics): StockInSalesReportMetrics {
   };
 }
 
-export async function getStockInSalesReport(
-  filters: StockInSalesReportFilters
-): Promise<StockInSalesReportResult> {
+export async function getStockInSalesReport(filters: StockInSalesReportFilters): Promise<StockInSalesReportResult> {
   const [stockInRows, salesRows, noteRows] = await Promise.all([
     getStockInRows(filters),
     getSalesRows(filters),
