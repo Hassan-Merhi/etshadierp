@@ -1,0 +1,83 @@
+name: Temporary main CI repair
+
+on:
+  push:
+    branches:
+      - ci/main-green-20260812-1102
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.14.0'
+          cache: npm
+      - run: npm ci
+      - name: Repair hook dependencies
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = 'client/src/pages/StockInSalesReportDetail.tsx';
+          let source = fs.readFileSync(path, 'utf8');
+          source = source.replace(
+            'import { useMemo, useState } from "react";',
+            'import { useCallback, useMemo, useState } from "react";'
+          );
+          const oldBlock = `  const locationName = (id: number | null) => (id ? locationNameById.get(id) || \`Location #\${id}\` : "—");
+  const sourceLocationName = (row: MovementRow) =>
+    row.movementType === "Transfer In" ? locationName(row.counterpartyLocationId) : locationName(row.locationId);
+  const destinationLocationName = (row: MovementRow) =>
+    row.movementType === "Transfer In"
+      ? locationName(row.locationId)
+      : row.movementType === "Transfer Out"
+        ? locationName(row.counterpartyLocationId)
+        : "—";`;
+          const newBlock = `  const locationName = useCallback(
+    (id: number | null) => (id ? locationNameById.get(id) || \`Location #\${id}\` : "—"),
+    [locationNameById]
+  );
+  const sourceLocationName = useCallback(
+    (row: MovementRow) =>
+      row.movementType === "Transfer In" ? locationName(row.counterpartyLocationId) : locationName(row.locationId),
+    [locationName]
+  );
+  const destinationLocationName = useCallback(
+    (row: MovementRow) =>
+      row.movementType === "Transfer In"
+        ? locationName(row.locationId)
+        : row.movementType === "Transfer Out"
+          ? locationName(row.counterpartyLocationId)
+          : "—",
+    [locationName]
+  );`;
+          if (!source.includes(oldBlock)) throw new Error('Expected location helper block was not found');
+          source = source.replace(oldBlock, newBlock);
+          const oldDeps = '    [movements?.rows, locationNameById]\n  );';
+          const newDeps = '    [movements?.rows, sourceLocationName, destinationLocationName]\n  );';
+          if (!source.includes(oldDeps)) throw new Error('Expected sortedMovements dependency list was not found');
+          source = source.replace(oldDeps, newDeps);
+          fs.writeFileSync(path, source);
+          NODE
+      - name: Apply repository formatting
+        run: npx prettier --write client/src/pages/StockInSalesReport.tsx client/src/pages/StockInSalesReportDetail.tsx
+      - name: Verify lint and types
+        run: |
+          npm run lint
+          npm run check
+      - name: Commit repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add client/src/pages/StockInSalesReport.tsx client/src/pages/StockInSalesReportDetail.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m "Fix main report formatting and hook lint"
+          git push origin HEAD:ci/main-green-20260812-1102
