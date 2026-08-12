@@ -148,7 +148,7 @@ function chooseAccount(row: number, name: string) {
   fireEvent.focus(input);
   const option = screen.getAllByRole("button").find((button) => button.textContent?.includes(name));
   expect(option).toBeDefined();
-  fireEvent.click(option!);
+  fireEvent.mouseDown(option!);
 }
 
 describe("journal voucher form behavior", () => {
