@@ -48,6 +48,21 @@ export const fmtMoney = (v: string | number | null | undefined) => {
   return n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 };
 
+function clampPaymentAllocationPeriod(
+  year: number,
+  month: number,
+  contractStartDate?: string
+): { year: number; month: number } {
+  if (!contractStartDate) return { year, month };
+  const start = new Date(contractStartDate + "T00:00:00Z");
+  const startYear = start.getUTCFullYear();
+  const startMonth = start.getUTCMonth() + 1;
+  if (year < startYear || (year === startYear && month < startMonth)) {
+    return { year: startYear, month: startMonth };
+  }
+  return { year, month };
+}
+
 // ── Context (avoids prop-drilling apiBase through every sub-component) ──
 
 export // ──────────────────────────────────────────────────────────
@@ -57,7 +72,8 @@ function buildPaymentAllocations(
   totalAmount: number,
   rentalAmount: number,
   paymentDate: string,
-  ledger?: Array<{ year: number; month: number; expectedAmount: string; paidAmount: string }>
+  ledger?: Array<{ year: number; month: number; expectedAmount: string; paidAmount: string }>,
+  contractStartDate?: string
 ): Array<{ year: number; month: number; chunk: number }> {
   if (!totalAmount || !rentalAmount || !paymentDate) return [];
 
@@ -78,6 +94,8 @@ function buildPaymentAllocations(
   if (ledger && ledger.length > 0) {
     const sorted = [...ledger].sort((a, b) => (a.year !== b.year ? a.year - b.year : a.month - b.month));
     const earliest = sorted.find((r) => {
+      const clamped = clampPaymentAllocationPeriod(r.year, r.month, contractStartDate);
+      if (clamped.year !== r.year || clamped.month !== r.month) return false;
       const isPastOrCurrent = r.year < nowYear || (r.year === nowYear && r.month <= nowMonth);
       if (!isPastOrCurrent) return false;
       return Math.max(0, parseFloat(r.expectedAmount) - parseFloat(r.paidAmount)) > 0.005;
@@ -86,15 +104,19 @@ function buildPaymentAllocations(
       ay = earliest.year;
       am = earliest.month;
     } else {
-      const pd = new Date(paymentDate);
+      const pd = new Date(paymentDate + "T00:00:00Z");
       ay = pd.getUTCFullYear();
       am = pd.getUTCMonth() + 1;
     }
   } else {
-    const pd = new Date(paymentDate);
+    const pd = new Date(paymentDate + "T00:00:00Z");
     ay = pd.getUTCFullYear();
     am = pd.getUTCMonth() + 1;
   }
+
+  const clampedStart = clampPaymentAllocationPeriod(ay, am, contractStartDate);
+  ay = clampedStart.year;
+  am = clampedStart.month;
 
   const allocations: Array<{ year: number; month: number; chunk: number }> = [];
   let remaining = totalAmount;
