@@ -178,10 +178,10 @@ describe("immutable stock transfer revision review lifecycle", () => {
 
   it("validates identifiers and reviewer identity before opening a transaction", async () => {
     await expect(approveImmutableStockTransferRevision(0, 41, "reviewer-1")).rejects.toThrow(
-      "Company ID must be a positive integer",
+      "Company ID must be a positive integer"
     );
     await expect(approveImmutableStockTransferRevision(4, 0, "reviewer-1")).rejects.toThrow(
-      "Revision ID must be a positive integer",
+      "Revision ID must be a positive integer"
     );
     await expect(rejectImmutableStockTransferRevision(4, 41, "   ")).rejects.toThrow("Reviewer ID is required");
     expect(harness.db.transaction).not.toHaveBeenCalled();

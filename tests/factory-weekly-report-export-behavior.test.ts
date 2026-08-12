@@ -92,7 +92,12 @@ vi.mock("@shared/schema", () => ({
     usedKg: "raw.usedKg",
     offloadedAt: "raw.offloadedAt",
   },
-  factoryMixBatches: { id: "mix.id", companyId: "mix.companyId", batchDate: "mix.batchDate", createdAt: "mix.createdAt" },
+  factoryMixBatches: {
+    id: "mix.id",
+    companyId: "mix.companyId",
+    batchDate: "mix.batchDate",
+    createdAt: "mix.createdAt",
+  },
   factoryMixBatchSources: { mixBatchId: "src.mixBatchId", containerId: "src.containerId", weightKg: "src.weightKg" },
   factoryRawMaterialAdjustments: {
     companyId: "adj.companyId",
@@ -170,7 +175,7 @@ describe("factory weekly report export behavior", () => {
           catIdViaContainer: 7,
           weightKg: "20",
         },
-      ],
+      ]
     );
 
     const res = responseHarness();

@@ -48,7 +48,11 @@ describe("credential version service behavior", () => {
 
     const session: any = { userId: "u1" };
     await expect(hydrateActiveCredentialVersion(db, session, { now: 1000, refreshMs: 60_000 })).resolves.toBe(4);
-    expect(session).toMatchObject({ activeCredentialVersion: 4, credentialVersion: 4, credentialVersionCheckedAt: 1000 });
+    expect(session).toMatchObject({
+      activeCredentialVersion: 4,
+      credentialVersion: 4,
+      credentialVersionCheckedAt: 1000,
+    });
   });
 
   it("uses a fresh cached active version without hitting the database", async () => {

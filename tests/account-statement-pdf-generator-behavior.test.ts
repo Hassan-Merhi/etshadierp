@@ -53,7 +53,7 @@ vi.mock("drizzle-orm", () => ({
   isNull: (column: unknown) => ({ type: "isNull", column }),
   sql: Object.assign(
     (strings: TemplateStringsArray, ...values: unknown[]) => ({ type: "sql", strings: Array.from(strings), values }),
-    { raw: (value: string) => ({ type: "raw", value }) },
+    { raw: (value: string) => ({ type: "raw", value }) }
   ),
 }));
 vi.mock("@shared/schema", () => ({
@@ -145,7 +145,7 @@ describe("account statement PDF generator behavior", () => {
         narration: "second line",
         debitAmount: "50",
         creditAmount: "0",
-      },
+      }
     );
 
     const buffer = await generateAccountStatementPdf({
@@ -160,10 +160,7 @@ describe("account statement PDF generator behavior", () => {
   });
 
   it("applies supplier opening and pre-period balances in parent-company books", async () => {
-    harness.selectResults.push(
-      [{ id: 7, legalName: "Supplier A", openingBalance: "500" }],
-      [{ d: "40", c: "90" }],
-    );
+    harness.selectResults.push([{ id: 7, legalName: "Supplier A", openingBalance: "500" }], [{ d: "40", c: "90" }]);
     harness.supplierEntries.push(
       {
         voucherId: 10,
@@ -184,7 +181,7 @@ describe("account statement PDF generator behavior", () => {
         narration: "Achat",
         debitAmount: "0",
         creditAmount: "250",
-      },
+      }
     );
 
     const buffer = await generateAccountStatementPdf({
@@ -222,7 +219,7 @@ describe("account statement PDF generator behavior", () => {
         description: "دفعة نقدية",
         debitAmount: "0",
         creditAmount: "500",
-      },
+      }
     );
 
     const buffer = await generateAccountStatementPdf({
@@ -236,8 +233,8 @@ describe("account statement PDF generator behavior", () => {
   });
 
   it("rejects unknown account types before attempting PDF generation", async () => {
-    await expect(
-      generateAccountStatementPdf({ accountType: "mystery", accountId: 1, companyId: 4 }),
-    ).rejects.toThrow("Unknown account type: mystery");
+    await expect(generateAccountStatementPdf({ accountType: "mystery", accountId: 1, companyId: 4 })).rejects.toThrow(
+      "Unknown account type: mystery"
+    );
   });
 });

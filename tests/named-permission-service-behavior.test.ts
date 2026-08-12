@@ -29,7 +29,8 @@ function selectDb(rows: any[] | Promise<any[]>) {
     from: vi.fn(() => builder),
     where: vi.fn(() => builder),
     limit: vi.fn(async () => (await rows).slice(0, 1)),
-    then: (resolve: (value: any[]) => unknown, reject: (reason: unknown) => unknown) => Promise.resolve(rows).then(resolve, reject),
+    then: (resolve: (value: any[]) => unknown, reject: (reason: unknown) => unknown) =>
+      Promise.resolve(rows).then(resolve, reject),
   };
   return { select: vi.fn(() => builder) };
 }
@@ -88,7 +89,7 @@ describe("named permission service behavior", () => {
         companyId: 5,
         permissions: ["files.download", "administration.repair"],
         grantedBy: "admin",
-      }),
+      })
     ).resolves.toEqual(["administration.repair", "files.download"]);
     expect(insertBuilder.values).toHaveBeenCalledWith([
       expect.objectContaining({ userId: "u1", companyId: 5, permission: "administration.repair", grantedBy: "admin" }),
@@ -97,7 +98,7 @@ describe("named permission service behavior", () => {
 
     insertBuilder.values.mockClear();
     await expect(
-      replaceNamedPermissions(tx, { userId: "u1", companyId: 5, permissions: [], grantedBy: "admin" }),
+      replaceNamedPermissions(tx, { userId: "u1", companyId: 5, permissions: [], grantedBy: "admin" })
     ).resolves.toEqual([]);
     expect(insertBuilder.values).not.toHaveBeenCalled();
   });
@@ -107,7 +108,12 @@ describe("named permission service behavior", () => {
     await expect(hydrateSessionNamedPermissions(selectDb([]), invalid)).resolves.toEqual([]);
     expect(invalid).toMatchObject({ securityPermissions: [], securityPermissionsCompanyId: null });
 
-    const cached: any = { userId: "u1", currentCompanyId: 3, securityPermissions: ["files.download"], securityPermissionsCompanyId: 3 };
+    const cached: any = {
+      userId: "u1",
+      currentCompanyId: 3,
+      securityPermissions: ["files.download"],
+      securityPermissionsCompanyId: 3,
+    };
     await expect(hydrateSessionNamedPermissions(selectDb([]), cached)).resolves.toEqual(["files.download"]);
 
     const legacyCached: any = { userId: "u1", currentCompanyId: 3, securityPermissions: ["files.download"] };
@@ -120,9 +126,9 @@ describe("named permission service behavior", () => {
       securityPermissions: ["files.download"],
       securityPermissionsCompanyId: 3,
     };
-    await expect(hydrateSessionNamedPermissions(selectDb([{ permission: "security.anomalies.read" }]), switched)).resolves.toEqual([
-      "security.anomalies.read",
-    ]);
+    await expect(
+      hydrateSessionNamedPermissions(selectDb([{ permission: "security.anomalies.read" }]), switched)
+    ).resolves.toEqual(["security.anomalies.read"]);
     expect(switched.securityPermissionsCompanyId).toBe(4);
   });
 

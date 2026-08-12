@@ -123,7 +123,9 @@ vi.mock("@/pages/supplierprofitcheck/utils", () => ({
   }),
 }));
 vi.mock("@/pages/supplierprofitcheck/components/ProfitCell", () => ({
-  ProfitCell: ({ value, pct }: any) => <span data-testid="profit-cell">{value == null ? "none" : `${value}:${pct}`}</span>,
+  ProfitCell: ({ value, pct }: any) => (
+    <span data-testid="profit-cell">{value == null ? "none" : `${value}:${pct}`}</span>
+  ),
 }));
 vi.mock("@/pages/supplierprofitcheck/components/StatusBadge", () => ({
   StatusBadge: ({ status }: any) => <span data-testid="status-badge">{status}</span>,
@@ -172,7 +174,7 @@ describe("supplier profit check page behavior", () => {
     });
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => ({ ok: false, json: async () => ({}), blob: async () => new Blob() })),
+      vi.fn(async () => ({ ok: false, json: async () => ({}), blob: async () => new Blob() }))
     );
   });
 
@@ -237,10 +239,10 @@ describe("supplier profit check page behavior", () => {
             supplierPrice: 12,
           }),
         ],
-      }),
+      })
     );
     expect(harness.toast).toHaveBeenCalledWith(
-      expect.objectContaining({ title: "Proforma saved", description: "Reference: PF-NEW" }),
+      expect.objectContaining({ title: "Proforma saved", description: "Reference: PF-NEW" })
     );
   });
 });

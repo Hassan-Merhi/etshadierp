@@ -47,7 +47,14 @@ const journalData = {
   ],
   summary: [
     { companyId: 4, companyName: "GC Lshi", voucherCount: 2, currency: "USD", totalDebits: "250", totalCredits: "250" },
-    { companyId: 5, companyName: "GC #2", voucherCount: 1, currency: "CFA", totalDebits: "12000", totalCredits: "12000" },
+    {
+      companyId: 5,
+      companyName: "GC #2",
+      voucherCount: 1,
+      currency: "CFA",
+      totalDebits: "12000",
+      totalCredits: "12000",
+    },
   ],
   total: 2,
   totalPages: 1,
@@ -60,8 +67,10 @@ vi.mock("@tanstack/react-query", () => ({
       return { data: journalData, isLoading: false, isFetching: false, refetch: harness.refetch };
     }
     if (queryKey?.[0] === "/api/global/transactions/voucher-types") return { data: ["Payment", "Receipt"] };
-    if (queryKey?.[0] === "/api/global/transactions" && queryKey?.[2] === "detail") return { data: null, isLoading: false };
-    if (queryKey?.[0] === "/api/global/transactions" && queryKey?.[2] === "view-entries") return { data: [], isLoading: false };
+    if (queryKey?.[0] === "/api/global/transactions" && queryKey?.[2] === "detail")
+      return { data: null, isLoading: false };
+    if (queryKey?.[0] === "/api/global/transactions" && queryKey?.[2] === "view-entries")
+      return { data: [], isLoading: false };
     return { data: undefined, isLoading: false, isFetching: false, refetch: harness.refetch };
   },
 }));

@@ -50,7 +50,12 @@ vi.mock("@tanstack/react-query", () => ({
       return { data: { items: [group], total: 1, totalBales: 3, totalWeight: 75 }, isLoading: false };
     }
     if (root === "/api/factory/workers") {
-      return { data: [{ id: 1, fullName: "Alice", active: true }, { id: 2, fullName: "Bob", active: true }] };
+      return {
+        data: [
+          { id: 1, fullName: "Alice", active: true },
+          { id: 2, fullName: "Bob", active: true },
+        ],
+      };
     }
     if (root === "/api/factory/bale-products") return { data: [{ id: 7, name: "Shirts" }] };
     if (root === "/api/locations") return { data: [{ id: 11, name: "Main" }] };
@@ -182,10 +187,10 @@ describe("stock entry history page behavior", () => {
     await waitFor(() =>
       expect(harness.apiRequest).toHaveBeenCalledWith("POST", "/api/factory/bales/send-worker-pdf-whatsapp", {
         date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
-      }),
+      })
     );
     expect(harness.toast).toHaveBeenCalledWith(
-      expect.objectContaining({ title: "Sent", description: "Worker PDF sent to production WhatsApp group." }),
+      expect.objectContaining({ title: "Sent", description: "Worker PDF sent to production WhatsApp group." })
     );
   });
 });

@@ -31,25 +31,19 @@ describe("currency amount domain behavior", () => {
 
   it("converts transaction and base amounts for every supported convention", () => {
     expect(convertTransactionToBase("5000", "CFA", "USD", "2500", RateConvention.TRANSACTION_PER_BASE)).toBe(
-      "2.000000",
+      "2.000000"
     );
     expect(convertBaseToTransaction("2", "CFA", "USD", "2500", RateConvention.TRANSACTION_PER_BASE)).toBe(
-      "5000.000000",
+      "5000.000000"
     );
     expect(convertTransactionToBase("12.5", "EUR", "USD", "1.2", RateConvention.BASE_PER_TRANSACTION)).toBe(
-      "15.000000",
+      "15.000000"
     );
-    expect(convertBaseToTransaction("15", "EUR", "USD", "1.2", RateConvention.BASE_PER_TRANSACTION)).toBe(
-      "12.500000",
-    );
+    expect(convertBaseToTransaction("15", "EUR", "USD", "1.2", RateConvention.BASE_PER_TRANSACTION)).toBe("12.500000");
     expect(convertTransactionToBase("9.25", "USD", "USD", null, RateConvention.IDENTITY)).toBe("9.250000");
     expect(convertBaseToTransaction("9.25", "USD", "USD", null, RateConvention.IDENTITY)).toBe("9.250000");
-    expect(() => convertTransactionToBase("1", "CFA", "USD", "2500", "BAD" as any)).toThrow(
-      "Unknown rate convention",
-    );
-    expect(() => convertBaseToTransaction("1", "CFA", "USD", "2500", "BAD" as any)).toThrow(
-      "Unknown rate convention",
-    );
+    expect(() => convertTransactionToBase("1", "CFA", "USD", "2500", "BAD" as any)).toThrow("Unknown rate convention");
+    expect(() => convertBaseToTransaction("1", "CFA", "USD", "2500", "BAD" as any)).toThrow("Unknown rate convention");
   });
 
   it("normalizes debit and credit entries while preserving historical base amounts", () => {
@@ -99,19 +93,24 @@ describe("currency amount domain behavior", () => {
       historicalRate: "2500",
     };
     expect(() =>
-      normalizeVoucherEntryAmounts({ ...base, transactionDebitAmount: "-1", transactionCreditAmount: "0" }),
+      normalizeVoucherEntryAmounts({ ...base, transactionDebitAmount: "-1", transactionCreditAmount: "0" })
     ).toThrow("transactionDebitAmount must be ≥ 0");
     expect(() =>
-      normalizeVoucherEntryAmounts({ ...base, transactionDebitAmount: "0", transactionCreditAmount: "-1" }),
+      normalizeVoucherEntryAmounts({ ...base, transactionDebitAmount: "0", transactionCreditAmount: "-1" })
     ).toThrow("transactionCreditAmount must be ≥ 0");
     expect(() =>
-      normalizeVoucherEntryAmounts({ ...base, transactionDebitAmount: "1", transactionCreditAmount: "1" }),
+      normalizeVoucherEntryAmounts({ ...base, transactionDebitAmount: "1", transactionCreditAmount: "1" })
     ).toThrow("cannot have both debit");
     expect(() =>
-      normalizeVoucherEntryAmounts({ ...base, transactionDebitAmount: "0", transactionCreditAmount: "0" }),
+      normalizeVoucherEntryAmounts({ ...base, transactionDebitAmount: "0", transactionCreditAmount: "0" })
     ).toThrow("must have either debit or credit");
     expect(() =>
-      normalizeVoucherEntryAmounts({ ...base, transactionDebitAmount: "1", transactionCreditAmount: "0", historicalRate: null }),
+      normalizeVoucherEntryAmounts({
+        ...base,
+        transactionDebitAmount: "1",
+        transactionCreditAmount: "0",
+        historicalRate: null,
+      })
     ).toThrow("valid positive rate is required");
   });
 
@@ -124,7 +123,7 @@ describe("currency amount domain behavior", () => {
         storedDebitAmount: "4",
         storedCreditAmount: "0",
         voucherExchangeRate: null,
-      }),
+      })
     ).toBeNull();
 
     expect(
@@ -135,7 +134,7 @@ describe("currency amount domain behavior", () => {
         storedDebitAmount: "4",
         storedCreditAmount: "0",
         voucherExchangeRate: null,
-      }),
+      })
     ).toMatchObject({ transactionCurrency: "USD", transactionDebitAmount: "4.000000", baseDebitAmount: "4.000000" });
 
     expect(
@@ -146,7 +145,7 @@ describe("currency amount domain behavior", () => {
         storedDebitAmount: "2",
         storedCreditAmount: "0",
         voucherExchangeRate: "2500",
-      }),
+      })
     ).toMatchObject({
       transactionCurrency: "CFA",
       transactionDebitAmount: "5000.000000",
@@ -166,7 +165,7 @@ describe("currency amount domain behavior", () => {
           storedDebitAmount: "1",
           storedCreditAmount: "0",
           ...params,
-        }),
+        })
       ).toBeNull();
     }
   });
@@ -179,7 +178,7 @@ describe("currency amount domain behavior", () => {
         transactionCurrency: "CFA",
         voucherCurrency: "CFA",
         baseCurrency: "USD",
-      }),
+      })
     ).toEqual({ safe: true, classification: "migrated" });
     expect(
       classifyVoucherEntryFallback({
@@ -188,7 +187,7 @@ describe("currency amount domain behavior", () => {
         transactionCurrency: null,
         voucherCurrency: "USD",
         baseCurrency: "USD",
-      }),
+      })
     ).toEqual({ safe: true, classification: "identity-usd" });
     expect(
       classifyVoucherEntryFallback({
@@ -197,7 +196,7 @@ describe("currency amount domain behavior", () => {
         transactionCurrency: "CFA",
         voucherCurrency: null,
         baseCurrency: "USD",
-      }),
+      })
     ).toMatchObject({ safe: false, classification: "unresolved-legacy" });
     expect(
       classifyVoucherEntryFallback({
@@ -206,8 +205,12 @@ describe("currency amount domain behavior", () => {
         transactionCurrency: "BAD",
         voucherCurrency: null,
         baseCurrency: "USD",
-      }),
-    ).toMatchObject({ safe: false, classification: "unresolved-legacy", reason: expect.stringContaining("Cannot determine") });
+      })
+    ).toMatchObject({
+      safe: false,
+      classification: "unresolved-legacy",
+      reason: expect.stringContaining("Cannot determine"),
+    });
     expect(
       classifyVoucherEntryFallback({
         baseDebitAmount: null,
@@ -215,8 +218,12 @@ describe("currency amount domain behavior", () => {
         transactionCurrency: "USD",
         voucherCurrency: null,
         baseCurrency: "BAD",
-      }),
-    ).toMatchObject({ safe: false, classification: "unresolved-legacy", reason: expect.stringContaining("Unknown base currency") });
+      })
+    ).toMatchObject({
+      safe: false,
+      classification: "unresolved-legacy",
+      reason: expect.stringContaining("Unknown base currency"),
+    });
   });
 
   it("bridges ERP rates to daybook USD-per-unit rates", () => {

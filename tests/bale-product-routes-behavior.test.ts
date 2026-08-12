@@ -57,7 +57,10 @@ type Handler = (req: any, res: any) => unknown;
 
 function buildRoutes() {
   const routes = new Map<string, Handler>();
-  const register = (method: string) => (path: string, ...handlers: any[]) => routes.set(`${method} ${path}`, handlers.at(-1));
+  const register =
+    (method: string) =>
+    (path: string, ...handlers: any[]) =>
+      routes.set(`${method} ${path}`, handlers.at(-1));
   const app: any = {
     get: register("GET"),
     post: register("POST"),
@@ -120,7 +123,9 @@ describe("bale product catalog route behavior", () => {
 
   it("creates pending barcodes with the session company and imports mixed barcode shapes", async () => {
     harness.storage.createPendingBarcode.mockImplementation(async (value) => ({ id: 2, ...value }));
-    harness.storage.bulkCreatePendingBarcodes.mockImplementation(async (values) => values.map((value: any, i: number) => ({ id: i + 1, ...value })));
+    harness.storage.bulkCreatePendingBarcodes.mockImplementation(async (values) =>
+      values.map((value: any, i: number) => ({ id: i + 1, ...value }))
+    );
 
     const created = responseHarness();
     await routes.get("POST /api/pending-barcodes")!(request({ body: { barcode: "HD002", category: "A" } }), created);
@@ -130,7 +135,7 @@ describe("bale product catalog route behavior", () => {
     const imported = responseHarness();
     await routes.get("POST /api/pending-barcodes/import")!(
       request({ body: { barcodes: [{ code: "HD003", grade: "B" }, "HD004"] } }),
-      imported,
+      imported
     );
     expect(harness.storage.bulkCreatePendingBarcodes).toHaveBeenCalledWith([
       { companyId: 4, barcode: "HD003", category: null, grade: "B", origin: null, printed: false, used: false },
@@ -141,7 +146,10 @@ describe("bale product catalog route behavior", () => {
 
   it("validates barcode mutation payload shapes and ids", async () => {
     const invalidImport = responseHarness();
-    await routes.get("POST /api/pending-barcodes/import")!(request({ body: { barcodes: "not-an-array" } }), invalidImport);
+    await routes.get("POST /api/pending-barcodes/import")!(
+      request({ body: { barcodes: "not-an-array" } }),
+      invalidImport
+    );
     expect(invalidImport.statusCode).toBe(400);
 
     const invalidPatch = responseHarness();
@@ -154,7 +162,9 @@ describe("bale product catalog route behavior", () => {
   });
 
   it("creates categories once and rejects duplicate names", async () => {
-    harness.storage.getBaleProductCategoryByName.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 10, name: "Tops" });
+    harness.storage.getBaleProductCategoryByName
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 10, name: "Tops" });
     harness.storage.createBaleProductCategory.mockResolvedValue({ id: 10, companyId: 4, name: "Tops" });
 
     const created = responseHarness();
@@ -169,11 +179,16 @@ describe("bale product catalog route behavior", () => {
   });
 
   it("updates and deletes only existing category ids", async () => {
-    harness.storage.getBaleProductCategoryById.mockResolvedValueOnce({ id: 10, name: "Tops" }).mockResolvedValueOnce(null);
+    harness.storage.getBaleProductCategoryById
+      .mockResolvedValueOnce({ id: 10, name: "Tops" })
+      .mockResolvedValueOnce(null);
     harness.storage.updateBaleProductCategory.mockResolvedValue({ id: 10, name: "Premium Tops" });
 
     const updated = responseHarness();
-    await routes.get("PATCH /api/bale-product-categories/:id")!(request({ params: { id: "10" }, body: { name: "Premium Tops" } }), updated);
+    await routes.get("PATCH /api/bale-product-categories/:id")!(
+      request({ params: { id: "10" }, body: { name: "Premium Tops" } }),
+      updated
+    );
     expect(updated.body).toMatchObject({ name: "Premium Tops" });
 
     const missing = responseHarness();
@@ -183,16 +198,23 @@ describe("bale product catalog route behavior", () => {
   });
 
   it("derives an HMD article code from itemNumber and prevents duplicate article codes", async () => {
-    harness.storage.getBaleProductByArticleCode.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 1, articleCode: "HMD07000" });
+    harness.storage.getBaleProductByArticleCode
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 1, articleCode: "HMD07000" });
     harness.storage.createBaleProduct.mockImplementation(async (value) => ({ id: 1, ...value }));
 
     const created = responseHarness();
     await routes.get("POST /api/bale-products")!(request({ body: { itemNumber: 7, name: "Shirts" } }), created);
-    expect(harness.productParse).toHaveBeenCalledWith(expect.objectContaining({ companyId: 4, articleCode: "HMD07000", code: "HMD07000" }));
+    expect(harness.productParse).toHaveBeenCalledWith(
+      expect.objectContaining({ companyId: 4, articleCode: "HMD07000", code: "HMD07000" })
+    );
     expect(created.body).toMatchObject({ id: 1, articleCode: "HMD07000" });
 
     const duplicate = responseHarness();
-    await routes.get("POST /api/bale-products")!(request({ body: { articleCode: "HMD07000", name: "Duplicate" } }), duplicate);
+    await routes.get("POST /api/bale-products")!(
+      request({ body: { articleCode: "HMD07000", name: "Duplicate" } }),
+      duplicate
+    );
     expect(duplicate.statusCode).toBe(409);
   });
 
@@ -200,7 +222,10 @@ describe("bale product catalog route behavior", () => {
     harness.storage.getBaleProductById.mockResolvedValue({ id: 7, companyId: 99, name: "Other company" });
 
     const patch = responseHarness();
-    await routes.get("PATCH /api/bale-products/:id")!(request({ params: { id: "7" }, body: { name: "Changed" } }), patch);
+    await routes.get("PATCH /api/bale-products/:id")!(
+      request({ params: { id: "7" }, body: { name: "Changed" } }),
+      patch
+    );
     expect(patch.statusCode).toBe(403);
     expect(harness.storage.updateBaleProduct).not.toHaveBeenCalled();
 
@@ -215,7 +240,10 @@ describe("bale product catalog route behavior", () => {
     harness.storage.updateBaleProduct.mockResolvedValue({ id: 7, companyId: 4, name: "Premium Shirts" });
 
     const patch = responseHarness();
-    await routes.get("PATCH /api/bale-products/:id")!(request({ params: { id: "7" }, body: { name: "Premium Shirts" } }), patch);
+    await routes.get("PATCH /api/bale-products/:id")!(
+      request({ params: { id: "7" }, body: { name: "Premium Shirts" } }),
+      patch
+    );
     expect(harness.productPartialParse).toHaveBeenCalledWith({ name: "Premium Shirts" });
     expect(patch.body).toMatchObject({ name: "Premium Shirts" });
 

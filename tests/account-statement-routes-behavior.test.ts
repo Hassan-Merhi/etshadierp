@@ -31,7 +31,9 @@ const harness = vi.hoisted(() => {
 vi.mock("../server/db", () => ({ db: harness.db }));
 vi.mock("../server/storage", () => ({ storage: { getCompanyById: harness.getCompanyById } }));
 vi.mock("../server/auth", () => ({ requireAuth: (_req: any, _res: any, next: any) => next() }));
-vi.mock("../server/routes/helpers/supplierBalanceHelpers", () => ({ isParentCompanyContext: harness.isParentCompanyContext }));
+vi.mock("../server/routes/helpers/supplierBalanceHelpers", () => ({
+  isParentCompanyContext: harness.isParentCompanyContext,
+}));
 vi.mock("../server/lib/accountStatementPdfGenerator", () => ({
   generateAccountStatementPdf: harness.generateAccountStatementPdf,
 }));
@@ -72,9 +74,19 @@ vi.mock("@shared/schema", () => ({
     openingBalance: "customers.ob",
     openingBalanceSide: "customers.side",
   },
-  employees: { id: "employees.id", firstName: "employees.firstName", lastName: "employees.lastName", openingBalance: "employees.ob" },
+  employees: {
+    id: "employees.id",
+    firstName: "employees.firstName",
+    lastName: "employees.lastName",
+    openingBalance: "employees.ob",
+  },
   fixedAssets: { id: "assets.id", name: "assets.name", openingBalance: "assets.ob" },
-  ledgerAccounts: { id: "ledger.id", name: "ledger.name", openingBalance: "ledger.ob", openingBalanceSide: "ledger.side" },
+  ledgerAccounts: {
+    id: "ledger.id",
+    name: "ledger.name",
+    openingBalance: "ledger.ob",
+    openingBalanceSide: "ledger.side",
+  },
   suppliers: { id: "suppliers.id", legalName: "suppliers.legalName", openingBalance: "suppliers.ob" },
   voucherEntries: {
     voucherId: "entries.voucherId",
@@ -107,7 +119,10 @@ type Handler = (req: any, res: any) => unknown;
 
 function buildRoutes() {
   const routes = new Map<string, Handler>();
-  const register = (method: string) => (path: string, ...handlers: any[]) => routes.set(`${method} ${path}`, handlers.at(-1));
+  const register =
+    (method: string) =>
+    (path: string, ...handlers: any[]) =>
+      routes.set(`${method} ${path}`, handlers.at(-1));
   const app: any = { get: register("GET"), post: register("POST") };
   registerAccountStatementRoutes(app);
   return routes;
@@ -156,7 +171,7 @@ describe("account statement route behavior", () => {
     const res = responseHarness();
     await routes.get("GET /api/accounts/:type/:id/deleted-vouchers")!(
       request({ params: { type: "ledger", id: "12" } }),
-      res,
+      res
     );
     expect(res.body).toEqual([expect.objectContaining({ id: 90, voucherNumber: "PAY-90" })]);
   });
@@ -165,7 +180,7 @@ describe("account statement route behavior", () => {
     const res = responseHarness();
     await routes.get("GET /api/accounts/:type/:id/deleted-vouchers")!(
       request({ params: { type: "mystery", id: "12" } }),
-      res,
+      res
     );
     expect(res.body).toEqual([]);
     expect(harness.db.selectDistinct).not.toHaveBeenCalled();
@@ -176,7 +191,7 @@ describe("account statement route behavior", () => {
     const parent = responseHarness();
     await routes.get("GET /api/accounts/:type/:id/pre-period-balance")!(
       request({ params: { type: "supplier", id: "8" }, query: { endDate: "2026-08-01" } }),
-      parent,
+      parent
     );
     expect(parent.body).toEqual({ balance: 125 });
     expect(harness.isParentCompanyContext).toHaveBeenCalledWith(4);
@@ -186,7 +201,7 @@ describe("account statement route behavior", () => {
     const child = responseHarness();
     await routes.get("GET /api/accounts/:type/:id/pre-period-balance")!(
       request({ params: { type: "supplier", id: "8" }, query: { endDate: "2026-08-01" } }),
-      child,
+      child
     );
     expect(child.body).toEqual({ balance: 25 });
   });
@@ -196,7 +211,7 @@ describe("account statement route behavior", () => {
     const res = responseHarness();
     await routes.get("GET /api/accounts/:type/:id/pre-period-balance")!(
       request({ params: { type: "bank", id: "3" }, query: { endDate: "2026-08-01" } }),
-      res,
+      res
     );
     expect(res.body).toEqual({ balance: -30 });
   });
@@ -209,12 +224,12 @@ describe("account statement route behavior", () => {
       [{ total: "120" }],
       [{ net: "-15" }],
       [{ net: "30" }],
-      [{ net: "5" }],
+      [{ net: "5" }]
     );
     const res = responseHarness();
     await routes.get("GET /api/accounts/:type/:id/pre-period-balance")!(
       request({ params: { type: "ledger", id: "12" }, query: { endDate: "2026-08-01" } }),
-      res,
+      res
     );
     expect(res.body).toEqual({ balance: 150 });
   });
@@ -223,7 +238,7 @@ describe("account statement route behavior", () => {
     const unknown = responseHarness();
     await routes.get("GET /api/accounts/:type/:id/pre-period-balance")!(
       request({ params: { type: "mystery", id: "4" } }),
-      unknown,
+      unknown
     );
     expect(unknown.statusCode).toBe(400);
     expect(unknown.body).toEqual({ message: "Unknown account type" });
@@ -231,7 +246,7 @@ describe("account statement route behavior", () => {
     const invalid = responseHarness();
     await routes.get("GET /api/accounts/:type/:id/pre-period-balance")!(
       request({ params: { type: "ledger", id: "bad" } }),
-      invalid,
+      invalid
     );
     expect(invalid.statusCode).toBe(400);
   });
@@ -244,7 +259,7 @@ describe("account statement route behavior", () => {
         params: { type: "supplier", id: "8" },
         query: { startDate: "2026-08-01", endDate: "2026-08-12", lang: "fr" },
       }),
-      res,
+      res
     );
 
     expect(harness.generateAccountStatementPdf).toHaveBeenCalledWith({

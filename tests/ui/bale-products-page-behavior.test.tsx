@@ -96,7 +96,9 @@ vi.mock("@shared/factoryProductSearch", () => ({
   productMatchesSearch: (product: any, query: string) => {
     const q = query.trim().toLowerCase();
     if (!q) return true;
-    return [product.name, product.articleCode, product.code].filter(Boolean).some((value) => String(value).toLowerCase().includes(q));
+    return [product.name, product.articleCode, product.code]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(q));
   },
 }));
 vi.mock("@/pages/baleproducts/utils", () => ({ hmdLogoPath: "/logo.png" }));
@@ -104,7 +106,8 @@ vi.mock("@/pages/baleproducts/components/EmptyState", () => ({
   EmptyState: ({ onCreateClick }: any) => <button onClick={onCreateClick}>Create first product</button>,
 }));
 vi.mock("@/components/CreateBaleProductDialog", () => ({
-  CreateBaleProductDialog: ({ open }: any) => (open ? <div data-testid="create-product-dialog">Create product dialog</div> : null),
+  CreateBaleProductDialog: ({ open }: any) =>
+    open ? <div data-testid="create-product-dialog">Create product dialog</div> : null,
 }));
 vi.mock("@/components/AdminAuthDialog", () => ({
   AdminAuthDialog: ({ open }: any) => (open ? <div data-testid="admin-auth-dialog">Admin auth</div> : null),
@@ -138,12 +141,7 @@ vi.mock("@/components/ui/dropdown-menu", () => ({
 }));
 vi.mock("@/components/ui/checkbox", () => ({
   Checkbox: ({ checked, onCheckedChange, ...props }: any) => (
-    <input
-      type="checkbox"
-      checked={Boolean(checked)}
-      onChange={() => onCheckedChange?.(!checked)}
-      {...props}
-    />
+    <input type="checkbox" checked={Boolean(checked)} onChange={() => onCheckedChange?.(!checked)} {...props} />
   ),
 }));
 vi.mock("@/components/ui/dialog", () => ({
@@ -166,7 +164,10 @@ describe("bale products page behavior", () => {
         return {};
       },
     }));
-    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({}) })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: true, json: async () => ({}) }))
+    );
   });
 
   it("shows active products, hides inactive products, and filters by name or code", () => {
@@ -195,11 +196,11 @@ describe("bale products page behavior", () => {
       expect(harness.apiRequest).toHaveBeenCalledWith("POST", "/api/factory/bale-products/bulk-toggle-active", {
         ids: [1],
         active: false,
-      }),
+      })
     );
     expect(harness.invalidateQueries).toHaveBeenCalledWith({ queryKey: ["/api/factory/bale-products"] });
     expect(harness.toast).toHaveBeenCalledWith(
-      expect.objectContaining({ title: "Products hidden", description: "1 product(s) updated." }),
+      expect.objectContaining({ title: "Products hidden", description: "1 product(s) updated." })
     );
   });
 
@@ -216,7 +217,7 @@ describe("bale products page behavior", () => {
     fireEvent.change(screen.getByTestId("input-new-category"), { target: { value: "Accessories" } });
     fireEvent.click(screen.getByTestId("button-add-category"));
     await waitFor(() =>
-      expect(harness.apiRequest).toHaveBeenCalledWith("POST", "/api/factory/categories", { name: "Accessories" }),
+      expect(harness.apiRequest).toHaveBeenCalledWith("POST", "/api/factory/categories", { name: "Accessories" })
     );
     expect(harness.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Category created" }));
   });
@@ -245,11 +246,11 @@ describe("bale products page behavior", () => {
           productionPrice: "100",
           sellingPrice: "125",
           labelDesignColor: null,
-        }),
-      ),
+        })
+      )
     );
     expect(harness.toast).toHaveBeenCalledWith(
-      expect.objectContaining({ title: "Product updated", description: "4 bale(s) also updated" }),
+      expect.objectContaining({ title: "Product updated", description: "4 bale(s) also updated" })
     );
   });
 
@@ -263,10 +264,10 @@ describe("bale products page behavior", () => {
       expect(harness.apiRequest).toHaveBeenCalledWith("POST", "/api/factory/bale-products/bulk-toggle-active", {
         ids: [3],
         active: true,
-      }),
+      })
     );
     expect(harness.toast).toHaveBeenCalledWith(
-      expect.objectContaining({ title: "Products unhidden", description: "1 product(s) updated." }),
+      expect.objectContaining({ title: "Products unhidden", description: "1 product(s) updated." })
     );
   });
 });

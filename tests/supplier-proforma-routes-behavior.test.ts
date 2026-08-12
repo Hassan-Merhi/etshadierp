@@ -70,7 +70,7 @@ const harness = vi.hoisted(() => {
             return [];
           }),
         })),
-      }),
+      })
     ),
   };
 
@@ -129,7 +129,10 @@ type Handler = (req: any, res: any) => unknown;
 
 function routesHarness() {
   const routes = new Map<string, Handler>();
-  const register = (method: string) => (path: string, ...handlers: any[]) => routes.set(`${method} ${path}`, handlers.at(-1));
+  const register =
+    (method: string) =>
+    (path: string, ...handlers: any[]) =>
+      routes.set(`${method} ${path}`, handlers.at(-1));
   const app: any = {
     get: register("GET"),
     post: register("POST"),
@@ -184,7 +187,9 @@ describe("supplier proforma route behavior", () => {
     harness.updatedValues.splice(0);
     harness.deletedTables.splice(0);
     harness.buildAliasMap.mockResolvedValue({ map: new Map([["ALT-1", "MAIN-1"]]) });
-    harness.resolveBarcode.mockImplementation((barcode: string, map: Map<string, string>) => map.get(barcode) ?? barcode);
+    harness.resolveBarcode.mockImplementation(
+      (barcode: string, map: Map<string, string>) => map.get(barcode) ?? barcode
+    );
   });
 
   it("lists supplier proformas in the selected company scope", async () => {
@@ -196,7 +201,10 @@ describe("supplier proforma route behavior", () => {
 
   it("rejects invalid ids and missing company scope before querying", async () => {
     const missingCompany = resHarness();
-    await routes.get("GET /api/suppliers/:supplierId/proformas")!(req({ session: {}, params: { supplierId: "2" } }), missingCompany);
+    await routes.get("GET /api/suppliers/:supplierId/proformas")!(
+      req({ session: {}, params: { supplierId: "2" } }),
+      missingCompany
+    );
     expect(missingCompany.statusCode).toBe(400);
 
     const invalid = resHarness();
@@ -208,12 +216,12 @@ describe("supplier proforma route behavior", () => {
   it("loads a scoped proforma together with its lines", async () => {
     harness.selectResults.push(
       [{ id: 10, companyId: 4, supplierId: 2, reference: "PF-10" }],
-      [{ id: 101, proformaId: 10, barcode: "MAIN-1", qty: 3 }],
+      [{ id: 101, proformaId: 10, barcode: "MAIN-1", qty: 3 }]
     );
     const res = resHarness();
     await routes.get("GET /api/suppliers/:supplierId/proformas/:proformaId")!(
       req({ params: { supplierId: "2", proformaId: "10" } }),
-      res,
+      res
     );
     expect(res.body).toMatchObject({ id: 10, lines: [{ id: 101, proformaId: 10, barcode: "MAIN-1", qty: 3 }] });
   });
@@ -232,12 +240,18 @@ describe("supplier proforma route behavior", () => {
         body: {
           reference: "PF-NEW",
           lines: [
-            { barcode: " ALT-1 ", itemName: " Shirts ", qty: "3", weightPerBale: "45.500 kg", pricePerBale: "$1,234.50" },
+            {
+              barcode: " ALT-1 ",
+              itemName: " Shirts ",
+              qty: "3",
+              weightPerBale: "45.500 kg",
+              pricePerBale: "$1,234.50",
+            },
             { barcode: "MAIN-2", itemName: "Pants", qty: "1", weightPerBale: "N/A", pricePerBale: "1e9" },
           ],
         },
       }),
-      res,
+      res
     );
 
     expect(harness.buildAliasMap).toHaveBeenCalledWith(4);
@@ -245,13 +259,20 @@ describe("supplier proforma route behavior", () => {
       {
         table: expect.anything(),
         values: [
-          { proformaId: 10, barcode: "MAIN-1", itemName: "Shirts", qty: 3, weightPerBale: "45.5", pricePerBale: "1234.5" },
+          {
+            proformaId: 10,
+            barcode: "MAIN-1",
+            itemName: "Shirts",
+            qty: 3,
+            weightPerBale: "45.5",
+            pricePerBale: "1234.5",
+          },
           { proformaId: 10, barcode: "MAIN-2", itemName: "Pants", qty: 1, weightPerBale: "0", pricePerBale: "0" },
         ],
       },
     ]);
     expect(harness.logAudit).toHaveBeenCalledWith(
-      expect.objectContaining({ companyId: 4, action: "create", tableName: "supplier_proformas", recordId: 10 }),
+      expect.objectContaining({ companyId: 4, action: "create", tableName: "supplier_proformas", recordId: 10 })
     );
     expect(res.body).toMatchObject({ id: 10, reference: "PF-NEW", lines: expect.any(Array) });
   });
@@ -261,7 +282,7 @@ describe("supplier proforma route behavior", () => {
     const res = resHarness();
     await routes.get("POST /api/suppliers/:supplierId/proformas/:proformaId/lines")!(
       req({ params: { supplierId: "2", proformaId: "10" }, body: { barcode: "MAIN-1", qty: 2 } }),
-      res,
+      res
     );
     expect(res.statusCode).toBe(403);
     expect(res.body).toEqual({ message: "Access denied" });
@@ -277,11 +298,11 @@ describe("supplier proforma route behavior", () => {
         params: { supplierId: "2", proformaId: "10" },
         body: { barcode: "MAIN-1", itemName: "Shirts", qty: "4", weightPerBale: "45", pricePerBale: "12" },
       }),
-      res,
+      res
     );
     expect(res.body).toMatchObject({ id: 105, qty: 4 });
     expect(harness.updatedValues).toContainEqual(
-      expect.objectContaining({ values: expect.objectContaining({ updatedAt: expect.any(Date) }) }),
+      expect.objectContaining({ values: expect.objectContaining({ updatedAt: expect.any(Date) }) })
     );
   });
 
@@ -291,7 +312,7 @@ describe("supplier proforma route behavior", () => {
     const res = resHarness();
     await routes.get("PATCH /api/supplier-proforma-lines/:lineId")!(
       req({ params: { lineId: "105" }, body: { itemName: "Premium Shirts", qty: "6" } }),
-      res,
+      res
     );
     expect(harness.updatedValues[0]).toMatchObject({ values: { itemName: "Premium Shirts", qty: 6 } });
     expect(res.body).toMatchObject({ id: 105, qty: 6 });
@@ -301,11 +322,11 @@ describe("supplier proforma route behavior", () => {
     const res = resHarness();
     await routes.get("DELETE /api/suppliers/:supplierId/proformas/:proformaId")!(
       req({ params: { supplierId: "2", proformaId: "10" } }),
-      res,
+      res
     );
     expect(harness.deletedTables).toHaveLength(2);
     expect(harness.logAudit).toHaveBeenCalledWith(
-      expect.objectContaining({ companyId: 4, action: "delete", tableName: "supplier_proformas", recordId: 10 }),
+      expect.objectContaining({ companyId: 4, action: "delete", tableName: "supplier_proformas", recordId: 10 })
     );
     expect(res.body).toEqual({ success: true });
   });

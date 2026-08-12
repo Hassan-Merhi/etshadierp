@@ -28,7 +28,7 @@ describe("financial close service behavior", () => {
         reason: "audit",
         payload: { z: 1, nested: { b: 2, a: 1 }, a: [3, 2, 1] },
       },
-      "previous",
+      "previous"
     );
     const second = buildFinancialAuditHash(
       {
@@ -41,7 +41,7 @@ describe("financial close service behavior", () => {
         reason: "audit",
         payload: { a: [3, 2, 1], nested: { a: 1, b: 2 }, z: 1 },
       },
-      "previous",
+      "previous"
     );
 
     expect(first).toBe(second);
@@ -97,7 +97,7 @@ describe("financial close service behavior", () => {
         periodEnd: "2026-07-31",
         actorUserId: 9,
         reason: "   ",
-      }),
+      })
     ).rejects.toThrow("CLOSE_REASON_REQUIRED");
     expect(tx.query).not.toHaveBeenCalled();
   });
@@ -117,7 +117,14 @@ describe("financial close service behavior", () => {
     expect(tx.query.mock.calls[0][1]).toEqual([2, "2026-07-01", "2026-07-31", 11, "month end"]);
     expect(tx.query.mock.calls[1][1]).toEqual([2]);
     expect(tx.query.mock.calls[2][1]).toEqual(
-      expect.arrayContaining([2, 11, "FINANCIAL_PERIOD_CLOSED", "financial-period", "2026-07-01:2026-07-31", "month end"]),
+      expect.arrayContaining([
+        2,
+        11,
+        "FINANCIAL_PERIOD_CLOSED",
+        "financial-period",
+        "2026-07-01:2026-07-31",
+        "month end",
+      ])
     );
   });
 
@@ -130,7 +137,7 @@ describe("financial close service behavior", () => {
         periodEnd: "2026-07-31",
         actorUserId: 11,
         reason: "",
-      }),
+      })
     ).rejects.toThrow("REOPEN_REASON_REQUIRED");
 
     const missingTx = txHarness([{ rows: [] }]);
@@ -141,7 +148,7 @@ describe("financial close service behavior", () => {
         periodEnd: "2026-07-31",
         actorUserId: 11,
         reason: "correction",
-      }),
+      })
     ).rejects.toThrow("CLOSED_PERIOD_NOT_FOUND");
   });
 
@@ -170,7 +177,7 @@ describe("financial close service behavior", () => {
         expect.any(String),
         "previous",
         expect.stringMatching(/^[a-f0-9]{64}$/),
-      ]),
+      ])
     );
   });
 });

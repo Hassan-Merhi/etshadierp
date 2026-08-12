@@ -32,10 +32,7 @@ vi.mock("../server/services/export-excel/summary-sheet", () => ({
   },
 }));
 
-import {
-  buildCompanyWorkbook,
-  streamCompanyWorkbookDirect,
-} from "../server/services/export-excel/workbook";
+import { buildCompanyWorkbook, streamCompanyWorkbookDirect } from "../server/services/export-excel/workbook";
 
 describe("full company workbook export behavior", () => {
   beforeEach(() => {
@@ -62,7 +59,7 @@ describe("full company workbook export behavior", () => {
           if (property in target) return target[property as string];
           return [];
         },
-      },
+      }
     );
     const write = vi.fn();
 
@@ -79,7 +76,7 @@ describe("full company workbook export behavior", () => {
         "Supplier Balances",
         "Location Stock Detail",
         "Audit Log",
-      ]),
+      ])
     );
     expect(write).toHaveBeenCalledTimes(1);
     const buffer = write.mock.calls[0][0] as Buffer;
@@ -102,7 +99,7 @@ describe("full company workbook export behavior", () => {
         "Factory Bales",
         "Customer Order Detail",
         "Employee Txn Detail",
-      ]),
+      ])
     );
 
     const sql = harness.poolQuery.mock.calls.map(([query]) => String(query));
@@ -112,11 +109,11 @@ describe("full company workbook export behavior", () => {
         (query) =>
           query.includes("FROM vouchers") &&
           query.includes("voucher_date >= '2026-08-01'") &&
-          query.includes("voucher_date <= '2026-08-12'"),
-      ),
+          query.includes("voucher_date <= '2026-08-12'")
+      )
     ).toBe(true);
     expect(harness.loggerWarn).toHaveBeenCalledWith(
-      expect.stringContaining("[ExportStream] Query warning: optional table unavailable"),
+      expect.stringContaining("[ExportStream] Query warning: optional table unavailable")
     );
   });
 });

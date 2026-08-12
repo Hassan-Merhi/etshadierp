@@ -160,7 +160,7 @@ describe("smart transfer feedback behavior", () => {
     expect(sessionId).toBeNull();
     expect(harness.loggerError).toHaveBeenCalledWith(
       "[SmartTransferFeedback] Preview log failed:",
-      expect.objectContaining({ error: "insert failed" }),
+      expect.objectContaining({ error: "insert failed" })
     );
   });
 
@@ -276,7 +276,7 @@ describe("smart transfer feedback behavior", () => {
         { ...imported, actionName: "smart_transfer_import_v4" },
         { ...imported, actionName: "smart_transfer_approval_v4" },
       ],
-      [preview, imported],
+      [preview, imported]
     );
 
     const summary = await getSmartTransferFeedbackSummary(4, 2);
@@ -300,7 +300,7 @@ describe("smart transfer feedback behavior", () => {
       sourceChangedQuantity: 1,
     });
     expect(summary.recommendations).toContain(
-      "Collect at least five approved smart transfers before changing forecasting or source-selection weights.",
+      "Collect at least five approved smart transfers before changing forecasting or source-selection weights."
     );
   });
 

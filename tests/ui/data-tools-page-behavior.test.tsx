@@ -139,10 +139,12 @@ describe("ERP data tools behavior", () => {
     render(<DataToolsTab />);
     fireEvent.click(screen.getByTestId("button-fix-cost-prices"));
 
-    await waitFor(() => expect(harness.apiRequest).toHaveBeenCalledWith("POST", "/api/sales-report/recalculate-costs", {}));
+    await waitFor(() =>
+      expect(harness.apiRequest).toHaveBeenCalledWith("POST", "/api/sales-report/recalculate-costs", {})
+    );
     expect(harness.invalidateQueries).toHaveBeenCalledWith({ queryKey: ["/api/sales-report"] });
     expect(harness.toast).toHaveBeenCalledWith(
-      expect.objectContaining({ title: "Cost Prices Updated", description: "Updated 4 of 5 sales items" }),
+      expect.objectContaining({ title: "Cost Prices Updated", description: "Updated 4 of 5 sales items" })
     );
   });
 
@@ -168,7 +170,7 @@ describe("ERP data tools behavior", () => {
         locationId: "11",
         type: "Production",
         items: [{ stockItemId: "7", quantity: "3", rate: "2.5" }],
-      }),
+      })
     );
     expect(screen.getByText("Applied 1 item(s) silently")).toBeInTheDocument();
   });

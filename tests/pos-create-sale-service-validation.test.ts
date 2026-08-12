@@ -113,8 +113,8 @@ describe("POS create sale service validation and replay guards", () => {
           ...baseParams,
           body: { locationId: 2, items: [{ stockItemId: 7, quantity: "1", rate: "3" }] },
         } as any,
-        { isSpCompany: false },
-      ),
+        { isSpCompany: false }
+      )
     ).resolves.toEqual({ status: 403, body: { message: "Cash account is not assigned" } });
     expect(harness.resolvePaymentAccount).not.toHaveBeenCalled();
   });
@@ -124,7 +124,7 @@ describe("POS create sale service validation and replay guards", () => {
     harness.checkIdempotentSale.mockResolvedValue(committed);
 
     await expect(
-      createPosSale({ ...baseParams, body: { clientSaleId: "offline-123" } } as any, { isSpCompany: false }),
+      createPosSale({ ...baseParams, body: { clientSaleId: "offline-123" } } as any, { isSpCompany: false })
     ).resolves.toBe(committed);
     expect(harness.checkIdempotentSale).toHaveBeenCalledWith(4, "offline-123");
   });
@@ -133,7 +133,7 @@ describe("POS create sale service validation and replay guards", () => {
     await expect(
       createPosSale({ ...baseParams, body: { items: [{ stockItemId: 7, quantity: "1", rate: "3" }] } } as any, {
         isSpCompany: false,
-      }),
+      })
     ).resolves.toEqual({ status: 400, body: { message: "Location is required" } });
   });
 
@@ -157,8 +157,8 @@ describe("POS create sale service validation and replay guards", () => {
             items: [{ stockItemId: 7, quantity: "0", rate: "3" }],
           },
         } as any,
-        { isSpCompany: false },
-      ),
+        { isSpCompany: false }
+      )
     ).resolves.toEqual({ status: 422, body: { message: "Invalid item quantity" } });
     expect(harness.getShiftById).toHaveBeenCalledWith(77);
     expect(harness.validateItemsBasic).toHaveBeenCalled();

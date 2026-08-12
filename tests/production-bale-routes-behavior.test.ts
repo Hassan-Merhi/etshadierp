@@ -45,7 +45,11 @@ vi.mock("@shared/schema", () => ({
   baleProducts: { id: "baleProducts.id" },
   baleSequences: { id: "baleSequences.id", companyId: "baleSequences.companyId" },
   mixBatches: { id: "mixBatches.id" },
-  pressingBatches: { id: "pressingBatches.id", companyId: "pressingBatches.companyId", createdAt: "pressingBatches.createdAt" },
+  pressingBatches: {
+    id: "pressingBatches.id",
+    companyId: "pressingBatches.companyId",
+    createdAt: "pressingBatches.createdAt",
+  },
   productionBales: {
     id: "productionBales.id",
     companyId: "productionBales.companyId",
@@ -66,9 +70,11 @@ type Handler = (req: any, res: any) => unknown;
 
 function buildRoutes() {
   const routes = new Map<string, Handler>();
-  const register = (method: string) => (path: string, ...handlers: any[]) => {
-    routes.set(`${method} ${path}`, handlers.at(-1));
-  };
+  const register =
+    (method: string) =>
+    (path: string, ...handlers: any[]) => {
+      routes.set(`${method} ${path}`, handlers.at(-1));
+    };
   const app: any = {
     get: register("GET"),
     post: register("POST"),
@@ -124,7 +130,7 @@ describe("production bale route behavior", () => {
 
     await routes.get("GET /api/production-bales")!(
       request({ query: { mixBatchId: "9", status: "IN_STOCK", category: "A", grade: "B" } }),
-      res,
+      res
     );
 
     expect(harness.storage.getAllProductionBales).toHaveBeenCalledWith(4, {
@@ -144,7 +150,9 @@ describe("production bale route behavior", () => {
   });
 
   it("returns barcode lookup results and maps missing bales to 404", async () => {
-    harness.storage.getProductionBaleByBarcode.mockResolvedValueOnce({ id: 7, barcodeValue: "HD00007" }).mockResolvedValueOnce(null);
+    harness.storage.getProductionBaleByBarcode
+      .mockResolvedValueOnce({ id: 7, barcodeValue: "HD00007" })
+      .mockResolvedValueOnce(null);
 
     const found = responseHarness();
     await routes.get("GET /api/production-bales/barcode/:barcode")!(request({ params: { barcode: "HD00007" } }), found);
@@ -152,7 +160,10 @@ describe("production bale route behavior", () => {
     expect(found.body).toMatchObject({ id: 7 });
 
     const missing = responseHarness();
-    await routes.get("GET /api/production-bales/barcode/:barcode")!(request({ params: { barcode: "UNKNOWN" } }), missing);
+    await routes.get("GET /api/production-bales/barcode/:barcode")!(
+      request({ params: { barcode: "UNKNOWN" } }),
+      missing
+    );
     expect(missing.statusCode).toBe(404);
     expect(missing.body).toEqual({ message: "Bale not found" });
   });
@@ -183,8 +194,10 @@ describe("production bale route behavior", () => {
     harness.selectResults.push([{ id: 7, companyId: 99, code: "HMD01" }]);
     const res = responseHarness();
     await routes.get("POST /api/production-bales/create-batch")!(
-      request({ body: { mixBatchId: 5, productId: 7, locationId: 2, quantity: "2", weightPerBale: "40", mode: "counting" } }),
-      res,
+      request({
+        body: { mixBatchId: 5, productId: 7, locationId: 2, quantity: "2", weightPerBale: "40", mode: "counting" },
+      }),
+      res
     );
     expect(res.statusCode).toBe(404);
     expect(res.body).toEqual({ message: "Product not found" });
@@ -193,7 +206,10 @@ describe("production bale route behavior", () => {
   it("looks up a bale by trimmed barcode and returns the first scoped match", async () => {
     harness.selectResults.push([{ bale: { id: 8 }, product: { id: 7 }, mixBatch: { id: 5 } }]);
     const res = responseHarness();
-    await routes.get("GET /api/production-bales/lookup/:barcode")!(request({ params: { barcode: "  HD00008  " } }), res);
+    await routes.get("GET /api/production-bales/lookup/:barcode")!(
+      request({ params: { barcode: "  HD00008  " } }),
+      res
+    );
     expect(res.body).toEqual({ bale: { id: 8 }, product: { id: 7 }, mixBatch: { id: 5 } });
   });
 
@@ -211,7 +227,7 @@ describe("production bale route behavior", () => {
         { id: 1, status: "PENDING" },
         { id: 2, status: "IN_STOCK" },
         { id: 3, status: "IN_STOCK" },
-      ],
+      ]
     );
     const res = responseHarness();
     await routes.get("GET /api/pressing-batches")!(request(), res);
