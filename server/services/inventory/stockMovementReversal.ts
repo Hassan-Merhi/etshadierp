@@ -1,9 +1,12 @@
 import Decimal from "decimal.js";
 import {
+  postStockMovementTx,
   StockMovementValidationError,
   type StockMovementActor,
+  type StockMovementAdapter,
   type StockMovementRecord,
   type StockMovementRequest,
+  type StockMovementResult,
   type StockMovementSourceIdentity,
 } from "./stockMovementIntegrityService";
 
@@ -12,6 +15,22 @@ export interface ExactStockMovementReversalInput {
   occurredAt: string;
   source: StockMovementSourceIdentity;
   actor?: StockMovementActor;
+}
+
+export interface ExactStockMovementReversalRequest {
+  companyId: number;
+  movementId: number;
+  occurredAt: string;
+  source: StockMovementSourceIdentity;
+  actor?: StockMovementActor;
+}
+
+export interface ExactStockMovementReversalAdapter extends StockMovementAdapter {
+  lockOriginalMovement(input: {
+    tx: any;
+    companyId: number;
+    movementId: number;
+  }): Promise<StockMovementRecord | null>;
 }
 
 function positiveId(value: unknown, field: string): number {
@@ -111,4 +130,46 @@ export function buildExactStockMovementReversal(
     allowNegativeStock: false,
     reversalOfMovementId: movementId,
   };
+}
+
+/**
+ * Transaction-owned exact reversal entry point.
+ *
+ * The original movement is loaded and locked by company inside the same transaction
+ * used for the append-only reversal. This prevents a request from supplying another
+ * tenant's movement snapshot or racing a concurrent correction.
+ */
+export async function postExactStockMovementReversalTx(
+  tx: any,
+  request: ExactStockMovementReversalRequest,
+  adapter: ExactStockMovementReversalAdapter
+): Promise<StockMovementResult> {
+  const companyId = positiveId(request.companyId, "companyId");
+  const movementId = positiveId(request.movementId, "movementId");
+  requiredText(request.occurredAt, "occurredAt");
+  requiredText(request.source.sourceType, "source.sourceType");
+  requiredText(request.source.sourceId, "source.sourceId");
+  requiredText(request.source.idempotencyKey, "source.idempotencyKey");
+
+  const original = await adapter.lockOriginalMovement({ tx, companyId, movementId });
+  if (!original) {
+    throw new StockMovementValidationError(
+      "STOCK_REVERSAL_ORIGINAL_NOT_FOUND",
+      "Original stock movement was not found in the requested company"
+    );
+  }
+  if (original.companyId !== companyId || original.id !== movementId) {
+    throw new StockMovementValidationError(
+      "STOCK_REVERSAL_COMPANY_MISMATCH",
+      "Locked stock movement does not match the requested company and movement"
+    );
+  }
+
+  const reversal = buildExactStockMovementReversal({
+    original,
+    occurredAt: request.occurredAt,
+    source: request.source,
+    actor: request.actor,
+  });
+  return postStockMovementTx(tx, reversal, adapter);
 }
