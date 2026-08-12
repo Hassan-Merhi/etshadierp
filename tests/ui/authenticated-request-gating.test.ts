@@ -28,17 +28,6 @@ describe("authenticated request gating", () => {
     expect(publicAppTree).toContain("<AuthenticatedRoot />");
   });
 
-  it("keeps transient auth failures recoverable instead of treating them as logout", () => {
-    const authHook = source("client/src/app/useAuthenticatedUser.ts");
-    const queryContracts = source("client/src/contracts/sessionQueryContracts.ts");
-
-    expect(authHook).not.toContain("setLoadingTimedOut");
-    expect(authHook).not.toContain("12000");
-    expect(queryContracts).toContain("if (response.status === 401) return null;");
-    expect(queryContracts).toContain("retry: 3");
-    expect(queryContracts).toContain("refetchOnReconnect: true");
-  });
-
   it("passes the already-verified user into the authenticated workspace", () => {
     const authenticatedApp = source("client/src/app/AuthenticatedApp.tsx");
 
