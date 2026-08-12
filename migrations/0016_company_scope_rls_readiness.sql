@@ -9,6 +9,8 @@
 --   * Therefore each policy preserves legacy behaviour while the setting is
 --     absent, but becomes company-restrictive as soon as a transaction supplies
 --     app.current_company_id.
+--   * A malformed or non-positive setting raises instead of becoming an absent
+--     context, so an invalid tenant assertion fails closed.
 --   * Phase 4 central transaction services can adopt SET LOCAL without another
 --     policy rewrite, after which enforcement can be tightened further.
 --   * FORCE ROW LEVEL SECURITY is deliberately NOT enabled here because the app
@@ -34,14 +36,14 @@ BEGIN
     RETURN NULL;
   END IF;
 
-  BEGIN
-    parsed_company_id := raw_company_id::integer;
-  EXCEPTION WHEN invalid_text_representation OR numeric_value_out_of_range THEN
-    RETURN NULL;
-  END;
-
+  -- Deliberately allow PostgreSQL to raise on malformed or overflowing input.
+  -- Returning NULL here would make an invalid tenant assertion indistinguishable
+  -- from the temporary compatibility case where no assertion was supplied.
+  parsed_company_id := raw_company_id::integer;
   IF parsed_company_id <= 0 THEN
-    RETURN NULL;
+    RAISE EXCEPTION USING
+      ERRCODE = '22023',
+      MESSAGE = 'app.current_company_id must be a positive integer';
   END IF;
   RETURN parsed_company_id;
 END
