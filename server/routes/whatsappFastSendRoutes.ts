@@ -171,7 +171,7 @@ function serveFastAttachment(req: Request, res: Response): void {
 
   res.setHeader("Content-Type", entry.contentType);
   res.setHeader("Content-Length", String(entry.buffer.length));
-  res.setHeader("Content-Disposition", `inline; filename="${entry.fileName.replace(/[\r\n\"]/g, "_")}"`);
+  res.setHeader("Content-Disposition", `inline; filename="${entry.fileName.replace(/[\r\n"]/g, "_")}"`);
   res.setHeader("Cache-Control", "private, no-store, max-age=0");
   res.setHeader("X-Content-Type-Options", "nosniff");
   if (req.method === "HEAD") {
@@ -235,12 +235,11 @@ async function sendPosStockFast(req: Request, res: Response): Promise<void> {
     }
 
     const companyName = company?.name || "Company";
-    const { buffer: pdfBuffer, pageCount, rowCount } = await generateStockPdf(
-      companyId,
-      companyName,
-      locationId,
-      location.name
-    );
+    const {
+      buffer: pdfBuffer,
+      pageCount,
+      rowCount,
+    } = await generateStockPdf(companyId, companyName, locationId, location.name);
 
     const maxAllowedPages = Math.ceil(rowCount / 20) + 5;
     if (pageCount > maxAllowedPages) {
@@ -293,7 +292,7 @@ async function sendPosInvoiceFast(req: Request, res: Response): Promise<void> {
 
     const voucherId = Number(req.body?.voucherId);
     if (!Number.isInteger(voucherId) || voucherId <= 0) {
-      res.status(400).json({ message: "voucherId is required" });
+      res.status(400).json({ message: "Invalid voucherId" });
       return;
     }
 
@@ -352,12 +351,15 @@ async function sendPosInvoiceFast(req: Request, res: Response): Promise<void> {
     const hideProfitCols = erpVis.hideSelling || erpVis.hideCost;
     const compactMode = true;
     const whatsappMode = true;
-    const { buffer: pdfBuffer, pageCount, itemCount } = await generateInvoicePdfMeta(
-      voucherId,
-      companyId,
-      req.user?.username,
-      { hideProfitCols, compactMode, whatsappMode }
-    );
+    const {
+      buffer: pdfBuffer,
+      pageCount,
+      itemCount,
+    } = await generateInvoicePdfMeta(voucherId, companyId, req.user?.username, {
+      hideProfitCols,
+      compactMode,
+      whatsappMode,
+    });
 
     const pdfSize = pdfBuffer?.length ?? 0;
     const validHeader = pdfBuffer && pdfBuffer.slice(0, 4).toString("ascii") === "%PDF";
@@ -404,14 +406,7 @@ async function sendPosInvoiceFast(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const result = await sendBufferFast(
-      req,
-      location.whatsappGroupChatId!,
-      pdfBuffer,
-      fileName,
-      "",
-      "application/pdf"
-    );
+    const result = await sendBufferFast(req, location.whatsappGroupChatId!, pdfBuffer, fileName, "", "application/pdf");
     if (!result.success) {
       res.status(502).json({ message: result.error ?? "WhatsApp send failed" });
       return;
@@ -568,20 +563,12 @@ export function registerWhatsAppFastSendRoutes(app: Express): void {
   // These handlers intentionally register before the legacy routes. They keep
   // the same auth/company checks while replacing multi-megabyte multipart
   // uploads with Green API's sendFileByUrl fast path.
-  app.post(
-    ["/api/pos/send-stock-pdf-backend", "/api/pos/send-stock-pdf"],
-    requireAuth,
-    enforcePosOperationalPermissionScope,
-    enforcePosCapabilityScope,
-    sendPosStockFast
-  );
-  app.post(
-    ["/api/pos/send-invoice-pdf-backend", "/api/pos/send-invoice-whatsapp"],
-    requireAuth,
-    enforcePosOperationalPermissionScope,
-    enforcePosCapabilityScope,
-    sendPosInvoiceFast
-  );
+  for (const route of ["/api/pos/send-stock-pdf-backend", "/api/pos/send-stock-pdf"]) {
+    app.post(route, requireAuth, enforcePosOperationalPermissionScope, enforcePosCapabilityScope, sendPosStockFast);
+  }
+  for (const route of ["/api/pos/send-invoice-pdf-backend", "/api/pos/send-invoice-whatsapp"]) {
+    app.post(route, requireAuth, enforcePosOperationalPermissionScope, enforcePosCapabilityScope, sendPosInvoiceFast);
+  }
   app.post(
     "/api/pos/send-whatsapp-pdf-upload",
     requireAuth,

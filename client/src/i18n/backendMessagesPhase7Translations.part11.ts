@@ -68,6 +68,11 @@ export const backendMessagesPhase7TranslationsPart11: readonly Phase7BackendMess
     fr: "voucherId est requis",
   },
   {
+    en: "Invalid voucherId",
+    ar: "voucherId غير صالح",
+    fr: "voucherId invalide",
+  },
+  {
     en: "Voucher has no location",
     ar: "القسيمة ليس لها موقع",
     fr: "Le bon n’a aucun emplacement",
