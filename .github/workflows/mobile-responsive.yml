@@ -40,7 +40,9 @@ jobs:
       - name: Focused responsive tests
         run: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts tests/ui/mobile-responsive-*.test.ts
       - name: Frontend regression suite
-        run: npm run test:frontend
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: npm run test:frontend -- --maxWorkers=1
       - name: Security and dependency contracts
         run: |
           npm run verify:lockfile
