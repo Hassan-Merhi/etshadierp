@@ -1,5 +1,5 @@
 import React, { createContext, useContext } from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => ({
@@ -208,7 +208,7 @@ describe("supplier profit check page behavior", () => {
 
     fireEvent.change(screen.getByTestId("input-freight"), { target: { value: "6" } });
     expect(screen.getByText("$6.00")).toBeInTheDocument();
-    expect(screen.getByText("$2.00")).toBeInTheDocument();
+    expect(within(screen.getByTestId("row-item-7")).getByText("$2.00")).toBeInTheDocument();
     expect(screen.getByTestId("stat-total-landing-cost")).toHaveTextContent("$42.00");
     expect(screen.getByTestId("stat-cost-profit")).toHaveTextContent("$18.00");
   });
