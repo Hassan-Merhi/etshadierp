@@ -21,8 +21,16 @@ type NetPositionResponse = {
   onUsTotal: number;
   netPosition: number;
   netPositionLabel: string;
-  forUs: { total: number; breakdown: Array<{ name: string; value: number }>; accounts: NetPositionAccount[] };
-  onUs: { total: number; breakdown: Array<{ name: string; value: number }>; accounts: NetPositionAccount[] };
+  forUs: {
+    total: number;
+    breakdown: Array<{ name: string; value: number }>;
+    accounts: NetPositionAccount[];
+  };
+  onUs: {
+    total: number;
+    breakdown: Array<{ name: string; value: number }>;
+    accounts: NetPositionAccount[];
+  };
   inventoryValue?: number;
   rawMaterialValue?: number;
   balanceOnTableValue?: number;
@@ -46,7 +54,11 @@ function replaceAccountValue(accounts: NetPositionAccount[], code: string, value
   if (account) account.value = round2(value);
 }
 
-async function computeHistoricalOperationalValues(companyId: number, asOf: string, currentRawMaterialValue: number) {
+async function computeHistoricalOperationalValues(
+  companyId: number,
+  asOf: string,
+  currentRawMaterialValue: number,
+) {
   const stockResult = await db.execute(sql`
     SELECT COALESCE(SUM(p.production_price::numeric), 0) AS total
     FROM factory_bales b
@@ -127,54 +139,74 @@ async function computeHistoricalOperationalValues(companyId: number, asOf: strin
   const adjustmentsAfterRow = resultRows(adjustmentsAfterResult)[0] ?? {};
   const adjustmentsAfter = parseFloat(String(adjustmentsAfterRow.value_after ?? "0")) || 0;
 
-  const rawMaterialValue = round2(Math.max(currentRawMaterialValue + consumedAfter - receiptsAfter - adjustmentsAfter, 0));
+  const rawMaterialValue = round2(
+    Math.max(currentRawMaterialValue + consumedAfter - receiptsAfter - adjustmentsAfter, 0),
+  );
 
   return { inventoryValue, rawMaterialValue, balanceOnTableValue };
 }
 
 export function registerNetPositionHistoricalCorrection(app: Express) {
-  app.get("/api/factory/net-position", requireAuth, (req: Request, res: Response, next: NextFunction) => {
-    const asOf = typeof req.query.asOf === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.asOf) ? req.query.asOf : null;
-    if (!asOf || asOf === getClientDate(req)) return next();
+  app.get(
+    "/api/factory/net-position",
+    requireAuth,
+    (req: Request, res: Response, next: NextFunction) => {
+      const asOf =
+        typeof req.query.asOf === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.asOf)
+          ? req.query.asOf
+          : null;
+      if (!asOf || asOf === getClientDate(req)) return next();
 
-    const originalJson = res.json.bind(res);
-    res.json = ((body: NetPositionResponse) => {
-      void (async () => {
-        const session = req.session as typeof req.session & {
-          factoryCompanyId?: number;
-          currentCompanyId?: number;
-        };
-        const companyId = Number(session.factoryCompanyId || session.currentCompanyId || 0);
-        if (!companyId) return originalJson(body);
+      const originalJson = res.json.bind(res);
+      res.json = ((body: NetPositionResponse) => {
+        void (async () => {
+          const session = req.session as typeof req.session & {
+            factoryCompanyId?: number;
+            currentCompanyId?: number;
+          };
+          const companyId = Number(session.factoryCompanyId || session.currentCompanyId || 0);
+          if (!companyId) return originalJson(body);
 
-        try {
-          if (!body?.forUs?.accounts || typeof body.rawMaterialValue !== "number") {
+          try {
+            if (!body?.forUs?.accounts || typeof body.rawMaterialValue !== "number") {
+              return originalJson(body);
+            }
+
+            const historical = await computeHistoricalOperationalValues(
+              companyId,
+              asOf,
+              body.rawMaterialValue,
+            );
+            replaceAccountValue(body.forUs.accounts, "INVENTORY", historical.inventoryValue);
+            replaceAccountValue(body.forUs.accounts, "RAW_MATERIAL", historical.rawMaterialValue);
+            replaceAccountValue(
+              body.forUs.accounts,
+              "BALANCE_ON_TABLE",
+              historical.balanceOnTableValue,
+            );
+
+            body.inventoryValue = historical.inventoryValue;
+            body.rawMaterialValue = historical.rawMaterialValue;
+            body.balanceOnTableValue = historical.balanceOnTableValue;
+            body.forUs.breakdown = recomputeBreakdown(body.forUs.accounts);
+            body.forUsTotal = round2(
+              body.forUs.accounts.reduce((sum, account) => sum + Number(account.value || 0), 0),
+            );
+            body.forUs.total = body.forUsTotal;
+            body.netPosition = round2(body.forUsTotal - body.onUsTotal);
+            body.netPositionLabel =
+              body.netPosition >= 0 ? "We have more than we owe" : "We owe more than we have";
+
+            return originalJson(body);
+          } catch (error) {
+            logger.error("Historical net-position correction failed", { error, companyId, asOf });
             return originalJson(body);
           }
+        })();
+        return res;
+      }) as Response["json"];
 
-          const historical = await computeHistoricalOperationalValues(companyId, asOf, body.rawMaterialValue);
-          replaceAccountValue(body.forUs.accounts, "INVENTORY", historical.inventoryValue);
-          replaceAccountValue(body.forUs.accounts, "RAW_MATERIAL", historical.rawMaterialValue);
-          replaceAccountValue(body.forUs.accounts, "BALANCE_ON_TABLE", historical.balanceOnTableValue);
-
-          body.inventoryValue = historical.inventoryValue;
-          body.rawMaterialValue = historical.rawMaterialValue;
-          body.balanceOnTableValue = historical.balanceOnTableValue;
-          body.forUs.breakdown = recomputeBreakdown(body.forUs.accounts);
-          body.forUsTotal = round2(body.forUs.accounts.reduce((sum, account) => sum + Number(account.value || 0), 0));
-          body.forUs.total = body.forUsTotal;
-          body.netPosition = round2(body.forUsTotal - body.onUsTotal);
-          body.netPositionLabel = body.netPosition >= 0 ? "We have more than we owe" : "We owe more than we have";
-
-          return originalJson(body);
-        } catch (error) {
-          logger.error("Historical net-position correction failed", { error, companyId, asOf });
-          return originalJson(body);
-        }
-      })();
-      return res;
-    }) as Response["json"];
-
-    next();
-  });
+      next();
+    },
+  );
 }
