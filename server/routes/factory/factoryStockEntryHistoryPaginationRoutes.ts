@@ -6,6 +6,7 @@ import { getClientDate } from "../../lib/dateUtils";
 
 const DEFAULT_PAGE_SIZE = 100;
 const MAX_PAGE_SIZE = 250;
+const SCREEN_FULL_LOAD_LIMIT = 9999;
 
 function parsePositiveInt(value: unknown, fallback: number): number {
   const parsed = Number.parseInt(String(value ?? ""), 10);
@@ -23,7 +24,9 @@ function wantsPagination(req: Request): boolean {
 }
 
 function parsePagination(req: Request): { page: number; limit: number; offset: number } {
-  const limit = Math.min(MAX_PAGE_SIZE, parsePositiveInt(req.query.limit ?? req.query.pageSize, DEFAULT_PAGE_SIZE));
+  const requestedLimit = parsePositiveInt(req.query.limit ?? req.query.pageSize, DEFAULT_PAGE_SIZE);
+  const limit =
+    requestedLimit === SCREEN_FULL_LOAD_LIMIT ? SCREEN_FULL_LOAD_LIMIT : Math.min(MAX_PAGE_SIZE, requestedLimit);
   if (req.query.offset !== undefined) {
     const offset = Math.max(0, Number.parseInt(String(req.query.offset), 10) || 0);
     return { page: Math.floor(offset / limit) + 1, limit, offset };
