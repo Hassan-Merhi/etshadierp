@@ -68,10 +68,10 @@ const harness = vi.hoisted(() => {
   return { db, selectResults, worksheets, FakeWorkbook };
 });
 
-vi.mock("../../../server/db", () => ({ db: harness.db }));
-vi.mock("../../../server/auth", () => ({ requireAuth: (_req: any, _res: any, next: any) => next() }));
-vi.mock("../../../server/lib/httpHandlers", () => ({ getErrorMessage: (error: any) => error?.message || String(error) }));
-vi.mock("../../../server/lib/logger", () => ({ logger: { error: vi.fn() } }));
+vi.mock("../server/db", () => ({ db: harness.db }));
+vi.mock("../server/auth", () => ({ requireAuth: (_req: any, _res: any, next: any) => next() }));
+vi.mock("../server/lib/httpHandlers", () => ({ getErrorMessage: (error: any) => error?.message || String(error) }));
+vi.mock("../server/lib/logger", () => ({ logger: { error: vi.fn() } }));
 vi.mock("exceljs", () => ({ default: harness.FakeWorkbook }));
 vi.mock("pdfkit", () => ({ default: class FakePdf {} }));
 vi.mock("fs", () => ({ default: { existsSync: () => false } }));
@@ -104,7 +104,7 @@ vi.mock("@shared/schema", () => ({
   factorySupplierCategories: { id: "cats.id", name: "cats.name", companyId: "cats.companyId" },
 }));
 
-import { registerFactoryWeeklyReportExportRoutes } from "../../../server/routes/factory/bale-exports/weekly-report";
+import { registerFactoryWeeklyReportExportRoutes } from "../server/routes/factory/bale-exports/weekly-report";
 
 type Handler = (req: any, res: any) => unknown;
 
