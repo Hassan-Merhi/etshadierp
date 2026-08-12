@@ -101,7 +101,7 @@ vi.mock("../server/lib/parseId", () => ({
 vi.mock("../server/routes/factory/customer-orders/orderHelpers", () => ({
   buildExportFilename: (parts: unknown[], ext: string) => `${parts.filter(Boolean).join("_")}.${ext}`,
 }));
-vi.mock("exceljs", () => ({ default: harness.FakeWorkbook }));
+vi.mock("exceljs", () => ({ default: { Workbook: harness.FakeWorkbook } }));
 vi.mock("os", () => ({ default: { tmpdir: () => "/tmp" } }));
 vi.mock("crypto", () => ({ default: { randomUUID: () => "uuid" } }));
 vi.mock("fs", () => ({
