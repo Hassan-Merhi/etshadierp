@@ -110,7 +110,7 @@ vi.mock("../server/netPositionHelper", () => ({
   classifyNetPositionAccounts: harness.classifyNetPositionAccounts,
   round2: (value: number) => Math.round((value + Number.EPSILON) * 100) / 100,
 }));
-vi.mock("exceljs", () => ({ default: harness.FakeWorkbook }));
+vi.mock("exceljs", () => ({ default: { Workbook: harness.FakeWorkbook } }));
 vi.mock("drizzle-orm", () => ({
   eq: (column: unknown, value: unknown) => ({ type: "eq", column, value }),
   and: (...conditions: unknown[]) => ({ type: "and", conditions }),
