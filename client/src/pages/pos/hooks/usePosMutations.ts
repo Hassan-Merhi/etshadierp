@@ -27,6 +27,7 @@ interface UsePosMutationsParams {
   setPendingStockSend: (val: boolean) => void;
   setStockWaStatus: (s: "idle" | "sending" | "sent" | "failed" | "not_configured") => void;
   toast: (opts: { title: string; description?: string; variant?: "destructive" | "default" }) => void;
+  refetchDrafts?: () => void;
 }
 
 export function usePosMutations({
