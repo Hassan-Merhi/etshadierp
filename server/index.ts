@@ -22,6 +22,7 @@ import { requestLogger } from "./middleware/requestLogger";
 import { bandwidthDebugMiddleware } from "./middleware/bandwidthDebug";
 import { logger } from "./lib/logger";
 import { startupMigrations } from "./startup-schema";
+import { canonicalStockMovementJournal } from "./startup-schema/021-canonical-stock-movement-journal";
 
 // Global error handlers
 // In production: log and exit so the process manager (Render/Replit) restarts cleanly.
@@ -1696,6 +1697,25 @@ END $mig$`;
         logger.error("[startup] ✗ Could not ensure multi-currency columns:", { error: getErrorMessage(colErr) });
         // Non-fatal: the app will start but the dashboard net-profit query may still fail
         // if the columns are genuinely absent.
+      }
+
+      // ── Always-running canonical stock movement journal (Phase 4) ─────────────
+      // Stock transfers write their canonical evidence inside the same
+      // transaction that applies inventory, so these tables must exist wherever
+      // the app runs — including production, which skips the ordered pass via
+      // RUN_STARTUP_MIGRATIONS=false. Failing to create them is fatal rather
+      // than logged and ignored: a transfer that cannot record its evidence
+      // must not be allowed to apply stock instead.
+      try {
+        for (const statement of canonicalStockMovementJournal) {
+          await pool.query(statement);
+        }
+        logger.info("[startup] ✓ Canonical stock movement journal ensured");
+      } catch (journalErr: unknown) {
+        logger.error("[startup] ✗ Could not ensure canonical stock movement journal:", {
+          error: getErrorMessage(journalErr),
+        });
+        throw journalErr;
       }
 
       if (migrationsEnabled) {

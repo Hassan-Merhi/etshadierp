@@ -16,6 +16,10 @@ import { eq, and } from "drizzle-orm";
 import { adjustInventory } from "../../inventoryHelper";
 import { sendTransferWhatsApp } from "../../helpers/sendTransferWhatsApp";
 import { getActiveCompanyPermissionContext } from "../../services/security/activeCompanyPermissionContext";
+import { createDatabaseStockMovementAdapter } from "../../services/inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../../services/inventory/stockMovementIntegrityService";
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 async function resolvePosTransferRecipientLocationId(req: Request): Promise<number | null> {
   const context = await getActiveCompanyPermissionContext(req);
@@ -195,6 +199,33 @@ export function registerStockTransferCreateRoutes(app: Express) {
 
               // Add to destination location (transfer in = positive delta with rate)
               await adjustInventory(tx, destinationLocationId, item.stockItemId, quantity, companyId!, rate);
+
+              // Canonical evidence for this leg, written inside the same
+              // transaction that just applied the inventory above, so evidence
+              // and effect commit or roll back together. Reconciliation reads
+              // these rows; without them an applied transfer looks unevidenced.
+              await postStockMovementTx(
+                tx,
+                {
+                  companyId: companyId!,
+                  stockItemId: item.stockItemId,
+                  kind: "transfer",
+                  quantity: quantity.toString(),
+                  unitCost: rate.toFixed(2),
+                  fromLocationId: item.sourceLocationId || sourceLocationId,
+                  toLocationId: destinationLocationId,
+                  occurredAt: new Date().toISOString(),
+                  source: {
+                    sourceType: "stock-transfer",
+                    sourceId: String(transfer.id),
+                    idempotencyKey: `stock-transfer:${transfer.id}:${item.stockItemId}`,
+                  },
+                  // The journal records what the transfer did; it does not add
+                  // a negative-stock rule the transfer does not itself enforce.
+                  allowNegativeStock: true,
+                },
+                canonicalStockMovementAdapter
+              );
             }
           }
 

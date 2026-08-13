@@ -12,6 +12,10 @@ import {
 } from "../../lib/inventoryMath";
 import * as schema from "@shared/schema";
 import type { StockTransferItem, StockAdjustmentItem } from "@shared/schema";
+import { createDatabaseStockMovementAdapter } from "../../services/inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../../services/inventory/stockMovementIntegrityService";
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 export async function createStockTransfer(
   voucherId: number,
@@ -119,6 +123,40 @@ export async function createStockTransfer(
             totalValue: inventoryMoney(totalAmount),
             lastUpdated: new Date(),
           });
+        }
+
+        // Canonical evidence for this leg, written inside the same transaction
+        // that applied the inventory above. Reconciliation compares the transfer
+        // document against these rows, so evidence and effect commit or roll
+        // back together — a transfer can never appear in one and not the other.
+        //
+        // A leg whose source and destination are the same location moves no
+        // stock between locations and has no balanced issue/receipt pair to
+        // record; reconciliation surfaces such a document as unevidenced rather
+        // than this path inventing a movement that did not happen.
+        if (item.sourceLocationId !== destinationLocationId) {
+          await postStockMovementTx(
+            tx,
+            {
+              companyId: voucher.companyId,
+              stockItemId: item.stockItemId,
+              kind: "transfer",
+              quantity: inventoryQuantity(quantity),
+              unitCost: inventoryUnitCost(rate),
+              fromLocationId: item.sourceLocationId,
+              toLocationId: destinationLocationId,
+              occurredAt: new Date().toISOString(),
+              source: {
+                sourceType: "stock-transfer",
+                sourceId: String(transfer.id),
+                idempotencyKey: `stock-transfer:${transfer.id}:${item.stockItemId}`,
+              },
+              // The journal records what the transfer did; it does not add a
+              // negative-stock rule the transfer itself does not enforce.
+              allowNegativeStock: true,
+            },
+            canonicalStockMovementAdapter
+          );
         }
       }
     }

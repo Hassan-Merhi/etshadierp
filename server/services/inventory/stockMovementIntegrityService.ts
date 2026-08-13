@@ -50,37 +50,42 @@ export interface StockMovementResult {
   idempotent: boolean;
 }
 
-export interface StockMovementAdapter {
+/**
+ * Generic over the transaction handle so a PostgreSQL adapter can be written
+ * against the concrete drizzle transaction — and keep drizzle's own row typing —
+ * while the boundary below only requires a tenant-scoped handle.
+ */
+export interface StockMovementAdapter<TTransaction = CompanyScopedTransaction> {
   findExisting(input: {
-    tx: CompanyScopedTransaction;
+    tx: TTransaction;
     companyId: number;
     source: StockMovementSourceIdentity;
   }): Promise<StockMovementResult | null>;
   validateOwnership(input: {
-    tx: CompanyScopedTransaction;
+    tx: TTransaction;
     companyId: number;
     stockItemId: number;
     locationIds: number[];
   }): Promise<void>;
   lockBalances(input: {
-    tx: CompanyScopedTransaction;
+    tx: TTransaction;
     companyId: number;
     stockItemId: number;
     locationIds: number[];
   }): Promise<Record<number, string>>;
   appendMovements(input: {
-    tx: CompanyScopedTransaction;
+    tx: TTransaction;
     request: StockMovementRequest;
     rows: Array<{ locationId: number; quantityDelta: string; unitCost: string }>;
   }): Promise<StockMovementRecord[]>;
   recordIdempotency(input: {
-    tx: CompanyScopedTransaction;
+    tx: TTransaction;
     companyId: number;
     source: StockMovementSourceIdentity;
     movementIds: number[];
   }): Promise<void>;
   recordAudit(input: {
-    tx: CompanyScopedTransaction;
+    tx: TTransaction;
     request: StockMovementRequest;
     movementIds: number[];
     quantity: string;
