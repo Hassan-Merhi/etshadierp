@@ -92,6 +92,48 @@ const pathLimits = [
 const activeByName = new Map();
 // Exposed for the lifecycle guard's runtime snapshot.
 globalThis.__erpConcurrencyCounters = activeByName;
+
+// Instead of instantly rejecting when a heavy endpoint is saturated, hold the
+// request in a short FIFO queue and start it as soon as a slot frees up. Users
+// double-clicking an export or two POS users opening the same report used to
+// see a raw ENDPOINT_BUSY JSON page; now the second request simply waits.
+const QUEUE_MAX_WAIT_MS = parsePositiveInt(process.env.ENDPOINT_QUEUE_MAX_WAIT_MS, 20_000);
+const QUEUE_MAX_DEPTH = parsePositiveInt(process.env.ENDPOINT_QUEUE_MAX_DEPTH, 8);
+const queuesByName = new Map();
+
+function queueFor(name) {
+  let queue = queuesByName.get(name);
+  if (!queue) {
+    queue = [];
+    queuesByName.set(name, queue);
+  }
+  return queue;
+}
+
+function tryAcquire(rule) {
+  const current = activeByName.get(rule.name) ?? 0;
+  if (current >= rule.max) return false;
+  activeByName.set(rule.name, current + 1);
+  return true;
+}
+
+function drainQueue(rule) {
+  const queue = queuesByName.get(rule.name);
+  while (queue && queue.length > 0 && tryAcquire(rule)) {
+    const waiter = queue.shift();
+    clearTimeout(waiter.timer);
+    if (waiter.res.writableEnded || waiter.res.destroyed || waiter.req.destroyed) {
+      // Client went away while waiting — free the slot for the next waiter.
+      releaseSlot(rule);
+      continue;
+    }
+    waiter.start();
+  }
+}
+
+function releaseSlot(rule) {
+  activeByName.set(rule.name, Math.max(0, (activeByName.get(rule.name) ?? 1) - 1));
+}
 function pathnameOf(req) {
   try { return new URL(req.url || "/", "http://localhost").pathname; } catch { return req.url || "/"; }
 }
@@ -121,21 +163,43 @@ Server.prototype.emit = function patchedEmit(event, ...args) {
   }
   const rule = pathLimits.find((candidate) => candidate.test(path));
   if (!rule) return originalEmit.call(this, event, ...args);
-  const current = activeByName.get(rule.name) ?? 0;
-  if (current >= rule.max) {
+
+  const server = this;
+  const start = () => {
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      releaseSlot(rule);
+      drainQueue(rule);
+    };
+    res.once("finish", release);
+    res.once("close", release);
+    originalEmit.call(server, event, req, res);
+  };
+
+  if (tryAcquire(rule)) {
+    start();
+    return true;
+  }
+
+  const queue = queueFor(rule.name);
+  if (queue.length >= QUEUE_MAX_DEPTH) {
+    // Queue is saturated too — shed load the old way rather than piling up.
     reject(res, 429, "ENDPOINT_BUSY", "This heavy operation is already running. Please retry shortly.", 5);
     return true;
   }
-  activeByName.set(rule.name, current + 1);
-  let released = false;
-  const release = () => {
-    if (released) return;
-    released = true;
-    activeByName.set(rule.name, Math.max(0, (activeByName.get(rule.name) ?? 1) - 1));
-  };
-  res.once("finish", release);
-  res.once("close", release);
-  return originalEmit.call(this, event, ...args);
+
+  const waiter = { req, res, start: null, timer: null };
+  waiter.start = start;
+  waiter.timer = setTimeout(() => {
+    const index = queue.indexOf(waiter);
+    if (index !== -1) queue.splice(index, 1);
+    reject(res, 429, "ENDPOINT_BUSY", "This heavy operation is still busy. Please retry shortly.", 5);
+  }, QUEUE_MAX_WAIT_MS);
+  waiter.timer.unref?.();
+  queue.push(waiter);
+  return true;
 };
 
 const timer = setInterval(() => sampleMemory("interval"), SAMPLE_INTERVAL_MS);
