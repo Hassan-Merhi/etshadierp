@@ -86,3 +86,31 @@ Focused regression coverage is in `server/routes/performance/readMicrocache.test
 3. Create or edit a real voucher and confirm the next dependent read shows `MISS` with fresh values across each active server instance.
 4. Leave POS open long enough for autosave and verify report-cache entries remain available while hit counts increase.
 5. Compare five-minute bandwidth snapshots before and after deployment, especially `/api/sales-report`, `/api/factory/payrolls`, `/api/factory/payrolls/preview`, and `/api/locations/:locationId/inventory`.
+
+## Location inventory bandwidth audit — Phases 1–2
+
+Production Render snapshots on 2026-08-13 showed `GET /api/locations/:locationId/inventory` repeatedly becoming the dominant API transfer and crossing the 20 MB per-endpoint reporting-window budget. Phase 1 therefore traced the direct interactive callers before changing the contract.
+
+### Caller classification
+
+- `client/src/pages/location-inventory/useLocationInventoryQueries.ts`: full current inventory plus historical `asOfDate` snapshots. Keep on the full contract because the page groups by stock group/category and calculates cost/value summaries.
+- `client/src/pages/pos/hooks/usePosQueries.ts`: normal POS item list only needs item identity, quantity and selling-price data. Migrate to the compact contract.
+- `client/src/pages/pos/hooks/usePosQueries.ts` stock report prefetch: only needs code, name and quantity. Migrate to the compact contract without pricing.
+- `client/src/pages/pos/postransferorders/components/CreateTransferDialog.tsx`: item picker only needs item identity and quantity. Migrate to the compact contract.
+- `client/src/pages/vouchers/stock-transfer-form/useTransferFormDerived.ts`: rate autofill needs item ID plus average rate. Migrate to the compact pricing contract.
+- Full historical/report/export flows remain on the existing route so Phase 2 does not change accounting, costing, export, or historical semantics.
+
+### Compact contract
+
+`GET /api/locations/:locationId/inventory/light` returns only:
+
+- `locationId`
+- `stockItemId`
+- `quantity`
+- `stockItemCode`
+- `stockItemName`
+- `stockItemUom`
+
+With `?includePricing=true`, it additionally returns `averageRate` and `lastSellingPrice`. The existing POS cost boundary is preserved: POS users receive `averageRate: null` while the configured selling price remains available.
+
+The compact route deliberately reuses the existing location/company authorization boundary and `checkPOSLocation`, so reducing the response shape does not weaken location isolation. HTTP caching remains conservative in these phases; refetch/caching policy changes are handled separately after the payload migration.
