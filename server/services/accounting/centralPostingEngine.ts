@@ -5,6 +5,7 @@ import type {
   VoucherWithEntries,
 } from "./accountingTypes";
 import { insertVoucherWithEntriesTx } from "./voucherPostingService";
+import { assertTransactionCompanyScope } from "../security/transactionCompanyScope";
 
 const TARGET_FIELDS = [
   "ledgerAccountId",
@@ -220,7 +221,8 @@ export function validateCentralPostingRequest(
  *
  * The caller supplies an existing transaction so required source-document,
  * inventory, and secondary-ledger effects can share the same commit. The
- * boundary validates the posting before writes, enforces company ownership,
+ * boundary validates the posting before writes, asserts transaction-local company
+ * scope for compatible PostgreSQL RLS policies, enforces company ownership,
  * performs deterministic idempotency lookup/recording, and writes audit data
  * before the transaction is allowed to commit.
  *
@@ -234,6 +236,8 @@ export async function postBalancedVoucherTx(
 ): Promise<CentralPostingResult> {
   const totals = validateCentralPostingRequest(request);
   const companyId = request.voucher.companyId;
+
+  await assertTransactionCompanyScope(tx, companyId);
 
   const existing = await dependencies.idempotency.findExisting({
     tx,
