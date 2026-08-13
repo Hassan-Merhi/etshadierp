@@ -95,12 +95,12 @@ The ceiling now lives in `config/lint-warning-ratchet.json`, alongside the
 coverage floors and type-escape baselines. `scripts/run-lint.mjs` reads it, so
 `npm run lint` has no number of its own, and the ratchet is a two-part gate:
 
-- **`totals.warningCeiling`** is the repository total, currently 9,457, and may
+- **`totals.warningCeiling`** is the repository total, currently 9,441, and may
   only fall. `totals.errorCeiling` is 0 and permanent — errors are not part of
   the drawdown.
 - **`perRule`** freezes each rule at its own count, checked by
-  `npm run audit:lint-ratchet`. This is the part that matters: 8,834 of the
-  9,457 warnings are `no-explicit-any`, so a total-only gate is a count of
+  `npm run audit:lint-ratchet`. This is the part that matters: 8,815 of the
+  9,441 warnings are `no-explicit-any`, so a total-only gate is a count of
   `any` wearing a lint badge. Under one, deleting 500 `any` annotations pays for
   500 new `react-hooks/exhaustive-deps` warnings — stale-closure bugs — and the
   total reports the trade as flat. Per-rule ceilings make it fail.

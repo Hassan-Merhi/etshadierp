@@ -206,27 +206,27 @@ export async function tenantIsolationBoundary(req: Request, res: Response, next:
   try {
     context = await resolveCanonicalContext(req);
 
-    const explicit = decideExplicitCompanyScope({
+    const decision = decideExplicitCompanyScope({
       queryCompanyId: req.query?.companyId,
       bodyCompanyId: (req.body as Record<string, unknown> | undefined)?.companyId,
     });
 
-    if (explicit.kind === "invalid") {
+    if (decision.kind === "invalid") {
       return res.status(400).json({
         code: "COMPANY_ID_INVALID",
-        message: `Invalid companyId in request ${explicit.source}.`,
+        message: `Invalid companyId in request ${decision.source}.`,
       });
     }
-    if (explicit.kind === "conflict") {
+    if (decision.kind === "conflict") {
       return res.status(400).json({
         code: "COMPANY_ID_CONFLICT",
         message: "All companyId values in the request must match.",
       });
     }
-    if (explicit.kind === "company") {
+    if (decision.kind === "company") {
       assertRequestCompanyMatchesSession(
         { userId: context.userId, role: context.role, companyId: context.companyId },
-        explicit.companyId
+        decision.companyId
       );
     }
 
