@@ -7,7 +7,7 @@
 import type { Express } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
-import { requireAuth, requireNonPOS } from "../../auth";
+import { requireAuth } from "../../auth";
 import { logger } from "../../lib/logger";
 import {
   stockTransferVouchers,
@@ -200,29 +200,12 @@ export function registerStockTransferRevisionWriteRoutes(app: Express) {
     }
   });
 
-  // Transfer Revisions - PATCH optional flag
-  app.patch("/api/stock-transfer-revisions/:id/optional", requireAuth, requireNonPOS, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      if (!id) return res.status(400).json({ message: "Revision ID required" });
-      const { optional } = req.body;
-      await db.update(stockTransferRevisions).set({ optional: !!optional }).where(eq(stockTransferRevisions.id, id));
-      res.json({ success: true });
-    } catch (error: unknown) {
-      res.status(500).json({ message: getErrorMessage(error) });
-    }
-  });
-
-  // Revisions - DELETE
-  app.delete("/api/stock-transfer-revisions/:id", requireAuth, requireNonPOS, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      if (!id) return res.status(400).json({ message: "Revision ID required" });
-      await db.delete(stockTransferRevisionItems).where(eq(stockTransferRevisionItems.revisionId, id));
-      await db.delete(stockTransferRevisions).where(eq(stockTransferRevisions.id, id));
-      res.json({ success: true });
-    } catch (error: unknown) {
-      res.status(500).json({ message: getErrorMessage(error) });
-    }
-  });
+  // PATCH /api/stock-transfer-revisions/:id/optional and
+  // DELETE /api/stock-transfer-revisions/:id used to live here, mutating and
+  // deleting revision rows directly. The lifecycle is immutable now: both paths
+  // are answered by the tombstones in
+  // server/routes/vouchers/immutableStockTransferRevisionRoutes.ts, which
+  // registerVoucherRoutes registers first and which reject every call with 409.
+  // These copies could never run, and leaving a live delete of revision history
+  // one registration-order change away from waking up is not worth the lines.
 }

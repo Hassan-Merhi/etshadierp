@@ -201,26 +201,6 @@ describe("stock transfer revision write routes", () => {
     );
   });
 
-  it("patches the optional flag and deletes revision items before the revision", async () => {
-    const patchRes = { status: vi.fn(), json: vi.fn() };
-    patchRes.status.mockReturnValue(patchRes);
-    await harness.handlers.get("PATCH /api/stock-transfer-revisions/:id/optional")!(
-      { params: { id: "41" }, body: { optional: 0 } },
-      patchRes
-    );
-    expect(harness.updates).toContainEqual({
-      table: harness.tables.stockTransferRevisions,
-      values: { optional: false },
-    });
-    expect(patchRes.json).toHaveBeenCalledWith({ success: true });
-
-    const deleteRes = { status: vi.fn(), json: vi.fn() };
-    deleteRes.status.mockReturnValue(deleteRes);
-    await harness.handlers.get("DELETE /api/stock-transfer-revisions/:id")!({ params: { id: "41" } }, deleteRes);
-    expect(harness.deletes).toEqual([harness.tables.stockTransferRevisionItems, harness.tables.stockTransferRevisions]);
-    expect(deleteRes.json).toHaveBeenCalledWith({ success: true });
-  });
-
   it("rejects invalid identifiers and empty revisions without DB writes", async () => {
     const res = { status: vi.fn(), json: vi.fn() };
     res.status.mockReturnValue(res);
