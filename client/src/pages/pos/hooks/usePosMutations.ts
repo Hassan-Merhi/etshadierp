@@ -1,5 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient, invalidateCustomerBalances } from "@/lib/queryClient";
+import { invalidateLocationInventoryQueries } from "@/api/inventoryApi";
 import type { SaleRow, Location } from "../pos-components/posTypes";
 
 interface UsePosMutationsParams {
@@ -138,8 +139,8 @@ export function usePosMutations({
       const locationId = activeLocation?.id || data.location?.id || (editVoucher as any)?.locationId;
       if (isSpCompany) {
         queryClient.invalidateQueries({ queryKey: ["/api/sp/stock"] });
-      } else if (locationId) {
-        queryClient.invalidateQueries({ queryKey: [`/api/locations/${locationId}/inventory`] });
+      } else {
+        invalidateLocationInventoryQueries(locationId);
       }
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       if (editVoucherId) queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${editVoucherId}`] });
