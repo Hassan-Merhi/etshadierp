@@ -4,12 +4,10 @@ import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
-import { locations, vouchers, voucherEntries, ledgerAccounts, posShifts, companies } from "@shared/schema";
+import { vouchers, voucherEntries, ledgerAccounts } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
-import { generateStockPdf } from "../../helpers/generateStockPdf";
-import { generateInvoicePdf, generateInvoicePdfMeta } from "../../helpers/generateInvoicePdf";
+import { generateInvoicePdf } from "../../helpers/generateInvoicePdf";
 import { getErpExportVisibility } from "../../helpers/exportVisibility";
-import { sendWhatsAppFileToChatIdPos, sendWhatsAppFileByUploadPos } from "../../services/whatsappService";
 import { tempPdfStore } from "./posHelpers";
 
 export function registerPosPrintRoutes(app: Express): void {
