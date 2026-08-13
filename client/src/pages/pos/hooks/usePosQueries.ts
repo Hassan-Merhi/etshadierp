@@ -43,11 +43,10 @@ export function usePosQueries({
     isLoading: inventoryLoading,
     error: inventoryError,
   } = useQuery<APIInventoryItem[]>({
-    queryKey: activeLocation ? [`/api/locations/${activeLocation.id}/inventory`] : [],
-    // Supplier Partner offloads and migration keep the normal location inventory
-    // synchronized with sp_stock_movements. Fetching it here gives the shared POS
-    // the authoritative per-location item IDs, names and quantities instead of
-    // silently hiding stock when an older SP movement has a missing/stale location.
+    queryKey: activeLocation ? [`/api/locations/${activeLocation.id}/inventory/light?includePricing=true`] : [],
+    // POS only needs item identity, quantity and selling-price data. The compact
+    // route avoids downloading stock-group/category/metadata fields on every
+    // location inventory read while preserving the POS cost-visibility boundary.
     enabled: !!activeLocation,
   });
 
@@ -147,10 +146,19 @@ export function usePosQueries({
     staleTime: 60_000,
   });
 
-  // Stock inventory — prefetch when invoice or stock dialog is open
+  // Stock inventory — prefetch only when the invoice or stock dialog is open.
+  // The report only renders item code/name and quantity, so do not load pricing,
+  // category or stock-group metadata here.
   const printLocationId = activeLocation?.id ?? (editVoucher as any)?.locationId ?? null;
   const { data: stockInventory = [], isLoading: stockInventoryLoading } = useQuery<any[]>({
-    queryKey: printLocationId ? [`/api/locations/${printLocationId}/inventory`] : [],
+    queryKey: printLocationId ? [`/api/locations/${printLocationId}/inventory/light`, "pos-stock-report"] : [],
+    queryFn: async () => {
+      if (!printLocationId) return [];
+      const res = await fetch(`/api/locations/${printLocationId}/inventory/light`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load stock report inventory");
+      const rows = await res.json();
+      return Array.isArray(rows) ? rows.map((item: any) => ({ ...item, stock: item.quantity })) : [];
+    },
     enabled: (showPrintDialog || showStockPrompt) && !!printLocationId,
   });
 
