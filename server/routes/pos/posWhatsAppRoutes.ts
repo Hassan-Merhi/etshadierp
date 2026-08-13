@@ -1,26 +1,12 @@
 import { type Express } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
-import { getClientDate } from "../../lib/dateUtils";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
-import {
-  locations,
-  posShifts,
-  inventory,
-  stockItems,
-  stockGroups,
-  vouchers,
-  voucherEntries,
-  ledgerAccounts,
-  userCompanyRoles,
-} from "@shared/schema";
-import { eq, and, desc, asc, gte, sql } from "drizzle-orm";
+import { locations, posShifts, inventory, stockItems, stockGroups, userCompanyRoles } from "@shared/schema";
+import { eq, and, desc, asc, gte } from "drizzle-orm";
 import { format } from "date-fns";
-import { generateStockPdf } from "../../helpers/generateStockPdf";
-import { generateInvoicePdf } from "../../helpers/generateInvoicePdf";
-import { getErpExportVisibility } from "../../helpers/exportVisibility";
-import { sendWhatsAppTextToChatIdPos, sendWhatsAppFileByUploadPos } from "../../services/whatsappService";
+import { sendWhatsAppTextToChatIdPos } from "../../services/whatsappService";
 
 export function registerPosWhatsAppRoutes(app: Express): void {
   // ── POS WhatsApp Shift Report ─────────────────────────────────────────────
@@ -133,7 +119,6 @@ export function registerPosWhatsAppRoutes(app: Express): void {
     } catch (error: unknown) {
       logger.error("[/api/pos/send-shift-report]", {
         locationId: req.body.locationId,
-        chatId: (error as any)?.chatId ?? undefined,
         error: getErrorMessage(error) ?? error,
       });
       res.status(500).json({ message: getErrorMessage(error) });
