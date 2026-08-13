@@ -1,6 +1,6 @@
 {
-  "version": 20,
-  "description": "Repository-wide god-file architecture boundaries plus a one-way size ratchet. Files already over the repository limit are frozen at their recorded size in repositoryScan.grandfathered: they may shrink but never grow, and any new file crossing the limit fails until it is split or explicitly baselined. Version 20 permanently retires the four original Wave 5 inventory-core targets after their behavior-preserving splits reduced every authored replacement file below the 900-line repository limit while keeping the original import paths stable.",
+  "version": 21,
+  "description": "Repository-wide god-file architecture boundaries plus a one-way size ratchet. Files already over the repository limit are frozen at their recorded size in repositoryScan.grandfathered: they may shrink but never grow, and any new file crossing the limit fails until it is split or explicitly baselined. Version 21 permanently retires StockAdjustmentForm.tsx after its behavior-preserving Wave 6 split into a typed model, typed view, and stable original-path composition shell, with every authored replacement file below the 900-line repository limit.",
   "retiredFiles": [
     "server/routesLegacy.ts",
     "server/routes/reportsRoutesLegacy.ts",
@@ -173,7 +173,6 @@
       "client/src/pages/SupplierProfitCheck.tsx": 1975,
       "client/src/pages/TransactionJournal.tsx": 1600,
       "client/src/pages/vouchers/JournalForm.tsx": 1650,
-      "client/src/pages/vouchers/StockAdjustmentForm.tsx": 1200,
       "client/src/pages/vouchers/StockTransferForm.tsx": 2400,
       "server/chatService.ts": 2000,
       "server/index.ts": 1725,
