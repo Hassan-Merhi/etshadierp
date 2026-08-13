@@ -8,19 +8,17 @@ import {
   reconcileConvergenceTx,
 } from "../../services/accounting/convergenceReconciliation";
 import { createDatabaseConvergenceAdapter } from "../../services/accounting/databaseConvergenceAdapter";
-import { loadDatabaseCanonicalStockTransferEvidence } from "../../services/inventory/databaseCanonicalStockTransferEvidence";
-import { createDatabaseStockTransferSnapshotLoader } from "../../services/inventory/databaseStockTransferConvergenceAdapter";
+import { loadDatabaseStockConvergenceSnapshots } from "../../services/inventory/databaseStockConvergenceSnapshots";
 
-const convergenceAdapter = createDatabaseConvergenceAdapter(
-  createDatabaseStockTransferSnapshotLoader(loadDatabaseCanonicalStockTransferEvidence)
-);
+const convergenceAdapter = createDatabaseConvergenceAdapter(loadDatabaseStockConvergenceSnapshots);
 
 /**
  * Read-only accounting and inventory convergence reconciliation.
  *
  * Compares the authoritative evidence for the active company — Voucher against
  * VoucherEntry against the Factory Daybook mirror, and applied stock transfer
- * documents against the canonical movement journal — and reports what disagrees.
+ * and stock adjustment documents against the canonical movement journal — and
+ * reports what disagrees.
  *
  * It never repairs anything. A discrepancy is a fact to investigate, and a
  * reconciler that silently corrected one would destroy the evidence that it

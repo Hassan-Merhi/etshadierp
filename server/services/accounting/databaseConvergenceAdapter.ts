@@ -17,11 +17,22 @@ export type AuthoritativeStockSnapshotLoader = (input: {
 }) => Promise<StockConvergenceSnapshot[]>;
 
 /**
- * Voucher types that record an inventory movement and deliberately post no
- * ledger entries. Kept in step with the stock transfer document loader, which
- * treats the same three spellings as one document type.
+ * Voucher types whose ledger posting is not a balanced double entry against the
+ * document total, and which therefore cannot be judged by this reconciliation.
+ *
+ * - Stock Transfer moves stock between locations and posts no ledger entry at
+ *   all. The three spellings are the ones the transfer document loader treats
+ *   as a single document type.
+ * - Stock Adjustment posts exactly one entry — production credits the production
+ *   account, consumption debits the consumption account — because the other side
+ *   of the movement is inventory, which is not a ledger account here. Comparing
+ *   its total against both ledger sides reports every adjustment as unbalanced.
+ *
+ * Both are inventory documents, and both are reconciled on the stock side of
+ * this same report against the canonical movement journal, so excluding them
+ * here removes noise rather than coverage.
  */
-const STOCK_ONLY_VOUCHER_TYPES = ["Stock Transfer", "StockTransfer", "Transfer"];
+const NON_DOUBLE_ENTRY_VOUCHER_TYPES = ["Stock Transfer", "StockTransfer", "Transfer", "Stock Adjustment"];
 
 function asInteger(value: unknown, field: string): number {
   const parsed = Number(value);
@@ -83,11 +94,9 @@ export async function loadDatabaseAccountingConvergenceSnapshots(input: {
       and(
         eq(vouchers.companyId, companyId),
         sql`${vouchers.deletedAt} is null`,
-        // Stock transfers move stock between locations and post no double
-        // entry, so demanding ledger evidence from them reports a discrepancy
-        // for every transfer ever made. Their convergence is checked by the
-        // stock half of the same reconciliation, against the canonical journal.
-        notInArray(vouchers.voucherType, STOCK_ONLY_VOUCHER_TYPES)
+        // See NON_DOUBLE_ENTRY_VOUCHER_TYPES: these are inventory documents
+        // reconciled on the stock side of this same report.
+        notInArray(vouchers.voucherType, NON_DOUBLE_ENTRY_VOUCHER_TYPES)
       )
     )
     .groupBy(vouchers.id, vouchers.companyId, vouchers.voucherType, vouchers.totalAmount);

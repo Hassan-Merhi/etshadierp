@@ -191,10 +191,10 @@ export function buildExactVoucherReversal(input: {
  * sides are swapped and posted through the same balanced/idempotent/audited
  * central posting boundary as new writes.
  */
-export async function reverseVoucherExactlyTx(
-  tx: CompanyScopedTransaction,
+export async function reverseVoucherExactlyTx<TTransaction extends CompanyScopedTransaction = CompanyScopedTransaction>(
+  tx: TTransaction,
   request: ExactVoucherReversalRequest,
-  loader: VoucherReversalLoader,
+  loader: VoucherReversalLoader<TTransaction>,
   dependencies: CentralPostingDependencies
 ): Promise<CentralPostingResult> {
   const companyId = positiveId(request.companyId, "companyId");

@@ -1,7 +1,8 @@
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import { stockTransferItems, stockTransferVouchers, vouchers } from "@shared/schema";
 import { ConvergenceReconciliationError, type StockConvergenceSnapshot } from "../accounting/convergenceReconciliation";
 import type { db } from "../../db";
+import { canonicalJournalStartedAt } from "./canonicalJournalStart";
 
 /** The concrete drizzle transaction handle, inferred from the shared client. */
 type DrizzleTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -61,13 +62,18 @@ function identity(sourceType: unknown, sourceId: unknown): string {
 /**
  * Reads the authoritative, inventory-applied stock-transfer documents for one
  * company. Draft/optional/deleted transfers are excluded because they are not
- * expected to have posted stock movement evidence yet.
+ * expected to have posted stock movement evidence yet, and transfers that
+ * predate the canonical journal are excluded because no evidence exists or ever
+ * will for them — the journal is append-only and is never backfilled.
  */
 export async function loadDatabaseStockTransferDocuments(input: {
   tx: DrizzleTransaction;
   companyId: number;
 }): Promise<StockTransferDocumentSnapshot[]> {
   const { tx, companyId } = input;
+  const journalStart = await canonicalJournalStartedAt(tx, companyId);
+  if (!journalStart) return [];
+
   const rows = await tx
     .select({
       transferId: stockTransferVouchers.id,
@@ -86,6 +92,7 @@ export async function loadDatabaseStockTransferDocuments(input: {
         isNull(vouchers.deletedAt),
         eq(vouchers.optional, false),
         eq(stockTransferVouchers.inventoryApplied, true),
+        gte(stockTransferVouchers.createdAt, journalStart),
         inArray(vouchers.voucherType, ["Stock Transfer", "StockTransfer", "Transfer"])
       )
     )
