@@ -39,11 +39,12 @@ export function CreateTransferDialog({
     enabled: open,
   });
 
-  // Inventory of the selected source location
+  // Inventory of the selected source location. This picker only needs item
+  // identity + quantity, so use the compact bandwidth-safe contract.
   const { data: sourceInventory = [] } = useQuery<InventoryItem[]>({
-    queryKey: ["/api/inventory", sourceId],
+    queryKey: ["/api/inventory/light", sourceId],
     queryFn: async () => {
-      const res = await fetch(`/api/locations/${sourceId}/inventory`, { credentials: "include" });
+      const res = await fetch(`/api/locations/${sourceId}/inventory/light`, { credentials: "include" });
       return res.ok ? res.json() : [];
     },
     enabled: !!sourceId && open,

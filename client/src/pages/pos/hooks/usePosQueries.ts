@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { locationInventoryLightUrl } from "@/api/inventoryApi";
 import type { APIInventoryItem, Location } from "../pos-components/posTypes";
 import { buildPosInventory, type SpMovement } from "./posInventory";
 
@@ -13,6 +14,8 @@ interface PosQueriesParams {
   /** Supplier Partner companies source their sellable stock from sp_stock_movements, not the normal inventory table. */
   isSpCompany?: boolean;
 }
+
+type StockInventoryItem = APIInventoryItem & { stock: string };
 
 export function usePosQueries({
   posUser,
@@ -38,17 +41,17 @@ export function usePosQueries({
     enabled: !!posUser,
   });
 
+  const posInventoryUrl = activeLocation ? locationInventoryLightUrl(activeLocation.id, true) : null;
   const {
     data: apiInventory = [],
     isLoading: inventoryLoading,
     error: inventoryError,
   } = useQuery<APIInventoryItem[]>({
-    queryKey: activeLocation ? [`/api/locations/${activeLocation.id}/inventory`] : [],
-    // Supplier Partner offloads and migration keep the normal location inventory
-    // synchronized with sp_stock_movements. Fetching it here gives the shared POS
-    // the authoritative per-location item IDs, names and quantities instead of
-    // silently hiding stock when an older SP movement has a missing/stale location.
-    enabled: !!activeLocation,
+    queryKey: posInventoryUrl ? [posInventoryUrl] : [],
+    // POS only needs item identity, quantity and selling-price data. The compact
+    // route avoids downloading stock-group/category/metadata fields on every
+    // location inventory read while preserving the POS cost-visibility boundary.
+    enabled: !!posInventoryUrl,
   });
 
   // Supplier Partner companies still need the SP lots for final-cost/FIFO data.
@@ -147,11 +150,18 @@ export function usePosQueries({
     staleTime: 60_000,
   });
 
-  // Stock inventory — prefetch when invoice or stock dialog is open
-  const printLocationId = activeLocation?.id ?? (editVoucher as any)?.locationId ?? null;
-  const { data: stockInventory = [], isLoading: stockInventoryLoading } = useQuery<any[]>({
-    queryKey: printLocationId ? [`/api/locations/${printLocationId}/inventory`] : [],
-    enabled: (showPrintDialog || showStockPrompt) && !!printLocationId,
+  // Stock inventory — use the exact compact query key shared by other item/qty
+  // consumers. `select` shapes the view without creating a second network cache.
+  const printLocationId = activeLocation?.id ?? editVoucher?.locationId ?? null;
+  const stockInventoryUrl = printLocationId ? locationInventoryLightUrl(printLocationId) : null;
+  const { data: stockInventory = [], isLoading: stockInventoryLoading } = useQuery<
+    APIInventoryItem[],
+    Error,
+    StockInventoryItem[]
+  >({
+    queryKey: stockInventoryUrl ? [stockInventoryUrl] : [],
+    enabled: (showPrintDialog || showStockPrompt) && !!stockInventoryUrl,
+    select: (rows) => rows.map((item) => ({ ...item, stock: item.quantity })),
   });
 
   return {

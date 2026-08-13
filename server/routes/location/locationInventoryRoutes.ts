@@ -89,6 +89,37 @@ export function registerLocationInventoryRoutes(app: Express) {
         });
       }
 
+      const includeZero = req.query.includeZero === "true";
+
+      // High-frequency interactive callers can request only the identity/quantity
+      // fields they need without registering a second route or downloading the
+      // full inventory/reporting payload.
+      if (req.query.profile === "light") {
+        const includePricing = req.query.includePricing === "true";
+        const rows = await storage.getLocationInventory(location.companyId, locationId, includeZero);
+        const isPOS = req.user?.role === "POS";
+        const compactRows = rows.map((item) => {
+          const compact: Record<string, unknown> = {
+            locationId: item.locationId,
+            stockItemId: item.stockItemId,
+            quantity: item.quantity,
+            stockItemCode: item.stockItemCode ?? "",
+            stockItemName: item.stockItemName ?? "",
+            stockItemUom: item.stockItemUom ?? "",
+          };
+
+          if (includePricing) {
+            compact.averageRate = isPOS ? null : (item.averageRate ?? null);
+            compact.lastSellingPrice = item.lastSellingPrice ?? null;
+          }
+
+          return compact;
+        });
+
+        res.setHeader("Cache-Control", "private, no-cache");
+        return res.json(compactRows);
+      }
+
       // Check for asOfDate query parameter for historical inventory
       const rawAsOfDate = req.query.asOfDate as string | undefined;
 
@@ -116,8 +147,6 @@ export function registerLocationInventoryRoutes(app: Express) {
           asOfDate = d.toISOString().slice(0, 10);
         }
       }
-
-      const includeZero = req.query.includeZero === "true";
 
       // Use the location's own companyId as source of truth (not session, which
       // may lag or differ in multi-company contexts). Access check above already
