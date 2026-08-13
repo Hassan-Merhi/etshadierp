@@ -9,8 +9,11 @@ export async function getAllDraftPosSales(userId: string, locationId?: number): 
   const { rows } = await pool.query(
     `SELECT d.id,
             d.location_id,
+            d.location_id AS "locationId",
             d.created_at,
+            d.created_at AS "createdAt",
             d.updated_at,
+            d.updated_at AS "updatedAt",
             COALESCE(s.item_count, 0)::int AS item_count,
             COALESCE(s.total_qty, 0) AS total_qty,
             COALESCE(s.total_amount, 0) AS total_amount
