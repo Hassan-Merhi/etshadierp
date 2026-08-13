@@ -41,7 +41,7 @@ interface PosDraftSummary {
 export function upsertPosDraftSummary(
   locationId: number | null | undefined,
   draft: DraftSummarySource,
-  items: DraftSummaryItem[] = [],
+  items: DraftSummaryItem[] = []
 ): void {
   if (!locationId || typeof draft.id !== "number") return;
   const itemCount = items.length;
@@ -73,7 +73,7 @@ export function upsertPosDraftSummary(
 export function removePosDraftSummary(locationId: number | null | undefined, draftId: number): void {
   if (!locationId) return;
   queryClient.setQueryData<PosDraftSummary[]>([posDraftsUrl(locationId)], (current) =>
-    Array.isArray(current) ? current.filter((row) => row.id !== draftId) : [],
+    Array.isArray(current) ? current.filter((row) => row.id !== draftId) : []
   );
 }
 
@@ -90,7 +90,7 @@ export const posApi = {
       closingCash?: number;
       notes?: string;
       [key: string]: unknown;
-    },
+    }
   ) => apiRequest("POST", `/api/pos/shifts/${shiftId}/close`, data),
 
   createSale: (data: {
