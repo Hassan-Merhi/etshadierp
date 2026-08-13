@@ -9,6 +9,7 @@
 import { useEffect, useMemo } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { queryClient } from "@/lib/queryClient";
+import { locationInventoryLightUrl } from "@/api/inventoryApi";
 
 /** Source-location inventory, filtered by the sidebar search and sorted by name. */
 export function useFilteredTransferInventory(transferInventory: any[], transferSearchTerm: string) {
@@ -34,8 +35,8 @@ export function usePendingTransferRevisions(transferRevisions: any[]) {
 
 /**
  * Fill in missing rates from each source location's average rate. One cached
- * request per distinct location, using the compact pricing payload instead of
- * the full location inventory response.
+ * request per distinct location, using the same compact pricing query key as
+ * POS so an already-loaded location does not get downloaded again.
  */
 export function useTransferRateAutofill(
   transferEntries: { sourceLocationId: number; stockItemId: number; rate?: string }[],
@@ -56,11 +57,9 @@ export function useTransferRateAutofill(
 
     let cancelled = false;
     for (const [locationId, pending] of missingByLocation) {
+      const pricingUrl = locationInventoryLightUrl(locationId, true);
       queryClient
-        .fetchQuery<any[]>({
-          queryKey: [`/api/locations/${locationId}/inventory/light?includePricing=true`],
-          staleTime: 60_000,
-        })
+        .fetchQuery<any[]>({ queryKey: [pricingUrl] })
         .then((locationInventory) => {
           if (cancelled || !Array.isArray(locationInventory)) return;
           const rateByItem = new Map<number, string>();
