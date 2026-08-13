@@ -7,16 +7,19 @@ export async function getAllDraftPosSales(userId: string, locationId?: number): 
   const locationFilter = locationId ? "AND d.location_id = $2" : "";
   const params = locationId ? [userId, locationId] : [userId];
   const { rows } = await pool.query(
-    `SELECT d.*,
-            COALESCE(s.item_count, 0)::int  AS item_count,
-            COALESCE(s.total_qty, 0)        AS total_qty,
-            COALESCE(s.total_amount, 0)     AS total_amount
+    `SELECT d.id,
+            d.location_id,
+            d.created_at,
+            d.updated_at,
+            COALESCE(s.item_count, 0)::int AS item_count,
+            COALESCE(s.total_qty, 0) AS total_qty,
+            COALESCE(s.total_amount, 0) AS total_amount
      FROM draft_pos_sales d
      LEFT JOIN (
        SELECT draft_id,
-              COUNT(*)               AS item_count,
+              COUNT(*) AS item_count,
               SUM(quantity::numeric) AS total_qty,
-              SUM(amount::numeric)   AS total_amount
+              SUM(amount::numeric) AS total_amount
        FROM draft_pos_sale_items
        GROUP BY draft_id
      ) s ON s.draft_id = d.id
