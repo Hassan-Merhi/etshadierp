@@ -32,15 +32,9 @@ export const inventoryApi = {
 
   deleteLocation: (id: number) => apiRequest("DELETE", `/api/locations/${id}`),
 
-  archiveStockGroup: (data: {
-    stockGroupId: number;
-    locationId: number;
-    [key: string]: unknown;
-  }) => apiRequest("POST", "/api/stock-group-archives", data),
+  archiveStockGroup: (data: { stockGroupId: number; locationId: number; [key: string]: unknown }) =>
+    apiRequest("POST", "/api/stock-group-archives", data),
 
-  silentProduction: (data: {
-    locationId: number;
-    items: unknown[];
-    [key: string]: unknown;
-  }) => apiRequest("POST", "/api/inventory/silent-production", data),
+  silentProduction: (data: { locationId: number; items: unknown[]; [key: string]: unknown }) =>
+    apiRequest("POST", "/api/inventory/silent-production", data),
 };
