@@ -6,6 +6,11 @@ import {
 } from "../server/services/inventory/stockMovementReversal";
 import type { StockMovementRecord } from "../server/services/inventory/stockMovementIntegrityService";
 
+/** A stub transaction that can run the transaction-local tenant-scope statement. */
+function stubTx(marker?: string) {
+  return { marker, execute: vi.fn(async () => ({ rows: [] })) };
+}
+
 const source = {
   sourceType: "stock-transfer-reversal",
   sourceId: "77",
@@ -126,7 +131,7 @@ describe("buildExactStockMovementReversal", () => {
 describe("postExactStockMovementReversalTx", () => {
   it("locks the original by company before posting its exact opposite", async () => {
     const mock = adapter();
-    const tx = { marker: "same-transaction" };
+    const tx = stubTx("same-transaction");
     const result = await postExactStockMovementReversalTx(
       tx,
       {
@@ -139,6 +144,11 @@ describe("postExactStockMovementReversalTx", () => {
       mock
     );
 
+    // The transaction-local company scope must be asserted before the original
+    // row is read, so a compatible RLS policy guards that first lock too. It is
+    // asserted again by the movement boundary this delegates to, so the count
+    // is not pinned.
+    expect(tx.execute).toHaveBeenCalled();
     expect(mock.lockOriginalMovement).toHaveBeenCalledWith({ tx, companyId: 12, movementId: 901 });
     expect(mock.validateOwnership).toHaveBeenCalledWith({
       tx,
@@ -161,7 +171,7 @@ describe("postExactStockMovementReversalTx", () => {
     const mock = adapter(null);
     await expect(
       postExactStockMovementReversalTx(
-        {},
+        stubTx(),
         {
           companyId: 12,
           movementId: 901,
@@ -178,7 +188,7 @@ describe("postExactStockMovementReversalTx", () => {
     const mock = adapter(original({ companyId: 99 }));
     await expect(
       postExactStockMovementReversalTx(
-        {},
+        stubTx(),
         {
           companyId: 12,
           movementId: 901,

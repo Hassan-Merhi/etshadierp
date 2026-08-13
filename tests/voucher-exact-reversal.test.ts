@@ -48,6 +48,11 @@ const original = {
   ],
 };
 
+/** A stub transaction that can run the transaction-local tenant-scope statement. */
+function stubTx() {
+  return { execute: vi.fn(async () => ({ rows: [] })) };
+}
+
 describe("exact voucher reversal", () => {
   it("derives all monetary and ownership fields from the locked original", () => {
     const reversal = buildExactVoucherReversal({
@@ -123,8 +128,9 @@ describe("exact voucher reversal", () => {
       audit: { recordPosting: vi.fn() },
     };
 
+    const tx = stubTx();
     const result = await reverseVoucherExactlyTx(
-      {},
+      tx,
       {
         companyId: 7,
         originalVoucherId: 91,
@@ -135,8 +141,11 @@ describe("exact voucher reversal", () => {
       dependencies
     );
 
+    // Asserted by the reversal boundary and again by the central posting
+    // engine it delegates to, so the count is not pinned.
+    expect(tx.execute).toHaveBeenCalled();
     expect(loader.loadOriginalForUpdate).toHaveBeenCalledWith({
-      tx: {},
+      tx,
       companyId: 7,
       voucherId: 91,
     });
