@@ -6,6 +6,10 @@
 import { salesItems, inventory, stockItemLocationPrices } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { adjustInventory } from "../../../inventoryHelper";
+import { createDatabaseStockMovementAdapter } from "../../inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../../inventory/stockMovementIntegrityService";
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
+
 import {
   addInventoryValues,
   inventoryMoney,
@@ -31,9 +35,11 @@ export async function rebuildSaleItems(
     oldItemsMap: Map<number, any>;
     canSellNegativeStock: boolean;
     companyId: number;
+    canonicalRevision?: number;
   }
 ): Promise<RebuildSaleItemsResult> {
-  const { voucherId, targetLocationId, items, oldItemsMap, canSellNegativeStock, companyId } = params;
+  const { voucherId, targetLocationId, items, oldItemsMap, canSellNegativeStock, companyId, canonicalRevision } =
+    params;
 
   const sortedNewItems = [...items].sort((a: any, b: any) => a.stockItemId - b.stockItemId);
   let grandTotal = toInventoryDecimal(0);
@@ -91,6 +97,30 @@ export async function rebuildSaleItems(
     });
 
     await adjustInventory(tx, targetLocationId, stockItemId, sellQty.negated().toNumber(), companyId);
+
+    // The edited sale issues its new quantities at the cost the line carries,
+    // which is the original line's cost when the item is unchanged.
+    if (canonicalRevision !== undefined && !sellQty.isZero()) {
+      await postStockMovementTx(
+        tx,
+        {
+          companyId,
+          stockItemId,
+          kind: "issue",
+          quantity: inventoryQuantity(sellQty),
+          unitCost: inventoryUnitCost(costPrice),
+          fromLocationId: targetLocationId,
+          occurredAt: new Date().toISOString(),
+          source: {
+            sourceType: "pos-sale",
+            sourceId: String(voucherId),
+            idempotencyKey: `pos-sale:${voucherId}:rev${canonicalRevision}:issue:${stockItemId}`,
+          },
+          allowNegativeStock: true,
+        },
+        canonicalStockMovementAdapter
+      );
+    }
 
     grandTotal = addInventoryValues(grandTotal, totalSales);
     totalSupplierCostEdit = addInventoryValues(totalSupplierCostEdit, totalCost);
