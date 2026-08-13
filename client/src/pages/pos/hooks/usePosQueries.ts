@@ -76,7 +76,7 @@ export function usePosQueries({
 
   const inventory = useMemo(
     () => buildPosInventory(apiInventory, spStock, !!isSpCompany, activeLocation ? Number(activeLocation.id) : null),
-    [apiInventory, spStock, isSpCompany, activeLocation],
+    [apiInventory, spStock, isSpCompany, activeLocation]
   );
 
   const { data: bankAccounts = [] } = useQuery<any[]>({
@@ -91,11 +91,11 @@ export function usePosQueries({
 
   const cashLedgerAccounts = useMemo(
     () => (Array.isArray(allLedgerAccounts) ? allLedgerAccounts : []).filter((acc) => acc.accountType === "Cash"),
-    [allLedgerAccounts],
+    [allLedgerAccounts]
   );
   const customerAccounts = useMemo(
     () => (Array.isArray(allLedgerAccounts) ? allLedgerAccounts : []).filter((acc) => acc.accountType === "Asset"),
-    [allLedgerAccounts],
+    [allLedgerAccounts]
   );
 
   const { data: drafts = [], refetch: refetchDrafts } = useQuery<any[]>({
