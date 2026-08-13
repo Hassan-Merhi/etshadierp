@@ -15,6 +15,8 @@ interface PosQueriesParams {
   isSpCompany?: boolean;
 }
 
+type StockInventoryItem = APIInventoryItem & { stock: string };
+
 export function usePosQueries({
   posUser,
   activeLocation,
@@ -74,7 +76,7 @@ export function usePosQueries({
 
   const inventory = useMemo(
     () => buildPosInventory(apiInventory, spStock, !!isSpCompany, activeLocation ? Number(activeLocation.id) : null),
-    [apiInventory, spStock, isSpCompany, activeLocation]
+    [apiInventory, spStock, isSpCompany, activeLocation],
   );
 
   const { data: bankAccounts = [] } = useQuery<any[]>({
@@ -89,11 +91,11 @@ export function usePosQueries({
 
   const cashLedgerAccounts = useMemo(
     () => (Array.isArray(allLedgerAccounts) ? allLedgerAccounts : []).filter((acc) => acc.accountType === "Cash"),
-    [allLedgerAccounts]
+    [allLedgerAccounts],
   );
   const customerAccounts = useMemo(
     () => (Array.isArray(allLedgerAccounts) ? allLedgerAccounts : []).filter((acc) => acc.accountType === "Asset"),
-    [allLedgerAccounts]
+    [allLedgerAccounts],
   );
 
   const { data: drafts = [], refetch: refetchDrafts } = useQuery<any[]>({
@@ -150,12 +152,16 @@ export function usePosQueries({
 
   // Stock inventory — use the exact compact query key shared by other item/qty
   // consumers. `select` shapes the view without creating a second network cache.
-  const printLocationId = activeLocation?.id ?? (editVoucher as any)?.locationId ?? null;
+  const printLocationId = activeLocation?.id ?? editVoucher?.locationId ?? null;
   const stockInventoryUrl = printLocationId ? locationInventoryLightUrl(printLocationId) : null;
-  const { data: stockInventory = [], isLoading: stockInventoryLoading } = useQuery<any[], Error, any[]>({
+  const { data: stockInventory = [], isLoading: stockInventoryLoading } = useQuery<
+    APIInventoryItem[],
+    Error,
+    StockInventoryItem[]
+  >({
     queryKey: stockInventoryUrl ? [stockInventoryUrl] : [],
     enabled: (showPrintDialog || showStockPrompt) && !!stockInventoryUrl,
-    select: (rows) => (Array.isArray(rows) ? rows.map((item: any) => ({ ...item, stock: item.quantity })) : []),
+    select: (rows) => rows.map((item) => ({ ...item, stock: item.quantity })),
   });
 
   return {
