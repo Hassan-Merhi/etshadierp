@@ -145,7 +145,7 @@ export function getPerformanceDashboardSnapshot() {
   };
 }
 function isMonitoringRole(req: Request): boolean {
-  const role = String((req as any).session?.currentRole || (req as any).user?.role || "").toLowerCase();
+  const role = String(req.session?.currentRole || req.user?.role || "").toLowerCase();
   return role === "admin" || role === "developer";
 }
 function escapeHtml(value: unknown): string {
