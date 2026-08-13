@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { locationInventoryLightUrl } from "@/api/inventoryApi";
 import type { APIInventoryItem, Location } from "../pos-components/posTypes";
 import { buildPosInventory, type SpMovement } from "./posInventory";
 
@@ -38,16 +39,17 @@ export function usePosQueries({
     enabled: !!posUser,
   });
 
+  const posInventoryUrl = activeLocation ? locationInventoryLightUrl(activeLocation.id, true) : null;
   const {
     data: apiInventory = [],
     isLoading: inventoryLoading,
     error: inventoryError,
   } = useQuery<APIInventoryItem[]>({
-    queryKey: activeLocation ? [`/api/locations/${activeLocation.id}/inventory/light?includePricing=true`] : [],
+    queryKey: posInventoryUrl ? [posInventoryUrl] : [],
     // POS only needs item identity, quantity and selling-price data. The compact
     // route avoids downloading stock-group/category/metadata fields on every
     // location inventory read while preserving the POS cost-visibility boundary.
-    enabled: !!activeLocation,
+    enabled: !!posInventoryUrl,
   });
 
   // Supplier Partner companies still need the SP lots for final-cost/FIFO data.
@@ -146,20 +148,14 @@ export function usePosQueries({
     staleTime: 60_000,
   });
 
-  // Stock inventory — prefetch only when the invoice or stock dialog is open.
-  // The report only renders item code/name and quantity, so do not load pricing,
-  // category or stock-group metadata here.
+  // Stock inventory — use the exact compact query key shared by other item/qty
+  // consumers. `select` shapes the view without creating a second network cache.
   const printLocationId = activeLocation?.id ?? (editVoucher as any)?.locationId ?? null;
-  const { data: stockInventory = [], isLoading: stockInventoryLoading } = useQuery<any[]>({
-    queryKey: printLocationId ? [`/api/locations/${printLocationId}/inventory/light`, "pos-stock-report"] : [],
-    queryFn: async () => {
-      if (!printLocationId) return [];
-      const res = await fetch(`/api/locations/${printLocationId}/inventory/light`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to load stock report inventory");
-      const rows = await res.json();
-      return Array.isArray(rows) ? rows.map((item: any) => ({ ...item, stock: item.quantity })) : [];
-    },
-    enabled: (showPrintDialog || showStockPrompt) && !!printLocationId,
+  const stockInventoryUrl = printLocationId ? locationInventoryLightUrl(printLocationId) : null;
+  const { data: stockInventory = [], isLoading: stockInventoryLoading } = useQuery<any[], Error, any[]>({
+    queryKey: stockInventoryUrl ? [stockInventoryUrl] : [],
+    enabled: (showPrintDialog || showStockPrompt) && !!stockInventoryUrl,
+    select: (rows) => (Array.isArray(rows) ? rows.map((item: any) => ({ ...item, stock: item.quantity })) : []),
   });
 
   return {
