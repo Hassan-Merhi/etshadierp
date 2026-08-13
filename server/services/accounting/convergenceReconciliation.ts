@@ -90,6 +90,27 @@ function compare(
   }
 }
 
+function requiredIdentityPart(value: unknown, field: string): string {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) {
+    throw new ConvergenceReconciliationError(
+      "CONVERGENCE_IDENTITY_INVALID",
+      `${field} is required`
+    );
+  }
+  return normalized;
+}
+
+function assertUniqueIdentity(seen: Set<string>, identity: string, domain: string): void {
+  if (seen.has(identity)) {
+    throw new ConvergenceReconciliationError(
+      "CONVERGENCE_DUPLICATE_SNAPSHOT",
+      `Duplicate ${domain} reconciliation snapshot ${identity}`
+    );
+  }
+  seen.add(identity);
+}
+
 /**
  * Read-only transaction-owned reconciliation for the central convergence path.
  * It never repairs data. The caller may surface discrepancies to an operator, but
@@ -105,7 +126,16 @@ export async function reconcileConvergenceTx(
 
   const accounting = await adapter.loadAccountingSnapshots({ tx, companyId });
   const stock = await adapter.loadStockSnapshots({ tx, companyId });
+  if (!Array.isArray(accounting) || !Array.isArray(stock)) {
+    throw new ConvergenceReconciliationError(
+      "CONVERGENCE_ADAPTER_INVALID",
+      "Reconciliation adapters must return snapshot arrays"
+    );
+  }
+
   const discrepancies: ConvergenceDiscrepancy[] = [];
+  const accountingIdentities = new Set<string>();
+  const stockIdentities = new Set<string>();
 
   for (const row of accounting) {
     if (positiveId(row.companyId, "accounting.companyId") !== companyId) {
@@ -116,6 +146,7 @@ export async function reconcileConvergenceTx(
     }
 
     const identity = `voucher:${positiveId(row.voucherId, "voucherId")}`;
+    assertUniqueIdentity(accountingIdentities, identity, "accounting");
     const voucherDebit = decimal(row.voucherBaseDebit, "voucherBaseDebit");
     const voucherCredit = decimal(row.voucherBaseCredit, "voucherBaseCredit");
     const ledgerDebit = decimal(row.ledgerBaseDebit, "ledgerBaseDebit");
@@ -145,6 +176,14 @@ export async function reconcileConvergenceTx(
           decimal(row.daybookBaseAmount, "daybookBaseAmount")
         );
       }
+    } else if (row.daybookBaseAmount != null) {
+      discrepancies.push({
+        domain: "accounting",
+        identity,
+        code: "DAYBOOK_UNEXPECTED",
+        expected: "missing",
+        actual: decimal(row.daybookBaseAmount, "daybookBaseAmount").toFixed(),
+      });
     }
   }
 
@@ -156,10 +195,10 @@ export async function reconcileConvergenceTx(
       );
     }
 
-    const identity = `${String(row.sourceType).trim()}:${String(row.sourceId).trim()}`;
-    if (identity === ":") {
-      throw new ConvergenceReconciliationError("CONVERGENCE_IDENTITY_INVALID", "Stock source identity is required");
-    }
+    const sourceType = requiredIdentityPart(row.sourceType, "stock.sourceType");
+    const sourceId = requiredIdentityPart(row.sourceId, "stock.sourceId");
+    const identity = `${sourceType}:${sourceId}`;
+    assertUniqueIdentity(stockIdentities, identity, "inventory");
 
     compare(
       discrepancies,
