@@ -1,0 +1,189 @@
+import Decimal from "decimal.js";
+import { assertTransactionCompanyScope } from "../security/transactionCompanyScope";
+
+export interface AccountingConvergenceSnapshot {
+  voucherId: number;
+  companyId: number;
+  voucherBaseDebit: string;
+  voucherBaseCredit: string;
+  ledgerBaseDebit: string;
+  ledgerBaseCredit: string;
+  daybookBaseAmount?: string | null;
+  expectsDaybook: boolean;
+}
+
+export interface StockConvergenceSnapshot {
+  sourceType: string;
+  sourceId: string;
+  companyId: number;
+  documentQuantity: string;
+  movementQuantity: string;
+  documentValue: string;
+  movementValue: string;
+}
+
+export interface ConvergenceReconciliationAdapter {
+  loadAccountingSnapshots(input: { tx: any; companyId: number }): Promise<AccountingConvergenceSnapshot[]>;
+  loadStockSnapshots(input: { tx: any; companyId: number }): Promise<StockConvergenceSnapshot[]>;
+}
+
+export interface ConvergenceDiscrepancy {
+  domain: "accounting" | "inventory";
+  identity: string;
+  code: string;
+  expected: string;
+  actual: string;
+}
+
+export interface ConvergenceReconciliationResult {
+  companyId: number;
+  accountingSnapshots: number;
+  stockSnapshots: number;
+  discrepancies: ConvergenceDiscrepancy[];
+  clean: boolean;
+}
+
+export class ConvergenceReconciliationError extends Error {
+  readonly code: string;
+
+  constructor(code: string, message: string) {
+    super(message);
+    this.name = "ConvergenceReconciliationError";
+    this.code = code;
+  }
+}
+
+function positiveId(value: unknown, field: string): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new ConvergenceReconciliationError("CONVERGENCE_ID_INVALID", `${field} must be a positive integer`);
+  }
+  return parsed;
+}
+
+function decimal(value: unknown, field: string): Decimal {
+  try {
+    const parsed = new Decimal(String(value));
+    if (!parsed.isFinite()) throw new Error("not finite");
+    return parsed;
+  } catch {
+    throw new ConvergenceReconciliationError("CONVERGENCE_DECIMAL_INVALID", `${field} is invalid`);
+  }
+}
+
+function compare(
+  discrepancies: ConvergenceDiscrepancy[],
+  domain: ConvergenceDiscrepancy["domain"],
+  identity: string,
+  code: string,
+  expected: Decimal,
+  actual: Decimal
+): void {
+  if (!expected.eq(actual)) {
+    discrepancies.push({
+      domain,
+      identity,
+      code,
+      expected: expected.toFixed(),
+      actual: actual.toFixed(),
+    });
+  }
+}
+
+/**
+ * Read-only transaction-owned reconciliation for the central convergence path.
+ * It never repairs data. The caller may surface discrepancies to an operator, but
+ * any correction must go through the canonical posting/reversal services.
+ */
+export async function reconcileConvergenceTx(
+  tx: any,
+  companyIdValue: unknown,
+  adapter: ConvergenceReconciliationAdapter
+): Promise<ConvergenceReconciliationResult> {
+  const companyId = positiveId(companyIdValue, "companyId");
+  await assertTransactionCompanyScope(tx, companyId);
+
+  const accounting = await adapter.loadAccountingSnapshots({ tx, companyId });
+  const stock = await adapter.loadStockSnapshots({ tx, companyId });
+  const discrepancies: ConvergenceDiscrepancy[] = [];
+
+  for (const row of accounting) {
+    if (positiveId(row.companyId, "accounting.companyId") !== companyId) {
+      throw new ConvergenceReconciliationError(
+        "CONVERGENCE_COMPANY_MISMATCH",
+        `Accounting snapshot ${row.voucherId} crossed the transaction company boundary`
+      );
+    }
+
+    const identity = `voucher:${positiveId(row.voucherId, "voucherId")}`;
+    const voucherDebit = decimal(row.voucherBaseDebit, "voucherBaseDebit");
+    const voucherCredit = decimal(row.voucherBaseCredit, "voucherBaseCredit");
+    const ledgerDebit = decimal(row.ledgerBaseDebit, "ledgerBaseDebit");
+    const ledgerCredit = decimal(row.ledgerBaseCredit, "ledgerBaseCredit");
+
+    compare(discrepancies, "accounting", identity, "VOUCHER_LEDGER_DEBIT_MISMATCH", voucherDebit, ledgerDebit);
+    compare(discrepancies, "accounting", identity, "VOUCHER_LEDGER_CREDIT_MISMATCH", voucherCredit, ledgerCredit);
+    compare(discrepancies, "accounting", identity, "VOUCHER_NOT_BALANCED", voucherDebit, voucherCredit);
+    compare(discrepancies, "accounting", identity, "LEDGER_NOT_BALANCED", ledgerDebit, ledgerCredit);
+
+    if (row.expectsDaybook) {
+      if (row.daybookBaseAmount == null) {
+        discrepancies.push({
+          domain: "accounting",
+          identity,
+          code: "DAYBOOK_MISSING",
+          expected: voucherDebit.toFixed(),
+          actual: "missing",
+        });
+      } else {
+        compare(
+          discrepancies,
+          "accounting",
+          identity,
+          "DAYBOOK_AMOUNT_MISMATCH",
+          voucherDebit,
+          decimal(row.daybookBaseAmount, "daybookBaseAmount")
+        );
+      }
+    }
+  }
+
+  for (const row of stock) {
+    if (positiveId(row.companyId, "stock.companyId") !== companyId) {
+      throw new ConvergenceReconciliationError(
+        "CONVERGENCE_COMPANY_MISMATCH",
+        `Stock snapshot ${row.sourceType}:${row.sourceId} crossed the transaction company boundary`
+      );
+    }
+
+    const identity = `${String(row.sourceType).trim()}:${String(row.sourceId).trim()}`;
+    if (identity === ":") {
+      throw new ConvergenceReconciliationError("CONVERGENCE_IDENTITY_INVALID", "Stock source identity is required");
+    }
+
+    compare(
+      discrepancies,
+      "inventory",
+      identity,
+      "STOCK_QUANTITY_MISMATCH",
+      decimal(row.documentQuantity, "documentQuantity"),
+      decimal(row.movementQuantity, "movementQuantity")
+    );
+    compare(
+      discrepancies,
+      "inventory",
+      identity,
+      "STOCK_VALUE_MISMATCH",
+      decimal(row.documentValue, "documentValue"),
+      decimal(row.movementValue, "movementValue")
+    );
+  }
+
+  return {
+    companyId,
+    accountingSnapshots: accounting.length,
+    stockSnapshots: stock.length,
+    discrepancies,
+    clean: discrepancies.length === 0,
+  };
+}
