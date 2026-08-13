@@ -9,6 +9,30 @@ interface DraftSummaryItem {
   amount?: string | number;
 }
 
+interface DraftSummarySource {
+  id?: number | null;
+  created_at?: string | null;
+  createdAt?: string | null;
+  updated_at?: string | null;
+  updatedAt?: string | null;
+}
+
+interface PosDraftSummary {
+  id: number;
+  location_id: number;
+  locationId: number;
+  created_at: string;
+  createdAt: string;
+  updated_at: string;
+  updatedAt: string;
+  item_count: number;
+  itemCount: number;
+  total_qty: number;
+  totalQty: number;
+  total_amount: number;
+  totalAmount: number;
+}
+
 /**
  * Keep the lightweight draft-list cache current after save/autosave without
  * downloading the whole list again. Draft details are still fetched by id when
@@ -16,15 +40,15 @@ interface DraftSummaryItem {
  */
 export function upsertPosDraftSummary(
   locationId: number | null | undefined,
-  draft: any,
-  items: DraftSummaryItem[] = []
+  draft: DraftSummarySource,
+  items: DraftSummaryItem[] = [],
 ): void {
-  if (!locationId || !draft?.id) return;
+  if (!locationId || typeof draft.id !== "number") return;
   const itemCount = items.length;
   const totalQty = items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
   const totalAmount = items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
   const now = new Date().toISOString();
-  const summary = {
+  const summary: PosDraftSummary = {
     id: draft.id,
     location_id: locationId,
     locationId,
@@ -40,16 +64,16 @@ export function upsertPosDraftSummary(
     totalAmount,
   };
 
-  queryClient.setQueryData<any[]>([posDraftsUrl(locationId)], (current) => {
+  queryClient.setQueryData<PosDraftSummary[]>([posDraftsUrl(locationId)], (current) => {
     const rows = Array.isArray(current) ? current : [];
-    return [summary, ...rows.filter((row) => row?.id !== draft.id)];
+    return [summary, ...rows.filter((row) => row.id !== draft.id)];
   });
 }
 
 export function removePosDraftSummary(locationId: number | null | undefined, draftId: number): void {
   if (!locationId) return;
-  queryClient.setQueryData<any[]>([posDraftsUrl(locationId)], (current) =>
-    Array.isArray(current) ? current.filter((row) => row?.id !== draftId) : []
+  queryClient.setQueryData<PosDraftSummary[]>([posDraftsUrl(locationId)], (current) =>
+    Array.isArray(current) ? current.filter((row) => row.id !== draftId) : [],
   );
 }
 
@@ -66,7 +90,7 @@ export const posApi = {
       closingCash?: number;
       notes?: string;
       [key: string]: unknown;
-    }
+    },
   ) => apiRequest("POST", `/api/pos/shifts/${shiftId}/close`, data),
 
   createSale: (data: {
