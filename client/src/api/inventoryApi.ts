@@ -27,7 +27,7 @@ export const inventoryApi = {
       name?: string;
       whatsappGroupChatId?: string | null;
       [key: string]: unknown;
-    }
+    },
   ) => apiRequest("PATCH", `/api/locations/${id}`, payload),
 
   deleteLocation: (id: number) => apiRequest("DELETE", `/api/locations/${id}`),
