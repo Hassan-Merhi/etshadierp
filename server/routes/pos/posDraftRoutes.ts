@@ -51,7 +51,7 @@ export function registerPosDraftRoutes(app: Express): void {
                AND i.stock_item_id = si.stock_item_id
            )
          ORDER BY si.stock_item_id, v.voucher_date DESC, si.created_at DESC`,
-        [companyId, locationId],
+        [companyId, locationId]
       );
       const prices: Record<number, string> = {};
       for (const row of result.rows as LastSoldPriceRow[]) prices[row.stock_item_id] = row.selling_price;
