@@ -15,7 +15,7 @@ import { enforcePosOperationalPermissionScope } from "../middleware/posOperation
 import { generateInvoicePdfMeta } from "../helpers/generateInvoicePdf";
 import { generateStockPdf } from "../helpers/generateStockPdf";
 import { getErpExportVisibility } from "../helpers/exportVisibility";
-import { getPosWaSettings, sendWhatsAppFileByUploadPos } from "../services/whatsappService";
+import { getPosWaSettings, getWaSettingsById, sendWhatsAppFileByUploadPos } from "../services/whatsappService";
 import {
   companies,
   factoryAccountWhatsappRules,
@@ -37,6 +37,13 @@ type FastAttachment = {
   fileName: string;
   expiresAt: number;
 };
+
+type GreenApiCredentials = {
+  instanceId: string;
+  apiToken: string;
+};
+
+type FastUrlAttempt = { success: true } | { success: false; status?: number; body?: string; error: string };
 
 const fastAttachments = new Map<string, FastAttachment>();
 
@@ -96,6 +103,87 @@ function deleteFastAttachment(token: string): void {
   fastAttachments.delete(token);
 }
 
+function isGreenApiQuotaFailure(status: number | undefined, body: string | undefined): boolean {
+  if (status === 466) return true;
+  return /QUOTE_EXCEEDED|CORRESPONDENTS_QUOTE_EXCEEDED|CORRESPONDENTS_QUOTA_EXCEEDED/i.test(body || "");
+}
+
+function formatGreenApiFailure(attempt: FastUrlAttempt, uploadError?: string): string {
+  if (!attempt.success && isGreenApiQuotaFailure(attempt.status, attempt.body)) {
+    if (/correspondents|only send or receive messages/i.test(attempt.body || "")) {
+      return "Green API blocked this WhatsApp group because the configured Developer plan has reached its monthly chat limit. The ERP also tried its fallback delivery path. Configure/upgrade an instance that is allowed to message this group.";
+    }
+    return "Green API monthly quota has been reached. The ERP also tried its fallback delivery path, but the provider still blocked the send.";
+  }
+  if (uploadError) return uploadError;
+  if (!attempt.success) return attempt.error;
+  return "";
+}
+
+async function sendFileByUrlAttempt({
+  publicBaseUrl,
+  settings,
+  chatId,
+  buffer,
+  fileName,
+  caption,
+  contentType,
+}: {
+  publicBaseUrl: string;
+  settings: GreenApiCredentials;
+  chatId: string;
+  buffer: Buffer;
+  fileName: string;
+  caption: string;
+  contentType: string;
+}): Promise<FastUrlAttempt> {
+  const token = storeFastAttachment(buffer, fileName, contentType);
+  const fileUrl = `${publicBaseUrl}/api/whatsapp/fast-file/${token}`;
+  const apiUrl = `https://api.green-api.com/waInstance${settings.instanceId}/sendFileByUrl/${settings.apiToken}`;
+  const startedAt = Date.now();
+
+  try {
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chatId, urlFile: fileUrl, fileName, caption }),
+      signal: AbortSignal.timeout(FAST_SEND_TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      deleteFastAttachment(token);
+      return {
+        success: false,
+        status: response.status,
+        body,
+        error: `Green API ${response.status}: ${body}`,
+      };
+    }
+
+    logger.info("[WA fast send] Green API accepted URL delivery", {
+      chatId,
+      fileName,
+      instanceId: settings.instanceId,
+      size: buffer.length,
+      durationMs: Date.now() - startedAt,
+    });
+    return { success: true };
+  } catch (error: unknown) {
+    deleteFastAttachment(token);
+    const message = getErrorMessage(error) || "WhatsApp provider request timed out";
+    logger.error("[WA fast send] URL delivery failed", {
+      chatId,
+      fileName,
+      instanceId: settings.instanceId,
+      size: buffer.length,
+      durationMs: Date.now() - startedAt,
+      error,
+    });
+    return { success: false, error: message };
+  }
+}
+
 async function sendBufferFast(
   req: Request,
   chatId: string,
@@ -121,44 +209,79 @@ async function sendBufferFast(
     return { success: false, error: "WhatsApp sending is disabled", mode: "url" };
   }
 
-  const token = storeFastAttachment(buffer, fileName, contentType);
-  const fileUrl = `${publicBaseUrl}/api/whatsapp/fast-file/${token}`;
-  const apiUrl = `https://api.green-api.com/waInstance${settings.instanceId}/sendFileByUrl/${settings.apiToken}`;
-  const startedAt = Date.now();
+  const primaryAttempt = await sendFileByUrlAttempt({
+    publicBaseUrl,
+    settings,
+    chatId,
+    buffer,
+    fileName,
+    caption,
+    contentType,
+  });
+  if (primaryAttempt.success) return { success: true, mode: "url" };
 
-  try {
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chatId, urlFile: fileUrl, fileName, caption }),
-      signal: AbortSignal.timeout(FAST_SEND_TIMEOUT_MS),
-    });
+  logger.warn("[WA fast send] Primary URL delivery rejected; trying fallback", {
+    chatId,
+    fileName,
+    instanceId: settings.instanceId,
+    status: primaryAttempt.status,
+    quotaFailure: isGreenApiQuotaFailure(primaryAttempt.status, primaryAttempt.body),
+  });
 
-    if (!response.ok) {
-      const body = await response.text();
-      deleteFastAttachment(token);
-      return { success: false, error: `Green API ${response.status}: ${body}`, mode: "url" };
+  // Green API's Developer plan can return HTTP 466 when the active instance has
+  // exhausted its allowed correspondents. If a second ERP WhatsApp instance is
+  // configured, try it immediately before giving up. This is especially useful
+  // for POS where instance 2 is preferred but instance 1 may still be allowed to
+  // message the location group.
+  if (isGreenApiQuotaFailure(primaryAttempt.status, primaryAttempt.body)) {
+    const [mainSettings, posSettings] = await Promise.all([getWaSettingsById(1), getWaSettingsById(2)]);
+    const alternate = [mainSettings, posSettings].find(
+      (candidate) =>
+        !!candidate?.instanceId &&
+        !!candidate?.apiToken &&
+        candidate.instanceId !== settings.instanceId &&
+        candidate.apiToken !== settings.apiToken
+    );
+
+    if (alternate?.instanceId && alternate.apiToken) {
+      const alternateAttempt = await sendFileByUrlAttempt({
+        publicBaseUrl,
+        settings: alternate,
+        chatId,
+        buffer,
+        fileName,
+        caption,
+        contentType,
+      });
+      if (alternateAttempt.success) {
+        logger.warn("[WA fast send] Recovered through alternate WhatsApp instance", {
+          chatId,
+          fileName,
+          primaryInstanceId: settings.instanceId,
+          alternateInstanceId: alternate.instanceId,
+        });
+        return { success: true, mode: "url" };
+      }
     }
-
-    logger.info("[WA fast send] Green API accepted URL delivery", {
-      chatId,
-      fileName,
-      size: buffer.length,
-      durationMs: Date.now() - startedAt,
-    });
-    return { success: true, mode: "url" };
-  } catch (error: unknown) {
-    deleteFastAttachment(token);
-    const message = getErrorMessage(error) || "WhatsApp provider request timed out";
-    logger.error("[WA fast send] URL delivery failed", {
-      chatId,
-      fileName,
-      size: buffer.length,
-      durationMs: Date.now() - startedAt,
-      error,
-    });
-    return { success: false, error: message, mode: "url" };
   }
+
+  // Preserve the pre-fast-path multipart upload as a final fallback. This also
+  // handles provider-side sendFileByUrl failures that are not chat-limit errors.
+  const uploadFallback = await sendWhatsAppFileByUploadPos(chatId, buffer, fileName, caption, contentType);
+  if (uploadFallback.success) {
+    logger.warn("[WA fast send] Recovered through direct upload fallback", {
+      chatId,
+      fileName,
+      instanceId: settings.instanceId,
+    });
+    return { success: true, mode: "upload" };
+  }
+
+  return {
+    success: false,
+    error: formatGreenApiFailure(primaryAttempt, uploadFallback.error),
+    mode: "url",
+  };
 }
 
 function serveFastAttachment(req: Request, res: Response): void {

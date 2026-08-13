@@ -102,4 +102,14 @@ export const backendMessagesPhase7TranslationsPart11: readonly Phase7BackendMess
     ar: "لم يتم إعداد وجهة واتساب لهذا الحساب",
     fr: "Aucune destination WhatsApp configurée pour ce compte",
   },
+  {
+    en: "Green API blocked this WhatsApp group because the configured Developer plan has reached its monthly chat limit. The ERP also tried its fallback delivery path. Configure/upgrade an instance that is allowed to message this group.",
+    ar: "حظرت Green API مجموعة واتساب هذه لأن خطة المطور المهيأة وصلت إلى حد المحادثات الشهري. حاول نظام ERP أيضًا مسار الإرسال الاحتياطي. قم بتهيئة أو ترقية مثيل مسموح له بمراسلة هذه المجموعة.",
+    fr: "Green API a bloqué ce groupe WhatsApp car le forfait Developer configuré a atteint sa limite mensuelle de conversations. L’ERP a également essayé le mode d’envoi de secours. Configurez ou mettez à niveau une instance autorisée à envoyer des messages à ce groupe.",
+  },
+  {
+    en: "Green API monthly quota has been reached. The ERP also tried its fallback delivery path, but the provider still blocked the send.",
+    ar: "تم بلوغ الحصة الشهرية لـ Green API. حاول نظام ERP أيضًا مسار الإرسال الاحتياطي، لكن المزود ما زال يمنع الإرسال.",
+    fr: "Le quota mensuel de Green API a été atteint. L’ERP a également essayé le mode d’envoi de secours, mais le fournisseur bloque toujours l’envoi.",
+  },
 ];
