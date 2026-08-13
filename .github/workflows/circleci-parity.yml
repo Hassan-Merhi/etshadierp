@@ -88,7 +88,8 @@ jobs:
 
           printf 'Checking formatting for %s changed source file(s):\n' "${#changed_files[@]}"
           printf ' - %s\n' "${changed_files[@]}"
-          node node_modules/prettier/bin/prettier.cjs --check "${changed_files[@]}"
+          node node_modules/prettier/bin/prettier.cjs --write "${changed_files[@]}"
+          git diff --exit-code -- "${changed_files[@]}"
 
       - name: Lint
         run: npm run lint
