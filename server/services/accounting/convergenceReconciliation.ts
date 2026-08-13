@@ -1,5 +1,9 @@
 import Decimal from "decimal.js";
-import { assertTransactionCompanyScope, type CompanyScopedReadTransaction } from "../security/transactionCompanyScope";
+import {
+  assertTransactionCompanyScope,
+  type CompanyScopedReadTransaction,
+  type CompanyScopedTransaction,
+} from "../security/transactionCompanyScope";
 
 export interface AccountingConvergenceSnapshot {
   voucherId: number;
@@ -22,15 +26,14 @@ export interface StockConvergenceSnapshot {
   movementValue: string;
 }
 
-export interface ConvergenceReconciliationAdapter {
-  loadAccountingSnapshots(input: {
-    tx: CompanyScopedReadTransaction;
-    companyId: number;
-  }): Promise<AccountingConvergenceSnapshot[]>;
-  loadStockSnapshots(input: {
-    tx: CompanyScopedReadTransaction;
-    companyId: number;
-  }): Promise<StockConvergenceSnapshot[]>;
+/**
+ * Generic over the transaction handle so a caller holding a concrete drizzle
+ * transaction can reconcile with it directly, while the loaders stay written
+ * against the minimal read shape they actually need.
+ */
+export interface ConvergenceReconciliationAdapter<TTransaction = CompanyScopedReadTransaction> {
+  loadAccountingSnapshots(input: { tx: TTransaction; companyId: number }): Promise<AccountingConvergenceSnapshot[]>;
+  loadStockSnapshots(input: { tx: TTransaction; companyId: number }): Promise<StockConvergenceSnapshot[]>;
 }
 
 export interface ConvergenceDiscrepancy {
@@ -119,10 +122,12 @@ function assertUniqueIdentity(seen: Set<string>, identity: string, domain: strin
  * It never repairs data. The caller may surface discrepancies to an operator, but
  * any correction must go through the canonical posting/reversal services.
  */
-export async function reconcileConvergenceTx(
-  tx: CompanyScopedReadTransaction,
+export async function reconcileConvergenceTx<
+  TTransaction extends CompanyScopedTransaction = CompanyScopedReadTransaction,
+>(
+  tx: TTransaction,
   companyIdValue: unknown,
-  adapter: ConvergenceReconciliationAdapter
+  adapter: ConvergenceReconciliationAdapter<TTransaction>
 ): Promise<ConvergenceReconciliationResult> {
   const companyId = positiveId(companyIdValue, "companyId");
   await assertTransactionCompanyScope(tx, companyId);

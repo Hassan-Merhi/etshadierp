@@ -1,6 +1,9 @@
-import { and, eq, sql } from "drizzle-orm";
-import type { CompanyScopedReadTransaction } from "../security/transactionCompanyScope";
+import { and, eq, notInArray, sql } from "drizzle-orm";
 import { factoryDaybookEntries, voucherEntries, vouchers } from "@shared/schema";
+import type { db } from "../../db";
+
+/** The concrete drizzle transaction handle, inferred from the shared client. */
+type DrizzleTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 import {
   ConvergenceReconciliationError,
   type AccountingConvergenceSnapshot,
@@ -9,9 +12,16 @@ import {
 } from "./convergenceReconciliation";
 
 export type AuthoritativeStockSnapshotLoader = (input: {
-  tx: CompanyScopedReadTransaction;
+  tx: DrizzleTransaction;
   companyId: number;
 }) => Promise<StockConvergenceSnapshot[]>;
+
+/**
+ * Voucher types that record an inventory movement and deliberately post no
+ * ledger entries. Kept in step with the stock transfer document loader, which
+ * treats the same three spellings as one document type.
+ */
+const STOCK_ONLY_VOUCHER_TYPES = ["Stock Transfer", "StockTransfer", "Transfer"];
 
 function asInteger(value: unknown, field: string): number {
   const parsed = Number(value);
@@ -40,7 +50,7 @@ function asDecimalString(value: unknown, field: string): string {
  * aggregation.
  */
 export async function loadDatabaseAccountingConvergenceSnapshots(input: {
-  tx: CompanyScopedReadTransaction;
+  tx: DrizzleTransaction;
   companyId: number;
 }): Promise<AccountingConvergenceSnapshot[]> {
   const { tx, companyId } = input;
@@ -69,7 +79,17 @@ export async function loadDatabaseAccountingConvergenceSnapshots(input: {
         eq(factoryDaybookEntries.referenceId, vouchers.id)
       )
     )
-    .where(and(eq(vouchers.companyId, companyId), sql`${vouchers.deletedAt} is null`))
+    .where(
+      and(
+        eq(vouchers.companyId, companyId),
+        sql`${vouchers.deletedAt} is null`,
+        // Stock transfers move stock between locations and post no double
+        // entry, so demanding ledger evidence from them reports a discrepancy
+        // for every transfer ever made. Their convergence is checked by the
+        // stock half of the same reconciliation, against the canonical journal.
+        notInArray(vouchers.voucherType, STOCK_ONLY_VOUCHER_TYPES)
+      )
+    )
     .groupBy(vouchers.id, vouchers.companyId, vouchers.voucherType, vouchers.totalAmount);
 
   return rows.map((row: Record<string, unknown>) => {
@@ -120,7 +140,7 @@ export async function loadDatabaseAccountingConvergenceSnapshots(input: {
  */
 export function createDatabaseConvergenceAdapter(
   loadStockSnapshots: AuthoritativeStockSnapshotLoader
-): ConvergenceReconciliationAdapter {
+): ConvergenceReconciliationAdapter<DrizzleTransaction> {
   return {
     loadAccountingSnapshots: ({ tx, companyId }) => loadDatabaseAccountingConvergenceSnapshots({ tx, companyId }),
     loadStockSnapshots,

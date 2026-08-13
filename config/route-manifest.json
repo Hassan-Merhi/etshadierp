@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
   "description": "Ordered snapshot of every registered Express route (method, path, guard chain) and middleware mount. Regenerate with UPDATE_ROUTE_MANIFEST=1 only when a route change is intended; during a file split the manifest must not change at all.",
-  "routeCount": 1906,
+  "routeCount": 1907,
   "middlewareMountCount": 91,
   "routes": [
     "GET /api/admin/operational-monitoring [requireAuth > <anonymous> > <anonymous>]",
@@ -1627,6 +1627,7 @@
     "PUT /api/admin/users/:userId/security-permissions [requireAuth > <anonymous> > requirePermissionAdministrator > <anonymous>]",
     "GET /api/admin/schema-check [requireAuth > <anonymous>]",
     "POST /api/admin/schema-fix [requireAuth > <anonymous>]",
+    "GET /api/admin/convergence-reconciliation [requireAuth > <anonymous> > <anonymous>]",
     "GET /api/admin/repair-balances/scan [requireAuth > <anonymous> > <anonymous>]",
     "POST /api/admin/repair-balances/apply [requireAuth > <anonymous> > <anonymous>]",
     "POST /api/admin/repair-balances/undo [requireAuth > <anonymous> > <anonymous>]",

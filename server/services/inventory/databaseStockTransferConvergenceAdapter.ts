@@ -1,7 +1,10 @@
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
-import type { CompanyScopedReadTransaction } from "../security/transactionCompanyScope";
 import { stockTransferItems, stockTransferVouchers, vouchers } from "@shared/schema";
 import { ConvergenceReconciliationError, type StockConvergenceSnapshot } from "../accounting/convergenceReconciliation";
+import type { db } from "../../db";
+
+/** The concrete drizzle transaction handle, inferred from the shared client. */
+type DrizzleTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export interface StockTransferDocumentSnapshot {
   sourceType: "stock-transfer";
@@ -22,7 +25,7 @@ export interface StockTransferMovementEvidence {
 }
 
 export type StockTransferMovementEvidenceLoader = (input: {
-  tx: CompanyScopedReadTransaction;
+  tx: DrizzleTransaction;
   companyId: number;
   documents: StockTransferDocumentSnapshot[];
 }) => Promise<StockTransferMovementEvidence[]>;
@@ -61,7 +64,7 @@ function identity(sourceType: unknown, sourceId: unknown): string {
  * expected to have posted stock movement evidence yet.
  */
 export async function loadDatabaseStockTransferDocuments(input: {
-  tx: CompanyScopedReadTransaction;
+  tx: DrizzleTransaction;
   companyId: number;
 }): Promise<StockTransferDocumentSnapshot[]> {
   const { tx, companyId } = input;
@@ -194,10 +197,7 @@ export function mergeStockTransferConvergenceEvidence(input: {
 }
 
 export function createDatabaseStockTransferSnapshotLoader(loadMovementEvidence: StockTransferMovementEvidenceLoader) {
-  return async (input: {
-    tx: CompanyScopedReadTransaction;
-    companyId: number;
-  }): Promise<StockConvergenceSnapshot[]> => {
+  return async (input: { tx: DrizzleTransaction; companyId: number }): Promise<StockConvergenceSnapshot[]> => {
     const documents = await loadDatabaseStockTransferDocuments(input);
     const evidence = await loadMovementEvidence({ ...input, documents });
     if (!Array.isArray(evidence)) {
