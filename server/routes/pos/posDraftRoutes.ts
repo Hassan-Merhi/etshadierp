@@ -6,6 +6,11 @@ import { requireAuth } from "../../auth";
 import { InsertDraftPosSale, userLocations } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 
+interface LastSoldPriceRow {
+  stock_item_id: number;
+  selling_price: string;
+}
+
 export function registerPosDraftRoutes(app: Express): void {
   // Last sold price stays company-wide, but the response only includes stock
   // items that exist at the active location. POS cannot select unrelated items,
@@ -46,10 +51,10 @@ export function registerPosDraftRoutes(app: Express): void {
                AND i.stock_item_id = si.stock_item_id
            )
          ORDER BY si.stock_item_id, v.voucher_date DESC, si.created_at DESC`,
-        [companyId, locationId]
+        [companyId, locationId],
       );
       const prices: Record<number, string> = {};
-      for (const row of result.rows as any[]) prices[row.stock_item_id] = row.selling_price;
+      for (const row of result.rows as LastSoldPriceRow[]) prices[row.stock_item_id] = row.selling_price;
       res.setHeader("Cache-Control", "private, no-cache");
       return res.json(prices);
     } catch (error: unknown) {
