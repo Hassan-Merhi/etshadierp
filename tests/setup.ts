@@ -178,6 +178,14 @@ export async function cleanupTestData(prefix: string): Promise<void> {
       `DELETE FROM stock_adjustment_items WHERE stock_item_id IN (SELECT id FROM stock_items WHERE company_id = $1)`,
       [company.id]
     );
+    // The canonical stock movement journal holds restricting foreign keys to
+    // stock_items, locations and companies, so any transfer a test posted keeps
+    // its fixture alive. The journal is append-only in production — there is no
+    // delete path in the application — which is precisely why the fixture has to
+    // clear it explicitly here.
+    await pool.query("DELETE FROM canonical_stock_movement_audit WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM canonical_stock_movement_requests WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM canonical_stock_movements WHERE company_id = $1", [company.id]);
     await db.delete(schema.stockItems).where(eq(schema.stockItems.companyId, company.id));
     await db.delete(schema.stockGroups).where(eq(schema.stockGroups.companyId, company.id));
     await db.delete(schema.locations).where(eq(schema.locations.companyId, company.id));

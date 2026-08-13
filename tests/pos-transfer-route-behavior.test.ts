@@ -61,6 +61,7 @@ const harness = vi.hoisted(() => {
       from: vi.fn(() => ({ where: vi.fn(async () => [{ name: "Main Warehouse" }]) })),
     })),
     getLocationById: vi.fn(),
+    postStockMovementTx: vi.fn(),
     adjustInventory: vi.fn(),
     getActiveCompanyPermissionContext: vi.fn(),
     sendTransferWhatsApp: vi.fn(),
@@ -81,6 +82,16 @@ vi.mock("../server/services/security/activeCompanyPermissionContext", () => ({
   getActiveCompanyPermissionContext: harness.getActiveCompanyPermissionContext,
 }));
 vi.mock("@shared/schema", () => harness.tables);
+// The canonical journal has its own database-backed coverage in
+// tests/canonical-stock-transfer-journal.test.ts. Here it is mocked at the
+// module boundary — this harness fakes drizzle down to eq/and, so the real
+// adapter cannot run against it — and the route is asserted to call it.
+vi.mock("../server/services/inventory/databaseStockMovementAdapter", () => ({
+  createDatabaseStockMovementAdapter: () => ({ name: "canonical-adapter" }),
+}));
+vi.mock("../server/services/inventory/stockMovementIntegrityService", () => ({
+  postStockMovementTx: harness.postStockMovementTx,
+}));
 vi.mock("drizzle-orm", () => ({
   eq: (column: unknown, value: unknown) => ({ column, value }),
   and: (...conditions: unknown[]) => conditions,
@@ -105,6 +116,7 @@ describe("stock transfer route POS notification behavior", () => {
       companyId: 4,
     });
     harness.sendTransferWhatsApp.mockResolvedValue(undefined);
+    harness.postStockMovementTx.mockResolvedValue({ movements: [], quantity: "3", value: "37.5", idempotent: false });
 
     registerStockTransferCreateRoutes({
       post: (path: string, ...callbacks: Array<(...args: any[]) => unknown>) => {
@@ -135,6 +147,26 @@ describe("stock transfer route POS notification behavior", () => {
     expect(res.status).toHaveBeenCalledWith(201);
     expect(harness.adjustInventory).toHaveBeenNthCalledWith(1, harness.tx, 11, 5, -3, 4);
     expect(harness.adjustInventory).toHaveBeenNthCalledWith(2, harness.tx, 23, 5, 3, 4, 12.5);
+
+    // A POS transfer records canonical evidence on the same transaction that
+    // applied the inventory, keyed to the transfer it came from.
+    expect(harness.postStockMovementTx).toHaveBeenCalledTimes(1);
+    expect(harness.postStockMovementTx).toHaveBeenCalledWith(
+      harness.tx,
+      expect.objectContaining({
+        companyId: 4,
+        stockItemId: 5,
+        kind: "transfer",
+        fromLocationId: 11,
+        toLocationId: 23,
+        source: expect.objectContaining({
+          sourceType: "stock-transfer",
+          sourceId: "202",
+          idempotencyKey: "stock-transfer:202:5",
+        }),
+      }),
+      expect.anything()
+    );
     expect(harness.getActiveCompanyPermissionContext).toHaveBeenCalledWith(req);
     expect(harness.sendTransferWhatsApp).toHaveBeenCalledWith(
       expect.objectContaining({

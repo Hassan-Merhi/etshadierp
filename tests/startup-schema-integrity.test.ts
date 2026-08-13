@@ -24,7 +24,7 @@ import { describe, expect, it } from "vitest";
 import { startupMigrations } from "../server/startup-schema";
 
 /** Statement count of the reviewed composed array. */
-const EXPECTED_STATEMENT_COUNT = 1280;
+const EXPECTED_STATEMENT_COUNT = 1288;
 
 /**
  * sha256 of JSON.stringify(startupMigrations) for the reviewed composed array.
@@ -43,8 +43,14 @@ const EXPECTED_STATEMENT_COUNT = 1280;
  * exists (supplier_containers, bales.erp_location_id) were guarded on the object
  * being present. The count is still 1280 and nothing moved — every statement was
  * guarded in place — and the migration ceiling fell from 11 to 0.
+ *
+ * Re-pinned again for the canonical stock movement journal
+ * (021-canonical-stock-movement-journal.ts): eight appended statements creating
+ * the three journal tables and their indexes, taking the count from 1280 to
+ * 1288. They are appended last because they reference companies, stock_items
+ * and locations, so nothing before them moved.
  */
-const EXPECTED_CONTENT_HASH = "412c33005449a49ae8da9a90880abad22127c84037e48b1e5b7846166567b42c";
+const EXPECTED_CONTENT_HASH = "2755f40b21ff4532d765157f0b26126c57263c6b3a7d54533630b9db9d8ff96c";
 
 function contentHash(statements: string[]): string {
   return crypto.createHash("sha256").update(JSON.stringify(statements)).digest("hex");
