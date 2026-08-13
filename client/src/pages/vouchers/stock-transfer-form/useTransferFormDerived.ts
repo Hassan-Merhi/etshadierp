@@ -34,7 +34,8 @@ export function usePendingTransferRevisions(transferRevisions: any[]) {
 
 /**
  * Fill in missing rates from each source location's average rate. One cached
- * request per distinct location, not one per entry row.
+ * request per distinct location, using the compact pricing payload instead of
+ * the full location inventory response.
  */
 export function useTransferRateAutofill(
   transferEntries: { sourceLocationId: number; stockItemId: number; rate?: string }[],
@@ -56,7 +57,10 @@ export function useTransferRateAutofill(
     let cancelled = false;
     for (const [locationId, pending] of missingByLocation) {
       queryClient
-        .fetchQuery<any[]>({ queryKey: [`/api/locations/${locationId}/inventory`], staleTime: 60_000 })
+        .fetchQuery<any[]>({
+          queryKey: [`/api/locations/${locationId}/inventory/light?includePricing=true`],
+          staleTime: 60_000,
+        })
         .then((locationInventory) => {
           if (cancelled || !Array.isArray(locationInventory)) return;
           const rateByItem = new Map<number, string>();
