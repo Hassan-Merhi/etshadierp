@@ -53,7 +53,7 @@ const bundles = [
     parts: 11,
     translatorImport: "translatePhase7BackendMessageText",
     test: "tests/phase7-backend-messages-translations.test.ts",
-    expectedCount: 581,
+    expectedCount: 593,
   },
 ];
 
@@ -160,7 +160,7 @@ console.log(
       phases: [4, 5, 6, 7],
       status: "reconciled-on-current-main",
       languages: ["en", "ar", "fr"],
-      reviewedEntries: 230 + 182 + 251 + 581,
+      reviewedEntries: 230 + 182 + 251 + 593,
       storedBusinessValuesProtected: true,
       sqlRequired: false,
     },
