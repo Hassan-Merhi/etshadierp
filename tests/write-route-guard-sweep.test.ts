@@ -33,6 +33,17 @@
  * make it less real. Both zero ceilings still hold at the wider set, so the
  * coverage was already there — only the classification was wrong.
  *
+ * Two stock-transfer-revision routes left this list when the revision lifecycle
+ * became immutable. DELETE /api/stock-transfer-revisions/:id and
+ * PATCH /api/stock-transfer-revisions/:id/optional are now answered by the
+ * tombstones in server/routes/vouchers/immutableStockTransferRevisionRoutes.ts,
+ * which are registered first and reject every call with 409 before any write.
+ * The approve handler that used to adjust inventory from
+ * server/routes/fiscal-transfers/revisions-write.ts moved to
+ * services/immutableStockTransferRevisionLifecycle, so the owner file no longer
+ * writes a sensitive table. Unlike the worker deductions above, narrowing is
+ * right here: these two routes can no longer write anything at all.
+ *
  * The inventory below is written out rather than derived from the manifest at
  * runtime, for two reasons: the coverage audit looks for path literals in test
  * sources, and an explicit list is reviewable in a diff. The first test keeps
@@ -91,7 +102,6 @@ const SENSITIVE_WRITE_ROUTES = [
   "DELETE /api/purchase-orders/:id",
   "DELETE /api/salary-advances/:id",
   "DELETE /api/sp/migration/cutover",
-  "DELETE /api/stock-transfer-revisions/:id",
   "DELETE /api/vouchers/:id",
   "DELETE /api/waste-dispatches/:id",
   "PATCH /api/bales/:id",
@@ -135,7 +145,6 @@ const SENSITIVE_WRITE_ROUTES = [
   "PATCH /api/purchase-orders/:id",
   "PATCH /api/sp/containers/:id",
   "PATCH /api/sp/migration/cutover",
-  "PATCH /api/stock-transfer-revisions/:id/optional",
   "PATCH /api/vouchers/:id",
   "PATCH /api/vouchers/:id/adjustment",
   "PATCH /api/vouchers/:id/journal",
