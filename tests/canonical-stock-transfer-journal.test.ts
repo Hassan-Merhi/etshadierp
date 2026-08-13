@@ -158,4 +158,38 @@ describe("canonical stock transfer journal", () => {
     const after = await journalRows(ctx.companyId);
     expect(after).toHaveLength(before.length + 2);
   });
+
+  it("records a receipt for a production adjustment posted through the API", async () => {
+    const before = await journalRows(ctx.companyId);
+
+    // The adjustment endpoint posts against an existing voucher, so the
+    // document is created first exactly as the application does.
+    const { rows: voucherRows } = await pool.query(
+      `INSERT INTO vouchers (company_id, voucher_type, voucher_number, voucher_date, description, total_amount, optional)
+       VALUES ($1, 'Stock Adjustment', $2, CURRENT_DATE, 'canonical journal adjustment', '0', false)
+       RETURNING id`,
+      [ctx.companyId, `ADJ-CANON-${Date.now()}`]
+    );
+
+    const res = await agent.post("/api/stock-adjustments").send({
+      voucherId: Number(voucherRows[0].id),
+      locationId: ctx.locationId,
+      adjustmentType: "Production",
+      notes: "canonical journal adjustment",
+      items: [{ stockItemId: ctx.stockItemIds[0], quantity: "6", rate: "3.00" }],
+    });
+    expect(res.status).toBeGreaterThanOrEqual(200);
+    expect(res.status).toBeLessThan(300);
+
+    const written = (await journalRows(ctx.companyId)).slice(before.length);
+
+    // Production adds stock at one location, so it is a single receipt row —
+    // not the balanced pair a transfer writes.
+    expect(written).toHaveLength(1);
+    expect(written[0].movement_kind).toBe("receipt");
+    expect(written[0].source_type).toBe("stock-adjustment");
+    expect(Number(written[0].quantity_delta)).toBe(6);
+    expect(Number(written[0].location_id)).toBe(ctx.locationId);
+    expect(Number(written[0].unit_cost)).toBe(3);
+  });
 });

@@ -317,6 +317,40 @@ export async function createStockAdjustment(
         }
       }
 
+      // Canonical evidence for the applied adjustment, on the same transaction
+      // that just moved the inventory above. The rate is the one the adjustment
+      // actually resolved — a consumption line takes the location's current
+      // average or the item's opening rate, not the rate the caller sent — so
+      // the journal records the cost that was really applied.
+      //
+      // A zero-quantity adjustment changes no stock and gets no movement row:
+      // the canonical boundary rejects a zero quantity precisely because it is
+      // not a movement.
+      if (!isOptional && !absoluteQuantity.isZero()) {
+        await postStockMovementTx(
+          tx,
+          {
+            companyId: voucher.companyId,
+            stockItemId: item.stockItemId,
+            kind: isProduction ? "receipt" : "issue",
+            quantity: inventoryQuantity(absoluteQuantity),
+            unitCost: inventoryUnitCost(actualRate),
+            fromLocationId: isProduction ? null : locationId,
+            toLocationId: isProduction ? locationId : null,
+            occurredAt: new Date().toISOString(),
+            source: {
+              sourceType: "stock-adjustment",
+              sourceId: String(adjustment.id),
+              idempotencyKey: `stock-adjustment:${adjustment.id}:${item.stockItemId}`,
+            },
+            // The journal records what the adjustment did; it does not add a
+            // negative-stock rule the adjustment does not itself enforce.
+            allowNegativeStock: true,
+          },
+          canonicalStockMovementAdapter
+        );
+      }
+
       const [adjustmentItem] = await tx
         .insert(schema.stockAdjustmentItems)
         .values({
