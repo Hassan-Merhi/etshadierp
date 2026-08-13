@@ -1,0 +1,38 @@
+name: Fix PR 659 translation count
+
+on:
+  push:
+    branches:
+      - fix/green-api-466-pos-whatsapp
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Update translation count contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('tests/phase7-backend-messages-translations.test.ts')
+          text = p.read_text()
+          text = text.replace('toHaveLength(593)', 'toHaveLength(595)')
+          text = text.replace(').size).toBe(593);', ').size).toBe(595);')
+          p.write_text(text)
+          PY
+          rm .github/workflows/fix-pr659-translation-count.yml
+          npx prettier --write tests/phase7-backend-messages-translations.test.ts
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tests/phase7-backend-messages-translations.test.ts .github/workflows/fix-pr659-translation-count.yml
+          git commit -m "test: account for Green API fallback translations"
+          git push origin HEAD:fix/green-api-466-pos-whatsapp
