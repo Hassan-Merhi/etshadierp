@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { apiRequest } from "@/lib/queryClient";
+import { upsertPosDraftSummary } from "@/api/posApi";
 
 interface AutoSaveState {
   activeLocation: any;
@@ -19,7 +20,6 @@ interface PosAutosaveParams {
   lastSavedFingerprintRef: React.MutableRefObject<string>;
   setCurrentDraftId: (id: number | null) => void;
   setLastAutosaved: (date: Date | null) => void;
-  refetchDrafts: () => void;
 }
 
 export function usePosAutosave({
@@ -28,15 +28,12 @@ export function usePosAutosave({
   lastSavedFingerprintRef,
   setCurrentDraftId,
   setLastAutosaved,
-  refetchDrafts,
 }: PosAutosaveParams) {
-  // Autosave every 3 seconds — stops permanently on 401 (session expired)
   useEffect(() => {
-    // Tracks whether the session has expired; once true, all future ticks are no-ops.
     let sessionLost = false;
 
     const interval = setInterval(async () => {
-      if (sessionLost) return; // session expired — stop hammering the server
+      if (sessionLost) return;
       const s = autoSaveStateRef.current;
       if (!s.activeLocation) return;
       if (autoSaveInProgressRef.current || s.saveDraftIsPending) return;
@@ -81,20 +78,17 @@ export function usePosAutosave({
           data = await res.json();
         }
         if (data?.id) setCurrentDraftId(data.id);
+        upsertPosDraftSummary(s.activeLocation.id, data, draftData.items);
         lastSavedFingerprintRef.current = fingerprint;
         setLastAutosaved(new Date());
-        refetchDrafts();
       } catch (err: unknown) {
-        // Stop autosave entirely if session has expired (401) — avoids
-        // hammering the server with unauthenticated requests every 3 seconds.
         if (err && typeof err === "object" && "status" in err && (err as any).status === 401) {
           sessionLost = true;
         }
-        // All other failures are silent — transient network issues, etc.
       } finally {
         autoSaveInProgressRef.current = false;
       }
     }, 3000);
     return () => clearInterval(interval);
-  }, []); // Empty deps — reads from autoSaveStateRef
+  }, []);
 }
