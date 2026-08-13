@@ -20,6 +20,7 @@ interface PosAutosaveParams {
   lastSavedFingerprintRef: React.MutableRefObject<string>;
   setCurrentDraftId: (id: number | null) => void;
   setLastAutosaved: (date: Date | null) => void;
+  refetchDrafts?: () => void;
 }
 
 export function usePosAutosave({
