@@ -1,4 +1,5 @@
 import Decimal from "decimal.js";
+import { assertTransactionCompanyScope } from "../security/transactionCompanyScope";
 import {
   postStockMovementTx,
   StockMovementValidationError,
@@ -67,16 +68,6 @@ function finiteDecimal(value: unknown, field: string): Decimal {
   }
 }
 
-/**
- * Construct an exact append-only reversal from an immutable stock movement.
- *
- * Callers deliberately do not provide quantity, cost, item, company, or location.
- * Those values are copied from the locked original movement so a correction cannot
- * silently change valuation, cross tenant boundaries, or reverse a different amount.
- * The canonical postStockMovementTx boundary still owns locking, ownership checks,
- * negative-stock protection, idempotency, persistence, and audit inside the caller's
- * surrounding database transaction.
- */
 export function buildExactStockMovementReversal(
   input: ExactStockMovementReversalInput
 ): StockMovementRequest {
@@ -132,13 +123,6 @@ export function buildExactStockMovementReversal(
   };
 }
 
-/**
- * Transaction-owned exact reversal entry point.
- *
- * The original movement is loaded and locked by company inside the same transaction
- * used for the append-only reversal. This prevents a request from supplying another
- * tenant's movement snapshot or racing a concurrent correction.
- */
 export async function postExactStockMovementReversalTx(
   tx: any,
   request: ExactStockMovementReversalRequest,
@@ -150,6 +134,10 @@ export async function postExactStockMovementReversalTx(
   requiredText(request.source.sourceType, "source.sourceType");
   requiredText(request.source.sourceId, "source.sourceId");
   requiredText(request.source.idempotencyKey, "source.idempotencyKey");
+
+  // The original movement is itself tenant data. Assert the PostgreSQL tenant
+  // context before loading/locking it so compatible RLS protects this first read.
+  await assertTransactionCompanyScope(tx, companyId);
 
   const original = await adapter.lockOriginalMovement({ tx, companyId, movementId });
   if (!original) {
