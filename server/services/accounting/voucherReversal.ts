@@ -10,6 +10,7 @@ import {
   type CentralPostingResult,
   type PostingActor,
 } from "./centralPostingEngine";
+import { assertTransactionCompanyScope } from "../security/transactionCompanyScope";
 
 export interface LockedVoucherForReversal extends VoucherWithEntries<any, any> {
   isReversal?: boolean;
@@ -148,9 +149,10 @@ export function buildExactVoucherReversal(input: {
 }
 
 /**
- * Transaction-owned exact reversal entry point. The original is locked and
- * company-scoped first, then its accounting sides are swapped and posted through
- * the same balanced/idempotent/audited central posting boundary as new writes.
+ * Transaction-owned exact reversal entry point. The transaction-local company
+ * scope is asserted before the original row is read/locked, then its accounting
+ * sides are swapped and posted through the same balanced/idempotent/audited
+ * central posting boundary as new writes.
  */
 export async function reverseVoucherExactlyTx(
   tx: any,
@@ -160,6 +162,9 @@ export async function reverseVoucherExactlyTx(
 ): Promise<CentralPostingResult> {
   const companyId = positiveId(request.companyId, "companyId");
   const originalVoucherId = positiveId(request.originalVoucherId, "originalVoucherId");
+
+  await assertTransactionCompanyScope(tx, companyId);
+
   const original = await loader.loadOriginalForUpdate({ tx, companyId, voucherId: originalVoucherId });
 
   if (!original) {
