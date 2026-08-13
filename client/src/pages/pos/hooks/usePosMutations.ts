@@ -1,13 +1,13 @@
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient, invalidateCustomerBalances } from "@/lib/queryClient";
 import { invalidateLocationInventoryQueries } from "@/api/inventoryApi";
+import { removePosDraftSummary, upsertPosDraftSummary } from "@/api/posApi";
 import type { SaleRow, Location } from "../pos-components/posTypes";
 
 interface UsePosMutationsParams {
   activeLocation: Location | null;
   editVoucherId?: string;
   editVoucher: any;
-  /** Supplier Partner companies post through /api/sp/sales with SP-specific accounting. */
   isSpCompany?: boolean;
   clientSaleIdRef: React.MutableRefObject<string>;
   rows: SaleRow[];
@@ -27,7 +27,6 @@ interface UsePosMutationsParams {
   setPendingStockSend: (val: boolean) => void;
   setStockWaStatus: (s: "idle" | "sending" | "sent" | "failed" | "not_configured") => void;
   toast: (opts: { title: string; description?: string; variant?: "destructive" | "default" }) => void;
-  refetchDrafts: () => void;
 }
 
 export function usePosMutations({
@@ -53,9 +52,7 @@ export function usePosMutations({
   setPendingStockSend,
   setStockWaStatus,
   toast,
-  refetchDrafts,
 }: UsePosMutationsParams) {
-  // ISSUE 1 + 2: Fixed endpoints and payload
   const saveMutation = useMutation({
     mutationFn: async (saleData: any) => {
       if (editVoucherId) {
@@ -79,11 +76,6 @@ export function usePosMutations({
       }
 
       if (isSpCompany) {
-        // Supplier Partner sale — posts through the SP-specific endpoint so the
-        // voucher stays exactly Dr Bank/Cash / Cr Supplier Cash Payable (no
-        // Sales/COGS/Stock/Cost-Clearing lines); see server/routes/spRoutes.ts.
-        // paymentAccountType/paymentAccountId are resolved server-side against
-        // bank accounts or Cash-type ledger accounts, same as normal ERP POS.
         const spBody = {
           saleDate: saleData.voucherDate,
           customerName: (saleData.notes || "").trim() || "Walk-in Customer",
@@ -98,9 +90,6 @@ export function usePosMutations({
         };
         const res = await apiRequest("POST", "/api/sp/sales", spBody);
         const raw = await res.json();
-
-        // Normalize into the same shape the normal-POS response has so the
-        // shared print/toast/onSuccess logic below needs no SP-specific branching.
         const grandTotal = parseFloat(raw.totalSalePriceUsd || "0");
         const voucherNumber = `SP-SALE-${raw.id}`;
         return {
@@ -111,9 +100,6 @@ export function usePosMutations({
             stockItemName: l.description || l.articleCode,
             stockItemCode: l.articleCode,
             quantity: l.qtySold,
-            // InvoiceTemplate reads rate/rateUSD (not sellingPrice) for per-unit
-            // price and profit math — keep all three in sync so print/invoice
-            // totals don't resolve to NaN for SP sales.
             rate: l.salePricePerUnit,
             rateUSD: l.salePricePerUnit,
             sellingPrice: l.salePricePerUnit,
@@ -137,11 +123,8 @@ export function usePosMutations({
       if (!editVoucherId) setSaleJustCompleted(true);
 
       const locationId = activeLocation?.id || data.location?.id || (editVoucher as any)?.locationId;
-      if (isSpCompany) {
-        queryClient.invalidateQueries({ queryKey: ["/api/sp/stock"] });
-      } else {
-        invalidateLocationInventoryQueries(locationId);
-      }
+      if (isSpCompany) queryClient.invalidateQueries({ queryKey: ["/api/sp/stock"] });
+      else invalidateLocationInventoryQueries(locationId);
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       if (editVoucherId) queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${editVoucherId}`] });
       invalidateCustomerBalances(data?.voucher?.customerId ?? undefined);
@@ -174,13 +157,12 @@ export function usePosMutations({
 
   const deleteDraftMutation = useMutation({
     mutationFn: async (id: number) => apiRequest("DELETE", `/api/pos/drafts/${id}`),
-    onSuccess: () => {
+    onSuccess: (_data, draftId) => {
+      removePosDraftSummary(activeLocation?.id, draftId);
       toast({ title: "Draft Deleted", description: "Draft has been deleted successfully" });
-      refetchDrafts();
     },
   });
 
-  // Save draft mutation
   const saveDraftMutation = useMutation({
     mutationFn: async () => {
       if (!activeLocation) throw new Error("No location selected");
@@ -208,15 +190,15 @@ export function usePosMutations({
       if (currentDraftId) {
         const res = await apiRequest("PATCH", `/api/pos/drafts/${currentDraftId}`, draftData);
         return res.json();
-      } else {
-        const res = await apiRequest("POST", "/api/pos/drafts", draftData);
-        return res.json();
       }
+      const res = await apiRequest("POST", "/api/pos/drafts", draftData);
+      return res.json();
     },
     onSuccess: (data: any) => {
       setCurrentDraftId(data.id);
       setLastAutosaved(new Date());
       const validItems = rows.filter((r) => r.stockItemId && r.quantity > 0 && r.rate > 0);
+      upsertPosDraftSummary(activeLocation?.id, data, validItems);
       lastSavedFingerprintRef.current = JSON.stringify({
         items: validItems.map((r) => ({ id: r.stockItemId, qty: r.quantity, rate: r.rate })),
         notes,
@@ -226,7 +208,6 @@ export function usePosMutations({
         selectedCustomerId,
       });
       toast({ title: "Draft Saved", description: "Your transaction has been saved as a draft" });
-      refetchDrafts();
     },
     onError: (error: any) => {
       if (error?._handledGlobally) return;
