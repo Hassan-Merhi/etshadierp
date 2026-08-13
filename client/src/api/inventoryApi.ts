@@ -6,7 +6,7 @@ export function locationInventoryFullUrl(locationId: number, search = ""): strin
 }
 
 export function locationInventoryLightUrl(locationId: number, includePricing = false): string {
-  return `/api/locations/${locationId}/inventory/light${includePricing ? "?includePricing=true" : ""}`;
+  return `/api/locations/${locationId}/inventory?profile=light${includePricing ? "&includePricing=true" : ""}`;
 }
 
 /** Invalidate every cached full/light representation for exactly one location. */
