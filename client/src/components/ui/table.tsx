@@ -77,7 +77,7 @@ const Table = React.forwardRef<HTMLTableElement, TableProps>(
           // Printing must never clip rows, so the cap lifts and the table paginates naturally.
           !unclipped && !usesParentScroll && "max-h-[70vh] overflow-x-auto overflow-y-auto overscroll-y-contain",
           !unclipped && !usesParentScroll && "print:max-h-none print:overflow-visible",
-          usesParentScroll && "max-h-none overflow-visible",
+          usesParentScroll && "max-h-none overflow-x-auto overflow-y-auto",
           wrapperClassName
         )}
         style={{ maxHeight }}
