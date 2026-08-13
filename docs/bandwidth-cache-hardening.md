@@ -114,3 +114,24 @@ Production Render snapshots on 2026-08-13 showed `GET /api/locations/:locationId
 With `?includePricing=true`, it additionally returns `averageRate` and `lastSellingPrice`. The existing POS cost boundary is preserved: POS users receive `averageRate: null` while the configured selling price remains available.
 
 The compact route deliberately reuses the existing location/company authorization boundary and `checkPOSLocation`, so reducing the response shape does not weaken location isolation. HTTP caching remains conservative in these phases; refetch/caching policy changes are handled separately after the payload migration.
+
+## Phase 3 — frontend cache-key consolidation
+
+The global TanStack Query client already disables interval polling, focus refetches, remount refetches, and reconnect refetches by default, with a five-minute stale window and 30-minute garbage-collection window. Phase 3 therefore does not duplicate those settings per component. It fixes the remaining causes of duplicate inventory downloads instead.
+
+### Canonical inventory cache identities
+
+- Full current and historical location-inventory reads now use the exact request URL as the sole query key. Removing the extra `companyId` key segment allows identical full-inventory reads from different screens to share one cached response and one in-flight request. Location IDs are globally unique and the server remains the authorization boundary.
+- Compact inventory URLs are built through shared helpers in `client/src/api/inventoryApi.ts`, preventing small string/key differences from creating separate caches for the same representation.
+- POS stock-report rendering now uses TanStack Query `select` to derive its `stock` display field from the shared compact response instead of creating a second query cache with a custom transformed fetch.
+- Stock-transfer rate autofill now uses the same compact `?includePricing=true` query key and the global five-minute stale policy, instead of overriding the shared cache with a one-minute fetch policy.
+
+### Targeted freshness after writes
+
+A location-scoped invalidation helper invalidates all current, historical/include-zero, compact, and compact-pricing variants whose URL begins with `/api/locations/:locationId/inventory`. It uses `refetchType: "active"`, so only mounted views refetch immediately; inactive cached locations are marked stale without generating background traffic.
+
+POS sale create/edit now uses that helper. A sale therefore refreshes the affected location's full and light inventory representations together without invalidating or downloading inventory for unrelated locations.
+
+### Phase 3 acceptance boundary
+
+Phase 3 is complete when identical inventory reads converge on canonical URL keys, POS display transformations do not create duplicate network caches, transfer rate autofill reuses the compact pricing cache, and POS inventory mutations refresh only the affected location. CI and production bandwidth verification remain intentionally deferred to the final verification phase.
