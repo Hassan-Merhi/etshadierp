@@ -1,9 +1,6 @@
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { stockTransferItems, stockTransferVouchers, vouchers } from "@shared/schema";
-import {
-  ConvergenceReconciliationError,
-  type StockConvergenceSnapshot,
-} from "../accounting/convergenceReconciliation";
+import { ConvergenceReconciliationError, type StockConvergenceSnapshot } from "../accounting/convergenceReconciliation";
 
 export interface StockTransferDocumentSnapshot {
   sourceType: "stock-transfer";
@@ -32,10 +29,7 @@ export type StockTransferMovementEvidenceLoader = (input: {
 function positiveInteger(value: unknown, field: string): number {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new ConvergenceReconciliationError(
-      "CONVERGENCE_DATABASE_ROW_INVALID",
-      `${field} must be a positive integer`
-    );
+    throw new ConvergenceReconciliationError("CONVERGENCE_DATABASE_ROW_INVALID", `${field} must be a positive integer`);
   }
   return parsed;
 }
@@ -43,10 +37,7 @@ function positiveInteger(value: unknown, field: string): number {
 function decimalString(value: unknown, field: string): string {
   const normalized = String(value ?? "").trim();
   if (!normalized) {
-    throw new ConvergenceReconciliationError(
-      "CONVERGENCE_DATABASE_ROW_INVALID",
-      `${field} is required`
-    );
+    throw new ConvergenceReconciliationError("CONVERGENCE_DATABASE_ROW_INVALID", `${field} is required`);
   }
   return normalized;
 }
@@ -201,9 +192,7 @@ export function mergeStockTransferConvergenceEvidence(input: {
   });
 }
 
-export function createDatabaseStockTransferSnapshotLoader(
-  loadMovementEvidence: StockTransferMovementEvidenceLoader
-) {
+export function createDatabaseStockTransferSnapshotLoader(loadMovementEvidence: StockTransferMovementEvidenceLoader) {
   return async (input: { tx: any; companyId: number }): Promise<StockConvergenceSnapshot[]> => {
     const documents = await loadDatabaseStockTransferDocuments(input);
     const evidence = await loadMovementEvidence({ ...input, documents });

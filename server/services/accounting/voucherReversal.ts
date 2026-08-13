@@ -1,8 +1,4 @@
-import type {
-  VoucherEntryInsertFields,
-  VoucherInsertFields,
-  VoucherWithEntries,
-} from "./accountingTypes";
+import type { VoucherEntryInsertFields, VoucherInsertFields, VoucherWithEntries } from "./accountingTypes";
 import {
   PostingValidationError,
   postBalancedVoucherTx,
@@ -62,14 +58,11 @@ function swapAmounts(entry: any): VoucherEntryInsertFields {
     creditAmount: String(entry.debitAmount ?? "0"),
     narration: entry.narration ?? null,
     transactionCurrency: entry.transactionCurrency ?? null,
-    transactionDebitAmount:
-      entry.transactionCreditAmount == null ? null : String(entry.transactionCreditAmount),
-    transactionCreditAmount:
-      entry.transactionDebitAmount == null ? null : String(entry.transactionDebitAmount),
+    transactionDebitAmount: entry.transactionCreditAmount == null ? null : String(entry.transactionCreditAmount),
+    transactionCreditAmount: entry.transactionDebitAmount == null ? null : String(entry.transactionDebitAmount),
     baseDebitAmount: entry.baseCreditAmount == null ? null : String(entry.baseCreditAmount),
     baseCreditAmount: entry.baseDebitAmount == null ? null : String(entry.baseDebitAmount),
-    historicalExchangeRate:
-      entry.historicalExchangeRate == null ? null : String(entry.historicalExchangeRate),
+    historicalExchangeRate: entry.historicalExchangeRate == null ? null : String(entry.historicalExchangeRate),
     rateConvention: entry.rateConvention ?? null,
   };
 }
@@ -95,31 +88,31 @@ export function buildExactVoucherReversal(input: {
   if (!originalVoucher || Number(originalVoucher.id) !== originalVoucherId) {
     throw new PostingValidationError(
       "VOUCHER_REVERSAL_ORIGINAL_MISMATCH",
-      "Locked original voucher does not match the requested voucher",
+      "Locked original voucher does not match the requested voucher"
     );
   }
   if (Number(originalVoucher.companyId) !== companyId) {
     throw new PostingValidationError(
       "VOUCHER_REVERSAL_COMPANY_MISMATCH",
-      "Locked original voucher belongs to a different company",
+      "Locked original voucher belongs to a different company"
     );
   }
   if (originalVoucher.deletedAt != null) {
     throw new PostingValidationError(
       "VOUCHER_REVERSAL_ORIGINAL_DELETED",
-      "Deleted vouchers cannot be reversed through the exact reversal path",
+      "Deleted vouchers cannot be reversed through the exact reversal path"
     );
   }
   if (input.original.isReversal) {
     throw new PostingValidationError(
       "VOUCHER_REVERSAL_CHAIN_FORBIDDEN",
-      "A reversal voucher cannot itself be reversed",
+      "A reversal voucher cannot itself be reversed"
     );
   }
   if (!Array.isArray(input.original.entries) || input.original.entries.length < 2) {
     throw new PostingValidationError(
       "VOUCHER_REVERSAL_ENTRIES_MISSING",
-      "Original voucher does not contain a reversible balanced entry set",
+      "Original voucher does not contain a reversible balanced entry set"
     );
   }
 
@@ -132,8 +125,7 @@ export function buildExactVoucherReversal(input: {
     voucherType: String(originalVoucher.voucherType),
     voucherDate: reversalDate,
     totalAmount: String(originalVoucher.totalAmount),
-    description:
-      input.description ?? `Exact reversal of ${String(originalVoucher.voucherNumber ?? originalVoucherId)}`,
+    description: input.description ?? `Exact reversal of ${String(originalVoucher.voucherNumber ?? originalVoucherId)}`,
     locationId: originalVoucher.locationId ?? null,
     optional: Boolean(originalVoucher.optional),
     currency: originalVoucher.currency ?? null,
@@ -158,7 +150,7 @@ export async function reverseVoucherExactlyTx(
   tx: any,
   request: ExactVoucherReversalRequest,
   loader: VoucherReversalLoader,
-  dependencies: CentralPostingDependencies,
+  dependencies: CentralPostingDependencies
 ): Promise<CentralPostingResult> {
   const companyId = positiveId(request.companyId, "companyId");
   const originalVoucherId = positiveId(request.originalVoucherId, "originalVoucherId");
@@ -170,7 +162,7 @@ export async function reverseVoucherExactlyTx(
   if (!original) {
     throw new PostingValidationError(
       "VOUCHER_REVERSAL_ORIGINAL_NOT_FOUND",
-      `Voucher ${originalVoucherId} was not found in company ${companyId}`,
+      `Voucher ${originalVoucherId} was not found in company ${companyId}`
     );
   }
 
@@ -194,6 +186,6 @@ export async function reverseVoucherExactlyTx(
       },
       actor: request.actor,
     },
-    dependencies,
+    dependencies
   );
 }

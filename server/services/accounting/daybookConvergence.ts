@@ -71,8 +71,7 @@ export function buildFactoryDaybookPosting(input: {
     txType: voucher.voucherType === "Payment" ? "PAYMENT" : "RECEIPT",
     referenceId: voucher.id,
     referenceTable: "vouchers",
-    description:
-      voucher.description || `${voucher.voucherType} voucher #${voucher.voucherNumber}`,
+    description: voucher.description || `${voucher.voucherType} voucher #${voucher.voucherNumber}`,
     currencyCode: currency,
     amountCurrency: amountCurrency.toDecimalPlaces(6).toFixed(6),
     fxRateToUsd: erpRateToDaybookFxRateToUsd(currency, "USD", voucher.exchangeRate),

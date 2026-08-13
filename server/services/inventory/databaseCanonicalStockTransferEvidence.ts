@@ -10,10 +10,7 @@ import type {
 function positiveInteger(value: unknown, field: string): number {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new ConvergenceReconciliationError(
-      "CONVERGENCE_DATABASE_ROW_INVALID",
-      `${field} must be a positive integer`
-    );
+    throw new ConvergenceReconciliationError("CONVERGENCE_DATABASE_ROW_INVALID", `${field} must be a positive integer`);
   }
   return parsed;
 }
@@ -63,7 +60,10 @@ export const loadDatabaseCanonicalStockTransferEvidence: StockTransferMovementEv
   }
 
   const ids = sourceIds(documents);
-  const idList = sql.join(ids.map((id) => sql`${id}`), sql`, `);
+  const idList = sql.join(
+    ids.map((id) => sql`${id}`),
+    sql`, `
+  );
   const result = await (tx as any).execute(sql`
     SELECT
       company_id AS "companyId",

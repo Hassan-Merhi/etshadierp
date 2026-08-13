@@ -19,10 +19,7 @@ export type AuthoritativeStockSnapshotLoader = (input: {
 function asInteger(value: unknown, field: string): number {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new ConvergenceReconciliationError(
-      "CONVERGENCE_DATABASE_ROW_INVALID",
-      `${field} must be a positive integer`
-    );
+    throw new ConvergenceReconciliationError("CONVERGENCE_DATABASE_ROW_INVALID", `${field} must be a positive integer`);
   }
   return parsed;
 }
@@ -30,10 +27,7 @@ function asInteger(value: unknown, field: string): number {
 function asDecimalString(value: unknown, field: string): string {
   const normalized = String(value ?? "").trim();
   if (!normalized) {
-    throw new ConvergenceReconciliationError(
-      "CONVERGENCE_DATABASE_ROW_INVALID",
-      `${field} is required`
-    );
+    throw new ConvergenceReconciliationError("CONVERGENCE_DATABASE_ROW_INVALID", `${field} is required`);
   }
   return normalized;
 }
@@ -115,9 +109,7 @@ export async function loadDatabaseAccountingConvergenceSnapshots(input: {
       ledgerBaseDebit: asDecimalString(row.ledgerBaseDebit, "ledgerBaseDebit"),
       ledgerBaseCredit: asDecimalString(row.ledgerBaseCredit, "ledgerBaseCredit"),
       daybookBaseAmount:
-        row.daybookBaseAmount == null
-          ? null
-          : asDecimalString(row.daybookBaseAmount, "daybookBaseAmount"),
+        row.daybookBaseAmount == null ? null : asDecimalString(row.daybookBaseAmount, "daybookBaseAmount"),
       expectsDaybook,
     };
   });
@@ -133,8 +125,7 @@ export function createDatabaseConvergenceAdapter(
   loadStockSnapshots: AuthoritativeStockSnapshotLoader
 ): ConvergenceReconciliationAdapter {
   return {
-    loadAccountingSnapshots: ({ tx, companyId }) =>
-      loadDatabaseAccountingConvergenceSnapshots({ tx, companyId }),
+    loadAccountingSnapshots: ({ tx, companyId }) => loadDatabaseAccountingConvergenceSnapshots({ tx, companyId }),
     loadStockSnapshots,
   };
 }

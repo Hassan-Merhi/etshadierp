@@ -95,11 +95,7 @@ describe("reconcileConvergenceTx", () => {
     };
 
     await expect(
-      reconcileConvergenceTx(
-        txStub(),
-        7,
-        adapter({ loadAccountingSnapshots: async () => [duplicate, duplicate] })
-      )
+      reconcileConvergenceTx(txStub(), 7, adapter({ loadAccountingSnapshots: async () => [duplicate, duplicate] }))
     ).rejects.toMatchObject({ code: "CONVERGENCE_DUPLICATE_SNAPSHOT" });
   });
 

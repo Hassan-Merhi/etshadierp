@@ -105,11 +105,7 @@ async function resolvePaymentReceiptTargetTx(input: {
   return { [field]: accountId } as VoucherEntryInsertFields;
 }
 
-async function writeFactoryDaybookCompatibilityTx(input: {
-  tx: any;
-  companyId: number;
-  voucher: any;
-}): Promise<void> {
+async function writeFactoryDaybookCompatibilityTx(input: { tx: any; companyId: number; voucher: any }): Promise<void> {
   const [settings] = await input.tx
     .select({ id: factorySettings.id })
     .from(factorySettings)

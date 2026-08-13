@@ -27,19 +27,12 @@ export interface ExactStockMovementReversalRequest {
 }
 
 export interface ExactStockMovementReversalAdapter extends StockMovementAdapter {
-  lockOriginalMovement(input: {
-    tx: any;
-    companyId: number;
-    movementId: number;
-  }): Promise<StockMovementRecord | null>;
+  lockOriginalMovement(input: { tx: any; companyId: number; movementId: number }): Promise<StockMovementRecord | null>;
 }
 
 function positiveId(value: unknown, field: string): number {
   if (!Number.isInteger(value) || Number(value) <= 0) {
-    throw new StockMovementValidationError(
-      "STOCK_REVERSAL_ORIGINAL_INVALID",
-      `${field} must be a positive integer`
-    );
+    throw new StockMovementValidationError("STOCK_REVERSAL_ORIGINAL_INVALID", `${field} must be a positive integer`);
   }
   return Number(value);
 }
@@ -47,10 +40,7 @@ function positiveId(value: unknown, field: string): number {
 function requiredText(value: unknown, field: string): string {
   const normalized = String(value ?? "").trim();
   if (!normalized) {
-    throw new StockMovementValidationError(
-      "STOCK_REVERSAL_INPUT_REQUIRED",
-      `${field} is required`
-    );
+    throw new StockMovementValidationError("STOCK_REVERSAL_INPUT_REQUIRED", `${field} is required`);
   }
   return normalized;
 }
@@ -61,16 +51,11 @@ function finiteDecimal(value: unknown, field: string): Decimal {
     if (!parsed.isFinite()) throw new Error("not finite");
     return parsed;
   } catch {
-    throw new StockMovementValidationError(
-      "STOCK_REVERSAL_ORIGINAL_INVALID",
-      `${field} is invalid`
-    );
+    throw new StockMovementValidationError("STOCK_REVERSAL_ORIGINAL_INVALID", `${field} is invalid`);
   }
 }
 
-export function buildExactStockMovementReversal(
-  input: ExactStockMovementReversalInput
-): StockMovementRequest {
+export function buildExactStockMovementReversal(input: ExactStockMovementReversalInput): StockMovementRequest {
   const { original } = input;
   const companyId = positiveId(original.companyId, "original.companyId");
   const stockItemId = positiveId(original.stockItemId, "original.stockItemId");
@@ -91,10 +76,7 @@ export function buildExactStockMovementReversal(
     );
   }
   if (unitCost.isNegative()) {
-    throw new StockMovementValidationError(
-      "STOCK_REVERSAL_ORIGINAL_INVALID",
-      "original.unitCost must be non-negative"
-    );
+    throw new StockMovementValidationError("STOCK_REVERSAL_ORIGINAL_INVALID", "original.unitCost must be non-negative");
   }
   if (original.movementKind === "reversal" || original.reversalOfMovementId) {
     throw new StockMovementValidationError(

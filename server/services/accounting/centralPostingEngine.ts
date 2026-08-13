@@ -1,9 +1,5 @@
 import Decimal from "decimal.js";
-import type {
-  VoucherEntryInsertFields,
-  VoucherInsertFields,
-  VoucherWithEntries,
-} from "./accountingTypes";
+import type { VoucherEntryInsertFields, VoucherInsertFields, VoucherWithEntries } from "./accountingTypes";
 import { insertVoucherWithEntriesTx } from "./voucherPostingService";
 import { assertTransactionCompanyScope } from "../security/transactionCompanyScope";
 
@@ -46,12 +42,7 @@ export interface PostingIdempotencyStore {
     companyId: number;
     source: PostingSourceIdentity;
   }): Promise<VoucherWithEntries | null>;
-  record(input: {
-    tx: any;
-    companyId: number;
-    voucherId: number;
-    source: PostingSourceIdentity;
-  }): Promise<void>;
+  record(input: { tx: any; companyId: number; voucherId: number; source: PostingSourceIdentity }): Promise<void>;
 }
 
 export interface PostingAuditWriter {
@@ -111,10 +102,7 @@ function amount(value: string | undefined, field: string, index: number): Decima
   try {
     parsed = new Decimal(value ?? "0");
   } catch {
-    throw new PostingValidationError(
-      "POSTING_AMOUNT_INVALID",
-      `Entry ${index + 1} has an invalid ${field}`
-    );
+    throw new PostingValidationError("POSTING_AMOUNT_INVALID", `Entry ${index + 1} has an invalid ${field}`);
   }
   if (!parsed.isFinite() || parsed.isNegative()) {
     throw new PostingValidationError(
@@ -137,16 +125,10 @@ export function populatedPostingTargets(entry: VoucherEntryInsertFields): Target
 export function hasSupportedPostingTargetShape(entry: VoucherEntryInsertFields): boolean {
   const populated = populatedPostingTargets(entry);
   if (populated.length === 1) return true;
-  return (
-    populated.length === 2 &&
-    populated.includes("customerId") &&
-    populated.includes("ledgerAccountId")
-  );
+  return populated.length === 2 && populated.includes("customerId") && populated.includes("ledgerAccountId");
 }
 
-export function validateCentralPostingRequest(
-  request: CentralPostingRequest
-): ValidatedPostingTotals {
+export function validateCentralPostingRequest(request: CentralPostingRequest): ValidatedPostingTotals {
   const { voucher, entries, source } = request;
 
   if (!Number.isInteger(voucher.companyId) || voucher.companyId <= 0) {
@@ -160,10 +142,7 @@ export function validateCentralPostingRequest(
   requiredText(source.idempotencyKey, "idempotencyKey");
 
   if (!Array.isArray(entries) || entries.length < 2) {
-    throw new PostingValidationError(
-      "POSTING_ENTRIES_REQUIRED",
-      "A balanced voucher requires at least two entries"
-    );
+    throw new PostingValidationError("POSTING_ENTRIES_REQUIRED", "A balanced voucher requires at least two entries");
   }
 
   let debitTotal = new Decimal(0);

@@ -93,10 +93,7 @@ function compare(
 function requiredIdentityPart(value: unknown, field: string): string {
   const normalized = String(value ?? "").trim();
   if (!normalized) {
-    throw new ConvergenceReconciliationError(
-      "CONVERGENCE_IDENTITY_INVALID",
-      `${field} is required`
-    );
+    throw new ConvergenceReconciliationError("CONVERGENCE_IDENTITY_INVALID", `${field} is required`);
   }
   return normalized;
 }

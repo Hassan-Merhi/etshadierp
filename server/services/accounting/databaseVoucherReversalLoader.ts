@@ -30,10 +30,7 @@ export function createDatabaseVoucherReversalLoader(): VoucherReversalLoader {
         .limit(1);
       if (!voucher) return null;
 
-      const entries = await tx
-        .select()
-        .from(voucherEntries)
-        .where(eq(voucherEntries.voucherId, voucherId));
+      const entries = await tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
 
       const [reversalAudit] = await tx
         .select({ id: auditLog.id })
@@ -43,8 +40,8 @@ export function createDatabaseVoucherReversalLoader(): VoucherReversalLoader {
             eq(auditLog.companyId, companyId),
             eq(auditLog.tableName, POSTING_AUDIT_TABLE),
             eq(auditLog.recordId, voucherId),
-            like(auditLog.recordIdentifier, "voucher-reversal:%"),
-          ),
+            like(auditLog.recordIdentifier, "voucher-reversal:%")
+          )
         )
         .limit(1);
 

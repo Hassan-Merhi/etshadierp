@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  buildExactVoucherReversal,
-  reverseVoucherExactlyTx,
-} from "../server/services/accounting/voucherReversal";
+import { buildExactVoucherReversal, reverseVoucherExactlyTx } from "../server/services/accounting/voucherReversal";
 
 const original = {
   voucher: {
@@ -98,7 +95,7 @@ describe("exact voucher reversal", () => {
         original,
         reversalVoucherNumber: "REV-91",
         reversalDate: "2026-08-13",
-      }),
+      })
     ).toThrow(/different company/i);
   });
 
@@ -110,7 +107,7 @@ describe("exact voucher reversal", () => {
         original: { ...original, isReversal: true },
         reversalVoucherNumber: "REV-REV-91",
         reversalDate: "2026-08-13",
-      }),
+      })
     ).toThrow(/cannot itself be reversed/i);
   });
 
@@ -135,7 +132,7 @@ describe("exact voucher reversal", () => {
         reversalDate: "2026-08-13",
       },
       loader,
-      dependencies,
+      dependencies
     );
 
     expect(loader.loadOriginalForUpdate).toHaveBeenCalledWith({
@@ -151,7 +148,7 @@ describe("exact voucher reversal", () => {
           sourceId: "91",
           idempotencyKey: "voucher-reversal:7:91",
         },
-      }),
+      })
     );
     expect(result.replayed).toBe(true);
     expect(dependencies.idempotency.record).not.toHaveBeenCalled();

@@ -11,10 +11,7 @@ export interface CompanyRequestRuntimeContext {
 
 const companyRequestRuntime = new AsyncLocalStorage<CompanyRequestRuntimeContext>();
 
-export function runWithCompanyRequestRuntimeContext<T>(
-  context: CompanyRequestRuntimeContext,
-  callback: () => T
-): T {
+export function runWithCompanyRequestRuntimeContext<T>(context: CompanyRequestRuntimeContext, callback: () => T): T {
   return companyRequestRuntime.run(context, callback);
 }
 

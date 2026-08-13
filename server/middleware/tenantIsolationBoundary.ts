@@ -4,24 +4,15 @@ import { companies, userCompanyRoles } from "@shared/schema";
 
 import { db } from "../db";
 import { logger } from "../lib/logger";
-import {
-  assertCompaniesAccess,
-  CompanyAccessError,
-  sendCompanyAccessError,
-} from "../security/companyAccessBoundary";
+import { assertCompaniesAccess, CompanyAccessError, sendCompanyAccessError } from "../security/companyAccessBoundary";
 import {
   ActiveCompanyPermissionContextError,
   getActiveCompanyPermissionContext,
   type ActiveCompanyPermissionContext,
 } from "../services/security/activeCompanyPermissionContext";
-import {
-  assertRequestCompanyMatchesSession,
-  CompanyIsolationError,
-} from "../services/security/companyIsolationPolicy";
+import { assertRequestCompanyMatchesSession, CompanyIsolationError } from "../services/security/companyIsolationPolicy";
 import { decideExplicitCompanyScope } from "../services/security/companyRequestScopePolicy";
-import {
-  isPinnedCompanyRoute,
-} from "../services/security/activeCompanyPermissionPolicy";
+import { isPinnedCompanyRoute } from "../services/security/activeCompanyPermissionPolicy";
 import { chooseAuthorizedFactoryCompany } from "../services/security/factoryCompanyScopePolicy";
 import { runWithCompanyRequestRuntimeContext } from "../services/security/companyRequestRuntimeContext";
 
@@ -61,7 +52,10 @@ function isContextOptionalPath(path: string): boolean {
 async function ensurePinnedFactoryCompany(req: Request): Promise<void> {
   const path = req.originalUrl.split("?", 1)[0] || req.path;
   const normalizedPath = path.toLowerCase();
-  if (!isPinnedCompanyRoute(path) || !(normalizedPath === "/api/factory" || normalizedPath.startsWith("/api/factory/"))) {
+  if (
+    !isPinnedCompanyRoute(path) ||
+    !(normalizedPath === "/api/factory" || normalizedPath.startsWith("/api/factory/"))
+  ) {
     return;
   }
 
@@ -132,7 +126,7 @@ async function resolveCanonicalContext(req: Request): Promise<ActiveCompanyPermi
     ) {
       const path = req.originalUrl.split("?", 1)[0] || req.path;
       const companyId = isPinnedCompanyRoute(path)
-        ? positiveId((req.session as any).factoryCompanyId) ?? positiveId(req.session.currentCompanyId)
+        ? (positiveId((req.session as any).factoryCompanyId) ?? positiveId(req.session.currentCompanyId))
         : positiveId(req.session.currentCompanyId);
       if (companyId) {
         return {

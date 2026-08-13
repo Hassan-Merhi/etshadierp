@@ -31,8 +31,6 @@ function positiveCompanyId(value: unknown): number {
  */
 export async function assertTransactionCompanyScope(tx: any, value: unknown): Promise<number> {
   const companyId = positiveCompanyId(value);
-  await tx.execute(
-    sql`SELECT set_config('app.current_company_id', ${String(companyId)}, true)`,
-  );
+  await tx.execute(sql`SELECT set_config('app.current_company_id', ${String(companyId)}, true)`);
   return companyId;
 }

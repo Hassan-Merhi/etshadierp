@@ -13,10 +13,7 @@ export interface CanonicalStockTransferMovementRow {
 function positiveInteger(value: unknown, field: string): number {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new ConvergenceReconciliationError(
-      "CONVERGENCE_DATABASE_ROW_INVALID",
-      `${field} must be a positive integer`
-    );
+    throw new ConvergenceReconciliationError("CONVERGENCE_DATABASE_ROW_INVALID", `${field} must be a positive integer`);
   }
   return parsed;
 }
@@ -28,10 +25,7 @@ function decimal(value: unknown, field: string): Decimal {
     if (!normalized || !parsed.isFinite()) throw new Error("invalid");
     return parsed;
   } catch {
-    throw new ConvergenceReconciliationError(
-      "CONVERGENCE_DATABASE_ROW_INVALID",
-      `${field} must be a finite decimal`
-    );
+    throw new ConvergenceReconciliationError("CONVERGENCE_DATABASE_ROW_INVALID", `${field} must be a finite decimal`);
   }
 }
 
