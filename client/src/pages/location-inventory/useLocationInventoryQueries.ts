@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { locationInventoryFullUrl } from "@/api/inventoryApi";
 import type { InventoryLocation as Location } from "./locationInventoryTypes";
 
 interface InventoryItem {
@@ -99,50 +100,34 @@ export function useLocationInventoryQueries({
   const locations = posUser ? posAssignedLocations : allLocations;
   const locationsLoading = posUser ? posLocationsLoading : allLocationsLoading;
 
+  // Inventory URLs are the cache identity. Do not append companyId as another
+  // query-key element: location IDs are globally unique and the server enforces
+  // company/location access. Using the exact URL lets every identical caller
+  // share the same TanStack Query cache entry and in-flight request.
+  const currentInventoryUrl = selectedLocationLocal
+    ? locationInventoryFullUrl(selectedLocationLocal.id, showZeroStock ? "includeZero=true" : "")
+    : null;
   const { data: inventoryData = [], isLoading: inventoryLoading } = useQuery<InventoryItem[]>({
-    queryKey:
-      selectedLocationLocal && companyId
-        ? [`/api/locations/${selectedLocationLocal.id}/inventory${showZeroStock ? "?includeZero=true" : ""}`, companyId]
-        : [],
-    queryFn: async () => {
-      const url = `/api/locations/${selectedLocationLocal!.id}/inventory${showZeroStock ? "?includeZero=true" : ""}`;
-      const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    },
-    enabled: !!selectedLocationLocal && !!companyId,
+    queryKey: currentInventoryUrl ? [currentInventoryUrl] : [],
+    enabled: !!currentInventoryUrl && !!companyId,
   });
 
+  const openingInventoryUrl =
+    selectedLocationLocal && fromDate
+      ? locationInventoryFullUrl(selectedLocationLocal.id, `asOfDate=${encodeURIComponent(fromDate)}`)
+      : null;
   const { data: openingInventoryData = [], isLoading: openingInventoryLoading } = useQuery<InventoryItem[]>({
-    queryKey:
-      selectedLocationLocal && fromDate && companyId
-        ? [`/api/locations/${selectedLocationLocal.id}/inventory?asOfDate=${fromDate}`, companyId]
-        : [],
-    queryFn: async () => {
-      const url = `/api/locations/${selectedLocationLocal!.id}/inventory?asOfDate=${fromDate}`;
-      const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    },
-    enabled: !!selectedLocationLocal && !!fromDate && !!companyId,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    queryKey: openingInventoryUrl ? [openingInventoryUrl] : [],
+    enabled: !!openingInventoryUrl && !!companyId,
   });
 
+  const closingInventoryUrl =
+    selectedLocationLocal && asOfDate
+      ? locationInventoryFullUrl(selectedLocationLocal.id, `asOfDate=${encodeURIComponent(asOfDate)}`)
+      : null;
   const { data: closingInventoryData = [], isLoading: closingInventoryLoading } = useQuery<InventoryItem[]>({
-    queryKey:
-      selectedLocationLocal && asOfDate && companyId
-        ? [`/api/locations/${selectedLocationLocal.id}/inventory?asOfDate=${asOfDate}`, companyId]
-        : [],
-    queryFn: async () => {
-      const url = `/api/locations/${selectedLocationLocal!.id}/inventory?asOfDate=${asOfDate}`;
-      const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    },
-    enabled: !!selectedLocationLocal && !!asOfDate && !!companyId,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    queryKey: closingInventoryUrl ? [closingInventoryUrl] : [],
+    enabled: !!closingInventoryUrl && !!companyId,
   });
 
   const { data: allInventoryRaw, isLoading: allInventoryLoading } = useQuery<any>({
