@@ -59,7 +59,7 @@ async function ensurePinnedFactoryCompany(req: Request): Promise<void> {
     return;
   }
 
-  const session = req.session as any;
+  const session = req.session;
   if (positiveId(session.factoryCompanyId)) return;
   if (!session.userId) return;
 
@@ -77,11 +77,12 @@ async function ensurePinnedFactoryCompany(req: Request): Promise<void> {
     .orderBy(companies.id);
 
   let currentCompany = assignedFactories.find((company) => company.id === session.currentCompanyId) ?? null;
-  if (!currentCompany && session.currentRole === "Developer" && positiveId(session.currentCompanyId)) {
+  const developerCurrentCompanyId = positiveId(session.currentCompanyId);
+  if (!currentCompany && session.currentRole === "Developer" && developerCurrentCompanyId) {
     const [developerCurrent] = await db
       .select({ id: companies.id, companyType: companies.companyType, active: companies.active })
       .from(companies)
-      .where(eq(companies.id, session.currentCompanyId))
+      .where(eq(companies.id, developerCurrentCompanyId))
       .limit(1);
     if (
       developerCurrent?.active &&
@@ -126,7 +127,7 @@ async function resolveCanonicalContext(req: Request): Promise<ActiveCompanyPermi
     ) {
       const path = req.originalUrl.split("?", 1)[0] || req.path;
       const companyId = isPinnedCompanyRoute(path)
-        ? (positiveId((req.session as any).factoryCompanyId) ?? positiveId(req.session.currentCompanyId))
+        ? (positiveId(req.session.factoryCompanyId) ?? positiveId(req.session.currentCompanyId))
         : positiveId(req.session.currentCompanyId);
       if (companyId) {
         return {

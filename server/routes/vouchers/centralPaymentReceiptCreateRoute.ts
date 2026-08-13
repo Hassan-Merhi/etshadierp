@@ -152,7 +152,7 @@ async function createCentralPaymentReceipt(req: Request, res: Response, next: Ne
         clientRequestId: body.clientRequestId,
         actor: {
           userId: userId ?? null,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           reason: `${body.voucherType} voucher creation`,
         },
         resolveTarget: (accountType, accountId) =>
@@ -206,7 +206,7 @@ async function createCentralPaymentReceipt(req: Request, res: Response, next: Ne
         const entrySnapshot = await snapshotVoucherEntries(posted.entries);
         await logAudit({
           userId: userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId,
           action: "create",
           tableName: "vouchers",

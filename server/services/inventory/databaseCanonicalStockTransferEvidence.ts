@@ -15,6 +15,17 @@ function positiveInteger(value: unknown, field: string): number {
   return parsed;
 }
 
+/**
+ * Drivers differ: some return `{ rows }`, others the row array itself. Anything
+ * that is neither is handed back untouched so the caller's array check fails it.
+ */
+function resultRows(result: unknown): unknown {
+  if (typeof result === "object" && result !== null && "rows" in result) {
+    return result.rows;
+  }
+  return result ?? [];
+}
+
 function sourceIds(documents: StockTransferDocumentSnapshot[]): string[] {
   const seen = new Set<string>();
   for (const document of documents) {
@@ -64,7 +75,7 @@ export const loadDatabaseCanonicalStockTransferEvidence: StockTransferMovementEv
     ids.map((id) => sql`${id}`),
     sql`, `
   );
-  const result = await (tx as any).execute(sql`
+  const result = await tx.execute(sql`
     SELECT
       company_id AS "companyId",
       source_type AS "sourceType",
@@ -78,7 +89,7 @@ export const loadDatabaseCanonicalStockTransferEvidence: StockTransferMovementEv
     ORDER BY source_id, id
   `);
 
-  const rows = result?.rows ?? result ?? [];
+  const rows = resultRows(result);
   if (!Array.isArray(rows)) {
     throw new ConvergenceReconciliationError(
       "CONVERGENCE_ADAPTER_INVALID",
@@ -107,10 +118,12 @@ export const loadDatabaseCanonicalStockTransferEvidence: StockTransferMovementEv
 
   return summarizeCanonicalStockTransferEvidence({
     companyId: scopedCompanyId,
-    rows: rows.map((row: any) => ({
-      companyId: row.companyId,
-      sourceType: row.sourceType,
-      sourceId: row.sourceId,
+    rows: rows.map((row: Record<string, unknown>) => ({
+      // Each row was validated in the loop above; these repeat the same
+      // normalisation so the summariser receives the declared row types.
+      companyId: positiveInteger(row.companyId, "movement.companyId"),
+      sourceType: String(row.sourceType ?? "").trim(),
+      sourceId: String(row.sourceId ?? "").trim(),
       quantityDelta: String(row.quantityDelta),
       unitCost: String(row.unitCost),
     })),

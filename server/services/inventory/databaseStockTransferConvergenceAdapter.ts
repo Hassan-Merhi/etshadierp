@@ -1,4 +1,5 @@
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import type { CompanyScopedReadTransaction } from "../security/transactionCompanyScope";
 import { stockTransferItems, stockTransferVouchers, vouchers } from "@shared/schema";
 import { ConvergenceReconciliationError, type StockConvergenceSnapshot } from "../accounting/convergenceReconciliation";
 
@@ -21,7 +22,7 @@ export interface StockTransferMovementEvidence {
 }
 
 export type StockTransferMovementEvidenceLoader = (input: {
-  tx: any;
+  tx: CompanyScopedReadTransaction;
   companyId: number;
   documents: StockTransferDocumentSnapshot[];
 }) => Promise<StockTransferMovementEvidence[]>;
@@ -60,7 +61,7 @@ function identity(sourceType: unknown, sourceId: unknown): string {
  * expected to have posted stock movement evidence yet.
  */
 export async function loadDatabaseStockTransferDocuments(input: {
-  tx: any;
+  tx: CompanyScopedReadTransaction;
   companyId: number;
 }): Promise<StockTransferDocumentSnapshot[]> {
   const { tx, companyId } = input;
@@ -87,7 +88,7 @@ export async function loadDatabaseStockTransferDocuments(input: {
     )
     .groupBy(stockTransferVouchers.id, stockTransferVouchers.voucherId, vouchers.companyId);
 
-  return rows.map((row: any) => {
+  return rows.map((row: Record<string, unknown>) => {
     const transferId = positiveInteger(row.transferId, "transferId");
     const voucherId = positiveInteger(row.voucherId, "voucherId");
     const rowCompanyId = positiveInteger(row.companyId, "companyId");
@@ -193,7 +194,10 @@ export function mergeStockTransferConvergenceEvidence(input: {
 }
 
 export function createDatabaseStockTransferSnapshotLoader(loadMovementEvidence: StockTransferMovementEvidenceLoader) {
-  return async (input: { tx: any; companyId: number }): Promise<StockConvergenceSnapshot[]> => {
+  return async (input: {
+    tx: CompanyScopedReadTransaction;
+    companyId: number;
+  }): Promise<StockConvergenceSnapshot[]> => {
     const documents = await loadDatabaseStockTransferDocuments(input);
     const evidence = await loadMovementEvidence({ ...input, documents });
     if (!Array.isArray(evidence)) {

@@ -1,6 +1,17 @@
 import { and, eq, like, sql } from "drizzle-orm";
 import { auditLog, voucherEntries, vouchers } from "@shared/schema";
+import type { db } from "../../db";
 import type { VoucherReversalLoader } from "./voucherReversal";
+
+/** The concrete drizzle transaction handle, inferred from the shared client. */
+type DrizzleTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+function resultRowCount(result: unknown): number {
+  if (typeof result === "object" && result !== null && "rows" in result && Array.isArray(result.rows)) {
+    return result.rows.length;
+  }
+  return 0;
+}
 
 const POSTING_AUDIT_TABLE = "accounting_postings";
 
@@ -10,7 +21,7 @@ const POSTING_AUDIT_TABLE = "accounting_postings";
  * from one stable immutable accounting snapshot. Company scope is part of the
  * locking query rather than being checked after an unscoped read.
  */
-export function createDatabaseVoucherReversalLoader(): VoucherReversalLoader {
+export function createDatabaseVoucherReversalLoader(): VoucherReversalLoader<DrizzleTransaction> {
   return {
     async loadOriginalForUpdate({ tx, companyId, voucherId }) {
       const locked = await tx.execute(sql`
@@ -20,8 +31,7 @@ export function createDatabaseVoucherReversalLoader(): VoucherReversalLoader {
           AND company_id = ${companyId}
         FOR UPDATE
       `);
-      const rows = Array.isArray(locked?.rows) ? locked.rows : [];
-      if (rows.length === 0) return null;
+      if (resultRowCount(locked) === 0) return null;
 
       const [voucher] = await tx
         .select()

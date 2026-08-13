@@ -114,6 +114,8 @@ declare module "express-session" {
     daybookEditDays?: number;
     canAccessCustomers?: boolean;
     canDeleteRecords?: boolean;
+    /** Display name of the active company, cached for presence/session reads. */
+    currentCompanyName?: string | null;
     /** Unix timestamp (ms) when user last confirmed their password via POST /api/auth/confirm-password */
     passwordConfirmedAt?: number;
   }

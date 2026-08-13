@@ -1,5 +1,5 @@
 import Decimal from "decimal.js";
-import { assertTransactionCompanyScope } from "../security/transactionCompanyScope";
+import { assertTransactionCompanyScope, type CompanyScopedTransaction } from "../security/transactionCompanyScope";
 import {
   postStockMovementTx,
   StockMovementValidationError,
@@ -27,7 +27,11 @@ export interface ExactStockMovementReversalRequest {
 }
 
 export interface ExactStockMovementReversalAdapter extends StockMovementAdapter {
-  lockOriginalMovement(input: { tx: any; companyId: number; movementId: number }): Promise<StockMovementRecord | null>;
+  lockOriginalMovement(input: {
+    tx: CompanyScopedTransaction;
+    companyId: number;
+    movementId: number;
+  }): Promise<StockMovementRecord | null>;
 }
 
 function positiveId(value: unknown, field: string): number {
@@ -106,7 +110,7 @@ export function buildExactStockMovementReversal(input: ExactStockMovementReversa
 }
 
 export async function postExactStockMovementReversalTx(
-  tx: any,
+  tx: CompanyScopedTransaction,
   request: ExactStockMovementReversalRequest,
   adapter: ExactStockMovementReversalAdapter
 ): Promise<StockMovementResult> {

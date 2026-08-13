@@ -1,5 +1,5 @@
 import Decimal from "decimal.js";
-import { assertTransactionCompanyScope } from "../security/transactionCompanyScope";
+import { assertTransactionCompanyScope, type CompanyScopedTransaction } from "../security/transactionCompanyScope";
 
 export type StockMovementKind = "receipt" | "issue" | "transfer" | "adjustment" | "reversal";
 
@@ -52,30 +52,35 @@ export interface StockMovementResult {
 
 export interface StockMovementAdapter {
   findExisting(input: {
-    tx: any;
+    tx: CompanyScopedTransaction;
     companyId: number;
     source: StockMovementSourceIdentity;
   }): Promise<StockMovementResult | null>;
-  validateOwnership(input: { tx: any; companyId: number; stockItemId: number; locationIds: number[] }): Promise<void>;
+  validateOwnership(input: {
+    tx: CompanyScopedTransaction;
+    companyId: number;
+    stockItemId: number;
+    locationIds: number[];
+  }): Promise<void>;
   lockBalances(input: {
-    tx: any;
+    tx: CompanyScopedTransaction;
     companyId: number;
     stockItemId: number;
     locationIds: number[];
   }): Promise<Record<number, string>>;
   appendMovements(input: {
-    tx: any;
+    tx: CompanyScopedTransaction;
     request: StockMovementRequest;
     rows: Array<{ locationId: number; quantityDelta: string; unitCost: string }>;
   }): Promise<StockMovementRecord[]>;
   recordIdempotency(input: {
-    tx: any;
+    tx: CompanyScopedTransaction;
     companyId: number;
     source: StockMovementSourceIdentity;
     movementIds: number[];
   }): Promise<void>;
   recordAudit(input: {
-    tx: any;
+    tx: CompanyScopedTransaction;
     request: StockMovementRequest;
     movementIds: number[];
     quantity: string;
@@ -201,7 +206,7 @@ export function validateStockMovementRequest(request: StockMovementRequest): Val
 }
 
 export async function postStockMovementTx(
-  tx: any,
+  tx: CompanyScopedTransaction,
   request: StockMovementRequest,
   adapter: StockMovementAdapter
 ): Promise<StockMovementResult> {

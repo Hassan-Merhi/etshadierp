@@ -1,4 +1,5 @@
 import { and, eq, sql } from "drizzle-orm";
+import type { CompanyScopedReadTransaction } from "../security/transactionCompanyScope";
 import { factoryDaybookEntries, voucherEntries, vouchers } from "@shared/schema";
 import {
   ConvergenceReconciliationError,
@@ -7,12 +8,8 @@ import {
   type StockConvergenceSnapshot,
 } from "./convergenceReconciliation";
 
-interface AccountingReadTx {
-  select(fields: Record<string, unknown>): any;
-}
-
 export type AuthoritativeStockSnapshotLoader = (input: {
-  tx: any;
+  tx: CompanyScopedReadTransaction;
   companyId: number;
 }) => Promise<StockConvergenceSnapshot[]>;
 
@@ -43,7 +40,7 @@ function asDecimalString(value: unknown, field: string): string {
  * aggregation.
  */
 export async function loadDatabaseAccountingConvergenceSnapshots(input: {
-  tx: AccountingReadTx;
+  tx: CompanyScopedReadTransaction;
   companyId: number;
 }): Promise<AccountingConvergenceSnapshot[]> {
   const { tx, companyId } = input;
@@ -75,7 +72,7 @@ export async function loadDatabaseAccountingConvergenceSnapshots(input: {
     .where(and(eq(vouchers.companyId, companyId), sql`${vouchers.deletedAt} is null`))
     .groupBy(vouchers.id, vouchers.companyId, vouchers.voucherType, vouchers.totalAmount);
 
-  return rows.map((row: any) => {
+  return rows.map((row: Record<string, unknown>) => {
     const voucherId = asInteger(row.voucherId, "voucherId");
     const rowCompanyId = asInteger(row.companyId, "companyId");
     if (rowCompanyId !== companyId) {

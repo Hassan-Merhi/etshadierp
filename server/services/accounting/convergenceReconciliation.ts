@@ -1,5 +1,5 @@
 import Decimal from "decimal.js";
-import { assertTransactionCompanyScope } from "../security/transactionCompanyScope";
+import { assertTransactionCompanyScope, type CompanyScopedReadTransaction } from "../security/transactionCompanyScope";
 
 export interface AccountingConvergenceSnapshot {
   voucherId: number;
@@ -23,8 +23,14 @@ export interface StockConvergenceSnapshot {
 }
 
 export interface ConvergenceReconciliationAdapter {
-  loadAccountingSnapshots(input: { tx: any; companyId: number }): Promise<AccountingConvergenceSnapshot[]>;
-  loadStockSnapshots(input: { tx: any; companyId: number }): Promise<StockConvergenceSnapshot[]>;
+  loadAccountingSnapshots(input: {
+    tx: CompanyScopedReadTransaction;
+    companyId: number;
+  }): Promise<AccountingConvergenceSnapshot[]>;
+  loadStockSnapshots(input: {
+    tx: CompanyScopedReadTransaction;
+    companyId: number;
+  }): Promise<StockConvergenceSnapshot[]>;
 }
 
 export interface ConvergenceDiscrepancy {
@@ -114,7 +120,7 @@ function assertUniqueIdentity(seen: Set<string>, identity: string, domain: strin
  * any correction must go through the canonical posting/reversal services.
  */
 export async function reconcileConvergenceTx(
-  tx: any,
+  tx: CompanyScopedReadTransaction,
   companyIdValue: unknown,
   adapter: ConvergenceReconciliationAdapter
 ): Promise<ConvergenceReconciliationResult> {
