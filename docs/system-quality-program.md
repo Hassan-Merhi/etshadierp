@@ -20,7 +20,7 @@ audit fails instead of allowing the reference to drift.
 | Type escapes (AST) | 8,658 total | `npm run audit:type-escapes` |
 | ESLint warnings | 9,282 total | `npm run lint` |
 | Startup migration failures | 0 on a fresh database | `npm run verify:startup-migrations` |
-| Backend coverage floor (lines) | 18% | `config/coverage-thresholds.json` |
+| Backend coverage floor (lines) | 29% | `config/coverage-thresholds.json` |
 | Write routes with no test at all | 0 of 328 | `npm run audit:write-routes` |
 | Write routes covered only by the guard sweep | 0 of 328 | `npm run audit:write-routes` |
 | Registered routes | 1,904 | `config/route-manifest.json` |
@@ -114,7 +114,7 @@ same change that removes the warnings, never after.
 stronger than any repository total. Its `perRule` entry exists so the two cannot
 drift apart, and the audit fails if they disagree — the ESLint count must always
 equal the type-escape ceiling minus its ts-comment suppressions, which are not a
-rule (8,984 = 8,986 − 2).
+rule (8,815 = 8,817 − 2).
 
 ---
 
