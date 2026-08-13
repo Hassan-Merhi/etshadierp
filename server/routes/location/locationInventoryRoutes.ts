@@ -68,6 +68,56 @@ export function registerLocationInventoryRoutes(app: Express) {
     }
   });
 
+  // Compact current-location inventory for high-frequency interactive consumers.
+  // Full-detail/historical/reporting callers continue using the legacy endpoint below.
+  app.get("/api/locations/:locationId/inventory/light", requireAuth, checkPOSLocation, async (req, res) => {
+    try {
+      const locationId = parseInt(req.params.locationId);
+      if (isNaN(locationId)) {
+        return res.status(400).json({ message: "Invalid location ID" });
+      }
+
+      const location = await storage.getLocationById(locationId);
+      if (!location) {
+        return res.status(404).json({ message: "Location not found" });
+      }
+      if (location.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied: Location belongs to a different company" });
+      }
+
+      const includeZero = req.query.includeZero === "true";
+      const includePricing = req.query.includePricing === "true";
+      const rows = await storage.getLocationInventory(location.companyId, locationId, includeZero);
+      const isPOS = req.user?.role === "POS";
+
+      const compactRows = rows.map((item) => {
+        const compact: Record<string, unknown> = {
+          locationId: item.locationId,
+          stockItemId: item.stockItemId,
+          quantity: item.quantity,
+          stockItemCode: item.stockItemCode ?? "",
+          stockItemName: item.stockItemName ?? "",
+          stockItemUom: item.stockItemUom ?? "",
+        };
+
+        if (includePricing) {
+          compact.averageRate = isPOS ? null : (item.averageRate ?? null);
+          compact.lastSellingPrice = item.lastSellingPrice ?? null;
+        }
+
+        return compact;
+      });
+
+      res.setHeader("Cache-Control", "private, no-cache");
+      return res.json(compactRows);
+    } catch (error: unknown) {
+      logger.error(`[inventory-light] ERROR locationId=${req.params.locationId}:`, {
+        error: getErrorMessage(error) ?? error,
+      });
+      return res.status(500).json({ message: getErrorMessage(error) });
+    }
+  });
+
   // Location Inventory - Get inventory for a specific location
   app.get("/api/locations/:locationId/inventory", requireAuth, checkPOSLocation, async (req, res) => {
     try {
