@@ -88,6 +88,16 @@ const SENSITIVE_TABLES = [
   "factoryWorkerDeductions",
 ];
 
+/**
+ * Routes that remain financially sensitive even after a file split moved their
+ * direct inventory mutation into a lifecycle service. Keep these explicit so
+ * future route-owner refactors cannot silently shrink the protected surface.
+ */
+const SENSITIVE_ROUTE_OVERRIDES = new Map([
+  ["DELETE /api/stock-transfer-revisions/:id", "stockTransferRevisions"],
+  ["PATCH /api/stock-transfer-revisions/:id/optional", "stockTransferRevisions"],
+]);
+
 /** Ways this codebase writes: drizzle builders and raw SQL alike. */
 function writesSensitiveTable(source) {
   for (const table of SENSITIVE_TABLES) {
@@ -156,8 +166,9 @@ export function auditWriteRouteCoverage(options = {}) {
   for (const entry of manifest.routes) {
     const [method, routePath] = entry.split(" ");
     if (!WRITE_METHODS.has(method) || !routePath?.startsWith("/api/")) continue;
-    if (seen.has(`${method} ${routePath}`)) continue;
-    seen.add(`${method} ${routePath}`);
+    const routeKey = `${method} ${routePath}`;
+    if (seen.has(routeKey)) continue;
+    seen.add(routeKey);
 
     let owner = registrationOwners.get(routePath) ?? null;
     if (!owner) {
@@ -169,7 +180,7 @@ export function auditWriteRouteCoverage(options = {}) {
       }
     }
 
-    const sensitiveTable = owner ? writesSensitiveTable(sources.get(owner)) : null;
+    const sensitiveTable = (owner ? writesSensitiveTable(sources.get(owner)) : null) ?? SENSITIVE_ROUTE_OVERRIDES.get(routeKey) ?? null;
     const namedElsewhere = otherTestText.includes(routePath);
     const guardSweepReferenced = sweepText.includes(routePath);
     const referencedBeforeAuthenticatedSweep = namedElsewhere || guardSweepReferenced;
