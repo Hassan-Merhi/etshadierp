@@ -85,7 +85,7 @@ function hexToArgb(hex?: string): string {
 
 /** Iterates Fortune Sheet cells regardless of sparse (celldata) or dense (data) format */
 function iterateFortuneCells(sheet: FortuneSheet, cb: (r: number, c: number, v: any) => void): void {
-  const s = sheet as any;
+  const s = sheet;
   if (Array.isArray(s.celldata)) {
     for (const { r, c, v } of s.celldata) {
       if (v !== null && v !== undefined) cb(r, c, v);
@@ -198,7 +198,7 @@ export async function syncFortuneToXlsx(rawXlsx: string, sheets: FortuneSheet[])
   await wb.xlsx.load(base64ToArrayBuffer(rawXlsx));
 
   for (let sheetIdx = 0; sheetIdx < sheets.length; sheetIdx++) {
-    const fsSheet = sheets[sheetIdx] as any;
+    const fsSheet = sheets[sheetIdx];
 
     // Match by name first, fall back to index
     let ws = wb.getWorksheet(fsSheet.name);
@@ -278,7 +278,7 @@ export async function syncFortuneToXlsx(rawXlsx: string, sheets: FortuneSheet[])
     }
     if (cfg.rowhidden) {
       for (const ri of Object.keys(cfg.rowhidden)) {
-        (ws.getRow(Number(ri) + 1) as any).hidden = true;
+        ws.getRow(Number(ri) + 1).hidden = true;
       }
     }
 
@@ -291,7 +291,7 @@ export async function syncFortuneToXlsx(rawXlsx: string, sheets: FortuneSheet[])
     }
     if (cfg.colhidden) {
       for (const ci of Object.keys(cfg.colhidden)) {
-        (ws.getColumn(Number(ci) + 1) as any).hidden = true;
+        ws.getColumn(Number(ci) + 1).hidden = true;
       }
     }
 

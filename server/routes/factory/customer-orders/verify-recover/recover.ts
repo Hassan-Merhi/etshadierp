@@ -35,7 +35,7 @@ export function registerOrderRecoverBalesRoutes(app: Express) {
   //    ORDER BY fb.updated_at DESC;
   app.post("/api/factory/customer-orders/:id/recover-bales", requireAuth, async (req: Request, res: Response) => {
     try {
-      const session = req.session as any;
+      const session = req.session;
       const companyId = session.factoryCompanyId || session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
@@ -175,7 +175,7 @@ export function registerOrderRecoverBalesRoutes(app: Express) {
   // Requires Admin / Owner. Order must have a proformaIdUsed and 0 existing bales.
   app.post("/api/factory/customer-orders/:id/auto-recover-bales", requireAuth, async (req: Request, res: Response) => {
     try {
-      const session = req.session as any;
+      const session = req.session;
       const companyId = session.factoryCompanyId || session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 

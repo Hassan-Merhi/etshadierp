@@ -24,7 +24,7 @@ import { eq, and, sql } from "drizzle-orm";
 export function registerRawStockOpeningBalanceRoutes(app: Express) {
   app.post("/api/factory/raw-stock/opening-balance", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const {
@@ -167,7 +167,7 @@ export function registerRawStockOpeningBalanceRoutes(app: Express) {
             .where(
               and(
                 eq(factorySuppliers.companyId, companyId),
-                eq((factorySuppliers as any).parentId, existingSupplier.id),
+                eq(factorySuppliers.parentId, existingSupplier.id),
                 sql`lower(${factorySuppliers.name}) = lower(${commName})`
               )
             )
@@ -177,7 +177,7 @@ export function registerRawStockOpeningBalanceRoutes(app: Express) {
           } else {
             const [created] = await tx
               .insert(factorySuppliers)
-              .values({ companyId, name: commName, isActive: true, parentId: existingSupplier.id } as any)
+              .values({ companyId, name: commName, isActive: true, parentId: existingSupplier.id })
               .returning();
             commissionSupplierId = created.id;
           }
@@ -240,7 +240,7 @@ export function registerRawStockOpeningBalanceRoutes(app: Express) {
   // GET a single opening-balance raw stock record
   app.get("/api/factory/raw-stock/opening-balance/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
@@ -291,7 +291,7 @@ export function registerRawStockOpeningBalanceRoutes(app: Express) {
   // UnresolvedExchangeRateError from the FX helpers used below.)
   app.patch("/api/factory/raw-stock/opening-balance/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
@@ -367,7 +367,7 @@ export function registerRawStockOpeningBalanceRoutes(app: Express) {
               costPerKg: factoryRawStock.costPerKg,
               currencyCode: factoryContainers.currencyCode,
               fxRateToUsd: factoryContainers.fxRateToUsd,
-              fxRateConfirmed: (factoryContainers as any).fxRateConfirmed,
+              fxRateConfirmed: factoryContainers.fxRateConfirmed,
             })
             .from(factoryRawStock)
             .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
@@ -473,7 +473,7 @@ export function registerRawStockOpeningBalanceRoutes(app: Express) {
   // DELETE a single opening-balance raw stock record (bale-safe)
   app.delete("/api/factory/raw-stock/opening-balance/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);

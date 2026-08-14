@@ -425,7 +425,7 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
 export function registerOrderExcelExportRoutes(app: Express) {
   app.get("/api/factory/customer-orders/:id/export/excel", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseId(req.params.id);
@@ -474,8 +474,8 @@ export function registerOrderExcelExportRoutes(app: Express) {
       const orderLinePricingMap = new Map<string, { pricingMode: string; pricePerKg: number }>();
       for (const ol of orderLinesForXls) {
         orderLinePricingMap.set((ol.articleCode || "").toLowerCase(), {
-          pricingMode: (ol as any).pricingMode || "per_bale",
-          pricePerKg: parseFloat((ol as any).pricePerKg || "0"),
+          pricingMode: ol.pricingMode || "per_bale",
+          pricePerKg: parseFloat(ol.pricePerKg || "0"),
         });
       }
 
@@ -531,7 +531,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
         orderDate: order.orderDate ?? null,
         containerNumber: order.containerNumber ?? null,
         customerName: customer?.legalName ?? null,
-        baseCurrency: (company as any)?.baseCurrency || "USD",
+        baseCurrency: company?.baseCurrency || "USD",
         lines: lines.map((g) => ({
           articleCode: g.articleCode,
           productName: g.productName,
@@ -558,7 +558,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || req.session.userId!,
+          username: req.session.username || req.session.userId!,
           companyId,
           action: "export",
           tableName: "factory_customer_orders",
@@ -589,7 +589,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
 
   app.get("/api/factory/customer-orders/:id/export-excel", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseId(req.params.id);
@@ -671,7 +671,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
         orderDate: order.orderDate ?? null,
         containerNumber: order.containerNumber ?? null,
         customerName: order.customerName ?? null,
-        baseCurrency: (company as any)?.baseCurrency || "USD",
+        baseCurrency: company?.baseCurrency || "USD",
         lines: lines.map((l: any) => ({
           articleCode: l.articleCode,
           productName: l.productName,
@@ -699,12 +699,12 @@ export function registerOrderExcelExportRoutes(app: Express) {
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || req.session.userId!,
+          username: req.session.username || req.session.userId!,
           companyId,
           action: "export",
           tableName: "factory_customer_orders",
           recordId: orderId,
-          recordIdentifier: `Customer Order #${(order as any).invoiceNumber || orderId} Excel`,
+          recordIdentifier: `Customer Order #${order.invoiceNumber || orderId} Excel`,
           changes: { format: { old: null, new: "xlsx" }, orderId: { old: null, new: orderId } },
         });
       } catch (auditErr) {

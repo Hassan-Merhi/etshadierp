@@ -47,7 +47,7 @@ import { isFactoryCompanyOptionalRoute } from "../services/security/companyResou
 export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   app.use("/api/factory", async (req: any, res: any, next: any) => {
     try {
-      const session = req.session as any;
+      const session = req.session;
       if (!session?.userId) return next();
       if (isFactoryCompanyOptionalRoute(req.path)) return next();
 

@@ -280,7 +280,7 @@ export function ContainerFormDialog({
       onClose();
     },
     onError: (err: Error) => {
-      if ((err as any)?._handledGlobally) return;
+      if ((err as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -373,7 +373,7 @@ export function ContainerFormDialog({
       onClose();
     },
     onError: (err: Error) => {
-      if ((err as any)?._handledGlobally) return;
+      if ((err as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });

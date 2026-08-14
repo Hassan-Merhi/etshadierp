@@ -27,7 +27,7 @@ import { normalizeVoucherEntryAmounts } from "../../services/accounting/currency
 export function registerVoucherCreateRoutes(app: Express) {
   app.post("/api/vouchers", requireAuth, async (req, res) => {
     try {
-      const isPOS = (req as any).user?.role === "POS";
+      const isPOS = req.user?.role === "POS";
       const voucherType = req.body.voucherType;
       if (isPOS && voucherType !== "StockTransfer" && voucherType !== "Stock Transfer" && voucherType !== "Transfer") {
         return res.status(403).json({ message: "Access denied: This resource is not available for POS users" });
@@ -44,7 +44,7 @@ export function registerVoucherCreateRoutes(app: Express) {
   // Create a voucher with entries in one transaction
   app.post("/api/vouchers/with-entries", requireAuth, requireNonPOS, async (req, res) => {
     const _t = Date.now();
-    const _uid = (req as any).user?.id;
+    const _uid = req.user?.id;
     const _cid = req.session.currentCompanyId;
     logger.info("Voucher with-entries create started", {
       module: "vouchers",
@@ -229,7 +229,7 @@ export function registerVoucherCreateRoutes(app: Express) {
       const _createEntriesSnap = await snapshotVoucherEntries(createdEntries).catch(() => []);
       await logAudit({
         userId: req.session.userId!,
-        username: (req.session as any).username || "unknown",
+        username: req.session.username || "unknown",
         companyId: req.session.currentCompanyId!,
         action: "create",
         tableName: "vouchers",

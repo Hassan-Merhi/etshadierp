@@ -125,7 +125,7 @@ function authorizeExplicitCompanyScope(req: Request, res: Response): boolean {
 
   if (req.method === "GET" && ["Admin", "Owner", "Manager"].includes(role ?? "")) return true;
 
-  const companyId = (req.session as any).currentCompanyId ?? null;
+  const companyId = req.session.currentCompanyId ?? null;
 
   try {
     assertRequestCompanyMatchesSession(
@@ -191,7 +191,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       canSellNegativeStock: ["Admin", "Owner", "Manager", "Developer"].includes(role)
         ? true
         : (req.session.canSellNegativeStock ?? false),
-      posViewOnly: (req.session as any).posViewOnly ?? false,
+      posViewOnly: req.session.posViewOnly ?? false,
       daybookEditDays: req.session.daybookEditDays ?? 0,
       canAccessCustomers: req.session.canAccessCustomers ?? false,
       canDeleteRecords: req.session.canDeleteRecords ?? false,
@@ -403,7 +403,7 @@ export function blockViewOnlyWrites(req: Request, res: Response, next: NextFunct
   if (req.path.startsWith("/api/auth/")) return next();
   if (isViewOnlyPassiveLifecycleWrite(req)) return next();
 
-  const role = (req.session as any)?.currentRole;
+  const role = req.session?.currentRole;
   if (role === "View Only") {
     logDenied({
       userId: req.session.userId ?? null,

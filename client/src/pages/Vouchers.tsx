@@ -384,7 +384,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         });
         return;
       }
-      if ((error as any)._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || `Failed to ${voucherIdToEdit ? "update" : "create"} voucher`,

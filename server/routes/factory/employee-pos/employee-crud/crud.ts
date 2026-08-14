@@ -14,7 +14,7 @@ import { eq, and, sql } from "drizzle-orm";
 export function registerFactoryEmployeeCrudRoutes(app: Express) {
   app.get("/api/factory/employees", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const rows = await db
@@ -38,7 +38,7 @@ export function registerFactoryEmployeeCrudRoutes(app: Express) {
   // GET /api/factory/employees/:id - single employee
   app.get("/api/factory/employees/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -59,7 +59,7 @@ export function registerFactoryEmployeeCrudRoutes(app: Express) {
   // POST /api/factory/employees - create employee with employeeType = "Employee"
   app.post("/api/factory/employees", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { firstName, lastName, code, department, phone, monthlySalary, joinDate, active } = req.body;
@@ -116,7 +116,7 @@ export function registerFactoryEmployeeCrudRoutes(app: Express) {
   // PATCH /api/factory/employees/:id - update employee
   app.patch("/api/factory/employees/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -147,7 +147,7 @@ export function registerFactoryEmployeeCrudRoutes(app: Express) {
   // DELETE /api/factory/employees/:id - soft-delete employee
   app.delete("/api/factory/employees/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -169,7 +169,7 @@ export function registerFactoryEmployeeCrudRoutes(app: Express) {
   // GET /api/factory/employees/:id/statement - running ledger from voucher entries
   app.get("/api/factory/employees/:id/statement", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);

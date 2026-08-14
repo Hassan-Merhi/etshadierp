@@ -301,7 +301,7 @@ function BarcodesTab() {
   } | null>(null);
 
   const downloadTemplate = async () => {
-    const wb = new (ExcelJS as any).Workbook();
+    const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet("Barcodes");
     ws.columns = [
       { header: "Item Code", key: "itemCode", width: 20 },
@@ -591,7 +591,7 @@ function UpdateCategoriesTab() {
   } | null>(null);
 
   const downloadTemplate = async () => {
-    const wb = new (ExcelJS as any).Workbook();
+    const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet("Categories");
     ws.columns = [
       { header: "Item Code", key: "itemCode", width: 20 },
@@ -661,7 +661,7 @@ function UpdateCategoriesTab() {
       const res = await apiRequest("POST", "/api/stock-items/update-categories", {
         rows: valid.map((r) => ({ itemCode: r.itemCode, categoryName: r.categoryName })),
       });
-      const data = await (res as any).json();
+      const data = await res.json();
       setResult(data);
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });

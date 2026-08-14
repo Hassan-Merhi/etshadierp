@@ -151,7 +151,7 @@ export function OffloadDialog({
   const receiptValue = useMemo(() => {
     if (!isSubsequentReceipt || !selectedContainer) return null;
     const kg = parseFloat(actualReceivedKg || "0");
-    const rate = parseFloat((selectedContainer as any).fixedCostPerKgUsd || "0");
+    const rate = parseFloat(selectedContainer.fixedCostPerKgUsd || "0");
     if (!kg || !rate) return null;
     return kg * rate;
   }, [isSubsequentReceipt, selectedContainer, actualReceivedKg]);
@@ -162,8 +162,8 @@ export function OffloadDialog({
     if (!receivedKg || !selectedContainerId || !selectedContainer) return null;
 
     const valuationKg = resolveFactoryOffloadValuationKg({
-      totalKg: (selectedContainer as any).totalKg,
-      declaredKg: (selectedContainer as any).declaredKg,
+      totalKg: selectedContainer.totalKg,
+      declaredKg: selectedContainer.declaredKg,
       receivedKg,
     });
     if (valuationKg <= 0) return null;
@@ -293,7 +293,7 @@ export function OffloadDialog({
       setActualReceivedKg(String(remaining.toFixed(3)));
       // For continuation receipts, pre-fill the fixed landed rate from raw stock (informational —
       // the server uses the DB rate; the field is disabled so the user cannot override it).
-      setCostPerKg((container as any).fixedCostPerKgUsd || container.ratePerKg || "");
+      setCostPerKg(container.fixedCostPerKgUsd || container.ratePerKg || "");
       // Clear charge fields — they are locked for subsequent receipts
       setFreight("");
       setFreightAccountId("");
@@ -325,14 +325,14 @@ export function OffloadDialog({
     // account, not the credit destination) and do not auto-assign the material
     // supplier — the user must explicitly pick where freight goes.
     if (container.freightSupplierId) setFreightAccountId(`SUP:${container.freightSupplierId}`);
-    else if ((container as any).freightPaidBy === "own" && (container as any).freightOwnAccountId)
-      setFreightAccountId(String((container as any).freightOwnAccountId));
+    else if (container.freightPaidBy === "own" && container.freightOwnAccountId)
+      setFreightAccountId(String(container.freightOwnAccountId));
     else setFreightAccountId("");
 
     const ocVal = parseFloat(container.otherCharges || "0");
     setOtherCharges(ocVal > 0 ? String(ocVal) : "");
     setOtherChargesFromContainer(ocVal > 0);
-    const effectiveOcCcy = (container as any).otherChargesCurrencyCode || ccy;
+    const effectiveOcCcy = container.otherChargesCurrencyCode || ccy;
     setOtherChargesCurrencyCode(effectiveOcCcy);
     setOtherChargesFxRate(effectiveOcCcy === "USD" ? "1" : container.fxRateToUsd || "1");
     if (container.otherChargesSupplierId) setOtherChargesAccountId(`SUP:${container.otherChargesSupplierId}`);
@@ -351,8 +351,8 @@ export function OffloadDialog({
       setCommissionPersonName(broker?.name || "Commission");
       // Initialize commission FX: prefer the container's stored commission-specific rate,
       // then fall back to container material FX (valid only when same currency).
-      const storedCommFx = parseFloat((container as any).commissionFxRateToUsd || "");
-      const storedCommFxConfirmed = (container as any).commissionFxRateConfirmed === true;
+      const storedCommFx = parseFloat(container.commissionFxRateToUsd || "");
+      const storedCommFxConfirmed = container.commissionFxRateConfirmed === true;
       if (commCcy === "USD") {
         setCommissionFxRate("1");
       } else if (Number.isFinite(storedCommFx) && storedCommFx > 0 && storedCommFxConfirmed) {

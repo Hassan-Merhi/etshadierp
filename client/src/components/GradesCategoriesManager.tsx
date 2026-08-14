@@ -319,7 +319,7 @@ function BulkExportImport() {
       const data: ImportSummary = await res.json();
 
       if (!res.ok) {
-        toast({ title: "Import failed", description: (data as any).message, variant: "destructive" });
+        toast({ title: "Import failed", description: data.message, variant: "destructive" });
         return;
       }
 

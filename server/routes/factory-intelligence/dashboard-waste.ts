@@ -14,7 +14,7 @@ import { factoryWasteEntries, factoryWorkers, customerOrders } from "@shared/sch
 export function registerFactoryDashboardWasteRoutes(app: Express, requireAuth: any, db: any) {
   app.get("/api/factory/dashboard", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const dateStr = (req.query.date as string) || getClientDate(req);
@@ -30,7 +30,7 @@ export function registerFactoryDashboardWasteRoutes(app: Express, requireAuth: a
       for (const w of wasteOnDate) {
         const kg = parseFloat(w.kgWaste || "0");
         wasteTotalKg += kg;
-        const wType = (w as any).wasteType ? (w as any).wasteType.toUpperCase() : "OTHER";
+        const wType = w.wasteType ? w.wasteType.toUpperCase() : "OTHER";
         wasteBreakdownMap[wType] = (wasteBreakdownMap[wType] || 0) + kg;
       }
       const wasteBreakdown = Object.entries(wasteBreakdownMap).map(([wasteType, kg]) => ({
@@ -52,7 +52,7 @@ export function registerFactoryDashboardWasteRoutes(app: Express, requireAuth: a
           AND attendance_date = ${dateStr}::date
           AND LOWER(status) != 'absent'
       `);
-      const attendanceTodayCount = parseInt(String((attendanceTodayResult.rows[0] as any)?.count ?? "0"), 10);
+      const attendanceTodayCount = parseInt(String(attendanceTodayResult.rows[0]?.count ?? "0"), 10);
 
       // Loaded customer containers: finalized orders with containerNumber
       const loadedOrders = await db
@@ -82,7 +82,7 @@ export function registerFactoryDashboardWasteRoutes(app: Express, requireAuth: a
 
   app.get("/api/factory/waste", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const from = req.query.from as string;
@@ -107,8 +107,7 @@ export function registerFactoryDashboardWasteRoutes(app: Express, requireAuth: a
 
   app.post("/api/factory/waste", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId =
-        req.body.companyId || (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.body.companyId || req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { date, mixBatchId, supplierId, containerId, wasteType, kgWaste, reason } = req.body;
@@ -124,7 +123,7 @@ export function registerFactoryDashboardWasteRoutes(app: Express, requireAuth: a
           wasteType: wasteType || null,
           kgWaste: String(kgWaste),
           reason: reason || null,
-          createdBy: (req.session as any).userId ?? null,
+          createdBy: req.session.userId ?? null,
         })
         .returning();
 
@@ -137,7 +136,7 @@ export function registerFactoryDashboardWasteRoutes(app: Express, requireAuth: a
 
   app.delete("/api/factory/waste/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);

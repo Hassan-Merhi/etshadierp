@@ -463,7 +463,7 @@ export function registerShippingContainerDocumentRoutes(app: Express) {
           AND (file_url IS NULL OR file_url = '' OR file_url = '-')
       `);
 
-      const removed = (result as any).rowCount ?? 0;
+      const removed = result.rowCount ?? 0;
       res.json({ success: true, removed });
     } catch (error: unknown) {
       logger.error("Error cleaning up ghost documents:", { error: error });

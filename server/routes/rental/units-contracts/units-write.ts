@@ -27,11 +27,11 @@ export function registerRentalUnitsWriteRoutes(app: Express, ctx: RentalRoutesCo
       const data = insertPropertyUnitSchema.parse({ ...req.body, companyId });
       const [created] = await db
         .insert(propertyUnits)
-        .values({ ...data, module } as any)
+        .values({ ...data, module })
         .returning();
       await logAudit({
         userId: req.session.userId!,
-        username: (req.session as any).username || "unknown",
+        username: req.session.username || "unknown",
         companyId,
         action: "create",
         tableName: "property_units",
@@ -77,7 +77,7 @@ export function registerRentalUnitsWriteRoutes(app: Express, ctx: RentalRoutesCo
         }
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId,
           action: "update",
           tableName: "property_units",
@@ -129,7 +129,7 @@ export function registerRentalUnitsWriteRoutes(app: Express, ctx: RentalRoutesCo
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId,
           action: "delete",
           tableName: "property_units",

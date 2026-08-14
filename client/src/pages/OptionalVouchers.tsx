@@ -252,7 +252,7 @@ export default function OptionalVouchers() {
         >
           <FileText className="h-10 w-10 opacity-30" />
           <p className="text-sm font-medium">Failed to load optional vouchers</p>
-          <p className="text-xs text-muted-foreground">{(error as any)?.message}</p>
+          <p className="text-xs text-muted-foreground">{error?.message}</p>
         </div>
       ) : vouchers.length === 0 ? (
         <div

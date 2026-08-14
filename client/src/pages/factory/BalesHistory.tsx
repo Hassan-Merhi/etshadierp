@@ -231,7 +231,7 @@ export default function BalesHistory() {
       setDeleteConfirm(null);
     },
     onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error deleting bale", description: error.message, variant: "destructive" });
       setDeleteConfirm(null);
     },
@@ -246,7 +246,7 @@ export default function BalesHistory() {
       toast({ title: "Status updated" });
     },
     onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error updating status", description: error.message, variant: "destructive" });
     },
   });
@@ -262,7 +262,7 @@ export default function BalesHistory() {
       toast({ title: "Bulk status updated" });
     },
     onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error updating status", description: error.message, variant: "destructive" });
     },
   });
@@ -278,7 +278,7 @@ export default function BalesHistory() {
       toast({ title: "Product name updated" });
     },
     onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error updating name", description: error.message, variant: "destructive" });
     },
   });
@@ -340,7 +340,7 @@ export default function BalesHistory() {
       openBrowserReprint([label]);
     },
     onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error repacking bale", description: error.message, variant: "destructive" });
       setRepackConfirm(null);
     },

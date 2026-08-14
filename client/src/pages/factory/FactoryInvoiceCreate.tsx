@@ -173,7 +173,7 @@ export default function FactoryInvoiceCreate() {
       setTimeout(() => scannerRef.current?.focus(), 100);
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -196,7 +196,7 @@ export default function FactoryInvoiceCreate() {
       setTimeout(() => setScanFlash(null), 500);
       setScanCode("");
       scannerRef.current?.focus();
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Scan Error", description: error.message, variant: "destructive" });
     },
   });
@@ -210,7 +210,7 @@ export default function FactoryInvoiceCreate() {
       toast({ title: "Bale removed" });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -232,7 +232,7 @@ export default function FactoryInvoiceCreate() {
       }
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -246,7 +246,7 @@ export default function FactoryInvoiceCreate() {
       toast({ title: "Charge removed" });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -261,7 +261,7 @@ export default function FactoryInvoiceCreate() {
       toast({ title: data.linked > 0 ? "Ledger entries created" : "Nothing to relink", description: data.message });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -280,7 +280,7 @@ export default function FactoryInvoiceCreate() {
     onError: (error: Error) => {
       if (error?._handledGlobally) return;
       setShowFinalizeDialog(false);
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -296,7 +296,7 @@ export default function FactoryInvoiceCreate() {
       return res.json();
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error updating date", description: error.message, variant: "destructive" });
     },
   });
@@ -325,7 +325,7 @@ export default function FactoryInvoiceCreate() {
       toast({ title: "Prices updated", description: `Applied current prices to ${data.repriced} bale(s)` });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });

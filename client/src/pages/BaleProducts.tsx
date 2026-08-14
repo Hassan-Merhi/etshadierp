@@ -205,7 +205,7 @@ export default function BaleProducts() {
       toast({ title: "Category created" });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -222,7 +222,7 @@ export default function BaleProducts() {
       toast({ title: "Category updated" });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -237,7 +237,7 @@ export default function BaleProducts() {
       toast({ title: "Category deleted" });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -341,7 +341,7 @@ export default function BaleProducts() {
       });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -357,7 +357,7 @@ export default function BaleProducts() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -374,7 +374,7 @@ export default function BaleProducts() {
       toast({ title: "Product deleted", description: "The product has been removed." });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -394,7 +394,7 @@ export default function BaleProducts() {
       });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -464,7 +464,7 @@ export default function BaleProducts() {
       const C_TOTAL = "FFE8F0F8";
       const C_TOTAL_LABEL = "FF00205B";
 
-      const wb = new (ExcelJS as any).Workbook();
+      const wb = new ExcelJS.Workbook();
       wb.creator = "HMD International Group";
       const ws = wb.addWorksheet("Make Your Order");
 
@@ -659,7 +659,7 @@ export default function BaleProducts() {
       const C_MUTED = "FF888888";
       const C_TOTAL = "FFE8F0F8";
 
-      const wb = new (ExcelJS as any).Workbook();
+      const wb = new ExcelJS.Workbook();
       wb.creator = "HMD International Group";
       const ws = wb.addWorksheet("Make Your Order");
 

@@ -68,7 +68,7 @@ export function registerAiImportJobRoutes(app: Express) {
         warnings: [],
       }));
 
-      await db.insert(aiImportRows).values(rowValues as any);
+      await db.insert(aiImportRows).values(rowValues);
 
       res.json({
         jobId: job.id,

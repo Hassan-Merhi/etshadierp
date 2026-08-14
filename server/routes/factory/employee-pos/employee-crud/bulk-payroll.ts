@@ -15,7 +15,7 @@ export function registerFactoryEmployeeBulkPayrollRoutes(app: Express) {
   // POST /api/factory/employees/bulk-payroll - bulk payroll deposit for multiple employees
   app.post("/api/factory/employees/bulk-payroll", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { deposits, date, notes, effectiveDate } = req.body;

@@ -26,8 +26,8 @@ export function registerPosSaleWriteRoutes(app: Express) {
   // POST /api/factory/pos/sale — create a factory POS sale
   app.post("/api/factory/pos/sale", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
-      const rawUserId = (req.session as any).userId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
+      const rawUserId = req.session.userId;
       const userId: number | null = rawUserId && !isNaN(Number(rawUserId)) ? Number(rawUserId) : null;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
@@ -306,7 +306,7 @@ export function registerPosSaleWriteRoutes(app: Express) {
   // PUT /api/factory/pos/sales/:id — edit an existing factory POS sale
   app.put("/api/factory/pos/sales/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const saleId = parseInt(req.params.id);
 

@@ -387,7 +387,7 @@ export function OffloadDialog({ open, onOpenChange, containerId, containerNumber
       setLocation("/containers");
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Offload failed", description: error.message, variant: "destructive" });
     },
   });

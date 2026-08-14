@@ -455,7 +455,7 @@ export function deriveEstimatedDeliveryDate(shipment: ParcelsAppShipment): strin
   // It can also be a past actual-delivery date, so only use it when the date is
   // strictly in the future (> today).  This is the ONLY circumstance where we
   // use delivered_by — never for containers that have already been delivered.
-  const deliveredByRaw = (shipment as any).delivered_by as string | undefined;
+  const deliveredByRaw = shipment.delivered_by as string | undefined;
   if (deliveredByRaw) {
     const d = tryDate(deliveredByRaw);
     if (d && d > todayStr) {

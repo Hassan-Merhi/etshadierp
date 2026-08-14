@@ -21,7 +21,7 @@ export function registerEmployeeRoutes(app: Express) {
       const transformedEmployees = employees.map((emp) => {
         // Use stored currentBalance which is kept in sync by payroll operations and journal vouchers
         // The syncEmployeePayrollBalance function updates currentBalance when vouchers are created/edited/deleted
-        const currentBalance = parseFloat((emp as any).currentBalance || "0");
+        const currentBalance = parseFloat(emp.currentBalance || "0");
 
         return {
           ...emp,
@@ -52,7 +52,7 @@ export function registerEmployeeRoutes(app: Express) {
       if (!employee) {
         return res.status(404).json({ message: "Employee not found" });
       }
-      const balance = parseFloat((employee as any).currentBalance || "0").toFixed(2);
+      const balance = parseFloat(employee.currentBalance || "0").toFixed(2);
       res.json({ balance });
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
@@ -234,7 +234,7 @@ export function registerEmployeeRoutes(app: Express) {
         return res.status(400).json({ message: "No fields to update" });
       }
 
-      const updated = await storage.updateEmployee(id, companyId, updates as any);
+      const updated = await storage.updateEmployee(id, companyId, updates);
       if (!updated) return res.status(404).json({ message: "Employee not found" });
 
       res.json(updated);

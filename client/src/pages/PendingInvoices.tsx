@@ -70,7 +70,7 @@ export default function PendingInvoices() {
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
     },
     onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });

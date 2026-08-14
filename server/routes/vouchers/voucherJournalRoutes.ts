@@ -378,7 +378,7 @@ export function registerVoucherJournalRoutes(app: Express) {
         const auditEntries = await snapshotVoucherEntries(result.entries);
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId: req.session.currentCompanyId!,
           action: "create",
           tableName: "vouchers",
@@ -688,7 +688,7 @@ export function registerVoucherJournalRoutes(app: Express) {
         const _newSnapJ = await snapshotVoucherEntries(result.entries);
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId: req.session.currentCompanyId!,
           action: "update",
           tableName: "vouchers",

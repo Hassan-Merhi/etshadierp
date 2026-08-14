@@ -66,7 +66,7 @@ export function resetCsrfToken() {
 /* ── Capacitor API base URL ──────────────────────────────────────────────── */
 // Set VITE_API_BASE_URL at Capacitor build time, e.g. "https://your-server.com".
 // Empty string in all web builds — every code path below falls back unchanged.
-const _CAPACITOR_API_BASE: string = ((import.meta as any).env?.VITE_API_BASE_URL as string) || "";
+const _CAPACITOR_API_BASE: string = (import.meta.env?.VITE_API_BASE_URL as string) || "";
 
 /* ── Session-expiry redirect ─────────────────────────────────────────────── */
 // Single-fire: only after /api/auth/me confirms the session is truly gone do

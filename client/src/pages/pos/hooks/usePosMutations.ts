@@ -123,7 +123,7 @@ export function usePosMutations({
       setSavedSale(data);
       if (!editVoucherId) setSaleJustCompleted(true);
 
-      const locationId = activeLocation?.id || data.location?.id || (editVoucher as any)?.locationId;
+      const locationId = activeLocation?.id || data.location?.id || editVoucher?.locationId;
       if (isSpCompany) queryClient.invalidateQueries({ queryKey: ["/api/sp/stock"] });
       else invalidateLocationInventoryQueries(locationId);
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });

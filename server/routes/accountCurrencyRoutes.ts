@@ -6,10 +6,7 @@ import { db, pool } from "../db";
 import { requireAuth, requireNonPOS } from "../auth";
 import { bankAccounts, companies, ledgerAccounts } from "@shared/schema";
 import { normalizeOpeningBalanceCurrency } from "../services/accounting/openingBalanceCurrency";
-import {
-  getCashBankAccountSummary,
-  getCashBankRevaluation,
-} from "../services/accounting/cashBankRevaluationService";
+import { getCashBankAccountSummary, getCashBankRevaluation } from "../services/accounting/cashBankRevaluationService";
 
 const OPENING_FIELDS = [
   "openingBalance",
@@ -58,13 +55,13 @@ function unresolvedOpeningPayload(body: Record<string, any>, rawAmount: Decimal)
 function normalizedOpeningPayload(
   body: Record<string, any>,
   existing: Record<string, any> | null,
-  baseCurrency: string,
+  baseCurrency: string
 ): Record<string, any> {
   const hasExplicitCurrencyPayload = EXPLICIT_CURRENCY_FIELDS.some((field) => hasOwn(body, field));
   const existingIsResolved = Boolean(
     existing?.openingBalanceNativeAmount != null &&
-      existing?.openingBalanceCurrency &&
-      existing?.openingBalanceBaseAmount != null,
+    existing?.openingBalanceCurrency &&
+    existing?.openingBalanceBaseAmount != null
   );
 
   // Old edit forms submit only openingBalance, which is historical base after a
@@ -116,10 +113,8 @@ function normalizedOpeningPayload(
   const normalized = normalizeOpeningBalanceCurrency({
     openingBalance: nativeOpeningBalance,
     openingBalanceCurrency: rawCurrency,
-    openingBalanceHistoricalRate:
-      body.openingBalanceHistoricalRate ?? existing?.openingBalanceHistoricalRate,
-    openingBalanceBaseAmount:
-      body.openingBalanceBaseAmount ?? existing?.openingBalanceBaseAmount,
+    openingBalanceHistoricalRate: body.openingBalanceHistoricalRate ?? existing?.openingBalanceHistoricalRate,
+    openingBalanceBaseAmount: body.openingBalanceBaseAmount ?? existing?.openingBalanceBaseAmount,
     baseCurrency,
   });
 
@@ -151,10 +146,10 @@ export const normalizeAccountOpeningBalance: RequestHandler = async (req, res, n
       const table = isLedger ? ledgerAccounts : bankAccounts;
       const rows = await db
         .select()
-        .from(table as any)
-        .where(and(eq((table as any).id, id), eq((table as any).companyId, companyId)))
+        .from(table)
+        .where(and(eq(table.id, id), eq(table.companyId, companyId)))
         .limit(1);
-      existing = (rows[0] as any) || null;
+      existing = rows[0] || null;
       if (!existing) return res.status(404).json({ message: "Account not found" });
     }
 
@@ -173,8 +168,8 @@ async function getHistoricalLedgerBalance(companyId: number, ledgerAccountId: nu
       and(
         eq(ledgerAccounts.id, ledgerAccountId),
         eq(ledgerAccounts.companyId, companyId),
-        isNull(ledgerAccounts.deletedAt),
-      ),
+        isNull(ledgerAccounts.deletedAt)
+      )
     )
     .limit(1);
   if (!account) return null;
@@ -211,7 +206,7 @@ async function getHistoricalLedgerBalance(companyId: number, ledgerAccountId: nu
        AND v.company_id = $2
        AND v.optional = false
        AND v.deleted_at IS NULL`,
-    [ledgerAccountId, companyId],
+    [ledgerAccountId, companyId]
   );
 
   let historicalBalance = new Decimal(result.rows[0]?.historical_net || 0);
@@ -289,8 +284,7 @@ export function registerAccountCurrencyRoutes(app: Express) {
           currentTranslatedBaseBalance: null,
           translationDifference: null,
           nativeBalancesByCurrency: {},
-          totalsProvisional:
-            historical.openingBalanceCurrencyUnresolved || historical.unresolvedLegacyEntryCount > 0,
+          totalsProvisional: historical.openingBalanceCurrencyUnresolved || historical.unresolvedLegacyEntryCount > 0,
           ...historical,
         });
       }
@@ -332,7 +326,7 @@ export function registerAccountCurrencyRoutes(app: Express) {
             translationDifference: summary.translationDifference,
             totalsProvisional: summary.totalsProvisional,
           };
-        }),
+        })
       );
     } catch (error: unknown) {
       return res.status(500).json({ message: getErrorMessage(error) });

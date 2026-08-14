@@ -27,7 +27,7 @@ import { eq, and, desc, inArray } from "drizzle-orm";
 export function registerSupplierFxTransferRoutes(app: Express) {
   app.get("/api/factory/supplier-fx-transfers", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const transfers = await db
         .select()
@@ -43,7 +43,7 @@ export function registerSupplierFxTransferRoutes(app: Express) {
 
   app.post("/api/factory/supplier-fx-transfers", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const parsed = insertFactorySupplierFxTransferSchema.parse({ ...req.body, companyId });
@@ -64,7 +64,7 @@ export function registerSupplierFxTransferRoutes(app: Express) {
       // ── Balance validation (Phase 3) ─────────────────────────────────────────
       const currCode = parsed.fromCurrencyCode;
       const fromSupId = parsed.fromSupplierId;
-      const sourceType = (parsed as any).sourceType || "supplier";
+      const sourceType = parsed.sourceType || "supplier";
 
       // 1a. Containers for this supplier in this currency (for supplier-bucket validation)
       const contRowsInCurrency = await db
@@ -269,7 +269,7 @@ export function registerSupplierFxTransferRoutes(app: Express) {
       }
       // ─────────────────────────────────────────────────────────────────────────
 
-      const transferKind = (created as any).sourceType === "commission" ? "Commission Transfer" : "FX Transfer";
+      const transferKind = created.sourceType === "commission" ? "Commission Transfer" : "FX Transfer";
       await writeDaybookEntry(db, {
         companyId,
         txDate: created.date,
@@ -292,7 +292,7 @@ export function registerSupplierFxTransferRoutes(app: Express) {
 
   app.delete("/api/factory/supplier-fx-transfers/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });

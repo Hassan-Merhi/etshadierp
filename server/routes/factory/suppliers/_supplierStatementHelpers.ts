@@ -55,7 +55,7 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
   const allSuppliers = [broker, ...linkedRaw];
   const allSupplierIds = allSuppliers.map((s) => s.id);
   const supplierNameMap: Record<number, string> = {};
-  for (const s of allSuppliers) supplierNameMap[(s as any).id] = (s as any).name;
+  for (const s of allSuppliers) supplierNameMap[s.id] = s.name;
 
   // Containers — exclude OTW unless caller opts in; always exclude soft-deleted
   const containersWhereClause = includeOtw
@@ -114,7 +114,7 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
           .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
           .where(
             and(
-              inArray(voucherEntries.factorySupplierId as any, allSupplierIds),
+              inArray(voucherEntries.factorySupplierId, allSupplierIds),
               sql`${voucherEntries.debitAmount}::numeric > 0`,
               sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-PAY-%'`
             )
@@ -151,13 +151,13 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
             currencyCode: factoryOffloadAdditionalCharges.currencyCode,
             fxRateToUsd: factoryOffloadAdditionalCharges.fxRateToUsd,
             createdAt: factoryOffloadAdditionalCharges.createdAt,
-            supplierId: (factoryOffloadAdditionalCharges as any).supplierId,
+            supplierId: factoryOffloadAdditionalCharges.supplierId,
           })
           .from(factoryOffloadAdditionalCharges)
           .where(
             and(
               eq(factoryOffloadAdditionalCharges.companyId, companyId),
-              sql`${(factoryOffloadAdditionalCharges as any).supplierId} = ANY(${sqlArray(allSupplierIds)})`
+              sql`${factoryOffloadAdditionalCharges.supplierId} = ANY(${sqlArray(allSupplierIds)})`
             )
           )
           .orderBy(factoryOffloadAdditionalCharges.createdAt)
@@ -424,7 +424,7 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
             containerNumber: factoryContainers.containerNumber,
             otherCharges: factoryContainers.otherCharges,
             otherChargesSupplierId: factoryContainers.otherChargesSupplierId,
-            otherChargesCurrencyCode: (factoryContainers as any).otherChargesCurrencyCode,
+            otherChargesCurrencyCode: factoryContainers.otherChargesCurrencyCode,
             containerCurrencyCode: factoryContainers.currencyCode,
             arrivalDate: factoryContainers.arrivalDate,
             createdAt: factoryContainers.createdAt,

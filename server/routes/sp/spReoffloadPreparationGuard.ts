@@ -15,7 +15,7 @@ import { resultRows, firstRow } from "../../lib/queryResult";
  */
 async function prepareCorrectedReoffload(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const companyId = await requireSpCompany(req as any, res as any);
+    const companyId = await requireSpCompany(req, res);
     if (!companyId) return;
 
     const containerId = Number(req.body?.containerId);

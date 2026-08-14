@@ -245,7 +245,7 @@ export function WorkerProfilesTab({
                       variant="ghost"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setWorkerDeductionTarget(worker as any);
+                        setWorkerDeductionTarget(worker);
                       }}
                       data-testid={`button-deduction-worker-${worker.id}`}
                       title="Add deduction"

@@ -36,7 +36,7 @@ function getRequestLanguage(req: any): FactoryCatalogLanguage {
 }
 
 function getFactoryCompanyId(req: Request): number | null {
-  const companyId = Number((req.session as any)?.factoryCompanyId);
+  const companyId = Number(req.session?.factoryCompanyId);
   return Number.isSafeInteger(companyId) && companyId > 0 ? companyId : null;
 }
 
@@ -61,9 +61,14 @@ async function sendCategories(req: any, res: any, companyId: number) {
   const language = getRequestLanguage(req);
   const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
   const filters = [eq(factoryCategories.companyId, companyId), isNull(factoryCategories.deletedAt)];
-  if (query) filters.push(or(ilike(factoryCategories.name, `%${query}%`), ilike(factoryCategories.nameAr, `%${query}%`))!);
+  if (query)
+    filters.push(or(ilike(factoryCategories.name, `%${query}%`), ilike(factoryCategories.nameAr, `%${query}%`))!);
 
-  const results = await db.select().from(factoryCategories).where(and(...filters)).orderBy(asc(factoryCategories.name));
+  const results = await db
+    .select()
+    .from(factoryCategories)
+    .where(and(...filters))
+    .orderBy(asc(factoryCategories.name));
   return res.json(results.map((category) => mapCategory(category, language)));
 }
 
@@ -86,7 +91,11 @@ async function sendProducts(req: any, res: any, companyId: number) {
   }
 
   const rows = await db
-    .select({ product: factoryBaleProducts, categoryName: factoryCategories.name, categoryNameAr: factoryCategories.nameAr })
+    .select({
+      product: factoryBaleProducts,
+      categoryName: factoryCategories.name,
+      categoryNameAr: factoryCategories.nameAr,
+    })
     .from(factoryBaleProducts)
     .leftJoin(
       factoryCategories,
@@ -122,7 +131,11 @@ async function sendProducts(req: any, res: any, companyId: number) {
 async function sendProductDetail(req: any, res: any, companyId: number, id: number) {
   const language = getRequestLanguage(req);
   const [row] = await db
-    .select({ product: factoryBaleProducts, categoryName: factoryCategories.name, categoryNameAr: factoryCategories.nameAr })
+    .select({
+      product: factoryBaleProducts,
+      categoryName: factoryCategories.name,
+      categoryNameAr: factoryCategories.nameAr,
+    })
     .from(factoryBaleProducts)
     .leftJoin(
       factoryCategories,
@@ -136,7 +149,10 @@ async function sendProductDetail(req: any, res: any, companyId: number, id: numb
     .limit(1);
 
   if (!row) return res.status(404).json({ message: "Product not found" });
-  const resolved = resolveFactoryProductLanguage({ ...row.product, categoryName: row.categoryName, categoryNameAr: row.categoryNameAr }, language);
+  const resolved = resolveFactoryProductLanguage(
+    { ...row.product, categoryName: row.categoryName, categoryNameAr: row.categoryNameAr },
+    language
+  );
   return res.json({
     ...row.product,
     nameEn: row.product.name,
@@ -173,7 +189,13 @@ async function applyDeferredProductArabic(
   const [product] = await db
     .update(factoryBaleProducts)
     .set(update)
-    .where(and(eq(factoryBaleProducts.id, productId), eq(factoryBaleProducts.companyId, companyId), isNull(factoryBaleProducts.deletedAt)))
+    .where(
+      and(
+        eq(factoryBaleProducts.id, productId),
+        eq(factoryBaleProducts.companyId, companyId),
+        isNull(factoryBaleProducts.deletedAt)
+      )
+    )
     .returning();
   return product ? (payload?.product ? { ...payload, product } : product) : payload;
 }
@@ -188,9 +210,13 @@ function prepareMutation(req: any, res: any, next: any) {
 
   if (req.body && method === "POST" && path === "/bale-products") {
     if (typeof req.body.nameEn === "string" && req.body.nameEn.trim()) req.body.name = req.body.nameEn.trim();
-    if (Object.prototype.hasOwnProperty.call(req.body, "nameAr")) productArabic.nameAr = typeof req.body.nameAr === "string" ? req.body.nameAr.trim() || null : null;
-    if (Object.prototype.hasOwnProperty.call(req.body, "descriptionAr")) productArabic.descriptionAr = typeof req.body.descriptionAr === "string" ? req.body.descriptionAr.trim() || null : null;
-    if (Object.prototype.hasOwnProperty.call(req.body, "descriptionEn")) req.body.description = typeof req.body.descriptionEn === "string" ? req.body.descriptionEn.trim() || null : null;
+    if (Object.prototype.hasOwnProperty.call(req.body, "nameAr"))
+      productArabic.nameAr = typeof req.body.nameAr === "string" ? req.body.nameAr.trim() || null : null;
+    if (Object.prototype.hasOwnProperty.call(req.body, "descriptionAr"))
+      productArabic.descriptionAr =
+        typeof req.body.descriptionAr === "string" ? req.body.descriptionAr.trim() || null : null;
+    if (Object.prototype.hasOwnProperty.call(req.body, "descriptionEn"))
+      req.body.description = typeof req.body.descriptionEn === "string" ? req.body.descriptionEn.trim() || null : null;
     delete req.body.nameEn;
     delete req.body.nameAr;
     delete req.body.descriptionEn;
@@ -202,7 +228,12 @@ function prepareMutation(req: any, res: any, next: any) {
     suppressFallbacks = language === "ar";
   }
 
-  if (req.body && method === "POST" && path === "/categories" && Object.prototype.hasOwnProperty.call(req.body, "nameAr")) {
+  if (
+    req.body &&
+    method === "POST" &&
+    path === "/categories" &&
+    Object.prototype.hasOwnProperty.call(req.body, "nameAr")
+  ) {
     categoryNameAr = typeof req.body.nameAr === "string" ? req.body.nameAr.trim() || null : null;
     delete req.body.nameAr;
   } else if (req.body && method === "PATCH" && /^\/categories\/\d+$/.test(path)) {
@@ -231,7 +262,13 @@ function prepareMutation(req: any, res: any, next: any) {
           const [category] = await db
             .update(factoryCategories)
             .set({ nameAr: categoryNameAr, updatedAt: new Date() })
-            .where(and(eq(factoryCategories.id, categoryId), eq(factoryCategories.companyId, companyId), isNull(factoryCategories.deletedAt)))
+            .where(
+              and(
+                eq(factoryCategories.id, categoryId),
+                eq(factoryCategories.companyId, companyId),
+                isNull(factoryCategories.deletedAt)
+              )
+            )
             .returning();
           if (category) output = category;
         }

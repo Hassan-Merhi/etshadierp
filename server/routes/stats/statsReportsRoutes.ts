@@ -175,7 +175,7 @@ export function registerStatsReportsRoutes(app: Express) {
       const { status, supplierId, startDate, endDate, allCompanies, specificCompanyId } = req.query;
       let companyCondition;
       if (allCompanies === "true") {
-        const isDeveloper = (req.user as any)?.role === "Developer";
+        const isDeveloper = req.user?.role === "Developer";
         const companyIds = isDeveloper
           ? (await storage.getAllCompanies()).map((company) => company.id)
           : (await storage.getUserCompaniesWithRoles(req.user!.id)).map((membership) => membership.companyId);

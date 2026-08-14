@@ -200,7 +200,7 @@ export default function FactoryInsurance() {
               View in Daybook
             </button>
           </span>
-        ) as any,
+        ),
       });
     },
     onError: (e: any) => {

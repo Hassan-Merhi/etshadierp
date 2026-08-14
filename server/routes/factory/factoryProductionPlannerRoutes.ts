@@ -10,7 +10,7 @@ import { resultRows } from "../../lib/queryResult";
 
 export function registerProductionPlannerRoutes(app: Express) {
   const getCompanyId = (req: any): number | null =>
-    (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId || null;
+    req.session.factoryCompanyId || req.session.currentCompanyId || null;
 
   // ── GET plan for a date ──────────────────────────────────────────────────────
   app.get("/api/factory/production-planner/:date", requireAuth, async (req: Request, res: Response) => {

@@ -327,11 +327,7 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
                 <MapPin className="h-4 w-4" />
                 <span>{data.location.name}</span>
                 <span>•</span>
-                <span>
-                  {showAllMonths
-                    ? String(year)
-                    : `${"monthName" in (data as any) ? (data as any).monthName : ""} ${year}`}
-                </span>
+                <span>{showAllMonths ? String(year) : `${"monthName" in data ? data.monthName : ""} ${year}`}</span>
               </div>
             )}
           </div>

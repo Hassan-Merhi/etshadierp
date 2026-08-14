@@ -6,7 +6,7 @@ import PDFDocument from "pdfkit";
 import { factoryAttendance, factoryWorkers } from "@shared/schema";
 
 function getFactoryCompanyId(req: any): number | undefined {
-  return (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+  return req.session.factoryCompanyId || req.session.currentCompanyId;
 }
 
 export function registerFactoryAttendanceRoutes(app: Express, requireAuth: any, db: any) {

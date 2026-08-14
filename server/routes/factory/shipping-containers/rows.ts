@@ -358,8 +358,7 @@ export function registerShippingContainerRowRoutes(app: Express) {
         .where(and(eq(factoryShippingContainerRows.id, id), eq(factoryShippingContainerRows.companyId, companyId)));
       if (!existing) return res.status(404).json({ message: "Row not found" });
 
-      const username: string =
-        (req.session as any).username || (req.session as any).email || (req.session as any).name || "Unknown";
+      const username: string = req.session.username || req.session.email || req.session.name || "Unknown";
       const now = new Date();
 
       const patch: any = { isDone: true, doneAt: now, doneBy: username, updatedAt: now };

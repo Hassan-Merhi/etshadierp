@@ -95,13 +95,11 @@ export function registerContainerFreightReadRoutes(app: Express) {
         documentCharges: po.documentCharges,
         discount: po.discount,
         otherCharges: po.otherCharges,
-        freightPaidBy: (po as any).freightPaidBy,
+        freightPaidBy: po.freightPaidBy,
       });
-      const poFreightPaidBy: string = (po as any).freightPaidBy || "supplier";
+      const poFreightPaidBy: string = po.freightPaidBy || "supplier";
       const poFreightAmt = parseFloat(po.freight || "0");
-      const poFreightParentAcctId: number | null = (po as any).freightParentAccountId
-        ? Number((po as any).freightParentAccountId)
-        : null;
+      const poFreightParentAcctId: number | null = po.freightParentAccountId ? Number(po.freightParentAccountId) : null;
       const poHasParentFreight = poFreightPaidBy === "parent" && poFreightAmt > 0 && !!poFreightParentAcctId;
 
       // Fetch container number up-front — used in both the same-company and interco paths.
@@ -136,7 +134,7 @@ export function registerContainerFreightReadRoutes(app: Express) {
         const toDeleteIds: number[] = [];
         const freightCrCandidates: number[] = [];
         for (const entry of existingEntries) {
-          const acctId = (entry as any).ledgerAccountId as number | null;
+          const acctId = entry.ledgerAccountId as number | null;
           const isDebit = parseFloat(entry.debitAmount || "0") > 0 && parseFloat(entry.creditAmount || "0") === 0;
           const isCredit = parseFloat(entry.creditAmount || "0") > 0 && parseFloat(entry.debitAmount || "0") === 0;
           if (isCredit && acctId === poFreightParentAcctId) {
@@ -236,7 +234,7 @@ export function registerContainerFreightReadRoutes(app: Express) {
         const toDeleteIds: number[] = [];
         const freightCrCandidates2: number[] = [];
         for (const entry of existingEntries) {
-          const acctId = (entry as any).ledgerAccountId as number | null;
+          const acctId = entry.ledgerAccountId as number | null;
           const isDebit = parseFloat(entry.debitAmount || "0") > 0 && parseFloat(entry.creditAmount || "0") === 0;
           const isCredit = parseFloat(entry.creditAmount || "0") > 0 && parseFloat(entry.debitAmount || "0") === 0;
           if (isCredit && acctId === poFreightParentAcctId) {

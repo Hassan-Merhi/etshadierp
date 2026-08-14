@@ -139,7 +139,7 @@ export function VoucherEntriesTable({
     const entry = entries[index];
     if (!entry || !entry.accountId || !sidebarAccounts.length) return null;
     const found = sidebarAccounts.find((a) => {
-      if (a.type !== (entry.accountType as any)) return false;
+      if (a.type !== entry.accountType) return false;
       if (entry.accountType === "employee") {
         return (a as any).accountId === entry.accountId;
       }

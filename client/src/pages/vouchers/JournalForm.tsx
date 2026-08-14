@@ -369,7 +369,7 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
       } else if (entry.customerId) {
         accountType = "customer";
         accountId = entry.customerId;
-        accountName = (customers.find((c: any) => c.id === accountId) as any)?.legalName || "";
+        accountName = customers.find((c: any) => c.id === accountId)?.legalName || "";
       }
       const debitAmt = parseFloat(entry.debitAmount || "0");
       const creditAmt = parseFloat(entry.creditAmount || "0");
@@ -492,7 +492,7 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
         });
         return;
       }
-      if ((error as any)._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || `Failed to ${voucherIdToEdit ? "update" : "create"} journal voucher`,

@@ -110,7 +110,7 @@ export function registerStockItemWriteRoutes(app: Express) {
         }
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId: req.session.currentCompanyId!,
           action: "update",
           tableName: "stock_items",
@@ -167,7 +167,7 @@ export function registerStockItemWriteRoutes(app: Express) {
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId: req.session.currentCompanyId!,
           action: "delete",
           tableName: "stock_items",

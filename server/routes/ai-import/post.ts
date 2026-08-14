@@ -43,7 +43,7 @@ export function registerAiImportPostRoutes(app: Express) {
 
       if (!rows.length) return res.status(400).json({ message: "No valid rows to post" });
 
-      const rowsToPost = rows.map((r) => ({ id: r.id, mappedData: r.mappedData as any }));
+      const rowsToPost = rows.map((r) => ({ id: r.id, mappedData: r.mappedData }));
 
       // Run everything in a single transaction
       const created = await db.transaction(async (tx) => {

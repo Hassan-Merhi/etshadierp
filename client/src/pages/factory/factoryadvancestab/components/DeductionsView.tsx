@@ -3,24 +3,31 @@
  *
  * Extracted from FactoryAdvancesTab.tsx during the Phase 4 god-file split.
  */
-import {useState, useMemo} from "react";
-import {useQuery, useMutation} from "@tanstack/react-query";
-import {useDateFormat} from "@/contexts/DateFormatContext";
-import {Plus, Trash2, Loader2} from "lucide-react";
-import {Button} from "@/components/ui/button";
-import {Card, CardContent} from "@/components/ui/card";
-import {Badge} from "@/components/ui/badge";
-import {Input} from "@/components/ui/input";
-import {Label} from "@/components/ui/label";
-import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter} from "@/components/ui/dialog";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {useToast} from "@/hooks/use-toast";
-import {queryClient, apiRequest} from "@/lib/queryClient";
-import type {FactoryWorker} from "@shared/schema";
+import { useState, useMemo } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useDateFormat } from "@/contexts/DateFormatContext";
+import { Plus, Trash2, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import type { FactoryWorker } from "@shared/schema";
 
-import type {DeductionRecord} from "../types";
-import {fmt} from "../utils";
+import type { DeductionRecord } from "../types";
+import { fmt } from "../utils";
 
 export function DeductionsView() {
   const { formatDisplayDate } = useDateFormat();
@@ -83,7 +90,7 @@ export function DeductionsView() {
       setForm({ workerId: "", amount: "", reason: "", deductionDate: new Date().toLocaleDateString("en-CA") });
     },
     onError: (err: Error) => {
-      if ((err as any)?._handledGlobally) return;
+      if ((err as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -106,7 +113,7 @@ export function DeductionsView() {
       setDeleteTarget(null);
     },
     onError: (err: Error) => {
-      if ((err as any)?._handledGlobally) return;
+      if ((err as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });

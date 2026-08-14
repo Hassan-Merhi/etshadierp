@@ -28,7 +28,7 @@ export function registerFactoryWeeklyReportExportRoutes(app: Express) {
   // ───────────────────────────────────────────────
   app.get("/api/factory/weekly-report/export", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const format = (req.query.format as string) || "excel";
       const period = (req.query.period as string) || "all"; // "all" | "year" | "month" | "week"
@@ -485,7 +485,7 @@ export function registerFactoryWeeklyReportExportRoutes(app: Express) {
             ];
             vals.forEach((v, ci) => {
               const cell = dataRow.getCell(ci + 1);
-              cell.value = v as any;
+              cell.value = v;
               cell.font = { size: 9 };
               cell.border = BORDER_ALL;
               if (ci === 0) {
@@ -515,7 +515,7 @@ export function registerFactoryWeeklyReportExportRoutes(app: Express) {
           ];
           totVals.forEach((v, ci) => {
             const cell = totRow.getCell(ci + 1);
-            cell.value = v as any;
+            cell.value = v;
             cell.font = { bold: true, size: 9 };
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: TOTAL_BG } };
             cell.border = BORDER_ALL;
@@ -560,7 +560,7 @@ export function registerFactoryWeeklyReportExportRoutes(app: Express) {
             } catch {
               // Failure here is non-fatal and the surrounding flow continues deliberately.
             }
-            if (doc.y < 130) (doc as any).y = 130;
+            if (doc.y < 130) doc.y = 130;
             doc.moveDown(0.5);
           }
           doc

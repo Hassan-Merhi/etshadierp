@@ -43,7 +43,7 @@ export function ContainerDetailDialog({
 
   if (!container) return null;
 
-  const vc = container as any;
+  const vc = container;
   const ccy = vc.currencyCode || "USD";
   const totalKg = parseFloat(vc.totalKg || "0");
   const ratePerKg = parseFloat(vc.ratePerKg || "0");

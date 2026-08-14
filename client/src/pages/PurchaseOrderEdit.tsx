@@ -393,7 +393,7 @@ export default function PurchaseOrderEdit() {
       <div className="p-6">
         <Card>
           <CardContent className="pt-6">
-            <p className="text-destructive">Failed to load purchase order. {(error as any)?.message}</p>
+            <p className="text-destructive">Failed to load purchase order. {error?.message}</p>
             <Button variant="outline" onClick={() => navigate("/daybook")} className="mt-4">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Daybook

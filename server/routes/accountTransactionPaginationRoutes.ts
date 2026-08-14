@@ -6,14 +6,7 @@ import { getErrorMessage } from "../lib/httpHandlers";
 import { getClientDate } from "../lib/dateUtils";
 import { authorizeCompanyIdParam } from "./helpers/supplierBalanceHelpers";
 import { getCustomerByLedgerId } from "../lib/factoryCustomerLedger";
-import {
-  bankAccounts,
-  companies,
-  customers,
-  employees,
-  fixedAssets,
-  ledgerAccounts,
-} from "@shared/schema";
+import { bankAccounts, companies, customers, employees, fixedAssets, ledgerAccounts } from "@shared/schema";
 import { companyScopedSuppliers } from "@shared/schema/supplierCompanyScope";
 
 const DEFAULT_PAGE_SIZE = 100;
@@ -68,10 +61,7 @@ function parsePositiveInt(value: unknown, fallback: number): number {
 }
 
 function parsePagination(req: Request): Pagination {
-  const limit = Math.min(
-    MAX_PAGE_SIZE,
-    parsePositiveInt(req.query.limit ?? req.query.pageSize, DEFAULT_PAGE_SIZE)
-  );
+  const limit = Math.min(MAX_PAGE_SIZE, parsePositiveInt(req.query.limit ?? req.query.pageSize, DEFAULT_PAGE_SIZE));
   if (req.query.offset !== undefined) {
     const offset = Math.max(0, Number.parseInt(String(req.query.offset), 10) || 0);
     return { page: Math.floor(offset / limit) + 1, limit, offset };
@@ -83,13 +73,9 @@ function parsePagination(req: Request): Pagination {
 function dateContext(req: Request): DateContext {
   const asOfDate = getClientDate(req);
   const rawStart =
-    typeof req.query.startDate === "string" && ISO_DATE.test(req.query.startDate)
-      ? req.query.startDate
-      : undefined;
+    typeof req.query.startDate === "string" && ISO_DATE.test(req.query.startDate) ? req.query.startDate : undefined;
   const rawEnd =
-    typeof req.query.endDate === "string" && ISO_DATE.test(req.query.endDate)
-      ? req.query.endDate
-      : undefined;
+    typeof req.query.endDate === "string" && ISO_DATE.test(req.query.endDate) ? req.query.endDate : undefined;
   const effectiveEndDate = rawEnd && rawEnd < asOfDate ? rawEnd : asOfDate;
   return { rawStart, effectiveEndDate, asOfDate };
 }
@@ -99,10 +85,7 @@ function exposePaginationHeaders(res: Response, page: StatementPage): void {
   res.setHeader("X-Page", String(page.page));
   res.setHeader("X-Page-Size", String(page.limit));
   res.setHeader("X-Total-Pages", String(page.totalPages));
-  res.setHeader(
-    "Access-Control-Expose-Headers",
-    "X-Total-Count, X-Page, X-Page-Size, X-Total-Pages"
-  );
+  res.setHeader("Access-Control-Expose-Headers", "X-Total-Count, X-Page, X-Page-Size, X-Total-Pages");
 }
 
 function buildPageResponse(
@@ -157,20 +140,12 @@ function genericFilteredCte(
     values.push(value);
     return `$${values.length}`;
   };
-  const conditions = [
-    `ve.${column} = $1`,
-    "v.optional = false",
-    "v.deleted_at IS NULL",
-  ];
+  const conditions = [`ve.${column} = $1`, "v.optional = false", "v.deleted_at IS NULL"];
   if (companyId) conditions.push(`v.company_id = ${bind(companyId)}`);
   if (dates.rawStart) {
-    conditions.push(
-      `COALESCE(v.effective_date::date, v.voucher_date::date) >= ${bind(dates.rawStart)}::date`
-    );
+    conditions.push(`COALESCE(v.effective_date::date, v.voucher_date::date) >= ${bind(dates.rawStart)}::date`);
   }
-  conditions.push(
-    `COALESCE(v.effective_date::date, v.voucher_date::date) <= ${bind(dates.effectiveEndDate)}::date`
-  );
+  conditions.push(`COALESCE(v.effective_date::date, v.voucher_date::date) <= ${bind(dates.effectiveEndDate)}::date`);
   const baseFrom = `FROM voucher_entries ve JOIN vouchers v ON ve.voucher_id = v.id WHERE ${conditions.join(" AND ")}`;
 
   if (kind === "ledger") {
@@ -248,12 +223,7 @@ async function runVoucherEntryStatement(options: {
   dates: DateContext;
 }): Promise<StatementPage> {
   const { kind, accountId, companyId, pagination, dates } = options;
-  const { cte, values, order, column } = genericFilteredCte(
-    kind,
-    accountId,
-    companyId,
-    dates
-  );
+  const { cte, values, order, column } = genericFilteredCte(kind, accountId, companyId, dates);
   const baseCount = values.length;
   const pageValues = [...values, pagination.limit, pagination.offset];
   const pageQuery = `WITH ${cte}
@@ -312,9 +282,7 @@ async function runVoucherEntryStatement(options: {
       ? pool.query(precedingQuery, [...values, pagination.offset])
       : Promise.resolve({ rows: [{ net: "0" }] }),
   ]);
-  const rows = pageResult.rows.map(
-    ({ sort_date: _date, sort_id: _id, sort_entry_id: _entry, ...row }) => row
-  );
+  const rows = pageResult.rows.map(({ sort_date: _date, sort_id: _id, sort_entry_id: _entry, ...row }) => row);
   return buildPageResponse(
     rows,
     summaryResult.rows[0],
@@ -556,9 +524,7 @@ async function runFactoryCustomerLedgerStatement(options: {
       ? pool.query(precedingQuery, [...values, pagination.offset])
       : Promise.resolve({ rows: [{ net: "0" }] }),
   ]);
-  const rows = pageResult.rows.map(
-    ({ voucher_date: _date, source_rank: _rank, source_id: _source, ...row }) => row
-  );
+  const rows = pageResult.rows.map(({ voucher_date: _date, source_rank: _rank, source_id: _source, ...row }) => row);
   return buildPageResponse(
     rows,
     summaryResult.rows[0],
@@ -600,7 +566,7 @@ export function registerAccountTransactionPaginationRoutes(app: Express): void {
         .where(and(eq(ledgerAccounts.id, accountId), isNull(ledgerAccounts.deletedAt)))
         .limit(1);
       if (!account) return res.status(404).json({ message: "Ledger account not found" });
-      if ((await authorizeCompanyIdParam(req as any, account.companyId)) === null) {
+      if ((await authorizeCompanyIdParam(req, account.companyId)) === null) {
         return res.status(403).json({ message: "No access to this account's company" });
       }
 
@@ -653,7 +619,7 @@ export function registerAccountTransactionPaginationRoutes(app: Express): void {
         .where(eq(bankAccounts.id, accountId))
         .limit(1);
       if (!account) return res.status(404).json({ message: "Bank account not found" });
-      if ((await authorizeCompanyIdParam(req as any, account.companyId)) === null) {
+      if ((await authorizeCompanyIdParam(req, account.companyId)) === null) {
         return res.status(403).json({ message: "No access to this account's company" });
       }
       return send(
@@ -683,7 +649,7 @@ export function registerAccountTransactionPaginationRoutes(app: Express): void {
         .where(eq(fixedAssets.id, accountId))
         .limit(1);
       if (!account) return res.status(404).json({ message: "Fixed asset not found" });
-      if ((await authorizeCompanyIdParam(req as any, account.companyId)) === null) {
+      if ((await authorizeCompanyIdParam(req, account.companyId)) === null) {
         return res.status(403).json({ message: "No access to this account's company" });
       }
       return send(
@@ -711,7 +677,7 @@ export function registerAccountTransactionPaginationRoutes(app: Express): void {
         typeof req.query.companyId === "string"
           ? Number.parseInt(req.query.companyId, 10)
           : req.session.currentCompanyId;
-      const companyId = await authorizeCompanyIdParam(req as any, requestedCompanyId);
+      const companyId = await authorizeCompanyIdParam(req, requestedCompanyId);
       if (companyId === null) {
         return res.status(403).json({ message: "No access to this company" });
       }
@@ -754,7 +720,7 @@ export function registerAccountTransactionPaginationRoutes(app: Express): void {
         .where(eq(employees.id, accountId))
         .limit(1);
       if (!account) return res.status(404).json({ message: "Employee not found" });
-      if ((await authorizeCompanyIdParam(req as any, account.companyId)) === null) {
+      if ((await authorizeCompanyIdParam(req, account.companyId)) === null) {
         return res.status(403).json({ message: "No access to this account's company" });
       }
       return send(
@@ -784,7 +750,7 @@ export function registerAccountTransactionPaginationRoutes(app: Express): void {
         .where(eq(customers.id, accountId))
         .limit(1);
       if (!account) return res.status(404).json({ message: "Customer not found" });
-      if ((await authorizeCompanyIdParam(req as any, account.companyId)) === null) {
+      if ((await authorizeCompanyIdParam(req, account.companyId)) === null) {
         return res.status(403).json({ message: "No access to this account's company" });
       }
       return send(

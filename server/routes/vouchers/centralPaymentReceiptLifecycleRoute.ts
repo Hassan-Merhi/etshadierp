@@ -5,34 +5,22 @@ import { requireAuth, requireNonPOS } from "../../auth";
 import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
-import {
-  isReadonlyMigratedVoucher,
-  READONLY_MIGRATED_VOUCHER_MESSAGE,
-} from "../../lib/migratedVoucherGuard";
+import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../../lib/migratedVoucherGuard";
 import { storage } from "../../storage";
 import type { VoucherEntryInsertFields } from "../../services/accounting/accountingTypes";
-import {
-  PostingValidationError,
-} from "../../services/accounting/centralPostingEngine";
+import { PostingValidationError } from "../../services/accounting/centralPostingEngine";
 import { createDatabasePostingDependencies } from "../../services/accounting/databasePostingDependencies";
 import { applyEmployeeBalanceDeltasTx } from "../../services/accounting/employeeBalancePosting";
 import { buildPaymentReceiptPostingRequest } from "../../services/accounting/paymentReceiptPosting";
 import { checkAccountWhatsAppRule } from "../factoryWhatsappRoutes";
-import {
-  buildVoucherChangesForUpdate,
-  logAudit,
-  snapshotVoucherEntries,
-} from "../_helpers";
+import { buildVoucherChangesForUpdate, logAudit, snapshotVoucherEntries } from "../_helpers";
 
 const postingDependencies = createDatabasePostingDependencies();
 
 function positiveAccountId(value: unknown, field: string): number {
   const id = Number(value);
   if (!Number.isInteger(id) || id <= 0) {
-    throw new PostingValidationError(
-      "POSTING_TARGET_ID_INVALID",
-      `${field} must be a positive integer`
-    );
+    throw new PostingValidationError("POSTING_TARGET_ID_INVALID", `${field} must be a positive integer`);
   }
   return id;
 }
@@ -71,11 +59,7 @@ function isActivePaymentReceiptType(value: unknown): value is "Payment" | "Recei
   return value === "Payment" || value === "Receipt";
 }
 
-async function updateActivePaymentReceipt(
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> {
+async function updateActivePaymentReceipt(req: Request, res: Response, next: NextFunction): Promise<void> {
   const startedAt = Date.now();
   const voucherId = Number(req.params.id);
   const companyId = req.session.currentCompanyId;
@@ -117,12 +101,7 @@ async function updateActivePaymentReceipt(
       return;
     }
 
-    if (
-      !body.voucherDate ||
-      !body.paymentAccountId ||
-      !Array.isArray(body.entries) ||
-      body.entries.length === 0
-    ) {
+    if (!body.voucherDate || !body.paymentAccountId || !Array.isArray(body.entries) || body.entries.length === 0) {
       res.status(400).json({ message: "Missing required fields" });
       return;
     }
@@ -159,15 +138,13 @@ async function updateActivePaymentReceipt(
         currency: body.currency || "USD",
         exchangeRate: body.exchangeRate ?? null,
         effectiveDate: body.effectiveDate || null,
-        clientRequestId:
-          body.clientRequestId || `payment-receipt-update-${voucherId}-${Date.now()}`,
+        clientRequestId: body.clientRequestId || `payment-receipt-update-${voucherId}-${Date.now()}`,
         actor: {
           userId: userId ?? null,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           reason: `${body.voucherType} voucher update`,
         },
-        resolveTarget: async (accountType, accountId) =>
-          buildLegacyPaymentReceiptEditTarget(accountType, accountId),
+        resolveTarget: async (accountType, accountId) => buildLegacyPaymentReceiptEditTarget(accountType, accountId),
       });
 
       await postingDependencies.ownership.validateVoucherOwnership({
@@ -177,10 +154,7 @@ async function updateActivePaymentReceipt(
         entries: built.request.entries,
       });
 
-      const oldEntries = await tx
-        .select()
-        .from(voucherEntries)
-        .where(eq(voucherEntries.voucherId, voucherId));
+      const oldEntries = await tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
 
       await applyEmployeeBalanceDeltasTx({
         tx,
@@ -255,7 +229,7 @@ async function updateActivePaymentReceipt(
       const newSnapshot = await snapshotVoucherEntries(result.entries);
       await logAudit({
         userId: userId!,
-        username: (req.session as any).username || "unknown",
+        username: req.session.username || "unknown",
         companyId,
         action: "update",
         tableName: "vouchers",

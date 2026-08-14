@@ -41,7 +41,7 @@ export function sheetToJson<T = Record<string, any>>(worksheet: ExcelJS.Workshee
         if (header) {
           let value = cell.value;
           if (value && typeof value === "object" && "result" in value) value = (value as any).result;
-          if (value && typeof value === "object" && "text" in value) value = (value as any).text;
+          if (value && typeof value === "object" && "text" in value) value = value.text;
           rowData[header] = value;
         }
       });

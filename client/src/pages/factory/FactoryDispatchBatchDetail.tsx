@@ -227,7 +227,7 @@ export default function FactoryDispatchBatchDetail() {
       <div className="p-6">
         <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
           <AlertTriangle className="w-8 h-8" />
-          <p>{(error as any)?.message || "Failed to load dispatch batch"}</p>
+          <p>{error?.message || "Failed to load dispatch batch"}</p>
           <Button variant="outline" onClick={() => navigate("/factory/dispatch-batches")}>
             <ArrowLeft className="w-4 h-4 mr-1" /> Back to list
           </Button>

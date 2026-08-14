@@ -59,7 +59,7 @@ export function registerUserPresenceRoutes(app: Express) {
     const userId = req.user!.id;
     const username = req.user!.username;
     const companyId = req.session.currentCompanyId || null;
-    const sessionCompanyName = (req.session as any).currentCompanyName || null;
+    const sessionCompanyName = req.session.currentCompanyName || null;
     const role = req.session.currentRole || null;
 
     res.status(204).end();
@@ -75,7 +75,7 @@ export function registerUserPresenceRoutes(app: Express) {
         companyName = companyRow?.name ?? null;
 
         if (companyName) {
-          (req.session as any).currentCompanyName = companyName;
+          req.session.currentCompanyName = companyName;
           req.session.save((error) => {
             if (error) {
               logger.warn("[Presence] Could not persist repaired company name in session.", {

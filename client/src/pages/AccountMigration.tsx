@@ -340,7 +340,7 @@ export default function AccountMigration() {
     },
     onSuccess: (data) => setPreview(data),
     onError: (err: Error) => {
-      if ((err as any)?._handledGlobally) return;
+      if ((err as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Preview failed", description: err.message, variant: "destructive" });
     },
   });
@@ -369,7 +369,7 @@ export default function AccountMigration() {
       });
     },
     onError: (err: Error) => {
-      if ((err as any)?._handledGlobally) return;
+      if ((err as { _handledGlobally?: boolean })?._handledGlobally) return;
       setConfirmOpen(false);
       toast({ title: "Migration failed", description: err.message, variant: "destructive" });
     },
@@ -398,7 +398,7 @@ export default function AccountMigration() {
       });
     },
     onError: (err: Error) => {
-      if ((err as any)?._handledGlobally) return;
+      if ((err as { _handledGlobally?: boolean })?._handledGlobally) return;
       setUndoConfirmOpen(false);
       toast({ title: "Undo failed", description: err.message, variant: "destructive" });
     },

@@ -134,7 +134,7 @@ export function requireExplicitCompanyContext(options: CompanyContextOptions = {
     const assertions = assertionValues(req, fields);
     const requestPath = req.originalUrl?.split("?", 1)[0] || req.path || "/";
     const decision = decideRouteCompanyContext(
-      req.session as any,
+      req.session,
       requestPath,
       assertions,
       options.includeLegacyFactorySessionAssertion !== false

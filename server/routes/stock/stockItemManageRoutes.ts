@@ -103,7 +103,7 @@ export function registerStockItemManageRoutes(app: Express) {
         }
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId: req.session.currentCompanyId!,
           action: "update",
           tableName: "stock_items",
@@ -160,7 +160,7 @@ export function registerStockItemManageRoutes(app: Express) {
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId: req.session.currentCompanyId!,
           action: "delete",
           tableName: "stock_items",
@@ -441,7 +441,7 @@ export function registerStockItemManageRoutes(app: Express) {
         if (req.body.stockItemId !== undefined) _sti.stockItemId = { new: String(req.body.stockItemId) };
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId: req.session.currentCompanyId!,
           action: "update",
           tableName: "stock_transfer_items",

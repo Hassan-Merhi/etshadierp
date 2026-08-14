@@ -35,7 +35,7 @@ export async function calculateNetPositionAsOf(
 ): Promise<NetPositionSnapshot> {
   const companyAccounts = await storage.getAllLedgerAccounts(companyId, true);
   const companyRow = await storage.getCompanyById(companyId);
-  const isSupplierPartner = (companyRow as any)?.companyType === "supplier_partner";
+  const isSupplierPartner = companyRow?.companyType === "supplier_partner";
 
   // Two separate aggregation queries — same rationale as the net-profit route:
   //
@@ -181,7 +181,7 @@ export async function calculateNetPositionAsOf(
   let employeeAdvanceTotal = 0;
   let employeeLiabilityTotal = 0;
   for (const emp of companyEmployees) {
-    const opening = parseFloat((emp as any).openingBalance || "0");
+    const opening = parseFloat(emp.openingBalance || "0");
     const openingSide = (emp as any).openingBalanceSide === "Dr" ? 1 : -1;
     const signedOpening = opening * openingSide;
     const balance = employeeBalances.get(emp.id) || { debit: 0, credit: 0 };

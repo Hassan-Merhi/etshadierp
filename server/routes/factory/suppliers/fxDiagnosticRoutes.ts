@@ -82,7 +82,7 @@ export function registerFactoryFxDiagnosticRoutes(app: Express) {
     requireRole(...ADMIN_ROLES),
     async (req: any, res: any) => {
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 
         const suppliers = await db
@@ -282,7 +282,7 @@ export function registerFactoryFxDiagnosticRoutes(app: Express) {
     requireRole(...ADMIN_ROLES),
     async (req: any, res: any) => {
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 
         const { source, id, fxRateToUsd, confirm, confirmationToken } = req.body || {};

@@ -144,7 +144,7 @@ export default function TestDataImport() {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
     },
     onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -160,7 +160,7 @@ export default function TestDataImport() {
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
     },
     onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -175,7 +175,7 @@ export default function TestDataImport() {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
     },
     onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });

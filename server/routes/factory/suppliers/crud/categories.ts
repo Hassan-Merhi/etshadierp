@@ -15,7 +15,7 @@ import { eq, and, asc } from "drizzle-orm";
 export function registerFactorySupplierCategoryRoutes(app: Express) {
   app.get("/api/factory/supplier-categories", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const cats = await db
         .select()
@@ -30,7 +30,7 @@ export function registerFactorySupplierCategoryRoutes(app: Express) {
 
   app.post("/api/factory/supplier-categories", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const parsed = insertFactorySupplierCategorySchema.parse({ ...req.body, companyId });
       const [created] = await db.insert(factorySupplierCategories).values(parsed).returning();
@@ -42,7 +42,7 @@ export function registerFactorySupplierCategoryRoutes(app: Express) {
 
   app.patch("/api/factory/supplier-categories/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
@@ -65,7 +65,7 @@ export function registerFactorySupplierCategoryRoutes(app: Express) {
 
   app.delete("/api/factory/supplier-categories/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });

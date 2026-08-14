@@ -95,7 +95,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
   // Phase 5: frontend renders these values directly — no availability math on client.
   app.get("/api/factory/v2/stock-allocation", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       // Bootstrap / reconcile: sync all active proformas so the reservations table is current.
@@ -260,7 +260,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
   // Loading-mode: same data structure as v1 but sourced cleanly from backend truth
   app.get("/api/factory/v2/stock-allocation/loading-mode", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const freeStockRaw = await db.execute(

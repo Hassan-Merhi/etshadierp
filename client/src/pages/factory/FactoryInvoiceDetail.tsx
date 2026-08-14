@@ -219,7 +219,7 @@ export default function FactoryInvoiceDetail() {
     queryKey: ["/api/factory/dispatch-batches", order?.dispatchBatchId],
     queryFn: async () => {
       const res = await fetch(`/api/factory/dispatch-batches/${order!.dispatchBatchId}`, { credentials: "include" });
-      if (!res.ok) return null as any;
+      if (!res.ok) return null;
       return res.json();
     },
     enabled: !!order?.dispatchBatchId,
@@ -508,7 +508,7 @@ export default function FactoryInvoiceDetail() {
       const res = await fetch(url, { credentials: "include", cache: "no-store" });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error((err as any).message || `Server error ${res.status}`);
+        throw new Error(err.message || `Server error ${res.status}`);
       }
       const blob = await res.blob();
       if (blob.size === 0) {

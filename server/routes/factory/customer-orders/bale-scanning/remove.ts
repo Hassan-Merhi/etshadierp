@@ -26,7 +26,7 @@ import { eq, and } from "drizzle-orm";
 export function registerOrderBaleRemovalRoutes(app: Express) {
   app.delete("/api/factory/customer-orders/:id/bales/:baleId", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseId(req.params.id);
@@ -106,7 +106,7 @@ export function registerOrderBaleRemovalRoutes(app: Express) {
   // Works for any order status. For FINALIZED orders: updates customer_balances + daybook. Admin-gated.
   app.post("/api/factory/bales/:id/return-to-stock", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const baleId = parseId(req.params.id);

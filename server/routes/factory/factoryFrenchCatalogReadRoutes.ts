@@ -7,7 +7,7 @@ import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 
 function factoryCompanyId(req: Request): number | null {
-  const value = Number((req.session as any)?.factoryCompanyId);
+  const value = Number(req.session?.factoryCompanyId);
   return Number.isSafeInteger(value) && value > 0 ? value : null;
 }
 

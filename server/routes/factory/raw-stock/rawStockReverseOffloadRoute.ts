@@ -41,7 +41,7 @@ export function registerRawStockReverseOffloadRoute(app: Express) {
   app.post("/api/factory/containers/:id/reverse-offload", requireAuth, async (req, res) => {
     try {
       // factoryCompanyId is not declared on SessionData; the cast stays until it is.
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const containerId = parseId(req.params.id);

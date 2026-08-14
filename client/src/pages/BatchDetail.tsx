@@ -187,7 +187,7 @@ export default function BatchDetail({ batchId, onBack, onDeleted }: BatchDetailP
             variant="outline"
             onClick={() => {
               setEditName(batch.name || "");
-              setEditNotes((batch as any).notes || "");
+              setEditNotes(batch.notes || "");
               setEditOpen(true);
             }}
             data-testid="button-edit-batch"
@@ -206,7 +206,7 @@ export default function BatchDetail({ batchId, onBack, onDeleted }: BatchDetailP
             <div className="flex items-center gap-3 flex-wrap">
               <Boxes className="h-5 w-5 text-muted-foreground" />
               <CardTitle data-testid="text-batch-name">{batch.name || batch.batchCode}</CardTitle>
-              <Badge variant={getStatusVariant(batch.status) as any} data-testid="badge-batch-status">
+              <Badge variant={getStatusVariant(batch.status)} data-testid="badge-batch-status">
                 {batch.status}
               </Badge>
             </div>

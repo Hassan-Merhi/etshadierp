@@ -100,7 +100,7 @@ export function BulkDeleteDialog({ open, selectedIds, onClose, onDeleted }: Bulk
       });
     },
     onError: (err: Error) => {
-      if ((err as any)?._handledGlobally) return;
+      if ((err as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Delete Failed", description: err.message, variant: "destructive" });
     },
   });
@@ -186,7 +186,7 @@ export function SingleDeleteDialog({ containerId, onClose }: SingleDeleteDialogP
       onClose();
     },
     onError: (err: Error) => {
-      if ((err as any)?._handledGlobally) return;
+      if ((err as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -267,7 +267,7 @@ export function ReverseOffloadDialog({ container, onClose }: ReverseOffloadDialo
       });
     },
     onError: (err: Error) => {
-      if ((err as any)?._handledGlobally) return;
+      if ((err as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -505,7 +505,7 @@ export function FullImportDialog({ open, onClose }: FullImportDialogProps) {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importPreview, setImportPreview] = [[] as any[], (_v: any[]) => {}];
-  const [importResult, setImportResult] = [null as any, (_v: any) => {}];
+  const [importResult, setImportResult] = [null, (_v: any) => {}];
 
   // This component is intentionally kept simple since the import state
   // lives in the parent (FactoryContainers) for now.

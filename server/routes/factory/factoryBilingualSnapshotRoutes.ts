@@ -18,12 +18,12 @@ import { registerFactoryBilingualSurfaceRoutes } from "./factoryBilingualSurface
 import { registerFactoryFrenchCatalogReadRoutes } from "./factoryFrenchCatalogReadRoutes";
 
 function getFactoryCompanyId(req: Request): number | null {
-  const companyId = Number((req.session as any)?.factoryCompanyId);
+  const companyId = Number(req.session?.factoryCompanyId);
   return Number.isSafeInteger(companyId) && companyId > 0 ? companyId : null;
 }
 
 function isAdmin(req: Request): boolean {
-  const role = String((req as any).user?.role ?? (req.session as any)?.currentRole ?? "");
+  const role = String(req.user?.role ?? req.session?.currentRole ?? "");
   return ["Admin", "Owner", "Developer"].includes(role);
 }
 
@@ -174,15 +174,15 @@ export function registerFactoryBilingualSnapshotRoutes(app: Express): void {
         const companyId = getFactoryCompanyId(req);
         if (!companyId) return res.status(403).json({ message: "Factory company access required" });
 
-        const apply = booleanValue((req.body as any)?.apply);
-        const includeFinalized = booleanValue((req.body as any)?.includeFinalized);
-        const overwrite = booleanValue((req.body as any)?.overwrite);
+        const apply = booleanValue(req.body?.apply);
+        const includeFinalized = booleanValue(req.body?.includeFinalized);
+        const overwrite = booleanValue(req.body?.overwrite);
         const plan = await buildFactoryBilingualSnapshotPlan(companyId);
 
         if (!apply) {
           return res.json({ dryRun: true, plan, options: { includeFinalized, overwrite } });
         }
-        if ((req.body as any)?.confirmation !== "APPLY_ARABIC_SNAPSHOT_BACKFILL") {
+        if (req.body?.confirmation !== "APPLY_ARABIC_SNAPSHOT_BACKFILL") {
           return res.status(400).json({
             message: "Confirmation is required before applying the snapshot backfill",
             requiredConfirmation: "APPLY_ARABIC_SNAPSHOT_BACKFILL",
@@ -205,10 +205,10 @@ export function registerFactoryBilingualSnapshotRoutes(app: Express): void {
               entityType: "factory_bilingual_snapshot",
               entityId: companyId,
               companyId,
-              userId: Number((req.session as any)?.userId) || undefined,
+              userId: Number(req.session?.userId) || undefined,
               metadata: { includeFinalized, overwrite, before, applied, after },
             },
-            tx as any
+            tx
           );
           return { before, applied, after };
         });

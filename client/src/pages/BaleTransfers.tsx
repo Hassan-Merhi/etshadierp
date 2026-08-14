@@ -138,7 +138,7 @@ export default function BaleTransfers() {
       handleCloseDialog();
     },
     onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error creating transfer", description: error.message, variant: "destructive" });
     },
   });
@@ -154,7 +154,7 @@ export default function BaleTransfers() {
       toast({ title: "Transfer completed" });
     },
     onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error completing transfer", description: error.message, variant: "destructive" });
     },
   });
@@ -171,7 +171,7 @@ export default function BaleTransfers() {
       if (expandedId !== null) setExpandedId(null);
     },
     onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error deleting transfer", description: error.message, variant: "destructive" });
       setDeleteConfirm(null);
     },

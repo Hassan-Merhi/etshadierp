@@ -138,7 +138,7 @@ export async function requireCompletedMigrationAction(
         AND action = ${dep} AND status = 'completed'
       ORDER BY id DESC LIMIT 1
     `)
-    ).rows?.[0] as any;
+    ).rows?.[0];
     if (!row) {
       return `Run ${ACTION_LABELS[dep] ?? dep} successfully before running ${ACTION_LABELS[actionName] ?? actionName}.`;
     }
@@ -194,7 +194,7 @@ export async function ensureGcProfitAccounts(
       SELECT id FROM ledger_accounts
       WHERE company_id = ${targetId} AND sub_type = ${acct.subType} AND deleted_at IS NULL LIMIT 1
     `)
-    ).rows[0] as any;
+    ).rows[0];
     if (!existing) {
       const code = overrides?.[acct.subType]?.code?.trim() || acct.code;
       const name = overrides?.[acct.subType]?.name?.trim() || acct.name;
@@ -244,7 +244,7 @@ export async function ensureTargetStockItems(
       await db.execute(sql`
       SELECT id FROM stock_groups WHERE company_id = ${targetId} AND code = ${g.code} AND deleted_at IS NULL LIMIT 1
     `)
-    ).rows[0] as any;
+    ).rows[0];
     if (existingGroup) {
       groupMap.set(pn(g.id), pn(existingGroup.id));
     } else {
@@ -284,7 +284,7 @@ export async function ensureTargetStockItems(
   for (const g of sourceGrades) {
     const existingGrade = (
       await db.execute(sql`SELECT id FROM stock_grades WHERE company_id = ${targetId} AND name = ${g.name} LIMIT 1`)
-    ).rows[0] as any;
+    ).rows[0];
     if (existingGrade) {
       gradeMap.set(pn(g.id), pn(existingGrade.id));
     } else {
@@ -317,7 +317,7 @@ export async function ensureTargetStockItems(
   for (const c of sourceCategories) {
     const existingCategory = (
       await db.execute(sql`SELECT id FROM stock_categories WHERE company_id = ${targetId} AND name = ${c.name} LIMIT 1`)
-    ).rows[0] as any;
+    ).rows[0];
     if (existingCategory) {
       categoryMap.set(pn(c.id), pn(existingCategory.id));
     } else {
@@ -355,14 +355,14 @@ export async function ensureTargetStockItems(
       WHERE source_table = 'stock_items' AND source_id = ${srcId} AND target_table = 'stock_items'
       LIMIT 1
     `)
-    ).rows[0] as any;
+    ).rows[0];
     if (priorLink) {
       // Verify it still exists in target (defensive — should always be true)
       const stillExists = (
         await db.execute(sql`
         SELECT id FROM stock_items WHERE id = ${pn(priorLink.target_id)} AND company_id = ${targetId} AND deleted_at IS NULL LIMIT 1
       `)
-      ).rows[0] as any;
+      ).rows[0];
       if (stillExists) {
         map.set(srcId, pn(priorLink.target_id));
         itemsReused++;
@@ -375,7 +375,7 @@ export async function ensureTargetStockItems(
       await db.execute(sql`
       SELECT id FROM stock_items WHERE company_id = ${targetId} AND code = ${item.code} AND deleted_at IS NULL LIMIT 1
     `)
-    ).rows[0] as any;
+    ).rows[0];
 
     let targetItemId: number;
     if (existingByCode) {
@@ -479,7 +479,7 @@ export async function buildGcMigrationPreview(sourceId: number, targetId: number
     FROM vouchers
     WHERE company_id = ${sourceId} AND voucher_type IN ('Sales', 'Sale') AND deleted_at IS NULL
   `)
-  ).rows[0] as any;
+  ).rows[0];
 
   // Already-migrated vouchers in target: linked from a source sale voucher, OR
   // carrying the migration-only marker (prefix + source_module).
@@ -496,7 +496,7 @@ export async function buildGcMigrationPreview(sourceId: number, targetId: number
         OR v.source_module = 'SP_MIGRATION_READONLY'
       )
   `)
-  ).rows[0] as any;
+  ).rows[0];
 
   // SP accounts status
   const spAcctRows = (
@@ -591,7 +591,7 @@ export async function ensureTargetLocation(
     await db.execute(sql`
     SELECT id FROM locations WHERE company_id = ${targetId} AND code = ${sourceLoc.code} AND deleted_at IS NULL LIMIT 1
   `)
-  ).rows[0] as any;
+  ).rows[0];
   if (byCode) targetLocId = pn(byCode.id);
 
   if (!targetLocId) {
@@ -599,7 +599,7 @@ export async function ensureTargetLocation(
       await db.execute(sql`
       SELECT id FROM locations WHERE company_id = ${targetId} AND name = ${sourceLoc.name} AND deleted_at IS NULL LIMIT 1
     `)
-    ).rows[0] as any;
+    ).rows[0];
     if (byName) targetLocId = pn(byName.id);
   }
 

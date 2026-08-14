@@ -288,8 +288,8 @@ export default function MixBatches() {
                 <TableBody>
                   {(() => {
                     const sorted = [...filteredBatches].sort((a, b) => {
-                      const da = (a as any).batchDate || a.createdAt || "";
-                      const db = (b as any).batchDate || b.createdAt || "";
+                      const da = a.batchDate || a.createdAt || "";
+                      const db = b.batchDate || b.createdAt || "";
                       return db > da ? 1 : db < da ? -1 : b.id - a.id;
                     });
                     return showAllBatches ? sorted : sorted.slice(0, 15);
@@ -310,7 +310,7 @@ export default function MixBatches() {
                           ${parseFloat(batch.costPerKg).toFixed(4)}
                         </TableCell>
                         <TableCell className="text-muted-foreground text-sm">
-                          {formatDisplayDate((batch as any).batchDate || batch.createdAt)}
+                          {formatDisplayDate(batch.batchDate || batch.createdAt)}
                         </TableCell>
                         <TableCell onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center gap-1">

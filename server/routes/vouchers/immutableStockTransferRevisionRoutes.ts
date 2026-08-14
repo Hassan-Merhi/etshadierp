@@ -121,7 +121,7 @@ async function auditRevision(
 ) {
   await logAudit({
     userId: userId(req) || "unknown",
-    username: (req.session as any).username || (req.user as any)?.username || "unknown",
+    username: req.session.username || req.user?.username || "unknown",
     companyId,
     action: "update",
     tableName: "stock_transfer_revisions",

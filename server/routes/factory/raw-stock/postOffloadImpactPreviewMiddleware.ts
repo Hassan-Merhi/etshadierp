@@ -32,15 +32,15 @@ export async function requirePostOffloadImpactPreview(
     return;
   }
 
-  if (Number((req.body as any)?.impactPreviewVersion) !== 1) {
+  if (Number(req.body?.impactPreviewVersion) !== 1) {
     next();
     return;
   }
 
-  const companyId = Number((req.session as any)?.factoryCompanyId || (req.session as any)?.currentCompanyId || 0);
-  const userId = String((req.session as any)?.userId || (req as any).user?.id || "");
+  const companyId = Number(req.session?.factoryCompanyId || req.session?.currentCompanyId || 0);
+  const userId = String(req.session?.userId || req.user?.id || "");
   const containerId = Number.parseInt(pathMatch[1], 10);
-  const token = (req.body as any)?.impactPreviewToken;
+  const token = req.body?.impactPreviewToken;
 
   if (!companyId || !userId || !Number.isInteger(containerId) || containerId <= 0) {
     res.status(400).json({
@@ -63,8 +63,8 @@ export async function requirePostOffloadImpactPreview(
       companyId,
       userId,
       containerId,
-      transactionDate: (req.body as any)?.txDate,
-      charges: (req.body as any)?.charges,
+      transactionDate: req.body?.txDate,
+      charges: req.body?.charges,
     });
     next();
   } catch (error: unknown) {

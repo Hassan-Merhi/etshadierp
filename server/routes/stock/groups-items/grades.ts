@@ -40,7 +40,7 @@ export function registerStockGradeRoutes(app: Express) {
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId,
           action: "create",
           tableName: "stock_grades",
@@ -79,7 +79,7 @@ export function registerStockGradeRoutes(app: Express) {
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId,
           action: "update",
           tableName: "stock_grades",
@@ -113,7 +113,7 @@ export function registerStockGradeRoutes(app: Express) {
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId,
           action: "update",
           tableName: "stock_grades",

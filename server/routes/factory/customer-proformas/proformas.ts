@@ -24,7 +24,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
   /* Single proforma by ID — used by EditProformaV5Drawer and lazy detail readers. */
   app.get("/api/factory/customer-proformas/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
@@ -88,7 +88,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
 
   app.get("/api/factory/customer-proformas", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const customerId = req.query.customerId ? parseOptionalId(req.query.customerId) : null;
@@ -260,7 +260,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
 
   app.post("/api/factory/customer-proformas", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const parsed = insertCustomerProformaSchema.parse({ ...req.body, companyId });
@@ -292,7 +292,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
 
   app.put("/api/factory/customer-proformas/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
@@ -338,7 +338,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
 
   app.delete("/api/factory/customer-proformas/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);

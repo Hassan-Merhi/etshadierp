@@ -166,17 +166,17 @@ export function registerCompanyAccessRoutes(app: Express) {
         .limit(1);
 
       req.session.currentCompanyId = companyId;
-      delete (req.session as any).factoryCompanyId;
+      delete req.session.factoryCompanyId;
       req.session.currentRole = userRole.role;
       req.session.currentLocationId = userRole.assignedLocationId;
       req.session.currentPOSStation = userRole.posStation;
       req.session.cashAccountId = userRole.cashAccountId;
       req.session.canSellNegativeStock = userRole.canSellNegativeStock;
-      (req.session as any).posViewOnly = (userRole as any).posViewOnly ?? false;
+      req.session.posViewOnly = userRole.posViewOnly ?? false;
       req.session.daybookEditDays = userRole.daybookEditDays;
       req.session.canAccessCustomers = userRole.canAccessCustomers;
       req.session.canDeleteRecords = userRole.canDeleteRecords;
-      (req.session as any).currentCompanyName = companyRow?.name ?? null;
+      req.session.currentCompanyName = companyRow?.name ?? null;
 
       try {
         await saveSession(req);

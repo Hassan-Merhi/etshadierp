@@ -22,7 +22,7 @@ import { buildExportFilename } from "../orderHelpers";
 export function registerOrderPendingExportRoutes(app: Express) {
   app.get("/api/factory/customer-orders/:id/pending-export", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseId(req.params.id);

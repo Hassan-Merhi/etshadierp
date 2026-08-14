@@ -56,7 +56,7 @@ export async function updateEmployee(
 ): Promise<Employee | undefined> {
   const [updated] = await db
     .update(schema.employees)
-    .set(updates as any)
+    .set(updates)
     .where(and(eq(schema.employees.id, id), eq(schema.employees.companyId, companyId)))
     .returning();
   return updated;
@@ -152,7 +152,7 @@ export async function getAllEmployeeGroups(companyId: number): Promise<any[]> {
     .orderBy(asc(schema.employeeGroups.name));
   return results.map((g) => ({
     ...g,
-    groupType: (g as any).groupType || "Employee",
+    groupType: g.groupType || "Employee",
   }));
 }
 

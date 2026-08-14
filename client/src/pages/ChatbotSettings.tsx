@@ -100,7 +100,7 @@ export default function ChatbotSettings() {
       toast({ title: "GitHub settings saved", description: "Repository settings have been updated." });
     },
     onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to save GitHub settings", variant: "destructive" });
     },
   });
@@ -152,7 +152,7 @@ export default function ChatbotSettings() {
       toast({ title: "Reverted", description: `${data.filePath} has been restored to its previous content.` });
     },
     onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Revert failed", description: error.message || "Could not revert patch", variant: "destructive" });
     },
   });
@@ -170,7 +170,7 @@ export default function ChatbotSettings() {
       });
     },
     onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to update chatbot access",
@@ -192,7 +192,7 @@ export default function ChatbotSettings() {
       });
     },
     onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to update AI provider",
@@ -248,7 +248,7 @@ export default function ChatbotSettings() {
       toast({ title: "Deleted", description: "The conversation has been deleted." });
     },
     onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to delete conversation", variant: "destructive" });
     },
   });

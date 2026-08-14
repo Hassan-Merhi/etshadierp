@@ -333,7 +333,7 @@ export function registerLocationWhatsappDeliveryRoutes(app: Express) {
         try {
           await logAudit({
             userId: req.session.userId!,
-            username: (req.session as any).username || "unknown",
+            username: req.session.username || "unknown",
             companyId: original.company_id,
             action: "retry_location_stock_whatsapp",
             tableName: "location_whatsapp_stock_deliveries",

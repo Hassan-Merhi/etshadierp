@@ -25,7 +25,7 @@ import { resultRows } from "../../../lib/queryResult";
 export function registerOrderCrudRoutes(app: Express) {
   app.get("/api/factory/customer-orders", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const conditions: any[] = [eq(customerOrders.companyId, companyId), isNull(customerOrders.deletedAt)];
@@ -117,7 +117,7 @@ export function registerOrderCrudRoutes(app: Express) {
 
   app.get("/api/factory/customer-orders/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
@@ -205,7 +205,7 @@ export function registerOrderCrudRoutes(app: Express) {
 
   app.patch("/api/factory/customer-orders/:id/hidden", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
@@ -223,7 +223,7 @@ export function registerOrderCrudRoutes(app: Express) {
 
   app.get("/api/factory/customer-orders/:id/profitability", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
@@ -334,14 +334,14 @@ export function registerOrderCrudRoutes(app: Express) {
 
   app.post("/api/factory/customer-orders", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const parsed = insertCustomerOrderSchema.parse({ ...req.body, companyId, status: "DRAFT" });
       const [order] = await db.insert(customerOrders).values(parsed).returning();
       await logAudit({
         userId: req.session.userId!,
-        username: (req.session as any).username || req.session.userId!,
+        username: req.session.username || req.session.userId!,
         companyId,
         action: "create",
         tableName: "factory_customer_orders",
@@ -358,7 +358,7 @@ export function registerOrderCrudRoutes(app: Express) {
 
   app.patch("/api/factory/customer-orders/:id/link-proforma", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseId(req.params.id);
@@ -446,7 +446,7 @@ export function registerOrderCrudRoutes(app: Express) {
   // can add or edit notes at any point during the loading lifecycle).
   app.patch("/api/factory/customer-orders/:id/loading-note", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseId(req.params.id);
@@ -468,7 +468,7 @@ export function registerOrderCrudRoutes(app: Express) {
 
       await logAudit({
         userId: req.session.userId!,
-        username: (req.session as any).username || req.session.userId!,
+        username: req.session.username || req.session.userId!,
         companyId,
         action: "update",
         tableName: "factory_customer_orders",
@@ -485,7 +485,7 @@ export function registerOrderCrudRoutes(app: Express) {
 
   app.delete("/api/factory/customer-orders/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseId(req.params.id);
@@ -529,7 +529,7 @@ export function registerOrderCrudRoutes(app: Express) {
 
       await logAudit({
         userId: req.session.userId!,
-        username: (req.session as any).username || req.session.userId!,
+        username: req.session.username || req.session.userId!,
         companyId,
         action: "delete",
         tableName: "factory_customer_orders",
@@ -546,7 +546,7 @@ export function registerOrderCrudRoutes(app: Express) {
 
   app.patch("/api/factory/customer-orders/:id/date", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseId(req.params.id);
@@ -571,7 +571,7 @@ export function registerOrderCrudRoutes(app: Express) {
 
       await logAudit({
         userId: req.session.userId!,
-        username: (req.session as any).username || req.session.userId!,
+        username: req.session.username || req.session.userId!,
         companyId,
         action: "update",
         tableName: "factory_customer_orders",
@@ -588,7 +588,7 @@ export function registerOrderCrudRoutes(app: Express) {
 
   app.post("/api/factory/customer-orders/:id/assign-container", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseId(req.params.id);
@@ -619,7 +619,7 @@ export function registerOrderCrudRoutes(app: Express) {
 
       await logAudit({
         userId: req.session.userId!,
-        username: (req.session as any).username || req.session.userId!,
+        username: req.session.username || req.session.userId!,
         companyId,
         action: "update",
         tableName: "factory_customer_orders",
@@ -630,10 +630,10 @@ export function registerOrderCrudRoutes(app: Express) {
             ? { containerNumber: { old: order.containerNumber ?? null, new: containerNumber } }
             : {}),
           ...(destination !== undefined
-            ? { destination: { old: (order as any).destination ?? null, new: destination || null } }
+            ? { destination: { old: order.destination ?? null, new: destination || null } }
             : {}),
           ...(shippingCompany !== undefined
-            ? { shippingCompany: { old: (order as any).shippingCompany ?? null, new: shippingCompany } }
+            ? { shippingCompany: { old: order.shippingCompany ?? null, new: shippingCompany } }
             : {}),
         },
       });
@@ -650,7 +650,7 @@ export function registerOrderCrudRoutes(app: Express) {
 
   app.get("/api/factory/bale-lookup", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const code = req.query.code as string;

@@ -20,7 +20,7 @@ import { resultRows } from "../../../lib/queryResult";
 export function registerEmployeeLedgerWasteRoutes(app: Express) {
   app.get("/api/factory/bale-ledger", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       // Load all relevant data
@@ -280,7 +280,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
   // Keeps the main /api/factory/bale-ledger response small by not returning baleDetails there.
   app.get("/api/factory/bale-ledger/details", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const section = String(req.query.section || "");
@@ -409,7 +409,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
 
   app.get("/api/factory/waste-dispatch/bales", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const search = (req.query.search as string) || "";
@@ -514,7 +514,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
 
   app.get("/api/factory/waste-dispatch/history", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const dispatches = await db
@@ -563,7 +563,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
   // Reverses a waste dispatch: restores bales to IN_STOCK, reverses ERP stock, deletes daybook entry.
   app.delete("/api/factory/waste-dispatch/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const dispatchId = parseInt(req.params.id);
@@ -628,7 +628,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
 
   app.post("/api/factory/waste-dispatch/submit", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { baleIds, dispatchDate, notes } = req.body;
@@ -639,7 +639,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
         return res.status(400).json({ message: "dispatchDate is required" });
       }
 
-      const userId = (req.session as any).user?.id || null;
+      const userId = req.session.user?.id || null;
 
       const [lastDispatch] = await db
         .select({ dispatchNumber: factoryBaleWasteDispatches.dispatchNumber })

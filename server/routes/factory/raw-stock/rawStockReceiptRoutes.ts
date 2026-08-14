@@ -21,7 +21,7 @@ import { eq, and, desc, sql, isNull } from "drizzle-orm";
 export function registerRawStockReceiptRoutes(app: Express) {
   app.get("/api/factory/raw-stock", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       // Pre-fetch all suppliers with their category info for this company
@@ -463,7 +463,7 @@ export function registerRawStockReceiptRoutes(app: Express) {
   // bales already have finalized costing and must not be silently rewritten.
   app.post("/api/factory/raw-stock/update-cost", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { supplierId, newCostPerKg } = req.body;
@@ -608,7 +608,7 @@ export function registerRawStockReceiptRoutes(app: Express) {
   // POST deduct from received_kg directly on factory_raw_stock rows for a supplier
   app.post("/api/factory/raw-stock/deduct-received", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { supplierId, kg, notes, reference, costPerKg, currencyCode, txDate } = req.body;

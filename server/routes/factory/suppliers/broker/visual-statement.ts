@@ -26,7 +26,7 @@ export function registerSupplierBrokerVisualStatementRoutes(app: Express) {
   // ── Broker Visual Statement (container-centric view for the new dedicated page) ──
   app.get("/api/factory/suppliers/:id/broker-visual-statement", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const brokerId = parseId(req.params.id);
       if (brokerId === null) return res.status(400).json({ message: "Invalid id" });
@@ -46,7 +46,7 @@ export function registerSupplierBrokerVisualStatementRoutes(app: Express) {
         .where(and(eq(factorySuppliers.parentId, brokerId), eq(factorySuppliers.companyId, companyId)));
       const allSupplierIds = [broker.id, ...linked.map((s) => s.id)];
       const nameMap: Record<number, string> = {};
-      for (const s of [broker, ...linked]) nameMap[(s as any).id] = (s as any).name;
+      for (const s of [broker, ...linked]) nameMap[s.id] = s.name;
 
       // Containers (filtered by arrival date if provided)
       let containerQuery = db
@@ -127,7 +127,7 @@ export function registerSupplierBrokerVisualStatementRoutes(app: Express) {
           .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
           .where(
             and(
-              inArray(voucherEntries.factorySupplierId as any, allSupplierIds),
+              inArray(voucherEntries.factorySupplierId, allSupplierIds),
               sql`${voucherEntries.debitAmount}::numeric > 0`,
               sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-PAY-%'`,
               eq(vouchers.optional, false)
@@ -258,7 +258,7 @@ export function registerSupplierBrokerVisualStatementRoutes(app: Express) {
       }
 
       return res.json({
-        broker: { id: broker.id, name: (broker as any).name },
+        broker: { id: broker.id, name: broker.name },
         linkedSuppliers: linked.map((s) => ({ id: s.id, name: s.name })),
         containers: containerRows,
         payments: paymentRows,

@@ -21,7 +21,7 @@ export function registerRawStockRecalcAuditRoutes(app: Express) {
     requireAuth,
     requireRole(...ADMIN_ROLES),
     async (req: Request, res: Response) => {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       try {
         const result = await getFullAuditScan(companyId);
@@ -42,7 +42,7 @@ export function registerRawStockRecalcAuditRoutes(app: Express) {
     requireAuth,
     requireRole(...ADMIN_ROLES),
     async (req: Request, res: Response) => {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       try {
         const result = await getMixBatchSourceCostMismatchPreview(companyId);

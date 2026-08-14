@@ -65,15 +65,13 @@ export function otwAddToCurrency(map: Record<string, number>, ccy: string, amoun
 
 export function otwContainerByCurrency(c: ContainerWithSupplier): Record<string, number> {
   const amounts: Record<string, number> = {};
-  const containerCcy = (c as any).currencyCode || "USD";
+  const containerCcy = c.currencyCode || "USD";
   const goodsValue =
-    otwNum((c as any).finalPayableAmount) > 0
-      ? otwNum((c as any).finalPayableAmount)
-      : otwNum(c.ratePerKg) * otwNum(c.totalKg);
+    otwNum(c.finalPayableAmount) > 0 ? otwNum(c.finalPayableAmount) : otwNum(c.ratePerKg) * otwNum(c.totalKg);
   otwAddToCurrency(amounts, containerCcy, goodsValue);
-  otwAddToCurrency(amounts, (c as any).freightCurrencyCode || containerCcy, otwNum((c as any).freight));
-  otwAddToCurrency(amounts, (c as any).commissionCurrencyCode || "USD", otwNum((c as any).commissionAmount));
-  otwAddToCurrency(amounts, containerCcy, otwNum((c as any).otherCharges));
+  otwAddToCurrency(amounts, c.freightCurrencyCode || containerCcy, otwNum(c.freight));
+  otwAddToCurrency(amounts, c.commissionCurrencyCode || "USD", otwNum(c.commissionAmount));
+  otwAddToCurrency(amounts, containerCcy, otwNum(c.otherCharges));
   otwAddToCurrency(amounts, containerCcy, otwNum((c as any).additionalChargesSum));
   otwAddToCurrency(amounts, containerCcy, otwNum((c as any).preRegisteredChargesSum));
   return amounts;

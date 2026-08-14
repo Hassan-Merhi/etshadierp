@@ -22,7 +22,7 @@ import { eq, and, desc, sql, inArray, ilike, isNull } from "drizzle-orm";
 export function registerRawStockAdjRoutes(app: Express) {
   app.get("/api/factory/raw-stock/adjustments", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const rows = await db
         .select({
@@ -61,7 +61,7 @@ export function registerRawStockAdjRoutes(app: Express) {
   // Returns adjustments + mix batch usage sorted newest-first
   app.get("/api/factory/raw-stock/history/:supplierId", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const supplierId = parseId(req.params.supplierId);
       if (supplierId === null) return res.status(400).json({ message: "Invalid id" });
@@ -220,7 +220,7 @@ export function registerRawStockAdjRoutes(app: Express) {
       }));
 
       const all = [...adjustmentsWithId, ...batches, ...receipts].sort(
-        (a, b) => new Date(b.createdAt as any).getTime() - new Date(a.createdAt as any).getTime()
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
 
       res.json(all);
@@ -233,7 +233,7 @@ export function registerRawStockAdjRoutes(app: Express) {
   // POST create a new adjustment (ADD or REMOVE), or create a new standalone manual material
   app.post("/api/factory/raw-stock/adjustment", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { type, kg, costPerKg, currencyCode, supplierId, materialLabel, notes, reference, date, createVoucher } =
         req.body;
@@ -372,7 +372,7 @@ export function registerRawStockAdjRoutes(app: Express) {
   // DELETE a specific adjustment
   app.delete("/api/factory/raw-stock/adjustments/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
@@ -477,7 +477,7 @@ export function registerRawStockAdjRoutes(app: Express) {
   // DELETE a batch source entry for a supplier from a batch (reverses usedKg on raw stock)
   app.delete("/api/factory/raw-stock/batch-source", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const batchId = parseId(req.body.batchId) ?? -1;
@@ -554,7 +554,7 @@ export function registerRawStockAdjRoutes(app: Express) {
   // DELETE a container raw stock receipt (only if no kg has been used yet)
   app.delete("/api/factory/raw-stock/receipts/:rawStockId", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const rawStockId = parseId(req.params.rawStockId);
@@ -605,7 +605,7 @@ export function registerRawStockAdjRoutes(app: Express) {
   // PATCH update receivedKg on a container raw stock record (fixes balance going forward)
   app.patch("/api/factory/raw-stock/receipts/:rawStockId", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const rawStockId = parseId(req.params.rawStockId);
@@ -646,7 +646,7 @@ export function registerRawStockAdjRoutes(app: Express) {
 
   app.get("/api/factory/raw-stock/by-container", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const results = await db
@@ -695,7 +695,7 @@ export function registerRawStockAdjRoutes(app: Express) {
 
   app.get("/api/factory/raw-stock/available-containers", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       // Include containers in statuses that can accept a first offload:

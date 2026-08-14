@@ -5,7 +5,7 @@ import { pool } from "../../db";
 import { requireAuth } from "../../auth";
 
 function getFactoryCompanyId(req: any): number | undefined {
-  return (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+  return req.session.factoryCompanyId || req.session.currentCompanyId;
 }
 
 async function hasWriteAccess(req: any, companyId: number): Promise<boolean> {

@@ -113,7 +113,7 @@ function ErpContainerForm({ onOpenChange }: { onOpenChange: (open: boolean) => v
       form.reset();
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -338,7 +338,7 @@ function SpContainerForm({ onOpenChange }: { onOpenChange: (open: boolean) => vo
       form.reset();
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });

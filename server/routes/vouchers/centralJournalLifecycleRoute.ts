@@ -15,10 +15,7 @@ import { requireAuth, requireNonPOS, requireRole } from "../../auth";
 import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
-import {
-  isReadonlyMigratedVoucher,
-  READONLY_MIGRATED_VOUCHER_MESSAGE,
-} from "../../lib/migratedVoucherGuard";
+import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../../lib/migratedVoucherGuard";
 import { storage } from "../../storage";
 import { applyEmployeeBalanceDeltasTx } from "../../services/accounting/employeeBalancePosting";
 import { createDatabasePostingDependencies } from "../../services/accounting/databasePostingDependencies";
@@ -48,10 +45,7 @@ async function syncJournalToOrderCharge(
   if (!customerEntry) return;
 
   const ledgerCreditEntries = savedEntries.filter(
-    (entry) =>
-      entry.ledgerAccountId !== null &&
-      entry.customerId === null &&
-      Number(entry.creditAmount || 0) > 0
+    (entry) => entry.ledgerAccountId !== null && entry.customerId === null && Number(entry.creditAmount || 0) > 0
   );
 
   for (const ledgerEntry of ledgerCreditEntries) {
@@ -73,10 +67,7 @@ async function syncJournalToOrderCharge(
       .from(customerOrderCharges)
       .innerJoin(
         customerOrders,
-        and(
-          eq(customerOrderCharges.orderId, customerOrders.id),
-          eq(customerOrders.companyId, companyId)
-        )
+        and(eq(customerOrderCharges.orderId, customerOrders.id), eq(customerOrders.companyId, companyId))
       )
       .where(
         and(
@@ -151,31 +142,19 @@ async function syncIntercompanyCounterpart(voucherId: number, newTotal: number):
     const [transfer] = await db
       .select()
       .from(interCompanyTransfers)
-      .where(
-        or(
-          eq(interCompanyTransfers.fromVoucherId, voucherId),
-          eq(interCompanyTransfers.toVoucherId, voucherId)
-        )
-      )
+      .where(or(eq(interCompanyTransfers.fromVoucherId, voucherId), eq(interCompanyTransfers.toVoucherId, voucherId)))
       .limit(1);
     if (!transfer) return;
 
-    const otherVoucherId =
-      transfer.fromVoucherId === voucherId ? transfer.toVoucherId : transfer.fromVoucherId;
+    const otherVoucherId = transfer.fromVoucherId === voucherId ? transfer.toVoucherId : transfer.fromVoucherId;
     if (!otherVoucherId) return;
 
-    const [otherVoucher] = await db
-      .select()
-      .from(vouchers)
-      .where(eq(vouchers.id, otherVoucherId));
+    const [otherVoucher] = await db.select().from(vouchers).where(eq(vouchers.id, otherVoucherId));
     if (!otherVoucher) return;
 
     const oldTotal = Number(otherVoucher.totalAmount || 0);
     const ratio = oldTotal > 0 ? newTotal / oldTotal : 1;
-    const otherEntries = await db
-      .select()
-      .from(voucherEntries)
-      .where(eq(voucherEntries.voucherId, otherVoucherId));
+    const otherEntries = await db.select().from(voucherEntries).where(eq(voucherEntries.voucherId, otherVoucherId));
 
     for (const entry of otherEntries) {
       await db
@@ -195,10 +174,7 @@ async function syncIntercompanyCounterpart(voucherId: number, newTotal: number):
       .update(factoryDaybookEntries)
       .set({ amountCurrency: newTotal.toFixed(2), amountUsd: newTotal.toFixed(2) })
       .where(
-        and(
-          eq(factoryDaybookEntries.referenceTable, "vouchers"),
-          eq(factoryDaybookEntries.referenceId, otherVoucherId)
-        )
+        and(eq(factoryDaybookEntries.referenceTable, "vouchers"), eq(factoryDaybookEntries.referenceId, otherVoucherId))
       );
   } catch (error: unknown) {
     logger.error("[Central journal lifecycle] Intercompany counterpart update failed (non-fatal)", {
@@ -208,11 +184,7 @@ async function syncIntercompanyCounterpart(voucherId: number, newTotal: number):
   }
 }
 
-async function updateActiveJournal(
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> {
+async function updateActiveJournal(req: Request, res: Response, next: NextFunction): Promise<void> {
   const startedAt = Date.now();
   const voucherId = Number(req.params.id);
   const companyId = req.session.currentCompanyId;
@@ -278,7 +250,7 @@ async function updateActiveJournal(
       clientRequestId: clientRequestId || `journal-update-${voucherId}-${Date.now()}`,
       actor: {
         userId: userId ?? null,
-        username: (req.session as any).username || "unknown",
+        username: req.session.username || "unknown",
         reason: "Manual journal update",
       },
     });
@@ -302,10 +274,7 @@ async function updateActiveJournal(
         throw new Error("Optional journal transitions must use the compatibility route");
       }
 
-      const oldEntries = await tx
-        .select()
-        .from(voucherEntries)
-        .where(eq(voucherEntries.voucherId, voucherId));
+      const oldEntries = await tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
 
       await postingDependencies.ownership.validateVoucherOwnership({
         tx,
@@ -358,13 +327,12 @@ async function updateActiveJournal(
       };
     });
 
-    await syncJournalToOrderCharge(companyId, result.entries, result.voucher.id).catch(
-      (error: unknown) =>
-        logger.error("Central journal order-charge update failed (non-fatal)", {
-          companyId,
-          voucherId,
-          error,
-        })
+    await syncJournalToOrderCharge(companyId, result.entries, result.voucher.id).catch((error: unknown) =>
+      logger.error("Central journal order-charge update failed (non-fatal)", {
+        companyId,
+        voucherId,
+        error,
+      })
     );
     await syncIntercompanyCounterpart(voucherId, Number(result.voucher.totalAmount || 0));
 
@@ -379,10 +347,7 @@ async function updateActiveJournal(
       let accountType = mainAccountType ? String(mainAccountType) : "ledger";
       if (!accountId) {
         const firstLedgerDebit = entries.find(
-          (entry: any) =>
-            entry.accountType === "ledger" &&
-            entry.type === "DR" &&
-            Number(entry.accountId) > 0
+          (entry: any) => entry.accountType === "ledger" && entry.type === "DR" && Number(entry.accountId) > 0
         );
         if (firstLedgerDebit) {
           accountId = Number(firstLedgerDebit.accountId);
@@ -411,7 +376,7 @@ async function updateActiveJournal(
       const newSnapshot = await snapshotVoucherEntries(result.entries);
       await logAudit({
         userId: userId!,
-        username: (req.session as any).username || "unknown",
+        username: req.session.username || "unknown",
         companyId,
         action: "update",
         tableName: "vouchers",
@@ -463,11 +428,7 @@ async function updateActiveJournal(
   }
 }
 
-async function deleteActiveJournal(
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> {
+async function deleteActiveJournal(req: Request, res: Response, next: NextFunction): Promise<void> {
   const voucherId = Number(req.params.id);
   const companyId = req.session.currentCompanyId;
   if (!Number.isInteger(voucherId) || voucherId <= 0) {
@@ -516,10 +477,7 @@ async function deleteActiveJournal(
         return { replayed: true, voucher: lockedVoucher, entries: [] as any[] };
       }
 
-      const entries = await tx
-        .select()
-        .from(voucherEntries)
-        .where(eq(voucherEntries.voucherId, voucherId));
+      const entries = await tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
       await applyEmployeeBalanceDeltasTx({
         tx,
         companyId,
@@ -528,10 +486,7 @@ async function deleteActiveJournal(
         missingEmployeeBehavior: "skip",
       });
 
-      const linkedPayments = await tx
-        .select()
-        .from(propertyPayments)
-        .where(eq(propertyPayments.voucherId, voucherId));
+      const linkedPayments = await tx.select().from(propertyPayments).where(eq(propertyPayments.voucherId, voucherId));
       for (const payment of linkedPayments) {
         if (payment.ledgerRowId) {
           await tx.execute(sql`
@@ -547,14 +502,10 @@ async function deleteActiveJournal(
         .select()
         .from(interCompanyTransfers)
         .where(
-          or(
-            eq(interCompanyTransfers.fromVoucherId, voucherId),
-            eq(interCompanyTransfers.toVoucherId, voucherId)
-          )
+          or(eq(interCompanyTransfers.fromVoucherId, voucherId), eq(interCompanyTransfers.toVoucherId, voucherId))
         );
       for (const transfer of linkedTransfers) {
-        const otherVoucherId =
-          transfer.fromVoucherId === voucherId ? transfer.toVoucherId : transfer.fromVoucherId;
+        const otherVoucherId = transfer.fromVoucherId === voucherId ? transfer.toVoucherId : transfer.fromVoucherId;
         await tx.delete(interCompanyTransfers).where(eq(interCompanyTransfers.id, transfer.id));
         if (otherVoucherId && otherVoucherId !== voucherId) {
           await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, otherVoucherId));
@@ -583,7 +534,7 @@ async function deleteActiveJournal(
         const entrySnapshot = await snapshotVoucherEntries(deletion.entries);
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId,
           action: "delete",
           tableName: "vouchers",

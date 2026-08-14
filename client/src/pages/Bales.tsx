@@ -79,7 +79,7 @@ export default function Bales() {
       }
     },
     onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Error creating bale",
         description: error.message,
@@ -98,7 +98,7 @@ export default function Bales() {
       toast({ title: "Bale deleted successfully" });
     },
     onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Error deleting bale",
         description: error.message,

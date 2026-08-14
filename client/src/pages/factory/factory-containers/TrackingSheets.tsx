@@ -178,7 +178,7 @@ export function TrackingSettingsSheet({
 
   useEffect(() => {
     if (container) {
-      const fc = container as any;
+      const fc = container;
       setEnabled(fc.trackingEnabled !== false);
       setAutoUpdate(fc.trackingAutoUpdate !== false);
       setCarrierHint(fc.trackingCarrierHint ?? "");

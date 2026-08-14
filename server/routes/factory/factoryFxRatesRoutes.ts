@@ -18,7 +18,7 @@ import { factoryFxRates, insertFactoryFxRateSchema } from "@shared/schema";
 export function registerFactoryFxRatesRoutes(app: Express) {
   app.get("/api/factory/fx-rates", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { currencyCode } = req.query;
       // Only return manually-set rates in the UI list (auto rows are internal cache only)
@@ -37,7 +37,7 @@ export function registerFactoryFxRatesRoutes(app: Express) {
 
   app.get("/api/factory/fx-rates/latest/:currencyCode", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const currency = req.params.currencyCode.toUpperCase();
       const today = getClientDate(req);
@@ -64,7 +64,7 @@ export function registerFactoryFxRatesRoutes(app: Express) {
 
   app.get("/api/factory/fx-rates/:currencyCode/:date", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const currency = req.params.currencyCode.toUpperCase();
       const dateISO = req.params.date;
@@ -80,7 +80,7 @@ export function registerFactoryFxRatesRoutes(app: Express) {
 
   app.post("/api/factory/fx-rates", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const today = getClientDate(req);
       const parsed = insertFactoryFxRateSchema.parse({
@@ -99,7 +99,7 @@ export function registerFactoryFxRatesRoutes(app: Express) {
   // DELETE by currency code — removes all rows (manual + auto) for that currency
   app.delete("/api/factory/fx-rates/:currency", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const currency = req.params.currency.toUpperCase();
       await db

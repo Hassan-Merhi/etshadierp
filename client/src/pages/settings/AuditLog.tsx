@@ -210,10 +210,10 @@ export function AuditLog({
   const errorCode = (error as any)?.code;
   const isPermissionError =
     errorStatus === 403 ||
-    String((error as any)?.message || "")
+    String(error?.message || "")
       .toLowerCase()
       .includes("access denied") ||
-    String((error as any)?.message || "")
+    String(error?.message || "")
       .toLowerCase()
       .includes("permission");
   const isCompanyError = errorStatus === 409 || errorCode === "AUDIT_COMPANY_REQUIRED";

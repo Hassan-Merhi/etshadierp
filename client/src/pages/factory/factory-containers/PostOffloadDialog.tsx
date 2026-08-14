@@ -99,7 +99,7 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
       setNewCharges([]);
     },
     onError: (err: Error) => {
-      if ((err as any)?._handledGlobally) return;
+      if ((err as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -123,7 +123,7 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
       setEditResult(data);
     },
     onError: (err: Error) => {
-      if ((err as any)?._handledGlobally) return;
+      if ((err as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -157,7 +157,7 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
       setEditResult(data);
     },
     onError: (err: Error) => {
-      if ((err as any)?._handledGlobally) return;
+      if ((err as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -187,7 +187,7 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
       }
     },
     onError: (err: Error) => {
-      if ((err as any)?._handledGlobally) return;
+      if ((err as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -719,7 +719,7 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                               id: Date.now().toString(),
                               description: "",
                               amount: "",
-                              currencyCode: (container as any)?.currencyCode || "USD",
+                              currencyCode: container?.currencyCode || "USD",
                               ledgerAccountId: "",
                               supplierId: "",
                             },

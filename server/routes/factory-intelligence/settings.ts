@@ -18,7 +18,7 @@ export function registerFactorySettingsRoutes(app: Express, requireAuth: any, db
 
   app.get("/api/factory/settings", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const result = await cache(`factory_settings:${companyId}`, 30_000, async () => {
@@ -49,7 +49,7 @@ export function registerFactorySettingsRoutes(app: Express, requireAuth: any, db
         }
 
         // Spread extraSettings so clients see all flags as top-level fields
-        const extra = (settings as any).extraSettings ?? {};
+        const extra = settings.extraSettings ?? {};
         return { ...settings, ...extra };
       });
 
@@ -86,8 +86,7 @@ export function registerFactorySettingsRoutes(app: Express, requireAuth: any, db
 
   app.put("/api/factory/settings", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId =
-        req.body.companyId || (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.body.companyId || req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const {
@@ -143,7 +142,7 @@ export function registerFactorySettingsRoutes(app: Express, requireAuth: any, db
           .select({ extraSettings: factorySettings.extraSettings })
           .from(factorySettings)
           .where(eq(factorySettings.companyId, companyId));
-        const currentExtra: any = (current?.extraSettings as any) ?? {};
+        const currentExtra: any = current?.extraSettings ?? {};
         const newExtra: any = { ...currentExtra };
         for (const key of extraKeys) {
           if (req.body[key] !== undefined) newExtra[key] = req.body[key];
@@ -160,7 +159,7 @@ export function registerFactorySettingsRoutes(app: Express, requireAuth: any, db
         })
         .returning();
 
-      const resultExtra = (result as any).extraSettings ?? {};
+      const resultExtra = result.extraSettings ?? {};
       cache.del(`factory_settings:${companyId}`);
       res.json({ ...result, ...resultExtra });
     } catch (error: unknown) {

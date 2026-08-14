@@ -834,7 +834,7 @@ export default function FactorySuppliers() {
             setPaymentForm({ ...paymentForm, supplierId: s.id });
           }}
           openFxConversionDialog={(s, currencyCode, balance) => {
-            const toId = (s as any).parentId || s.id;
+            const toId = s.parentId || s.id;
             const balStr = balance.toFixed(2);
             setFxConversionForm({
               fromSupplierId: s.id,
@@ -885,15 +885,15 @@ export default function FactorySuppliers() {
           allSuppliers={allSuppliers}
           createSubAccountParentId={createSubAccountParentId}
           setCreateSubAccountParentId={setCreateSubAccountParentId}
-          createMutation={createMutation as any}
-          updateMutation={updateMutation as any}
+          createMutation={createMutation}
+          updateMutation={updateMutation}
           resetForm={resetForm}
           paymentDialogSupplier={paymentDialogSupplier}
           setPaymentDialogSupplier={setPaymentDialogSupplier}
           paymentForm={paymentForm}
           setPaymentForm={setPaymentForm}
           ledgerAccounts={ledgerAccounts}
-          paymentMutation={paymentMutation as any}
+          paymentMutation={paymentMutation}
           paymentAmtUsd={0}
           paymentBalanceUsd={0}
           isOverpayment={false}
@@ -904,7 +904,7 @@ export default function FactorySuppliers() {
           setFxConversionForm={setFxConversionForm}
           fxSourceType={fxSourceType}
           setFxSourceType={setFxSourceType}
-          fxConversionMutation={fxConversionMutation as any}
+          fxConversionMutation={fxConversionMutation}
           wrapAdminAction={wrapAdminAction}
           bulkFxOpen={bulkFxOpen}
           setBulkFxOpen={setBulkFxOpen}
@@ -914,20 +914,20 @@ export default function FactorySuppliers() {
           setBulkFxForm={setBulkFxForm}
           bulkFxPreview={bulkFxPreview}
           setBulkFxPreview={setBulkFxPreview}
-          bulkFxPreviewMutation={bulkFxPreviewMutation as any}
-          bulkFxMutation={bulkFxMutation as any}
+          bulkFxPreviewMutation={bulkFxPreviewMutation}
+          bulkFxMutation={bulkFxMutation}
           obEditSupplier={obEditSupplier}
           setObEditSupplier={setObEditSupplier}
           obEditValue={obEditValue}
           setObEditValue={setObEditValue}
-          obEditMutation={obEditMutation as any}
+          obEditMutation={obEditMutation}
           dueDialogSupplier={dueDialogSupplier}
           setDueDialogSupplier={setDueDialogSupplier}
           formatDate={formatDate}
           formatNum={formatNum}
           editObComm={editObComm}
           setEditObComm={setEditObComm}
-          updateObCommissionMutation={updateObCommissionMutation as any}
+          updateObCommissionMutation={updateObCommissionMutation}
         />
         {moveContainerDialogJsx}
         {AdminDialog}
@@ -1079,7 +1079,7 @@ export default function FactorySuppliers() {
                         title={`Settle ${cb.currencyCode} → USD`}
                         onClick={(e) => {
                           e.stopPropagation();
-                          const toId = (s as any).parentId || s.id;
+                          const toId = s.parentId || s.id;
                           const balStr = cb.balance.toFixed(2);
                           setFxConversionForm({
                             fromSupplierId: s.id,
@@ -1173,7 +1173,7 @@ export default function FactorySuppliers() {
                         <DropdownMenuItem
                           key={cb.currencyCode}
                           onClick={() => {
-                            const toId = (s as any).parentId || s.id;
+                            const toId = s.parentId || s.id;
                             const balStr = cb.balance.toFixed(2);
                             setFxConversionForm({
                               fromSupplierId: s.id,
@@ -1272,15 +1272,15 @@ export default function FactorySuppliers() {
         allSuppliers={allSuppliers}
         createSubAccountParentId={createSubAccountParentId}
         setCreateSubAccountParentId={setCreateSubAccountParentId}
-        createMutation={createMutation as any}
-        updateMutation={updateMutation as any}
+        createMutation={createMutation}
+        updateMutation={updateMutation}
         resetForm={resetForm}
         paymentDialogSupplier={paymentDialogSupplier}
         setPaymentDialogSupplier={setPaymentDialogSupplier}
         paymentForm={paymentForm}
         setPaymentForm={setPaymentForm}
         ledgerAccounts={ledgerAccounts}
-        paymentMutation={paymentMutation as any}
+        paymentMutation={paymentMutation}
         paymentAmtUsd={0}
         paymentBalanceUsd={0}
         isOverpayment={false}
@@ -1291,7 +1291,7 @@ export default function FactorySuppliers() {
         setFxConversionForm={setFxConversionForm}
         fxSourceType={fxSourceType}
         setFxSourceType={setFxSourceType}
-        fxConversionMutation={fxConversionMutation as any}
+        fxConversionMutation={fxConversionMutation}
         wrapAdminAction={wrapAdminAction}
         bulkFxOpen={bulkFxOpen}
         setBulkFxOpen={setBulkFxOpen}
@@ -1301,20 +1301,20 @@ export default function FactorySuppliers() {
         setBulkFxForm={setBulkFxForm}
         bulkFxPreview={bulkFxPreview}
         setBulkFxPreview={setBulkFxPreview}
-        bulkFxPreviewMutation={bulkFxPreviewMutation as any}
-        bulkFxMutation={bulkFxMutation as any}
+        bulkFxPreviewMutation={bulkFxPreviewMutation}
+        bulkFxMutation={bulkFxMutation}
         obEditSupplier={obEditSupplier}
         setObEditSupplier={setObEditSupplier}
         obEditValue={obEditValue}
         setObEditValue={setObEditValue}
-        obEditMutation={obEditMutation as any}
+        obEditMutation={obEditMutation}
         dueDialogSupplier={dueDialogSupplier}
         setDueDialogSupplier={setDueDialogSupplier}
         formatDate={formatDate}
         formatNum={formatNum}
         editObComm={editObComm}
         setEditObComm={setEditObComm}
-        updateObCommissionMutation={updateObCommissionMutation as any}
+        updateObCommissionMutation={updateObCommissionMutation}
       />
 
       {moveContainerDialogJsx}

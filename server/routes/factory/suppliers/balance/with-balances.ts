@@ -26,7 +26,7 @@ import { buildBrokerStatement, isPayableContainer, isSupplierPaidFreight, resolv
 export function registerSupplierWithBalancesRoutes(app: Express) {
   app.get("/api/factory/suppliers/with-balances", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const includeOtw = req.query.includeOtw === "true";
@@ -124,7 +124,7 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
         allSupplierIds.length > 0
           ? await db
               .select({
-                supplierId: (factoryOffloadAdditionalCharges as any).supplierId,
+                supplierId: factoryOffloadAdditionalCharges.supplierId,
                 amount: factoryOffloadAdditionalCharges.amount,
                 currencyCode: factoryOffloadAdditionalCharges.currencyCode,
                 fxRateToUsd: factoryOffloadAdditionalCharges.fxRateToUsd,
@@ -133,7 +133,7 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
               .where(
                 and(
                   eq(factoryOffloadAdditionalCharges.companyId, companyId),
-                  sql`${(factoryOffloadAdditionalCharges as any).supplierId} = ANY(${sqlArray(allSupplierIds)})`
+                  sql`${factoryOffloadAdditionalCharges.supplierId} = ANY(${sqlArray(allSupplierIds)})`
                 )
               )
           : [];
@@ -159,12 +159,7 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
           const rate = parseFloat(c.ratePerKg || "0");
           const freight = isSupplierPaidFreight(c) ? parseFloat(c.freight || "0") : 0;
           const containerCc = c.currencyCode || "USD";
-          const fx = resolveDisplayFx(
-            containerCc,
-            configuredFxRates[containerCc],
-            c.fxRateToUsd,
-            (c as any).fxRateConfirmed
-          );
+          const fx = resolveDisplayFx(containerCc, configuredFxRates[containerCc], c.fxRateToUsd, c.fxRateConfirmed);
           const freightCc = c.freightCurrencyCode || containerCc;
           const freightFx = configuredFxRates[freightCc] ?? fx;
           const freightInContainerCurr = freightCc === containerCc ? freight : 0;
@@ -183,7 +178,7 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
             commCurr,
             configuredFxRates[commCurr],
             commCurr === (c.currencyCode || "USD") ? c.fxRateToUsd : undefined,
-            commCurr === (c.currencyCode || "USD") ? (c as any).fxRateConfirmed : undefined
+            commCurr === (c.currencyCode || "USD") ? c.fxRateConfirmed : undefined
           );
           return sum + (commCurr === "USD" ? commAmt : commAmt * commFx);
         }, 0);
@@ -215,10 +210,10 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
         let fxNetUsd = 0;
         for (const t of allFxTransfers) {
           if (t.toSupplierId === s.id) {
-            fxNetUsd += parseFloat((t as any).toAmountUsd || "0");
+            fxNetUsd += parseFloat(t.toAmountUsd || "0");
           }
           if (t.fromSupplierId === s.id) {
-            fxNetUsd -= parseFloat((t as any).toAmountUsd || "0");
+            fxNetUsd -= parseFloat(t.toAmountUsd || "0");
           }
         }
         // Other charges from containers where this supplier is the charge recipient.
@@ -227,9 +222,9 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
           if (c.otherChargesSupplierId !== s.id) return sum;
           const oc = parseFloat(c.otherCharges || "0");
           if (oc <= 0) return sum;
-          const ocCcy = (c as any).otherChargesCurrencyCode || "USD";
+          const ocCcy = c.otherChargesCurrencyCode || "USD";
           if (s.parentId && ocCcy === "USD") return sum;
-          const fx = resolveDisplayFx(ocCcy, configuredFxRates[ocCcy], c.fxRateToUsd, (c as any).fxRateConfirmed);
+          const fx = resolveDisplayFx(ocCcy, configuredFxRates[ocCcy], c.fxRateToUsd, c.fxRateConfirmed);
           return sum + oc * fx;
         }, 0);
         // Per-currency balances (original currency, not converted).
@@ -257,7 +252,7 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
           const baseVal = parseFloat(c.totalKg || "0") * parseFloat(c.ratePerKg || "0");
           const freightAmt = isSupplierPaidFreight(c) ? parseFloat(c.freight || "0") : 0;
           const freightCc = c.freightCurrencyCode || cc;
-          const fx = resolveDisplayFx(cc, configuredFxRates[cc], c.fxRateToUsd, (c as any).fxRateConfirmed);
+          const fx = resolveDisplayFx(cc, configuredFxRates[cc], c.fxRateToUsd, c.fxRateConfirmed);
           markIfUnresolved(cc, fx);
 
           byCurrencyNative[cc] = (byCurrencyNative[cc] || 0) + baseVal;
@@ -270,9 +265,7 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
               freightCc === "USD"
                 ? 1
                 : (configuredFxRates[freightCc] ??
-                  (freightCc === cc
-                    ? fx
-                    : resolveDisplayFx(freightCc, undefined, c.fxRateToUsd, (c as any).fxRateConfirmed)));
+                  (freightCc === cc ? fx : resolveDisplayFx(freightCc, undefined, c.fxRateToUsd, c.fxRateConfirmed)));
             markIfUnresolved(freightCc, freightFx);
             byCurrencyNative[freightCc] = (byCurrencyNative[freightCc] || 0) + freightAmt;
             byCurrencyUsd[freightCc] =
@@ -288,9 +281,7 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
                 commCc === "USD"
                   ? 1
                   : (configuredFxRates[commCc] ??
-                    (commCc === cc
-                      ? fx
-                      : resolveDisplayFx(commCc, undefined, c.fxRateToUsd, (c as any).fxRateConfirmed)));
+                    (commCc === cc ? fx : resolveDisplayFx(commCc, undefined, c.fxRateToUsd, c.fxRateConfirmed)));
               markIfUnresolved(commCc, commFx);
               byCurrencyNative[commCc] = (byCurrencyNative[commCc] || 0) + commAmt;
               byCurrencyUsd[commCc] = (byCurrencyUsd[commCc] || 0) + commAmt * (commCc === "USD" ? 1 : commFx);
@@ -328,12 +319,12 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
 
         // Other charges attributed to this supplier (container-column otherCharges)
         for (const c of containers.filter(isPayableContainer)) {
-          if ((c as any).otherChargesSupplierId !== s.id) continue;
-          const oc = parseFloat((c as any).otherCharges || "0");
+          if (c.otherChargesSupplierId !== s.id) continue;
+          const oc = parseFloat(c.otherCharges || "0");
           if (oc <= 0) continue;
-          const cc = (c as any).otherChargesCurrencyCode || "USD";
+          const cc = c.otherChargesCurrencyCode || "USD";
           if (s.parentId && cc === "USD") continue;
-          const fx = resolveDisplayFx(cc, configuredFxRates[cc], c.fxRateToUsd, (c as any).fxRateConfirmed);
+          const fx = resolveDisplayFx(cc, configuredFxRates[cc], c.fxRateToUsd, c.fxRateConfirmed);
           markIfUnresolved(cc, fx);
           byCurrencyNative[cc] = (byCurrencyNative[cc] || 0) + oc;
           byCurrencyUsd[cc] = (byCurrencyUsd[cc] || 0) + oc * fx;
@@ -345,7 +336,7 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
           const amt = parseFloat(oc.amount || "0");
           if (amt <= 0) continue;
           const cc = oc.currencyCode || "USD";
-          const fx = resolveDisplayFx(cc, configuredFxRates[cc], oc.fxRateToUsd, (oc as any).fxRateConfirmed);
+          const fx = resolveDisplayFx(cc, configuredFxRates[cc], oc.fxRateToUsd, oc.fxRateConfirmed);
           markIfUnresolved(cc, fx);
           byCurrencyNative[cc] = (byCurrencyNative[cc] || 0) + amt;
           byCurrencyUsd[cc] = (byCurrencyUsd[cc] || 0) + amt * fx;
@@ -402,7 +393,7 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
         // fxRateToUsd of exactly 1 that isn't confirmed is not a "looks set" rate.
         const fxContainers = payableContainers.filter((c: any) => {
           if ((c.currencyCode || "USD") === "USD") return false;
-          const { looksSet } = resolveStoredFxRate(c.currencyCode, c.fxRateToUsd, (c as any).fxRateConfirmed);
+          const { looksSet } = resolveStoredFxRate(c.currencyCode, c.fxRateToUsd, c.fxRateConfirmed);
           return looksSet;
         });
         const fxWeightedSum = fxContainers.reduce((s: number, c: any) => {
@@ -412,7 +403,7 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
           // fxContainers was already filtered to looksSet===true rows above, so this rate
           // is guaranteed resolved — resolve it through the same helper rather than a bare
           // "|| 1" fallback (which would silently mask a bug if that filter is ever loosened).
-          const { fxRate } = resolveStoredFxRate(c.currencyCode, c.fxRateToUsd, (c as any).fxRateConfirmed);
+          const { fxRate } = resolveStoredFxRate(c.currencyCode, c.fxRateToUsd, c.fxRateConfirmed);
           return s + val * fxRate;
         }, 0);
         const fxWeightBase = fxContainers.reduce((s: number, c: any) => {

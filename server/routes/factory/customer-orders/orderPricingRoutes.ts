@@ -21,7 +21,7 @@ import { eq, and, sql, inArray } from "drizzle-orm";
 export function registerOrderPricingRoutes(app: Express) {
   app.post("/api/factory/customer-orders/:id/reprice", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseId(req.params.id);
@@ -173,7 +173,7 @@ export function registerOrderPricingRoutes(app: Express) {
   // Apply PRODUCTION prices to all bales in this order
   app.post("/api/factory/customer-orders/:id/reprice-production", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseId(req.params.id);
@@ -300,7 +300,7 @@ export function registerOrderPricingRoutes(app: Express) {
     requireAuth,
     async (req: Request, res: Response) => {
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 
         const orderId = parseId(req.params.id);
@@ -409,7 +409,7 @@ export function registerOrderPricingRoutes(app: Express) {
     requireAuth,
     async (req: Request, res: Response) => {
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 
         const orderId = parseId(req.params.id);
@@ -469,7 +469,7 @@ export function registerOrderPricingRoutes(app: Express) {
 
   app.post("/api/factory/repair-perkg-prices", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       // Find all LOADING / PENDING_VERIFICATION orders that have a proforma

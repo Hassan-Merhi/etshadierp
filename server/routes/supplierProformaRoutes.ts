@@ -119,8 +119,8 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         .from(supplierProformaLines)
         .where(eq(supplierProformaLines.proformaId, proforma.id));
       await logAudit({
-        userId: (req as any).session.userId!,
-        username: (req as any).session.username || "unknown",
+        userId: req.session.userId!,
+        username: req.session.username || "unknown",
         companyId,
         action: "create",
         tableName: "supplier_proformas",
@@ -167,8 +167,8 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         .delete(supplierProformas)
         .where(and(eq(supplierProformas.id, proformaId), eq(supplierProformas.companyId, companyId)));
       await logAudit({
-        userId: (req as any).session.userId!,
-        username: (req as any).session.username || "unknown",
+        userId: req.session.userId!,
+        username: req.session.username || "unknown",
         companyId,
         action: "delete",
         tableName: "supplier_proformas",

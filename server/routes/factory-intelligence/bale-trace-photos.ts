@@ -26,7 +26,7 @@ import { balePhotoUpload } from "./_helpers";
 export function registerFactoryBaleTracePhotoRoutes(app: Express, requireAuth: any, db: any) {
   app.get("/api/factory/bales/:id/trace", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const baleId = parseInt(req.params.id);
@@ -123,7 +123,7 @@ export function registerFactoryBaleTracePhotoRoutes(app: Express, requireAuth: a
 
   app.get("/api/factory/bales/:id/photos", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const baleId = parseInt(req.params.id);
@@ -147,8 +147,7 @@ export function registerFactoryBaleTracePhotoRoutes(app: Express, requireAuth: a
     balePhotoUpload.single("photo"),
     async (req: Request, res: Response) => {
       try {
-        const companyId =
-          req.body.companyId || (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.body.companyId || req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 
         if (!req.file) return res.status(400).json({ message: "No photo uploaded" });
@@ -163,7 +162,7 @@ export function registerFactoryBaleTracePhotoRoutes(app: Express, requireAuth: a
             baleId,
             url,
             fileName: req.file.originalname,
-            uploadedBy: (req.session as any).userId ?? null,
+            uploadedBy: req.session.userId ?? null,
           })
           .returning();
 
@@ -177,7 +176,7 @@ export function registerFactoryBaleTracePhotoRoutes(app: Express, requireAuth: a
 
   app.delete("/api/factory/bale-photos/:photoId", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const photoId = parseInt(req.params.photoId);

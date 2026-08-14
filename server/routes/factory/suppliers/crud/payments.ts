@@ -25,7 +25,7 @@ import { eq, and, desc, sql, inArray } from "drizzle-orm";
 export function registerFactorySupplierPaymentRoutes(app: Express) {
   app.get("/api/factory/supplier-payments", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const supplierId = req.query.supplierId ? parseOptionalId(req.query.supplierId) : null;
 
@@ -35,7 +35,7 @@ export function registerFactorySupplierPaymentRoutes(app: Express) {
         const children = await db
           .select({ id: factorySuppliers.id })
           .from(factorySuppliers)
-          .where(and(eq(factorySuppliers.companyId, companyId), eq((factorySuppliers as any).parentId, supplierId)));
+          .where(and(eq(factorySuppliers.companyId, companyId), eq(factorySuppliers.parentId, supplierId)));
         children.forEach((c: any) => supplierIds.push(c.id));
       }
 
@@ -58,7 +58,7 @@ export function registerFactorySupplierPaymentRoutes(app: Express) {
 
   app.post("/api/factory/supplier-payments", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const parsed = insertFactorySupplierPaymentSchema.parse({ ...req.body, companyId });
@@ -66,9 +66,9 @@ export function registerFactorySupplierPaymentRoutes(app: Express) {
       // Reject writes with an unresolved non-USD rate rather than silently posting the
       // payment voucher at an assumed rate of 1 — factory_supplier_payments has no
       // fxRateConfirmed flag yet, so any explicitly-supplied rate is trusted as-is.
-      const payCurrency = (parsed as any).currencyCode || "USD";
+      const payCurrency = parsed.currencyCode || "USD";
       if (payCurrency !== "USD") {
-        const suppliedRate = parseFloat((parsed as any).fxRateToUsd || "0");
+        const suppliedRate = parseFloat(parsed.fxRateToUsd || "0");
         if (!(suppliedRate > 0)) {
           return res.status(400).json({
             message: `Cannot record a ${payCurrency} payment without an explicit exchange rate to USD.`,
@@ -150,7 +150,7 @@ export function registerFactorySupplierPaymentRoutes(app: Express) {
 
   app.delete("/api/factory/supplier-payments/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });

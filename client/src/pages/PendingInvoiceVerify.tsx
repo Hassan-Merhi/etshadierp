@@ -130,7 +130,7 @@ export default function PendingInvoiceVerify() {
       navigate("/factory/invoicing?tab=invoices");
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -145,7 +145,7 @@ export default function PendingInvoiceVerify() {
       navigate("/factory/invoicing?tab=invoices");
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -159,7 +159,7 @@ export default function PendingInvoiceVerify() {
       toast({ title: "Container info saved" });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -176,7 +176,7 @@ export default function PendingInvoiceVerify() {
       toast({ title: "Charge added" });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -190,7 +190,7 @@ export default function PendingInvoiceVerify() {
       toast({ title: "Charge removed" });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -205,7 +205,7 @@ export default function PendingInvoiceVerify() {
       navigate(`/factory/sales/invoices/${orderId}`);
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -221,7 +221,7 @@ export default function PendingInvoiceVerify() {
       setShowFixBalesDialog(false);
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -237,7 +237,7 @@ export default function PendingInvoiceVerify() {
       toast({ title: "Price updated", description: "Bale prices have been updated and totals recalculated" });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });

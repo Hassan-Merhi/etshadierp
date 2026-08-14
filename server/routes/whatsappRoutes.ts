@@ -309,7 +309,7 @@ export function registerWhatsAppRoutes(app: Express) {
         userId: _uid,
         companyId: _cid,
       });
-      const currentRole = (req.session as any)?.currentRole;
+      const currentRole = req.session?.currentRole;
       const isAdmin = currentRole === "Admin" || currentRole === "Developer";
       const requestedCompanyId = req.body.companyId ? parseInt(req.body.companyId) : null;
       const companyId = isAdmin && requestedCompanyId ? requestedCompanyId : req.session.currentCompanyId;

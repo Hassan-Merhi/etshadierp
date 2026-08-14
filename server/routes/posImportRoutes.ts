@@ -281,7 +281,7 @@ export function registerPosImportRoutes(app: Express) {
         const importedSaleDate = saleDate;
         const voucherDate = createdVoucher.voucherDate;
         const voucherId = createdVoucher.id;
-        const senderName = (req as any).user?.username || "Import";
+        const senderName = req.user?.username || "Import";
         const dateString = getClientDate(req);
         setImmediate(async () => {
           try {

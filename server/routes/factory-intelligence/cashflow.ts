@@ -13,7 +13,7 @@ import { factoryWorkers, containerFreight, containerFreightPayments, customerOrd
 export function registerFactoryCashflowRoutes(app: Express, requireAuth: any, db: any) {
   app.get("/api/factory/cashflow", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const days = parseInt(req.query.days as string) || 30;

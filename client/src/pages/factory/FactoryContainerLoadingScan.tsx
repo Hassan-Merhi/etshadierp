@@ -217,7 +217,7 @@ export default function FactoryContainerLoadingScan() {
       setTimeout(() => scannerRef.current?.focus(), 100);
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
@@ -287,7 +287,7 @@ export default function FactoryContainerLoadingScan() {
       setScanCode("");
     },
     onError: (error: Error, variables: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       if ((error as any).overloaded) {
         setPendingBypassOverloadRef(variables.scanCode);
         setPendingBypassBaleRef(null);
@@ -395,7 +395,7 @@ export default function FactoryContainerLoadingScan() {
       toast({ title: "Bale removed" });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
@@ -437,7 +437,7 @@ export default function FactoryContainerLoadingScan() {
       setTimeout(() => scannerRef.current?.focus(), 100);
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Import failed", description: error.message, variant: "destructive" });
     },
   });
@@ -461,7 +461,7 @@ export default function FactoryContainerLoadingScan() {
     onError: (error: Error) => {
       if (error?._handledGlobally) return;
       setShowFinalizeDialog(false);
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
@@ -482,7 +482,7 @@ export default function FactoryContainerLoadingScan() {
       toast({ title: "Note saved" });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Failed to save note", description: error.message, variant: "destructive" });
     },
   });

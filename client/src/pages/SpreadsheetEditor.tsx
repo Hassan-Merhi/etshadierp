@@ -155,7 +155,7 @@ function fortuneToXlsx(sheets: FortuneSheet[]): any {
       maxC = Math.max(maxC, c);
     };
 
-    const sheetData = (sheet as any).data as any[][] | undefined;
+    const sheetData = sheet.data as any[][] | undefined;
     if (sheetData && Array.isArray(sheetData) && sheetData.length > 0) {
       for (let r = 0; r < sheetData.length; r++) {
         if (!sheetData[r]) continue;
@@ -167,7 +167,7 @@ function fortuneToXlsx(sheets: FortuneSheet[]): any {
 
     ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: maxR, c: maxC } });
 
-    const cfg = (sheet as any).config || {};
+    const cfg = sheet.config || {};
 
     // Merged cells
     if (cfg.merge) {
@@ -210,7 +210,7 @@ function fortuneToXlsx(sheets: FortuneSheet[]): any {
     }
 
     // Auto filter
-    const fs = (sheet as any).filter_select;
+    const fs = sheet.filter_select;
     if (fs) {
       const c1 = XLSX.utils.encode_col(fs.column[0]);
       const c2 = XLSX.utils.encode_col(fs.column[1]);

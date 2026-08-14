@@ -65,9 +65,9 @@ export function postOffloadHistoricalReplayMiddleware(req: Request, res: Respons
     }
 
     void (async () => {
-      const companyId = Number((req.session as any)?.factoryCompanyId || (req.session as any)?.currentCompanyId || 0);
-      const userId = String((req.session as any)?.userId || (req as any).user?.id || "system");
-      const username = (req.session as any)?.username || null;
+      const companyId = Number(req.session?.factoryCompanyId || req.session?.currentCompanyId || 0);
+      const userId = String(req.session?.userId || req.user?.id || "system");
+      const username = req.session?.username || null;
       const chargeId = Number.isInteger(Number(body?.chargeId)) ? Number(body.chargeId) : null;
 
       let supplierId: number | null = null;

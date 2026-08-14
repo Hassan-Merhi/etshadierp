@@ -201,7 +201,7 @@ export default function FactoryCustomers() {
       <div className="flex flex-col h-full p-6 gap-4">
         <PageHeader title="Customers" />
         <div className="rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
-          Failed to load customers: {(error as any)?.message || "Unknown error"}
+          Failed to load customers: {error?.message || "Unknown error"}
         </div>
       </div>
     );

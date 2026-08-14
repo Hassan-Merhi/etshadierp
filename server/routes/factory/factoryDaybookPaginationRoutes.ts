@@ -87,7 +87,7 @@ async function deriveBaleStockEntryAmounts(rows: any[], companyId: number): Prom
           .select({
             id: factoryBaleProducts.id,
             articleCode: factoryBaleProducts.articleCode,
-            productionPrice: (factoryBaleProducts as any).productionPrice,
+            productionPrice: factoryBaleProducts.productionPrice,
           })
           .from(factoryBaleProducts)
           .where(
@@ -128,7 +128,7 @@ export function registerFactoryDaybookPaginationRoutes(app: Express): void {
     if (!wantsPagination(req)) return next();
 
     try {
-      const session = req.session as any;
+      const session = req.session;
       const companyId = session.factoryCompanyId || session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 

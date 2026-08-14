@@ -59,7 +59,7 @@ export function PayrollDetailDialog({
                   { label: "Base Salary", value: payrollDetail.payroll.baseSalary, className: "" },
                   {
                     label: "Transport Allowance",
-                    value: (payrollDetail.payroll as any).transport || "0",
+                    value: payrollDetail.payroll.transport || "0",
                     className: "",
                   },
                   {
@@ -67,7 +67,7 @@ export function PayrollDetailDialog({
                     value: payrollDetail.payroll.bonuses,
                     className: "text-green-700 dark:text-green-400",
                   },
-                  { label: "Overtime Pay", value: (payrollDetail.payroll as any).overtimePay || "0", className: "" },
+                  { label: "Overtime Pay", value: payrollDetail.payroll.overtimePay || "0", className: "" },
                   {
                     label: "Advances Deducted",
                     value: payrollDetail.payroll.advances,
@@ -75,7 +75,7 @@ export function PayrollDetailDialog({
                   },
                   {
                     label: "Other Deductions",
-                    value: (payrollDetail.payroll as any).deductions || "0",
+                    value: payrollDetail.payroll.deductions || "0",
                     className: "text-red-700 dark:text-red-400",
                   },
                 ].map(({ label, value, className }) => (
@@ -100,15 +100,15 @@ export function PayrollDetailDialog({
                 {[
                   {
                     label: "Present Days",
-                    value: parseFloat((payrollDetail.payroll as any).presentDays || "0"),
+                    value: parseFloat(payrollDetail.payroll.presentDays || "0"),
                     color: "text-green-700 dark:text-green-400",
                   },
                   {
                     label: "Absent Days",
-                    value: parseFloat((payrollDetail.payroll as any).absentDays || "0"),
+                    value: parseFloat(payrollDetail.payroll.absentDays || "0"),
                     color: "text-red-700 dark:text-red-400",
                   },
-                  { label: "Working Days", value: (payrollDetail.payroll as any).totalWorkingDays || 0, color: "" },
+                  { label: "Working Days", value: payrollDetail.payroll.totalWorkingDays || 0, color: "" },
                 ].map(({ label, value, color }) => (
                   <Card key={label}>
                     <CardContent className="p-3 text-center">
@@ -175,35 +175,35 @@ export function PayrollDetailDialog({
             </div>
 
             {/* Extra stats (bales / kg / overtime) */}
-            {(parseFloat((payrollDetail.payroll as any).balesCount || "0") > 0 ||
-              parseFloat((payrollDetail.payroll as any).kgProcessed || "0") > 0 ||
-              parseFloat((payrollDetail.payroll as any).overtimeHours || "0") > 0) && (
+            {(parseFloat(payrollDetail.payroll.balesCount || "0") > 0 ||
+              parseFloat(payrollDetail.payroll.kgProcessed || "0") > 0 ||
+              parseFloat(payrollDetail.payroll.overtimeHours || "0") > 0) && (
               <div>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Production</p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {parseFloat((payrollDetail.payroll as any).balesCount || "0") > 0 && (
+                  {parseFloat(payrollDetail.payroll.balesCount || "0") > 0 && (
                     <Card>
                       <CardContent className="p-3 text-center">
-                        <p className="text-xl font-bold">{(payrollDetail.payroll as any).balesCount}</p>
+                        <p className="text-xl font-bold">{payrollDetail.payroll.balesCount}</p>
                         <p className="text-xs text-muted-foreground">Bales</p>
                       </CardContent>
                     </Card>
                   )}
-                  {parseFloat((payrollDetail.payroll as any).kgProcessed || "0") > 0 && (
+                  {parseFloat(payrollDetail.payroll.kgProcessed || "0") > 0 && (
                     <Card>
                       <CardContent className="p-3 text-center">
                         <p className="text-xl font-bold">
-                          {parseFloat((payrollDetail.payroll as any).kgProcessed || "0").toFixed(1)}
+                          {parseFloat(payrollDetail.payroll.kgProcessed || "0").toFixed(1)}
                         </p>
                         <p className="text-xs text-muted-foreground">KG</p>
                       </CardContent>
                     </Card>
                   )}
-                  {parseFloat((payrollDetail.payroll as any).overtimeHours || "0") > 0 && (
+                  {parseFloat(payrollDetail.payroll.overtimeHours || "0") > 0 && (
                     <Card>
                       <CardContent className="p-3 text-center">
                         <p className="text-xl font-bold">
-                          {parseFloat((payrollDetail.payroll as any).overtimeHours || "0").toFixed(1)}
+                          {parseFloat(payrollDetail.payroll.overtimeHours || "0").toFixed(1)}
                         </p>
                         <p className="text-xs text-muted-foreground">OT Hours</p>
                       </CardContent>

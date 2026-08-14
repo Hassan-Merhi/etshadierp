@@ -75,7 +75,7 @@ export function registerBaleTransferRoutes(app: Express) {
           message: "Missing required fields: sourceLocationId, destinationLocationId, transferDate, and items array",
         });
       }
-      const createdBy = (req.session as any).username || "system";
+      const createdBy = req.session.username || "system";
 
       const result = await db.transaction(async (tx) => {
         const [transfer] = await tx
@@ -213,7 +213,7 @@ export function registerBaleTransferRoutes(app: Express) {
         .update(baleTransfers)
         .set({
           status: "COMPLETED",
-          updatedBy: (req.session as any).username || "system",
+          updatedBy: req.session.username || "system",
           updatedAt: sql`now()`,
         })
         .where(eq(baleTransfers.id, transferId))
@@ -272,7 +272,7 @@ export function registerBaleTransferRoutes(app: Express) {
       await storage.updateBaleTransfer(transferId, {
         status,
         notes,
-        updatedBy: (req.session as any).username || "system",
+        updatedBy: req.session.username || "system",
       });
 
       if (items) {

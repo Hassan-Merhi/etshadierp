@@ -25,8 +25,8 @@ import { normFactoryEntry } from "./_helpers";
 export function registerFactoryContainerCreateRoutes(app: Express) {
   app.post("/api/factory/containers", requireAuth, async (req: Request, res: Response) => {
     const _t = Date.now();
-    const _uid = (req.session as any).userId;
-    const _cid = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+    const _uid = req.session.userId;
+    const _cid = req.session.factoryCompanyId || req.session.currentCompanyId;
     try {
       logger.info("factory container create started", {
         module: "factoryContainers",
@@ -34,7 +34,7 @@ export function registerFactoryContainerCreateRoutes(app: Express) {
         userId: _uid,
         companyId: _cid,
       });
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const parsed = insertFactoryContainerSchema.parse({ ...req.body, companyId });
@@ -208,7 +208,7 @@ export function registerFactoryContainerCreateRoutes(app: Express) {
         description: descParts.join(" · "),
         currencyCode: ccyForDesc,
         amountCurrency: parseFloat(container.ratePerKg || "0") * parseFloat(container.totalKg || "0"),
-        fxRateToUsd: resolveStoredFxRateOrThrow(ccyForDesc, container.fxRateToUsd, (container as any).fxRateConfirmed),
+        fxRateToUsd: resolveStoredFxRateOrThrow(ccyForDesc, container.fxRateToUsd, container.fxRateConfirmed),
       });
 
       // Double-entry: Goods value — Dr Factory Import Cost / Cr Supplier Payable
@@ -227,11 +227,7 @@ export function registerFactoryContainerCreateRoutes(app: Express) {
             totalAmount: String(goodsValue),
             currency: container.currencyCode || "USD",
             exchangeRate: String(
-              resolveStoredFxRateOrThrow(
-                container.currencyCode,
-                container.fxRateToUsd,
-                (container as any).fxRateConfirmed
-              )
+              resolveStoredFxRateOrThrow(container.currencyCode, container.fxRateToUsd, container.fxRateConfirmed)
             ),
             sourceModule: "FACTORY",
           })
@@ -239,7 +235,7 @@ export function registerFactoryContainerCreateRoutes(app: Express) {
         const importFactoryFxRate = resolveStoredFxRateOrThrow(
           container.currencyCode,
           container.fxRateToUsd,
-          (container as any).fxRateConfirmed
+          container.fxRateConfirmed
         );
         await db.insert(voucherEntries).values({
           voucherId: importVoucher.id,
@@ -263,9 +259,9 @@ export function registerFactoryContainerCreateRoutes(app: Express) {
       // If freightPaidBy='own': Dr Freight Expense / Cr own ledger account
       // If freightPaidBy='supplier' (default): Dr Freight Expense / Cr Supplier Payable
       const freightAmt = parseFloat(container.freight || "0");
-      const freightCcy = (container as any).freightCurrencyCode || container.currencyCode || "USD";
-      const freightPaidBy = (container as any).freightPaidBy || "supplier";
-      const freightOwnAcctId = (container as any).freightOwnAccountId ?? null;
+      const freightCcy = container.freightCurrencyCode || container.currencyCode || "USD";
+      const freightPaidBy = container.freightPaidBy || "supplier";
+      const freightOwnAcctId = container.freightOwnAccountId ?? null;
       if (freightAmt > 0 && container.freightAccountId) {
         const freightVoucherNum = `FACTORY-FREIGHT-${container.id}`;
         const [freightVoucher] = await db
@@ -281,11 +277,7 @@ export function registerFactoryContainerCreateRoutes(app: Express) {
             exchangeRate:
               freightCcy === (container.currencyCode || "USD")
                 ? String(
-                    resolveStoredFxRateOrThrow(
-                      container.currencyCode,
-                      container.fxRateToUsd,
-                      (container as any).fxRateConfirmed
-                    )
+                    resolveStoredFxRateOrThrow(container.currencyCode, container.fxRateToUsd, container.fxRateConfirmed)
                   )
                 : "1",
             sourceModule: "FACTORY",
@@ -294,11 +286,7 @@ export function registerFactoryContainerCreateRoutes(app: Express) {
         // Compute factory freight FX rate (BASE_PER_TRANSACTION: USD per foreign)
         const freightFactoryFxRate =
           freightCcy === (container.currencyCode || "USD")
-            ? resolveStoredFxRateOrThrow(
-                container.currencyCode,
-                container.fxRateToUsd,
-                (container as any).fxRateConfirmed
-              )
+            ? resolveStoredFxRateOrThrow(container.currencyCode, container.fxRateToUsd, container.fxRateConfirmed)
             : 1; // USD-denominated freight — treat as USD-equivalent
         // Dr Freight Expense
         await db.insert(voucherEntries).values({

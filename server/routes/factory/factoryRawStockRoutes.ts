@@ -101,7 +101,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
       requiredPermission: RAW_STOCK_REPAIR_PERMISSION,
       sourceType: "raw-stock-recalc-undo",
       enforcement: "always",
-      sourceId: (req) => String((req.body as any)?.undoLogId || "recalc-undo"),
+      sourceId: (req) => String(req.body?.undoLogId || "recalc-undo"),
     })
   );
 

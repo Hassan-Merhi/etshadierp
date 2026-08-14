@@ -113,7 +113,7 @@ export default function Chat() {
       inputRef.current?.focus();
     },
     onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Message failed to send",
         description: error?.message || "Please try again.",

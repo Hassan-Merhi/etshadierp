@@ -226,7 +226,7 @@ export default function ProductionRawStock() {
         0
       ),
       totalUsed,
-      totalUsedValue: rs.reduce((sum, r) => sum + parseFloat((r as any).usedValueUsd || "0"), 0),
+      totalUsedValue: rs.reduce((sum, r) => sum + parseFloat(r.usedValueUsd || "0"), 0),
       totalFree: rs.reduce((sum, r) => sum + parseFloat(r.freeKg || "0"), 0),
       totalValue: rs.reduce((sum, r) => sum + parseFloat(r.valueRemainingUsd || r.valueRemaining || "0"), 0),
     };

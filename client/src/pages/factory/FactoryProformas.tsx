@@ -220,7 +220,7 @@ export default function FactoryProformas() {
       navigate("/factory/sales/loadings");
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -389,7 +389,7 @@ export default function FactoryProformas() {
       setInlineQtyLineId(null);
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
       setInlineQtyLineId(null);
     },
@@ -435,7 +435,7 @@ export default function FactoryProformas() {
       setExcelImportErrors([]);
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Import failed", description: error.message, variant: "destructive" });
     },
   });
@@ -559,7 +559,7 @@ export default function FactoryProformas() {
       });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });

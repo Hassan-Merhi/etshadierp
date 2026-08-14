@@ -17,9 +17,9 @@ import { eq, and, or, desc, sql, inArray, isNull } from "drizzle-orm";
 export function registerFactoryDaybookRoutes(app: Express) {
   app.get("/api/factory/daybook", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const currentUserId = (req.session as any).userId != null ? String((req.session as any).userId) : undefined;
+      const currentUserId = req.session.userId != null ? String(req.session.userId) : undefined;
       // startDate/endDate are reassigned by the unbounded-range guard below;
       // the other two are read as sent.
       let { startDate, endDate } = req.query;
@@ -314,7 +314,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
               .select({
                 id: factoryBaleProducts.id,
                 articleCode: factoryBaleProducts.articleCode,
-                productionPrice: (factoryBaleProducts as any).productionPrice,
+                productionPrice: factoryBaleProducts.productionPrice,
               })
               .from(factoryBaleProducts)
               .where(eq(factoryBaleProducts.companyId, companyId));

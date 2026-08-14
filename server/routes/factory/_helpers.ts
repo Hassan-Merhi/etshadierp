@@ -350,17 +350,15 @@ export async function recalculateContainerCosts(
 
   // Freight — may be in a different currency; normalise to container currency
   const freightVal = parseFloat(container.freight || "0");
-  const freightCcy = (container as any).freightCurrencyCode || containerCcy;
-  const freightFx = parseFloat(
-    (container as any).fxRateToUsdOffload || (container as any).freightFxRate || String(fxRate)
-  );
+  const freightCcy = container.freightCurrencyCode || containerCcy;
+  const freightFx = parseFloat(container.fxRateToUsdOffload || container.freightFxRate || String(fxRate));
   const freightUsd = freightCcy === "USD" ? freightVal : freightVal * freightFx;
   const freightInCcy = freightCcy === containerCcy ? freightVal : fxRate > 0 ? freightUsd / fxRate : freightVal;
 
   // Other charges (bulk field)
   const ocVal = parseFloat(container.otherCharges || "0");
-  const ocCcy = (container as any).otherChargesCurrencyCode || containerCcy;
-  const ocFx = parseFloat((container as any).otherChargesFxRate || String(fxRate));
+  const ocCcy = container.otherChargesCurrencyCode || containerCcy;
+  const ocFx = parseFloat(container.otherChargesFxRate || String(fxRate));
   const ocUsd = ocCcy === "USD" ? ocVal : ocVal * ocFx;
   const ocInCcy = ocCcy === containerCcy ? ocVal : fxRate > 0 ? ocUsd / fxRate : ocVal;
 
@@ -381,7 +379,7 @@ export async function recalculateContainerCosts(
       const { fxRate: resolvedCommFx, looksSet: commFxLooksSet } = resolveStoredFxRate(
         commCcy,
         commission.fxRateToUsd,
-        (commission as any).fxRateConfirmed
+        commission.fxRateConfirmed
       );
       if (!commFxLooksSet) throw new UnresolvedExchangeRateError(commCcy);
       commFx = resolvedCommFx;

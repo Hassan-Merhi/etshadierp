@@ -12,7 +12,7 @@ import { resultRows } from "../../../lib/queryResult";
 export function registerEmployeeAttendanceRoutes(app: Express) {
   app.get("/api/factory/net-position/payroll-breakdown", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const rows = await db
@@ -59,7 +59,7 @@ export function registerEmployeeAttendanceRoutes(app: Express) {
   // Returns all active workers + attendance matrix for the given date range.
   app.get("/api/factory/workers/attendance-report", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const DAY_ABBR = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
@@ -242,7 +242,7 @@ export function registerEmployeeAttendanceRoutes(app: Express) {
   // Returns month totals prorated to the given date (defaults to today)
   app.get("/api/factory/monthly-salary-summary", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const dateParam =
@@ -290,13 +290,11 @@ export function registerEmployeeAttendanceRoutes(app: Express) {
         `),
       ]);
 
-      const totalWorkerBaseSalary = parseFloat(String((workerAgg.rows[0] as any)?.totalWorkerBaseSalary ?? "0"));
-      const totalWorkerTransport = parseFloat(String((workerAgg.rows[0] as any)?.totalWorkerTransport ?? "0"));
-      const totalWorkerPaid = parseFloat(String((payrollAgg.rows[0] as any)?.totalWorkerPaid ?? "0"));
-      const totalEmployeeMonthlySalary = parseFloat(
-        String((employeeAgg.rows[0] as any)?.totalEmployeeMonthlySalary ?? "0")
-      );
-      const totalEmployeeBalance = parseFloat(String((employeeAgg.rows[0] as any)?.totalEmployeeBalance ?? "0"));
+      const totalWorkerBaseSalary = parseFloat(String(workerAgg.rows[0]?.totalWorkerBaseSalary ?? "0"));
+      const totalWorkerTransport = parseFloat(String(workerAgg.rows[0]?.totalWorkerTransport ?? "0"));
+      const totalWorkerPaid = parseFloat(String(payrollAgg.rows[0]?.totalWorkerPaid ?? "0"));
+      const totalEmployeeMonthlySalary = parseFloat(String(employeeAgg.rows[0]?.totalEmployeeMonthlySalary ?? "0"));
+      const totalEmployeeBalance = parseFloat(String(employeeAgg.rows[0]?.totalEmployeeBalance ?? "0"));
 
       // When breakdown is not requested, return lightweight summary only (no row-level data).
       if (!includeBreakdown) {

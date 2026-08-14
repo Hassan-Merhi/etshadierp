@@ -479,7 +479,7 @@ export default function OffloadDetail() {
       ) : isError ? (
         <div className="text-center py-12 space-y-2">
           <p className="text-muted-foreground font-medium">Could not load offload #{id}</p>
-          <p className="text-sm text-muted-foreground">{(error as any)?.message || "Unknown error"}</p>
+          <p className="text-sm text-muted-foreground">{error?.message || "Unknown error"}</p>
           <Button variant="outline" className="mt-4" onClick={handleBack}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Go Back

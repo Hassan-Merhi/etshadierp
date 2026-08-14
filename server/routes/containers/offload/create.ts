@@ -37,7 +37,7 @@ import { firstRow } from "../../../lib/queryResult";
 export function registerContainerOffloadCreateRoutes(app: Express) {
   app.post("/api/containers/:id/offload", requireAuth, requireNonPOS, async (req, res) => {
     const startedAt = Date.now();
-    const userId = (req as any).user?.id;
+    const userId = req.user?.id;
     const sessionCompanyId = req.session.currentCompanyId;
     logger.info("Container offload started", {
       module: "containers",

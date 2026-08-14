@@ -125,7 +125,7 @@ export default function Login() {
 
   const [, navigate] = useLocation();
   const passkeySupported =
-    PASSKEY_ENABLED && !isNative && typeof window !== "undefined" && !!(window as any).PublicKeyCredential;
+    PASSKEY_ENABLED && !isNative && typeof window !== "undefined" && !!window.PublicKeyCredential;
 
   const finalizeLogin = () => {
     if (!pendingUserData.current) return;
@@ -178,7 +178,7 @@ export default function Login() {
     onError: (error: any) => {
       setPassword("");
       requestAnimationFrame(() => passwordInputRef.current?.focus());
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Login Failed",
         description: error.message || "Invalid username or password",

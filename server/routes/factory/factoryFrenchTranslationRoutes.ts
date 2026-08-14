@@ -11,7 +11,7 @@ const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.s
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024, files: 1 } });
 
 function factoryCompanyId(req: Request): number | null {
-  const value = Number((req.session as any)?.factoryCompanyId);
+  const value = Number(req.session?.factoryCompanyId);
   return Number.isSafeInteger(value) && value > 0 ? value : null;
 }
 
@@ -238,7 +238,7 @@ export function registerFactoryFrenchTranslationRoutes(app: Express) {
             WHERE company_id = ${companyId} AND UPPER(BTRIM(article_code)) = ${articleCode} AND deleted_at IS NULL
             RETURNING category_id AS "categoryId"
           `);
-          const categoryId = Number((product.rows[0] as any)?.categoryId);
+          const categoryId = Number(product.rows[0]?.categoryId);
           if (!product.rows[0]) continue;
           updatedProducts += 1;
           if (

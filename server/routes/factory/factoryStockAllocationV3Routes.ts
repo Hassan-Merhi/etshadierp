@@ -8,7 +8,7 @@ import { factoryV3Loads, factoryV3LoadBales } from "@shared/schema";
 import { requireAuth } from "../../auth";
 
 function getCompanyId(req: any): number | null {
-  return (req.session as any)?.factoryCompanyId || (req.session as any)?.currentCompanyId || null;
+  return req.session?.factoryCompanyId || req.session?.currentCompanyId || null;
 }
 
 function getUserInfo(req: any) {

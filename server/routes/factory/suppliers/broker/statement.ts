@@ -17,7 +17,7 @@ import { buildBrokerStatement } from "./_helpers";
 export function registerSupplierBrokerStatementRoutes(app: Express) {
   app.get("/api/factory/suppliers/:id/broker-statement", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const brokerId = parseId(req.params.id);
       if (brokerId === null) return res.status(400).json({ message: "Invalid id" });
@@ -33,7 +33,7 @@ export function registerSupplierBrokerStatementRoutes(app: Express) {
 
   app.get("/api/factory/suppliers/:id/broker-statement/export", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const brokerId = parseId(req.params.id);
       if (brokerId === null) return res.status(400).json({ message: "Invalid id" });
@@ -70,7 +70,7 @@ export function registerSupplierBrokerStatementRoutes(app: Express) {
         ws.properties.defaultRowHeight = 15;
 
         // Title row
-        const titleRow = ws.addRow([`Broker Statement — ${(data.supplier as any).name} — ${section.currencyCode}`]);
+        const titleRow = ws.addRow([`Broker Statement — ${data.supplier.name} — ${section.currencyCode}`]);
         titleRow.font = { bold: true, size: 13 };
         ws.mergeCells(`A${titleRow.number}:G${titleRow.number}`);
         ws.addRow([]);
@@ -108,10 +108,10 @@ export function registerSupplierBrokerStatementRoutes(app: Express) {
             row.date || "",
             typeLabel[row.type] || row.type,
             row.description,
-            parseFloat((row.amount as any).toFixed(2)),
-            row.commissionAmount != null ? parseFloat((row.commissionAmount as any).toFixed(2)) : "",
+            parseFloat(row.amount.toFixed(2)),
+            row.commissionAmount != null ? parseFloat(row.commissionAmount.toFixed(2)) : "",
             row.commissionCurrency || "",
-            parseFloat((row.runningBalance as any).toFixed(2)),
+            parseFloat(row.runningBalance.toFixed(2)),
           ]);
           dr.getCell("D").numFmt = "#,##0.00";
           dr.getCell("E").numFmt = "#,##0.00";
@@ -150,7 +150,7 @@ export function registerSupplierBrokerStatementRoutes(app: Express) {
 
       // Summary sheet
       const sumWs = wb.addWorksheet("Summary");
-      sumWs.addRow([`Broker Consolidated Statement — ${(data.supplier as any).name}`]).font = { bold: true, size: 13 };
+      sumWs.addRow([`Broker Consolidated Statement — ${data.supplier.name}`]).font = { bold: true, size: 13 };
       sumWs.addRow([
         `Generated: ${new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`,
       ]).font = { italic: true };
@@ -217,10 +217,7 @@ export function registerSupplierBrokerStatementRoutes(app: Express) {
       res.setHeader(
         "Content-Disposition",
         contentDisposition(
-          buildSafeFilename(
-            ["broker-statement", (data.supplier as any).name || String(brokerId), getClientDate(req)],
-            "xlsx"
-          )
+          buildSafeFilename(["broker-statement", data.supplier.name || String(brokerId), getClientDate(req)], "xlsx")
         )
       );
       res.setHeader("Content-Length", xlsBuffer.byteLength);

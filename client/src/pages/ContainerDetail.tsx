@@ -798,7 +798,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
         </div>
       );
     }
-    if (!spContainerData || (spContainerData as any).error) {
+    if (!spContainerData || spContainerData.error) {
       return (
         <div className="flex flex-col items-center justify-center min-h-[400px]">
           <Package className="w-16 h-16 text-muted-foreground mb-4" />
@@ -813,7 +813,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       );
     }
 
-    const spc = spContainerData as any;
+    const spc = spContainerData;
     const discFactor = 1 - parseFloat(spc.discountPct || "0") / 100;
     const baseCost = (spc.lines || []).reduce(
       (s: number, l: any) => s + parseFloat(l.qty || "0") * parseFloat(l.unitRateUsd || "0") * discFactor,

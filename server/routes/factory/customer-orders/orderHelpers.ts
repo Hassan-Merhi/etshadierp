@@ -87,7 +87,7 @@ export async function buildOrderExcelBuffer(
     .sort((a: any, b: any) => a.articleCode.localeCompare(b.articleCode));
   const anyPerKgH = helperLines.some((l: any) => l.pricingMode === "per_kg");
 
-  const baseCurrency = (company as any)?.baseCurrency || "USD";
+  const baseCurrency = company?.baseCurrency || "USD";
   const currencySymbolMap: Record<string, string> = {
     USD: "$",
     GBP: "£",
@@ -171,7 +171,7 @@ export async function buildOrderExcelBuffer(
     ["Invoice No.", invoiceNum],
     ["Customer", order.customerName || "-"],
     ["Date", orderDateFmt],
-    ["Container", (order as any).containerNumber || "-"],
+    ["Container", order.containerNumber || "-"],
   ]) {
     const dr = sheet.addRow(["", "", "", "", "", label, "", value]);
     dr.height = 20;

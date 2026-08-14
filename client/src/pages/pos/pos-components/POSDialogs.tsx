@@ -124,11 +124,17 @@ export function POSDialogs({
                         </p>
                         {count > 0 && (
                           <p className="text-xs text-muted-foreground font-medium">
-                            Total: ${totalAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            Total: $
+                            {totalAmount.toLocaleString("en-US", {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
                           </p>
                         )}
                         <p className="text-xs text-muted-foreground">
-                          {new Date(draft.updated_at || draft.updatedAt || draft.created_at || draft.createdAt).toLocaleString()}
+                          {new Date(
+                            draft.updated_at || draft.updatedAt || draft.created_at || draft.createdAt
+                          ).toLocaleString()}
                         </p>
                       </>
                     );
@@ -203,7 +209,7 @@ export function POSDialogs({
                 New Sale
               </Button>
             )}
-            {(activeLocation as any)?.whatsappGroupChatId &&
+            {activeLocation?.whatsappGroupChatId &&
               (() => {
                 if (invoiceWaStatus === "sending") {
                   return (
@@ -243,7 +249,7 @@ export function POSDialogs({
               })()}
             {!editVoucherId &&
               (() => {
-                const hasWa = !!(activeLocation as any)?.whatsappGroupChatId;
+                const hasWa = !!activeLocation?.whatsappGroupChatId;
                 if (stockWaStatus === "sending") {
                   return (
                     <Button variant="outline" disabled className="gap-2" data-testid="button-stock-wa-sending">
@@ -308,7 +314,7 @@ export function POSDialogs({
           <AlertDialogHeader>
             <AlertDialogTitle>Location Stock Report</AlertDialogTitle>
             <AlertDialogDescription>
-              View and share current stock levels for {(activeLocation as any)?.name}.
+              View and share current stock levels for {activeLocation?.name}.
             </AlertDialogDescription>
           </AlertDialogHeader>
 
@@ -354,7 +360,7 @@ export function POSDialogs({
             <Button
               variant="outline"
               onClick={handleSendWhatsAppReport}
-              disabled={sendingWhatsApp || !(activeLocation as any)?.whatsappGroupChatId}
+              disabled={sendingWhatsApp || !activeLocation?.whatsappGroupChatId}
               className="gap-2"
               data-testid="button-share-stock-wa"
             >
@@ -384,7 +390,7 @@ export function POSDialogs({
           <div className="text-center border-b-2 border-black pb-4 mb-4">
             <h1 className="text-2xl font-bold uppercase">Stock Level Report</h1>
             <p className="text-lg">
-              Location: {(activeLocation as any)?.name} ({(activeLocation as any)?.code})
+              Location: {activeLocation?.name} ({activeLocation?.code})
             </p>
             <p className="text-sm">Printed: {new Date().toLocaleString()}</p>
           </div>

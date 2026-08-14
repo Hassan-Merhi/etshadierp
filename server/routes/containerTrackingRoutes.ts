@@ -45,7 +45,7 @@ function isInactiveStatus(status: string): boolean {
 }
 
 function requireAllowedRole(req: Request, res: Response): boolean {
-  const role = (req.user as any)?.role;
+  const role = req.user?.role;
   if (!ALLOWED_ROLES.includes(role as any)) {
     res.status(403).json({ message: "Insufficient permissions" });
     return false;
@@ -377,7 +377,7 @@ export function registerContainerTrackingRoutes(app: Express) {
           status: r.latestStatus,
           error: r.error ?? null,
           deepScanPath: deepEta?.path ?? null,
-          blocked: (r as any).blocked ?? false,
+          blocked: r.blocked ?? false,
         });
       } catch (e: unknown) {
         providersAttempted.push({
@@ -413,7 +413,7 @@ export function registerContainerTrackingRoutes(app: Express) {
         status: r.latestStatus,
         error: r.error ?? null,
         deepScanPath: deepEta?.path ?? null,
-        blocked: (r as any).blocked ?? false,
+        blocked: r.blocked ?? false,
       });
     } catch (e: unknown) {
       providersAttempted.push({ provider: "maersk_public", success: false, etaFound: null, error: getErrorMessage(e) });

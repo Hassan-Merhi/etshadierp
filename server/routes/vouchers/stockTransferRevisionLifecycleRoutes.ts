@@ -43,7 +43,11 @@ function errorStatus(error: unknown): number {
     return 409;
   }
   if (/different company|own source location/i.test(message)) return 403;
-  if (/required|positive|non-negative|different|missing|deleted|not found|not a stock transfer|inactive|no effective/i.test(message)) {
+  if (
+    /required|positive|non-negative|different|missing|deleted|not found|not a stock transfer|inactive|no effective/i.test(
+      message
+    )
+  ) {
     return 400;
   }
   return 500;
@@ -86,9 +90,7 @@ export function registerStockTransferRevisionLifecycleRoutes(app: Express) {
         const parsed = pendingRevisionSchema.parse(req.body);
         const role = req.user?.role ?? req.session.currentRole;
         const assignedLocationId =
-          role === "POS"
-            ? Number(req.user?.assignedLocationId ?? req.session.currentLocationId ?? 0) || null
-            : null;
+          role === "POS" ? Number(req.user?.assignedLocationId ?? req.session.currentLocationId ?? 0) || null : null;
         if (role === "POS" && !assignedLocationId) {
           return res.status(403).json({ message: "POS user has no assigned source location" });
         }
@@ -112,7 +114,7 @@ export function registerStockTransferRevisionLifecycleRoutes(app: Express) {
         try {
           await logAudit({
             userId,
-            username: (req.session as any).username || (req.user as any)?.username || "unknown",
+            username: req.session.username || req.user?.username || "unknown",
             companyId,
             action: "update",
             tableName: "stock_transfer_revisions",
@@ -161,7 +163,9 @@ export function registerStockTransferRevisionLifecycleRoutes(app: Express) {
               voucherDate: result.voucherDate,
             });
           } catch (error: unknown) {
-            logger.error("[RevisedTransferWA] Failed to send safe pending revision:", { error: getErrorMessage(error) });
+            logger.error("[RevisedTransferWA] Failed to send safe pending revision:", {
+              error: getErrorMessage(error),
+            });
           }
         });
       } catch (error) {
@@ -195,7 +199,7 @@ export function registerStockTransferRevisionLifecycleRoutes(app: Express) {
         try {
           await logAudit({
             userId: String(req.user?.id ?? req.session.userId ?? "unknown"),
-            username: (req.session as any).username || (req.user as any)?.username || "unknown",
+            username: req.session.username || req.user?.username || "unknown",
             companyId,
             action: "update",
             tableName: "stock_transfer_revisions",

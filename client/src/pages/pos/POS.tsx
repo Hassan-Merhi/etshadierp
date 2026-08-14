@@ -176,7 +176,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   // Supplier Partner companies too, same as normal ERP POS.
   useEffect(() => {
     if (editVoucherId) return;
-    const locCashId = (posSelectedLocation as any)?.cashAccountId;
+    const locCashId = posSelectedLocation?.cashAccountId;
     if (posUser && locCashId) {
       setPaymentAccountType("cash");
       setPaymentAccountId(String(locCashId));

@@ -50,7 +50,7 @@ export default function BarcodeManager() {
       toast({ title: `Imported ${data.count} barcodes` });
     },
     onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Import failed", description: error.message, variant: "destructive" });
     },
   });

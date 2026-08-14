@@ -27,7 +27,7 @@ export function registerSupplierBalanceSingleRoutes(app: Express) {
   app.get("/api/factory/suppliers/:id/balance", requireAuth, async (req: Request, res: Response) => {
     res.set("Cache-Control", "no-store");
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const supplierId = parseId(req.params.id);
       if (supplierId === null) return res.status(400).json({ message: "Invalid id" });
@@ -37,7 +37,7 @@ export function registerSupplierBalanceSingleRoutes(app: Express) {
       const allSuppliers = await db.select().from(factorySuppliers).where(eq(factorySuppliers.companyId, companyId));
       const supplier = allSuppliers.find((s) => s.id === supplierId);
       if (!supplier) return res.status(404).json({ message: "Supplier not found" });
-      const children = allSuppliers.filter((s) => (s as any).parentId === supplierId);
+      const children = allSuppliers.filter((s) => s.parentId === supplierId);
       const supplierIds = [supplierId, ...children.map((c) => c.id)];
 
       // Load all containers, payments, and FX transfers for the relevant supplier IDs
@@ -114,17 +114,17 @@ export function registerSupplierBalanceSingleRoutes(app: Express) {
       // Charges posted to a ledger account have supplierId=null and must NOT appear on any supplier balance.
       const offloadAdditionalChargesForSupplier = await db
         .select({
-          supplierId: (factoryOffloadAdditionalCharges as any).supplierId,
+          supplierId: factoryOffloadAdditionalCharges.supplierId,
           amount: factoryOffloadAdditionalCharges.amount,
           currencyCode: factoryOffloadAdditionalCharges.currencyCode,
           fxRateToUsd: factoryOffloadAdditionalCharges.fxRateToUsd,
-          fxRateConfirmed: (factoryOffloadAdditionalCharges as any).fxRateConfirmed,
+          fxRateConfirmed: factoryOffloadAdditionalCharges.fxRateConfirmed,
         })
         .from(factoryOffloadAdditionalCharges)
         .where(
           and(
             eq(factoryOffloadAdditionalCharges.companyId, companyId),
-            sql`${(factoryOffloadAdditionalCharges as any).supplierId} = ANY(${sqlArray(supplierIds)})`
+            sql`${factoryOffloadAdditionalCharges.supplierId} = ANY(${sqlArray(supplierIds)})`
           )
         );
 
@@ -143,7 +143,7 @@ export function registerSupplierBalanceSingleRoutes(app: Express) {
           const { fxRate: fx, looksSet: fxLooksSet } = resolveStoredFxRate(
             containerCc,
             c.fxRateToUsd,
-            (c as any).fxRateConfirmed
+            c.fxRateConfirmed
           );
           if (!fxLooksSet) balanceFxUnresolved.add(sid);
           const freightCc = c.freightCurrencyCode || containerCc;
@@ -165,7 +165,7 @@ export function registerSupplierBalanceSingleRoutes(app: Express) {
             const { fxRate: commFx, looksSet: commFxLooksSet } = resolveStoredFxRate(
               commCurr,
               c.fxRateToUsd,
-              (c as any).fxRateConfirmed
+              c.fxRateConfirmed
             );
             if (!commFxLooksSet) {
               balanceFxUnresolved.add(sid);
@@ -178,7 +178,7 @@ export function registerSupplierBalanceSingleRoutes(app: Express) {
           const { fxRate: commFx, looksSet: commFxLooksSet } = resolveStoredFxRate(
             commCurr,
             c.commissionFxRateToUsd,
-            (c as any).commissionFxRateConfirmed
+            c.commissionFxRateConfirmed
           );
           if (!commFxLooksSet) {
             balanceFxUnresolved.add(sid);
@@ -191,9 +191,9 @@ export function registerSupplierBalanceSingleRoutes(app: Express) {
           if (c.otherChargesSupplierId !== sid) return sum;
           const oc = parseFloat(c.otherCharges || "0");
           if (oc <= 0) return sum;
-          const ocCcy = (c as any).otherChargesCurrencyCode || "USD";
+          const ocCcy = c.otherChargesCurrencyCode || "USD";
           if (ocCcy === "USD") return sum + oc;
-          const { fxRate: fx, looksSet } = resolveStoredFxRate(ocCcy, c.fxRateToUsd, (c as any).fxRateConfirmed);
+          const { fxRate: fx, looksSet } = resolveStoredFxRate(ocCcy, c.fxRateToUsd, c.fxRateConfirmed);
           if (!looksSet) {
             balanceFxUnresolved.add(sid);
             return sum;

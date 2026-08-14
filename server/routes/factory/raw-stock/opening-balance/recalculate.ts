@@ -30,7 +30,7 @@ export function registerRawStockRecalculateUsedRoutes(app: Express) {
   app.post("/api/factory/raw-stock/recalculate-used", requireAuth, async (req: any, res: any) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const dryRun = req.body?.confirm !== true;
 
@@ -239,7 +239,7 @@ export function registerRawStockRecalculateUsedRoutes(app: Express) {
   app.post("/api/factory/raw-stock/recalculate-bale-costs", requireAuth, async (req: any, res: any) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const dryRun = req.body?.confirm !== true;
 

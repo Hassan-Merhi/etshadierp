@@ -34,7 +34,7 @@ export function registerRawStockZeroCostSourceRoutes(app: Express) {
     requireRole(...ADMIN_ROLES),
     async (req: any, res: any) => {
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
         const rows = await getZeroCostMixBatchSourcesPreview(companyId);
         res.json(rows);
@@ -58,7 +58,7 @@ export function registerRawStockZeroCostSourceRoutes(app: Express) {
     requireRole(...ADMIN_ROLES),
     async (req: any, res: any) => {
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
         const { sourceIds, manualRates, confirm, confirmationToken } = req.body;
         if (!Array.isArray(sourceIds) || sourceIds.length === 0) {

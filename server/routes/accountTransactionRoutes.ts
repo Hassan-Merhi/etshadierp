@@ -138,7 +138,7 @@ export function registerAccountTransactionRoutes(app: Express) {
       const companyId = bankAccount.companyId;
 
       // Authorize: confirm the logged-in user can access this company
-      const authorizedCompanyId = await authorizeCompanyIdParam(req as any, companyId);
+      const authorizedCompanyId = await authorizeCompanyIdParam(req, companyId);
       if (authorizedCompanyId === null) {
         return res.status(403).json({ message: "No access to this account's company" });
       }
@@ -200,7 +200,7 @@ export function registerAccountTransactionRoutes(app: Express) {
       const companyId = fixedAsset.companyId;
 
       // Authorize: confirm the logged-in user can access this company
-      const authorizedCompanyId = await authorizeCompanyIdParam(req as any, companyId);
+      const authorizedCompanyId = await authorizeCompanyIdParam(req, companyId);
       if (authorizedCompanyId === null) {
         return res.status(403).json({ message: "No access to this account's company" });
       }
@@ -262,7 +262,7 @@ export function registerAccountTransactionRoutes(app: Express) {
       // must be authorized against the user's actual company access — never
       // trusted blindly (it would otherwise let one company's session peek at
       // another company's supplier ledger).
-      const filterCompanyId = await authorizeCompanyIdParam(req as any, requestedCompanyId);
+      const filterCompanyId = await authorizeCompanyIdParam(req, requestedCompanyId);
       if (requestedCompanyId && filterCompanyId === null) {
         return res.status(403).json({ message: "No access to this company" });
       }
@@ -334,7 +334,7 @@ export function registerAccountTransactionRoutes(app: Express) {
       const companyId = employee.companyId;
 
       // Authorize: confirm the logged-in user can access this company
-      const authorizedCompanyId = await authorizeCompanyIdParam(req as any, companyId);
+      const authorizedCompanyId = await authorizeCompanyIdParam(req, companyId);
       if (authorizedCompanyId === null) {
         return res.status(403).json({ message: "No access to this account's company" });
       }
@@ -391,7 +391,7 @@ export function registerAccountTransactionRoutes(app: Express) {
       const companyId = customer.companyId;
 
       // Authorize: confirm the logged-in user can access this company
-      const authorizedCompanyId = await authorizeCompanyIdParam(req as any, companyId);
+      const authorizedCompanyId = await authorizeCompanyIdParam(req, companyId);
       if (authorizedCompanyId === null) {
         return res.status(403).json({ message: "No access to this account's company" });
       }

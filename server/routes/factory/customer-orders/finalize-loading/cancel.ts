@@ -19,7 +19,7 @@ import { eq, and, sql } from "drizzle-orm";
 export function registerOrderCancelRoutes(app: Express) {
   app.post("/api/factory/customer-orders/:id/cancel", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseId(req.params.id);
@@ -92,7 +92,7 @@ export function registerOrderCancelRoutes(app: Express) {
                 eq(factoryDaybookEntries.referenceId, orderId)
               )
             );
-          const cancelledBy = (req.session as any)?.username || "user";
+          const cancelledBy = req.session?.username || "user";
           await writeDaybookEntry(db, {
             companyId,
             txDate: cancelToday,
@@ -103,7 +103,7 @@ export function registerOrderCancelRoutes(app: Express) {
           try {
             await logAudit({
               userId: req.session.userId!,
-              username: (req.session as any).username || req.session.userId!,
+              username: req.session.username || req.session.userId!,
               companyId,
               action: "update",
               tableName: "factory_customer_orders",
@@ -164,7 +164,7 @@ export function registerOrderCancelRoutes(app: Express) {
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || req.session.userId!,
+          username: req.session.username || req.session.userId!,
           companyId,
           action: "update",
           tableName: "factory_customer_orders",
@@ -186,7 +186,7 @@ export function registerOrderCancelRoutes(app: Express) {
   // Restore a recently-cancelled LOADING order back to LOADING status
   app.post("/api/factory/customer-orders/:id/restore-loading", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseId(req.params.id);
@@ -234,7 +234,7 @@ export function registerOrderCancelRoutes(app: Express) {
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || req.session.userId!,
+          username: req.session.username || req.session.userId!,
           companyId,
           action: "update",
           tableName: "factory_customer_orders",

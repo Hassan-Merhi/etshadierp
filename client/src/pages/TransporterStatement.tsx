@@ -538,7 +538,7 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
           ) : statementError ? (
             <div className="flex flex-col items-center justify-center h-48 gap-2 text-destructive print:hidden">
               <p className="text-sm font-medium">Failed to load statement</p>
-              <p className="text-xs text-muted-foreground">{(statementErrorObj as any)?.message ?? "Unknown error"}</p>
+              <p className="text-xs text-muted-foreground">{statementErrorObj?.message ?? "Unknown error"}</p>
             </div>
           ) : (
             <Table>

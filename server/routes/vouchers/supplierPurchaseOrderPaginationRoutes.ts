@@ -50,7 +50,7 @@ export function registerSupplierPurchaseOrderPaginationRoutes(app: Express): voi
         typeof req.query.companyId === "string"
           ? Number.parseInt(req.query.companyId, 10)
           : req.session.currentCompanyId;
-      const companyId = await authorizeCompanyIdParam(req as any, requestedCompanyId);
+      const companyId = await authorizeCompanyIdParam(req, requestedCompanyId);
       if (companyId === null) {
         return res.status(403).json({ message: "No access to this company" });
       }

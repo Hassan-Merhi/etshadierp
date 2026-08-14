@@ -349,7 +349,7 @@ app.use((req, res, next) => {
 // CSRF_ENFORCE=0 to fall back to warn-only mode if a regression surfaces.
 const CSRF_ENFORCE = process.env.CSRF_ENFORCE !== "0";
 app.get("/api/csrf-token", (req, res) => {
-  const sess = req.session as any;
+  const sess = req.session;
   if (!sess.csrfToken) {
     sess.csrfToken = randomBytes(32).toString("hex");
   }
@@ -362,7 +362,7 @@ app.use((req, res, next) => {
   if (ORIGIN_GUARD_EXEMPT_PATHS.has(req.path)) return next();
   if (req.path === "/api/csrf-token") return next();
 
-  const sess = req.session as any;
+  const sess = req.session;
   const expected: string | undefined = sess?.csrfToken;
   const got = req.headers["x-csrf-token"];
 

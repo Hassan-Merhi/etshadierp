@@ -15,7 +15,7 @@ import { eq, and, asc, sql } from "drizzle-orm";
 import { z } from "zod";
 
 function getCompanyId(req: Request): number | null {
-  const s = (req as any).session;
+  const s = req.session;
   return s?.factoryCompanyId || s?.currentCompanyId || null;
 }
 
@@ -211,7 +211,7 @@ export function registerFactoryTransporterRoutes(app: Express) {
             companyId,
             voucherNumber: `TRANS-CHG-${Date.now()}-${transporterId}`,
             voucherType: "Payment",
-            voucherDate: txDate as any,
+            voucherDate: txDate,
             description: narration,
             totalAmount: amount,
             currency: "USD",
@@ -237,7 +237,7 @@ export function registerFactoryTransporterRoutes(app: Express) {
             transporterId,
             txType: "charge",
             amount,
-            txDate: txDate as any,
+            txDate: txDate,
             description: narration,
             expenseAccountId,
             voucherId: v.id,
@@ -286,7 +286,7 @@ export function registerFactoryTransporterRoutes(app: Express) {
             companyId,
             voucherNumber: `TRANS-PAY-${Date.now()}-${transporterId}`,
             voucherType: "Payment",
-            voucherDate: txDate as any,
+            voucherDate: txDate,
             description: narration,
             totalAmount: amount,
             currency: "USD",
@@ -312,7 +312,7 @@ export function registerFactoryTransporterRoutes(app: Express) {
             transporterId,
             txType: "payment",
             amount,
-            txDate: txDate as any,
+            txDate: txDate,
             description: narration,
             cashAccountId,
             voucherId: v.id,

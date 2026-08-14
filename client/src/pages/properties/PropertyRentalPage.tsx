@@ -78,9 +78,9 @@ export default function PropertyRentalPage({
         totalGuarantee += (u as any).guaranteeRemaining ?? Number(u.contract.guaranteeAmount || 0);
         const outstanding = u.outstanding ?? 0;
         if (outstanding > 0) totalOwed += outstanding;
-        totalCredit += (u as any).prepaidCredit ?? 0;
-        totalPaid += (u as any).totalPaid ?? 0;
-        if (u.contract.status === "ACTIVE" || !(u.contract as any).status) {
+        totalCredit += u.prepaidCredit ?? 0;
+        totalPaid += u.totalPaid ?? 0;
+        if (u.contract.status === "ACTIVE" || !u.contract.status) {
           totalMonthlyRent += Number(u.contract.rentalAmount || 0);
         }
       }
@@ -496,7 +496,7 @@ export default function PropertyRentalPage({
                                       (u.outstanding ?? 0) > 0
                                         ? u.outstanding!
                                         : (u as any).prepaidCredit > 0
-                                          ? (u as any).prepaidCredit
+                                          ? u.prepaidCredit
                                           : 0,
                                       u.contract?.currency
                                     )
@@ -504,13 +504,11 @@ export default function PropertyRentalPage({
                               </td>
                               <td className="px-3 py-2 text-right tabular-nums text-muted-foreground text-xs">
                                 {(u as any).scheduledAmount > 0
-                                  ? fmtMoneyCurrency((u as any).scheduledAmount, u.contract?.currency)
+                                  ? fmtMoneyCurrency(u.scheduledAmount, u.contract?.currency)
                                   : "—"}
                               </td>
                               <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">
-                                {(u as any).nextBillingDate
-                                  ? format(new Date((u as any).nextBillingDate + "T00:00:00Z"), "dd MMM")
-                                  : "—"}
+                                {u.nextBillingDate ? format(new Date(u.nextBillingDate + "T00:00:00Z"), "dd MMM") : "—"}
                               </td>
                               <td className="px-3 py-2 text-xs text-muted-foreground">
                                 {u.contract ? format(new Date(u.contract.startDate), "dd MMM yyyy") : "—"}

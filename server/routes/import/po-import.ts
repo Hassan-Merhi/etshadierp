@@ -722,7 +722,7 @@ export function registerPoImportRoutes(app: Express) {
             chargesEdited: hasAnyCharges,
             freightPaidBy: resolvedFreightPaidBy,
             freightParentAccountId: resolvedFreightPaidBy === "parent" ? resolvedFreightParentAccountId : null,
-          } as any,
+          },
           getClientDate(req)
         );
 

@@ -62,7 +62,7 @@ export function registerPasskeyRoutes(app: Express) {
         },
       });
 
-      (req.session as any).passkeyChallenge = options.challenge;
+      req.session.passkeyChallenge = options.challenge;
       res.json(options);
     } catch (err: unknown) {
       res.status(500).json({ message: getErrorMessage(err) });
@@ -73,7 +73,7 @@ export function registerPasskeyRoutes(app: Express) {
   app.post("/api/auth/passkey/register/verify", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
-      const challenge = (req.session as any).passkeyChallenge;
+      const challenge = req.session.passkeyChallenge;
       if (!challenge) return res.status(400).json({ message: "No challenge in session" });
 
       const verification = await verifyRegistrationResponse({
@@ -99,7 +99,7 @@ export function registerPasskeyRoutes(app: Express) {
         ON CONFLICT (credential_id) DO NOTHING
       `);
 
-      delete (req.session as any).passkeyChallenge;
+      delete req.session.passkeyChallenge;
       res.json({ verified: true });
     } catch (err: unknown) {
       res.status(500).json({ message: getErrorMessage(err) });
@@ -130,7 +130,7 @@ export function registerPasskeyRoutes(app: Express) {
         userVerification: "preferred",
       });
 
-      (req.session as any).passkeyChallenge = options.challenge;
+      req.session.passkeyChallenge = options.challenge;
       res.json(options);
     } catch (err: unknown) {
       res.status(500).json({ message: getErrorMessage(err) });
@@ -140,7 +140,7 @@ export function registerPasskeyRoutes(app: Express) {
   // ── Authentication verify ────────────────────────────────────────────────
   app.post("/api/auth/passkey/authenticate/verify", async (req: Request, res: Response) => {
     try {
-      const challenge = (req.session as any).passkeyChallenge;
+      const challenge = req.session.passkeyChallenge;
       if (!challenge) return res.status(400).json({ message: "No challenge in session" });
 
       const credId = req.body.id;
@@ -198,11 +198,11 @@ export function registerPasskeyRoutes(app: Express) {
 
       req.session.userId = userId;
       req.session.username = cred.username;
-      (req.session as any).csrfToken = randomBytes(32).toString("hex");
-      (req.session as any).ip =
+      req.session.csrfToken = randomBytes(32).toString("hex");
+      req.session.ip =
         (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || null;
-      (req.session as any).userAgent = req.headers["user-agent"] || null;
-      (req.session as any).loginAt = new Date().toISOString();
+      req.session.userAgent = req.headers["user-agent"] || null;
+      req.session.loginAt = new Date().toISOString();
 
       if (userCompanies.length > 0) {
         const fc = userCompanies[0] as any;
@@ -215,7 +215,7 @@ export function registerPasskeyRoutes(app: Express) {
         req.session.daybookEditDays = fc.daybookEditDays;
         req.session.canAccessCustomers = fc.canAccessCustomers;
         req.session.canDeleteRecords = fc.canDeleteRecords;
-        (req.session as any).currentCompanyName = fc.companyName || null;
+        req.session.currentCompanyName = fc.companyName || null;
       }
 
       const { password: _pw, ...userWithoutPassword } = userRecord;

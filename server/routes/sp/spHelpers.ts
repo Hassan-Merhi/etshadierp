@@ -9,7 +9,7 @@ import { firstRow } from "../../lib/queryResult";
 // byte-for-byte identical to what every SP route sub-module previously used.
 
 export function getCompanyId(req: any): number | null {
-  return (req.session as any)?.currentCompanyId ?? null;
+  return req.session?.currentCompanyId ?? null;
 }
 
 export async function requireSpCompany(req: Request, res: Response): Promise<number | null> {

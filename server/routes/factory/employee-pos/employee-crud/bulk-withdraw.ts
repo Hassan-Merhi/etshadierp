@@ -15,7 +15,7 @@ export function registerFactoryEmployeeBulkWithdrawRoutes(app: Express) {
   // POST /api/factory/employees/bulk-withdraw — withdraw from multiple employees at once
   app.post("/api/factory/employees/bulk-withdraw", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { withdrawals, date, notes, cashAccountId } = req.body;
       if (!withdrawals || !Array.isArray(withdrawals) || withdrawals.length === 0)

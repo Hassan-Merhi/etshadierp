@@ -172,7 +172,7 @@ export function DailyRateModal({ companyId }: DailyRateModalProps) {
       setIsOpen(false);
     },
     onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -206,10 +206,7 @@ export function DailyRateModal({ companyId }: DailyRateModalProps) {
           </DialogTitle>
           <DialogDescription>
             No exchange rate has been set for today (
-            {format(
-              todayRateCheck?.today ? new Date(`${todayRateCheck.today}T00:00:00`) : new Date(),
-              "MMM d, yyyy"
-            )}
+            {format(todayRateCheck?.today ? new Date(`${todayRateCheck.today}T00:00:00`) : new Date(), "MMM d, yyyy")}
             ).
           </DialogDescription>
         </DialogHeader>

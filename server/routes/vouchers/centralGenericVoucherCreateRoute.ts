@@ -108,7 +108,7 @@ async function createCentralGenericVoucher(req: Request, res: Response, next: Ne
         exchangeRate: voucherExchangeRate,
         actor: {
           userId: userId ?? null,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           reason: "Generic voucher creation",
         },
       });
@@ -132,7 +132,7 @@ async function createCentralGenericVoucher(req: Request, res: Response, next: Ne
         const entrySnapshot = await snapshotVoucherEntries(posted.entries);
         await logAudit({
           userId: userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId,
           action: "create",
           tableName: "vouchers",

@@ -233,12 +233,12 @@ export function ContainerListView({
                 const count = groupContainers.length;
                 const groupTotals = new Map<string, number>();
                 for (const c of groupContainers) {
-                  const ccy = (c as any).currencyCode || "USD";
+                  const ccy = c.currencyCode || "USD";
                   const baseValue = parseFloat(c.totalKg || "0") * parseFloat(c.ratePerKg || "0");
-                  const freightAmt = parseFloat((c as any).freight || "0");
-                  const freightCcy = (c as any).freightCurrencyCode || ccy;
+                  const freightAmt = parseFloat(c.freight || "0");
+                  const freightCcy = c.freightCurrencyCode || ccy;
                   const freightSameCcy = freightCcy === ccy;
-                  const legacyOtherAmt = parseFloat((c as any).otherCharges || "0");
+                  const legacyOtherAmt = parseFloat(c.otherCharges || "0");
                   const preRegisteredAmt = parseFloat((c as any).preRegisteredChargesSum || "0");
                   const additionalAmt = parseFloat((c as any).additionalChargesSum || "0");
                   const totalInCcy =
@@ -285,14 +285,14 @@ export function ContainerListView({
                   </TableRow>,
                   ...(isExpanded
                     ? groupContainers.map((c) => {
-                        const commAmt = parseFloat((c as any).commissionAmount || "0");
-                        const commCcy = (c as any).commissionCurrencyCode || "USD";
-                        const ccy = (c as any).currencyCode || "USD";
+                        const commAmt = parseFloat(c.commissionAmount || "0");
+                        const commCcy = c.commissionCurrencyCode || "USD";
+                        const ccy = c.currencyCode || "USD";
                         const baseValue = parseFloat(c.totalKg || "0") * parseFloat(c.ratePerKg || "0");
-                        const freightAmt = parseFloat((c as any).freight || "0");
-                        const freightCcy = (c as any).freightCurrencyCode || ccy;
+                        const freightAmt = parseFloat(c.freight || "0");
+                        const freightCcy = c.freightCurrencyCode || ccy;
                         const freightSameCcy = freightCcy === ccy;
-                        const legacyOtherAmt = parseFloat((c as any).otherCharges || "0");
+                        const legacyOtherAmt = parseFloat(c.otherCharges || "0");
                         const preRegisteredAmt = parseFloat((c as any).preRegisteredChargesSum || "0");
                         const additionalAmt = parseFloat((c as any).additionalChargesSum || "0");
                         const totalValue =

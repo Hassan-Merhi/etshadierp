@@ -76,7 +76,7 @@ export function registerBankAssetRoutes(app: Express) {
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId: req.session.currentCompanyId!,
           action: "create",
           tableName: "bank_accounts",
@@ -85,8 +85,8 @@ export function registerBankAssetRoutes(app: Express) {
           changes: {
             name: { old: undefined, new: account.name },
             code: { old: undefined, new: account.code },
-            bankName: { old: undefined, new: (account as any).bankName || null },
-            accountNumber: { old: undefined, new: (account as any).accountNumber || null },
+            bankName: { old: undefined, new: account.bankName || null },
+            accountNumber: { old: undefined, new: account.accountNumber || null },
             openingBalance: { old: undefined, new: account.openingBalance || "0" },
             openingBalanceSide: { old: undefined, new: account.openingBalanceSide || null },
           },
@@ -127,13 +127,13 @@ export function registerBankAssetRoutes(app: Express) {
         if (existingBankAcc) {
           const _bankChanges: Record<string, { old?: any; new?: any }> = {};
           for (const _f of ["name", "code", "openingBalance", "openingBalanceSide"] as const) {
-            if (String((existingBankAcc as any)[_f] ?? "") !== String((account as any)[_f] ?? "")) {
-              _bankChanges[_f] = { old: (existingBankAcc as any)[_f], new: (account as any)[_f] };
+            if (String(existingBankAcc[_f] ?? "") !== String(account[_f] ?? "")) {
+              _bankChanges[_f] = { old: existingBankAcc[_f], new: account[_f] };
             }
           }
           await logAudit({
             userId: req.session.userId!,
-            username: (req.session as any).username || "unknown",
+            username: req.session.username || "unknown",
             companyId: req.session.currentCompanyId!,
             action: "update",
             tableName: "bank_accounts",
@@ -164,7 +164,7 @@ export function registerBankAssetRoutes(app: Express) {
         if (existingBankAccDel) {
           await logAudit({
             userId: req.session.userId!,
-            username: (req.session as any).username || "unknown",
+            username: req.session.username || "unknown",
             companyId: req.session.currentCompanyId!,
             action: "delete",
             tableName: "bank_accounts",

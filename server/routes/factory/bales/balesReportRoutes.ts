@@ -24,7 +24,7 @@ export function registerBalesReportRoutes(app: Express) {
   // Much faster than the full /api/factory/bales endpoint which returns up to 2000 rows.
   app.get("/api/factory/bales/daily-summary", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { date } = req.query as Record<string, string>;
       if (!date) return res.status(400).json({ message: "date is required (YYYY-MM-DD)" });
@@ -49,11 +49,10 @@ export function registerBalesReportRoutes(app: Express) {
 
   app.get("/api/factory/bales/stock-entry-history", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const userRole =
-        ((req.session as any).currentRole as string) || ((req.session as any).factoryRole as string) || "";
+      const userRole = (req.session.currentRole as string) || (req.session.factoryRole as string) || "";
       const isPrivileged = ["Admin", "Owner", "Manager", "Developer"].includes(userRole);
 
       const {
@@ -185,9 +184,9 @@ export function registerBalesReportRoutes(app: Express) {
           `),
           db.execute(countQuery),
         ]);
-        const total = parseInt(String((countResult.rows[0] as any)?.total ?? "0"), 10);
-        const totalBales = parseInt(String((countResult.rows[0] as any)?.total_bales ?? "0"), 10);
-        const totalWeight = parseFloat(String((countResult.rows[0] as any)?.total_weight ?? "0"));
+        const total = parseInt(String(countResult.rows[0]?.total ?? "0"), 10);
+        const totalBales = parseInt(String(countResult.rows[0]?.total_bales ?? "0"), 10);
+        const totalWeight = parseFloat(String(countResult.rows[0]?.total_weight ?? "0"));
         const items = liteResult.rows.map((r) => ({ ...r, bales: [] }));
         return res.json(buildPaginatedResponse(items, total, totalBales, totalWeight));
       }
@@ -229,9 +228,9 @@ export function registerBalesReportRoutes(app: Express) {
         db.execute(countQuery),
       ]);
 
-      const total = parseInt(String((countResult.rows[0] as any)?.total ?? "0"), 10);
-      const totalBales = parseInt(String((countResult.rows[0] as any)?.total_bales ?? "0"), 10);
-      const totalWeight = parseFloat(String((countResult.rows[0] as any)?.total_weight ?? "0"));
+      const total = parseInt(String(countResult.rows[0]?.total ?? "0"), 10);
+      const totalBales = parseInt(String(countResult.rows[0]?.total_bales ?? "0"), 10);
+      const totalWeight = parseFloat(String(countResult.rows[0]?.total_weight ?? "0"));
       res.json(buildPaginatedResponse(dataResult.rows, total, totalBales, totalWeight));
     } catch (error: unknown) {
       logger.error("Error fetching stock entry history:", { error: error });
@@ -242,11 +241,10 @@ export function registerBalesReportRoutes(app: Express) {
   // ── Stock Entry History: PDF Export ──────────────────────────────────────
   app.get("/api/factory/bales/stock-entry-history/export-pdf", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const userRole =
-        ((req.session as any).currentRole as string) || ((req.session as any).factoryRole as string) || "";
+      const userRole = (req.session.currentRole as string) || (req.session.factoryRole as string) || "";
       const isPrivileged = ["Admin", "Owner", "Manager", "Developer"].includes(userRole);
 
       const { startDate, endDate, workerId, productId, locationId, status, search, includeUnassigned } =
@@ -467,7 +465,7 @@ export function registerBalesReportRoutes(app: Express) {
 
   app.get("/api/factory/bales/lookup/:barcode", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const barcode = req.params.barcode.toUpperCase();
@@ -540,7 +538,7 @@ export function registerBalesReportRoutes(app: Express) {
 
   app.get("/api/factory/production-summary", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const allBales = await db
@@ -609,7 +607,7 @@ export function registerBalesReportRoutes(app: Express) {
 
   app.get("/api/factory/dashboard-kpis", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const todayStart = new Date();

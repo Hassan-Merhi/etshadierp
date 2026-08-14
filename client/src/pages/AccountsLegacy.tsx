@@ -517,7 +517,7 @@ export default function Accounts() {
   // Cr opening balances must be negated (convention: positive = Dr, negative = Cr).
   const broughtForwardBalance = useMemo(() => {
     const rawOB = parseFloat(String(selectedAccount?.openingBalance ?? 0)) || 0;
-    const obSide = (selectedAccount as any)?.openingBalanceSide || "Dr";
+    const obSide = selectedAccount?.openingBalanceSide || "Dr";
     const storedOB = obSide === "Cr" ? -rawOB : rawOB;
     if (!rawTransactionData || Array.isArray(rawTransactionData)) return storedOB;
     return storedOB + (rawTransactionData.preNetBalance ?? 0);
@@ -798,7 +798,7 @@ export default function Accounts() {
                     editForm.reset({
                       code: account.code,
                       name: account.name,
-                      accountType: (account.accountType || account.type || "") as any,
+                      accountType: account.accountType || account.type || "",
                       subType: account.subType || "",
                       openingBalance: String(Math.abs(account.openingBalance || 0)),
                       openingBalanceSide: (account.openingBalanceSide as "Dr" | "Cr") || "Dr",
@@ -825,9 +825,9 @@ export default function Accounts() {
               toggleSelectAll={toggleSelectAll}
               setShowBulkDeleteConfirm={setShowBulkDeleteConfirm}
               filterCurrency={filterCurrency}
-              setFilterCurrency={setFilterCurrency as any}
+              setFilterCurrency={setFilterCurrency}
               showDeletedVouchers={showDeletedVouchers}
-              setShowDeletedVouchers={setShowDeletedVouchers as any}
+              setShowDeletedVouchers={setShowDeletedVouchers}
               currentUser={currentUser}
               formatAmount={(amt) => formatAmountForAccount(amt, selectedAccount?.type)}
               hideBalances={hideBalances}
@@ -950,7 +950,7 @@ export default function Accounts() {
             <Form {...editForm}>
               <form
                 onSubmit={editForm.handleSubmit((data) => {
-                  updateLedgerMutation.mutate({ id: alterSelectedAccount.accountId, ...data } as any);
+                  updateLedgerMutation.mutate({ id: alterSelectedAccount.accountId, ...data });
                   setEditDialogOpen(false);
                 })}
                 className="space-y-4 mt-1"

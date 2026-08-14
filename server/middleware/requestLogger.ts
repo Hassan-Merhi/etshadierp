@@ -88,16 +88,16 @@ function percentage(part: number, total: number): number {
 }
 
 function isMonitoringRole(req: Request): boolean {
-  const role = String((req as any).session?.currentRole || (req as any).user?.role || "").toLowerCase();
+  const role = String(req.session?.currentRole || req.user?.role || "").toLowerCase();
   return role === "admin" || role === "developer";
 }
 
 export function getRequestMetricsSnapshot() {
   const memory = process.memoryUsage();
-  const poolMax = Number((pool as any).options?.max || 0);
-  const poolTotal = Number((pool as any).totalCount || 0);
-  const poolIdle = Number((pool as any).idleCount || 0);
-  const poolWaiting = Number((pool as any).waitingCount || 0);
+  const poolMax = Number(pool.options?.max || 0);
+  const poolTotal = Number(pool.totalCount || 0);
+  const poolIdle = Number(pool.idleCount || 0);
+  const poolWaiting = Number(pool.waitingCount || 0);
   const completed = metrics.success + metrics.expectedClientResponse + metrics.clientError + metrics.serverError;
   const slowRequestThresholdsMs = getSlowRequestThresholdConfig();
 
@@ -153,11 +153,11 @@ export function getRequestMetricsSnapshot() {
 export function requestLogger(req: Request, res: Response, next: NextFunction): void {
   const start = Date.now();
   const requestId = normaliseRequestId(req.headers["x-request-id"]) || randomUUID();
-  const session = (req as any).session;
+  const session = req.session;
   const initialCompanyId = Number(session?.currentCompanyId) || undefined;
   const initialFactoryCompanyId = Number(session?.factoryCompanyId) || undefined;
   const initialLocationId = Number(session?.currentLocationId) || undefined;
-  const initialUserId = session?.userId || (req as any).user?.id;
+  const initialUserId = session?.userId || req.user?.id;
   const buildVersion = process.env.BUILD_VERSION || process.env.RENDER_GIT_COMMIT?.substring(0, 8) || "dev";
   let responseBytes = 0;
 
@@ -208,7 +208,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
         }
 
         if (req.method === "GET" && req.path === "/api/audit-log") {
-          const companyId = Number((req as any).session?.currentCompanyId);
+          const companyId = Number(req.session?.currentCompanyId);
           if (!Number.isSafeInteger(companyId) || companyId <= 0) {
             res
               .status(409)
@@ -231,8 +231,8 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
           const durationMs = Date.now() - start;
           const routeTemplate = normaliseRouteTemplate(path, req.route?.path, req.baseUrl || "");
           const databaseMetrics = getRequestPerformanceMetrics();
-          const currentSession = (req as any).session;
-          const userId = currentSession?.userId || (req as any).user?.id;
+          const currentSession = req.session;
+          const userId = currentSession?.userId || req.user?.id;
           const companyId = Number(currentSession?.currentCompanyId) || undefined;
           const factoryCompanyId = Number(currentSession?.factoryCompanyId) || undefined;
           const locationId = Number(currentSession?.currentLocationId) || undefined;

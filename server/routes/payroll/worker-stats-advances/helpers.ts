@@ -8,7 +8,7 @@ import { factoryDaybookEntries, ledgerAccounts } from "@shared/schema";
 
 /** Prefer the factory-pinned company ID so cross-tab ERP company switches don't corrupt factory writes. */
 export function getFactoryCompanyId(req: any): number | undefined {
-  return (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+  return req.session.factoryCompanyId || req.session.currentCompanyId;
 }
 
 /** Write a single daybook entry (factory audit log). */
@@ -165,5 +165,5 @@ export function getErpCompanyId(req: any): number | undefined {
     ? parseInt(req.body.companyId)
     : req.query?.companyId
       ? parseInt(req.query.companyId as string)
-      : (req.session as any).currentCompanyId || (req.session as any).factoryCompanyId;
+      : req.session.currentCompanyId || req.session.factoryCompanyId;
 }

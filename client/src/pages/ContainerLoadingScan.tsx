@@ -150,7 +150,7 @@ export default function ContainerLoadingScan() {
       setTimeout(() => scannerRef.current?.focus(), 100);
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -306,7 +306,7 @@ export default function ContainerLoadingScan() {
       toast({ title: "Bale removed" });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -325,7 +325,7 @@ export default function ContainerLoadingScan() {
       navigate("/factory/invoicing?tab=invoices");
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
       setShowFinalizeDialog(false);
     },
@@ -352,7 +352,7 @@ export default function ContainerLoadingScan() {
       );
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error saving note", description: error.message, variant: "destructive" });
     },
   });
