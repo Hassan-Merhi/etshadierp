@@ -60,7 +60,7 @@ function isQueryable(expr) {
 }
 function safeType(value) {
   if (!value || /\bany\b/.test(value) || value === "unknown") return null;
-  if (value.length > 900) return null;
+  if (value.length > 1200) return null;
   return value;
 }
 function printType(type, node) {
@@ -98,9 +98,41 @@ function cleanRequired(type) {
   if (!type || /\bany\b/.test(type)) return "unknown";
   return type;
 }
+function enclosingFunction(node) {
+  let current = node.parent;
+  while (current) {
+    if (ts.isFunctionLike(current)) return current;
+    current = current.parent;
+  }
+  return null;
+}
+function returnExpressionType(node) {
+  const fn = enclosingFunction(node);
+  if (!fn) return null;
+  try {
+    if (fn.type) {
+      const declared = checker.getTypeFromTypeNode(fn.type);
+      if (fn.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword)) {
+        const awaited = checker.getPromisedTypeOfPromise(declared);
+        return printType(awaited ?? declared, node);
+      }
+      return printType(declared, node);
+    }
+    const sig = checker.getSignatureFromDeclaration(fn);
+    if (!sig) return null;
+    const returned = checker.getReturnTypeOfSignature(sig);
+    if (fn.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword)) {
+      const awaited = checker.getPromisedTypeOfPromise(returned);
+      return printType(awaited ?? returned, node);
+    }
+    return printType(returned, node);
+  } catch {
+    return null;
+  }
+}
 
 function requiredType(expr, sf, depth = 0) {
-  if (depth > 8) return "unknown";
+  if (depth > 10) return "unknown";
   const current = outer(expr);
   const parent = current.parent;
   if (!parent) return "unknown";
@@ -120,8 +152,10 @@ function requiredType(expr, sf, depth = 0) {
       return `(...args: unknown[]) => ${cleanRequired(requiredType(parent, sf, depth + 1))}`;
     }
     const index = parent.arguments.findIndex((arg) => arg === current);
-    if (index >= 0 && isQueryable(parent.expression)) {
-      return `Parameters<typeof ${parent.expression.getText(sf)}>[${index}]`;
+    if (index >= 0) {
+      const ctx = contextual(current);
+      if (ctx) return ctx;
+      if (isQueryable(parent.expression)) return `Parameters<typeof ${parent.expression.getText(sf)}>[${index}]`;
     }
   }
 
@@ -130,15 +164,20 @@ function requiredType(expr, sf, depth = 0) {
       return `new (...args: unknown[]) => ${cleanRequired(requiredType(parent, sf, depth + 1))}`;
     }
     const index = parent.arguments?.findIndex((arg) => arg === current) ?? -1;
-    if (index >= 0 && isQueryable(parent.expression)) {
-      return `ConstructorParameters<typeof ${parent.expression.getText(sf)}>[${index}]`;
+    if (index >= 0) {
+      const ctx = contextual(current);
+      if (ctx) return ctx;
+      if (isQueryable(parent.expression)) return `ConstructorParameters<typeof ${parent.expression.getText(sf)}>[${index}]`;
     }
   }
 
   if (ts.isBinaryExpression(parent)) {
     const op = parent.operatorToken.kind;
-    if (parent.operatorToken.kind === ts.SyntaxKind.EqualsToken && parent.right === current && isQueryable(parent.left)) {
+    if (op === ts.SyntaxKind.EqualsToken && parent.right === current && isQueryable(parent.left)) {
       return `typeof ${parent.left.getText(sf)}`;
+    }
+    if ([ts.SyntaxKind.QuestionQuestionToken, ts.SyntaxKind.BarBarToken, ts.SyntaxKind.AmpersandAmpersandToken].includes(op)) {
+      return cleanRequired(requiredType(parent, sf, depth + 1));
     }
     if (
       [
@@ -165,6 +204,11 @@ function requiredType(expr, sf, depth = 0) {
     }
   }
 
+  if (ts.isConditionalExpression(parent)) {
+    if (parent.condition === current) return "unknown";
+    return cleanRequired(requiredType(parent, sf, depth + 1));
+  }
+
   if (ts.isPrefixUnaryExpression(parent)) {
     if ([ts.SyntaxKind.PlusToken, ts.SyntaxKind.MinusToken, ts.SyntaxKind.TildeToken].includes(parent.operator)) return "number";
     if (parent.operator === ts.SyntaxKind.ExclamationToken) return "unknown";
@@ -176,9 +220,14 @@ function requiredType(expr, sf, depth = 0) {
     return parent.type.getText(sf);
   }
 
-  if (ts.isReturnStatement(parent)) return "unknown";
-  if (ts.isAwaitExpression(parent)) return "unknown";
-  if (ts.isConditionalExpression(parent) && parent.condition === current) return "unknown";
+  if (ts.isPropertyAssignment(parent) && parent.initializer === current) {
+    const ctx = contextual(current);
+    if (ctx) return ctx;
+  }
+
+  if (ts.isReturnStatement(parent)) return returnExpressionType(parent) ?? "unknown";
+  if (ts.isArrowFunction(parent) && parent.body === current) return returnExpressionType(parent) ?? "unknown";
+  if (ts.isAwaitExpression(parent)) return cleanRequired(requiredType(parent, sf, depth + 1));
   if (ts.isIfStatement(parent) && parent.expression === current) return "unknown";
   if (ts.isWhileStatement(parent) && parent.expression === current) return "unknown";
   if (ts.isDoStatement(parent) && parent.expression === current) return "unknown";
@@ -205,6 +254,40 @@ function sourceHasProperty(node, name) {
   }
 }
 
+function combinedVariableType(name, sf) {
+  let symbol;
+  try {
+    symbol = checker.getSymbolAtLocation(name);
+  } catch {
+    symbol = null;
+  }
+  if (!symbol) return null;
+
+  const targets = new Set();
+  const visit = (node) => {
+    if (ts.isIdentifier(node) && node !== name) {
+      let candidate;
+      try {
+        candidate = checker.getSymbolAtLocation(node);
+      } catch {
+        candidate = null;
+      }
+      if (candidate === symbol) {
+        const target = safeType(requiredType(node, sf));
+        if (target && target !== "unknown") targets.add(target);
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+
+  if (!targets.size) return null;
+  const values = [...targets];
+  if (values.length === 1) return values[0];
+  const combined = values.map((value) => `(${value})`).join(" & ");
+  return combined.length <= 1800 ? combined : null;
+}
+
 function replacementFor(node, sf) {
   const asToken = node.getChildren(sf).find((child) => child.kind === ts.SyntaxKind.AsKeyword);
   if (!asToken) return null;
@@ -214,7 +297,19 @@ function replacementFor(node, sf) {
   let replacement = "";
   let kind = "remove";
 
-  if (parent && ts.isPropertyAccessExpression(parent) && parent.expression === current) {
+  if (
+    parent &&
+    ts.isVariableDeclaration(parent) &&
+    parent.initializer === current &&
+    !parent.type &&
+    ts.isIdentifier(parent.name)
+  ) {
+    const target = combinedVariableType(parent.name, sf);
+    if (target) {
+      replacement = `as unknown as ${target}`;
+      kind = "variable-combined-shape";
+    }
+  } else if (parent && ts.isPropertyAccessExpression(parent) && parent.expression === current) {
     const name = propertyNameText(parent.name);
     if (name && sourceHasProperty(node, name)) {
       replacement = "";
@@ -237,7 +332,7 @@ function replacementFor(node, sf) {
     replacement = `as unknown as new (...args: unknown[]) => ${cleanRequired(requiredType(parent, sf))}`;
     kind = "constructable";
   } else {
-    const target = requiredType(node, sf);
+    const target = safeType(requiredType(node, sf));
     if (target && target !== "unknown") {
       replacement = `as unknown as ${target}`;
       kind = "context-target";
@@ -303,7 +398,7 @@ function restore(files) {
 
 let check = run("npm", ["run", "check"]);
 let passes = 0;
-while (check.code !== 0 && passes < 4) {
+while (check.code !== 0 && passes < 5) {
   passes += 1;
   const changed = new Set(changedSourceFiles());
   const direct = diagnosticFiles(check.output).filter((file) => changed.has(file));
