@@ -32,6 +32,14 @@ jobs:
           npm ci --no-audit --bin-links=true
           git checkout -- package-lock.json
 
+      - name: Reset ratchets to current main baseline
+        run: |
+          git fetch origin main
+          git checkout origin/main -- \
+            config/lint-warning-ratchet.json \
+            config/type-escape-boundaries.json \
+            docs/system-quality-program.md
+
       - name: Remove explicit any from catch bindings
         run: |
           python3 - <<'PY'
@@ -52,55 +60,103 @@ jobs:
                       path.write_text(updated, encoding="utf-8")
                       changed.append(str(path))
                       replacements += count
-          Path("/tmp/phase3-initial-files.txt").write_text("\n".join(changed) + ("\n" if changed else ""))
           Path("/tmp/phase3-initial-count.txt").write_text(str(replacements))
+          Path("/tmp/phase3-restored-count.txt").write_text("0")
           print(f"Initial catch-any replacements: {replacements} across {len(changed)} files")
           PY
 
-      - name: Revert files that need real catch-domain typing
+      - name: Restore only catch clauses that are not unknown-safe
         shell: bash
         run: |
           set -euo pipefail
-          for round in $(seq 1 12); do
+          for round in $(seq 1 8); do
             set +e
             npm run check > /tmp/phase3-tsc.log 2>&1
             status=$?
             set -e
             if [ "$status" -eq 0 ]; then
-              echo "TypeScript is clean after round $round."
+              echo "TypeScript is clean after granular round $round."
               break
             fi
 
-            python3 - <<'PY' > /tmp/phase3-bad-files.txt
-          from pathlib import Path
-          import re
-          import subprocess
+            node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          import ts from "typescript";
 
-          changed = set(subprocess.check_output(
-              ["git", "diff", "--name-only", "HEAD", "--", "client/src", "server", "shared"],
-              text=True,
-          ).splitlines())
-          log = Path("/tmp/phase3-tsc.log").read_text(encoding="utf-8", errors="replace")
-          candidates = set(re.findall(r"(?m)^([^\n]+?\.(?:ts|tsx))\(\d+,\d+\): error TS\d+:", log))
-          for path in sorted(changed & candidates):
-              print(path)
-          PY
+          const log = fs.readFileSync("/tmp/phase3-tsc.log", "utf8");
+          const errorPattern = /^(.+?\.(?:ts|tsx))\((\d+),(\d+)\): error TS\d+:/gm;
+          const byFile = new Map();
+          for (const match of log.matchAll(errorPattern)) {
+            const file = match[1];
+            const line = Number(match[2]) - 1;
+            const column = Number(match[3]) - 1;
+            if (!byFile.has(file)) byFile.set(file, []);
+            byFile.get(file).push([line, column]);
+          }
 
-            if [ ! -s /tmp/phase3-bad-files.txt ]; then
+          let restored = 0;
+          const restoredSites = [];
+          for (const [file, positions] of byFile) {
+            if (!fs.existsSync(file)) continue;
+            let source = fs.readFileSync(file, "utf8");
+            const sf = ts.createSourceFile(
+              file,
+              source,
+              ts.ScriptTarget.Latest,
+              true,
+              file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS
+            );
+            const absoluteErrors = positions.map(([line, column]) =>
+              sf.getPositionOfLineAndCharacter(line, column)
+            );
+            const insertions = [];
+
+            function visit(node) {
+              if (
+                ts.isCatchClause(node) &&
+                node.variableDeclaration &&
+                !node.variableDeclaration.type &&
+                ts.isIdentifier(node.variableDeclaration.name)
+              ) {
+                const blockStart = node.block.getFullStart();
+                const blockEnd = node.block.getEnd();
+                if (absoluteErrors.some((pos) => pos >= blockStart && pos <= blockEnd)) {
+                  const name = node.variableDeclaration.name;
+                  insertions.push({
+                    position: name.getEnd(),
+                    line: sf.getLineAndCharacterOfPosition(name.getStart(sf)).line + 1,
+                    name: name.text,
+                  });
+                }
+              }
+              ts.forEachChild(node, visit);
+            }
+            visit(sf);
+
+            const unique = [...new Map(insertions.map((item) => [item.position, item])).values()]
+              .sort((a, b) => b.position - a.position);
+            for (const item of unique) {
+              source = `${source.slice(0, item.position)}: any${source.slice(item.position)}`;
+              restored += 1;
+              restoredSites.push(`${file}:${item.line} catch (${item.name}: any)`);
+            }
+            if (unique.length) fs.writeFileSync(file, source);
+          }
+
+          if (restored === 0) {
+            console.error(log);
+            console.error("TypeScript is red but no transformed catch clause contains an error; refusing unrelated edits.");
+            process.exit(1);
+          }
+          const prior = Number(fs.readFileSync("/tmp/phase3-restored-count.txt", "utf8"));
+          fs.writeFileSync("/tmp/phase3-restored-count.txt", String(prior + restored));
+          console.log(`Restored ${restored} catch annotation(s) in this round:`);
+          console.log(restoredSites.join("\n"));
+          NODE
+
+            if [ "$round" -eq 8 ]; then
               cat /tmp/phase3-tsc.log
-              echo "TypeScript failed without identifying a changed Phase 3 file; refusing to force a fix."
-              exit 1
-            fi
-
-            echo "Reverting changed files that became type-unsafe:"
-            cat /tmp/phase3-bad-files.txt
-            while IFS= read -r file; do
-              [ -n "$file" ] && git checkout HEAD -- "$file"
-            done < /tmp/phase3-bad-files.txt
-
-            if [ "$round" -eq 12 ]; then
-              cat /tmp/phase3-tsc.log
-              echo "TypeScript did not converge after 12 revert rounds."
+              echo "TypeScript did not converge after 8 granular rounds."
               exit 1
             fi
           done
@@ -110,13 +166,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -t files < <(git diff --name-only HEAD -- 'client/src/**/*.ts' 'client/src/**/*.tsx' 'server/**/*.ts' 'shared/**/*.ts' 'shared/**/*.tsx')
+          mapfile -t files < <(git diff --name-only origin/main -- 'client/src/**/*.ts' 'client/src/**/*.tsx' 'server/**/*.ts' 'shared/**/*.ts' 'shared/**/*.tsx')
           if [ "${#files[@]}" -gt 0 ]; then
             node node_modules/prettier/bin/prettier.cjs --write "${files[@]}"
           fi
           npm run check
 
-      - name: Revert only Phase 3 files that trip structural or i18n gates
+      - name: Revert Phase 3 files that trip structural or i18n gates
         shell: bash
         run: |
           set -euo pipefail
@@ -141,7 +197,7 @@ jobs:
 
           log = Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace")
           changed = subprocess.check_output(
-              ["git", "diff", "--name-only", "HEAD", "--", "client/src", "server", "shared"],
+              ["git", "diff", "--name-only", "origin/main", "--", "client/src", "server", "shared"],
               text=True,
           ).splitlines()
           for path in sorted({p for p in changed if p and p in log}):
@@ -152,11 +208,11 @@ jobs:
               echo "$name identified changed files that must be reverted:"
               cat /tmp/phase3-gate-bad-files.txt
               while IFS= read -r file; do
-                [ -n "$file" ] && git checkout HEAD -- "$file"
+                [ -n "$file" ] && git checkout origin/main -- "$file"
               done < /tmp/phase3-gate-bad-files.txt
               npm run check
             else
-              echo "$name is red without naming a changed Phase 3 file; treating it as pre-existing and preserving the log:"
+              echo "$name is red without naming a changed Phase 3 file; treating it as pre-existing:"
               cat "$log"
             fi
           }
@@ -164,7 +220,7 @@ jobs:
           run_guarded_gate god-files npm run audit:god-files
           run_guarded_gate i18n node scripts/audit-i18n-phase14.mjs --json-out /tmp/phase3-i18n.json --markdown-out /tmp/phase3-i18n.md
 
-      - name: Lock in type-escape and lint gains
+      - name: Lock in exact ratchet gains
         shell: bash
         run: |
           set -euo pipefail
@@ -180,7 +236,6 @@ jobs:
           lint_path = Path("config/lint-warning-ratchet.json")
           lint = json.loads(lint_path.read_text(encoding="utf-8"))
           report = json.loads(Path(lint["scan"]["reportPath"]).read_text(encoding="utf-8"))
-
           warnings = 0
           errors = 0
           by_rule = Counter()
@@ -190,10 +245,8 @@ jobs:
               for message in result.get("messages", []):
                   if message.get("severity") == 1:
                       by_rule[message.get("ruleId") or "(no-rule)"] += 1
-
           if errors:
               raise SystemExit(f"Refusing to ratchet a lint run with {errors} error(s)")
-
           old_ceiling = lint["totals"]["warningCeiling"]
           if warnings > old_ceiling:
               raise SystemExit(f"Warnings increased from ceiling {old_ceiling} to {warnings}")
@@ -231,7 +284,6 @@ jobs:
           if n1 != 1 or n2 != 1:
               raise SystemExit(f"Expected one documented figure each, got type={n1}, lint={n2}")
           doc_path.write_text(doc, encoding="utf-8")
-
           print(f"Locked lint warnings {old_ceiling} -> {warnings}")
           print(f"Locked no-explicit-any -> {no_any}; type escapes -> {type_total}")
           PY
@@ -251,12 +303,12 @@ jobs:
           node scripts/verify-i18n-audit-classifier.mjs
           node scripts/audit-i18n-phase14.mjs --json-out /tmp/phase3-final-i18n.json --markdown-out /tmp/phase3-final-i18n.md
 
-          mapfile -t changed < <(git diff --name-only HEAD)
+          mapfile -t changed < <(git diff --name-only origin/main -- client/src server shared config/lint-warning-ratchet.json config/type-escape-boundaries.json docs/system-quality-program.md)
           if [ "${#changed[@]}" -gt 0 ]; then
             node node_modules/prettier/bin/prettier.cjs --check "${changed[@]}"
           fi
 
-      - name: Commit Phase 3 drawdown
+      - name: Commit granular Phase 3 drawdown
         shell: bash
         run: |
           set -euo pipefail
@@ -275,15 +327,16 @@ jobs:
           print(count)
           PY
           )
-          kept=$((initial - remaining))
-          echo "Phase 3 initial candidates: $initial; repository catch-any remaining: $remaining; net removed from candidate set: $kept"
+          removed=$((initial - remaining))
+          restored=$(cat /tmp/phase3-restored-count.txt)
+          echo "Phase 3 initial candidates: $initial; catch-any remaining: $remaining; removed: $removed; restored for type safety: $restored"
+          if [ "$removed" -le 0 ]; then
+            echo "Granular pass removed no catch annotations; Phase 3 requires semantic per-site typing instead."
+            exit 1
+          fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add client/src server shared config/lint-warning-ratchet.json config/type-escape-boundaries.json docs/system-quality-program.md
-          if git diff --cached --quiet; then
-            echo "No safe Phase 3 changes survived verification."
-            exit 0
-          fi
-          git commit --no-verify -m "remove type-safe catch any annotations"
+          git commit --no-verify -m "remove unknown-safe catch any annotations"
           git push --no-verify origin HEAD:agent/lint-phase-3-catch-any
