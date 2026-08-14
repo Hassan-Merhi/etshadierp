@@ -8,97 +8,65 @@ on:
       - .github/workflows/lint-phase3-catch-any-repair.yml
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  repair:
+  classify:
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout Phase 3 branch
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
         with:
           ref: agent/lint-phase-3-catch-any
-          fetch-depth: 0
-
-      - name: Set up canonical Node.js
-        uses: actions/setup-node@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: "22.14"
           cache: npm
-
-      - name: Normalize registry and install
+      - name: Install dependencies
         run: |
           sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
           npm ci --no-audit --bin-links=true
           git checkout -- package-lock.json
-
-      - name: Reset ratchets to current main baseline
+      - name: Classify remaining catch-any usages
         run: |
-          git fetch origin main
-          git checkout origin/main -- \
-            config/lint-warning-ratchet.json \
-            config/type-escape-boundaries.json \
-            docs/system-quality-program.md
-
-      - name: Remove explicit any from catch bindings
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-
-          roots = [Path("client/src"), Path("server"), Path("shared")]
-          pattern = re.compile(r"catch\s*\(\s*([A-Za-z_$][A-Za-z0-9_$]*)\s*:\s*any\s*\)")
-          changed = []
-          replacements = 0
-          for root in roots:
-              if not root.exists():
-                  continue
-              for path in sorted(list(root.rglob("*.ts")) + list(root.rglob("*.tsx"))):
-                  text = path.read_text(encoding="utf-8")
-                  updated, count = pattern.subn(lambda m: f"catch ({m.group(1)})", text)
-                  if count:
-                      path.write_text(updated, encoding="utf-8")
-                      changed.append(str(path))
-                      replacements += count
-          Path("/tmp/phase3-initial-count.txt").write_text(str(replacements))
-          Path("/tmp/phase3-restored-count.txt").write_text("0")
-          print(f"Initial catch-any replacements: {replacements} across {len(changed)} files")
-          PY
-
-      - name: Restore only catch clauses that are not unknown-safe
-        shell: bash
-        run: |
-          set -euo pipefail
-          for round in $(seq 1 8); do
-            set +e
-            npm run check > /tmp/phase3-tsc.log 2>&1
-            status=$?
-            set -e
-            if [ "$status" -eq 0 ]; then
-              echo "TypeScript is clean after granular round $round."
-              break
-            fi
-
-            node --input-type=module <<'NODE'
+          node --input-type=module <<'NODE'
           import fs from "node:fs";
+          import path from "node:path";
           import ts from "typescript";
 
-          const log = fs.readFileSync("/tmp/phase3-tsc.log", "utf8");
-          const errorPattern = /^(.+?\.(?:ts|tsx))\((\d+),(\d+)\): error TS\d+:/gm;
-          const byFile = new Map();
-          for (const match of log.matchAll(errorPattern)) {
-            const file = match[1];
-            const line = Number(match[2]) - 1;
-            const column = Number(match[3]) - 1;
-            if (!byFile.has(file)) byFile.set(file, []);
-            byFile.get(file).push([line, column]);
-          }
+          const roots = ["client/src", "server", "shared"];
+          const files = [];
+          const walk = (dir) => {
+            if (!fs.existsSync(dir)) return;
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+              const full = path.join(dir, entry.name);
+              if (entry.isDirectory()) walk(full);
+              else if (/\.(?:ts|tsx)$/.test(entry.name)) files.push(full);
+            }
+          };
+          roots.forEach(walk);
 
-          let restored = 0;
-          const restoredSites = [];
-          for (const [file, positions] of byFile) {
-            if (!fs.existsSync(file)) continue;
-            let source = fs.readFileSync(file, "utf8");
+          const chainCounts = new Map();
+          const parentCounts = new Map();
+          let catches = 0;
+          const sites = [];
+
+          const rootIdentifier = (node) => {
+            let current = node;
+            while (
+              ts.isPropertyAccessExpression(current) ||
+              ts.isElementAccessExpression(current) ||
+              ts.isCallExpression(current) ||
+              ts.isNonNullExpression(current) ||
+              ts.isParenthesizedExpression(current)
+            ) {
+              if (ts.isCallExpression(current)) current = current.expression;
+              else current = current.expression;
+            }
+            return ts.isIdentifier(current) ? current : null;
+          };
+
+          for (const file of files) {
+            const source = fs.readFileSync(file, "utf8");
             const sf = ts.createSourceFile(
               file,
               source,
@@ -106,237 +74,70 @@ jobs:
               true,
               file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS
             );
-            const absoluteErrors = positions.map(([line, column]) =>
-              sf.getPositionOfLineAndCharacter(line, column)
-            );
-            const insertions = [];
-
-            function visit(node) {
+            const visit = (node) => {
               if (
                 ts.isCatchClause(node) &&
                 node.variableDeclaration &&
-                !node.variableDeclaration.type &&
-                ts.isIdentifier(node.variableDeclaration.name)
+                ts.isIdentifier(node.variableDeclaration.name) &&
+                node.variableDeclaration.type?.getText(sf) === "any"
               ) {
-                const blockStart = node.block.getFullStart();
-                const blockEnd = node.block.getEnd();
-                if (absoluteErrors.some((pos) => pos >= blockStart && pos <= blockEnd)) {
-                  const name = node.variableDeclaration.name;
-                  insertions.push({
-                    position: name.getEnd(),
-                    line: sf.getLineAndCharacterOfPosition(name.getStart(sf)).line + 1,
-                    name: name.text,
-                  });
-                }
+                catches += 1;
+                const name = node.variableDeclaration.name.text;
+                const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
+                const usages = new Set();
+                const scan = (child) => {
+                  if (
+                    ts.isIdentifier(child) &&
+                    child.text === name &&
+                    child !== node.variableDeclaration.name
+                  ) {
+                    let top = child;
+                    while (
+                      top.parent &&
+                      (ts.isPropertyAccessExpression(top.parent) ||
+                        ts.isElementAccessExpression(top.parent) ||
+                        ts.isCallExpression(top.parent) ||
+                        ts.isNonNullExpression(top.parent) ||
+                        ts.isParenthesizedExpression(top.parent)) &&
+                      (top.parent.expression === top ||
+                        (ts.isCallExpression(top.parent) && top.parent.arguments.includes(top)))
+                    ) {
+                      if (ts.isCallExpression(top.parent) && top.parent.arguments.includes(top)) break;
+                      top = top.parent;
+                    }
+                    const text = top.getText(sf).replace(/\s+/g, " ").slice(0, 180);
+                    usages.add(text);
+                    const parentKind = ts.SyntaxKind[child.parent.kind];
+                    parentCounts.set(parentKind, (parentCounts.get(parentKind) ?? 0) + 1);
+
+                    let chainNode = child;
+                    while (
+                      chainNode.parent &&
+                      (ts.isPropertyAccessExpression(chainNode.parent) || ts.isElementAccessExpression(chainNode.parent)) &&
+                      chainNode.parent.expression === chainNode
+                    ) chainNode = chainNode.parent;
+                    if (chainNode !== child) {
+                      const chain = chainNode.getText(sf).replace(/\s+/g, " ");
+                      chainCounts.set(chain, (chainCounts.get(chain) ?? 0) + 1);
+                    }
+                  }
+                  ts.forEachChild(child, scan);
+                };
+                scan(node.block);
+                sites.push(`${file}:${line} catch (${name}: any) :: ${[...usages].join(" | ")}`);
               }
               ts.forEachChild(node, visit);
-            }
+            };
             visit(sf);
-
-            const unique = [...new Map(insertions.map((item) => [item.position, item])).values()]
-              .sort((a, b) => b.position - a.position);
-            for (const item of unique) {
-              source = `${source.slice(0, item.position)}: any${source.slice(item.position)}`;
-              restored += 1;
-              restoredSites.push(`${file}:${item.line} catch (${item.name}: any)`);
-            }
-            if (unique.length) fs.writeFileSync(file, source);
           }
 
-          if (restored === 0) {
-            console.error(log);
-            console.error("TypeScript is red but no transformed catch clause contains an error; refusing unrelated edits.");
-            process.exit(1);
+          console.log(`Remaining catch-any sites: ${catches}`);
+          console.log("\n=== DIRECT/CHAIN USAGE COUNTS ===");
+          for (const [chain, count] of [...chainCounts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))) {
+            console.log(`${count}\t${chain}`);
           }
-          const prior = Number(fs.readFileSync("/tmp/phase3-restored-count.txt", "utf8"));
-          fs.writeFileSync("/tmp/phase3-restored-count.txt", String(prior + restored));
-          console.log(`Restored ${restored} catch annotation(s) in this round:`);
-          console.log(restoredSites.join("\n"));
+          console.log("\n=== IDENTIFIER PARENT KINDS ===");
+          for (const [kind, count] of [...parentCounts].sort((a, b) => b[1] - a[1])) console.log(`${count}\t${kind}`);
+          console.log("\n=== SITES ===");
+          console.log(sites.join("\n"));
           NODE
-
-            if [ "$round" -eq 8 ]; then
-              cat /tmp/phase3-tsc.log
-              echo "TypeScript did not converge after 8 granular rounds."
-              exit 1
-            fi
-          done
-          npm run check
-
-      - name: Keep changed files formatted
-        shell: bash
-        run: |
-          set -euo pipefail
-          mapfile -t files < <(git diff --name-only origin/main -- 'client/src/**/*.ts' 'client/src/**/*.tsx' 'server/**/*.ts' 'shared/**/*.ts' 'shared/**/*.tsx')
-          if [ "${#files[@]}" -gt 0 ]; then
-            node node_modules/prettier/bin/prettier.cjs --write "${files[@]}"
-          fi
-          npm run check
-
-      - name: Revert Phase 3 files that trip structural or i18n gates
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          run_guarded_gate() {
-            local name="$1"
-            shift
-            local log="/tmp/phase3-${name}.log"
-            set +e
-            "$@" > "$log" 2>&1
-            local status=$?
-            set -e
-            if [ "$status" -eq 0 ]; then
-              echo "$name gate passed."
-              return 0
-            fi
-
-            python3 - "$log" <<'PY' > /tmp/phase3-gate-bad-files.txt
-          from pathlib import Path
-          import subprocess
-          import sys
-
-          log = Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace")
-          changed = subprocess.check_output(
-              ["git", "diff", "--name-only", "origin/main", "--", "client/src", "server", "shared"],
-              text=True,
-          ).splitlines()
-          for path in sorted({p for p in changed if p and p in log}):
-              print(path)
-          PY
-
-            if [ -s /tmp/phase3-gate-bad-files.txt ]; then
-              echo "$name identified changed files that must be reverted:"
-              cat /tmp/phase3-gate-bad-files.txt
-              while IFS= read -r file; do
-                [ -n "$file" ] && git checkout origin/main -- "$file"
-              done < /tmp/phase3-gate-bad-files.txt
-              npm run check
-            else
-              echo "$name is red without naming a changed Phase 3 file; treating it as pre-existing:"
-              cat "$log"
-            fi
-          }
-
-          run_guarded_gate god-files npm run audit:god-files
-          run_guarded_gate i18n node scripts/audit-i18n-phase14.mjs --json-out /tmp/phase3-i18n.json --markdown-out /tmp/phase3-i18n.md
-
-      - name: Lock in exact ratchet gains
-        shell: bash
-        run: |
-          set -euo pipefail
-          UPDATE_TYPE_ESCAPE_BASELINE=1 node scripts/audit-type-escapes.mjs
-          node scripts/run-lint.mjs --quiet
-
-          python3 - <<'PY'
-          from collections import Counter
-          from pathlib import Path
-          import json
-          import re
-
-          lint_path = Path("config/lint-warning-ratchet.json")
-          lint = json.loads(lint_path.read_text(encoding="utf-8"))
-          report = json.loads(Path(lint["scan"]["reportPath"]).read_text(encoding="utf-8"))
-          warnings = 0
-          errors = 0
-          by_rule = Counter()
-          for result in report:
-              errors += result.get("errorCount", 0)
-              warnings += result.get("warningCount", 0)
-              for message in result.get("messages", []):
-                  if message.get("severity") == 1:
-                      by_rule[message.get("ruleId") or "(no-rule)"] += 1
-          if errors:
-              raise SystemExit(f"Refusing to ratchet a lint run with {errors} error(s)")
-          old_ceiling = lint["totals"]["warningCeiling"]
-          if warnings > old_ceiling:
-              raise SystemExit(f"Warnings increased from ceiling {old_ceiling} to {warnings}")
-          lint["totals"]["warningCeiling"] = warnings
-          for rule in list(lint.get("perRule", {})):
-              lint["perRule"][rule] = by_rule.get(rule, 0)
-
-          type_path = Path("config/type-escape-boundaries.json")
-          type_cfg = json.loads(type_path.read_text(encoding="utf-8"))
-          type_total = type_cfg["totals"]["typeEscapeCeiling"]
-          suppressions = sum(values[2] for values in type_cfg["scan"]["baseline"].values())
-          no_any = by_rule.get("@typescript-eslint/no-explicit-any", 0)
-          lint.setdefault("notes", {})["@typescript-eslint/no-explicit-any"] = (
-              f"Exactly the type-escape backlog seen from ESLint: {no_any} = the {type_total} in "
-              "config/type-escape-boundaries.json minus its "
-              f"{suppressions} suppressions, which are not an ESLint rule. The binding gate for this rule stays "
-              "config/type-escape-boundaries.json, which freezes every file individually and is therefore strictly "
-              "stronger than a repository total. This ceiling exists so the two cannot disagree - it must be lowered "
-              "whenever the type-escape ceiling is."
-          )
-          lint_path.write_text(json.dumps(lint, indent=2) + "\n", encoding="utf-8")
-
-          doc_path = Path("docs/system-quality-program.md")
-          doc = doc_path.read_text(encoding="utf-8")
-          doc, n1 = re.subn(
-              r"(Type escapes \(AST\) \| )[\d,]+( total)",
-              lambda m: f"{m.group(1)}{type_total:,}{m.group(2)}",
-              doc,
-          )
-          doc, n2 = re.subn(
-              r"(ESLint warnings \| )[\d,]+( total)",
-              lambda m: f"{m.group(1)}{warnings:,}{m.group(2)}",
-              doc,
-          )
-          if n1 != 1 or n2 != 1:
-              raise SystemExit(f"Expected one documented figure each, got type={n1}, lint={n2}")
-          doc_path.write_text(doc, encoding="utf-8")
-          print(f"Locked lint warnings {old_ceiling} -> {warnings}")
-          print(f"Locked no-explicit-any -> {no_any}; type escapes -> {type_total}")
-          PY
-
-      - name: Verify Phase 3 quality gates
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm run check
-          npm run lint
-          npm run audit:lint-ratchet
-          npm run audit:type-escapes
-          npm run audit:doc-index
-          npm run audit:scripts
-          npm run audit:toolchain
-          npm run audit:write-routes
-          node scripts/verify-i18n-audit-classifier.mjs
-          node scripts/audit-i18n-phase14.mjs --json-out /tmp/phase3-final-i18n.json --markdown-out /tmp/phase3-final-i18n.md
-
-          mapfile -t changed < <(git diff --name-only origin/main -- client/src server shared config/lint-warning-ratchet.json config/type-escape-boundaries.json docs/system-quality-program.md)
-          if [ "${#changed[@]}" -gt 0 ]; then
-            node node_modules/prettier/bin/prettier.cjs --check "${changed[@]}"
-          fi
-
-      - name: Commit granular Phase 3 drawdown
-        shell: bash
-        run: |
-          set -euo pipefail
-          git checkout -- package-lock.json || true
-          initial=$(cat /tmp/phase3-initial-count.txt)
-          remaining=$(python3 - <<'PY'
-          from pathlib import Path
-          import re
-          pattern = re.compile(r"catch\s*\(\s*([A-Za-z_$][A-Za-z0-9_$]*)\s*:\s*any\s*\)")
-          count = 0
-          for root in [Path("client/src"), Path("server"), Path("shared")]:
-              if not root.exists():
-                  continue
-              for path in list(root.rglob("*.ts")) + list(root.rglob("*.tsx")):
-                  count += len(pattern.findall(path.read_text(encoding="utf-8")))
-          print(count)
-          PY
-          )
-          removed=$((initial - remaining))
-          restored=$(cat /tmp/phase3-restored-count.txt)
-          echo "Phase 3 initial candidates: $initial; catch-any remaining: $remaining; removed: $removed; restored for type safety: $restored"
-          if [ "$removed" -le 0 ]; then
-            echo "Granular pass removed no catch annotations; Phase 3 requires semantic per-site typing instead."
-            exit 1
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add client/src server shared config/lint-warning-ratchet.json config/type-escape-boundaries.json docs/system-quality-program.md
-          git commit --no-verify -m "remove unknown-safe catch any annotations"
-          git push --no-verify origin HEAD:agent/lint-phase-3-catch-any
