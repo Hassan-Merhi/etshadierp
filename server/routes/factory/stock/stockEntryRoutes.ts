@@ -11,6 +11,8 @@ import { getClientDate } from "../../../lib/dateUtils";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { adjustInventory } from "../../../inventoryHelper";
+import { createDatabaseStockMovementAdapter } from "../../../services/inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../../../services/inventory/stockMovementIntegrityService";
 import { resolveStockEntryProductionAttributions } from "../../../services/factory/stockEntryProductionAttribution";
 import { writeDaybookEntry } from "../_helpers";
 import {
@@ -24,6 +26,8 @@ import {
   stockGroups,
 } from "@shared/schema";
 import { eq, and, sql, inArray } from "drizzle-orm";
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 export function registerFactoryStockEntryRoutes(app: Express) {
   app.post("/api/factory/stock-entry", requireAuth, async (req: Request, res: Response) => {
@@ -321,10 +325,45 @@ export function registerFactoryStockEntryRoutes(app: Express) {
           inventoryAdjMap.set(erpStockItemId!, { qty: prev.qty + 1, totalCost: prev.totalCost + baleRate });
         }
 
+        // A stock entry has no header row of its own — it writes a batch of
+        // bales — so the canonical journal keys its evidence on the smallest
+        // bale id in the batch. That is unique to this entry, deterministic
+        // from the rows written in this transaction, and stable afterwards
+        // because bale ids are never reused.
+        const canonicalBatchKey = insertedBales.length
+          ? String(Math.min(...insertedBales.map((bale: { id: number }) => Number(bale.id))))
+          : null;
+
         // ── One adjustInventory call per unique stock item ──
         for (const [stockItemId, { qty, totalCost }] of inventoryAdjMap) {
           const avgRatePerBale = qty > 0 ? totalCost / qty : 0;
           await adjustInventory(tx, erpLocationId, stockItemId, qty, companyId, avgRatePerBale);
+
+          // Canonical evidence for the stock this entry received, on the same
+          // transaction that applied it. The unit cost is the batch's average
+          // cost per bale for this item, which is the rate the inventory was
+          // updated with.
+          if (canonicalBatchKey && qty > 0) {
+            await postStockMovementTx(
+              tx,
+              {
+                companyId,
+                stockItemId,
+                kind: "receipt",
+                quantity: String(qty),
+                unitCost: avgRatePerBale.toFixed(6),
+                toLocationId: erpLocationId,
+                occurredAt: new Date().toISOString(),
+                source: {
+                  sourceType: "factory-stock-entry",
+                  sourceId: canonicalBatchKey,
+                  idempotencyKey: `factory-stock-entry:${canonicalBatchKey}:${stockItemId}`,
+                },
+                allowNegativeStock: true,
+              },
+              canonicalStockMovementAdapter
+            );
+          }
         }
 
         return { bales, totalWeight };

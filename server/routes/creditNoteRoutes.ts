@@ -28,6 +28,8 @@ import {
 } from "@shared/schema";
 import { eq, and, or, desc, ilike } from "drizzle-orm";
 import { adjustInventory } from "../inventoryHelper";
+import { createDatabaseStockMovementAdapter } from "../services/inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../services/inventory/stockMovementIntegrityService";
 
 async function getOrCreateSalesReturnsAccount(companyId: number, txOrDb: any = db): Promise<number | null> {
   const byName = await txOrDb
@@ -89,6 +91,8 @@ function normEntryAmounts(debit: Decimal.Value, credit: Decimal.Value): Record<s
     return { debitAmount: inventoryMoney(debit), creditAmount: inventoryMoney(credit) };
   }
 }
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 export function registerCreditNoteRoutes(app: Express) {
   app.post("/api/credit-notes", requireAuth, requireNonPOS, async (req, res) => {
@@ -188,6 +192,34 @@ export function registerCreditNoteRoutes(app: Express) {
             await adjustInventory(tx, locationId, stockItemId, qty.toNumber(), companyId);
           } else {
             await adjustInventory(tx, locationId, stockItemId, qty.negated().toNumber(), companyId);
+          }
+
+          // Canonical evidence for the return, on the same transaction that
+          // moved the stock. A credit note takes a customer's goods back into
+          // the location; a debit note sends goods back out to a supplier. The
+          // unit cost is the inventory cost the note itself carries, which is
+          // what the accounting entries below are built from.
+          if (!qty.isZero()) {
+            await postStockMovementTx(
+              tx,
+              {
+                companyId,
+                stockItemId,
+                kind: noteType === "Credit Note" ? "receipt" : "issue",
+                quantity: inventoryQuantity(qty),
+                unitCost: inventoryUnitCost(inventoryCostVal),
+                fromLocationId: noteType === "Credit Note" ? null : locationId,
+                toLocationId: noteType === "Credit Note" ? locationId : null,
+                occurredAt: new Date().toISOString(),
+                source: {
+                  sourceType: noteType === "Credit Note" ? "credit-note" : "debit-note",
+                  sourceId: String(createdVoucher.id),
+                  idempotencyKey: `${noteType === "Credit Note" ? "credit-note" : "debit-note"}:${createdVoucher.id}:${stockItemId}:${locationId}`,
+                },
+                allowNegativeStock: true,
+              },
+              canonicalStockMovementAdapter
+            );
           }
 
           const inventoryAccount = await tx

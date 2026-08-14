@@ -70,6 +70,7 @@ const FACTORY_COMPANY_PREFIXES = new Set([
   "wbonus",
   "advmgt",
   "dspbat",
+  "canonfse",
 ]);
 
 function testCompanyType(prefix: string): "erp" | "factory" {
@@ -166,6 +167,32 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     // worker_bonuses.cash_account_id is ON DELETE RESTRICT against
     // ledger_accounts, so a paid worker bonus blocks the ledger delete below.
     await pool.query("DELETE FROM worker_bonuses WHERE company_id = $1", [company.id]);
+    // Documents that hang off a voucher with a restricting key: a credit or
+    // debit note's lines, a waste dispatch, and a stock adjustment's header and
+    // lines (which the waste dispatch also creates, since waste is dispatched
+    // as an adjustment). Each blocks the voucher delete below, and none of them was
+    // reachable from a fixture company until the canonical journal work gave
+    // these routes end-to-end coverage.
+    await pool.query(
+      `DELETE FROM credit_note_items WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = $1)`,
+      [company.id]
+    );
+    await pool.query(
+      `DELETE FROM stock_adjustment_items WHERE adjustment_id IN (
+         SELECT sav.id FROM stock_adjustment_vouchers sav
+         JOIN vouchers v ON v.id = sav.voucher_id
+         WHERE v.company_id = $1)`,
+      [company.id]
+    );
+    await pool.query(
+      `DELETE FROM waste_dispatch_items WHERE dispatch_id IN (SELECT id FROM waste_dispatches WHERE company_id = $1)`,
+      [company.id]
+    );
+    await pool.query("DELETE FROM waste_dispatches WHERE company_id = $1", [company.id]);
+    await pool.query(
+      `DELETE FROM stock_adjustment_vouchers WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = $1)`,
+      [company.id]
+    );
     await db.delete(schema.vouchers).where(eq(schema.vouchers.companyId, company.id));
     // stock_adjustment_items.stock_item_id is a foreign key against stock_items,
     // so any adjustment line left by a test blocks the stock_items delete below
