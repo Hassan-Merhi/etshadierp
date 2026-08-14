@@ -1,23 +1,24 @@
-import {useState, useMemo, useCallback} from "react";
-import {useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
-import {apiRequest} from "@/lib/queryClient";
-import {useToast} from "@/hooks/use-toast";
-import {useDateFormat} from "@/contexts/DateFormatContext";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
-import {Label} from "@/components/ui/label";
-import {Badge} from "@/components/ui/badge";
-import {Skeleton} from "@/components/ui/skeleton";
-import {TrendingDown, TrendingUp, Minus, RefreshCw, Printer, MessageCircle} from "lucide-react";
-import {cn} from "@/lib/utils";
+import { getErrorDetails } from "@shared/errorUtils";
+import { useState, useMemo, useCallback } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { useDateFormat } from "@/contexts/DateFormatContext";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { TrendingDown, TrendingUp, Minus, RefreshCw, Printer, MessageCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-import type {StatementResponse, StatementRow, Transporter} from "./transporterstatement/types";
-import {fmtAmt, fmtNum, monthAgo, today} from "./transporterstatement/utils";
-import {StatusBadge} from "./transporterstatement/components/StatusBadge";
-import {DueDateCell} from "./transporterstatement/components/DueDateCell";
-import {SettingsPopover} from "./transporterstatement/components/SettingsPopover";
+import type { StatementResponse, StatementRow, Transporter } from "./transporterstatement/types";
+import { fmtAmt, fmtNum, monthAgo, today } from "./transporterstatement/utils";
+import { StatusBadge } from "./transporterstatement/components/StatusBadge";
+import { DueDateCell } from "./transporterstatement/components/DueDateCell";
+import { SettingsPopover } from "./transporterstatement/components/SettingsPopover";
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export default function TransporterStatement({ embedded }: { embedded?: boolean }) {
@@ -260,9 +261,9 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
       link.href = canvas.toDataURL("image/png");
       link.click();
       toast({ title: "Exported", description: "Statement saved as PNG image." });
-    } catch (err: any) {
+    } catch (err) {
       document.body.removeChild(el);
-      toast({ title: "Export failed", description: err.message, variant: "destructive" });
+      toast({ title: "Export failed", description: getErrorDetails(err).message, variant: "destructive" });
     } finally {
       setPdfExporting(false);
     }
@@ -294,9 +295,9 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
         imageBase64,
       });
       toast({ title: "WhatsApp sent", description: `Delivered to ${data?.sent ?? 0} recipient(s).` });
-    } catch (err: any) {
+    } catch (err) {
       if (el.parentNode) document.body.removeChild(el);
-      toast({ title: "WhatsApp failed", description: err?.message, variant: "destructive" });
+      toast({ title: "WhatsApp failed", description: getErrorDetails(err).optionalMessage, variant: "destructive" });
     } finally {
       setWaSending(false);
     }

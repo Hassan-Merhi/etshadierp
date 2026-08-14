@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import type { Express, NextFunction, Request, Response } from "express";
 import { and, eq } from "drizzle-orm";
 import { stockCategories, stockGroups } from "@shared/schema";
@@ -244,8 +245,9 @@ export function registerLocationWhatsappScheduleRoutes(app: Express) {
           [locationId, companyId]
         );
         res.json(serializeSchedule(result.rows[0], locationId));
-      } catch (error: any) {
-        if (error?.code === "42P01") return res.json(defaultSchedule(Number.parseInt(req.params.locationId, 10)));
+      } catch (error) {
+        if (getErrorDetails(error).code === "42P01")
+          return res.json(defaultSchedule(Number.parseInt(req.params.locationId, 10)));
         logger.error("[LocationStockSchedule] GET failed", { error });
         res.status(500).json({ message: getErrorMessage(error) });
       }

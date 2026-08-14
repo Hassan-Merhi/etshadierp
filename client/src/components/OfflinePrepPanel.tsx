@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useEffect, useCallback } from "react";
 import { OFFLINE_MODE_ENABLED } from "@/lib/featureFlags";
 import {
@@ -117,8 +118,12 @@ function OfflinePrepPanelContent() {
       await runOfflinePrep(companyId, (p) => setProgress({ ...p }));
       await loadReadiness();
       toast({ title: "Device prepared", description: "All offline data downloaded and ready." });
-    } catch (e: any) {
-      toast({ title: "Preparation failed", description: e?.message || "Unknown error", variant: "destructive" });
+    } catch (e) {
+      toast({
+        title: "Preparation failed",
+        description: getErrorDetails(e).optionalMessage || "Unknown error",
+        variant: "destructive",
+      });
     } finally {
       setRunning(false);
     }

@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { randomUUID } from "crypto";
 import type { Express, NextFunction, Request, Response } from "express";
 import { pool } from "../../db";
@@ -265,8 +266,8 @@ export function registerLocationWhatsappDeliveryRoutes(app: Express) {
             lastSentIncludeCost: summary?.last_sent_include_cost ?? null,
           },
         });
-      } catch (error: any) {
-        if (error?.code === "42P01") {
+      } catch (error) {
+        if (getErrorDetails(error).code === "42P01") {
           return res.json({
             locationId: Number.parseInt(req.params.locationId, 10),
             deliveries: [],

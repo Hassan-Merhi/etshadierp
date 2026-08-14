@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -290,8 +291,8 @@ export function ChatWidget() {
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.message || "Failed to parse file");
       setPoDraft(data as POImportDraft);
-    } catch (err: any) {
-      alert(`Could not parse file: ${err.message}`);
+    } catch (err) {
+      alert(`Could not parse file: ${getErrorDetails(err).message}`);
     } finally {
       setPoDraftUploading(false);
     }
@@ -310,8 +311,8 @@ export function ChatWidget() {
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.message || "Import failed");
       setPoDraftResult(data as POImportResult);
-    } catch (err: any) {
-      setPoDraftError(err.message);
+    } catch (err) {
+      setPoDraftError(getErrorDetails(err).message);
     } finally {
       setPoDraftSubmitting(false);
     }
@@ -319,13 +320,13 @@ export function ChatWidget() {
 
   const hasPendingDrafts = Boolean(
     pendingVoucher ||
-      pendingStockAdj ||
-      pendingStockTransfer ||
-      (pendingStockTransferBatch && pendingStockTransferBatch.length > 0) ||
-      pendingStockItem ||
-      pendingPriceUpdate ||
-      poDraft ||
-      pendingFilePatches.length > 0
+    pendingStockAdj ||
+    pendingStockTransfer ||
+    (pendingStockTransferBatch && pendingStockTransferBatch.length > 0) ||
+    pendingStockItem ||
+    pendingPriceUpdate ||
+    poDraft ||
+    pendingFilePatches.length > 0
   );
 
   const handleClearChat = () => {
@@ -558,124 +559,124 @@ export function ChatWidget() {
 
           <CardContent className="p-0 flex flex-col flex-1 overflow-hidden">
             {showAlerts && (
-                <AlertsDigest
-                  onClose={() => setShowAlerts(false)}
-                  onPrefill={(text) => {
-                    setMessage(text);
-                    inputRef.current?.focus();
-                  }}
-                />
-              )}
-
-              <ChatMessageList
-                history={history}
-                isPending={sendMutation.isPending}
-                displaySuggestions={displaySuggestions}
-                handleSuggestionClick={(s) => handleSend(s)}
-                formatMsgTime={formatMsgTime}
-                feedbackGiven={feedbackGiven}
-                handleFeedback={handleFeedback}
-                lastUsedProvider={lastUsedProvider}
-                pendingVoucher={pendingVoucher}
-                handleConfirmVoucher={handleConfirmVoucher}
-                setPendingVoucher={setPendingVoucher}
-                voucherSubmitting={voucherSubmitting}
-                pendingStockTransfer={pendingStockTransfer}
-                handleConfirmStockTransfer={handleConfirmStockTransfer}
-                setPendingStockTransfer={setPendingStockTransfer}
-                stockTransferSubmitting={stockTransferSubmitting}
-                pendingStockTransferBatch={pendingStockTransferBatch}
-                handleConfirmStockTransferBatchItem={handleConfirmStockTransferBatchItem}
-                handleDismissStockTransferBatchItem={handleDismissStockTransferBatchItem}
-                pendingStockAdj={pendingStockAdj}
-                handleConfirmStockAdj={handleConfirmStockAdj}
-                setPendingStockAdj={setPendingStockAdj}
-                stockAdjSubmitting={stockAdjSubmitting}
-                voucherSearchResults={voucherSearchResults}
-                setVoucherSearchResults={setVoucherSearchResults}
-                pendingStockItem={pendingStockItem}
-                handleConfirmStockItem={handleConfirmStockItem}
-                setPendingStockItem={setPendingStockItem}
-                stockItemSubmitting={stockItemSubmitting}
-                pendingPriceUpdate={pendingPriceUpdate}
-                handleConfirmPriceUpdate={handleConfirmPriceUpdate}
-                setPendingPriceUpdate={setPendingPriceUpdate}
-                priceUpdateSubmitting={priceUpdateSubmitting}
-                accountQueryResult={accountQueryResult}
-                setAccountQueryResult={setAccountQueryResult}
-                poDraft={poDraft}
-                handleConfirmPOImport={handleConfirmPOImport}
-                setPoDraft={setPoDraft}
-                poDraftSubmitting={poDraftSubmitting}
-                poDraftResult={poDraftResult}
-                poDraftError={poDraftError}
-                setPoDraftResult={setPoDraftResult}
-                setPoDraftError={setPoDraftError}
-                verifyContainerDraft={verifyContainerDraft}
-                setVerifyContainerDraft={setVerifyContainerDraft}
-                dataQueryResult={dataQueryResult}
-                setDataQueryResult={setDataQueryResult}
-                pendingFilePatches={pendingFilePatches}
-                setPendingFilePatches={setPendingFilePatches}
-                appliedPatchFiles={appliedPatchFiles}
-                setAppliedPatchFiles={setAppliedPatchFiles}
-                patchApplying={patchApplying}
-                handleApplyPatch={handleApplyPatch}
-                handleApplyAllPatches={handleApplyAllPatches}
-                handleGitPush={handleGitPush}
-                gitPushing={gitPushing}
-                perFilePushResult={perFilePushResult}
-                setPerFilePushResult={setPerFilePushResult}
-                scrollAreaRef={scrollAreaRef}
+              <AlertsDigest
+                onClose={() => setShowAlerts(false)}
+                onPrefill={(text) => {
+                  setMessage(text);
+                  inputRef.current?.focus();
+                }}
               />
+            )}
 
-              {sessionReadFiles.length > 0 && (
-                <div className="px-4 pb-1 border-b border-border/40">
-                  <button
-                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mb-1"
-                    onClick={() => setShowSessionFiles((v) => !v)}
-                  >
-                    {showSessionFiles ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                    <FileCode className="h-3 w-3" />
-                    {sessionReadFiles.length} file{sessionReadFiles.length !== 1 ? "s" : ""} read this session
-                  </button>
-                  {showSessionFiles && (
-                    <div className="flex flex-wrap gap-1 pb-1">
-                      {sessionReadFiles.map((fp) => (
-                        <span
-                          key={fp}
-                          className="inline-flex items-center gap-1 text-[10px] font-mono bg-muted rounded px-1.5 py-0.5 text-muted-foreground"
-                        >
-                          <FileCode className="h-2.5 w-2.5 shrink-0" />
-                          {fp.replace(/^.*\//, "")}
-                        </span>
-                      ))}
-                      <button
-                        className="text-[10px] text-muted-foreground/60 hover:text-muted-foreground transition-colors px-1"
-                        onClick={() => {
-                          setSessionReadFiles([]);
-                          setShowSessionFiles(false);
-                        }}
+            <ChatMessageList
+              history={history}
+              isPending={sendMutation.isPending}
+              displaySuggestions={displaySuggestions}
+              handleSuggestionClick={(s) => handleSend(s)}
+              formatMsgTime={formatMsgTime}
+              feedbackGiven={feedbackGiven}
+              handleFeedback={handleFeedback}
+              lastUsedProvider={lastUsedProvider}
+              pendingVoucher={pendingVoucher}
+              handleConfirmVoucher={handleConfirmVoucher}
+              setPendingVoucher={setPendingVoucher}
+              voucherSubmitting={voucherSubmitting}
+              pendingStockTransfer={pendingStockTransfer}
+              handleConfirmStockTransfer={handleConfirmStockTransfer}
+              setPendingStockTransfer={setPendingStockTransfer}
+              stockTransferSubmitting={stockTransferSubmitting}
+              pendingStockTransferBatch={pendingStockTransferBatch}
+              handleConfirmStockTransferBatchItem={handleConfirmStockTransferBatchItem}
+              handleDismissStockTransferBatchItem={handleDismissStockTransferBatchItem}
+              pendingStockAdj={pendingStockAdj}
+              handleConfirmStockAdj={handleConfirmStockAdj}
+              setPendingStockAdj={setPendingStockAdj}
+              stockAdjSubmitting={stockAdjSubmitting}
+              voucherSearchResults={voucherSearchResults}
+              setVoucherSearchResults={setVoucherSearchResults}
+              pendingStockItem={pendingStockItem}
+              handleConfirmStockItem={handleConfirmStockItem}
+              setPendingStockItem={setPendingStockItem}
+              stockItemSubmitting={stockItemSubmitting}
+              pendingPriceUpdate={pendingPriceUpdate}
+              handleConfirmPriceUpdate={handleConfirmPriceUpdate}
+              setPendingPriceUpdate={setPendingPriceUpdate}
+              priceUpdateSubmitting={priceUpdateSubmitting}
+              accountQueryResult={accountQueryResult}
+              setAccountQueryResult={setAccountQueryResult}
+              poDraft={poDraft}
+              handleConfirmPOImport={handleConfirmPOImport}
+              setPoDraft={setPoDraft}
+              poDraftSubmitting={poDraftSubmitting}
+              poDraftResult={poDraftResult}
+              poDraftError={poDraftError}
+              setPoDraftResult={setPoDraftResult}
+              setPoDraftError={setPoDraftError}
+              verifyContainerDraft={verifyContainerDraft}
+              setVerifyContainerDraft={setVerifyContainerDraft}
+              dataQueryResult={dataQueryResult}
+              setDataQueryResult={setDataQueryResult}
+              pendingFilePatches={pendingFilePatches}
+              setPendingFilePatches={setPendingFilePatches}
+              appliedPatchFiles={appliedPatchFiles}
+              setAppliedPatchFiles={setAppliedPatchFiles}
+              patchApplying={patchApplying}
+              handleApplyPatch={handleApplyPatch}
+              handleApplyAllPatches={handleApplyAllPatches}
+              handleGitPush={handleGitPush}
+              gitPushing={gitPushing}
+              perFilePushResult={perFilePushResult}
+              setPerFilePushResult={setPerFilePushResult}
+              scrollAreaRef={scrollAreaRef}
+            />
+
+            {sessionReadFiles.length > 0 && (
+              <div className="px-4 pb-1 border-b border-border/40">
+                <button
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mb-1"
+                  onClick={() => setShowSessionFiles((v) => !v)}
+                >
+                  {showSessionFiles ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                  <FileCode className="h-3 w-3" />
+                  {sessionReadFiles.length} file{sessionReadFiles.length !== 1 ? "s" : ""} read this session
+                </button>
+                {showSessionFiles && (
+                  <div className="flex flex-wrap gap-1 pb-1">
+                    {sessionReadFiles.map((fp) => (
+                      <span
+                        key={fp}
+                        className="inline-flex items-center gap-1 text-[10px] font-mono bg-muted rounded px-1.5 py-0.5 text-muted-foreground"
                       >
-                        clear
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
+                        <FileCode className="h-2.5 w-2.5 shrink-0" />
+                        {fp.replace(/^.*\//, "")}
+                      </span>
+                    ))}
+                    <button
+                      className="text-[10px] text-muted-foreground/60 hover:text-muted-foreground transition-colors px-1"
+                      onClick={() => {
+                        setSessionReadFiles([]);
+                        setShowSessionFiles(false);
+                      }}
+                    >
+                      clear
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
-              <ChatWidgetInput
-                fileInputRef={fileInputRef}
-                handleFileSelect={handleFileSelect}
-                poDraftUploading={poDraftUploading}
-                isPending={sendMutation.isPending}
-                inputRef={inputRef}
-                message={message}
-                setMessage={setMessage}
-                handleKeyDown={handleKeyDown}
-                handleSend={handleSend}
-                isError={sendMutation.isError}
-              />
+            <ChatWidgetInput
+              fileInputRef={fileInputRef}
+              handleFileSelect={handleFileSelect}
+              poDraftUploading={poDraftUploading}
+              isPending={sendMutation.isPending}
+              inputRef={inputRef}
+              message={message}
+              setMessage={setMessage}
+              handleKeyDown={handleKeyDown}
+              handleSend={handleSend}
+              isError={sendMutation.isError}
+            />
           </CardContent>
         </Card>
       )}

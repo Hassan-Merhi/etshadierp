@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -70,7 +71,9 @@ export function TabTruckLocation() {
 
         for (const quality of qualities) {
           const candidate = candidateCanvas.toDataURL("image/jpeg", quality);
-          const payloadBytes = new TextEncoder().encode(JSON.stringify({ imageBase64: candidate, fileName })).byteLength;
+          const payloadBytes = new TextEncoder().encode(
+            JSON.stringify({ imageBase64: candidate, fileName })
+          ).byteLength;
           if (payloadBytes <= MAX_JSON_BYTES) {
             imageBase64 = candidate;
             break outer;
@@ -92,18 +95,19 @@ export function TabTruckLocation() {
           imageBase64,
           fileName,
         });
-      } catch (apiErr: any) {
+      } catch (apiErr) {
         const msg =
-          apiErr?.status === 413 || String(apiErr?.message).toLowerCase().includes("too large")
+          getErrorDetails(apiErr).status === 413 ||
+          String(getErrorDetails(apiErr).optionalMessage).toLowerCase().includes("too large")
             ? "Tracking report is still too large to send to WhatsApp."
-            : (apiErr?.message ?? "Failed to send");
+            : (getErrorDetails(apiErr).optionalMessage ?? "Failed to send");
         toast({ title: "Failed to send", description: msg, variant: "destructive" });
         return;
       }
 
       toast({ title: "Sent", description: "Truck / Location report sent to WhatsApp group." });
-    } catch (err: any) {
-      toast({ title: "Failed to send", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Failed to send", description: getErrorDetails(err).message, variant: "destructive" });
     } finally {
       setWaSending(false);
     }

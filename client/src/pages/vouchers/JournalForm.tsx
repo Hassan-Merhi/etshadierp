@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { resolveWhatsAppPrompt } from "@/lib/whatsapp-prompt";
 import type { WhatsAppPromptState } from "@/lib/whatsapp-prompt";
@@ -45,7 +46,6 @@ import { useFormDraft } from "@/hooks/useFormDraft";
 import { Plus, X, Search, ChevronDown, FileDown, Loader2, CheckCircle, AlertTriangle } from "lucide-react";
 import { utils, writeFile } from "@/lib/excelHelper";
 import { cn } from "@/lib/utils";
-
 import type {
   Account,
   BankAccount,
@@ -76,7 +76,6 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
   const [waPendingPrompt, setWaPendingPrompt] = useState<WhatsAppPromptState>(null);
   const [accountPickersNeeded, setAccountPickersNeeded] = useState(() => !!voucherIdToEdit);
   const hydratedVoucherIdRef = useRef<number | null>(null);
-
   const { data: bankAccounts = [], isFetched: bankAccountsFetched } = useQuery<BankAccount[]>({
     queryKey: ["/api/bank-accounts", selectedCompany?.id],
   });
@@ -106,14 +105,12 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
   const { data: sidebarAccounts = [] } = useQuery<Account[]>({
     queryKey: ["/api/accounts/voucher-sidebar", selectedCompany?.id],
   });
-
   const [liveAccountSearch, setLiveAccountSearch] = useState("");
   const [debouncedAccountSearch, setDebouncedAccountSearch] = useState("");
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedAccountSearch(liveAccountSearch), 300);
     return () => clearTimeout(timer);
   }, [liveAccountSearch]);
-
   const { data: supplierSearchResults = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers", "live-search", debouncedAccountSearch, selectedCompany?.id],
     enabled: debouncedAccountSearch.length >= 2 && !!selectedCompany && !isPropertiesCompany,
@@ -708,8 +705,12 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
         code: newAccount.code || "",
         balance: 0,
       };
-    } catch (error: any) {
-      toast({ variant: "destructive", title: "Error", description: error.message || "Failed to create account" });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: getErrorDetails(error).message || "Failed to create account",
+      });
       return null;
     } finally {
       setIsAutoCreating(false);

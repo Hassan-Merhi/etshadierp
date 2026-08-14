@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -293,8 +294,8 @@ function BulkExportImport() {
       a.download = "grade-category-template.xlsx";
       a.click();
       URL.revokeObjectURL(url);
-    } catch (error: any) {
-      toast({ title: "Export failed", description: error.message, variant: "destructive" });
+    } catch (error) {
+      toast({ title: "Export failed", description: getErrorDetails(error).message, variant: "destructive" });
     }
   };
 
@@ -329,8 +330,8 @@ function BulkExportImport() {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-categories"] });
 
       setResultDialog(data);
-    } catch (error: any) {
-      toast({ title: "Import failed", description: error.message, variant: "destructive" });
+    } catch (error) {
+      toast({ title: "Import failed", description: getErrorDetails(error).message, variant: "destructive" });
     } finally {
       setIsImporting(false);
     }

@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -88,8 +89,8 @@ export default function FactoryBaleTracking() {
         throw new Error(d.message || "Not found");
       }
       setResult(await res.json());
-    } catch (e: any) {
-      setError(e.message || "Search failed");
+    } catch (e) {
+      setError(getErrorDetails(e).message || "Search failed");
     } finally {
       setLoading(false);
     }

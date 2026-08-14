@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
@@ -202,8 +203,12 @@ export default function DailyScan() {
         articleCode: bale.article_code,
         message: `${bale.weight_kg ? formatNumber(parseFloat(bale.weight_kg)) + " kg · " : ""}Verified`,
       });
-    } catch (error: any) {
-      showFeedback({ type: "error", refCode: ref, message: error?.message || "Failed to record scan" });
+    } catch (error) {
+      showFeedback({
+        type: "error",
+        refCode: ref,
+        message: getErrorDetails(error).optionalMessage || "Failed to record scan",
+      });
     } finally {
       setScanning(false);
       setTimeout(() => scanRef.current?.focus(), 50);

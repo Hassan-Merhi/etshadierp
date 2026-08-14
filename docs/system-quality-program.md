@@ -17,14 +17,14 @@ audit fails instead of allowing the reference to drift.
 
 | Signal | Now | Command |
 |---|---|---|
-| Type escapes (AST) | 8,829 total | `npm run audit:type-escapes` |
-| ESLint warnings | 9,457 total | `npm run lint` |
+| Type escapes (AST) | 8,658 total | `npm run audit:type-escapes` |
+| ESLint warnings | 9,282 total | `npm run lint` |
 | Startup migration failures | 0 on a fresh database | `npm run verify:startup-migrations` |
 | Backend coverage floor (lines) | 18% | `config/coverage-thresholds.json` |
 | Write routes with no test at all | 0 of 328 | `npm run audit:write-routes` |
 | Write routes covered only by the guard sweep | 0 of 328 | `npm run audit:write-routes` |
 | Registered routes | 1,904 | `config/route-manifest.json` |
-| God-file backlog | 49 files, 25,420 excess lines | `npm run audit:god-files` |
+| God-file backlog | 49 files, 25,436 excess lines | `npm run audit:god-files` |
 
 The schema layer remains the type source of truth. New code is not allowed to
 increase the type-escape ceiling, and sensitive write routes are not allowed to

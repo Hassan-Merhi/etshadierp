@@ -1,13 +1,14 @@
+import { getErrorDetails } from "@shared/errorUtils";
 /**
  * ReconciliationRunner — extracted sub-component.
  *
  * Extracted from GcLshiMigration.tsx during the Phase 4 god-file split.
  */
-import {useState} from "react";
-import {Button} from "@/components/ui/button";
-import {Badge} from "@/components/ui/badge";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {CheckCircle2, XCircle, AlertTriangle} from "lucide-react";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 
 export function ReconciliationRunner({
   sourceCompanyId,
@@ -34,9 +35,9 @@ export function ReconciliationRunner({
       const data = await r.json();
       if (!r.ok) throw new Error(data.message ?? `Request failed (${r.status})`);
       setReport(data);
-    } catch (err: any) {
+    } catch (err) {
       // Keep the previous report visible; surface the real error instead of silently clearing it.
-      setError(err.message ?? "Reconciliation failed");
+      setError(getErrorDetails(err).message ?? "Reconciliation failed");
     } finally {
       setLoading(false);
     }

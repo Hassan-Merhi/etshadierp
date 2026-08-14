@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { QueryClient, QueryFunction, MutationCache, QueryCache } from "@tanstack/react-query";
 import { isSafeToQueue, enqueueRequest, getDescriptionForRequest } from "./offlineQueue";
 import { OFFLINE_MODE_ENABLED } from "@/lib/featureFlags";
@@ -377,14 +378,14 @@ export async function apiRequest(
 
     await throwIfResNotOk(res);
     return res;
-  } catch (error: any) {
+  } catch (error) {
     clearTimeout(timeoutId);
-    if (error.name === "AbortError" && intentionalAbort) {
+    if (getErrorDetails(error).name === "AbortError" && intentionalAbort) {
       throw new Error(`Request timeout after ${Math.round(timeoutMs / 1000)} seconds for ${method} ${url}`, {
         cause: error,
       });
     }
-    const networkFail = error.name === "AbortError" ? true : isNetworkError(error);
+    const networkFail = getErrorDetails(error).name === "AbortError" ? true : isNetworkError(error);
     if (OFFLINE_MODE_ENABLED && networkFail && isSafeToQueue(method, url)) {
       const description = getDescriptionForRequest(url);
       const body = data ? JSON.stringify(data) : "";
@@ -443,9 +444,9 @@ export const getQueryFn: <T>(options: { on401: UnauthorizedBehavior }) => QueryF
 
       await throwIfResNotOk(res);
       return await res.json();
-    } catch (error: any) {
+    } catch (error) {
       clearTimeout(timeoutId);
-      if (timedOut && error?.name === "AbortError") {
+      if (timedOut && getErrorDetails(error).name === "AbortError") {
         throw new Error(`Request timed out after 30 seconds: GET ${requestUrl}`, { cause: error });
       }
       throw error;

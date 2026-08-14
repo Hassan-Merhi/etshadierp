@@ -1,23 +1,24 @@
+import { getErrorDetails } from "@shared/errorUtils";
 /**
  * MergeStockItemsCard — extracted sub-component.
  *
  * Extracted from DataToolsTab.tsx during the Phase 4 god-file split.
  */
-import {useState} from "react";
-import {Card, CardHeader, CardTitle, CardContent, CardDescription} from "@/components/ui/card";
-import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
-import {Label} from "@/components/ui/label";
-import {Alert, AlertDescription} from "@/components/ui/alert";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {useToast} from "@/hooks/use-toast";
-import {StockItemAutocomplete} from "@/components/StockItemAutocomplete";
-import {useQuery} from "@tanstack/react-query";
-import {queryClient, apiRequest} from "@/lib/queryClient";
-import {Loader2, AlertTriangle, Eye, ArrowLeftRight} from "lucide-react";
-import {formatNumber} from "@/lib/formatNumber";
+import { useState } from "react";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useToast } from "@/hooks/use-toast";
+import { StockItemAutocomplete } from "@/components/StockItemAutocomplete";
+import { useQuery } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Loader2, AlertTriangle, Eye, ArrowLeftRight } from "lucide-react";
+import { formatNumber } from "@/lib/formatNumber";
 
-import type {MergePreviewResult} from "../types";
+import type { MergePreviewResult } from "../types";
 
 export function MergeStockItemsCard({ embedded }: { embedded?: boolean } = {}) {
   const { toast } = useToast();
@@ -50,8 +51,8 @@ export function MergeStockItemsCard({ embedded }: { embedded?: boolean } = {}) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Preview failed");
       setPreview(data);
-    } catch (err: any) {
-      setPreviewError(err.message);
+    } catch (err) {
+      setPreviewError(getErrorDetails(err).message);
     } finally {
       setIsLoadingPreview(false);
     }
@@ -79,8 +80,8 @@ export function MergeStockItemsCard({ embedded }: { embedded?: boolean } = {}) {
       setPreview(null);
       setConfirmText("");
       setPreviewError(null);
-    } catch (err: any) {
-      toast({ title: "Merge failed", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Merge failed", description: getErrorDetails(err).message, variant: "destructive" });
     } finally {
       setIsMerging(false);
     }

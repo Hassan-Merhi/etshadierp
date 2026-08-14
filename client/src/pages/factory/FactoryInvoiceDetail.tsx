@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Button } from "@/components/ui/button";
@@ -529,8 +530,8 @@ export default function FactoryInvoiceDetail() {
         document.body.removeChild(a);
         URL.revokeObjectURL(objectUrl);
       }, 10000);
-    } catch (err: any) {
-      toast({ title: "Export failed", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Export failed", description: getErrorDetails(err).message, variant: "destructive" });
     }
   };
 

@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 /**
  * Pure helpers and lookup tables for the FactoryBaleRelabeling page.
  *
@@ -60,8 +61,8 @@ export function parseExcelFile(file: File): Promise<ParsedRow[]> {
           .map((r, i: number) => ({ currentRef: String(r[refCol] || "").trim(), rowNum: i + 2 }))
           .filter((r) => r.currentRef);
         resolve(parsed);
-      } catch (err: any) {
-        reject(new Error(err.message || "Failed to parse file"));
+      } catch (err) {
+        reject(new Error(getErrorDetails(err).message || "Failed to parse file"));
       }
     };
     reader.onerror = () => reject(new Error("Failed to read file"));

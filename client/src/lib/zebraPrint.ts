@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 const PRINT_MODE_KEY = "LABEL_PRINT_MODE";
 const PRINTER_NAME_KEY = "LABEL_PRINTER_NAME";
 
@@ -47,11 +48,11 @@ async function getConnection(): Promise<any> {
   if (!qz.websocket.isActive()) {
     try {
       await qz.websocket.connect();
-    } catch (err: any) {
+    } catch (err) {
       throw new Error(
         "Cannot connect to QZ Tray. Make sure QZ Tray is installed and running on this computer. " +
           "Download from https://qz.io/download/. Error: " +
-          (err.message || err),
+          (getErrorDetails(err).message || err),
         { cause: err }
       );
     }

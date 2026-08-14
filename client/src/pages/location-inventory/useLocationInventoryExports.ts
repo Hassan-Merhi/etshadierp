@@ -1,9 +1,7 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import type { InventoryLocation as Location } from "./locationInventoryTypes";
 
-export function useLocationInventoryExports(
-  selectedLocationLocal: Location | null,
-  toast: (opts: any) => void,
-) {
+export function useLocationInventoryExports(selectedLocationLocal: Location | null, toast: (opts: any) => void) {
   const handlePrintWithOption = async (withCost: boolean) => {
     if (!selectedLocationLocal) return;
     try {
@@ -29,15 +27,12 @@ export function useLocationInventoryExports(
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
       toast({ title: "PDF Downloaded" });
-    } catch (error: any) {
-      toast({ title: "Export Failed", description: error.message, variant: "destructive" });
+    } catch (error) {
+      toast({ title: "Export Failed", description: getErrorDetails(error).message, variant: "destructive" });
     }
   };
 
-  const handlePrintGroup = async (
-    group: { groupId: number | null; groupName: string },
-    withCost: boolean
-  ) => {
+  const handlePrintGroup = async (group: { groupId: number | null; groupName: string }, withCost: boolean) => {
     if (!selectedLocationLocal) return;
     try {
       const includeCost = withCost ? "1" : "0";
@@ -64,8 +59,8 @@ export function useLocationInventoryExports(
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
       toast({ title: "PDF Downloaded" });
-    } catch (error: any) {
-      toast({ title: "Export Failed", description: error.message, variant: "destructive" });
+    } catch (error) {
+      toast({ title: "Export Failed", description: getErrorDetails(error).message, variant: "destructive" });
     }
   };
 
@@ -84,8 +79,8 @@ export function useLocationInventoryExports(
       a.click();
       window.URL.revokeObjectURL(url);
       toast({ title: "Export Successful" });
-    } catch (error: any) {
-      toast({ title: "Export Failed", description: error.message, variant: "destructive" });
+    } catch (error) {
+      toast({ title: "Export Failed", description: getErrorDetails(error).message, variant: "destructive" });
     }
   };
 

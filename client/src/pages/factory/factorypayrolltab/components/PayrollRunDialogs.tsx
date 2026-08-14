@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { ChevronDown, ChevronRight, X, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -503,8 +504,8 @@ export function PayrollRunDialogs({ payroll }: { payroll: FactoryPayrollState })
                   a.download = `Payroll_${runForm.periodStart}_${runForm.periodEnd}.xlsx`;
                   a.click();
                   URL.revokeObjectURL(url);
-                } catch (err: any) {
-                  alert(err?.message || "Failed to export Excel");
+                } catch (err) {
+                  alert(getErrorDetails(err).optionalMessage || "Failed to export Excel");
                 }
               }}
               data-testid="button-export-payroll-excel"

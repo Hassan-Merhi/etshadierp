@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef, useEffect } from "react";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -822,7 +823,7 @@ export default function BaleProducts() {
       XLSX.utils.book_append_sheet(wb, ws, "Bale Products");
       await XLSX.writeFile(wb, "bale_products_template.xlsx");
       toast({ title: "Template downloaded" });
-    } catch (err: any) {
+    } catch (err) {
       toast({ title: "Error", description: "Failed to generate template", variant: "destructive" });
     }
   };
@@ -894,10 +895,10 @@ export default function BaleProducts() {
 
       setImportPreview(preview.filter((r) => r.articleCode && r.name));
       setImportDialogOpen(true);
-    } catch (err: any) {
-      setImportError(err.message || "Failed to parse Excel file");
+    } catch (err) {
+      setImportError(getErrorDetails(err).message || "Failed to parse Excel file");
       setImportFile(null);
-      toast({ title: "Parse Error", description: err.message, variant: "destructive" });
+      toast({ title: "Parse Error", description: getErrorDetails(err).message, variant: "destructive" });
     }
 
     if (fileInputRef.current) fileInputRef.current.value = "";

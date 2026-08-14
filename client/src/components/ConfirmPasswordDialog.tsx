@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -41,8 +42,8 @@ export function ConfirmPasswordDialog({ open, onClose, onConfirmed, action, desc
       await apiRequest("POST", "/api/auth/confirm-password", { password });
       reset();
       onConfirmed();
-    } catch (err: any) {
-      setError(err?.message || "Incorrect password. Please try again.");
+    } catch (err) {
+      setError(getErrorDetails(err).optionalMessage || "Incorrect password. Please try again.");
       setPassword("");
     } finally {
       setLoading(false);

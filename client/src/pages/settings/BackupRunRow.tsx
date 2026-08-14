@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { Download, Mail, MessageSquare, AlertTriangle, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
@@ -15,8 +16,8 @@ export function RunRow({ run }: { run: BackupRun }) {
       await apiRequest("POST", `/api/export/retry-email/${run.id}`);
       toast({ title: "Retry requested", description: "System will attempt to re-send the email shortly." });
       qc.invalidateQueries({ queryKey: ["/api/export/backup-status"] });
-    } catch (e: any) {
-      toast({ variant: "destructive", title: "Retry failed", description: e.message });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Retry failed", description: getErrorDetails(e).message });
     }
   };
 
@@ -25,8 +26,8 @@ export function RunRow({ run }: { run: BackupRun }) {
       await apiRequest("POST", `/api/export/retry-whatsapp/${run.id}`);
       toast({ title: "Retry requested", description: "System will attempt to re-send via WhatsApp shortly." });
       qc.invalidateQueries({ queryKey: ["/api/export/backup-status"] });
-    } catch (e: any) {
-      toast({ variant: "destructive", title: "Retry failed", description: e.message });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Retry failed", description: getErrorDetails(e).message });
     }
   };
 

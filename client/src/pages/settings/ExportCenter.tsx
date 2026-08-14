@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -115,8 +116,8 @@ export function ExportCenter() {
       setActiveJobId(result.jobId);
       setActiveMode(mode);
       setProgressOpen(true);
-    } catch (e: any) {
-      toast({ variant: "destructive", title: "Could not start export", description: e.message });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Could not start export", description: getErrorDetails(e).message });
     }
   };
 
@@ -154,8 +155,8 @@ export function ExportCenter() {
       setGmailUser("");
       setGmailPassword("");
       toast({ title: "Settings saved" });
-    } catch (e: any) {
-      toast({ variant: "destructive", title: "Error", description: e.message });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Error", description: getErrorDetails(e).message });
     } finally {
       setSavingGmail(false);
     }

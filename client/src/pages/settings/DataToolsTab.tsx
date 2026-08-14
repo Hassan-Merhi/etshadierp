@@ -1,39 +1,63 @@
-import {useState, useRef} from "react";
-import {Card, CardHeader, CardTitle, CardContent, CardDescription} from "@/components/ui/card";
-import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
-import {Label} from "@/components/ui/label";
-import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from "@/components/ui/dialog";
-import {Alert, AlertDescription} from "@/components/ui/alert";
+import { getErrorDetails } from "@shared/errorUtils";
+import { useState, useRef } from "react";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {} from "@/components/ui/alert-dialog";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-
-import {useToast} from "@/hooks/use-toast";
-import {useMutation, useQuery} from "@tanstack/react-query";
-import {queryClient, apiRequest} from "@/lib/queryClient";
-import {useAppMode} from "@/contexts/AppModeContext";
-import {getApiRequest} from "@/lib/factoryApi";
-import {Plus, Edit, RefreshCw, Calculator, Loader2, AlertTriangle, Package, Upload, Download, Database, TrendingUp, TrendingDown, Check, X, ArrowLeftRight, CheckCircle2, FileSpreadsheet, FileDown, Search} from "lucide-react";
-import {utils, writeFile, readFile, read} from "@/lib/excelHelper";
-import {Link} from "wouter";
-import {BulkRenameTab} from "./BulkRenameTab";
-import {useCompany} from "@/contexts/CompanyContext";
-import {formatNumber} from "@/lib/formatNumber";
-
-import type {SilentImportRow} from "./datatoolstab/types";
-import {ReconcileOTWNamesCard} from "./datatoolstab/components/ReconcileOTWNamesCard";
-import {MergeStockItemsLauncher} from "./datatoolstab/components/MergeStockItemsLauncher";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useToast } from "@/hooks/use-toast";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
+import {
+  Plus,
+  Edit,
+  RefreshCw,
+  Calculator,
+  Loader2,
+  AlertTriangle,
+  Package,
+  Upload,
+  Download,
+  Database,
+  TrendingUp,
+  TrendingDown,
+  Check,
+  X,
+  ArrowLeftRight,
+  CheckCircle2,
+  FileSpreadsheet,
+  FileDown,
+  Search,
+} from "lucide-react";
+import { utils, writeFile, readFile, read } from "@/lib/excelHelper";
+import { Link } from "wouter";
+import { BulkRenameTab } from "./BulkRenameTab";
+import { useCompany } from "@/contexts/CompanyContext";
+import { formatNumber } from "@/lib/formatNumber";
+import type { SilentImportRow } from "./datatoolstab/types";
+import { ReconcileOTWNamesCard } from "./datatoolstab/components/ReconcileOTWNamesCard";
+import { MergeStockItemsLauncher } from "./datatoolstab/components/MergeStockItemsLauncher";
 export function DataToolsTab() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
-
   // Separate location selection for each import operation
   const [costPriceLocationId, setCostPriceLocationId] = useState<string>("");
   const [stockLocationId, setStockLocationId] = useState<string>("");
-
   // Cost price import state
   const [costPriceImportOpen, setCostPriceImportOpen] = useState(false);
   const [costPriceFile, setCostPriceFile] = useState<File | null>(null);
@@ -41,7 +65,6 @@ export function DataToolsTab() {
   const [costPriceErrors, setCostPriceErrors] = useState<string[]>([]);
   const [isImportingCostPrice, setIsImportingCostPrice] = useState(false);
   const [costPriceImportComplete, setCostPriceImportComplete] = useState(false);
-
   // Stock import state
   const [stockImportOpen, setStockImportOpen] = useState(false);
   const [stockFile, setStockFile] = useState<File | null>(null);
@@ -51,10 +74,8 @@ export function DataToolsTab() {
   const [stockErrors, setStockErrors] = useState<string[]>([]);
   const [isImportingStock, setIsImportingStock] = useState(false);
   const [stockImportComplete, setStockImportComplete] = useState(false);
-
   // Current user (for developer-only features)
   const { data: dtCurrentUser } = useQuery<{ role?: string }>({ queryKey: ["/api/auth/me"] });
-
   // Silent production / consumption state
   const [silentProdOpen, setSilentProdOpen] = useState(false);
   const [silentProdType, setSilentProdType] = useState<"Production" | "Consumption">("Production");
@@ -65,13 +86,11 @@ export function DataToolsTab() {
   const [silentProdSearchTerm, setSilentProdSearchTerm] = useState("");
   const [silentProdApplying, setSilentProdApplying] = useState(false);
   const [silentProdDone, setSilentProdDone] = useState(0);
-
   // Silent prod — Excel import state
   const [silentImportMode, setSilentImportMode] = useState(false);
   const [silentImportPreview, setSilentImportPreview] = useState<SilentImportRow[]>([]);
   const [silentImportLoading, setSilentImportLoading] = useState(false);
   const silentImportFileRef = useRef<HTMLInputElement>(null);
-
   // Silent inventory transfer state
   const [silentTransferOpen, setSilentTransferOpen] = useState(false);
   const [silentSrcId, setSilentSrcId] = useState("");
@@ -86,16 +105,13 @@ export function DataToolsTab() {
   const [isSilentParsing, setIsSilentParsing] = useState(false);
   const [isSilentApplying, setIsSilentApplying] = useState(false);
   const [silentAppliedCount, setSilentAppliedCount] = useState(0);
-
   // Bulk rename dialog state
   const [bulkRenameOpen, setBulkRenameOpen] = useState(false);
-
   // Fetch locations for the current company
   const { data: locations = [] } = useQuery<any[]>({
     queryKey: ["/api/locations", selectedCompany?.id],
     enabled: !!selectedCompany,
   });
-
   // Fetch stock items for silent production picker (developer-only, lightweight)
   const { data: allStockItems = [] } = useQuery<any[]>({
     queryKey: ["/api/stock-items/light", selectedCompany?.id],
@@ -105,7 +121,6 @@ export function DataToolsTab() {
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });
-
   // Fetch location inventory for silent prod (manual + import modes)
   const { data: silentLocInventory = [], isLoading: silentLocInventoryLoading } = useQuery<
     {
@@ -124,7 +139,6 @@ export function DataToolsTab() {
     },
     enabled: !!silentProdLocId && silentProdOpen,
   });
-
   // Fix Cost Prices mutation
   const recalculateCostsMutation = useMutation({
     mutationFn: async () => {
@@ -146,7 +160,6 @@ export function DataToolsTab() {
       });
     },
   });
-
   // Cost price import functions
   const downloadCostPriceTemplate = async () => {
     const template = [
@@ -162,32 +175,26 @@ export function DataToolsTab() {
       description: "Use this template to update cost prices",
     });
   };
-
   const handleCostPriceFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
-
     setCostPriceFile(selectedFile);
     setCostPriceErrors([]);
     setCostPricePreview([]);
     setCostPriceImportComplete(false);
-
     try {
       const data = await selectedFile.arrayBuffer();
       const workbook = await read(data);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = utils.sheet_to_json<any>(worksheet);
-
       if (jsonData.length === 0) {
         toast({ title: "Empty File", description: "The Excel file is empty.", variant: "destructive" });
         return;
       }
-
       const headerRow = utils.sheet_to_json<string[]>(worksheet, { header: 1 })[0] || [];
       const columns = headerRow.map((h: any) => String(h || "").trim());
       const requiredCols = ["barcode", "costPrice"];
       const missingCols = requiredCols.filter((col) => !columns.includes(col));
-
       if (missingCols.length > 0) {
         toast({
           title: "Missing Required Columns",
@@ -196,10 +203,8 @@ export function DataToolsTab() {
         });
         return;
       }
-
       const errors: string[] = [];
       const rows: Array<{ barcode: string; costPrice: number }> = [];
-
       jsonData.forEach((row: any, index: number) => {
         const rowNumber = index + 2;
         if (!row.barcode || String(row.barcode).trim() === "") {
@@ -213,14 +218,12 @@ export function DataToolsTab() {
         }
         rows.push({ barcode: String(row.barcode).trim(), costPrice });
       });
-
       setCostPricePreview(rows);
       setCostPriceErrors(errors);
     } catch (error) {
       toast({ title: "Error Reading File", description: "Please ensure valid Excel file.", variant: "destructive" });
     }
   };
-
   const handleCostPriceImport = async () => {
     if (!costPriceLocationId) {
       toast({ title: "No Location Selected", description: "Please select a location first", variant: "destructive" });
@@ -230,7 +233,6 @@ export function DataToolsTab() {
       toast({ title: "Cannot Import", description: "Please fix validation errors first", variant: "destructive" });
       return;
     }
-
     setIsImportingCostPrice(true);
     try {
       const res = await modeApiRequest("POST", `/api/locations/${costPriceLocationId}/import-cost-prices`, {
@@ -243,13 +245,16 @@ export function DataToolsTab() {
         title: "Import Successful",
         description: `Updated ${response.updated} cost prices.`,
       });
-    } catch (error: any) {
-      toast({ title: "Import Failed", description: error.message || "Failed to import", variant: "destructive" });
+    } catch (error) {
+      toast({
+        title: "Import Failed",
+        description: getErrorDetails(error).message || "Failed to import",
+        variant: "destructive",
+      });
     } finally {
       setIsImportingCostPrice(false);
     }
   };
-
   const handleCostPriceDialogClose = async () => {
     setCostPriceImportOpen(false);
     setCostPriceFile(null);
@@ -257,7 +262,6 @@ export function DataToolsTab() {
     setCostPriceErrors([]);
     setCostPriceImportComplete(false);
   };
-
   // Stock import functions
   const downloadStockTemplate = async () => {
     const template = [
@@ -270,32 +274,26 @@ export function DataToolsTab() {
     await writeFile(wb, "stock_import_template.xlsx");
     toast({ title: "Template Downloaded", description: "Use this template to import stock" });
   };
-
   const handleStockFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
-
     setStockFile(selectedFile);
     setStockErrors([]);
     setStockPreview([]);
     setStockImportComplete(false);
-
     try {
       const data = await selectedFile.arrayBuffer();
       const workbook = await read(data);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = utils.sheet_to_json<any>(worksheet);
-
       if (jsonData.length === 0) {
         toast({ title: "Empty File", description: "The Excel file is empty.", variant: "destructive" });
         return;
       }
-
       const headerRow = utils.sheet_to_json<string[]>(worksheet, { header: 1 })[0] || [];
       const columns = headerRow.map((h: any) => String(h || "").trim());
       const requiredCols = ["Item_barcode", "quantity", "rate", "value"];
       const missingCols = requiredCols.filter((col) => !columns.includes(col));
-
       if (missingCols.length > 0) {
         toast({
           title: "Missing Required Columns",
@@ -304,7 +302,6 @@ export function DataToolsTab() {
         });
         return;
       }
-
       const errors: string[] = [];
       const rows: Array<{
         Item_barcode: string;
@@ -313,7 +310,6 @@ export function DataToolsTab() {
         rate: string;
         value: string;
       }> = [];
-
       jsonData.forEach((row: any, index: number) => {
         const rowNumber = index + 2;
         if (!row.Item_barcode || String(row.Item_barcode).trim() === "") {
@@ -339,14 +335,12 @@ export function DataToolsTab() {
           value: String(value),
         });
       });
-
       setStockPreview(rows);
       setStockErrors(errors);
     } catch (error) {
       toast({ title: "Error Reading File", description: "Please ensure valid Excel file.", variant: "destructive" });
     }
   };
-
   const handleStockImport = async () => {
     if (!stockLocationId) {
       toast({ title: "No Location Selected", description: "Please select a location first", variant: "destructive" });
@@ -356,7 +350,6 @@ export function DataToolsTab() {
       toast({ title: "Cannot Import", description: "Please fix validation errors first", variant: "destructive" });
       return;
     }
-
     setIsImportingStock(true);
     try {
       const res = await modeApiRequest("POST", `/api/locations/${stockLocationId}/import-inventory`, {
@@ -370,8 +363,12 @@ export function DataToolsTab() {
         title: "Import Successful",
         description: `Imported ${response.imported || stockPreview.length} inventory items`,
       });
-    } catch (error: any) {
-      toast({ title: "Import Failed", description: error.message || "Failed to import", variant: "destructive" });
+    } catch (error) {
+      toast({
+        title: "Import Failed",
+        description: getErrorDetails(error).message || "Failed to import",
+        variant: "destructive",
+      });
     } finally {
       setIsImportingStock(false);
     }
@@ -471,8 +468,12 @@ export function DataToolsTab() {
         });
 
       setSilentImportPreview(preview);
-    } catch (err: any) {
-      toast({ title: "Parse Error", description: err.message || "Failed to read file", variant: "destructive" });
+    } catch (err) {
+      toast({
+        title: "Parse Error",
+        description: getErrorDetails(err).message || "Failed to read file",
+        variant: "destructive",
+      });
     } finally {
       setSilentImportLoading(false);
     }
@@ -556,8 +557,8 @@ export function DataToolsTab() {
       setSilentImportMode(false);
       queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
       queryClient.invalidateQueries({ queryKey: ["/api/location-summary"] });
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Error", description: getErrorDetails(err).message, variant: "destructive" });
     } finally {
       setSilentProdApplying(false);
     }
@@ -1139,7 +1140,7 @@ export function DataToolsTab() {
                             });
                             const data = await res.json();
                             setSilentProdDone(data.applied || validItems.length);
-                          } catch (err: any) {
+                          } catch (err) {
                             console.error("Silent production error:", err);
                           } finally {
                             setSilentProdApplying(false);
@@ -1469,8 +1470,8 @@ export function DataToolsTab() {
                       setSilentErrorLines(data.errorLines || []);
                       setSilentIncludeWarnings(false);
                       setSilentStep("validation");
-                    } catch (err: any) {
-                      setSilentParseError(err.message);
+                    } catch (err) {
+                      setSilentParseError(getErrorDetails(err).message);
                     } finally {
                       setIsSilentParsing(false);
                     }
@@ -1673,8 +1674,8 @@ export function DataToolsTab() {
                           queryClient.invalidateQueries({ queryKey: ["/api/location-summary"] });
                           setSilentAppliedCount(applyItems.length);
                           setSilentStep("done");
-                        } catch (err: any) {
-                          setSilentParseError(err.message);
+                        } catch (err) {
+                          setSilentParseError(getErrorDetails(err).message);
                           setSilentStep("setup");
                         } finally {
                           setIsSilentApplying(false);

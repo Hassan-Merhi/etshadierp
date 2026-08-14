@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { pool } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -282,9 +283,9 @@ export async function checkAndRunLocationStockReports(now = new Date()): Promise
       if (!due.due || !due.localDate) continue;
       await runOneLocationSchedule(row, due.localDate);
     }
-  } catch (error: any) {
+  } catch (error) {
     // During a rolling deployment an older database may briefly precede startup migrations.
-    if (error?.code === "42P01") return;
+    if (getErrorDetails(error).code === "42P01") return;
     logger.error("[LocationStockSchedule] scheduler check failed", { error });
   }
 }

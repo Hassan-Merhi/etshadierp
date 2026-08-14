@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef, useEffect } from "react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -186,8 +187,8 @@ function BatchDetailView({ batch, onBack }: { batch: any; onBack: () => void }) 
         next.add(bale.id);
         return next;
       });
-    } catch (error: any) {
-      setScanError(error.message || "Bale not found");
+    } catch (error) {
+      setScanError(getErrorDetails(error).message || "Bale not found");
     }
 
     setScanInput("");

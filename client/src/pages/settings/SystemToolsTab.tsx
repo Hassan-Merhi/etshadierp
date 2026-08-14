@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState } from "react";
 import {
   RefreshCw,
@@ -172,8 +173,8 @@ export function SystemToolsTab({ appMode, currentUser, selectedCompany, companie
           } else {
             toast({ title: "Error", description: result.message, variant: "destructive" });
           }
-        } catch (error: any) {
-          toast({ title: "Error", description: error.message, variant: "destructive" });
+        } catch (error) {
+          toast({ title: "Error", description: getErrorDetails(error).message, variant: "destructive" });
         }
       },
       testId: "card-orphaned-vouchers",

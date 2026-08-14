@@ -1,15 +1,16 @@
+import { getErrorDetails } from "@shared/errorUtils";
 /**
  * ReconcileOTWNamesCard — extracted sub-component.
  *
  * Extracted from DataToolsTab.tsx during the Phase 4 god-file split.
  */
-import {useState} from "react";
-import {Card, CardHeader, CardTitle, CardContent, CardDescription} from "@/components/ui/card";
-import {Button} from "@/components/ui/button";
-import {Alert, AlertDescription} from "@/components/ui/alert";
-import {useToast} from "@/hooks/use-toast";
-import {queryClient, apiRequest} from "@/lib/queryClient";
-import {Loader2, RotateCcw} from "lucide-react";
+import { useState } from "react";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Loader2, RotateCcw } from "lucide-react";
 
 export function ReconcileOTWNamesCard() {
   const { toast } = useToast();
@@ -29,8 +30,8 @@ export function ReconcileOTWNamesCard() {
       toast({
         title: data.fixed > 0 ? `Fixed ${data.fixed} OTW line item(s)` : "All OTW names are already up to date",
       });
-    } catch (err: any) {
-      toast({ title: "Reconcile failed", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Reconcile failed", description: getErrorDetails(err).message, variant: "destructive" });
     } finally {
       setRunning(false);
     }

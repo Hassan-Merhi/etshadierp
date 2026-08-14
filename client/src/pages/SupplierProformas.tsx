@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
@@ -280,8 +281,8 @@ export default function SupplierProformas() {
           return;
         }
         importLinesMutation.mutate({ proformaId: importTarget, lines });
-      } catch (err: any) {
-        toast({ title: "Parse error", description: err.message, variant: "destructive" });
+      } catch (err) {
+        toast({ title: "Parse error", description: getErrorDetails(err).message, variant: "destructive" });
       }
     };
     reader.readAsArrayBuffer(file);

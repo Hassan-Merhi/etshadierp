@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -169,8 +170,8 @@ export function useChatActions(state: ChatActionsState) {
       sendMutation.mutate(
         `Voucher created: ${edited.type} of $${Math.max(...edited.entries.map((e) => e.debit || e.credit))} on ${edited.date}`
       );
-    } catch (err: any) {
-      sendMutation.mutate(`Voucher creation failed: ${err.message}`);
+    } catch (err) {
+      sendMutation.mutate(`Voucher creation failed: ${getErrorDetails(err).message}`);
     }
   };
 
@@ -224,8 +225,8 @@ export function useChatActions(state: ChatActionsState) {
           ? `Optional stock transfer draft created from "${resolved.sourceLocationName}" to "${resolved.destinationLocationName}"${voucherRef}. ${resolved.items.length} item(s). Inventory has NOT moved — open Stock Transfers to review and approve/post it.`
           : `Stock transfer created from "${resolved.sourceLocationName}" to "${resolved.destinationLocationName}" on ${resolved.date}. ${resolved.items.length} item(s) transferred.`
       );
-    } catch (err: any) {
-      sendMutation.mutate(`Stock transfer failed: ${err.message}`);
+    } catch (err) {
+      sendMutation.mutate(`Stock transfer failed: ${getErrorDetails(err).message}`);
     }
   };
 
@@ -260,8 +261,8 @@ export function useChatActions(state: ChatActionsState) {
       sendMutation.mutate(
         `Stock adjustment created: ${adjType} voucher on ${resolved.date} at ${resolved.locationName}`
       );
-    } catch (err: any) {
-      sendMutation.mutate(`Stock adjustment failed: ${err.message}`);
+    } catch (err) {
+      sendMutation.mutate(`Stock adjustment failed: ${getErrorDetails(err).message}`);
     }
   };
 
@@ -280,8 +281,8 @@ export function useChatActions(state: ChatActionsState) {
       sendMutation.mutate(
         `Stock item "${resolved.name}" (${resolved.code}) created successfully in group "${resolved.stockGroupName}".`
       );
-    } catch (err: any) {
-      sendMutation.mutate(`Failed to create stock item: ${err.message}`);
+    } catch (err) {
+      sendMutation.mutate(`Failed to create stock item: ${getErrorDetails(err).message}`);
     }
   };
 
@@ -302,8 +303,8 @@ export function useChatActions(state: ChatActionsState) {
       sendMutation.mutate(
         `Price updated: "${resolved.stockItemName}" set to ${resolved.newPrice} for "${resolved.locationName}"${cascadeNote}.`
       );
-    } catch (err: any) {
-      sendMutation.mutate(`Failed to update price: ${err.message}`);
+    } catch (err) {
+      sendMutation.mutate(`Failed to update price: ${getErrorDetails(err).message}`);
     }
   };
 
@@ -322,8 +323,8 @@ export function useChatActions(state: ChatActionsState) {
         return;
       }
       setAppliedPatchFiles((prev) => new Set([...prev, patch.filePath]));
-    } catch (err: any) {
-      sendMutation.mutate(`Failed to apply patch: ${err.message}`);
+    } catch (err) {
+      sendMutation.mutate(`Failed to apply patch: ${getErrorDetails(err).message}`);
     }
   };
 
@@ -353,8 +354,11 @@ export function useChatActions(state: ChatActionsState) {
         ...prev,
         [filePath]: { success: true, commitHash: data.commitHash, branch: data.branch },
       }));
-    } catch (err: any) {
-      setPerFilePushResult((prev) => ({ ...prev, [filePath]: { success: false, error: err.message } }));
+    } catch (err) {
+      setPerFilePushResult((prev) => ({
+        ...prev,
+        [filePath]: { success: false, error: getErrorDetails(err).message },
+      }));
     }
   };
 

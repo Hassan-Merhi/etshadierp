@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/PageHeader";
@@ -212,10 +213,10 @@ export default function FactoryReprintLabels() {
         const zpl = buildZplBatch(labels, true);
         await printRawZpl(zpl);
         toast({ title: `${labels.length} label(s) sent to Zebra printer` });
-      } catch (err: any) {
+      } catch (err) {
         toast({
           title: "Zebra print failed — falling back to browser",
-          description: err.message,
+          description: getErrorDetails(err).message,
           variant: "destructive",
         });
         openBrowserPrint(labels);

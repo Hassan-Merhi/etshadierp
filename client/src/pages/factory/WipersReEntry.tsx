@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -52,18 +53,15 @@ import {
 import { useLabelDesignColors } from "@/hooks/useLabelDesignColors";
 import type { FactoryBaleProduct, Location, FactoryCategory } from "@shared/schema";
 import * as XLSX from "@/lib/excelHelper";
-
 import type { CartItem, CreatedBale } from "./wipersreentry/types";
 import { isWipers, isWipersBale } from "./wipersreentry/utils";
 import { productMatchesSearch } from "@shared/factoryProductSearch";
-
 export default function WipersReEntry() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { colors } = useLabelDesignColors();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
-
   const [entryDate, setEntryDate] = useState<string>(new Date().toLocaleDateString("en-CA"));
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -79,7 +77,6 @@ export default function WipersReEntry() {
   const [designPickerOpen, setDesignPickerOpen] = useState(false);
   const [pendingLabels, setPendingLabels] = useState<LabelData[] | null>(null);
   const scanRef = useRef<HTMLInputElement>(null);
-
   const { data: baleProducts, isLoading: productsLoading } = useQuery<FactoryBaleProduct[]>({
     queryKey: ["/api/factory/bale-products"],
   });
@@ -284,8 +281,12 @@ export default function WipersReEntry() {
         await printRawZpl(zpl);
         toast({ title: "Labels sent to Zebra printer" });
         return;
-      } catch (err: any) {
-        toast({ title: "Zebra failed", description: err.message + " — using browser print", variant: "destructive" });
+      } catch (err) {
+        toast({
+          title: "Zebra failed",
+          description: getErrorDetails(err).message + " — using browser print",
+          variant: "destructive",
+        });
       }
     }
     openBrowserPrint(labels, format);
@@ -317,10 +318,10 @@ export default function WipersReEntry() {
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "WipersReEntry");
       await XLSX.writeFile(wb, `wipers-re-entry-${entryDate}.xlsx`);
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Export failed",
-        description: err?.message || "Could not generate Excel file.",
+        description: getErrorDetails(err).optionalMessage || "Could not generate Excel file.",
         variant: "destructive",
       });
     }

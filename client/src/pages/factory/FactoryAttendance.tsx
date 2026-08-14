@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -163,8 +164,8 @@ export default function FactoryAttendance() {
         const html = generateRangePrintHtml(activeOnly, rangeAttendance, dates, rangeStart, rangeEnd, lang);
         openPrintWindow(html);
       }
-    } catch (err: any) {
-      toast({ title: "Export failed", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Export failed", description: getErrorDetails(err).message, variant: "destructive" });
     } finally {
       setIsExportingRange(false);
     }

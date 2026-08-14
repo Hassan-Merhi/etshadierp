@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Upload, Download, FileSpreadsheet } from "lucide-react";
@@ -133,10 +134,10 @@ export function ImportBalesTab() {
 
         setImportRows(rows);
         toast({ title: "File Parsed", description: `Found ${rows.length} bale(s) to import` });
-      } catch (err: any) {
+      } catch (err) {
         toast({
           title: "Parse Error",
-          description: err.message || "Failed to parse Excel file",
+          description: getErrorDetails(err).message || "Failed to parse Excel file",
           variant: "destructive",
         });
       }

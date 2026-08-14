@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -65,8 +66,8 @@ export function LabelPrintSettings() {
       if (list.length === 0) {
         toast({ title: "No printers found", description: "Make sure QZ Tray is running", variant: "destructive" });
       }
-    } catch (err: any) {
-      toast({ title: "Error loading printers", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Error loading printers", description: getErrorDetails(err).message, variant: "destructive" });
     } finally {
       setLoadingPrinters(false);
     }
@@ -78,8 +79,8 @@ export function LabelPrintSettings() {
       const zpl = buildZplTestLabel();
       await printRawZpl(zpl);
       toast({ title: "Test label sent", description: "Check your Zebra printer" });
-    } catch (err: any) {
-      toast({ title: "Test print failed", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Test print failed", description: getErrorDetails(err).message, variant: "destructive" });
     } finally {
       setTestPrinting(false);
     }

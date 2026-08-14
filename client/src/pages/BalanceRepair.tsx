@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -136,8 +137,8 @@ export default function BalanceRepair() {
             ? "No discrepancies found — everything looks good."
             : `Found ${data.totalDiscrepancies} issue${data.totalDiscrepancies !== 1 ? "s" : ""}.`,
       });
-    } catch (e: any) {
-      toast({ title: "Scan failed", description: e.message, variant: "destructive" });
+    } catch (e) {
+      toast({ title: "Scan failed", description: getErrorDetails(e).message, variant: "destructive" });
       setPhase("idle");
     }
   }
@@ -164,8 +165,8 @@ export default function BalanceRepair() {
         title: "Fixes applied",
         description: `${data.ledgerFixed} ledger row(s), ${data.voucherEntriesFixed} voucher(s), ${data.orphansFixed} orphaned transfer(s), ${data.depositsFixed} deposit flag(s).`,
       });
-    } catch (e: any) {
-      toast({ title: "Repair failed", description: e.message, variant: "destructive" });
+    } catch (e) {
+      toast({ title: "Repair failed", description: getErrorDetails(e).message, variant: "destructive" });
       setPhase("scanned");
     }
   }
@@ -184,8 +185,8 @@ export default function BalanceRepair() {
       setScan(null);
       setPhase("idle");
       toast({ title: "Undo complete", description: "All changes have been reverted." });
-    } catch (e: any) {
-      toast({ title: "Undo failed", description: e.message, variant: "destructive" });
+    } catch (e) {
+      toast({ title: "Undo failed", description: getErrorDetails(e).message, variant: "destructive" });
       setPhase("applied");
     }
   }
@@ -229,21 +230,13 @@ export default function BalanceRepair() {
           </Button>
           {phase === "scanned" && total > 0 && (
             <Button onClick={applyFixes} disabled={busy} data-testid="button-apply-fixes">
-              {busy ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Wrench className="mr-2 h-4 w-4" />
-              )}
+              {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wrench className="mr-2 h-4 w-4" />}
               Apply {total} Fix{total !== 1 ? "es" : ""}
             </Button>
           )}
           {phase === "applied" && snapshot && (
             <Button variant="outline" onClick={undoFixes} disabled={busy} data-testid="button-undo-repair">
-              {busy ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Undo2 className="mr-2 h-4 w-4" />
-              )}
+              {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Undo2 className="mr-2 h-4 w-4" />}
               Undo Repair
             </Button>
           )}

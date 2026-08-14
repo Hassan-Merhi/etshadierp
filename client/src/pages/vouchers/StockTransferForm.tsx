@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -52,7 +53,6 @@ import {
   History,
   Search,
 } from "lucide-react";
-
 import type { Location, StockItem, StockTransferFormData, StockTransferFormProps } from "./stocktransferform/types";
 import { stockTransferFormSchema } from "./stocktransferform/utils";
 import { ApproveRevisionDialog } from "./stock-transfer-form/dialogs/ApproveRevisionDialog";
@@ -623,11 +623,12 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       const refreshedRevisions = queryClient.getQueryData<any[]>(["/api/stock-transfers", transferId, "revisions"]);
       const nextRevNum = refreshedRevisions?.length ?? transferRevisions.length + 1;
       toast({ title: "Revision Saved", description: `Rev ${nextRevNum} recorded and transfer updated` });
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Revision Not Saved",
         description:
-          error.message || "The transfer was updated, but the revision record failed to save. Please try again.",
+          getErrorDetails(error).message ||
+          "The transfer was updated, but the revision record failed to save. Please try again.",
         variant: "destructive",
       });
     } finally {

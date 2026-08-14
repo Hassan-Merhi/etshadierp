@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -142,8 +143,8 @@ export default function FactoryBaleRelabeling() {
     try {
       const rows = await parseExcelFile(file);
       setParsedRows(rows);
-    } catch (err: any) {
-      setParseError(err.message);
+    } catch (err) {
+      setParseError(getErrorDetails(err).message);
     }
     if (fileRef.current) fileRef.current.value = "";
   };

@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Plus, Minus, Trash2, Printer, Barcode, ScanLine, AlertCircle, Package, Info } from "lucide-react";
@@ -202,8 +203,12 @@ export default function PressingBales() {
       printWindow.document.close();
       printWindow.focus();
       setTimeout(() => printWindow.print(), 500);
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to generate labels", variant: "destructive" });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: getErrorDetails(error).message || "Failed to generate labels",
+        variant: "destructive",
+      });
     }
   };
 

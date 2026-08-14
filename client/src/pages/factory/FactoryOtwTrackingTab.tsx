@@ -1,25 +1,52 @@
-import {useState} from "react";
-import {useQuery, useMutation, useQueryClient as useTQClient} from "@tanstack/react-query";
-import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
-import {Checkbox} from "@/components/ui/checkbox";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Tooltip, TooltipContent, TooltipTrigger} from "@/components/ui/tooltip";
-import {Radio, RefreshCw, Loader2, AlertTriangle, Settings2, Search, Package, Pencil, Ship, Truck, CheckCircle2, DollarSign, Clock, Filter, ChevronDown, Scale, Download, Upload} from "lucide-react";
-import {cn} from "@/lib/utils";
-import {useToast} from "@/hooks/use-toast";
-import {factoryApiRequest} from "@/lib/factoryApi";
-import {useFactoryJsonCargoEta} from "./useFactoryJsonCargoEta";
-
-import type {ContainerWithSupplier, OtwTrackingTabProps} from "./factoryotwtrackingtab/types";
-import {STATUS_ACTIVE, calcDelayDays, ccySym, containerCost, fmtAmt, isOverdue, num} from "./factoryotwtrackingtab/utils";
-import {SummaryCard} from "./factoryotwtrackingtab/components/SummaryCard";
-import {EtaCell} from "./factoryotwtrackingtab/components/EtaCell";
-import {NotesCell} from "./factoryotwtrackingtab/components/NotesCell";
-import {EventTimelineSheet} from "./factoryotwtrackingtab/components/EventTimelineSheet";
-import {TrackingSettingsSheet} from "./factoryotwtrackingtab/components/TrackingSettingsSheet";
-import {TrackNowProgressLog} from "./factoryotwtrackingtab/components/TrackNowProgressLog";
+import { getErrorDetails } from "@shared/errorUtils";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient as useTQClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Radio,
+  RefreshCw,
+  Loader2,
+  AlertTriangle,
+  Settings2,
+  Search,
+  Package,
+  Pencil,
+  Ship,
+  Truck,
+  CheckCircle2,
+  DollarSign,
+  Clock,
+  Filter,
+  ChevronDown,
+  Scale,
+  Download,
+  Upload,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { factoryApiRequest } from "@/lib/factoryApi";
+import { useFactoryJsonCargoEta } from "./useFactoryJsonCargoEta";
+import type { ContainerWithSupplier, OtwTrackingTabProps } from "./factoryotwtrackingtab/types";
+import {
+  STATUS_ACTIVE,
+  calcDelayDays,
+  ccySym,
+  containerCost,
+  fmtAmt,
+  isOverdue,
+  num,
+} from "./factoryotwtrackingtab/utils";
+import { SummaryCard } from "./factoryotwtrackingtab/components/SummaryCard";
+import { EtaCell } from "./factoryotwtrackingtab/components/EtaCell";
+import { NotesCell } from "./factoryotwtrackingtab/components/NotesCell";
+import { EventTimelineSheet } from "./factoryotwtrackingtab/components/EventTimelineSheet";
+import { TrackingSettingsSheet } from "./factoryotwtrackingtab/components/TrackingSettingsSheet";
+import { TrackNowProgressLog } from "./factoryotwtrackingtab/components/TrackNowProgressLog";
 export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = {}) {
   const { toast } = useToast();
   const tqClient = useTQClient();
@@ -36,7 +63,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
   const [sortOrder, setSortOrder] = useState<string>("DEFAULT");
   const [search, setSearch] = useState("");
   const [showFilters, setShowFilters] = useState(false);
-
   // Use activeOnly=true so the backend pre-filters to PENDING/IN_TRANSIT/ARRIVED.
   // The queryKey uses the base path so existing invalidations (prefix-match) still work.
   const { data: containers, isLoading } = useQuery<ContainerWithSupplier[]>({
@@ -47,16 +73,13 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
       return res.json();
     },
   });
-
   const otwContainers = (containers || []).filter((c) => STATUS_ACTIVE.has(c.status));
-
   // Supplier list for filter
   const suppliers = Array.from(
     new Map(
       otwContainers.map((c) => [String(c.supplierId ?? "none"), (c as any).supplierName || "No Supplier"])
     ).entries()
   ).sort((a, b) => a[1].localeCompare(b[1]));
-
   // Apply filters + sort
   let filtered = otwContainers.filter((c) => {
     if (supplierFilter !== "all" && String(c.supplierId ?? "none") !== supplierFilter) return false;
@@ -75,7 +98,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     }
     return true;
   });
-
   // Sort
   filtered = [...filtered].sort((a, b) => {
     if (sortOrder === "ETA_ASC" || sortOrder === "ETA_DESC") {
@@ -87,7 +109,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     const sb = ((b as any).supplierName || "").toLowerCase();
     return sa.localeCompare(sb);
   });
-
   // Summary stats
   const pending = otwContainers.filter((c) => c.status === "PENDING").length;
   const inTransit = otwContainers.filter((c) => c.status === "IN_TRANSIT").length;
@@ -99,7 +120,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     const fc = c as any;
     return fc.trackingLastCheckedAt && new Date(fc.trackingLastCheckedAt).toDateString() === today;
   }).length;
-
   // Cost totals grouped by currency
   const costByCurrency = filtered.reduce<Record<string, { symbol: string; amount: number }>>((acc, c) => {
     const { symbol, amount } = containerCost(c);
@@ -110,7 +130,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     }
     return acc;
   }, {});
-
   // Freight totals grouped by currency
   const freightByCurrency = filtered.reduce<Record<string, { symbol: string; amount: number }>>((acc, c) => {
     const freightAmt = num((c as any).freight);
@@ -121,7 +140,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     acc[ccy].amount += freightAmt;
     return acc;
   }, {});
-
   // Commission totals grouped by currency — there's no dedicated Commission KPI card;
   // instead its USD portion is folded into the "Total (USD)" card below so that card
   // represents the full USD balance (container cost + freight + commission), matching
@@ -135,7 +153,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     acc[ccy].amount += commAmt;
     return acc;
   }, {});
-
   // "Total (USD)" = USD-priced container cost + USD freight + USD commission.
   // Other currencies' Total cards are left as cost-only (freight/commission for those
   // currencies already appear on their own Freight (CCY) card, and commission has no
@@ -153,12 +170,10 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
       };
     }
   }
-
   const docsReceived = filtered.filter((c) => !!(c as any).otwDocsReceived).length;
   const totalWeight = filtered.reduce((sum, c) => sum + num(c.totalKg), 0);
   const timelineContainer = otwContainers.find((c) => c.id === timelineId) ?? null;
   const trackingEnabledCount = otwContainers.filter((c) => (c as any).trackingEnabled !== false).length;
-
   const hasActiveFilters =
     search ||
     supplierFilter !== "all" ||
@@ -167,7 +182,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     docsFilter !== "all" ||
     delayedFilter !== "all" ||
     sortOrder !== "DEFAULT";
-
   /** Immediately patch the in-memory cache entry so the UI reflects the new
    *  value without waiting for the background refetch to complete. */
   function patchCacheContainer(id: number, patch: Partial<ContainerWithSupplier>) {
@@ -175,14 +189,17 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
       old?.map((c) => (c.id === id ? { ...c, ...patch } : c))
     );
   }
-
   async function saveNote(id: number, val: string) {
     try {
       await factoryApiRequest("PATCH", `/api/factory/containers/${id}`, { otwNote: val || null });
       patchCacheContainer(id, { otwNote: val || null } as any);
       tqClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
-    } catch (err: any) {
-      toast({ title: "Failed to save note", description: err?.message, variant: "destructive" });
+    } catch (err) {
+      toast({
+        title: "Failed to save note",
+        description: getErrorDetails(err).optionalMessage,
+        variant: "destructive",
+      });
     }
   }
   async function toggleDoc(id: number, checked: boolean) {
@@ -190,11 +207,14 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
       await factoryApiRequest("PATCH", `/api/factory/containers/${id}`, { otwDocsReceived: checked });
       patchCacheContainer(id, { otwDocsReceived: checked });
       tqClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
-    } catch (err: any) {
-      toast({ title: "Failed to update docs", description: err?.message, variant: "destructive" });
+    } catch (err) {
+      toast({
+        title: "Failed to update docs",
+        description: getErrorDetails(err).optionalMessage,
+        variant: "destructive",
+      });
     }
   }
-
   const etaMutation = useMutation({
     mutationFn: async ({ id, arrivalDate }: { id: number; arrivalDate: string | null }) => {
       const res = await factoryApiRequest("PATCH", `/api/factory/containers/${id}`, {
@@ -214,7 +234,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
       toast({ title: "Failed to update ETA", description: err?.message, variant: "destructive" });
     },
   });
-
   function saveEta(id: number, val: string | null) {
     etaMutation.mutate({ id, arrivalDate: val });
   }
@@ -227,7 +246,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     setDelayedFilter("all");
     setSortOrder("DEFAULT");
   }
-
   const trackNowMutation = useMutation({
     mutationFn: async (containerId: number) => {
       const res = await factoryApiRequest("POST", `/api/factory/container-tracking/${containerId}/track-now`, {});
@@ -255,11 +273,9 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
       toast({ title: "Tracking failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
-
   const [bulkTracking, setBulkTracking] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
   const [importing, setImporting] = useState(false);
-
   // ── Dev-only: Export filtered containers as CSV ──────────────────────────
   function exportCsv() {
     const rows = [["Container #", "Supplier", "ETA (YYYY-MM-DD)", "Status", "Cost", "Freight", "Weight (KG)", "Notes"]];
@@ -284,7 +300,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     a.click();
     URL.revokeObjectURL(url);
   }
-
   // ── Dev-only: Import CSV to bulk-update ETA ──────────────────────────────
   // Expected columns: Container # (col 0), ETA YYYY-MM-DD (col 2)
   async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -320,7 +335,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
         out.push(cur.trim());
         return out;
       }
-
       // Convert any recognisable date to YYYY-MM-DD or return null
       function normaliseDate(raw: string): string | null {
         const s = raw.trim();
@@ -363,7 +377,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
         }
         return null;
       }
-
       // Detect column positions from header row
       const headerCols = parseCsvLine(lines[0]).map((h) => h.toLowerCase());
       const containerCol = headerCols.findIndex((h) => h.includes("container"));
@@ -371,7 +384,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
       // Fall back to positional defaults if headers are unrecognised
       const cIdx = containerCol >= 0 ? containerCol : 0;
       const eIdx = etaCol >= 0 ? etaCol : 2;
-
       // Skip header row
       const dataLines = lines.slice(1);
       // Build lookup: containerNumber -> container id
@@ -406,13 +418,12 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
         title: `Import complete`,
         description: `${updated} ETA(s) updated, ${skipped} skipped.`,
       });
-    } catch (err: any) {
-      toast({ title: "Import failed", description: err?.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Import failed", description: getErrorDetails(err).optionalMessage, variant: "destructive" });
     } finally {
       setImporting(false);
     }
   }
-
   async function trackAll() {
     const eligible = otwContainers.filter((c) => {
       const fc = c as any;
@@ -470,7 +481,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
       if (elapsed >= MAX_MS) clearInterval(interval);
     }, POLL_MS);
   }
-
   if (isLoading) {
     return (
       <div className="space-y-4 p-4">
@@ -483,7 +493,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
       </div>
     );
   }
-
   if (otwContainers.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
@@ -492,7 +501,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
       </div>
     );
   }
-
   return (
     <div className="flex flex-col gap-4 p-4">
       {/* ── Summary Cards (ERP-style) ── */}
@@ -554,7 +562,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
           />
         ))}
       </div>
-
       {/* ── Search + Filters Toggle + Track All ── */}
       <div className="flex items-center gap-2 flex-wrap">
         <div className="relative flex-1 min-w-48">
@@ -635,7 +642,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
           </>
         )}
       </div>
-
       {/* ── Expandable Filters Panel ── */}
       {showFilters && (
         <div className="flex flex-wrap gap-3 rounded-md border bg-muted/30 p-3">
@@ -733,7 +739,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
           </div>
         </div>
       )}
-
       {/* ── Results count + Legend ── */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <p className="text-xs text-muted-foreground">
@@ -751,7 +756,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
           <span className="text-muted-foreground">{docsReceived} docs received</span>
         </div>
       </div>
-
       {/* ── Main Table ── */}
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
@@ -793,13 +797,11 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
               const delayDays = calcDelayDays(c);
               const overdue = isOverdue(c);
               const location = fc.trackingLastLocation || c.destination || null;
-
               const rowBg = overdue
                 ? "bg-red-50/50 dark:bg-red-950/20"
                 : hasError
                   ? "bg-amber-50/50 dark:bg-amber-950/20"
                   : "";
-
               return (
                 <TableRow
                   key={c.id}
@@ -809,7 +811,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
                 >
                   {/* # */}
                   <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
-
                   {/* Container # */}
                   <TableCell className="font-mono font-medium">
                     <div className="flex flex-col gap-0.5">

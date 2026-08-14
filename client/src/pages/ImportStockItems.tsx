@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -153,10 +154,10 @@ function NewItemsTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
       setImportComplete(true);
       toast({ title: "Import Successful", description: `Successfully imported ${itemsToImport.length} stock items` });
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Import Failed",
-        description: error.message || "Failed to import stock items",
+        description: getErrorDetails(error).message || "Failed to import stock items",
         variant: "destructive",
       });
     } finally {
@@ -398,8 +399,8 @@ function BarcodesTab() {
         description: `${res.imported} barcodes added${res.skipped ? `, ${res.skipped} skipped (already exist)` : ""}${res.notFound ? `, ${res.notFound} item code(s) not found` : ""}`,
         variant: res.notFound > 0 ? "destructive" : "default",
       });
-    } catch (error: any) {
-      toast({ title: "Import Failed", description: error.message, variant: "destructive" });
+    } catch (error) {
+      toast({ title: "Import Failed", description: getErrorDetails(error).message, variant: "destructive" });
     } finally {
       setIsProcessing(false);
     }
@@ -669,8 +670,8 @@ function UpdateCategoriesTab() {
         description: `${data.updated} items updated${data.notFound ? `, ${data.notFound} item codes not found` : ""}${data.categoryNotFound ? `, ${data.categoryNotFound} category names not found` : ""}`,
         variant: data.notFound > 0 || data.categoryNotFound > 0 ? "destructive" : "default",
       });
-    } catch (err: any) {
-      toast({ title: "Update Failed", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Update Failed", description: getErrorDetails(err).message, variant: "destructive" });
     } finally {
       setIsProcessing(false);
     }

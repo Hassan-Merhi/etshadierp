@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -28,7 +29,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-
 import type {
   Location,
   MasterItem,
@@ -62,15 +62,12 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
   }, [editingItem?.stockItemId, editingItem?.locationId]);
   const lastSavedRef = useRef<{ stockItemId: number; locationId: number } | null>(null);
   const skipBlurSaveRef = useRef(false);
-
   const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const isPrivileged = ["Admin", "Owner", "Manager", "Developer"].includes(currentUser?.role || "");
-
   const { data: posAssignedLocations = [], isLoading: posLocationsLoading } = useQuery<Location[]>({
     queryKey: ["/api/my-locations"],
     enabled: !!posUser,
   });
-
   const { data: allLocations = [], isLoading: allLocationsLoading } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
     enabled: !posUser,
@@ -494,10 +491,10 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       }
       setImportPreview(preview);
       setImportDialogOpen(true);
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Could not read file",
-        description: err?.message || "Make sure it is a valid .xlsx file.",
+        description: getErrorDetails(err).optionalMessage || "Make sure it is a valid .xlsx file.",
         variant: "destructive",
       });
     }
@@ -520,8 +517,12 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       setImportPreview([]);
       queryClient.invalidateQueries({ queryKey: ["/api/pos/price-list-by-masters"] });
       queryClient.invalidateQueries({ queryKey: ["/api/pos/price-list", selectedLocationId] });
-    } catch (err: any) {
-      toast({ title: "Upload failed", description: err.message || "Something went wrong.", variant: "destructive" });
+    } catch (err) {
+      toast({
+        title: "Upload failed",
+        description: getErrorDetails(err).message || "Something went wrong.",
+        variant: "destructive",
+      });
     } finally {
       setImporting(false);
     }

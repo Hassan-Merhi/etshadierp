@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -106,8 +107,12 @@ export default function FactoryInvoices() {
           document.body.removeChild(a);
           URL.revokeObjectURL(blobUrl);
         }, 10000);
-      } catch (e: any) {
-        toast({ title: "Download failed", description: e.message || "Network error", variant: "destructive" });
+      } catch (e) {
+        toast({
+          title: "Download failed",
+          description: getErrorDetails(e).message || "Network error",
+          variant: "destructive",
+        });
       }
     },
     [toast]

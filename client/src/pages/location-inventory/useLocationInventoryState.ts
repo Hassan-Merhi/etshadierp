@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef, useEffect } from "react";
 import { useLocation } from "@/contexts/LocationContext";
 import { queryClient } from "@/lib/queryClient";
@@ -106,8 +107,8 @@ export function useLocationInventoryState({ companyId, toast }: UseLocationInven
       toast({ title: "Location Deleted", description: `${selectedLocationLocal.name} deleted` });
       setSelectedLocationLocal(null);
       setDeleteDialogOpen(false);
-    } catch (error: any) {
-      toast({ title: "Delete Failed", description: error.message, variant: "destructive" });
+    } catch (error) {
+      toast({ title: "Delete Failed", description: getErrorDetails(error).message, variant: "destructive" });
     } finally {
       setIsDeleting(false);
     }
@@ -125,8 +126,8 @@ export function useLocationInventoryState({ companyId, toast }: UseLocationInven
       toast({ title: "Stock Group Archived" });
       setSelectedGroup(null);
       setArchiveDialogOpen(false);
-    } catch (error: any) {
-      toast({ title: "Archive Failed", description: error.message, variant: "destructive" });
+    } catch (error) {
+      toast({ title: "Archive Failed", description: getErrorDetails(error).message, variant: "destructive" });
     } finally {
       setIsArchiving(false);
     }

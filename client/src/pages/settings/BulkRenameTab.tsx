@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState } from "react";
 import { z } from "zod";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -99,8 +100,8 @@ export function BulkRenameTab() {
       if (matches.length === 0) {
         toast({ title: "No matches", description: "No stock items matched the search text" });
       }
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Error", description: getErrorDetails(err).message, variant: "destructive" });
     } finally {
       setIsSearching(false);
     }
@@ -168,8 +169,8 @@ export function BulkRenameTab() {
       setSelectedIds(new Set());
       setFindText("");
       setReplaceWith("");
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Error", description: getErrorDetails(err).message, variant: "destructive" });
     } finally {
       setIsApplying(false);
     }

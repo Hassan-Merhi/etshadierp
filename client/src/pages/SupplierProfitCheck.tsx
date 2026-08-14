@@ -1,30 +1,68 @@
-import {useState, useMemo, useCallback, useEffect, useRef} from "react";
-import {useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
-import {PeriodFilter, PeriodFilterValue} from "@/components/ui/period-filter";
-import {useCompany} from "@/contexts/CompanyContext";
-import {useToast} from "@/hooks/use-toast";
-import {apiRequest} from "@/lib/queryClient";
-import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
-import {Badge} from "@/components/ui/badge";
-import {Checkbox} from "@/components/ui/checkbox";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter} from "@/components/ui/dialog";
-import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {TrendingUp, AlertTriangle, Search, Download, FileText, CheckCircle, Package, Loader2, BarChart2, Save, Hash, ShoppingCart, Columns, RotateCcw, Truck, Filter, ChevronDown, CircleDollarSign, MapPin, Container, Plus, Upload, X, FileSpreadsheet} from "lucide-react";
-
-import type {AnalysisRow, ColKey, ColVisibility, ComputedRow, LocationGroup, OtwContainer} from "./supplierprofitcheck/types";
-import {ALL_COLUMNS, DEFAULT_COL_VISIBILITY, STATUS_OPTIONS, STORAGE_KEY_COLS, fmt, loadColVisibility} from "./supplierprofitcheck/utils";
-import {ProfitCell} from "./supplierprofitcheck/components/ProfitCell";
-import {StatusBadge} from "./supplierprofitcheck/components/StatusBadge";
-import {StatCard} from "./supplierprofitcheck/components/StatCard";
+import { getErrorDetails } from "@shared/errorUtils";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { PeriodFilter, PeriodFilterValue } from "@/components/ui/period-filter";
+import { useCompany } from "@/contexts/CompanyContext";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  TrendingUp,
+  AlertTriangle,
+  Search,
+  Download,
+  FileText,
+  CheckCircle,
+  Package,
+  Loader2,
+  BarChart2,
+  Save,
+  Hash,
+  ShoppingCart,
+  Columns,
+  RotateCcw,
+  Truck,
+  Filter,
+  ChevronDown,
+  CircleDollarSign,
+  MapPin,
+  Container,
+  Plus,
+  Upload,
+  X,
+  FileSpreadsheet,
+} from "lucide-react";
+import type {
+  AnalysisRow,
+  ColKey,
+  ColVisibility,
+  ComputedRow,
+  LocationGroup,
+  OtwContainer,
+} from "./supplierprofitcheck/types";
+import {
+  ALL_COLUMNS,
+  DEFAULT_COL_VISIBILITY,
+  STATUS_OPTIONS,
+  STORAGE_KEY_COLS,
+  fmt,
+  loadColVisibility,
+} from "./supplierprofitcheck/utils";
+import { ProfitCell } from "./supplierprofitcheck/components/ProfitCell";
+import { StatusBadge } from "./supplierprofitcheck/components/StatusBadge";
+import { StatCard } from "./supplierprofitcheck/components/StatCard";
 export default function SupplierProfitCheck() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
   const companyId = selectedCompany?.id;
   const queryClient = useQueryClient();
-
   const [supplierId, setSupplierId] = useState<string>("");
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>({ fromDate: "", toDate: "", preset: "all_time" });
   const [sourceType, setSourceType] = useState<"all" | "proforma" | "otw_containers">("all");
@@ -36,26 +74,21 @@ export default function SupplierProfitCheck() {
   const [manualAvgPrices, setManualAvgPrices] = useState<Record<number, string>>({});
   const debounceTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
   const debounceAvgTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
-
   const [freight, setFreight] = useState("");
   const [duties, setDuties] = useState("");
   const [otherCharges, setOtherCharges] = useState("");
   const [surcharge, setSurcharge] = useState("");
-
   const [colVisibility, setColVisibility] = useState<ColVisibility>(loadColVisibility);
   const [showColPicker, setShowColPicker] = useState(false);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
-
   const [qtyMap, setQtyMap] = useState<Record<number, string>>({});
   const [search, setSearch] = useState("");
   const [activeStatuses, setActiveStatuses] = useState<string[]>([]);
-
   const [savedProforma, setSavedProforma] = useState<{ id: number; reference: string } | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [proformaRef, setProformaRef] = useState<string>("");
   const [proformaNotes, setProformaNotes] = useState<string>("");
-
   // Add item dialog
   const [showAddItemDialog, setShowAddItemDialog] = useState(false);
   const [newItemCode, setNewItemCode] = useState("");
@@ -63,12 +96,10 @@ export default function SupplierProfitCheck() {
   const [newItemGroupId, setNewItemGroupId] = useState("");
   const [newItemDubaiPrice, setNewItemDubaiPrice] = useState("");
   const [newItemAvgSell, setNewItemAvgSell] = useState("");
-
   // Autosave
   const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [qtyVersion, setQtyVersion] = useState(0);
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   // Excel import
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [importedRows, setImportedRows] = useState<AnalysisRow[]>([]);
@@ -78,7 +109,6 @@ export default function SupplierProfitCheck() {
   const [importPreview, setImportPreview] = useState<{ rows: AnalysisRow[]; notFound: string[] } | null>(null);
   const [importLoading, setImportLoading] = useState(false);
   const importFileRef = useRef<HTMLInputElement>(null);
-
   // ─── Queries ─────────────────────────────────────────────────────────────
   const { data: suppliers = [] } = useQuery<any[]>({
     queryKey: ["/api/suppliers-all-spc"],
@@ -88,7 +118,6 @@ export default function SupplierProfitCheck() {
     },
     staleTime: 5 * 60 * 1000,
   });
-
   const { data: stockGroups = [] } = useQuery<any[]>({
     queryKey: ["/api/stock-groups", companyId],
     enabled: !!companyId,
@@ -97,9 +126,7 @@ export default function SupplierProfitCheck() {
       return res.ok ? res.json() : [];
     },
   });
-
   const selectedSupplier = suppliers.find((s: any) => String(s.id) === supplierId);
-
   const linkStockGroupMutation = useMutation({
     mutationFn: async (stockGroupId: number | null) => {
       const res = await apiRequest("PATCH", `/api/suppliers/${supplierId}/stock-group`, { stockGroupId });
@@ -111,7 +138,6 @@ export default function SupplierProfitCheck() {
     },
     onError: (err: any) => toast({ title: "Failed to update", description: err.message, variant: "destructive" }),
   });
-
   const { data: proformas = [] } = useQuery<any[]>({
     queryKey: ["/api/suppliers", supplierId, "proformas"],
     enabled: !!supplierId && sourceType === "proforma",
@@ -120,7 +146,6 @@ export default function SupplierProfitCheck() {
       return res.ok ? res.json() : [];
     },
   });
-
   const { data: locationGroups = [] } = useQuery<LocationGroup[]>({
     queryKey: ["/api/supplier-profit-check/location-groups", companyId],
     enabled: !!companyId,
@@ -129,7 +154,6 @@ export default function SupplierProfitCheck() {
       return res.ok ? res.json() : [];
     },
   });
-
   const { data: otwContainers = [], isLoading: isLoadingOtw } = useQuery<OtwContainer[]>({
     queryKey: ["/api/supplier-profit-check/otw-containers", supplierId],
     enabled: !!supplierId && sourceType === "otw_containers",
@@ -140,7 +164,6 @@ export default function SupplierProfitCheck() {
       return res.ok ? res.json() : [];
     },
   });
-
   const queryEnabled =
     !!supplierId &&
     (sourceType === "all" ||
@@ -173,7 +196,6 @@ export default function SupplierProfitCheck() {
       return res.json();
     },
   });
-
   // ─── PO price overrides (persisted to DB) ─────────────────────────────────
   const { data: overridesData } = useQuery<{ stockItemId: number; poPrice: string; avgPrice: string }[]>({
     queryKey: ["/api/supplier-profit-check/po-overrides", supplierId],
@@ -183,7 +205,6 @@ export default function SupplierProfitCheck() {
       return res.json();
     },
   });
-
   useEffect(() => {
     const initPo: Record<number, string> = {};
     const initAvg: Record<number, string> = {};
@@ -194,21 +215,18 @@ export default function SupplierProfitCheck() {
     setManualPoPrices(initPo);
     setManualAvgPrices(initAvg);
   }, [overridesData]);
-
   // Auto-select first location group when groups load and none is selected
   useEffect(() => {
     if (sellPriceSource === "location_group" && locationGroups.length > 0 && !selectedLocationId) {
       setSelectedLocationId(String(locationGroups[0].id));
     }
   }, [locationGroups, sellPriceSource]);
-
   const saveOverrideMutation = useMutation({
     mutationFn: async (payload: { supplierId: number; stockItemId: number; poPrice?: number; avgPrice?: number }) => {
       const res = await apiRequest("PUT", "/api/supplier-profit-check/po-overrides", payload);
       return res.json();
     },
   });
-
   // ─── Excel import handler ─────────────────────────────────────────────────
   const handleExcelFile = useCallback(
     async (file: File) => {
@@ -228,7 +246,6 @@ export default function SupplierProfitCheck() {
         const colCost = headers.findIndex((h) => h.includes("cost") || h.includes("dubai") || h.includes("po"));
         const colSell = headers.findIndex((h) => h.includes("sell") || h.includes("price") || h.includes("avg"));
         const colQty = headers.findIndex((h) => h.includes("qty") || h.includes("quantity"));
-
         const codeIdx = colCode >= 0 ? colCode : 0;
         const parsed: { code: string; costPrice?: number; sellPrice?: number; qty?: number }[] = [];
         for (let i = 1; i < raw.length; i++) {
@@ -252,7 +269,6 @@ export default function SupplierProfitCheck() {
         setImportParsed(parsed);
         setImportPreview(null);
         setShowImportDialog(true);
-
         // Auto-fetch analysis
         setImportLoading(true);
         try {
@@ -267,18 +283,17 @@ export default function SupplierProfitCheck() {
           });
           const result = await res.json();
           setImportPreview(result);
-        } catch (err: any) {
-          toast({ title: "Import failed", description: err.message, variant: "destructive" });
+        } catch (err) {
+          toast({ title: "Import failed", description: getErrorDetails(err).message, variant: "destructive" });
         } finally {
           setImportLoading(false);
         }
-      } catch (err: any) {
-        toast({ title: "Failed to parse file", description: err.message, variant: "destructive" });
+      } catch (err) {
+        toast({ title: "Failed to parse file", description: getErrorDetails(err).message, variant: "destructive" });
       }
     },
     [supplierId, periodFilter, sellPriceSource, selectedLocationId, toast]
   );
-
   const handleConfirmImport = useCallback(() => {
     if (!importPreview) return;
     const newRows = importPreview.rows;
@@ -323,7 +338,6 @@ export default function SupplierProfitCheck() {
       description: `${newRows.length} item(s) added to the analysis${importPreview.notFound.length > 0 ? ` (${importPreview.notFound.length} code(s) not found)` : ""}`,
     });
   }, [importPreview, importParsed, toast]);
-
   const addItemMutation = useMutation({
     mutationFn: async (payload: {
       code: string;
@@ -351,7 +365,6 @@ export default function SupplierProfitCheck() {
     },
     onError: (err: any) => toast({ title: "Failed to add item", description: err.message, variant: "destructive" }),
   });
-
   const handleManualPoChange = useCallback(
     (stockItemId: number, value: string) => {
       setManualPoPrices((prev) => ({ ...prev, [stockItemId]: value }));
@@ -365,7 +378,6 @@ export default function SupplierProfitCheck() {
     },
     [supplierId, saveOverrideMutation]
   );
-
   const handleArrowNav = useCallback((e: React.KeyboardEvent<HTMLInputElement>, dataAttr: string) => {
     if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
     e.preventDefault();
@@ -377,7 +389,6 @@ export default function SupplierProfitCheck() {
       target.select();
     }
   }, []);
-
   const handleManualAvgChange = useCallback(
     (stockItemId: number, value: string) => {
       setManualAvgPrices((prev) => ({ ...prev, [stockItemId]: value }));
@@ -391,7 +402,6 @@ export default function SupplierProfitCheck() {
     },
     [supplierId, saveOverrideMutation]
   );
-
   useEffect(() => {
     const initialQty: Record<number, string> = {};
     for (const r of rows) {
@@ -402,16 +412,13 @@ export default function SupplierProfitCheck() {
     setAutosaveStatus("idle");
     // Don't bump qtyVersion here — initialization should not trigger autosave
   }, [rows]);
-
   // ─── Autosave effect ─────────────────────────────────────────────────────
   useEffect(() => {
     if (qtyVersion === 0) return; // skip initial render / initialization
     const targetId = sourceType === "proforma" && proformaId ? Number(proformaId) : (savedProforma?.id ?? null);
     if (!targetId) return; // no proforma to save to yet
-
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
     setAutosaveStatus("saving");
-
     autosaveTimerRef.current = setTimeout(async () => {
       try {
         const items = computedRows
@@ -435,20 +442,16 @@ export default function SupplierProfitCheck() {
       }
     }, 1200);
   }, [qtyVersion]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const loaded = queryEnabled && !isLoading && rows.length >= 0;
-
   // ─── Charge math ─────────────────────────────────────────────────────────
   const totalBales = useMemo(() => {
     const fromProforma = rows.reduce((s, r) => s + (r.proformaQty ?? 0), 0);
     if (fromProforma > 0) return fromProforma;
     return Object.values(qtyMap).reduce((s, v) => s + (Number(v) || 0), 0);
   }, [rows, qtyMap]);
-
   const totalExtraCharges =
     (Number(freight) || 0) + (Number(duties) || 0) + (Number(otherCharges) || 0) + (Number(surcharge) || 0);
   const extraCostPerBale = totalBales > 0 ? totalExtraCharges / totalBales : 0;
-
   // ─── Computed rows ────────────────────────────────────────────────────────
   const computedRows = useMemo((): ComputedRow[] => {
     // Merge rows from query + importedRows (deduplicated by stockItemId)
@@ -477,19 +480,16 @@ export default function SupplierProfitCheck() {
       return { ...row, landingCost, costProfit, costProfitPct, computedStatus, hassanProfit };
     });
   }, [rows, importedRows, extraCostPerBale, manualPoPrices, manualAvgPrices, sellPriceSource]);
-
   // ─── Multi-status filter ──────────────────────────────────────────────────
   const toggleStatus = useCallback((val: string) => {
     setActiveStatuses((prev) => (prev.includes(val) ? prev.filter((s) => s !== val) : [...prev, val]));
   }, []);
-
   const statusFilterLabel = useMemo(() => {
     if (activeStatuses.length === 0) return "All Statuses";
     if (activeStatuses.length === 1)
       return STATUS_OPTIONS.find((s) => s.value === activeStatuses[0])?.label ?? activeStatuses[0];
     return `${activeStatuses.length} statuses`;
   }, [activeStatuses]);
-
   // ─── Filtered rows ────────────────────────────────────────────────────────
   const filteredRows = useMemo(() => {
     return computedRows.filter((r) => {
@@ -609,8 +609,8 @@ export default function SupplierProfitCheck() {
       } catch {
         // Non-fatal: the user can still click "Supplier Excel" to re-download
       }
-    } catch (err: any) {
-      toast({ title: "Save failed", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Save failed", description: getErrorDetails(err).message, variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
@@ -630,8 +630,8 @@ export default function SupplierProfitCheck() {
       a.download = `proforma-${savedProforma.reference}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch (err: any) {
-      toast({ title: "Export failed", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Export failed", description: getErrorDetails(err).message, variant: "destructive" });
     }
   }, [savedProforma, toast]);
 
@@ -658,8 +658,8 @@ export default function SupplierProfitCheck() {
       a.download = `profit-analysis-${savedProforma?.reference || "export"}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch (err: any) {
-      toast({ title: "Export failed", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Export failed", description: getErrorDetails(err).message, variant: "destructive" });
     }
   }, [itemsWithQty, qtyMap, selectedSupplier, periodFilter, savedProforma, toast]);
 

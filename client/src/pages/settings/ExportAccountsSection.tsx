@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState } from "react";
 import { z } from "zod";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -238,8 +239,8 @@ export function ExportAccountsSection() {
         title: "Export complete",
         description: `${selectedIds.size} account${selectedIds.size !== 1 ? "s" : ""} exported successfully.`,
       });
-    } catch (err: any) {
-      toast({ title: "Export failed", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Export failed", description: getErrorDetails(err).message, variant: "destructive" });
     } finally {
       setExporting(false);
     }

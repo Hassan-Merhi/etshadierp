@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useEffect, useRef } from "react";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -278,8 +279,8 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       }
 
       pricePreviewMutation.mutate(rows);
-    } catch (err: any) {
-      setPriceImportError("Could not read Excel file: " + err.message);
+    } catch (err) {
+      setPriceImportError("Could not read Excel file: " + getErrorDetails(err).message);
     } finally {
       setPriceImportParsing(false);
     }
@@ -450,8 +451,8 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       await writeFile(workbook, `container_${data.container.containerNumber}.xlsx`);
 
       toast({ title: "Export successful", description: "Container data downloaded as Excel" });
-    } catch (error: any) {
-      toast({ title: "Export failed", description: error.message, variant: "destructive" });
+    } catch (error) {
+      toast({ title: "Export failed", description: getErrorDetails(error).message, variant: "destructive" });
     }
   };
 
@@ -586,8 +587,8 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       URL.revokeObjectURL(url);
 
       toast({ title: "No-cost export downloaded" });
-    } catch (error: any) {
-      toast({ title: "Export failed", description: error.message, variant: "destructive" });
+    } catch (error) {
+      toast({ title: "Export failed", description: getErrorDetails(error).message, variant: "destructive" });
     }
   };
 

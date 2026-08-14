@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
@@ -215,8 +216,8 @@ export default function GroundScan() {
         title: "Upload complete",
         description: `${inserted} bales uploaded${skipped > 0 ? `, ${skipped} skipped (duplicates)` : ""}.`,
       });
-    } catch (e: any) {
-      toast({ title: "Upload failed", description: e.message, variant: "destructive" });
+    } catch (e) {
+      toast({ title: "Upload failed", description: getErrorDetails(e).message, variant: "destructive" });
     } finally {
       setUploading(false);
     }
@@ -604,8 +605,8 @@ export default function GroundScan() {
       }
 
       await XLSX.writeFile(wb, `ground-verification-${dateStr}.xlsx`);
-    } catch (err: any) {
-      toast({ title: "Export failed", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Export failed", description: getErrorDetails(err).message, variant: "destructive" });
     } finally {
       setExporting(false);
     }

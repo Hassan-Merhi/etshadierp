@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useEffect, Fragment, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -50,7 +51,6 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
-
 import type {
   ImportPreviewRow,
   Location,
@@ -70,13 +70,11 @@ export default function StockTransferOrder() {
   const [_location, navigate] = useLocation();
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
-
   const editVoucherId = (() => {
     const params = new URLSearchParams(window.location.search);
     const v = params.get("edit");
     return v ? parseInt(v) : null;
   })();
-
   const [selectedLocationIds, setSelectedLocationIds] = useState<number[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -99,7 +97,6 @@ export default function StockTransferOrder() {
     }
     return null;
   })();
-
   const [expandedGroups, setExpandedGroups] = useState<Set<number>>(
     () => new Set<number>(_sessionSnapshot?.expandedGroups || [])
   );
@@ -108,7 +105,6 @@ export default function StockTransferOrder() {
     () => _sessionSnapshot?.destinationLocationId ?? null
   );
   const [orderItems, setOrderItems] = useState<OrderItem[]>(() => _sessionSnapshot?.orderItems || []);
-
   const [quantityPicker, setQuantityPicker] = useState<QuantityPickerState>({
     open: false,
     stockItem: null,
@@ -117,18 +113,15 @@ export default function StockTransferOrder() {
     availableQty: 0,
   });
   const [pickerQuantity, setPickerQuantity] = useState("");
-
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [transferDate, setTransferDate] = useState<Date>(new Date());
   const [isOptional, setIsOptional] = useState(false);
   const [editDataLoaded, setEditDataLoaded] = useState(false);
-
   const quantityInputRef = useRef<HTMLInputElement>(null);
   const matrixRef = useRef<HTMLDivElement>(null);
   const [focusedCell, setFocusedCell] = useState<{ row: number; col: number } | null>(null);
   const prevDialogOpen = useRef(false);
-
   // Autosave draft state (new transfers only)
   const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved" | "failed">("idle");
   const [hasDraft, setHasDraft] = useState<boolean>(false);
@@ -1190,8 +1183,12 @@ export default function StockTransferOrder() {
         });
 
       setImportPreview(preview);
-    } catch (err: any) {
-      toast({ title: "Parse Error", description: err.message || "Failed to read file", variant: "destructive" });
+    } catch (err) {
+      toast({
+        title: "Parse Error",
+        description: getErrorDetails(err).message || "Failed to read file",
+        variant: "destructive",
+      });
     } finally {
       setImportLoading(false);
     }
@@ -1337,8 +1334,12 @@ export default function StockTransferOrder() {
       const nextRevNum = revisions.length + 1;
       toast({ title: "Revision Saved", description: `Rev ${nextRevNum} recorded and order updated` });
       navigate("/daybook");
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to save revision", variant: "destructive" });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: getErrorDetails(error).message || "Failed to save revision",
+        variant: "destructive",
+      });
     } finally {
       setIsSavingRevision(false);
     }
