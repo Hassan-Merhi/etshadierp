@@ -1,4 +1,4 @@
-name: Phase 4 structural semantic reduction
+name: Phase 4 file-batched structural reduction
 
 on:
   push:
@@ -26,26 +26,20 @@ jobs:
           node-version: '22.14.0'
           cache: npm
       - run: npm ci
-      - name: Retype remaining any casts with semantic structural contracts
-        run: node scripts/phase4-semantic-v2-runner.mjs
-      - name: Format changed sources
-        run: |
-          FILES=$(git diff --name-only -- client/src server shared | tr '\n' ' ')
-          if [ -n "$FILES" ]; then
-            node node_modules/prettier/bin/prettier.cjs --write $FILES
-          fi
+      - name: Retype casts in whole-file batches
+        run: node scripts/phase4-file-batch-worker.mjs
       - name: Verify TypeScript after formatting
         run: npm run check
       - name: Report remaining cast count
         run: node scripts/audit-type-escapes.mjs --json | tee phase4-bridge-audit.json || true
-      - name: Persist structural semantic retyping
+      - name: Persist file-batched structural retyping
         run: |
           if git diff --quiet -- client/src server shared; then
-            echo "No structural semantic Phase 4 changes to persist."
+            echo "No file-batched Phase 4 changes to persist."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add client/src server shared
-          git commit -m "refactor: replace remaining any casts with structural contracts [phase4-bridge]"
+          git commit -m "refactor: batch-retype remaining any casts [phase4-bridge]"
           git push origin HEAD:${GITHUB_REF_NAME}
