@@ -61,13 +61,15 @@ export type { SpSalesFormV2Params } from "./sp-sales-form-v2/types";
 export async function generateSpSalesFormExcelV2(params: SpSalesFormV2Params): Promise<Buffer> {
   const { companyId, locationId, fromDate, toDate, cashAccountId } = params;
 
-  logger.info(`[spSalesFormExportV2] start companyId=${companyId} locationId=${locationId ?? "all"} ${fromDate}→${toDate}`);
+  logger.info(
+    `[spSalesFormExportV2] start companyId=${companyId} locationId=${locationId ?? "all"} ${fromDate}→${toDate}`
+  );
 
   // Build date list
   const startDate = toUtcDate(fromDate);
-  const endDate   = toUtcDate(toDate);
-  const dayCount  = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000) + 1);
-  const dates     = Array.from({ length: dayCount }, (_, i) => dateStr(addDays(startDate, i)));
+  const endDate = toUtcDate(toDate);
+  const dayCount = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000) + 1);
+  const dates = Array.from({ length: dayCount }, (_, i) => dateStr(addDays(startDate, i)));
   const dayBefore = dateStr(addDays(startDate, -1));
 
   // Fetch all data in parallel
@@ -78,8 +80,12 @@ export async function generateSpSalesFormExcelV2(params: SpSalesFormV2Params): P
     cashAccountId ? fetchCashAccountBalance(cashAccountId, companyId, dayBefore) : Promise.resolve(null),
     fetchAgeingData(companyId, locationId, toDate),
   ]);
-  logger.info(`[spSalesFormExportV2] cashAccountId=${cashAccountId ?? "none"} openingCashBalance=${openingCashBalance ?? "n/a (manual)"}`);
-  logger.info(`[spSalesFormExportV2] openItems=${openMap.size} closeItems=${closeMap.size} saleRows=${salesRows.length} dayCount=${dayCount}`);
+  logger.info(
+    `[spSalesFormExportV2] cashAccountId=${cashAccountId ?? "none"} openingCashBalance=${openingCashBalance ?? "n/a (manual)"}`
+  );
+  logger.info(
+    `[spSalesFormExportV2] openItems=${openMap.size} closeItems=${closeMap.size} saleRows=${salesRows.length} dayCount=${dayCount}`
+  );
 
   // Build item registry
   const items = buildItemRegistry(openMap, closeMap, salesRows, dayCount);
@@ -88,23 +94,23 @@ export async function generateSpSalesFormExcelV2(params: SpSalesFormV2Params): P
 
   // Build workbook (sheet order per spec)
   const wb = new ExcelJS.Workbook();
-  wb.creator  = "System SP Export V2";
-  wb.created  = new Date();
+  wb.creator = "System SP Export V2";
+  wb.created = new Date();
   wb.modified = new Date();
   // Force full recalculation when Excel opens the file
-  (wb as any).calcProperties = { fullCalcOnLoad: true };
+  wb.calcProperties = { fullCalcOnLoad: true };
 
-  buildCostingSheet(wb, items);                                    // 1. Costing — hidden
-  buildSalesSheet(wb, items, dates);                               // 2. Sales — hidden
+  buildCostingSheet(wb, items); // 1. Costing — hidden
+  buildSalesSheet(wb, items, dates); // 2. Sales — hidden
   await buildEntrySheet(wb, items, dates, dayCount, params, openingCashBalance); // 3. ENTRY — visible (async for ws.protect)
-  buildSummarySheet(wb, items, dates, params);                     // 4. Summary — visible
-  buildAgeingSheet(wb, items, ageingMap, toDate);                  // 5. Ageing — visible
-  buildSummaryItemwiseSheet(wb, items, dayCount);                  // 6. Summary-Itemwise — hidden
+  buildSummarySheet(wb, items, dates, params); // 4. Summary — visible
+  buildAgeingSheet(wb, items, ageingMap, toDate); // 5. Ageing — visible
+  buildSummaryItemwiseSheet(wb, items, dayCount); // 6. Summary-Itemwise — hidden
 
   // Error scan — fail fast on visible-sheet errors
   const errors = scanErrors(wb);
   if (errors.length > 0) {
-    const detail = errors.map(e => `${e.sheet}!${e.cell}: ${e.value}`).join(", ");
+    const detail = errors.map((e) => `${e.sheet}!${e.cell}: ${e.value}`).join(", ");
     logger.error(`[spSalesFormExportV2] Excel errors found: ${detail}`);
     throw new Error(`Excel formula errors detected in export: ${detail}`);
   }

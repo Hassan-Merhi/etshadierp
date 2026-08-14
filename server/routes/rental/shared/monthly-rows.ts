@@ -23,7 +23,7 @@ export async function ensureMonthlyLedgerRows(contractId: number, asOfDate?: str
       INSERT INTO property_monthly_ledger (
         company_id, module, contract_id, unit_id, year, month, expected_amount, paid_amount
       ) VALUES (
-        ${contract.companyId}, ${contract.module as any}, ${contract.id}, ${contract.unitId},
+        ${contract.companyId}, ${contract.module}, ${contract.id}, ${contract.unitId},
         ${period.year}, ${period.month}, ${contract.rentalAmount}, 0
       )
       ON CONFLICT (contract_id, year, month)

@@ -6,11 +6,7 @@ import { storage } from "../../storage";
 
 type CurrencyBalance = Record<string, { debit: number; credit: number; net: number }>;
 
-function addCurrencyBalance(
-  balances: Map<number, CurrencyBalance>,
-  key: number,
-  entry: any,
-): void {
+function addCurrencyBalance(balances: Map<number, CurrencyBalance>, key: number, entry: any): void {
   const currency = entry.transactionCurrency || "USD";
   const debit = Number.parseFloat(entry.transactionDebitAmount ?? entry.debitAmount ?? "0");
   const credit = Number.parseFloat(entry.transactionCreditAmount ?? entry.creditAmount ?? "0");
@@ -42,7 +38,9 @@ export async function getCustomersWithBalances(companyId: number) {
   const customers = await storage.getAllCustomers(companyId);
   if (customers.length === 0) return [];
 
-  const ledgerAccountIds = customers.filter((customer) => customer.ledgerAccountId).map((customer) => customer.ledgerAccountId as number);
+  const ledgerAccountIds = customers
+    .filter((customer) => customer.ledgerAccountId)
+    .map((customer) => customer.ledgerAccountId as number);
   const customerOnlyIds = customers.filter((customer) => !customer.ledgerAccountId).map((customer) => customer.id);
 
   const [ledgerEntries, customerEntries] = await Promise.all([
@@ -52,11 +50,11 @@ export async function getCustomersWithBalances(companyId: number) {
             ledgerAccountId: voucherEntries.ledgerAccountId,
             debitAmount: voucherEntries.debitAmount,
             creditAmount: voucherEntries.creditAmount,
-            transactionCurrency: (voucherEntries as any).transactionCurrency,
-            transactionDebitAmount: (voucherEntries as any).transactionDebitAmount,
-            transactionCreditAmount: (voucherEntries as any).transactionCreditAmount,
-            baseDebitAmount: (voucherEntries as any).baseDebitAmount,
-            baseCreditAmount: (voucherEntries as any).baseCreditAmount,
+            transactionCurrency: voucherEntries.transactionCurrency,
+            transactionDebitAmount: voucherEntries.transactionDebitAmount,
+            transactionCreditAmount: voucherEntries.transactionCreditAmount,
+            baseDebitAmount: voucherEntries.baseDebitAmount,
+            baseCreditAmount: voucherEntries.baseCreditAmount,
           })
           .from(voucherEntries)
           .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
@@ -65,22 +63,22 @@ export async function getCustomersWithBalances(companyId: number) {
               eq(vouchers.companyId, companyId),
               isNull(vouchers.deletedAt),
               isNotNull(voucherEntries.ledgerAccountId),
-              inArray(voucherEntries.ledgerAccountId, ledgerAccountIds),
-            ),
+              inArray(voucherEntries.ledgerAccountId, ledgerAccountIds)
+            )
           )
           .execute()
       : Promise.resolve([] as any[]),
     customerOnlyIds.length > 0
       ? db
           .select({
-            customerId: (voucherEntries as any).customerId,
+            customerId: voucherEntries.customerId,
             debitAmount: voucherEntries.debitAmount,
             creditAmount: voucherEntries.creditAmount,
-            transactionCurrency: (voucherEntries as any).transactionCurrency,
-            transactionDebitAmount: (voucherEntries as any).transactionDebitAmount,
-            transactionCreditAmount: (voucherEntries as any).transactionCreditAmount,
-            baseDebitAmount: (voucherEntries as any).baseDebitAmount,
-            baseCreditAmount: (voucherEntries as any).baseCreditAmount,
+            transactionCurrency: voucherEntries.transactionCurrency,
+            transactionDebitAmount: voucherEntries.transactionDebitAmount,
+            transactionCreditAmount: voucherEntries.transactionCreditAmount,
+            baseDebitAmount: voucherEntries.baseDebitAmount,
+            baseCreditAmount: voucherEntries.baseCreditAmount,
           })
           .from(voucherEntries)
           .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
@@ -88,9 +86,9 @@ export async function getCustomersWithBalances(companyId: number) {
             and(
               eq(vouchers.companyId, companyId),
               isNull(vouchers.deletedAt),
-              isNotNull((voucherEntries as any).customerId),
-              inArray((voucherEntries as any).customerId, customerOnlyIds),
-            ),
+              isNotNull(voucherEntries.customerId),
+              inArray(voucherEntries.customerId, customerOnlyIds)
+            )
           )
           .execute()
       : Promise.resolve([] as any[]),
@@ -110,7 +108,7 @@ export async function getCustomersWithBalances(companyId: number) {
   const customerCurrency = new Map<number, CurrencyBalance>();
   const customerBase = new Map<number, number>();
   for (const entry of customerEntries) {
-    const customerId = (entry as any).customerId;
+    const customerId = entry.customerId;
     if (!customerId) continue;
     addNetBalance(customerNet, customerId, entry);
     addCurrencyBalance(customerCurrency, customerId, entry);

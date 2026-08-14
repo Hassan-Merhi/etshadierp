@@ -19,7 +19,7 @@ export function registerV5UnlinkedLoadingOrderRoutes(app: Express) {
   // Read-only — does not modify any data.
   app.get("/api/factory/v5/unlinked-loading-orders", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const raw = await db.execute(

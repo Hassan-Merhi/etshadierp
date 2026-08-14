@@ -20,8 +20,8 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
 
   app.get("/api/factory/users", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
-      const currentRole = (req.session as any).currentRole;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
+      const currentRole = req.session.currentRole;
       const globalRole = req.user?.role;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const isAllowed =
@@ -85,8 +85,8 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
 
   app.post("/api/factory/users", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
-      const currentRole = (req.session as any).currentRole;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
+      const currentRole = req.session.currentRole;
       const globalRole = req.user?.role;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const isAllowed = ["Admin", "Owner"].includes(currentRole) || ["Admin", "Developer"].includes(globalRole);
@@ -158,8 +158,8 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
 
   app.put("/api/factory/users/:userId", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
-      const currentRole = (req.session as any).currentRole;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
+      const currentRole = req.session.currentRole;
       const globalRole = req.user?.role;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const isAllowed = ["Admin", "Owner"].includes(currentRole) || ["Admin", "Developer"].includes(globalRole);
@@ -251,10 +251,10 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
 
   app.delete("/api/factory/users/:userId", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
-      const currentRole = (req.session as any).currentRole;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
+      const currentRole = req.session.currentRole;
       const globalRole = req.user?.role;
-      const sessionUserId = (req.session as any).userId;
+      const sessionUserId = req.session.userId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const isAllowed = ["Admin", "Owner"].includes(currentRole) || ["Admin", "Developer"].includes(globalRole);
       if (!isAllowed) return res.status(403).json({ message: "Only Admin or Owner can manage users" });
@@ -277,11 +277,11 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
 
   app.get("/api/factory/my-access", requireAuth, async (req: any, res: any) => {
     try {
-      const userId = (req.session as any).userId;
-      const currentCompanyId = (req.session as any).currentCompanyId;
-      const pinnedFactoryId = (req.session as any).factoryCompanyId;
-      const cachedFactoryName = (req.session as any).factoryCompanyName as string | undefined;
-      const role = (req.session as any).currentRole;
+      const userId = req.session.userId;
+      const currentCompanyId = req.session.currentCompanyId;
+      const pinnedFactoryId = req.session.factoryCompanyId;
+      const cachedFactoryName = req.session.factoryCompanyName as string | undefined;
+      const role = req.session.currentRole;
 
       // Fast-path: if the session already has the resolved factory company AND the role
       // is admin/owner/developer (full access, no per-user DB lookup needed), return
@@ -363,8 +363,8 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
       if (!companyId || !userId) return res.status(400).json({ message: "No company or user" });
 
       // Pin both the ID and name into the session — subsequent calls use the fast-path above.
-      (req.session as any).factoryCompanyId = companyId;
-      (req.session as any).factoryCompanyName = companyName;
+      req.session.factoryCompanyId = companyId;
+      req.session.factoryCompanyName = companyName;
 
       if (role === "Admin" || role === "Owner" || role === "Developer") {
         res.set("Cache-Control", "private, max-age=120");

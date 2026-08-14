@@ -11,16 +11,16 @@ import { firstRow } from "../../../lib/queryResult";
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 export function getCompanyId(req: any): number | null {
-  return (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId || null;
+  return req.session.factoryCompanyId || req.session.currentCompanyId || null;
 }
 
 export function getUsername(req: any): string {
-  return (req.session as any).username || (req.session as any).user?.username || "unknown";
+  return req.session.username || req.session.user?.username || "unknown";
 }
 
 export async function isAdmin(req: any, companyId: number): Promise<boolean> {
   try {
-    const userId = (req.session as any).userId;
+    const userId = req.session.userId;
     if (!userId) return false;
     const rows = await db.execute(
       sql`SELECT role FROM user_company_roles WHERE company_id = ${companyId} AND user_id = ${String(userId)} LIMIT 1`

@@ -16,7 +16,7 @@ import { eq, and, isNull } from "drizzle-orm";
 export function registerFactoryCategoryRoutes(app: Express) {
   app.get("/api/factory/categories", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const results = await db
@@ -34,7 +34,7 @@ export function registerFactoryCategoryRoutes(app: Express) {
 
   app.post("/api/factory/categories", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const parsed = insertFactoryCategorySchema.parse({ ...req.body, companyId });
@@ -48,7 +48,7 @@ export function registerFactoryCategoryRoutes(app: Express) {
 
   app.patch("/api/factory/categories/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
@@ -70,7 +70,7 @@ export function registerFactoryCategoryRoutes(app: Express) {
 
   app.delete("/api/factory/categories/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);

@@ -92,7 +92,7 @@ export function registerChatbotStatusRoutes(app: Express) {
         await db.insert(systemSettings).values({
           key: "ai_provider",
           value: normalizedProvider,
-        } as any);
+        });
       }
 
       res.json({ success: true, provider: normalizedProvider });

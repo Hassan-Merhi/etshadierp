@@ -1,11 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
-import {
-  AuthorizationDeniedError,
-  type AuthorizationActor,
-  type AuthorizationDomain,
-} from "./authorizationPolicy";
+import { AuthorizationDeniedError, type AuthorizationActor, type AuthorizationDomain } from "./authorizationPolicy";
 import {
   authorizePrivilegedOperation,
   PrivilegedOperationError,
@@ -86,12 +82,12 @@ async function audit(
  */
 export function requireLegacyPrivilegedWrite(options: LegacyPrivilegedWriteOptions) {
   return async (req: Request, res: Response, next: NextFunction) => {
-    const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+    const body = req.body && typeof req.body === "object" ? (req.body as Record<string, unknown>) : {};
     if (!shouldEnforceLegacyPrivilegedWrite(options.enforcement, body)) return next();
 
     const sourceId = options.sourceId?.(req) || text(body.sourceId) || options.action;
     try {
-      const permissions = await hydrateSessionNamedPermissions(db, req.session as any);
+      const permissions = await hydrateSessionNamedPermissions(db, req.session);
       authorizePrivilegedOperation({
         actor: actor(req, permissions),
         companyId: req.session.currentCompanyId as number,
@@ -103,7 +99,7 @@ export function requireLegacyPrivilegedWrite(options: LegacyPrivilegedWriteOptio
         idempotencyKey: normalizeLegacyIdempotencyKey(body.idempotencyKey),
         sourceType: options.sourceType,
         sourceId,
-        passwordConfirmedAt: (req.session as any).passwordConfirmedAt,
+        passwordConfirmedAt: req.session.passwordConfirmedAt,
       });
       await audit(req, options, "allowed", "AUTHORIZED", sourceId);
       return next();

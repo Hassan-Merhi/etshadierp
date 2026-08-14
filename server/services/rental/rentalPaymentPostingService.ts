@@ -187,7 +187,7 @@ async function postGroupCore(
         companyId,
         voucherNumber: voucherNum,
         voucherType: "Payment",
-        voucherDate: paymentDate as any,
+        voucherDate: paymentDate,
         description: narration,
         totalAmount: totalAmountStr,
         currency,
@@ -246,7 +246,7 @@ async function postGroupCore(
           companyId,
           voucherNumber: `ADV-REC-${paymentDate.replace(/-/g, "")}-${groupId.slice(-6)}`,
           voucherType: "Journal",
-          voucherDate: paymentDate as any,
+          voucherDate: paymentDate,
           description: recNarr,
           totalAmount: advanceAmt.toFixed(2),
           currency,
@@ -321,7 +321,7 @@ async function postGroupCore(
           companyId,
           voucherNumber: voucherNum,
           voucherType: "Receipt",
-          voucherDate: paymentDate as any,
+          voucherDate: paymentDate,
           description: narration,
           totalAmount: totalAmountStr,
           currency,
@@ -370,7 +370,7 @@ async function postGroupCore(
         companyId,
         voucherNumber: voucherNum,
         voucherType: "Receipt",
-        voucherDate: paymentDate as any,
+        voucherDate: paymentDate,
         description: narration,
         totalAmount: totalAmountStr,
         currency,
@@ -516,7 +516,7 @@ export async function createRentalPaymentGroup(
           cashAccountId: cashAccountId ?? null,
           voucherId: null,
           amount: alloc.chunk,
-          paymentDate: paymentDate as any,
+          paymentDate: paymentDate,
           forYear: alloc.year,
           forMonth: alloc.month,
           currency: currency || "USD",
@@ -524,7 +524,7 @@ export async function createRentalPaymentGroup(
           notes: allocations.length > 1 ? `${notes ? notes + " | " : ""}Split from ${amount} payment` : (notes ?? null),
           postingStatus: "SCHEDULED",
           paymentGroupId,
-        } as any)
+        })
         .returning();
       created.push(p);
     }
@@ -554,10 +554,7 @@ export async function createRentalPaymentGroup(
       .select()
       .from(propertyPayments)
       .where(
-        and(
-          eq(propertyPayments.paymentGroupId, paymentGroupId),
-          sql`${propertyPayments.postingStatus} = 'POSTED'`
-        ) as any
+        and(eq(propertyPayments.paymentGroupId, paymentGroupId), sql`${propertyPayments.postingStatus} = 'POSTED'`)
       );
 
     return { paymentGroupId, scheduled: false, payments: posted };
@@ -623,7 +620,7 @@ export async function postDueScheduledRentalPayments(
         asOfDate,
         row.cash_account_id,
         row.currency,
-        String((firstRow as any)?.exchangeRate || row.exchange_rate || "1"),
+        String(firstRow?.exchangeRate || row.exchange_rate || "1"),
         firstRow.notes as string | null,
         shopExpenseAccountName,
         incomeAccountName,
@@ -665,9 +662,7 @@ async function postScheduledGroup(
     groupRows = await tx
       .select()
       .from(propertyPayments)
-      .where(
-        and(eq(propertyPayments.paymentGroupId, groupId), sql`${propertyPayments.postingStatus} = 'SCHEDULED'` as any)
-      );
+      .where(and(eq(propertyPayments.paymentGroupId, groupId), sql`${propertyPayments.postingStatus} = 'SCHEDULED'`));
 
     if (groupRows.length === 0) return;
 
@@ -688,7 +683,7 @@ async function postScheduledGroup(
         : `${String(allocs[0].forMonth).padStart(2, "0")}/${allocs[0].forYear}`;
     const narration = `Rent paid - ${unitLabel} - ${monthSpan}`;
 
-    const groupExchangeRate = String((groupRows[0] as any)?.exchangeRate || exchangeRate || "1");
+    const groupExchangeRate = String(groupRows[0]?.exchangeRate || exchangeRate || "1");
 
     const voucherId = await postGroupCore(tx, {
       companyId,
@@ -726,7 +721,7 @@ async function postScheduledGroup(
         postingStatus: "POSTED",
         postedAt: new Date(),
         voucherId: voucherId ?? null,
-      } as any)
+      })
       .where(inArray(propertyPayments.id, rowIds));
   });
 

@@ -1,10 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
-import {
-  AuthorizationDeniedError,
-  type AuthorizationActor,
-} from "./authorizationPolicy";
+import { AuthorizationDeniedError, type AuthorizationActor } from "./authorizationPolicy";
 import {
   PrivilegedOperationError,
   authorizePrivilegedOperation,
@@ -68,7 +65,7 @@ async function recordPrivilegedDecision(
       companyId: session.currentCompanyId ?? null,
       actorUserId: session.userId ?? null,
       targetType: options.sourceType,
-      targetId: normalizedText((req.body as any)?.sourceId) || null,
+      targetId: normalizedText(req.body?.sourceId) || null,
       reasonCode,
       ipAddress: req.ip,
       userAgent: req.get("user-agent"),
@@ -87,7 +84,7 @@ async function recordPrivilegedDecision(
 export function requirePrivilegedOperation(options: PrivilegedRouteOptions) {
   return async (req: Request, res: Response, next: NextFunction) => {
     const body = req.body && typeof req.body === "object" ? req.body : {};
-    if (options.allowDryRun && (body as any).dryRun !== false) return next();
+    if (options.allowDryRun && body.dryRun !== false) return next();
 
     const companyId = req.session.currentCompanyId;
     if (!companyId) {
@@ -108,12 +105,12 @@ export function requirePrivilegedOperation(options: PrivilegedRouteOptions) {
         action: options.action,
         kind: options.kind,
         requiredPermission: options.requiredPermission,
-        reason: normalizedText((body as any).reason),
-        confirmationToken: normalizedText((body as any).confirmationToken),
+        reason: normalizedText(body.reason),
+        confirmationToken: normalizedText(body.confirmationToken),
         expectedConfirmationToken: options.expectedConfirmationToken(companyId),
-        idempotencyKey: normalizedText((body as any).idempotencyKey),
+        idempotencyKey: normalizedText(body.idempotencyKey),
         sourceType: options.sourceType,
-        sourceId: normalizedText((body as any).sourceId),
+        sourceId: normalizedText(body.sourceId),
         passwordConfirmedAt: (req.session as SecuritySession).passwordConfirmedAt,
       });
       await recordPrivilegedDecision(req, options, "allowed", "AUTHORIZED");

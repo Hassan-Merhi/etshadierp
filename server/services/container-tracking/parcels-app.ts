@@ -82,10 +82,7 @@ export async function trackViaParcelsApp(
         updateSet.eta = finalEta;
         updateSet.etaSource = etaSrc;
       }
-      await db
-        .update(containers)
-        .set(updateSet as any)
-        .where(eq(containers.id, containerId));
+      await db.update(containers).set(updateSet).where(eq(containers.id, containerId));
       await logAndConfirmEta(
         containerId,
         containerNumber,
@@ -184,10 +181,7 @@ export async function trackViaParcelsApp(
           updateSet.etaSource = etaSrc;
         }
 
-        await db
-          .update(containers)
-          .set(updateSet as any)
-          .where(eq(containers.id, containerId));
+        await db.update(containers).set(updateSet).where(eq(containers.id, containerId));
         await logAndConfirmEta(
           containerId,
           containerNumber,
@@ -221,10 +215,7 @@ export async function trackViaParcelsApp(
           updateSet.eta = mdResult.eta;
           updateSet.etaSource = "api";
         }
-        await db
-          .update(containers)
-          .set(updateSet as any)
-          .where(eq(containers.id, containerId));
+        await db.update(containers).set(updateSet).where(eq(containers.id, containerId));
       }
 
       ep(containerId, "Maersk Puppeteer", "success", mdResult.latestStatus ?? "got data");
@@ -299,10 +290,7 @@ export async function trackViaParcelsApp(
         updateSet.etaSource = etaSrc;
       }
 
-      await db
-        .update(containers)
-        .set(updateSet as any)
-        .where(eq(containers.id, containerId));
+      await db.update(containers).set(updateSet).where(eq(containers.id, containerId));
       await logAndConfirmEta(
         containerId,
         containerNumber,
@@ -345,10 +333,7 @@ export async function trackViaParcelsApp(
     logger.info(
       `[ContainerTracking] ${containerNumber}: Maersk chain exhausted — preserving ETA=${currentEta ?? "none"}`
     );
-    await db
-      .update(containers)
-      .set({ trackingLastCheckedAt: now } as any)
-      .where(eq(containers.id, containerId));
+    await db.update(containers).set({ trackingLastCheckedAt: now }).where(eq(containers.id, containerId));
     return {
       success: false,
       lastStatus: null,
@@ -401,10 +386,7 @@ export async function trackViaParcelsApp(
         updateSet.eta = finalEta;
         updateSet.etaSource = etaSrc;
       }
-      await db
-        .update(containers)
-        .set(updateSet as any)
-        .where(eq(containers.id, containerId));
+      await db.update(containers).set(updateSet).where(eq(containers.id, containerId));
       await logAndConfirmEta(
         containerId,
         containerNumber,
@@ -477,10 +459,7 @@ export async function trackViaParcelsApp(
           updateSet.eta = finalEta;
           updateSet.etaSource = etaSrc;
         }
-        await db
-          .update(containers)
-          .set(updateSet as any)
-          .where(eq(containers.id, containerId));
+        await db.update(containers).set(updateSet).where(eq(containers.id, containerId));
         await logAndConfirmEta(
           containerId,
           containerNumber,
@@ -542,10 +521,7 @@ export async function trackViaParcelsApp(
           updateSet.eta = finalEta;
           updateSet.etaSource = etaSrc;
         }
-        await db
-          .update(containers)
-          .set(updateSet as any)
-          .where(eq(containers.id, containerId));
+        await db.update(containers).set(updateSet).where(eq(containers.id, containerId));
         await logAndConfirmEta(
           containerId,
           containerNumber,
@@ -608,10 +584,7 @@ export async function trackViaParcelsApp(
             updateSet.eta = finalEta;
             updateSet.etaSource = etaSrc;
           }
-          await db
-            .update(containers)
-            .set(updateSet as any)
-            .where(eq(containers.id, containerId));
+          await db.update(containers).set(updateSet).where(eq(containers.id, containerId));
           await logAndConfirmEta(
             containerId,
             containerNumber,
@@ -690,10 +663,7 @@ export async function trackViaParcelsApp(
         updateSet.eta = finalEta;
         updateSet.etaSource = etaSrc;
       }
-      await db
-        .update(containers)
-        .set(updateSet as any)
-        .where(eq(containers.id, containerId));
+      await db.update(containers).set(updateSet).where(eq(containers.id, containerId));
       await logAndConfirmEta(
         containerId,
         containerNumber,
@@ -762,10 +732,7 @@ export async function trackViaParcelsApp(
           updateSet.eta = finalEta;
           updateSet.etaSource = etaSrc;
         }
-        await db
-          .update(containers)
-          .set(updateSet as any)
-          .where(eq(containers.id, containerId));
+        await db.update(containers).set(updateSet).where(eq(containers.id, containerId));
         await logAndConfirmEta(
           containerId,
           containerNumber,

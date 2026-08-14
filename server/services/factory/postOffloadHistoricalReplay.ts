@@ -122,8 +122,8 @@ export async function replayPostOffloadHistoricalCosts(
       }
 
       if (!supplierPreview.safeToRepair) {
-        blockedReasons = Array.isArray((supplierPreview as any).reasons)
-          ? (supplierPreview as any).reasons.map(String)
+        blockedReasons = Array.isArray(supplierPreview.reasons)
+          ? supplierPreview.reasons.map(String)
           : ["Supplier timeline is not safe for automatic historical replay."];
         await prepareClient.query("COMMIT");
         return {

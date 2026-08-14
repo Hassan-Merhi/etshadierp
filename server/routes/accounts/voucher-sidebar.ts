@@ -157,8 +157,8 @@ export function registerAccountVoucherSidebarRoutes(app: Express) {
           }
         }
 
-        if ((entry as any).factorySupplierId) {
-          const fsId = (entry as any).factorySupplierId as number;
+        if (entry.factorySupplierId) {
+          const fsId = entry.factorySupplierId as number;
           // Only track non-FACTORY-PAY-* debits as ERP voucher payments.
           // FACTORY-PAY-* vouchers are already counted via fPayments.
           if (!factoryPayVoucherIds.has(entry.voucherId) && debit > 0 && credit === 0) {
@@ -179,8 +179,8 @@ export function registerAccountVoucherSidebarRoutes(app: Express) {
           });
         }
 
-        if ((entry as any).customerId) {
-          const cId = (entry as any).customerId as number;
+        if (entry.customerId) {
+          const cId = entry.customerId as number;
           const existing = customerBalances.get(cId) || { debits: 0, credits: 0 };
           customerBalances.set(cId, {
             debits: existing.debits + debit,

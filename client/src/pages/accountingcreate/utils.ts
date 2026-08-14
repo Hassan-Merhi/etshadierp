@@ -3,8 +3,15 @@
  *
  * Extracted from AccountingCreate.tsx during the Phase 4 god-file split.
  */
-import {insertLocationSchema, insertLedgerAccountSchema, insertEmployeeSchema, insertSupplierSchema, insertStockGroupSchema, insertStockItemSchema} from "@shared/schema";
-import type {EntityType} from "./types";
+import {
+  insertLocationSchema,
+  insertLedgerAccountSchema,
+  insertEmployeeSchema,
+  insertSupplierSchema,
+  insertStockGroupSchema,
+  insertStockItemSchema,
+} from "@shared/schema";
+import type { EntityType } from "./types";
 
 export const entityConfig = {
   location: {
@@ -49,11 +56,11 @@ const getDefaultValues = (entityType: EntityType) => {
     case "ledger":
       return {
         name: "",
-        accountType: "" as any,
+        accountType: "",
         subType: "",
-        parentId: undefined as any,
+        parentId: undefined,
         openingBalance: "0",
-        openingBalanceSide: "" as any,
+        openingBalanceSide: "",
         active: true,
       };
 
@@ -64,7 +71,7 @@ const getDefaultValues = (entityType: EntityType) => {
         phone: "",
         joinDate: "",
         department: "",
-        employeeType: "Employee" as any,
+        employeeType: "Employee",
         openingBalance: "0",
         active: true,
       };

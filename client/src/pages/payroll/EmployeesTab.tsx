@@ -143,7 +143,7 @@ export function EmployeesTab({
                   onClick={() => {
                     const fromPending: Record<number, string> = {};
                     for (const [empId, pb] of Object.entries(pendingBonuses)) {
-                      fromPending[parseInt(empId)] = (pb as any).amount.toFixed(2);
+                      fromPending[parseInt(empId)] = pb.amount.toFixed(2);
                     }
                     setBulkBonusAmounts(fromPending);
                     setBulkBonusStep("edit");

@@ -25,8 +25,8 @@ import { normFactoryEntry } from "./_helpers";
 export function registerFactoryContainerUpdateRoutes(app: Express) {
   app.patch("/api/factory/containers/:id", requireAuth, async (req: Request, res: Response) => {
     const _t = Date.now();
-    const _uid = (req.session as any).userId;
-    const _cid = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+    const _uid = req.session.userId;
+    const _cid = req.session.factoryCompanyId || req.session.currentCompanyId;
     try {
       logger.info("factory container update started", {
         module: "factoryContainers",
@@ -34,7 +34,7 @@ export function registerFactoryContainerUpdateRoutes(app: Express) {
         userId: _uid,
         companyId: _cid,
       });
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
@@ -118,7 +118,7 @@ export function registerFactoryContainerUpdateRoutes(app: Express) {
         const effCommCcy = (
           updateData.commissionCurrencyCode !== undefined
             ? updateData.commissionCurrencyCode || "USD"
-            : (existing as any).commissionCurrencyCode || "USD"
+            : existing.commissionCurrencyCode || "USD"
         ).toUpperCase();
         const effContainerCcy = (updateData.currencyCode || existing.currencyCode || "USD").toUpperCase();
         const effDate = updateData.arrivalDate || existing.arrivalDate || getClientDate(req);
@@ -189,7 +189,7 @@ export function registerFactoryContainerUpdateRoutes(app: Express) {
             const { fxRate, looksSet } = resolveStoredFxRate(
               currencyCode,
               existing.fxRateToUsd,
-              (existing as any).fxRateConfirmed
+              existing.fxRateConfirmed
             );
             if (!looksSet) {
               return res.status(400).json({ message: new UnresolvedExchangeRateError(currencyCode).message });
@@ -301,9 +301,9 @@ export function registerFactoryContainerUpdateRoutes(app: Express) {
 
       const newFreightAmt = parseFloat(updated.freight || "0");
       const newFreightAcctId = updated.freightAccountId ?? null;
-      const newFreightPaidBy = (updated as any).freightPaidBy || "supplier";
-      const newFreightOwnAcctId = (updated as any).freightOwnAccountId ?? null;
-      const freightCcy = (updated as any).freightCurrencyCode || updated.currencyCode || "USD";
+      const newFreightPaidBy = updated.freightPaidBy || "supplier";
+      const newFreightOwnAcctId = updated.freightOwnAccountId ?? null;
+      const freightCcy = updated.freightCurrencyCode || updated.currencyCode || "USD";
 
       if (newFreightAmt > 0 && newFreightAcctId) {
         if (existingFV) {
@@ -319,11 +319,7 @@ export function registerFactoryContainerUpdateRoutes(app: Express) {
             // Compute normalized amounts for the updated freight entries
             const updateFreightFactoryFxRate =
               freightCcy === (updated.currencyCode || "USD")
-                ? resolveStoredFxRateOrThrow(
-                    updated.currencyCode,
-                    (updated as any).fxRateToUsd,
-                    (updated as any).fxRateConfirmed
-                  )
+                ? resolveStoredFxRateOrThrow(updated.currencyCode, updated.fxRateToUsd, updated.fxRateConfirmed)
                 : 1;
             const normFreightDr = normFactoryEntry(freightCcy, String(newFreightAmt), "0", updateFreightFactoryFxRate);
             const normFreightCr = normFactoryEntry(freightCcy, "0", String(newFreightAmt), updateFreightFactoryFxRate);
@@ -392,11 +388,7 @@ export function registerFactoryContainerUpdateRoutes(app: Express) {
             .returning();
           const newFreightFactoryFxRate =
             freightCcy === (updated.currencyCode || "USD")
-              ? resolveStoredFxRateOrThrow(
-                  updated.currencyCode,
-                  (updated as any).fxRateToUsd,
-                  (updated as any).fxRateConfirmed
-                )
+              ? resolveStoredFxRateOrThrow(updated.currencyCode, updated.fxRateToUsd, updated.fxRateConfirmed)
               : 1;
           await db.insert(voucherEntries).values({
             voucherId: newFV.id,
@@ -461,7 +453,7 @@ export function registerFactoryContainerUpdateRoutes(app: Express) {
         ].filter(Boolean);
         const syncDesc = syncDescParts.join(" · ");
         const syncAmount = rateForSync * kgForSync;
-        const syncFxRate = parseFloat((updated as any).fxRateToUsd || "1") || 1;
+        const syncFxRate = parseFloat(updated.fxRateToUsd || "1") || 1;
         const daybookUpdateSet: Record<string, any> = { description: syncDesc };
         if (syncAmount > 0) {
           daybookUpdateSet.amountCurrency = String(syncAmount);

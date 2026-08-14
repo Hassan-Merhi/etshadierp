@@ -30,7 +30,7 @@ import { eq, and, desc, sql, inArray, not } from "drizzle-orm";
 export function registerBalesCrudRoutes(app: Express) {
   app.get("/api/factory/bales", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const {
@@ -171,7 +171,7 @@ export function registerBalesCrudRoutes(app: Express) {
 
   app.patch("/api/factory/bales/bulk-status", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { ids, status } = req.body;
@@ -211,7 +211,7 @@ export function registerBalesCrudRoutes(app: Express) {
   // PATCH /api/factory/bales/bulk-date — update stock_entry_date for a set of bales
   app.patch("/api/factory/bales/bulk-date", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { ids, stockEntryDate } = req.body;
@@ -235,7 +235,7 @@ export function registerBalesCrudRoutes(app: Express) {
 
   app.patch("/api/factory/bales/:id/status", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
@@ -302,7 +302,7 @@ export function registerBalesCrudRoutes(app: Express) {
       if (!updated) return res.status(404).json({ message: "Bale not found" });
       await logAudit({
         userId: req.session.userId!,
-        username: (req.session as any).username || req.session.userId!,
+        username: req.session.username || req.session.userId!,
         companyId,
         action: "update",
         tableName: "factory_bales",
@@ -318,7 +318,7 @@ export function registerBalesCrudRoutes(app: Express) {
 
   app.delete("/api/factory/bales/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
@@ -335,7 +335,7 @@ export function registerBalesCrudRoutes(app: Express) {
       if (!updated) return res.status(404).json({ message: "Bale not found" });
       await logAudit({
         userId: req.session.userId!,
-        username: (req.session as any).username || req.session.userId!,
+        username: req.session.username || req.session.userId!,
         companyId,
         action: "delete",
         tableName: "bales",
@@ -351,7 +351,7 @@ export function registerBalesCrudRoutes(app: Express) {
 
   app.patch("/api/factory/bales/:id/product-name", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
@@ -383,7 +383,7 @@ export function registerBalesCrudRoutes(app: Express) {
 
       await logAudit({
         userId: req.session.userId!,
-        username: (req.session as any).username || req.session.userId!,
+        username: req.session.username || req.session.userId!,
         companyId,
         action: "update",
         tableName: "bales",
@@ -400,7 +400,7 @@ export function registerBalesCrudRoutes(app: Express) {
 
   app.patch("/api/factory/bales/:id/assign-worker", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
@@ -457,7 +457,7 @@ export function registerBalesCrudRoutes(app: Express) {
   // ── Bulk assign worker to multiple bales (for stock entry history groups) ──
   app.patch("/api/factory/bales/bulk-assign-worker", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { baleIds, workerId } = req.body;
       if (!Array.isArray(baleIds) || baleIds.length === 0)
@@ -513,7 +513,7 @@ export function registerBalesCrudRoutes(app: Express) {
   // ── Correct bale weight (cascades to load bales, invoice bales, order bales) ──
   app.patch("/api/factory/bales/:id/weight", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
@@ -579,7 +579,7 @@ export function registerBalesCrudRoutes(app: Express) {
 
       await logAudit({
         userId: req.session.userId!,
-        username: (req.session as any).username || req.session.userId!,
+        username: req.session.username || req.session.userId!,
         companyId,
         action: "update",
         tableName: "factory_bales",
@@ -605,7 +605,7 @@ export function registerBalesCrudRoutes(app: Express) {
 
   app.post("/api/factory/bales/:id/repack", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
@@ -700,7 +700,7 @@ export function registerBalesCrudRoutes(app: Express) {
 
       await logAudit({
         userId: req.session.userId!,
-        username: (req.session as any).username || req.session.userId!,
+        username: req.session.username || req.session.userId!,
         companyId,
         action: "update",
         tableName: "factory_bales",

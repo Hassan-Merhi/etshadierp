@@ -149,7 +149,7 @@ export function registerContainerDocumentsRoutes(app: Express) {
           totalKg: container.totalKg,
         },
         supplier: {
-          code: (supplier as any)?.code || "",
+          code: supplier?.code || "",
           legalName: supplier?.legalName || "",
         },
         purchaseOrders: posWithItems,

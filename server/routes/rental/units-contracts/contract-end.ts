@@ -60,7 +60,7 @@ export function registerRentalContractEndRoutes(app: Express, ctx: RentalRoutesC
           .update(propertyContracts)
           .set({
             status: "ENDED",
-            endDate: endDate as any,
+            endDate: endDate,
             notes: notes ? `${contract.notes ? contract.notes + "\n" : ""}END: ${notes}` : contract.notes,
           })
           .where(eq(propertyContracts.id, id));
@@ -100,7 +100,7 @@ export function registerRentalContractEndRoutes(app: Express, ctx: RentalRoutesC
                   companyId,
                   voucherNumber: `GUAR-REFUND-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${id}`,
                   voucherType: "Receipt",
-                  voucherDate: dateStr as any,
+                  voucherDate: dateStr,
                   description: narration,
                   totalAmount: amt,
                   currency: contract.currency || "USD",
@@ -132,7 +132,7 @@ export function registerRentalContractEndRoutes(app: Express, ctx: RentalRoutesC
                   companyId,
                   voucherNumber: `GUAR-REFUND-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${id}`,
                   voucherType: "Payment",
-                  voucherDate: dateStr as any,
+                  voucherDate: dateStr,
                   description: narration,
                   totalAmount: amt,
                   currency: contract.currency || "USD",
@@ -162,7 +162,7 @@ export function registerRentalContractEndRoutes(app: Express, ctx: RentalRoutesC
             cashAccountId: refundCashAccountId ?? null,
             voucherId: null,
             amount: amt,
-            paymentDate: dateStr as any,
+            paymentDate: dateStr,
             forYear: new Date(dateStr).getUTCFullYear(),
             forMonth: new Date(dateStr).getUTCMonth() + 1,
             notes: `[Guarantee refund] ${narration}`,
@@ -172,7 +172,7 @@ export function registerRentalContractEndRoutes(app: Express, ctx: RentalRoutesC
 
       await logAudit({
         userId: req.session.userId!,
-        username: (req.session as any).username || "unknown",
+        username: req.session.username || "unknown",
         companyId,
         action: "update",
         tableName: "property_contracts",

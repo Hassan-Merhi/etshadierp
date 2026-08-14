@@ -171,11 +171,11 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
   } else if (accountType === "supplier") {
     rawEntries = await storage.getVoucherEntriesBySupplier(accountId, companyId, startDate, endDate);
     const [acct] = await db.select().from(suppliers).where(eq(suppliers.id, accountId));
-    accountName = (acct as any)?.legalName ?? "Supplier";
+    accountName = acct?.legalName ?? "Supplier";
     // The supplier opening balance only belongs to the explicitly configured
     // parent company's books — never guessed via "lowest company ID".
     const isParentForSupplier = await isParentCompanyContext(companyId);
-    rawOB = isParentForSupplier ? parseFloat((acct as any)?.openingBalance ?? "0") || 0 : 0;
+    rawOB = isParentForSupplier ? parseFloat(acct?.openingBalance ?? "0") || 0 : 0;
     obSide = "Cr";
   } else if (accountType === "employee") {
     rawEntries = await storage.getVoucherEntriesByEmployee(accountId, companyId, startDate, endDate);
@@ -321,9 +321,9 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
   // ── 5. Company info ──
   const company = await storage.getCompanyById(companyId);
   const settings = await storage.getCompanySettings(companyId);
-  const companyName = (company as any)?.name ?? "Company";
-  const logoUrl: string | null = (settings as any)?.logoUrl ?? null;
-  const baseCurrency = (company as any)?.baseCurrency ?? "USD";
+  const companyName = company?.name ?? "Company";
+  const logoUrl: string | null = settings?.logoUrl ?? null;
+  const baseCurrency = company?.baseCurrency ?? "USD";
   const currencySymbolMap: Record<string, string> = {
     USD: "$ ",
     GBP: "£",
@@ -384,7 +384,7 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
     const reshaperMod = require("arabic-reshaper") as { convertArabic: (t: string) => string };
     convertArabic = reshaperMod.convertArabic;
     const bidiFactory = require("bidi-js") as () => typeof bidiInst;
-    bidiInst = (bidiFactory as any)();
+    bidiInst = bidiFactory();
   } catch {
     // Failure here is non-fatal and the surrounding flow continues deliberately.
   }

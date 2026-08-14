@@ -2,13 +2,7 @@ import { randomUUID } from "crypto";
 import { logger } from "../lib/logger";
 import { and, desc, eq, gte, inArray, isNull, lte } from "drizzle-orm";
 import { db } from "../db";
-import {
-  aiActionLog,
-  salesItems,
-  stockTransferItems,
-  stockTransferVouchers,
-  vouchers,
-} from "@shared/schema";
+import { aiActionLog, salesItems, stockTransferItems, stockTransferVouchers, vouchers } from "@shared/schema";
 import { roundNumber } from "./smartTransferPerformance";
 
 const PREVIEW_ACTION = "smart_transfer_preview_v4";
@@ -170,9 +164,7 @@ function compareLines(suggested: CompactFeedbackLine[], finalLines: CompactFeedb
 }
 
 function jsonObject(value: unknown): Record<string, any> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, any>)
-    : {};
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, any>) : {};
 }
 
 export async function createSmartTransferPreviewFeedback(params: {
@@ -184,9 +176,7 @@ export async function createSmartTransferPreviewFeedback(params: {
   try {
     const sessionId = `stf_${randomUUID()}`;
     const lines = normalizeLines(params.preview.lines);
-    const averageScore = lines.length > 0
-      ? lines.reduce((sum, line) => sum + line.itemScore, 0) / lines.length
-      : 0;
+    const averageScore = lines.length > 0 ? lines.reduce((sum, line) => sum + line.itemScore, 0) / lines.length : 0;
 
     await db.insert(aiActionLog).values({
       companyId: params.companyId,
@@ -206,7 +196,7 @@ export async function createSmartTransferPreviewFeedback(params: {
         lines,
       },
       status: "success",
-    } as any);
+    });
     return sessionId;
   } catch (error) {
     logger.error("[SmartTransferFeedback] Preview log failed:", { error: (error as Error).message });
@@ -236,10 +226,12 @@ async function latestPreview(params: {
     .orderBy(desc(aiActionLog.createdAt))
     .limit(20);
 
-  return rows.find((row) => {
-    const output = jsonObject(row.outputJson);
-    return Number(output.destinationLocationId) === params.destinationLocationId;
-  }) ?? null;
+  return (
+    rows.find((row) => {
+      const output = jsonObject(row.outputJson);
+      return Number(output.destinationLocationId) === params.destinationLocationId;
+    }) ?? null
+  );
 }
 
 export async function recordSmartTransferImportFeedback(params: {
@@ -273,7 +265,7 @@ export async function recordSmartTransferImportFeedback(params: {
       comparison,
     },
     status: "success",
-  } as any);
+  });
 
   return { sessionId, matchedPreview: Boolean(preview), comparison };
 }
@@ -281,7 +273,8 @@ export async function recordSmartTransferImportFeedback(params: {
 function transferSimilarity(imported: CompactFeedbackLine[], actual: CompactFeedbackLine[]): number {
   if (imported.length === 0 || actual.length === 0) return 0;
   const comparison = compareLines(imported, actual);
-  const totalRatio = Math.min(comparison.finalQuantity, comparison.suggestedQuantity) /
+  const totalRatio =
+    Math.min(comparison.finalQuantity, comparison.suggestedQuantity) /
     Math.max(1, Math.max(comparison.finalQuantity, comparison.suggestedQuantity));
   return clamp(
     comparison.itemKeptPct * 0.35 +
@@ -429,7 +422,7 @@ async function reconcileApprovals(companyId: number, since: Date): Promise<numbe
         comparison,
       },
       status: "success",
-    } as any);
+    });
     created += 1;
   }
 
@@ -486,19 +479,30 @@ export async function getSmartTransferFeedbackSummary(companyId: number, request
       2
     ),
     quantityKeptPct: roundNumber(
-      weightedAverage(comparisonPool.map((comparison) => ({ value: comparison.quantityKeptPct, weight: comparison.suggestedQuantity }))),
+      weightedAverage(
+        comparisonPool.map((comparison) => ({
+          value: comparison.quantityKeptPct,
+          weight: comparison.suggestedQuantity,
+        }))
+      ),
       2
     ),
     lineKeptPct: roundNumber(
-      weightedAverage(comparisonPool.map((comparison) => ({ value: comparison.lineKeptPct, weight: comparison.suggestedLineCount }))),
+      weightedAverage(
+        comparisonPool.map((comparison) => ({ value: comparison.lineKeptPct, weight: comparison.suggestedLineCount }))
+      ),
       2
     ),
     itemKeptPct: roundNumber(
-      weightedAverage(comparisonPool.map((comparison) => ({ value: comparison.itemKeptPct, weight: comparison.suggestedItemCount }))),
+      weightedAverage(
+        comparisonPool.map((comparison) => ({ value: comparison.itemKeptPct, weight: comparison.suggestedItemCount }))
+      ),
       2
     ),
     sourceKeptPct: roundNumber(
-      weightedAverage(comparisonPool.map((comparison) => ({ value: comparison.sourceKeptPct, weight: comparison.keptQuantity }))),
+      weightedAverage(
+        comparisonPool.map((comparison) => ({ value: comparison.sourceKeptPct, weight: comparison.keptQuantity }))
+      ),
       2
     ),
     addedQuantity: comparisonPool.reduce((sum, comparison) => sum + comparison.addedQuantity, 0),
@@ -510,18 +514,19 @@ export async function getSmartTransferFeedbackSummary(companyId: number, request
   const voucherIds = approvalPayloads
     .map((entry) => Number(entry.output.voucherId ?? entry.row.createdRecordId))
     .filter((id) => Number.isInteger(id) && id > 0);
-  const transferRows = voucherIds.length > 0
-    ? await db
-        .select({
-          voucherId: vouchers.id,
-          voucherDate: vouchers.voucherDate,
-          destinationLocationId: stockTransferVouchers.destinationLocationId,
-          inventoryApplied: stockTransferVouchers.inventoryApplied,
-        })
-        .from(vouchers)
-        .innerJoin(stockTransferVouchers, eq(stockTransferVouchers.voucherId, vouchers.id))
-        .where(and(eq(vouchers.companyId, companyId), inArray(vouchers.id, voucherIds), isNull(vouchers.deletedAt)))
-    : [];
+  const transferRows =
+    voucherIds.length > 0
+      ? await db
+          .select({
+            voucherId: vouchers.id,
+            voucherDate: vouchers.voucherDate,
+            destinationLocationId: stockTransferVouchers.destinationLocationId,
+            inventoryApplied: stockTransferVouchers.inventoryApplied,
+          })
+          .from(vouchers)
+          .innerJoin(stockTransferVouchers, eq(stockTransferVouchers.voucherId, vouchers.id))
+          .where(and(eq(vouchers.companyId, companyId), inArray(vouchers.id, voucherIds), isNull(vouchers.deletedAt)))
+      : [];
   const transferByVoucher = new Map(transferRows.map((row) => [row.voucherId, row]));
 
   const performanceCandidates = approvalPayloads
@@ -544,36 +549,39 @@ export async function getSmartTransferFeedbackSummary(companyId: number, request
     })
     .filter((value): value is NonNullable<typeof value> => Boolean(value));
 
-  const itemIds = Array.from(new Set(performanceCandidates.flatMap((candidate) => candidate.finalItems.map((item) => item.stockItemId))));
+  const itemIds = Array.from(
+    new Set(performanceCandidates.flatMap((candidate) => candidate.finalItems.map((item) => item.stockItemId)))
+  );
   const destinationIds = Array.from(new Set(performanceCandidates.map((candidate) => candidate.destinationLocationId)));
   const earliestVoucherDate = performanceCandidates.reduce<string | null>(
     (current, candidate) => (!current || candidate.voucherDate < current ? candidate.voucherDate : current),
     null
   );
   const today = new Date().toISOString().slice(0, 10);
-  const salesRows = performanceCandidates.length > 0 && itemIds.length > 0 && destinationIds.length > 0 && earliestVoucherDate
-    ? await db
-        .select({
-          stockItemId: salesItems.stockItemId,
-          locationId: vouchers.locationId,
-          voucherDate: vouchers.voucherDate,
-          quantity: salesItems.quantity,
-        })
-        .from(salesItems)
-        .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
-        .where(
-          and(
-            eq(vouchers.companyId, companyId),
-            eq(vouchers.voucherType, "Sales"),
-            eq(vouchers.optional, false),
-            isNull(vouchers.deletedAt),
-            inArray(vouchers.locationId, destinationIds),
-            inArray(salesItems.stockItemId, itemIds),
-            gte(vouchers.voucherDate, earliestVoucherDate),
-            lte(vouchers.voucherDate, today)
+  const salesRows =
+    performanceCandidates.length > 0 && itemIds.length > 0 && destinationIds.length > 0 && earliestVoucherDate
+      ? await db
+          .select({
+            stockItemId: salesItems.stockItemId,
+            locationId: vouchers.locationId,
+            voucherDate: vouchers.voucherDate,
+            quantity: salesItems.quantity,
+          })
+          .from(salesItems)
+          .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+          .where(
+            and(
+              eq(vouchers.companyId, companyId),
+              eq(vouchers.voucherType, "Sales"),
+              eq(vouchers.optional, false),
+              isNull(vouchers.deletedAt),
+              inArray(vouchers.locationId, destinationIds),
+              inArray(salesItems.stockItemId, itemIds),
+              gte(vouchers.voucherDate, earliestVoucherDate),
+              lte(vouchers.voucherDate, today)
+            )
           )
-        )
-    : [];
+      : [];
 
   const performanceRows = performanceCandidates.map((candidate) => {
     const end = new Date(`${candidate.voucherDate}T00:00:00Z`);
@@ -621,35 +629,62 @@ export async function getSmartTransferFeedbackSummary(companyId: number, request
       2
     ),
     observedSalesToTransferPct: roundNumber(
-      weightedAverage(performanceRows.map((row) => ({ value: row.observedSalesToTransferPct, weight: Math.max(1, row.approvedQty) }))),
+      weightedAverage(
+        performanceRows.map((row) => ({ value: row.observedSalesToTransferPct, weight: Math.max(1, row.approvedQty) }))
+      ),
       2
     ),
     underForecastRatePct: roundNumber(
       performanceRows.length > 0
-        ? (performanceRows.filter((row) => row.actualSales > row.predictedSales * 1.25).length / performanceRows.length) * 100
+        ? (performanceRows.filter((row) => row.actualSales > row.predictedSales * 1.25).length /
+            performanceRows.length) *
+            100
         : 0,
       2
     ),
     overForecastRatePct: roundNumber(
       performanceRows.length > 0
-        ? (performanceRows.filter((row) => row.predictedSales > row.actualSales * 1.25).length / performanceRows.length) * 100
+        ? (performanceRows.filter((row) => row.predictedSales > row.actualSales * 1.25).length /
+            performanceRows.length) *
+            100
         : 0,
       2
     ),
-    caveat: "Observed destination sales can include opening stock or other receipts; this is an accuracy indicator, not exact transfer-only sell-through.",
+    caveat:
+      "Observed destination sales can include opening stock or other receipts; this is an accuracy indicator, not exact transfer-only sell-through.",
   };
 
   const recommendations: string[] = [];
   if (approvals.length < 5) {
-    recommendations.push("Collect at least five approved smart transfers before changing forecasting or source-selection weights.");
+    recommendations.push(
+      "Collect at least five approved smart transfers before changing forecasting or source-selection weights."
+    );
   } else {
-    if (editing.quantityKeptPct < 70) recommendations.push("Users frequently reduce suggested quantities; review demand coverage and concentration caps before increasing automation.");
-    if (editing.sourceKeptPct < 70) recommendations.push("Users frequently change source locations; review source reserve days, pending commitments and route-history weighting.");
-    if (performance.sampleSize >= 5 && performance.forecastBiasPct > 20) recommendations.push("Forecasts are running high versus observed destination sales; reduce recent-sales acceleration or coverage weighting cautiously.");
-    if (performance.sampleSize >= 5 && performance.forecastBiasPct < -20) recommendations.push("Forecasts are running low versus observed destination sales; increase recent-demand sensitivity cautiously.");
-    if (performance.sampleSize >= 5 && performance.forecastAccuracyPct >= 80 && editing.quantityKeptPct >= 80) recommendations.push("The current rules are stable enough for a limited pilot of stronger default recommendations, while keeping manual approval.");
+    if (editing.quantityKeptPct < 70)
+      recommendations.push(
+        "Users frequently reduce suggested quantities; review demand coverage and concentration caps before increasing automation."
+      );
+    if (editing.sourceKeptPct < 70)
+      recommendations.push(
+        "Users frequently change source locations; review source reserve days, pending commitments and route-history weighting."
+      );
+    if (performance.sampleSize >= 5 && performance.forecastBiasPct > 20)
+      recommendations.push(
+        "Forecasts are running high versus observed destination sales; reduce recent-sales acceleration or coverage weighting cautiously."
+      );
+    if (performance.sampleSize >= 5 && performance.forecastBiasPct < -20)
+      recommendations.push(
+        "Forecasts are running low versus observed destination sales; increase recent-demand sensitivity cautiously."
+      );
+    if (performance.sampleSize >= 5 && performance.forecastAccuracyPct >= 80 && editing.quantityKeptPct >= 80)
+      recommendations.push(
+        "The current rules are stable enough for a limited pilot of stronger default recommendations, while keeping manual approval."
+      );
   }
-  if (recommendations.length === 0) recommendations.push("Keep the current deterministic rules and continue collecting feedback; no tuning change is justified yet.");
+  if (recommendations.length === 0)
+    recommendations.push(
+      "Keep the current deterministic rules and continue collecting feedback; no tuning change is justified yet."
+    );
 
   return {
     feedbackVersion: 4,
@@ -674,10 +709,7 @@ export async function getSmartTransferFeedbackSummary(companyId: number, request
   };
 }
 
-export async function resetSmartTransferFeedback(params: {
-  companyId: number;
-  userId: string;
-}): Promise<string> {
+export async function resetSmartTransferFeedback(params: { companyId: number; userId: string }): Promise<string> {
   const sessionId = `stf_reset_${randomUUID()}`;
   await db.insert(aiActionLog).values({
     companyId: params.companyId,
@@ -687,6 +719,6 @@ export async function resetSmartTransferFeedback(params: {
     actionName: RESET_ACTION,
     outputJson: { resetAt: new Date().toISOString() },
     status: "success",
-  } as any);
+  });
   return sessionId;
 }

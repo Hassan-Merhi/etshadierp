@@ -14,7 +14,7 @@ import {
 
 async function runCentralOffload(req: Request, res: Response, mode: ContainerOffloadLifecycleMode): Promise<void> {
   const startedAt = Date.now();
-  const companyId = Number((req.session as any)?.currentCompanyId);
+  const companyId = Number(req.session?.currentCompanyId);
   const containerId = parseId(req.params.id);
 
   if (!Number.isInteger(companyId) || companyId <= 0) {

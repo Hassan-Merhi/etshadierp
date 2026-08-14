@@ -7,7 +7,7 @@ import multer from "multer";
 import http from "http";
 
 export function getCompanyId(req: any): number | null {
-  return (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId || null;
+  return req.session.factoryCompanyId || req.session.currentCompanyId || null;
 }
 
 export const ALLOWED_MIME_TYPES = new Set([

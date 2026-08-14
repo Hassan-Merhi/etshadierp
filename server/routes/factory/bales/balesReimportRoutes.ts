@@ -33,7 +33,7 @@ export function registerBalesReimportRoutes(app: Express) {
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 
         const ExcelJS = (await import("exceljs")).default;
@@ -250,7 +250,7 @@ export function registerBalesReimportRoutes(app: Express) {
             let stockGroupId: number | null = null;
             if (bale.category) {
               const catName = bale.category as string;
-              const catId = (product as any)?.categoryId as number | undefined;
+              const catId = product?.categoryId as number | undefined;
               const cacheKey = catId ? String(catId) : catName;
               const cached = stockGroupCache.get(cacheKey);
               if (cached) {
@@ -346,7 +346,7 @@ export function registerBalesReimportRoutes(app: Express) {
   // GET /api/factory/bales/export-names.xlsx — Export all bales for bulk product-name editing
   app.get("/api/factory/bales/export-names.xlsx", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const bales = await db
@@ -412,7 +412,7 @@ export function registerBalesReimportRoutes(app: Express) {
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 
         const { read: readXlsx, utils } = await import("xlsx");
@@ -463,7 +463,7 @@ export function registerBalesReimportRoutes(app: Express) {
         try {
           await logAudit({
             userId: req.session.userId!,
-            username: (req.session as any).username || req.session.userId!,
+            username: req.session.username || req.session.userId!,
             companyId,
             action: "update",
             tableName: "factory_bales",

@@ -1,10 +1,6 @@
 import type { Request, Response } from "express";
 import { eq, inArray } from "drizzle-orm";
-import {
-  intercompanyAccountLinks,
-  ledgerAccounts,
-  userCompanyRoles,
-} from "@shared/schema";
+import { intercompanyAccountLinks, ledgerAccounts, userCompanyRoles } from "@shared/schema";
 import { db } from "../db";
 import { logger } from "../lib/logger";
 import {
@@ -56,12 +52,7 @@ async function ledgersBelongToPair(input: {
   const rows = await db
     .select({ id: ledgerAccounts.id, companyId: ledgerAccounts.companyId })
     .from(ledgerAccounts)
-    .where(
-      inArray(ledgerAccounts.id, [
-        input.sourceLedgerAccountId,
-        input.destLedgerAccountId,
-      ])
-    );
+    .where(inArray(ledgerAccounts.id, [input.sourceLedgerAccountId, input.destLedgerAccountId]));
   const companyByLedger = new Map(rows.map((row) => [row.id, row.companyId]));
   return ledgersMatchIntercompanyPair(
     companyByLedger.get(input.sourceLedgerAccountId),
@@ -71,21 +62,12 @@ async function ledgersBelongToPair(input: {
   );
 }
 
-function installLinkFilter(
-  res: Response,
-  scope: IntercompanyActorScope
-): void {
+function installLinkFilter(res: Response, scope: IntercompanyActorScope): void {
   const originalJson = res.json.bind(res);
-  (res as any).json = (body: unknown) => {
+  res.json = (body: unknown) => {
     if (!Array.isArray(body)) return originalJson(body);
     return originalJson(
-      body.filter((row) =>
-        canManageIntercompanyPair(
-          scope,
-          Number(row?.sourceCompanyId),
-          Number(row?.destCompanyId)
-        )
-      )
+      body.filter((row) => canManageIntercompanyPair(scope, Number(row?.sourceCompanyId), Number(row?.destCompanyId)))
     );
   };
 }
@@ -114,10 +96,7 @@ function deny(
   return false;
 }
 
-export async function enforceIntercompanyConfigurationScope(
-  req: Request,
-  res: Response
-): Promise<boolean> {
+export async function enforceIntercompanyConfigurationScope(req: Request, res: Response): Promise<boolean> {
   const userId = req.session.userId;
   if (!userId) return true;
 
@@ -192,12 +171,8 @@ export async function enforceIntercompanyConfigurationScope(
     return deny(req, res, "INTERCOMPANY_COMPANY_ID_INVALID", 400, "Invalid company ID");
   }
 
-  const sourceCompanyId = sourceCompanyInput.provided
-    ? sourceCompanyInput.value!
-    : link.sourceCompanyId;
-  const destCompanyId = destCompanyInput.provided
-    ? destCompanyInput.value!
-    : link.destCompanyId;
+  const sourceCompanyId = sourceCompanyInput.provided ? sourceCompanyInput.value! : link.sourceCompanyId;
+  const destCompanyId = destCompanyInput.provided ? destCompanyInput.value! : link.destCompanyId;
   if (!canManageIntercompanyPair(scope, sourceCompanyId, destCompanyId)) {
     return deny(req, res, "INTERCOMPANY_LINK_SCOPE_DENIED");
   }
@@ -212,12 +187,8 @@ export async function enforceIntercompanyConfigurationScope(
       return deny(req, res, "INTERCOMPANY_LEDGER_ID_INVALID", 400, "Invalid ledger account ID");
     }
 
-    const sourceLedgerAccountId = sourceLedgerInput.provided
-      ? sourceLedgerInput.value!
-      : link.sourceLedgerAccountId;
-    const destLedgerAccountId = destLedgerInput.provided
-      ? destLedgerInput.value!
-      : link.destLedgerAccountId;
+    const sourceLedgerAccountId = sourceLedgerInput.provided ? sourceLedgerInput.value! : link.sourceLedgerAccountId;
+    const destLedgerAccountId = destLedgerInput.provided ? destLedgerInput.value! : link.destLedgerAccountId;
     if (
       !(await ledgersBelongToPair({
         sourceCompanyId,

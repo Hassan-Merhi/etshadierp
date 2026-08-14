@@ -116,7 +116,7 @@ export function registerFactoryDocsRoutes(app: Express) {
   app.get("/api/factory/containers/:containerId/documents", requireAuth, async (req: any, res: any) => {
     try {
       const containerId = Number(req.params.containerId);
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId || !(await verifyContainerOwnership(containerId, companyId))) {
         return res.status(403).json({ message: "Access denied" });
       }
@@ -156,7 +156,7 @@ export function registerFactoryDocsRoutes(app: Express) {
           if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
           const containerId = Number(req.params.containerId);
-          const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+          const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
           const docTypeId = Number(req.body.docTypeId);
           if (!companyId || !docTypeId) return res.status(400).json({ message: "Missing companyId or docTypeId" });
 
@@ -187,7 +187,7 @@ export function registerFactoryDocsRoutes(app: Express) {
               fileName: req.file.originalname,
               storageKey,
               mimeType: req.file.mimetype,
-              uploadedBy: (req.session as any).userId || null,
+              uploadedBy: req.session.userId || null,
               fileData,
             })
             .returning();
@@ -206,7 +206,7 @@ export function registerFactoryDocsRoutes(app: Express) {
             referenceTable: "containers",
             description: `Uploaded ${docTypeName}: ${req.file.originalname} for container #${containerId}`,
             metaJson: JSON.stringify({ docId: doc.id, docTypeId, fileName: req.file.originalname }),
-            createdBy: (req.session as any).userId || undefined,
+            createdBy: req.session.userId || undefined,
           });
 
           const allDocs = await db
@@ -234,7 +234,7 @@ export function registerFactoryDocsRoutes(app: Express) {
     try {
       const containerId = Number(req.params.containerId);
       const docId = Number(req.params.docId);
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
 
       if (!companyId || !(await verifyContainerOwnership(containerId, companyId))) {
         return res.status(403).json({ message: "Access denied" });
@@ -259,7 +259,7 @@ export function registerFactoryDocsRoutes(app: Express) {
         referenceTable: "containers",
         description: `Deleted document: ${deleted.fileName} from container #${containerId}`,
         metaJson: JSON.stringify({ docId: deleted.id, fileName: deleted.fileName }),
-        createdBy: (req.session as any).userId || undefined,
+        createdBy: req.session.userId || undefined,
       });
 
       const allDocs = await db.select().from(containerDocuments).where(eq(containerDocuments.containerId, containerId));
@@ -279,7 +279,7 @@ export function registerFactoryDocsRoutes(app: Express) {
   // Only the document's owner company can download a container-doc file.
   app.get("/api/factory/uploads/:folder/:filename", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(403).json({ message: "Access denied" });
 
       const folder = String(req.params.folder);

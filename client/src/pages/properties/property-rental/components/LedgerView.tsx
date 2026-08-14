@@ -155,7 +155,7 @@ function LedgerView({
     const guarRows = buildPayRows(guaranteePayments);
 
     const balColor = balance > 0 ? "#cc0000" : balance < 0 ? "#006600" : "#000";
-    const startStr = contract.startDate ? format(new Date(contract.startDate as any), "dd MMM yyyy") : "—";
+    const startStr = contract.startDate ? format(new Date(contract.startDate), "dd MMM yyyy") : "—";
 
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Rental Statement — ${contract.tenantName}</title>
     <style>

@@ -291,7 +291,7 @@ export async function loadOtwStockByItem(companyId: number, destinationLocationI
         }
         if (!stockItemId) continue; // do not guess unsafe matches
 
-        const qty = parseFloat(li.quantity as any) || 0;
+        const qty = parseFloat(li.quantity) || 0;
         if (qty <= 0) continue;
 
         // Only "direct" (matches destination) and "unknown" (shop not recorded,
@@ -472,18 +472,18 @@ export async function buildStockTransferSuggestionContext(
   // ── Build lookup maps ─────────────────────────────────────────────────
   const invMap = new Map<string, number>();
   for (const r of invRows) {
-    invMap.set(`${r.locationId}:${r.stockItemId}`, parseFloat(r.quantity as any) || 0);
+    invMap.set(`${r.locationId}:${r.stockItemId}`, parseFloat(r.quantity) || 0);
   }
   const salesMap = new Map<string, number>();
   for (const r of salesRows) {
     if (!r.locationId) continue;
     const key = `${r.locationId}:${r.stockItemId}`;
-    salesMap.set(key, (salesMap.get(key) || 0) + (parseFloat(r.quantity as any) || 0));
+    salesMap.set(key, (salesMap.get(key) || 0) + (parseFloat(r.quantity) || 0));
   }
   const oldTransferByItem = new Map<number, { qty: number; count: number; lastDate: string | null }>();
   for (const r of oldTransferRows) {
     const cur = oldTransferByItem.get(r.stockItemId) || { qty: 0, count: 0, lastDate: null };
-    cur.qty += parseFloat(r.quantity as any) || 0;
+    cur.qty += parseFloat(r.quantity) || 0;
     cur.count += 1;
     if (!cur.lastDate || r.voucherDate > cur.lastDate) cur.lastDate = r.voucherDate;
     oldTransferByItem.set(r.stockItemId, cur);
@@ -740,7 +740,7 @@ export async function buildStockTransferByTargetQuantityContext(
   const destQtyByItem = new Map<number, number>();
   for (const r of invRows) {
     if (r.locationId !== destinationLocationId) continue;
-    const qty = parseFloat(r.quantity as any) || 0;
+    const qty = parseFloat(r.quantity) || 0;
     if (qty > 0 && r.stockGroupId) destGroupIds.add(r.stockGroupId);
     destQtyByItem.set(r.stockItemId, (destQtyByItem.get(r.stockItemId) || 0) + qty);
   }
@@ -755,9 +755,7 @@ export async function buildStockTransferByTargetQuantityContext(
     if (remaining <= 0) break;
     const sourceLocationName = locNameById.get(sourceLocationId) || `Location #${sourceLocationId}`;
 
-    let candidates = invRows.filter(
-      (r) => r.locationId === sourceLocationId && (parseFloat(r.quantity as any) || 0) > 0
-    );
+    let candidates = invRows.filter((r) => r.locationId === sourceLocationId && (parseFloat(r.quantity) || 0) > 0);
     if (onlyDestinationStockGroups) {
       candidates = candidates.filter((r) => r.stockGroupId && destGroupIds.has(r.stockGroupId));
     }
@@ -771,7 +769,7 @@ export async function buildStockTransferByTargetQuantityContext(
     let sourceTotal = 0;
     for (const c of candidates) {
       if (remaining <= 0) break;
-      const available = Math.floor(parseFloat(c.quantity as any) || 0);
+      const available = Math.floor(parseFloat(c.quantity) || 0);
       if (available <= 0) continue;
       const take = Math.min(available, remaining);
       if (take <= 0) continue;

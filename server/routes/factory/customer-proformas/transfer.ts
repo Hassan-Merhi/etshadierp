@@ -17,7 +17,7 @@ export function registerFactoryCustomerProformaTransferRoutes(app: Express) {
   // Transfer a proforma to a different customer
   app.patch("/api/factory/customer-proformas/:id/transfer", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
@@ -89,7 +89,7 @@ export function registerFactoryCustomerProformaTransferRoutes(app: Express) {
     requireAuth,
     async (req: Request, res: Response) => {
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
         const lineId = parseId(req.params.lineId);
         if (lineId === null) return res.status(400).json({ message: "Invalid id" });
@@ -101,7 +101,7 @@ export function registerFactoryCustomerProformaTransferRoutes(app: Express) {
         if (!line) return res.status(404).json({ message: "Line not found" });
         const [updated] = await db
           .update(customerProformaLines)
-          .set({ priceFixed: !(line as any).priceFixed })
+          .set({ priceFixed: !line.priceFixed })
           .where(eq(customerProformaLines.id, lineId))
           .returning();
         res.json(updated);

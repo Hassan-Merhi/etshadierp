@@ -186,7 +186,7 @@ function isNonInvalidatingWrite(req: Request): boolean {
 }
 
 export function buildReadMicrocacheKey(req: Request): string {
-  const session = req.session as any;
+  const session = req.session;
   const bodyKey = isReadOnlyPost(req) ? stableSerialize(req.body ?? null) : "";
   return [
     req.method,

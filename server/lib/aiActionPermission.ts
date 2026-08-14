@@ -94,7 +94,7 @@ export async function logAIAction(params: {
       outputJson: params.outputJson ?? null,
       status: params.status,
       createdRecordId: params.createdRecordId ?? null,
-    } as any);
+    });
   } catch (err) {
     logger.error("[AIActionLog] write failed:", { error: (err as Error).message });
   }

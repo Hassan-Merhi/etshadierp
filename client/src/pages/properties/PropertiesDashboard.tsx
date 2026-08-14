@@ -1,21 +1,39 @@
-import {KPICard} from "@/components/KPICard";
-import {Card} from "@/components/ui/card";
-import {Button} from "@/components/ui/button";
-import {PageHeader} from "@/components/PageHeader";
-import {useCurrencyContext} from "@/contexts/CurrencyContext";
-import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger} from "@/components/ui/dialog";
-import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
-import {Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList} from "@/components/ui/command";
-import {TrendingUp, Plus, X, Wallet, ArrowUpRight, ArrowDownLeft, Check, ChevronsUpDown, Truck, DollarSign, GripVertical} from "lucide-react";
-import {cn} from "@/lib/utils";
-import {useQuery, useMutation} from "@tanstack/react-query";
-import {useCompany} from "@/contexts/CompanyContext";
-import {useState, useRef} from "react";
-import {useToast} from "@/hooks/use-toast";
-import {queryClient, apiRequest} from "@/lib/queryClient";
+import { KPICard } from "@/components/KPICard";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/PageHeader";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import {
+  TrendingUp,
+  Plus,
+  X,
+  Wallet,
+  ArrowUpRight,
+  ArrowDownLeft,
+  Check,
+  ChevronsUpDown,
+  Truck,
+  DollarSign,
+  GripVertical,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useCompany } from "@/contexts/CompanyContext";
+import { useState, useRef } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 
-import type {Account, DashboardCashAccount, ImportCycleBalanceData, PayableAccount, ProfitData} from "./propertiesdashboard/types";
-import {CustomNetPositionView} from "./propertiesdashboard/components/CustomNetPositionView";
+import type {
+  Account,
+  DashboardCashAccount,
+  ImportCycleBalanceData,
+  PayableAccount,
+  ProfitData,
+} from "./propertiesdashboard/types";
+import { CustomNetPositionView } from "./propertiesdashboard/components/CustomNetPositionView";
 export default function PropertiesDashboard() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
@@ -535,7 +553,7 @@ export default function PropertiesDashboard() {
 
             {cashAccountsError ? (
               <p className="text-sm text-destructive text-center py-4">
-                Error loading accounts: {(cashAccountsError as any)?.message || "Unknown error"}
+                Error loading accounts: {cashAccountsError?.message || "Unknown error"}
               </p>
             ) : displayedCashAccounts.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">No accounts added yet</p>
@@ -678,7 +696,7 @@ export default function PropertiesDashboard() {
 
             {payableAccountsError ? (
               <p className="text-sm text-destructive text-center py-4">
-                Error loading accounts: {(payableAccountsError as any)?.message || "Unknown error"}
+                Error loading accounts: {payableAccountsError?.message || "Unknown error"}
               </p>
             ) : dashboardPayableAccounts.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">No accounts added yet</p>

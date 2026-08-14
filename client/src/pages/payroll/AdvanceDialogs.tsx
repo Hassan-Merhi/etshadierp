@@ -61,7 +61,7 @@ export function AdvanceDialogs({
   deleteAdvanceMutation,
 }: AdvanceDialogsProps) {
   const { formatAmount } = useCurrencyContext();
-  const { formatDisplayDate } = useDateFormat() as any;
+  const { formatDisplayDate } = useDateFormat();
 
   return (
     <>

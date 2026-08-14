@@ -247,7 +247,7 @@ export function registerFactoryPayrollGenerateRoutes(app: Express, requireAuth: 
           description: `Payroll generated — Worker #${worker.id} (${worker.fullName || worker.employeeCode || ""}). Period: ${startDate} to ${endDate}. Net: $${netSalary.toFixed(2)}`,
           amountCurrency: netSalary,
           amountUsd: netSalary,
-          createdBy: (req.session as any).userId ?? undefined,
+          createdBy: req.session.userId ?? undefined,
         });
 
         payrollRecords.push(record);
@@ -256,7 +256,7 @@ export function registerFactoryPayrollGenerateRoutes(app: Express, requireAuth: 
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || req.session.userId!,
+          username: req.session.username || req.session.userId!,
           companyId: parseInt(companyId),
           action: "create",
           tableName: "factory_payrolls",

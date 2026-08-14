@@ -343,7 +343,7 @@ export function registerStockItemImportRoutes(app: Express) {
         try {
           await logAudit({
             userId: req.session.userId!,
-            username: (req.session as any).username || "unknown",
+            username: req.session.username || "unknown",
             companyId,
             action: "create",
             tableName: "stock_items",

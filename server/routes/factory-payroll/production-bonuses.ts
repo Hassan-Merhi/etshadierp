@@ -26,8 +26,8 @@ function parseDecisionItems(value: unknown): DecisionItem[] {
   if (!Array.isArray(value)) return [];
   const dedupe = new Map<string, DecisionItem>();
   for (const raw of value) {
-    const runId = Number((raw as any)?.runId);
-    const workerId = Number((raw as any)?.workerId);
+    const runId = Number(raw?.runId);
+    const workerId = Number(raw?.workerId);
     if (!Number.isInteger(runId) || runId <= 0 || !Number.isInteger(workerId) || workerId <= 0) continue;
     dedupe.set(`${runId}:${workerId}`, { runId, workerId });
   }
@@ -49,7 +49,7 @@ export function registerFactoryProductionBonusRoutes(app: Express, requireAuth: 
     try {
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid payroll id" });
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const payrollResult = await db.execute(sql`
@@ -68,7 +68,7 @@ export function registerFactoryProductionBonusRoutes(app: Express, requireAuth: 
       if (!checkFactoryAdmin(req, res)) return;
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid payroll id" });
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const decision = String(req.body?.decision ?? "").toUpperCase();
@@ -164,7 +164,7 @@ export function registerFactoryProductionBonusRoutes(app: Express, requireAuth: 
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || req.session.userId!,
+          username: req.session.username || req.session.userId!,
           companyId: Number(companyId),
           action: "update",
           tableName: "factory_production_bonus_allocations",

@@ -29,7 +29,7 @@ export function registerFactoryContainerDeleteRoutes(app: Express) {
   app.post("/api/factory/containers/bulk-delete", requireAuth, async (req: Request, res: Response) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { ids } = req.body as { ids: number[] };
@@ -75,7 +75,7 @@ export function registerFactoryContainerDeleteRoutes(app: Express) {
 
   app.delete("/api/factory/containers/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
@@ -187,7 +187,7 @@ export function registerFactoryContainerDeleteRoutes(app: Express) {
   // ── Backfill: create missing goods-import credits for existing containers ────
   app.post("/api/factory/containers/backfill-import-credits", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const allContainers = await db
@@ -234,7 +234,7 @@ export function registerFactoryContainerDeleteRoutes(app: Express) {
           backfillFxRate = resolveStoredFxRateOrThrow(
             container.currencyCode,
             container.fxRateToUsd,
-            (container as any).fxRateConfirmed
+            container.fxRateConfirmed
           );
         } catch {
           skipped++;

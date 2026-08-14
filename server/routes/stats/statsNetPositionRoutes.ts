@@ -111,7 +111,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
       const parentCompanyId = await storage.getParentCompanyId();
       const shouldIncludeSuppliers = parentCompanyId === null || companyId === parentCompanyId;
       // SP formula: Cash + Stock (inventory) → What We Have; sp_payable only → What We Owe.
-      const isSupplierPartner = (company as any)?.companyType === "supplier_partner";
+      const isSupplierPartner = company?.companyType === "supplier_partner";
       const accountsForClassify = isSupplierPartner
         ? companyAccounts.filter((a) => a.accountType === "Cash" || a.subType === "sp_payable")
         : companyAccounts.filter(
@@ -186,7 +186,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
           .select({ total: sql<string>`COALESCE(SUM(CAST(remaining_balance AS numeric)), 0)` })
           .from(factoryWorkerAdvances)
           .where(and(eq(factoryWorkerAdvances.companyId, companyId), eq(factoryWorkerAdvances.fullyPaid, false)));
-        const workerAdvances = parseFloat((fwAdvRow2 as any)?.total || "0");
+        const workerAdvances = parseFloat(fwAdvRow2?.total || "0");
         if (workerAdvances > 0) {
           forUsTotal += workerAdvances;
           forUsAccounts.push({
@@ -559,7 +559,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || req.session.userId!,
+          username: req.session.username || req.session.userId!,
           companyId: companyId!,
           action: "export",
           tableName: "reports",

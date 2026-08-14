@@ -188,9 +188,9 @@ export function registerWorkerStatementReadRoutes(app: Express) {
         .from(companySettings)
         .where(eq(companySettings.companyId, companyId))
         .catch(() => [null]);
-      const companyName = (co as any)?.name ?? "Company";
-      const logoUrl: string | null = (sett as any)?.logoUrl ?? null;
-      const baseCurrency = (co as any)?.baseCurrency ?? "USD";
+      const companyName = co?.name ?? "Company";
+      const logoUrl: string | null = sett?.logoUrl ?? null;
+      const baseCurrency = co?.baseCurrency ?? "USD";
       const currMap: Record<string, string> = { USD: "$ ", GBP: "£", EUR: "€", CFA: "CFA ", AED: "AED " };
       const sym = currMap[baseCurrency.toUpperCase()] ?? baseCurrency + " ";
       const fmtAmt = (n: number) =>
@@ -238,7 +238,7 @@ export function registerWorkerStatementReadRoutes(app: Express) {
         const reshaperMod = require("arabic-reshaper") as { convertArabic: (t: string) => string };
         wConvertArabic = reshaperMod.convertArabic;
         const bidiFactory = require("bidi-js") as () => typeof wBidiInst;
-        wBidiInst = (bidiFactory as any)();
+        wBidiInst = bidiFactory();
       } catch {
         // Failure here is non-fatal and the surrounding flow continues deliberately.
       }

@@ -18,7 +18,7 @@ export function resolveActiveCompanyId(req: Request): number | null {
   const path = req.originalUrl?.split("?", 1)[0] || req.path || "/";
   return resolvePermissionCompanyId({
     path,
-    currentCompanyId: (req.session as any).currentCompanyId,
-    factoryCompanyId: (req.session as any).factoryCompanyId,
+    currentCompanyId: req.session.currentCompanyId,
+    factoryCompanyId: req.session.factoryCompanyId,
   });
 }

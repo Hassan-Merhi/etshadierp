@@ -24,7 +24,7 @@ export async function saveTrackingCheck(
       status,
       checkedAt: new Date(),
       errorMessage,
-      rawResponseJson: rawResponse as any,
+      rawResponseJson: rawResponse,
     });
   } catch (err: unknown) {
     logger.warn("[FactoryTracking] Check record save warn", { error: getErrorMessage(err) });
@@ -44,7 +44,7 @@ export async function saveDirectEvents(containerId: number, result: CarrierTrack
           eventStatus: ev.status,
           eventLocation: ev.location,
           eventDescription: ev.description,
-          rawEventJson: { provider: result.provider, ...ev } as any,
+          rawEventJson: { provider: result.provider, ...ev },
         })
         .onConflictDoNothing();
     } catch (err: unknown) {
@@ -72,7 +72,7 @@ export async function saveParcelsAppEvents(containerId: number, shipment: Parcel
           eventStatus: ev.status,
           eventLocation: ev.location,
           eventDescription: ev.description,
-          rawEventJson: ev as any,
+          rawEventJson: ev,
         })
         .onConflictDoNothing();
     } catch (err: unknown) {
@@ -89,10 +89,7 @@ export async function setSchedulerMeta(
   try {
     const patch: Record<string, unknown> = { trackingLastSkipReason: skipReason };
     if (nextCheckAt !== undefined) patch.trackingNextCheckAt = nextCheckAt;
-    await db
-      .update(factoryContainers)
-      .set(patch as any)
-      .where(eq(factoryContainers.id, containerId));
+    await db.update(factoryContainers).set(patch).where(eq(factoryContainers.id, containerId));
   } catch (err: unknown) {
     logger.warn("[FactoryTracking] setSchedulerMeta warn", { error: getErrorMessage(err) });
   }

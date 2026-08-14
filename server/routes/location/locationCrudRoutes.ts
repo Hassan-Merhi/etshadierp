@@ -185,7 +185,7 @@ export function registerLocationCrudRoutes(app: Express) {
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId: req.session.currentCompanyId!,
           action: "create",
           tableName: "locations",
@@ -283,7 +283,7 @@ export function registerLocationCrudRoutes(app: Express) {
         if (location.name !== updated.name) _locChanges.name = { old: location.name, new: updated.name };
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId: req.session.currentCompanyId!,
           action: "update",
           tableName: "locations",
@@ -373,7 +373,7 @@ export function registerLocationCrudRoutes(app: Express) {
         try {
           await logAudit({
             userId: req.session.userId!,
-            username: (req.session as any).username || "unknown",
+            username: req.session.username || "unknown",
             companyId,
             action: "update_location_whatsapp_stock_reports",
             tableName: "location_whatsapp_stock_reports",
@@ -450,7 +450,7 @@ export function registerLocationCrudRoutes(app: Express) {
         try {
           await logAudit({
             userId: req.session.userId!,
-            username: (req.session as any).username || "unknown",
+            username: req.session.username || "unknown",
             companyId,
             action: "test_location_whatsapp",
             tableName: "location_whatsapp_stock_reports",
@@ -501,7 +501,7 @@ export function registerLocationCrudRoutes(app: Express) {
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId: req.session.currentCompanyId!,
           action: "delete",
           tableName: "locations",

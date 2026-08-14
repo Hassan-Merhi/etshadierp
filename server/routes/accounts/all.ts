@@ -113,7 +113,7 @@ export function registerAccountListRoutes(app: Express) {
                   sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`
                 )
               )
-              .where(inArray(voucherEntries.ledgerAccountId as any, linkedLedgerIds))
+              .where(inArray(voucherEntries.ledgerAccountId, linkedLedgerIds))
               .groupBy(voucherEntries.ledgerAccountId),
 
             db
@@ -132,9 +132,7 @@ export function registerAccountListRoutes(app: Express) {
                   sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`
                 )
               )
-              .where(
-                and(inArray(voucherEntries.customerId as any, linkedCustIds), isNull(voucherEntries.ledgerAccountId))
-              )
+              .where(and(inArray(voucherEntries.customerId, linkedCustIds), isNull(voucherEntries.ledgerAccountId)))
               .groupBy(voucherEntries.customerId),
           ]);
 
@@ -221,7 +219,7 @@ export function registerAccountListRoutes(app: Express) {
         isNotNull(voucherEntries.ledgerAccountId),
         ...(balStartDate ? [sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate}) >= ${balStartDate}`] : []),
         sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate}) <= ${effectiveEndDate}`,
-        ...(ledgerIds.length > 0 ? [inArray(voucherEntries.ledgerAccountId as any, ledgerIds)] : [sql`1=0`]),
+        ...(ledgerIds.length > 0 ? [inArray(voucherEntries.ledgerAccountId, ledgerIds)] : [sql`1=0`]),
       ];
 
       // Run both fetches in parallel
@@ -256,8 +254,8 @@ export function registerAccountListRoutes(app: Express) {
       const ledgerBalances = new Map<number, { debits: number; credits: number }>();
       for (const entry of companyLedgerEntries) {
         if (!entry.ledgerAccountId) continue;
-        const debit = parseFloat((entry as any).debitAmount || "0");
-        const credit = parseFloat((entry as any).creditAmount || "0");
+        const debit = parseFloat(entry.debitAmount || "0");
+        const credit = parseFloat(entry.creditAmount || "0");
         const existing = ledgerBalances.get(entry.ledgerAccountId) || { debits: 0, credits: 0 };
         ledgerBalances.set(entry.ledgerAccountId, {
           debits: existing.debits + debit,

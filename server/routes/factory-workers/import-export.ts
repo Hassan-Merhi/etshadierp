@@ -351,7 +351,7 @@ export function registerFactoryWorkerImportExportRoutes(app: Express, requireAut
           txDate: today,
           txType: "WORKER_IMPORT",
           description: `Worker import: ${created} created, ${updated} updated, ${skipped} skipped`,
-          createdBy: (req.session as any).userId ?? undefined,
+          createdBy: req.session.userId ?? undefined,
         });
 
         res.json({ created, updated, skipped, errors });

@@ -84,7 +84,7 @@ export async function replaySupplierTimeline(
     if (event.kind === "ADD_ADJUSTMENT") {
       const quantity = new Decimal(event.adjustKg ?? 0);
       if (quantity.gt(0)) {
-        const valuationBasis = (event as any).valuationBasis as string | undefined;
+        const valuationBasis = event.valuationBasis as string | undefined;
         if (valuationBasis === "VALUED_TRANSFER") {
           // Add both kg and USD value to moving average.
           const adjRate = new Decimal(event.costPerKgUsd ?? 0);

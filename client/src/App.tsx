@@ -73,7 +73,7 @@ function UpdateBanner() {
               >
                 Refresh
               </Button>
-            ) as any,
+            ),
           });
         }
       } catch {

@@ -63,7 +63,7 @@ export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ stat
   if ("error" in voucherResult) return err(voucherResult.error);
   const preExistingVoucher = voucherResult.existingVoucher;
 
-  if (isReadonlyMigratedVoucher(preExistingVoucher as any)) {
+  if (isReadonlyMigratedVoucher(preExistingVoucher)) {
     return err({ status: 403, body: { message: READONLY_MIGRATED_VOUCHER_MESSAGE } });
   }
 
@@ -91,7 +91,7 @@ export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ stat
         },
       };
     }
-    if (isReadonlyMigratedVoucher(lockedVoucher as any)) {
+    if (isReadonlyMigratedVoucher(lockedVoucher)) {
       return { error: { status: 403, body: { message: READONLY_MIGRATED_VOUCHER_MESSAGE } } };
     }
 
@@ -117,26 +117,15 @@ export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ stat
       if ("error" in newLocationResult) return newLocationResult;
     }
 
-    const editSpDeductionPerQty = await fetchSpEditDeductionPerQty(
-      isSpCompanyEdit,
-      targetLocationId,
-      tx
-    );
+    const editSpDeductionPerQty = await fetchSpEditDeductionPerQty(isSpCompanyEdit, targetLocationId, tx);
 
     // Voucher entries are loaded after the voucher lock, so account preservation
     // and historical currency reconstruction use the latest committed edit.
-    const oldEntries = await tx
-      .select()
-      .from(voucherEntries)
-      .where(eq(voucherEntries.voucherId, voucherId));
+    const oldEntries = await tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
 
     // Lock the current sales items in the same transaction. A second edit waits,
     // then sees the first edit's committed voucher, entries, location, and items.
-    const oldSalesItems = await tx
-      .select()
-      .from(salesItems)
-      .where(eq(salesItems.voucherId, voucherId))
-      .for("update");
+    const oldSalesItems = await tx.select().from(salesItems).where(eq(salesItems.voucherId, voucherId)).for("update");
     oldSalesItems.sort((a, b) => a.stockItemId - b.stockItemId);
 
     const oldItemsMap = new Map(oldSalesItems.map((item) => [item.id, item]));

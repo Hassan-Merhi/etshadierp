@@ -132,7 +132,7 @@ export function registerFactoryWorkerCrudRoutes(app: Express, requireAuth: any, 
         referenceId: worker.id,
         referenceTable: "factory_workers",
         description: `New worker created: ${worker.fullName} (${worker.employeeCode})`,
-        createdBy: (req.session as any).userId ?? undefined,
+        createdBy: req.session.userId ?? undefined,
       });
 
       const now = new Date();
@@ -223,7 +223,7 @@ export function registerFactoryWorkerCrudRoutes(app: Express, requireAuth: any, 
         referenceId: updated.id,
         referenceTable: "factory_workers",
         description: `Worker updated: ${updated.fullName}`,
-        createdBy: (req.session as any).userId ?? undefined,
+        createdBy: req.session.userId ?? undefined,
       });
 
       res.json(updated);
@@ -260,7 +260,7 @@ export function registerFactoryWorkerCrudRoutes(app: Express, requireAuth: any, 
         referenceId: updated.id,
         referenceTable: "factory_workers",
         description: `Contract ended for worker: ${updated.fullName} (${updated.employeeCode || "N/A"})`,
-        createdBy: (req.session as any).userId ?? undefined,
+        createdBy: req.session.userId ?? undefined,
       });
 
       res.json(updated);
@@ -296,7 +296,7 @@ export function registerFactoryWorkerCrudRoutes(app: Express, requireAuth: any, 
         referenceId: updated.id,
         referenceTable: "factory_workers",
         description: `Contract reactivated for worker: ${updated.fullName} (${updated.employeeCode || "N/A"})`,
-        createdBy: (req.session as any).userId ?? undefined,
+        createdBy: req.session.userId ?? undefined,
       });
 
       res.json(updated);

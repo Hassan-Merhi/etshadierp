@@ -49,7 +49,7 @@ export function registerRentalAccrualConfigRoutes(
         .where(
           and(
             eq(propertyContracts.companyId, companyId),
-            eq(propertyContracts.module, module as any),
+            eq(propertyContracts.module, module),
             eq(propertyContracts.status, "ACTIVE"),
             eq(propertyUnits.unitType, "SHOP")
           )
@@ -199,11 +199,11 @@ export function registerRentalAccrualConfigRoutes(
                   companyId,
                   voucherNumber: `PHANTOM-FIX-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
                   voucherType: "Journal",
-                  voucherDate: new Date().toISOString().slice(0, 10) as any,
+                  voucherDate: new Date().toISOString().slice(0, 10),
                   description: `Phantom accrual correction — Dr AP / Cr Rent Expense (${phantomRows.length} rows)`,
                   totalAmount: String(phantomFixTotal),
                   currency: "USD",
-                  sourceModule: module as any,
+                  sourceModule: module,
                 })
                 .returning();
 
@@ -340,11 +340,11 @@ export function registerRentalAccrualConfigRoutes(
                   companyId,
                   voucherNumber: `ORPHAN-AP-FIX-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
                   voucherType: "Journal",
-                  voucherDate: new Date().toISOString().slice(0, 10) as any,
+                  voucherDate: new Date().toISOString().slice(0, 10),
                   description: `Orphaned AP debit correction (${orphanRows.length} row${orphanRows.length > 1 ? "s" : ""}) — Dr Rent Expense / Cr AP`,
                   totalAmount: String(orphanedTotal),
                   currency: "USD",
-                  sourceModule: module as any,
+                  sourceModule: module,
                 })
                 .returning();
 
@@ -553,7 +553,7 @@ export function registerRentalAccrualConfigRoutes(
             companyId,
             voucherNumber: `ACCR-REV-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${rowId}`,
             voucherType: "Journal",
-            voucherDate: new Date().toISOString().slice(0, 10) as any,
+            voucherDate: new Date().toISOString().slice(0, 10),
             description: narration,
             totalAmount: amount,
             currency: "USD",

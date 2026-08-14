@@ -5,7 +5,7 @@
  */
 export function isReadonlyMigratedVoucher(voucher: { voucherNumber?: string | null; sourceModule?: string | null }) {
   if (!voucher) return false;
-  if ((voucher as any).sourceModule === "SP_MIGRATION_READONLY") return true;
+  if (voucher.sourceModule === "SP_MIGRATION_READONLY") return true;
   if (voucher.voucherNumber && voucher.voucherNumber.startsWith("MIG-")) return true;
   return false;
 }

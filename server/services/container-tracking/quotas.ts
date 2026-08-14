@@ -106,10 +106,7 @@ export async function setSchedulerMeta(
   try {
     const patch: Record<string, unknown> = { trackingLastSkipReason: skipReason };
     if (nextCheckAt !== undefined) patch.trackingNextCheckAt = nextCheckAt;
-    await db
-      .update(containers)
-      .set(patch as any)
-      .where(eq(containers.id, containerId));
+    await db.update(containers).set(patch).where(eq(containers.id, containerId));
   } catch (err: unknown) {
     logger.warn("[ContainerTracking] setSchedulerMeta warn:", { error: getErrorMessage(err) });
   }

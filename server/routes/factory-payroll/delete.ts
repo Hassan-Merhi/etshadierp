@@ -22,7 +22,7 @@ export function registerFactoryPayrollDeleteRoutes(app: Express, requireAuth: an
     try {
       const companyId = req.query.companyId
         ? parseOptionalId(req.query.companyId)
-        : (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        : req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
@@ -94,13 +94,13 @@ export function registerFactoryPayrollDeleteRoutes(app: Express, requireAuth: an
         referenceId: id,
         referenceTable: "factory_payrolls",
         description: `Draft payroll #${id} deleted (Worker #${existing.workerId}, period ${existing.periodStart}–${existing.periodEnd}, net $${parseFloat(existing.netSalary || "0").toFixed(2)})`,
-        createdBy: (req.session as any).userId ?? undefined,
+        createdBy: req.session.userId ?? undefined,
       });
 
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || req.session.userId!,
+          username: req.session.username || req.session.userId!,
           companyId,
           action: "delete",
           tableName: "factory_payrolls",

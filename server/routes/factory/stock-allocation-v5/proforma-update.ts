@@ -23,7 +23,7 @@ export function registerV5ProformaUpdateRoutes(app: Express) {
   // V5 guard: proformaIdUsed IS NOT NULL (proforma.isActive is V5-specific concept)
   app.patch("/api/factory/v5/proforma/:proformaId/close", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const proformaId = parseInt(req.params.proformaId);
@@ -78,7 +78,7 @@ export function registerV5ProformaUpdateRoutes(app: Express) {
     requireAuth,
     async (req: Request, res: Response) => {
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 
         const proformaId = parseInt(req.params.proformaId);
@@ -144,7 +144,7 @@ export function registerV5ProformaUpdateRoutes(app: Express) {
                     AND article_code = ${update.articleCode}
                     AND company_id = ${companyId}`
               );
-              totalUpdated += (result as any).rowCount ?? 0;
+              totalUpdated += result.rowCount ?? 0;
             }
           }
         });

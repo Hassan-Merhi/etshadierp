@@ -73,7 +73,7 @@ export function reportClientError(report: ClientErrorReport): void {
     stack,
     componentStack,
     route: currentRoute(),
-    buildVersion: (import.meta as any).env?.VITE_BUILD_VERSION || "unknown",
+    buildVersion: import.meta.env?.VITE_BUILD_VERSION || "unknown",
     lastRequestId,
   });
 

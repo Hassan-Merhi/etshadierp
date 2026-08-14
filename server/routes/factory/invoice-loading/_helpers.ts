@@ -17,7 +17,7 @@ import { resultRows } from "../../../lib/queryResult";
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 export function getCompanyId(req: any): number | null {
-  return (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId || null;
+  return req.session.factoryCompanyId || req.session.currentCompanyId || null;
 }
 
 /**
@@ -260,7 +260,7 @@ export function dataCell(
 ) {
   cell.value = value;
   cell.font = { bold: opts.bold ?? false, color: { argb: opts.color ?? "FF111827" }, size: 10 };
-  cell.alignment = { horizontal: (opts.align ?? "left") as any, vertical: "middle" };
+  cell.alignment = { horizontal: opts.align ?? "left", vertical: "middle" };
   if (opts.fill) cellFill(cell, opts.fill);
   cellBorder(cell);
 }

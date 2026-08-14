@@ -26,11 +26,11 @@ export async function ensureCutoverHardening(): Promise<void> {
 
 function collectExplicitCompanyIds(req: Request): number[] {
   const values = [
-    (req.body as any)?.companyId,
-    (req.body as any)?.sourceCompanyId,
-    (req.body as any)?.targetCompanyId,
-    (req.query as any)?.companyId,
-    (req.params as any)?.companyId,
+    req.body?.companyId,
+    req.body?.sourceCompanyId,
+    req.body?.targetCompanyId,
+    req.query?.companyId,
+    req.params?.companyId,
   ];
   return Array.from(
     new Set(
@@ -48,7 +48,7 @@ async function explicitCompanyWriteGuard(req: Request, res: Response, next: Next
     if (!req.path.startsWith("/api")) return next();
     if (req.path.startsWith("/api/sp/migration/") || req.path.startsWith("/api/auth/")) return next();
 
-    const sessionCompanyId = Number((req.session as any)?.currentCompanyId ?? 0);
+    const sessionCompanyId = Number(req.session?.currentCompanyId ?? 0);
     const candidates = Array.from(new Set([sessionCompanyId, ...collectExplicitCompanyIds(req)].filter(Boolean)));
     for (const companyId of candidates) {
       const lock = await getCompanyCutoverLock(companyId);
@@ -82,7 +82,7 @@ export function installExplicitCompanyWriteGuard(app: Express): void {
   installedApps.add(app);
   app.use(explicitCompanyWriteGuard);
 
-  const stack = (app as any)?._router?.stack as any[] | undefined;
+  const stack = app?._router?.stack as any[] | undefined;
   if (!stack?.length) return;
   const layer = stack.pop();
   const firstRouteIndex = stack.findIndex((entry) => Boolean(entry.route));

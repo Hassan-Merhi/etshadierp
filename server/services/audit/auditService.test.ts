@@ -39,7 +39,7 @@ describe("audit framework", () => {
         name: "x".repeat(2_100),
       },
       rows: Array.from({ length: 120 }, (_, index) => index),
-    }) as any;
+    });
 
     expect(result.password).toBe("[REDACTED]");
     expect(result.profile.apiKey).toBe("[REDACTED]");

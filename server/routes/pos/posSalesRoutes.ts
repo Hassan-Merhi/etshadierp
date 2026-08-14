@@ -12,7 +12,7 @@ import { logAudit } from "../helpers/auditHelpers";
 export function registerPosSalesRoutes(app: Express): void {
   app.post("/api/pos/sales", requireAuth, canModifyDate("voucherDate"), async (req, res) => {
     const _t = Date.now();
-    const _uid = (req as any).user?.id;
+    const _uid = req.user?.id;
     const _cid = req.session.currentCompanyId;
     logger.info("POS sale create started", { module: "pos", action: "createSale", userId: _uid, companyId: _cid });
     try {
@@ -31,7 +31,7 @@ export function registerPosSalesRoutes(app: Express): void {
         {
           currentCompanyId: req.session.currentCompanyId!,
           userId: req.user!.id,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           userRole: req.user?.role,
           canSellNegativeStock: req.user?.canSellNegativeStock || false,
           sessionCashAccountId: req.session.cashAccountId,
@@ -53,7 +53,7 @@ export function registerPosSalesRoutes(app: Express): void {
         try {
           await logAudit({
             userId: req.session.userId!,
-            username: (req.session as any).username || "unknown",
+            username: req.session.username || "unknown",
             companyId: req.session.currentCompanyId!,
             action: "create",
             tableName: "vouchers",
@@ -67,12 +67,22 @@ export function registerPosSalesRoutes(app: Express): void {
       }
       res.status(result.status).json(result.body);
     } catch (error: unknown) {
-      logger.error("POS sale create failed", { module: "pos", action: "createSale", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
+      logger.error("POS sale create failed", {
+        module: "pos",
+        action: "createSale",
+        userId: _uid,
+        companyId: _cid,
+        durationMs: Date.now() - _t,
+        error,
+      });
       // Return appropriate status codes for different error types
       if (getErrorMessage(error).includes("Inventory not found")) {
         return res.status(404).json({ message: getErrorMessage(error) });
       }
-      if (getErrorMessage(error).includes("Insufficient stock") || getErrorMessage(error).includes("Not enough stock")) {
+      if (
+        getErrorMessage(error).includes("Insufficient stock") ||
+        getErrorMessage(error).includes("Not enough stock")
+      ) {
         return res.status(400).json({ message: getErrorMessage(error) });
       }
       res.status(500).json({ message: getErrorMessage(error) });

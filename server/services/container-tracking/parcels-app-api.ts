@@ -39,7 +39,7 @@ export async function trackViaParcelsAppApi(
         trackingDetectedCarrier: detectedCarrier,
         trackingFallbackUsed: !!fallbackReason,
         trackingFallbackReason: fallbackReason,
-      } as any)
+      })
       .where(eq(containers.id, containerId));
     return {
       success: false,
@@ -66,7 +66,7 @@ export async function trackViaParcelsAppApi(
         trackingDetectedCarrier: detectedCarrier,
         trackingFallbackUsed: !!fallbackReason,
         trackingFallbackReason: fallbackReason ?? "parcelsapp_quota_exhausted",
-      } as any)
+      })
       .where(eq(containers.id, containerId));
     return {
       success: false,
@@ -106,7 +106,7 @@ export async function trackViaParcelsAppApi(
         trackingDetectedCarrier: detectedCarrier,
         trackingFallbackUsed: !!fallbackReason,
         trackingFallbackReason: fallbackReason,
-      } as any)
+      })
       .where(eq(containers.id, containerId));
     // backfillEtaFromEvents removed — event dates must not be used as ETA
     return {
@@ -146,10 +146,7 @@ export async function trackViaParcelsAppApi(
     updateSet.eta = finalEta;
     updateSet.etaSource = etaSrc;
   }
-  await db
-    .update(containers)
-    .set(updateSet as any)
-    .where(eq(containers.id, containerId));
+  await db.update(containers).set(updateSet).where(eq(containers.id, containerId));
   await logAndConfirmEta(
     containerId,
     containerNumber,

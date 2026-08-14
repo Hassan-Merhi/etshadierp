@@ -104,9 +104,9 @@ export function getPerformanceDashboardSnapshot() {
       ),
     };
   });
-  const poolMax = Number((pool as any).options?.max || 0),
-    poolTotal = Number((pool as any).totalCount || 0),
-    poolIdle = Number((pool as any).idleCount || 0),
+  const poolMax = Number(pool.options?.max || 0),
+    poolTotal = Number(pool.totalCount || 0),
+    poolIdle = Number(pool.idleCount || 0),
     runtime = getRuntimePerformanceSnapshot();
   return {
     timestamp: new Date().toISOString(),
@@ -133,7 +133,7 @@ export function getPerformanceDashboardSnapshot() {
       total: poolTotal,
       idle: poolIdle,
       active: Math.max(0, poolTotal - poolIdle),
-      waiting: Number((pool as any).waitingCount || 0),
+      waiting: Number(pool.waitingCount || 0),
     },
     byMode,
     slowestRoutes: [...routes].sort((a, b) => b.p95Ms - a.p95Ms).slice(0, 20),
@@ -145,7 +145,7 @@ export function getPerformanceDashboardSnapshot() {
   };
 }
 function isMonitoringRole(req: Request): boolean {
-  const role = String((req as any).session?.currentRole || (req as any).user?.role || "").toLowerCase();
+  const role = String(req.session?.currentRole || req.user?.role || "").toLowerCase();
   return role === "admin" || role === "developer";
 }
 function escapeHtml(value: unknown): string {

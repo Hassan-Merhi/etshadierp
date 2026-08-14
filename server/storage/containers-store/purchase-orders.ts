@@ -85,9 +85,9 @@ export async function createPurchaseOrder(
     // must live inside the SP company so its ledger/stats show the balance.
     const isSupplierPartner = currentCompany?.companyType === "supplier_partner";
     if (parentCompany && po.companyId !== parentCompany.id && !isSupplierPartner) {
-      const isParentFreight = (po as any).freightPaidBy === "parent" && poFreight > 0;
+      const isParentFreight = po.freightPaidBy === "parent" && poFreight > 0;
       const poIntercoTotal = isParentFreight ? poTotal - poFreight : poTotal;
-      const freightParentAcctId: number | null = isParentFreight ? ((po as any).freightParentAccountId ?? null) : null;
+      const freightParentAcctId: number | null = isParentFreight ? (po.freightParentAccountId ?? null) : null;
 
       const parentCreditCode = parentCompany.name.toUpperCase().replace(/\s+/g, "_") + "_CREDIT";
       const parentCreditName = parentCompany.name + " Credit";

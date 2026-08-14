@@ -25,11 +25,7 @@
  */
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "../../db";
-import {
-  factoryContainers,
-  factoryOffloadAdditionalCharges,
-  factoryContainerCommissions,
-} from "@shared/schema";
+import { factoryContainers, factoryOffloadAdditionalCharges, factoryContainerCommissions } from "@shared/schema";
 
 export type FxResolutionSource = "container" | "offload_additional_charge" | "commission";
 
@@ -94,7 +90,7 @@ async function loadRow(dbOrTx: any, source: FxResolutionSource, id: number, comp
     return {
       currencyCode: row.currencyCode,
       fxRateToUsd: row.fxRateToUsd,
-      fxRateConfirmed: !!(row as any).fxRateConfirmed,
+      fxRateConfirmed: !!row.fxRateConfirmed,
       containerId: row.id,
       containerStatus: row.status,
       versionTag: row.updatedAt ? new Date(row.updatedAt).toISOString() : null,
@@ -114,7 +110,7 @@ async function loadRow(dbOrTx: any, source: FxResolutionSource, id: number, comp
     return {
       currencyCode: row.currencyCode,
       fxRateToUsd: row.fxRateToUsd,
-      fxRateConfirmed: !!(row as any).fxRateConfirmed,
+      fxRateConfirmed: !!row.fxRateConfirmed,
       containerId: row.containerId,
       containerStatus: container?.status ?? null,
       // This table has no updatedAt column — createdAt is the only stable
@@ -137,7 +133,7 @@ async function loadRow(dbOrTx: any, source: FxResolutionSource, id: number, comp
   return {
     currencyCode: row.currencyCode,
     fxRateToUsd: row.fxRateToUsd,
-    fxRateConfirmed: !!(row as any).fxRateConfirmed,
+    fxRateConfirmed: !!row.fxRateConfirmed,
     containerId: row.containerId,
     containerStatus: container?.status ?? null,
     versionTag: row.createdAt ? new Date(row.createdAt).toISOString() : null,
@@ -244,7 +240,7 @@ export async function applyFxResolutionRepair(
       return { ...plan, applied: false };
     }
 
-    const values = { fxRateToUsd: String(newFxRateToUsd), fxRateConfirmed: true } as any;
+    const values = { fxRateToUsd: String(newFxRateToUsd), fxRateConfirmed: true };
     if (source === "container") {
       await tx.update(factoryContainers).set(values).where(eq(factoryContainers.id, id));
     } else if (source === "offload_additional_charge") {

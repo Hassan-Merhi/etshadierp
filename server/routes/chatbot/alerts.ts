@@ -185,7 +185,7 @@ export function registerChatbotAlertRoutes(app: Express) {
         actionName: actionName || null,
         createdRecordId: createdRecordId || null,
         status: status || "confirmed",
-      } as any);
+      });
       res.json({ success: true });
     } catch (error: unknown) {
       res.status(500).json({ message: "Internal server error" });

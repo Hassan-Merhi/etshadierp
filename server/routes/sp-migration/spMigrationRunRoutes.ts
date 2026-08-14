@@ -83,7 +83,7 @@ export function registerSpMigrationRunRoutes(app: Express) {
         SELECT id, source_company_id, target_company_id, status
         FROM sp_migration_rehearsal_runs WHERE id = ${runId} LIMIT 1
       `)
-      ).rows[0] as any;
+      ).rows[0];
 
       if (!runRow) return res.status(404).json({ message: "Run not found" });
       if (runRow.status === "rolled_back") {

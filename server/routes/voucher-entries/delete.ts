@@ -351,7 +351,7 @@ export function registerVoucherDeleteRoutes(app: Express) {
       const _delEntriesSnap = await snapshotVoucherEntries(_delEntries).catch(() => []);
       await logAudit({
         userId: req.session.userId!,
-        username: (req.session as any).username || "unknown",
+        username: req.session.username || "unknown",
         companyId: req.session.currentCompanyId!,
         action: "delete",
         tableName: "vouchers",

@@ -109,7 +109,7 @@ export async function buildAdjustmentEvents(
         type === "ADD" ? "ADD_ADJUSTMENT" : type === "REMOVE" ? "REMOVE_ADJUSTMENT" : "DEDUCT_ADJUSTMENT";
       const rawCost = numeric(row.costPerKg);
       const currency = row.currencyCode || "USD";
-      const valuationBasis = (row as any).valuationBasis as string | undefined | null;
+      const valuationBasis = row.valuationBasis as string | undefined | null;
 
       // Flag unclassified valued ADD adjustments — must block apply for that supplier.
       if (type === "ADD" && rawCost > 0 && !valuationBasis) {
@@ -203,7 +203,7 @@ export async function buildBatchConsumptionEvents(
   const sourceInfos = sourceRows.map<SourceInfo>((source) => {
     // Prefer the persisted column (added by V7 migration). Fall back to derivation
     // for defensive compatibility with pre-migration rows.
-    let inventorySupplierId: number | null = (source as any).inventorySupplierId ?? null;
+    let inventorySupplierId: number | null = source.inventorySupplierId ?? null;
     if (inventorySupplierId == null && source.sourceBatchId == null) {
       if (source.supplierId != null) {
         inventorySupplierId = source.supplierId;

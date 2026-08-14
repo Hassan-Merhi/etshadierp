@@ -21,7 +21,7 @@ export function registerV5CancelledContainerRoutes(app: Express) {
   // Read-only — does not modify any data.
   app.get("/api/factory/v5/recently-cancelled-containers", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const raw = await db.execute(
@@ -73,7 +73,7 @@ export function registerV5CancelledContainerRoutes(app: Express) {
   // (bales are back in stock and can be re-scanned).
   app.post("/api/factory/v5/containers/:id/restore", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseInt(req.params.id);

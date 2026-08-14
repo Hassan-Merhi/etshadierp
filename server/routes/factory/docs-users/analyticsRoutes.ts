@@ -22,7 +22,7 @@ export function registerFactoryAnalyticsRoutes(app: Express) {
   // ── Factory Analytics: Sales by Customer ─────────────────────────────────
   app.get("/api/factory/analytics/sales-by-customer", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { startDate, endDate } = req.query as Record<string, string>;
@@ -53,7 +53,7 @@ export function registerFactoryAnalyticsRoutes(app: Express) {
   // ── Factory Analytics: POS Sales Summary (by customer + grand total) ─────
   app.get("/api/factory/analytics/pos-summary", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { startDate, endDate } = req.query as Record<string, string>;
@@ -102,7 +102,7 @@ export function registerFactoryAnalyticsRoutes(app: Express) {
   // ── Factory Analytics: Container Sales Report (loaded containers by customer) ──
   app.get("/api/factory/analytics/container-sales-report", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { startDate, endDate, customerId, paymentStatus } = req.query as Record<string, string>;
@@ -144,7 +144,7 @@ export function registerFactoryAnalyticsRoutes(app: Express) {
   // ── Factory Analytics: Stock Summary (opening + closing stock) ───────────
   app.get("/api/factory/analytics/stock-summary", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       // Opening stock = total raw material received (cost basis)

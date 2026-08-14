@@ -112,7 +112,7 @@ export function ExportCenter() {
       const body: any = { mode };
       if (fromDate) body.fromDate = fromDate;
       if (toDate) body.toDate = toDate;
-      const result = (await (await apiRequest("POST", "/api/export/start", body)).json()) as any;
+      const result = await (await apiRequest("POST", "/api/export/start", body)).json();
       setActiveJobId(result.jobId);
       setActiveMode(mode);
       setProgressOpen(true);

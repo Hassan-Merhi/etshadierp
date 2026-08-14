@@ -27,7 +27,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
    */
   app.post("/api/factory/bales/relabel/validate", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { rows } = req.body;
@@ -89,9 +89,9 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
    */
   app.post("/api/factory/bales/relabel/apply", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const userId: string | null = (req.session as any).userId || null;
+      const userId: string | null = req.session.userId || null;
 
       const { rows, printFormat, designColor, filename } = req.body;
       if (!Array.isArray(rows) || rows.length === 0) {
@@ -226,7 +226,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
    */
   app.get("/api/factory/bales/relabel/sessions", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const sessions = await db

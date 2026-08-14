@@ -26,7 +26,7 @@ export function registerFactoryLocationInventoryExportRoutes(app: Express) {
   // Export ALL locations inventory to Excel — summary + bale detail, wipers/garbage on own sheet
   app.get("/api/factory/location-inventory/export/all", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const [fCfgAll] = await db
@@ -88,9 +88,7 @@ export function registerFactoryLocationInventoryExportRoutes(app: Express) {
 
       const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
       const productCategoryNameMap = new Map(products.map((p) => [p.id, categoryMap.get(p.categoryId!) || ""]));
-      const productProductionPriceMap = new Map(
-        products.map((p) => [p.id, parseFloat((p as any).productionPrice || "0")])
-      );
+      const productProductionPriceMap = new Map(products.map((p) => [p.id, parseFloat(p.productionPrice || "0")]));
 
       const isWiperOrGarbage = (catName: string) => {
         const n = catName.toLowerCase();
@@ -310,7 +308,7 @@ export function registerFactoryLocationInventoryExportRoutes(app: Express) {
           articleCode: b.articleCode || "",
           productName: b.productName || "",
           category: productCategoryNameMap.get(pid) || b.category || "",
-          grade: (b as any).grade || "",
+          grade: b.grade || "",
           weightKg: parseFloat(String(b.weightKg || "0")),
         };
         if (includeCost) {
@@ -371,7 +369,7 @@ export function registerFactoryLocationInventoryExportRoutes(app: Express) {
           articleCode: b.articleCode || "",
           productName: b.productName || "",
           category: productCategoryNameMap.get(pid) || b.category || "",
-          grade: (b as any).grade || "",
+          grade: b.grade || "",
           weightKg: w,
         };
         if (includeCost) {

@@ -152,7 +152,7 @@ export function DataToolsTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/sales-report"] });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if (error?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,

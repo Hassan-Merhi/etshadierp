@@ -24,7 +24,7 @@ export function registerFactoryCustomerCrudRoutes(app: Express) {
   registerFactoryDaybookRoutes(app);
   app.get("/api/factory/customers", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const allCustomers = await db
@@ -65,7 +65,7 @@ export function registerFactoryCustomerCrudRoutes(app: Express) {
         .innerJoin(
           customerOrders,
           and(
-            eq(customerOrders.id, customerBalances.referenceId as any),
+            eq(customerOrders.id, customerBalances.referenceId),
             eq(customerOrders.companyId, companyId),
             eq(customerOrders.status, "FINALIZED")
           )
@@ -104,7 +104,7 @@ export function registerFactoryCustomerCrudRoutes(app: Express) {
               sql`${vouchers.optional} IS NOT TRUE`
             )
           )
-          .where(inArray(voucherEntries.ledgerAccountId as any, ledgerAccountIds))
+          .where(inArray(voucherEntries.ledgerAccountId, ledgerAccountIds))
           .groupBy(voucherEntries.ledgerAccountId);
 
         for (const row of voucherNetRows) {
@@ -133,9 +133,7 @@ export function registerFactoryCustomerCrudRoutes(app: Express) {
               sql`${vouchers.optional} IS NOT TRUE`
             )
           )
-          .where(
-            and(inArray(voucherEntries.customerId as any, customerIds), sql`${voucherEntries.ledgerAccountId} IS NULL`)
-          )
+          .where(and(inArray(voucherEntries.customerId, customerIds), sql`${voucherEntries.ledgerAccountId} IS NULL`))
           .groupBy(voucherEntries.customerId);
 
         for (const row of directRows) {
@@ -169,7 +167,7 @@ export function registerFactoryCustomerCrudRoutes(app: Express) {
 
   app.post("/api/factory/customers", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const dataWithCompany = { ...req.body, companyId };
@@ -220,7 +218,7 @@ export function registerFactoryCustomerCrudRoutes(app: Express) {
       const customerId = parseInt(req.params.id);
       if (isNaN(customerId)) return res.status(400).json({ message: "Invalid customer ID" });
 
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const [existing] = await db.select().from(customers).where(eq(customers.id, customerId));
@@ -250,7 +248,7 @@ export function registerFactoryCustomerCrudRoutes(app: Express) {
       const customerId = parseInt(req.params.id);
       if (isNaN(customerId)) return res.status(400).json({ message: "Invalid customer ID" });
 
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const [existing] = await db.select().from(customers).where(eq(customers.id, customerId));
@@ -275,7 +273,7 @@ export function registerFactoryCustomerCrudRoutes(app: Express) {
     try {
       const customerId = parseInt(req.params.id);
       if (isNaN(customerId)) return res.status(400).json({ message: "Invalid customer ID" });
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const [existing] = await db.select().from(customers).where(eq(customers.id, customerId));
@@ -298,7 +296,7 @@ export function registerFactoryCustomerCrudRoutes(app: Express) {
   // LIST DELETED CUSTOMERS
   app.get("/api/factory/customers/deleted", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const deletedCustomers = await db

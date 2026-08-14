@@ -89,7 +89,7 @@ export async function calculateRawMaterialStockValue(companyId: number): Promise
     if (adj.supplierId) {
       key = `supplier-${adj.supplierId}`;
     } else {
-      const label = (adj as any).materialLabel || "Manual Stock";
+      const label = adj.materialLabel || "Manual Stock";
       key = `MANUAL__${label}`;
     }
 

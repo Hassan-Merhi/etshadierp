@@ -142,10 +142,10 @@ export const utils = {
         row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
           let value: any = cell.value;
           if (value && typeof value === "object" && "result" in value) {
-            value = (value as any).result;
+            value = value.result;
           }
           if (value && typeof value === "object" && "text" in value) {
-            value = (value as any).text;
+            value = value.text;
           }
           rowData[colNumber - 1] = value;
         });
@@ -166,10 +166,10 @@ export const utils = {
           if (header) {
             let value: any = cell.value;
             if (value && typeof value === "object" && "result" in value) {
-              value = (value as any).result;
+              value = value.result;
             }
             if (value && typeof value === "object" && "text" in value) {
-              value = (value as any).text;
+              value = value.text;
             }
             rowData[header] = value;
           }

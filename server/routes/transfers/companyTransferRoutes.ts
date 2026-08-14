@@ -3,11 +3,7 @@ import type { Express } from "express";
 import { requireAuth, requireNonPOS } from "../../auth";
 import { interCompanyTransferService } from "./interCompanyTransferService";
 import { sendTransferRouteError } from "./transferErrors";
-import {
-  getActiveTransferCompanyId,
-  getTransferUserId,
-  requireCompanyAccountAccess,
-} from "./transferRequestContext";
+import { getActiveTransferCompanyId, getTransferUserId, requireCompanyAccountAccess } from "./transferRequestContext";
 import { simpleCompanyTransferService } from "./simpleCompanyTransferService";
 import { parseCompanyId, parseTransferId } from "./transferValidation";
 
@@ -27,7 +23,7 @@ export function registerCompanyTransferRoutes(app: Express) {
       const userId = getTransferUserId(req);
       const transfer = await interCompanyTransferService.create(userId, req.body, {
         userId,
-        username: (req.session as any).username || "unknown",
+        username: req.session.username || "unknown",
         reason: "Inter-company transfer",
       });
       return res.status(201).json(transfer);
@@ -61,7 +57,7 @@ export function registerCompanyTransferRoutes(app: Express) {
       const userId = getTransferUserId(req);
       const transfer = await simpleCompanyTransferService.create(userId, req.body, {
         userId,
-        username: (req.session as any).username || "unknown",
+        username: req.session.username || "unknown",
         reason: "Simple company transfer",
       });
       return res.status(201).json(transfer);
@@ -77,9 +73,9 @@ export function registerCompanyTransferRoutes(app: Express) {
       return res.json(
         await simpleCompanyTransferService.delete(userId, transferId, {
           userId,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           reason: `Reverse simple company transfer ${transferId}`,
-        }),
+        })
       );
     } catch (error: unknown) {
       return sendTransferRouteError(res, error, 500);

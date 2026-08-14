@@ -18,7 +18,7 @@ function makeRequest(overrides: Record<string, unknown> = {}) {
       currentPOSStation: 1,
     },
     ...overrides,
-  } as any;
+  };
 }
 
 function makeResponse(statusCode = 200) {
@@ -51,7 +51,7 @@ function makeResponse(statusCode = 200) {
       this.ended = true;
       return this;
     },
-  } as any;
+  };
 }
 
 describe("read microcache edge cases", () => {

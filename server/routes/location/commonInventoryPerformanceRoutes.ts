@@ -25,7 +25,7 @@ export function registerCommonInventoryPerformanceRoutes(app: Express): void {
     if (!req.query.page) return next();
 
     try {
-      const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
+      const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const page = parsePage(req.query.page);

@@ -173,7 +173,7 @@ export function registerPayrollPreviewRoutes(app: Express) {
         absentDates.sort((a, b) => a.date.localeCompare(b.date));
         halfDayDates.sort((a, b) => a.date.localeCompare(b.date));
 
-        const workerTransportDefault = parseFloat((worker as any).transportAllowance || "0");
+        const workerTransportDefault = parseFloat(worker.transportAllowance || "0");
         const transportOverrideAmt = transportOverrides
           ? parseFloat(transportOverrides[String(worker.id)] ?? "-1")
           : -1;

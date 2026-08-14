@@ -63,7 +63,7 @@ export function PosSettingsTab() {
       toast({ title: "Updated", description: "POS Excel Import setting has been saved." });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -82,7 +82,7 @@ export function PosSettingsTab() {
       toast({ title: "Updated", description: "Timezone setting has been saved." });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });

@@ -43,7 +43,7 @@ export function registerVoucherUpdateRoutes(app: Express) {
       }
 
       // Verify voucher belongs to current company (respect factory mode company)
-      const effectiveCompanyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
+      const effectiveCompanyId = req.session.currentCompanyId || req.session.factoryCompanyId;
       if (existingVoucher.companyId !== effectiveCompanyId) {
         return res.status(403).json({
           message: "Access denied: Voucher belongs to a different company",
@@ -342,7 +342,7 @@ export function registerVoucherUpdateRoutes(app: Express) {
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId: req.session.currentCompanyId!,
           action: "update",
           tableName: "vouchers",

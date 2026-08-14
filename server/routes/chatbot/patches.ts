@@ -176,10 +176,7 @@ export function registerChatbotPatchRoutes(app: Express) {
         fs.writeFileSync(absPath, row.originalContent ?? "", "utf8");
 
         // Mark as reverted
-        await db
-          .update(codePatchHistory)
-          .set({ revertedAt: new Date() } as any)
-          .where(eq(codePatchHistory.id, patchId));
+        await db.update(codePatchHistory).set({ revertedAt: new Date() }).where(eq(codePatchHistory.id, patchId));
 
         await logAIAction({
           req,
@@ -217,10 +214,7 @@ export function registerChatbotPatchRoutes(app: Express) {
         .orderBy(desc(codePatchHistory.appliedAt))
         .limit(1);
       if (latest) {
-        await db
-          .update(codePatchHistory)
-          .set({ commitHash } as any)
-          .where(eq(codePatchHistory.id, latest.id));
+        await db.update(codePatchHistory).set({ commitHash }).where(eq(codePatchHistory.id, latest.id));
       }
     } catch (_) {
       /* Non-fatal */

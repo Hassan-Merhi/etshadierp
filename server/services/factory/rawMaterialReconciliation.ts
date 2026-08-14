@@ -297,7 +297,7 @@ export async function getRawMaterialReconciliation(companyId: number): Promise<R
   }
   if (parentCompanyId === companyId) {
     for (const s of suppliers as any[]) {
-      const ob = parseFloat((s as any).openingBalance || "0") || 0;
+      const ob = parseFloat(s.openingBalance || "0") || 0;
       if (ob !== 0) addGross(s.id, "USD", ob, ob);
     }
   }
@@ -481,7 +481,7 @@ export async function getRawMaterialReconciliation(companyId: number): Promise<R
           .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
           .where(
             and(
-              inArray(voucherEntries.factorySupplierId as any, supplierIds),
+              inArray(voucherEntries.factorySupplierId, supplierIds),
               sql`${voucherEntries.debitAmount}::numeric > 0`,
               sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-PAY-%'`
             )

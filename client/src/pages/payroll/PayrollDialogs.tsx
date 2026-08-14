@@ -40,7 +40,7 @@ export function WorkerDeductionDialog({
           <DialogTitle>Add Deduction</DialogTitle>
           <DialogDescription>
             {target
-              ? `Deduction for ${[target.firstName, (target as any).lastName].filter(Boolean).join(" ")}. Pending deductions are applied automatically at the next payroll run.`
+              ? `Deduction for ${[target.firstName, target.lastName].filter(Boolean).join(" ")}. Pending deductions are applied automatically at the next payroll run.`
               : "Add a pending deduction for this worker."}
           </DialogDescription>
         </DialogHeader>

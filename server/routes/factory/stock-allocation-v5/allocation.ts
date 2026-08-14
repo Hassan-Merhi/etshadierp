@@ -20,7 +20,7 @@ export function registerV5StockAllocationRoutes(app: Express) {
   // ── GET /api/factory/v5/stock-allocation ────────────────────────────────
   app.get("/api/factory/v5/stock-allocation", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const {
@@ -535,7 +535,7 @@ export function registerV5StockAllocationRoutes(app: Express) {
   // Returns aggregate totals only — used for dashboard cards without loading the full list.
   app.get("/api/factory/v5/stock-allocation/summary", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const [inStockRaw, inLoadingRaw, expectedRaw] = await Promise.all([

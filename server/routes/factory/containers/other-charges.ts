@@ -37,7 +37,7 @@ type PreparedCharge = {
 export function registerFactoryContainerOtherChargesRoutes(app: Express) {
   app.get("/api/factory/containers/:id/other-charges", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const containerId = parseId(req.params.id);
       if (containerId === null) return res.status(400).json({ message: "Invalid id" });
@@ -59,7 +59,7 @@ export function registerFactoryContainerOtherChargesRoutes(app: Express) {
 
   app.post("/api/factory/containers/:id/other-charges/sync", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const containerId = parseId(req.params.id);
       if (containerId === null) return res.status(400).json({ message: "Invalid id" });
@@ -77,7 +77,7 @@ export function registerFactoryContainerOtherChargesRoutes(app: Express) {
           containerNumber: factoryContainers.containerNumber,
           currencyCode: factoryContainers.currencyCode,
           fxRateToUsd: factoryContainers.fxRateToUsd,
-          fxRateConfirmed: (factoryContainers as any).fxRateConfirmed,
+          fxRateConfirmed: factoryContainers.fxRateConfirmed,
           arrivalDate: factoryContainers.arrivalDate,
           createdAt: factoryContainers.createdAt,
         })
@@ -119,7 +119,7 @@ export function registerFactoryContainerOtherChargesRoutes(app: Express) {
             const { fxRate: storedRate, looksSet } = resolveStoredFxRate(
               chargeCcy,
               container.fxRateToUsd,
-              (container as any).fxRateConfirmed
+              container.fxRateConfirmed
             );
             if (!looksSet) {
               return res.status(400).json({ message: new UnresolvedExchangeRateError(chargeCcy).message });

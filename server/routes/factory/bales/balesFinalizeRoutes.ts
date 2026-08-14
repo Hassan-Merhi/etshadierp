@@ -35,7 +35,7 @@ export function registerBalesFinalizeRoutes(app: Express) {
   app.post("/api/factory/finalize", requireAuth, async (req: Request, res: Response) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { pressingBatchId, scannedBaleIds, erpLocationId, mixBatchId } = req.body;
@@ -210,7 +210,7 @@ export function registerBalesFinalizeRoutes(app: Express) {
             const cat = categoryMap.get(factoryProduct.categoryId);
             if (cat) {
               const catName = cat.name as string;
-              const catId = (cat as any).id as number;
+              const catId = cat.id as number;
               const cacheKey = String(catId || catName);
               const cached = stockGroupCache.get(cacheKey);
               if (cached) {
@@ -327,7 +327,7 @@ export function registerBalesFinalizeRoutes(app: Express) {
   // Backfill historical bale costs from raw stock source prices
   app.post("/api/factory/bales/backfill-costs", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const balesWithMix = await db

@@ -103,7 +103,7 @@ export function registerChatbotTransactionRoutes(app: Express) {
               )
             )
             .limit(1);
-          const currentStock = parseFloat(invRow?.quantity as any) || 0;
+          const currentStock = parseFloat(invRow?.quantity) || 0;
           // AI-driven confirmation must never authorize negative inventory; that override
           // stays a manual, explicit user action on the normal stock transfer screen.
           if (qty > currentStock) {

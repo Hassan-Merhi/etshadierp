@@ -133,14 +133,14 @@ export function registerContainerFreightWriteRoutes(app: Express) {
           ? req.body.freightOwnAccountId === null
             ? null
             : Number(req.body.freightOwnAccountId)
-          : ((existingPO as any).freightOwnAccountId ?? null);
+          : (existingPO.freightOwnAccountId ?? null);
       const newFreightParentAccountId: number | null =
         req.body.freightParentAccountId !== undefined
           ? req.body.freightParentAccountId === null
             ? null
             : Number(req.body.freightParentAccountId)
-          : ((existingPO as any).freightParentAccountId ?? null);
-      const oldFreightPaidBy: string = (existingPO as any).freightPaidBy ?? "supplier";
+          : (existingPO.freightParentAccountId ?? null);
+      const oldFreightPaidBy: string = existingPO.freightPaidBy ?? "supplier";
 
       // Use centralised calculator — single source of truth for both branches
       const { grossTotal: newGrandTotal, intercoTotal: supplierTotal } = calcPoAmounts({
@@ -164,9 +164,8 @@ export function registerContainerFreightWriteRoutes(app: Express) {
         freightPaidBy: oldFreightPaidBy,
       });
       const freightPaidByChanged = newFreightPaidBy !== oldFreightPaidBy;
-      const freightOwnAccountChanged = newFreightOwnAccountId !== ((existingPO as any).freightOwnAccountId ?? null);
-      const freightParentAccountChanged =
-        newFreightParentAccountId !== ((existingPO as any).freightParentAccountId ?? null);
+      const freightOwnAccountChanged = newFreightOwnAccountId !== (existingPO.freightOwnAccountId ?? null);
+      const freightParentAccountChanged = newFreightParentAccountId !== (existingPO.freightParentAccountId ?? null);
       // Determine embedded-freight state (freight lives inside the purchase voucher)
       const newHasOwnFreight = newFreightPaidBy === "own" && newFreight > 0 && !!newFreightOwnAccountId;
       const newHasParentFreight = newFreightPaidBy === "parent" && newFreight > 0 && !!newFreightParentAccountId;
@@ -281,7 +280,7 @@ export function registerContainerFreightWriteRoutes(app: Express) {
                 const freightCrCandidatesPatch: number[] = [];
 
                 for (const entry of existingEntries) {
-                  const acctId = (entry as any).ledgerAccountId as number | null;
+                  const acctId = entry.ledgerAccountId as number | null;
                   const isDebit =
                     parseFloat(entry.debitAmount || "0") > 0 && parseFloat(entry.creditAmount || "0") === 0;
                   const isCredit =
@@ -357,7 +356,7 @@ export function registerContainerFreightWriteRoutes(app: Express) {
                 const toDeleteIds: number[] = [];
 
                 for (const entry of existingEntries) {
-                  const acctId = (entry as any).ledgerAccountId as number | null;
+                  const acctId = entry.ledgerAccountId as number | null;
                   const isDebit =
                     parseFloat(entry.debitAmount || "0") > 0 && parseFloat(entry.creditAmount || "0") === 0;
                   const isCredit =
@@ -422,8 +421,8 @@ export function registerContainerFreightWriteRoutes(app: Express) {
                 const isCredit =
                   parseFloat(entry.creditAmount || "0") > 0 && parseFloat(entry.debitAmount || "0") === 0;
                 if (isDebit) {
-                  if (!purchasesAcctId) purchasesAcctId = (entry as any).ledgerAccountId ?? null;
-                  if ((entry as any).ledgerAccountId !== newFreightOwnAccountId) {
+                  if (!purchasesAcctId) purchasesAcctId = entry.ledgerAccountId ?? null;
+                  if (entry.ledgerAccountId !== newFreightOwnAccountId) {
                     await tx
                       .update(voucherEntries)
                       .set({ debitAmount: supplierTotal.toFixed(2), creditAmount: "0" })
@@ -436,7 +435,7 @@ export function registerContainerFreightWriteRoutes(app: Express) {
                       .where(eq(voucherEntries.id, entry.id));
                   }
                 } else if (isCredit) {
-                  if ((entry as any).ledgerAccountId === newFreightOwnAccountId) {
+                  if (entry.ledgerAccountId === newFreightOwnAccountId) {
                     freightCrFound = true;
                     await tx
                       .update(voucherEntries)
@@ -475,8 +474,8 @@ export function registerContainerFreightWriteRoutes(app: Express) {
                 .filter((e) => {
                   const acct = e.ledgerAccountId;
                   return (
-                    acct === ((existingPO as any).freightOwnAccountId ?? -1) ||
-                    acct === ((existingPO as any).freightParentAccountId ?? -1)
+                    acct === (existingPO.freightOwnAccountId ?? -1) ||
+                    acct === (existingPO.freightParentAccountId ?? -1)
                   );
                 })
                 .map((e) => e.id);
@@ -602,8 +601,7 @@ export function registerContainerFreightWriteRoutes(app: Express) {
                 .select()
                 .from(voucherEntries)
                 .where(eq(voucherEntries.voucherId, existingPO.voucherId));
-              purchasesAcctId =
-                (svEntries.find((e) => parseFloat(e.debitAmount || "0") > 0) as any)?.ledgerAccountId ?? null;
+              purchasesAcctId = svEntries.find((e) => parseFloat(e.debitAmount || "0") > 0)?.ledgerAccountId ?? null;
             }
             const [existingFV] = await tx
               .select()
@@ -778,13 +776,13 @@ export function registerContainerFreightWriteRoutes(app: Express) {
           "otherCharges",
           "itemsTotal",
         ] as const) {
-          if (String((existingPO as any)[_f] ?? "") !== String((updated as any)[_f] ?? "")) {
-            _poChanges[_f] = { old: (existingPO as any)[_f], new: (updated as any)[_f] };
+          if (String(existingPO[_f] ?? "") !== String(updated[_f] ?? "")) {
+            _poChanges[_f] = { old: existingPO[_f], new: updated[_f] };
           }
         }
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId: req.session.currentCompanyId!,
           action: "update",
           tableName: "purchase_orders",
@@ -826,7 +824,7 @@ export function registerContainerFreightWriteRoutes(app: Express) {
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId: req.session.currentCompanyId!,
           action: "delete",
           tableName: "purchase_orders",

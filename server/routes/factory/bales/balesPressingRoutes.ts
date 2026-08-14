@@ -41,7 +41,7 @@ export function registerBalesPressingRoutes(app: Express) {
   registerFactoryFxRatesRoutes(app);
   app.post("/api/factory/pressing/create-and-print", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { productId, weightPerBale } = req.body;
@@ -132,7 +132,7 @@ export function registerBalesPressingRoutes(app: Express) {
 
   app.post("/api/factory/pressing/create-multi", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { items } = req.body;
@@ -237,7 +237,7 @@ export function registerBalesPressingRoutes(app: Express) {
 
   app.post("/api/factory/bales/create-batch", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { productId, weightPerBale } = req.body;
@@ -322,7 +322,7 @@ export function registerBalesPressingRoutes(app: Express) {
 
   app.get("/api/factory/pressing-batches", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const batches = await db
@@ -371,7 +371,7 @@ export function registerBalesPressingRoutes(app: Express) {
 
   app.get("/api/factory/pressing-batches/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);

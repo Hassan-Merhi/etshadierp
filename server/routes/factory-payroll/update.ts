@@ -29,7 +29,7 @@ export function registerFactoryPayrollUpdateRoutes(app: Express, requireAuth: an
     try {
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const {
         bonuses,
@@ -190,7 +190,7 @@ export function registerFactoryPayrollUpdateRoutes(app: Express, requireAuth: an
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || req.session.userId!,
+          username: req.session.username || req.session.userId!,
           companyId: current.companyId,
           action: "update",
           tableName: "factory_payrolls",
@@ -234,7 +234,7 @@ export function registerFactoryPayrollUpdateRoutes(app: Express, requireAuth: an
       if (!checkFactoryAdmin(req, res)) return;
       const companyId = req.query.companyId
         ? parseOptionalId(req.query.companyId)
-        : (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        : req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);

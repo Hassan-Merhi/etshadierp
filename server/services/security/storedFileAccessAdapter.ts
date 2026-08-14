@@ -61,7 +61,7 @@ export function requireStoredFileAccess(action: "read" | "download") {
   return async (req: Request, res: Response, next: NextFunction) => {
     const assetId = String(req.params.id ?? "");
     try {
-      const permissions = await hydrateSessionNamedPermissions(db, req.session as any);
+      const permissions = await hydrateSessionNamedPermissions(db, req.session);
       const lookup: ProtectedAssetLookup = {
         async loadAsset(id, kind) {
           if (kind !== "uploaded-file") return null;

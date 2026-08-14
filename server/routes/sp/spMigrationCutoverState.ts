@@ -175,7 +175,7 @@ async function cutoverWriteGuard(req: Request, res: Response, next: NextFunction
       return next();
     }
 
-    const companyId = Number((req.session as any)?.currentCompanyId ?? 0);
+    const companyId = Number(req.session?.currentCompanyId ?? 0);
     if (!companyId) return next();
     const lock = await getCompanyCutoverLock(companyId);
     if (!lock) return next();
@@ -216,7 +216,7 @@ export function installCutoverWriteGuard(app: Express): void {
   guardInstalled = true;
   app.use(cutoverWriteGuard);
 
-  const routerStack = (app as any)?._router?.stack as any[] | undefined;
+  const routerStack = app?._router?.stack as any[] | undefined;
   if (!routerStack?.length) {
     logger.warn("[SP Cutover Guard] Express router stack was unavailable; guard remained at registration order");
     return;

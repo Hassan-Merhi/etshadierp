@@ -85,7 +85,7 @@ export function ParentCreditAccountSelect({ company }: { company: any }) {
       toast({ title: "Saved", description: "Parent credit account updated" });
     },
     onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -107,7 +107,7 @@ export function ParentCreditAccountSelect({ company }: { company: any }) {
       setNewAccountName("");
     },
     onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if (error?._handledGlobally) return;
       toast({ title: "Error creating account", description: error.message, variant: "destructive" });
     },
   });

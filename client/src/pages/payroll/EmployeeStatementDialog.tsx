@@ -26,7 +26,7 @@ export function EmployeeStatementDialog({
   cleanTxnDesc,
 }: EmployeeStatementDialogProps) {
   const { formatAmount } = useCurrencyContext();
-  const { formatDisplayDate } = useDateFormat() as any;
+  const { formatDisplayDate } = useDateFormat();
 
   return (
     <Dialog open={!!statementEmployee} onOpenChange={(open) => !open && setStatementEmployee(null)}>

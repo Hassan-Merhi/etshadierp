@@ -59,7 +59,7 @@ export function registerStockItemBulkRoutes(app: Express) {
         for (const deletedItem of validItems) {
           await logAudit({
             userId: req.session.userId!,
-            username: (req.session as any).username || "unknown",
+            username: req.session.username || "unknown",
             companyId: req.session.currentCompanyId!,
             action: "delete",
             tableName: "stock_items",
@@ -206,7 +206,7 @@ export function registerStockItemBulkRoutes(app: Express) {
         if (updated > 0) {
           await logAudit({
             userId: req.session.userId!,
-            username: (req.session as any).username || "unknown",
+            username: req.session.username || "unknown",
             companyId: companyId,
             action: "update",
             tableName: "stock_items",

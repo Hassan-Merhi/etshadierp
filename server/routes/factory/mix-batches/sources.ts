@@ -25,7 +25,7 @@ export function registerFactoryMixBatchSourceRoutes(app: Express) {
   // Assign existing (unlinked) bales to a mix batch
   app.post("/api/factory/mix-batches/:id/assign-bales", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const mixBatchId = parseId(req.params.id);
@@ -85,7 +85,7 @@ export function registerFactoryMixBatchSourceRoutes(app: Express) {
 
   app.get("/api/factory/mix-batches/:id/sources", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);

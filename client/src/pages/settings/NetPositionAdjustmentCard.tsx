@@ -81,7 +81,7 @@ export function NetPositionAdjustmentCard() {
       setIsEditing(false);
     },
     onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if (error?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to update adjustment",

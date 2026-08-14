@@ -166,8 +166,8 @@ export function registerUserAdministrationRoutes(app: Express) {
       if (oldRecord) {
         const changes: Record<string, { old?: any; new?: any }> = {};
         for (const key of Object.keys(parsed) as Array<keyof typeof parsed>) {
-          const oldVal = (oldRecord as any)[key];
-          const newVal = (parsed as any)[key];
+          const oldVal = oldRecord[key];
+          const newVal = parsed[key];
           if (newVal !== undefined && String(oldVal) !== String(newVal)) changes[key] = { old: oldVal, new: newVal };
         }
         await logAudit({

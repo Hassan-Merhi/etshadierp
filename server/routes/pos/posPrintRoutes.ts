@@ -49,7 +49,7 @@ export function registerPosPrintRoutes(app: Express): void {
       // when no item has a configured price.  Do NOT gate on hideSalesProfitCost here —
       // the only valid reason to suppress the columns is "no configured price set".
       const hideProfitCols = erpVis.hideSelling || erpVis.hideCost;
-      const pdfBuffer = await generateInvoicePdf(voucherId, companyId, (req as any).user?.username, { hideProfitCols });
+      const pdfBuffer = await generateInvoicePdf(voucherId, companyId, req.user?.username, { hideProfitCols });
 
       // Build a friendly filename
       let customerName: string | null = null;

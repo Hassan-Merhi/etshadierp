@@ -21,7 +21,7 @@ export function registerBalesExportRoutes(app: Express) {
 
   app.get("/api/factory/bales/export-full.xlsx", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { date } = req.query;
@@ -123,7 +123,7 @@ export function registerBalesExportRoutes(app: Express) {
   // GET /api/factory/bales/stock-register.xlsx — Full stock register: all bales, all statuses
   app.get("/api/factory/bales/stock-register.xlsx", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { from, to } = req.query as { from?: string; to?: string };

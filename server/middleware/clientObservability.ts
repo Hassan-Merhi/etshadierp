@@ -53,7 +53,7 @@ function isTrustedOrigin(req: Request): boolean {
 }
 
 function rateKey(req: Request): string {
-  const sessionUser = (req as any).session?.userId;
+  const sessionUser = req.session?.userId;
   return sessionUser ? `user:${sessionUser}` : `ip:${req.ip || req.socket.remoteAddress || "unknown"}`;
 }
 
@@ -120,8 +120,8 @@ export function handleClientObservability(req: Request, res: Response, requestId
     return true;
   }
 
-  const session = (req as any).session;
-  const userId = positiveInteger(session?.userId || (req as any).user?.id);
+  const session = req.session;
+  const userId = positiveInteger(session?.userId || req.user?.id);
   if (!userId) {
     res.status(401).json({ message: "Authentication required." });
     return true;
@@ -132,7 +132,7 @@ export function handleClientObservability(req: Request, res: Response, requestId
     return true;
   }
 
-  const body = (req as any).body || {};
+  const body = req.body || {};
   const message = cleanText(body.message);
   const source = cleanText(body.source, 80) || "browser";
   const route = cleanRoute(body.route);

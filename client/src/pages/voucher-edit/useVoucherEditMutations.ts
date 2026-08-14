@@ -59,7 +59,7 @@ export function useVoucherEditMutations({
       handleBack();
     },
     onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to update voucher", variant: "destructive" });
     },
   });
@@ -75,7 +75,7 @@ export function useVoucherEditMutations({
       toast({ title: "Success", description: "Optional status updated successfully" });
     },
     onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if (error?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to update optional status",
@@ -102,7 +102,7 @@ export function useVoucherEditMutations({
       navigate(`${modePrefix}/daybook`);
     },
     onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to update sales voucher", variant: "destructive" });
     },
   });
@@ -125,7 +125,7 @@ export function useVoucherEditMutations({
       navigate(`${modePrefix}/daybook`);
     },
     onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if (error?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to update purchase voucher",
@@ -152,7 +152,7 @@ export function useVoucherEditMutations({
       navigate(`${modePrefix}/daybook`);
     },
     onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if (error?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to update adjustment voucher",
@@ -179,7 +179,7 @@ export function useVoucherEditMutations({
       navigate(`${modePrefix}/daybook`);
     },
     onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if (error?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to update stock transfer voucher",

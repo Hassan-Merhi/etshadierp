@@ -87,7 +87,7 @@ export async function calculateIncomeStatementForPeriod(
   const generalExpLines: IncomeLineItem[] = [];
 
   for (const [accId, activity] of accountActivity) {
-    const acc = accountMap.get(accId) as any;
+    const acc = accountMap.get(accId);
     if (!acc) continue;
     const type = acc.accountType || "";
 

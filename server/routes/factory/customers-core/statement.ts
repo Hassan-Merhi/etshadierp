@@ -18,7 +18,7 @@ export function registerFactoryCustomerStatementRoutes(app: Express) {
 
   app.get("/api/factory/customers/:id/statement", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const customerId = parseInt(req.params.id);
@@ -109,7 +109,7 @@ export function registerFactoryCustomerStatementRoutes(app: Express) {
       // to include manual accounting vouchers that don't flow through customerBalances.
       // Exclude CHARGE-* vouchers (those are already included via invoices).
       const voucherRows = [];
-      const ledgerAccountId = (customer as any).ledgerAccountId;
+      const ledgerAccountId = customer.ledgerAccountId;
       const voucherConditions = ledgerAccountId
         ? sql`(${voucherEntries.ledgerAccountId} = ${ledgerAccountId} OR ${voucherEntries.customerId} = ${customerId})`
         : sql`${voucherEntries.customerId} = ${customerId}`;
@@ -227,7 +227,7 @@ export function registerFactoryCustomerStatementRoutes(app: Express) {
   // ── Save Statement Note ─────────────────────────────────────────────────
   app.patch("/api/factory/customers/:id/statement-note", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const customerId = parseInt(req.params.id);
       if (isNaN(customerId)) return res.status(400).json({ message: "Invalid customer ID" });
@@ -254,7 +254,7 @@ export function registerFactoryCustomerStatementRoutes(app: Express) {
     requireAuth,
     async (req: Request, res: Response) => {
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
         const customerId = parseInt(req.params.customerId);
         const entryId = parseInt(req.params.entryId);

@@ -251,7 +251,7 @@ export function registerVoucherOptionalUpdateRoutes(app: Express) {
       // Log the optional status change to audit log
       await logAudit({
         userId: req.session.userId!,
-        username: (req.session as any).username || "unknown",
+        username: req.session.username || "unknown",
         companyId: req.session.currentCompanyId!,
         action: "update",
         tableName: "vouchers",

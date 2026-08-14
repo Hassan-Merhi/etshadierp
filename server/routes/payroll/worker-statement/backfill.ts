@@ -18,7 +18,7 @@ import { getFactoryCompanyId } from "./_helpers";
 export function registerPayrollVoucherBackfillRoutes(app: Express) {
   app.post("/api/admin/backfill-payroll-vouchers", requireAuth, async (req: Request, res: Response) => {
     try {
-      const currentRole = (req.session as any).currentRole;
+      const currentRole = req.session.currentRole;
       if (currentRole !== "Admin" && currentRole !== "Owner" && currentRole !== "Developer") {
         return res.status(403).json({ message: "Only Admin or Owner can run backfill" });
       }

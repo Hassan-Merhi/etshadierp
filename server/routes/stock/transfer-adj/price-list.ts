@@ -166,7 +166,7 @@ export function registerPosPriceListRoutes(app: Express) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const isPrivileged = ["Admin", "Owner", "Manager", "Developer"].includes((req.user as any)?.role || "");
+      const isPrivileged = ["Admin", "Owner", "Manager", "Developer"].includes(req.user?.role || "");
 
       // Get all configured master location IDs
       const groupRows = await db

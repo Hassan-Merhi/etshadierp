@@ -4,7 +4,7 @@ import { db } from "../../db";
 import { ledgerAccounts } from "@shared/schema";
 
 function selectedCompanyId(req: Request): number | null {
-  const session = req.session as any;
+  const session = req.session;
   const raw = session?.factoryCompanyId ?? session?.currentCompanyId;
   const companyId = Number(raw);
   return Number.isInteger(companyId) && companyId > 0 ? companyId : null;
@@ -22,13 +22,7 @@ function requestedLedgerIds(body: unknown): number[] {
     }
   }
 
-  return [
-    ...new Set(
-      candidates
-        .map((value) => Number(value))
-        .filter((value) => Number.isInteger(value) && value > 0)
-    ),
-  ];
+  return [...new Set(candidates.map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0))];
 }
 
 export async function requirePostOffloadLedgerOwnership(

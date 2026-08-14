@@ -292,7 +292,7 @@ export async function syncIntercoParentVoucher(
         if (parseFloat(entry.debitAmount || "0") > 0) {
           await dbOrTx.update(voucherEntries).set({ debitAmount: amountStr }).where(eq(voucherEntries.id, entry.id));
         } else if (parseFloat(entry.creditAmount || "0") > 0) {
-          if ((entry as any).ledgerAccountId === freightOpts.freightParentAccountId) {
+          if (entry.ledgerAccountId === freightOpts.freightParentAccountId) {
             freightEntryFound = true;
             await dbOrTx
               .update(voucherEntries)

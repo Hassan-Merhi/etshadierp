@@ -20,7 +20,7 @@ export function registerFactoryCustomerStatementExcelRoutes(app: Express) {
   // ── Customer Statement: Excel Export ────────────────────────────────────
   app.get("/api/factory/customers/:id/statement/export-excel", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const customerId = parseInt(req.params.id);
       if (isNaN(customerId)) return res.status(400).json({ message: "Invalid customer ID" });
@@ -41,7 +41,7 @@ export function registerFactoryCustomerStatementExcelRoutes(app: Express) {
 
       // Pull voucher entries (same logic as statement endpoint)
       const voucherRowsXlsx: any[] = [];
-      const ledgerAccountIdXlsx = (customer as any).ledgerAccountId;
+      const ledgerAccountIdXlsx = customer.ledgerAccountId;
       const voucherCondXlsx = ledgerAccountIdXlsx
         ? sql`(${voucherEntries.ledgerAccountId} = ${ledgerAccountIdXlsx} OR ${voucherEntries.customerId} = ${customerId})`
         : sql`${voucherEntries.customerId} = ${customerId}`;

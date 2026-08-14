@@ -18,7 +18,7 @@ import { eq, and, inArray } from "drizzle-orm";
 export function registerFactoryStockRemovalRoutes(app: Express) {
   app.post("/api/factory/stock-entry/remove", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { baleIds, supervisorUsername, supervisorPassword, reason } = req.body;
@@ -143,7 +143,7 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
   // Remove N bales of a specific product from a specific location
   app.post("/api/factory/stock-entry/remove-by-product", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { productId, locationId, qty, supervisorUsername, supervisorPassword, reason } = req.body;

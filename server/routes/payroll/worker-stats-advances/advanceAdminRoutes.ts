@@ -138,7 +138,7 @@ export function registerWorkerAdvanceAdminRoutes(app: Express) {
             description: `Advance given to ${worker.fullName}: $${amount.toFixed(2)}`,
             amountCurrency: amount,
             amountUsd: amount,
-            createdBy: (req.session as any).userId ?? undefined,
+            createdBy: req.session.userId ?? undefined,
           });
 
           created.push({ ...advance, workerName: worker.fullName });
@@ -156,7 +156,7 @@ export function registerWorkerAdvanceAdminRoutes(app: Express) {
   // PATCH /api/factory/advances/:id - Edit advance (admin/owner only)
   app.patch("/api/factory/advances/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const currentRole = (req.session as any).currentRole;
+      const currentRole = req.session.currentRole;
       if (currentRole !== "Admin" && currentRole !== "Owner" && currentRole !== "Developer") {
         return res.status(403).json({ message: "Only Admin or Owner can edit advances" });
       }

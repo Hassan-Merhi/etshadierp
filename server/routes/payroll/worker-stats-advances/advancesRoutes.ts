@@ -241,7 +241,7 @@ export function registerWorkerAdvancesRoutes(app: Express) {
           description: `Advance given to ${worker.fullName}: $${amount.toFixed(2)}`,
           amountCurrency: amount,
           amountUsd: amount,
-          createdBy: (req.session as any).userId ?? undefined,
+          createdBy: req.session.userId ?? undefined,
         });
 
         return { ...advance, voucherId, workerName: worker.fullName };

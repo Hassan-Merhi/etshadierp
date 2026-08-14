@@ -19,7 +19,7 @@ function activeCompany(req: any): number | null {
 
 async function requirePermissionAdministrator(req: Request, res: Response, next: NextFunction) {
   try {
-    const permissions = await hydrateSessionNamedPermissions(db, req.session as any);
+    const permissions = await hydrateSessionNamedPermissions(db, req.session);
     if (!permissions.includes("security.permissions.manage")) {
       return res.status(403).json({ message: "Forbidden" });
     }

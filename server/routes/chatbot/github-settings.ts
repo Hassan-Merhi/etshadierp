@@ -65,12 +65,9 @@ export function registerChatbotGithubSettingsRoutes(app: Express) {
           .where(eq(systemSettings.key, key))
           .limit(1);
         if (existing.length > 0) {
-          await db
-            .update(systemSettings)
-            .set({ value, updatedAt: new Date() } as any)
-            .where(eq(systemSettings.key, key));
+          await db.update(systemSettings).set({ value, updatedAt: new Date() }).where(eq(systemSettings.key, key));
         } else {
-          await db.insert(systemSettings).values({ key, value } as any);
+          await db.insert(systemSettings).values({ key, value });
         }
       };
 

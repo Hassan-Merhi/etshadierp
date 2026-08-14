@@ -18,7 +18,7 @@ function uniquePositiveIds(values: unknown[]): number[] {
 }
 
 async function guardSpOffload(req: Request, res: Response, next: NextFunction): Promise<void> {
-  const companyId = await requireSpCompany(req as any, res as any);
+  const companyId = await requireSpCompany(req, res);
   if (!companyId) return;
 
   const containerId = Number(req.body?.containerId);
@@ -64,10 +64,10 @@ async function guardSpOffload(req: Request, res: Response, next: NextFunction): 
   };
 
   try {
-    const lockResult = await client.query<{ locked: boolean }>(
-      "SELECT pg_try_advisory_lock($1, $2) AS locked",
-      [companyId, containerId]
-    );
+    const lockResult = await client.query<{ locked: boolean }>("SELECT pg_try_advisory_lock($1, $2) AS locked", [
+      companyId,
+      containerId,
+    ]);
     if (!lockResult.rows[0]?.locked) {
       client.release();
       released = true;
