@@ -1,9 +1,10 @@
-import { and, eq, notInArray, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { factoryDaybookEntries, voucherEntries, vouchers } from "@shared/schema";
 import type { db } from "../../db";
 
 /** The concrete drizzle transaction handle, inferred from the shared client. */
 type DrizzleTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+import { classifyVoucherLedgerExpectation } from "./voucherLedgerExpectation";
 import {
   ConvergenceReconciliationError,
   type AccountingConvergenceSnapshot,
@@ -15,24 +16,6 @@ export type AuthoritativeStockSnapshotLoader = (input: {
   tx: DrizzleTransaction;
   companyId: number;
 }) => Promise<StockConvergenceSnapshot[]>;
-
-/**
- * Voucher types whose ledger posting is not a balanced double entry against the
- * document total, and which therefore cannot be judged by this reconciliation.
- *
- * - Stock Transfer moves stock between locations and posts no ledger entry at
- *   all. The three spellings are the ones the transfer document loader treats
- *   as a single document type.
- * - Stock Adjustment posts exactly one entry — production credits the production
- *   account, consumption debits the consumption account — because the other side
- *   of the movement is inventory, which is not a ledger account here. Comparing
- *   its total against both ledger sides reports every adjustment as unbalanced.
- *
- * Both are inventory documents, and both are reconciled on the stock side of
- * this same report against the canonical movement journal, so excluding them
- * here removes noise rather than coverage.
- */
-const NON_DOUBLE_ENTRY_VOUCHER_TYPES = ["Stock Transfer", "StockTransfer", "Transfer", "Stock Adjustment"];
 
 function asInteger(value: unknown, field: string): number {
   const parsed = Number(value);
@@ -72,6 +55,7 @@ export async function loadDatabaseAccountingConvergenceSnapshots(input: {
       companyId: vouchers.companyId,
       voucherType: vouchers.voucherType,
       voucherTotal: vouchers.totalAmount,
+      voucherDeletedAt: vouchers.deletedAt,
       ledgerBaseDebit: sql<string>`coalesce(sum(coalesce(${voucherEntries.baseDebitAmount}, ${voucherEntries.debitAmount}, 0)), 0)`,
       ledgerBaseCredit: sql<string>`coalesce(sum(coalesce(${voucherEntries.baseCreditAmount}, ${voucherEntries.creditAmount}, 0)), 0)`,
       daybookCount: sql<number>`count(distinct ${factoryDaybookEntries.id})`,
@@ -90,16 +74,13 @@ export async function loadDatabaseAccountingConvergenceSnapshots(input: {
         eq(factoryDaybookEntries.referenceId, vouchers.id)
       )
     )
-    .where(
-      and(
-        eq(vouchers.companyId, companyId),
-        sql`${vouchers.deletedAt} is null`,
-        // See NON_DOUBLE_ENTRY_VOUCHER_TYPES: these are inventory documents
-        // reconciled on the stock side of this same report.
-        notInArray(vouchers.voucherType, NON_DOUBLE_ENTRY_VOUCHER_TYPES)
-      )
-    )
-    .groupBy(vouchers.id, vouchers.companyId, vouchers.voucherType, vouchers.totalAmount);
+    // Every voucher is loaded, cancelled ones included. What differs is which
+    // comparisons apply, and that is stated per row below rather than by
+    // excluding rows here — an excluded row is one nobody checks again, and a
+    // cancelled voucher that kept its Daybook mirror is exactly the kind of
+    // leftover that filtering on deletedAt would hide forever.
+    .where(eq(vouchers.companyId, companyId))
+    .groupBy(vouchers.id, vouchers.companyId, vouchers.voucherType, vouchers.totalAmount, vouchers.deletedAt);
 
   return rows.map((row: Record<string, unknown>) => {
     const voucherId = asInteger(row.voucherId, "voucherId");
@@ -137,6 +118,8 @@ export async function loadDatabaseAccountingConvergenceSnapshots(input: {
       daybookBaseAmount:
         row.daybookBaseAmount == null ? null : asDecimalString(row.daybookBaseAmount, "daybookBaseAmount"),
       expectsDaybook,
+      ledgerExpectation: classifyVoucherLedgerExpectation(row.voucherType),
+      voucherCancelled: row.voucherDeletedAt != null,
     };
   });
 }

@@ -1,4 +1,5 @@
 import Decimal from "decimal.js";
+import type { VoucherLedgerExpectation } from "./voucherLedgerExpectation";
 import {
   assertTransactionCompanyScope,
   type CompanyScopedReadTransaction,
@@ -14,6 +15,16 @@ export interface AccountingConvergenceSnapshot {
   ledgerBaseCredit: string;
   daybookBaseAmount?: string | null;
   expectsDaybook: boolean;
+  /**
+   * What ledger evidence this voucher type owes. Absent means "balanced", which
+   * keeps older adapters working, but the database adapter always states it.
+   */
+  ledgerExpectation?: VoucherLedgerExpectation;
+  /**
+   * The voucher has been cancelled (soft-deleted). Its ledger entries are kept
+   * as history, but nothing derived from it may still be presented as live.
+   */
+  voucherCancelled?: boolean;
 }
 
 export interface StockConvergenceSnapshot {
@@ -155,15 +166,64 @@ export async function reconcileConvergenceTx<
 
     const identity = `voucher:${positiveId(row.voucherId, "voucherId")}`;
     assertUniqueIdentity(accountingIdentities, identity, "accounting");
+
+    if (row.voucherCancelled) {
+      // A cancelled voucher keeps its ledger entries as history, so comparing
+      // them against a document that no longer stands would report every
+      // cancellation as a defect. What must not survive the cancellation is the
+      // Factory Daybook mirror: the Daybook is a cash view, and a mirror left
+      // behind reports money moving for a document nobody can open any more.
+      if (row.daybookBaseAmount != null) {
+        discrepancies.push({
+          domain: "accounting",
+          identity,
+          code: "CANCELLED_VOUCHER_DAYBOOK_MIRROR",
+          expected: "missing",
+          actual: decimal(row.daybookBaseAmount, "daybookBaseAmount").toFixed(),
+        });
+      }
+      continue;
+    }
+
     const voucherDebit = decimal(row.voucherBaseDebit, "voucherBaseDebit");
     const voucherCredit = decimal(row.voucherBaseCredit, "voucherBaseCredit");
     const ledgerDebit = decimal(row.ledgerBaseDebit, "ledgerBaseDebit");
     const ledgerCredit = decimal(row.ledgerBaseCredit, "ledgerBaseCredit");
 
-    compare(discrepancies, "accounting", identity, "VOUCHER_LEDGER_DEBIT_MISMATCH", voucherDebit, ledgerDebit);
-    compare(discrepancies, "accounting", identity, "VOUCHER_LEDGER_CREDIT_MISMATCH", voucherCredit, ledgerCredit);
-    compare(discrepancies, "accounting", identity, "VOUCHER_NOT_BALANCED", voucherDebit, voucherCredit);
-    compare(discrepancies, "accounting", identity, "LEDGER_NOT_BALANCED", ledgerDebit, ledgerCredit);
+    const expectation = row.ledgerExpectation ?? "balanced";
+    if (expectation === "unclassified") {
+      // A voucher type nobody has classified escapes every accounting check
+      // below, so it is reported instead. Silence here would mean a new posting
+      // path could be introduced and never reconciled against anything.
+      discrepancies.push({
+        domain: "accounting",
+        identity,
+        code: "VOUCHER_TYPE_UNCLASSIFIED",
+        expected: "a classified ledger expectation",
+        actual: "unclassified",
+      });
+    } else if (expectation === "balanced") {
+      compare(discrepancies, "accounting", identity, "VOUCHER_LEDGER_DEBIT_MISMATCH", voucherDebit, ledgerDebit);
+      compare(discrepancies, "accounting", identity, "VOUCHER_LEDGER_CREDIT_MISMATCH", voucherCredit, ledgerCredit);
+      compare(discrepancies, "accounting", identity, "VOUCHER_NOT_BALANCED", voucherDebit, voucherCredit);
+      compare(discrepancies, "accounting", identity, "LEDGER_NOT_BALANCED", ledgerDebit, ledgerCredit);
+    } else if (expectation === "single-sided") {
+      // One side is posted against inventory, so the sides cannot balance and
+      // the document total cannot equal both. What can still be checked is that
+      // exactly one side carries the value: an entry set that posts both, or
+      // neither, is not the single-sided posting this type is supposed to make.
+      const debitPosted = !ledgerDebit.isZero();
+      const creditPosted = !ledgerCredit.isZero();
+      if (debitPosted === creditPosted) {
+        discrepancies.push({
+          domain: "accounting",
+          identity,
+          code: "SINGLE_SIDED_LEDGER_INVALID",
+          expected: "exactly one posted ledger side",
+          actual: debitPosted ? "both sides posted" : "no side posted",
+        });
+      }
+    }
 
     if (row.expectsDaybook) {
       if (row.daybookBaseAmount == null) {
