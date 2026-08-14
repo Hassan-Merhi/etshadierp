@@ -258,3 +258,5 @@ jobs:
           git add client/src server shared config/lint-warning-ratchet.json config/type-escape-boundaries.json docs/system-quality-program.md docs/god-file-split-program.md
           git commit --no-verify -m "finish phase 3 catch error narrowing"
           git push --no-verify origin HEAD:agent/lint-phase-3-catch-any
+
+# Retry after removing the temporary workflow helper that intentionally had no Node setup.
