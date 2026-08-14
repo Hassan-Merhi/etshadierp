@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { sql } from "drizzle-orm";
 import { checkFactoryAdmin } from "../factory/_helpers";
 import { logAudit } from "../helpers/auditHelpers";
@@ -45,7 +45,7 @@ const emptyTotals = () => ({
 });
 
 export function registerFactoryProductionBonusRoutes(app: Express, requireAuth: any, db: any) {
-  app.get("/api/factory/payroll/:id/production-bonuses", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/payroll/:id/production-bonuses", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid payroll id" });
@@ -63,7 +63,7 @@ export function registerFactoryProductionBonusRoutes(app: Express, requireAuth: 
     }
   });
 
-  app.post("/api/factory/payroll/:id/production-bonuses/decision", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/payroll/:id/production-bonuses/decision", requireAuth, async (req: Request, res: Response) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;
       const id = parseId(req.params.id);
@@ -114,7 +114,7 @@ export function registerFactoryProductionBonusRoutes(app: Express, requireAuth: 
           FROM factory_production_bonus_allocations
           WHERE payroll_id = ${id}
         `);
-        const linked = rows(linkedResult).map((row: any) => ({
+        const linked = rows(linkedResult).map((row) => ({
           runId: Number(row.runId),
           workerId: Number(row.workerId),
         }));

@@ -143,7 +143,7 @@ export async function buildFactoryCustomerLedgerEntries(
       )`
     : sql`${voucherEntries.customerId} = ${customerId}`;
 
-  const dateFilters: any[] = [];
+  const dateFilters = [];
   if (startDate) dateFilters.push(sql`${vouchers.voucherDate} >= ${startDate}`);
   if (endDate) dateFilters.push(sql`${vouchers.voucherDate} <= ${endDate}`);
 

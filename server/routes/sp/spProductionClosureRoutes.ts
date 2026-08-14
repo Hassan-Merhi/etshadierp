@@ -1,3 +1,4 @@
+import { releaseDebtEnglish } from "../../i18n/finalCloseoutEnglish";
 import type { Express, Request, Response } from "express";
 import { sql } from "drizzle-orm";
 import { requireAuth } from "../../auth";
@@ -95,7 +96,7 @@ export async function buildSpProductionClosureStatus(companyId: number): Promise
   `);
   const migrationSuspenseEntryCount = Number(firstRow(suspense)?.count ?? 0);
 
-  const failures: any[] = checks.filter((check: any) => check.status !== "PASS");
+  const failures = checks.filter((check: any) => check.status !== "PASS");
   if (sourceWriteCount > 0) {
     failures.push({ type: "source_write_lock_database", status: "FAIL", sourceWriteCount });
   }
@@ -142,16 +143,16 @@ export function registerSpProductionClosureRoutes(app: Express): void {
       if (!companyId) return;
       const cutover = await latestActiveCutover(companyId);
       if (!cutover) {
-        return res.status(409).json({ message: "No active Supplier Partner cutover exists." });
+        return res.status(409).json({ message: releaseDebtEnglish("No active Supplier Partner cutover exists.") });
       }
 
       const evidenceType = String(req.body?.evidenceType ?? "").trim();
       const status = String(req.body?.status ?? "").toUpperCase();
       if (!ALL_EVIDENCE_TYPES.has(evidenceType)) {
-        return res.status(400).json({ message: "Unknown production evidence type." });
+        return res.status(400).json({ message: releaseDebtEnglish("Unknown production evidence type.") });
       }
       if (!["PASS", "FAIL", "RECORDED"].includes(status)) {
-        return res.status(400).json({ message: "status must be PASS, FAIL, or RECORDED." });
+        return res.status(400).json({ message: releaseDebtEnglish("status must be PASS, FAIL, or RECORDED.") });
       }
 
       const result = await db.execute(sql`
@@ -182,7 +183,7 @@ export function registerSpProductionClosureRoutes(app: Express): void {
       if (!companyId) return;
       const status = await buildSpProductionClosureStatus(companyId);
       if (status.status !== "PASS") {
-        return res.status(409).json({ message: "Stabilization checks are not all PASS.", status });
+        return res.status(409).json({ message: releaseDebtEnglish("Stabilization checks are not all PASS."), status });
       }
 
       const cutoverId = Number(status.cutover.id);
@@ -197,7 +198,7 @@ export function registerSpProductionClosureRoutes(app: Express): void {
           RETURNING id
         `);
         if (resultRows(updated).length !== 1) {
-          throw new Error("Cutover is no longer active.");
+          throw new Error(releaseDebtEnglish("Cutover is no longer active."));
         }
 
         const inserted = await tx.execute(sql`
@@ -212,14 +213,16 @@ export function registerSpProductionClosureRoutes(app: Express): void {
         `);
         const row = firstRow(inserted);
         if (!row) {
-          throw new Error("Supplier Partner cutover completion was already recorded.");
+          throw new Error(releaseDebtEnglish("Supplier Partner cutover completion was already recorded."));
         }
         return row;
       });
 
       res.json({
         success: true,
-        message: "Supplier Partner stabilization is closed and the rollback window is no longer available.",
+        message: releaseDebtEnglish(
+          "Supplier Partner stabilization is closed and the rollback window is no longer available."
+        ),
         completion,
       });
     } catch (error: unknown) {

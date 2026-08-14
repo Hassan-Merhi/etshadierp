@@ -85,7 +85,7 @@ export function StockEntrySidebar({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Workers</SelectItem>
-                    {workerCategoryGroups.map((c: any) => (
+                    {workerCategoryGroups.map((c) => (
                       <SelectItem key={c.id} value={String(c.id)}>
                         {c.name}
                       </SelectItem>
@@ -102,8 +102,8 @@ export function StockEntrySidebar({
                   <SelectContent>
                     <SelectItem value="none">No Global Logo</SelectItem>
                     {allCustomers
-                      .filter((c: any) => c.active)
-                      .map((c: any) => (
+                      .filter((c) => c.active)
+                      .map((c) => (
                         <SelectItem key={c.id} value={String(c.id)}>
                           {c.legalName}
                         </SelectItem>
@@ -118,13 +118,19 @@ export function StockEntrySidebar({
         <div className="grid grid-cols-2 gap-3 border-t pt-4">
           <div className="min-w-0 rounded-lg bg-muted/40 p-3">
             <span className="block text-xs font-medium text-muted-foreground">Total Bales</span>
-            <span className="mt-1 block break-words text-xl font-black tabular-nums text-primary" data-testid="text-total-qty">
+            <span
+              className="mt-1 block break-words text-xl font-black tabular-nums text-primary"
+              data-testid="text-total-qty"
+            >
               {totalQty}
             </span>
           </div>
           <div className="min-w-0 rounded-lg bg-muted/40 p-3">
             <span className="block text-xs font-medium text-muted-foreground">Total Weight</span>
-            <span className="mt-1 block break-words text-xl font-black tabular-nums text-primary" data-testid="text-total-kg">
+            <span
+              className="mt-1 block break-words text-xl font-black tabular-nums text-primary"
+              data-testid="text-total-kg"
+            >
               {totalKg.toFixed(1)}
               <span className="ml-1 text-xs font-bold text-muted-foreground">KG</span>
             </span>

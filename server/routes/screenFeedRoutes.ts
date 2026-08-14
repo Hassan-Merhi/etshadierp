@@ -5,9 +5,11 @@ import { requireActionAccess } from "../lib/permissionMiddleware";
 import { getSessionRole, getSessionUserId, getSessionUsername } from "../lib/requestContext";
 import {
   screenFeedCursorStore,
+  screenFeedFailureStore,
   screenFeedStore,
   watcherPollStore,
   type ScreenFeedCursor,
+  type ScreenFeedFailureInfo,
   type ScreenFrame,
 } from "../screenFeedStore";
 import { isRemoteControlControllerRole, stopAllRemoteControlSessions } from "../services/remoteControlSessionService";
@@ -18,6 +20,7 @@ import {
   sanitizeScreenFeedClicks,
   sanitizeScreenFeedClientCapturedAt,
   sanitizeScreenFeedCursor,
+  sanitizeScreenFeedFailure,
   sanitizeScreenFeedViewport,
 } from "../services/screenFeedService";
 import {
@@ -92,7 +95,17 @@ function serializeCursor(cursor: ScreenFeedCursor | null | undefined) {
   return { x: cursor.x, y: cursor.y, ts: cursor.ts, visible: cursor.visible };
 }
 
-function serializeFrame(frame: ScreenFrame) {
+function serializeFailure(failure: ScreenFeedFailureInfo | null | undefined) {
+  if (!failure) return null;
+  return {
+    stage: failure.stage,
+    reason: failure.reason,
+    occurredAt: failure.occurredAt.toISOString(),
+    durationMs: failure.durationMs ?? null,
+  };
+}
+
+function serializeFrame(frame: ScreenFrame, failure?: ScreenFeedFailureInfo | null) {
   return {
     dataUrl: frame.dataUrl,
     capturedAt: frame.capturedAt.toISOString(),
@@ -103,7 +116,20 @@ function serializeFrame(frame: ScreenFrame) {
     cursor: serializeCursor(frame.cursor),
     viewport: frame.viewport ?? null,
     capture: frame.capture ?? null,
+    captureFailure: serializeFailure(failure),
   };
+}
+
+function recordCaptureFailure(userId: string, value: unknown): boolean {
+  const sanitized = sanitizeScreenFeedFailure(value);
+  if (!sanitized) return false;
+  const failure: ScreenFeedFailureInfo = { ...sanitized, occurredAt: new Date() };
+  screenFeedFailureStore.set(userId, failure);
+  logger.warn(
+    `[ScreenFeed] capture failure userId=${userId} stage=${failure.stage} durationMs=${failure.durationMs ?? "unknown"} reason=${failure.reason}`
+  );
+  if (isRemoteSupportEnabled("fastScreenFeed")) screenFeedLiveHub.publishFailure(userId, failure);
+  return true;
 }
 
 export function registerScreenFeedRoutes(app: Express) {
@@ -120,6 +146,7 @@ export function registerScreenFeedRoutes(app: Express) {
     if (!snapshot.flags.screenFeedEnabled) {
       watcherPollStore.clear();
       screenFeedCursorStore.clear();
+      screenFeedFailureStore.clear();
     }
     if (!snapshot.flags.screenFeedEnabled || !snapshot.flags.fastScreenFeed) {
       screenFeedLiveHub.disconnectAll();
@@ -133,6 +160,7 @@ export function registerScreenFeedRoutes(app: Express) {
     if (!requireDeveloper(req, res)) return;
     watcherPollStore.clear();
     screenFeedCursorStore.clear();
+    screenFeedFailureStore.clear();
     screenFeedLiveHub.disconnectAll();
     stopAllRemoteControlSessions("global-emergency-stop");
     const snapshot = emergencyDisableRemoteSupport(runtimeActor(req));
@@ -155,12 +183,36 @@ export function registerScreenFeedRoutes(app: Express) {
     res.json(resetRemoteSupportMetrics());
   });
 
+  // The admin runtime snapshot is Developer-only, but every authorized watcher
+  // (Admin/Owner/Manager) needs to know whether the live transport is available
+  // before opening a viewer. Without this they all fall back to polling.
+  app.get("/api/screen-feed/capabilities", requireAuth, viewPermission, (req, res) => {
+    if (!requireSupportController(req, res)) return;
+    res.setHeader("Cache-Control", "no-store");
+    const screenFeedEnabled = isRemoteSupportEnabled("screenFeedEnabled");
+    res.json({
+      flags: {
+        screenFeedEnabled,
+        fastScreenFeed: screenFeedEnabled && isRemoteSupportEnabled("fastScreenFeed"),
+        remoteControl: screenFeedEnabled && isRemoteSupportEnabled("remoteControl"),
+        keyboardControl: screenFeedEnabled && isRemoteSupportEnabled("keyboardControl"),
+      },
+    });
+  });
+
   app.get("/api/screen-feed/live/status", requireLogin, (req, res) => {
     if (!isRemoteSupportEnabled("screenFeedEnabled") || !isRemoteSupportEnabled("fastScreenFeed")) {
       res.setHeader("Cache-Control", "no-store");
       return res.status(204).end();
     }
     const userId = String(getSessionUserId(req));
+    const wantsEventStream = String(req.headers.accept ?? "")
+      .toLowerCase()
+      .includes("text/event-stream");
+    if (!wantsEventStream) {
+      res.setHeader("Cache-Control", "no-store");
+      return res.json({ watched: isUserBeingWatched(userId), fast: true });
+    }
     openEventStream(res);
     recordRemoteSupportMetric("liveStatusConnected");
     const sendStatus = () => {
@@ -197,10 +249,13 @@ export function registerScreenFeedRoutes(app: Express) {
     watcherPollStore.set(watchedUserId, Date.now());
 
     const unsubscribeFrames = screenFeedLiveHub.subscribeFrames(watchedUserId, (frame) => {
-      writeEvent(res, "frame", serializeFrame(frame));
+      writeEvent(res, "frame", serializeFrame(frame, screenFeedFailureStore.get(watchedUserId)));
     });
     const unsubscribeCursors = screenFeedLiveHub.subscribeCursors(watchedUserId, (cursor) => {
       writeEvent(res, "cursor", serializeCursor(cursor));
+    });
+    const unsubscribeFailures = screenFeedLiveHub.subscribeFailures(watchedUserId, (failure) => {
+      writeEvent(res, "capture-failure", serializeFailure(failure));
     });
     let unsubscribeDisconnect = () => {};
     let closed = false;
@@ -216,6 +271,7 @@ export function registerScreenFeedRoutes(app: Express) {
       clearInterval(heartbeatId);
       unsubscribeFrames();
       unsubscribeCursors();
+      unsubscribeFailures();
       unsubscribeDisconnect();
       if (!screenFeedLiveHub.hasViewer(watchedUserId)) {
         watcherPollStore.delete(watchedUserId);
@@ -229,7 +285,9 @@ export function registerScreenFeedRoutes(app: Express) {
     res.once("close", cleanup);
     writeEvent(res, "ready", { userId: watchedUserId });
     const currentFrame = screenFeedStore.get(watchedUserId);
-    if (currentFrame) writeEvent(res, "frame", serializeFrame(currentFrame));
+    const currentFailure = screenFeedFailureStore.get(watchedUserId);
+    if (currentFrame) writeEvent(res, "frame", serializeFrame(currentFrame, currentFailure));
+    if (currentFailure) writeEvent(res, "capture-failure", serializeFailure(currentFailure));
     const currentCursor = screenFeedCursorStore.get(watchedUserId);
     if (currentCursor) writeEvent(res, "cursor", serializeCursor(currentCursor));
   });
@@ -268,6 +326,12 @@ export function registerScreenFeedRoutes(app: Express) {
     if (!isRemoteSupportEnabled("screenFeedEnabled")) return res.status(204).end();
     const userId = String(getSessionUserId(req));
     if (!isUserBeingWatched(userId)) return res.status(204).end();
+
+    // Failure telemetry shares this tiny watched-user channel so diagnostics do
+    // not create another route or another always-on request path. The payload is
+    // sanitized before storage/logging and contains no screenshot or page data.
+    if (recordCaptureFailure(userId, req.body?.failure)) return res.status(204).end();
+
     const cursor = sanitizeScreenFeedCursor(req.body?.cursor ?? req.body);
     // Pointer telemetry is visual-only. A stale/skewed sample must never create
     // a 400 retry loop or interfere with the employee's ERP session.
@@ -290,16 +354,12 @@ export function registerScreenFeedRoutes(app: Express) {
     const { dataUrl, clicks, cursor, viewport, capture, clientCapturedAt } = req.body ?? {};
     if (!isValidScreenFeedDataUrl(dataUrl)) {
       recordRemoteSupportMetric("frameRejected");
-      if (isDev) {
-        logger.warn(
-          `[ScreenFeed] POST rejected: missing or invalid dataUrl (type=${typeof dataUrl} starts=${typeof dataUrl === "string" ? dataUrl.slice(0, 30) : "N/A"})`
-        );
-      }
+      logger.warn(`[ScreenFeed] frame rejected userId=${userId} reason=invalid-data-url type=${typeof dataUrl}`);
       return res.status(400).end();
     }
     if (dataUrl.length > MAX_FRAME_SIZE) {
       recordRemoteSupportMetric("frameRejected");
-      if (isDev) logger.warn(`[ScreenFeed] POST rejected: frame too large (${dataUrl.length} bytes)`);
+      logger.warn(`[ScreenFeed] frame rejected userId=${userId} reason=frame-too-large bytes=${dataUrl.length}`);
       return res.status(204).end();
     }
     const receivedAt = new Date();
@@ -307,6 +367,7 @@ export function registerScreenFeedRoutes(app: Express) {
     const safeClicks = sanitizeScreenFeedClicks(clicks, receivedAt.getTime());
     const safeCursor =
       sanitizeScreenFeedCursor(cursor, receivedAt.getTime()) ?? screenFeedCursorStore.get(userId) ?? null;
+    const safeCapture = sanitizeScreenFeedCapture(capture);
     const frame: ScreenFrame = {
       dataUrl,
       capturedAt: receivedAt,
@@ -316,11 +377,17 @@ export function registerScreenFeedRoutes(app: Express) {
       clicks: safeClicks,
       cursor: safeCursor,
       viewport: sanitizeScreenFeedViewport(viewport),
-      capture: sanitizeScreenFeedCapture(capture),
+      capture: safeCapture,
     };
     screenFeedStore.set(userId, frame);
+    screenFeedFailureStore.delete(userId);
     if (safeCursor) screenFeedCursorStore.set(userId, safeCursor);
     recordRemoteSupportMetric("frameAccepted", Buffer.byteLength(dataUrl, "utf8"));
+    if (safeCapture?.failureReason) {
+      logger.warn(
+        `[ScreenFeed] fallback frame accepted userId=${userId} source=${safeCapture.source} durationMs=${safeCapture.durationMs} reason=${safeCapture.failureReason}`
+      );
+    }
     if (isRemoteSupportEnabled("fastScreenFeed")) {
       const pushed = screenFeedLiveHub.publishFrame(userId, frame);
       if (pushed > 0) recordRemoteSupportMetric("framePushed", pushed);
@@ -342,6 +409,7 @@ export function registerScreenFeedRoutes(app: Express) {
     watcherPollStore.set(watchedUserId, Date.now());
     screenFeedLiveHub.notifyStatus(watchedUserId);
     const frame = screenFeedStore.get(watchedUserId);
+    const failure = screenFeedFailureStore.get(watchedUserId);
     const hasFrame = !!frame;
     if (isDev) {
       const frameAgeMs = frame ? Date.now() - frame.capturedAt.getTime() : null;
@@ -349,9 +417,9 @@ export function registerScreenFeedRoutes(app: Express) {
         `[ScreenFeed] GET /:userId watchedUserId=${watchedUserId} hasFrame=${hasFrame} frameAgeMs=${frameAgeMs}`
       );
     }
-    if (!frame) return res.json(null);
+    if (!frame) return res.json(failure ? { captureFailure: serializeFailure(failure) } : null);
     const latestCursor = screenFeedCursorStore.get(watchedUserId);
     if (latestCursor) frame.cursor = latestCursor;
-    res.json(serializeFrame(frame));
+    res.json(serializeFrame(frame, failure));
   });
 }

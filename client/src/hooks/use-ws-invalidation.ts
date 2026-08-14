@@ -50,7 +50,7 @@ export function useWsInvalidation() {
         // thrown away, the request count doubles, and the aborts surface
         // as load failures. A request issued moments ago is fresh enough;
         // let it land and refetch the rest.
-        { cancelRefetch: false },
+        { cancelRefetch: false }
       );
     }
 
@@ -108,7 +108,9 @@ export function useWsInvalidation() {
           if (msg.type === "invalidate") {
             handleInvalidate();
           }
-        } catch {}
+        } catch {
+          // Malformed or absent payload — fall through to the default rather than surface a parse error.
+        }
       };
 
       ws.onclose = () => {

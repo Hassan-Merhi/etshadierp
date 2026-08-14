@@ -4,13 +4,13 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { pool } from "../../db";
 
 export function registerSupplierProfitProformaRoutes(app: Express, requireAuth: any) {
-  app.post("/api/supplier-profit-check/save-proforma", requireAuth, async (req: any, res: any) => {
+  app.post("/api/supplier-profit-check/save-proforma", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -33,7 +33,7 @@ export function registerSupplierProfitProformaRoutes(app: Express, requireAuth: 
       const proforma = proformaResult.rows[0];
 
       if (items.length > 0) {
-        const lineValues: any[] = [];
+        const lineValues = [];
         const linePlaceholders: string[] = [];
         let pIdx = 1;
         for (const item of items) {
@@ -65,7 +65,7 @@ export function registerSupplierProfitProformaRoutes(app: Express, requireAuth: 
   });
 
   // PUT /api/supplier-profit-check/proforma/:id/update-items — autosave: replace lines in place
-  app.put("/api/supplier-profit-check/proforma/:id/update-items", requireAuth, async (req: any, res: any) => {
+  app.put("/api/supplier-profit-check/proforma/:id/update-items", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -84,7 +84,7 @@ export function registerSupplierProfitProformaRoutes(app: Express, requireAuth: 
       await pool.query(`DELETE FROM supplier_proforma_lines WHERE proforma_id = $1`, [proformaId]);
 
       if (items.length > 0) {
-        const lineValues: any[] = [];
+        const lineValues = [];
         const linePlaceholders: string[] = [];
         let pIdx = 1;
         for (const item of items) {

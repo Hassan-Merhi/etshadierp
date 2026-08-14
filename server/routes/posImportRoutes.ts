@@ -291,7 +291,7 @@ export function registerPosImportRoutes(app: Express) {
             const safeDate = (voucherDate ?? importedSaleDate).replace(/[^0-9-]/g, "");
             const fileName =
               `${locationName} Invoice ${safeDate}`
-                .replace(/[^\w\s.()\-]/g, "_")
+                .replace(/[^\w\s.()-]/g, "_")
                 .replace(/\s+/g, " ")
                 .trim() + ".pdf";
             const invoiceResult = await sendWhatsAppFileByUploadPos(chatId, pdfBuffer, fileName, "");
@@ -325,7 +325,7 @@ export function registerPosImportRoutes(app: Express) {
                 hour: "2-digit",
                 minute: "2-digit",
               });
-              const stockName = `${locationName} STK ${companyName} ${dateString}`.replace(/[^\w\s.()\-]/g, "_").trim();
+              const stockName = `${locationName} STK ${companyName} ${dateString}`.replace(/[^\w\s.()-]/g, "_").trim();
               const stockResult = await sendWhatsAppFileToChatIdPos(
                 chatId,
                 buffer,

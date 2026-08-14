@@ -38,11 +38,7 @@ export function registerVoucherQueryRoutes(app: Express) {
 
       let vouchers;
       if (startDate && endDate) {
-        vouchers = await storage.getVouchersByDateRange(
-          access.activeCompanyId,
-          startDate as string,
-          endDate as string
-        );
+        vouchers = await storage.getVouchersByDateRange(access.activeCompanyId, startDate as string, endDate as string);
       } else {
         // No date range supplied — default to the last 90 days so we never do
         // a full-table scan. The UI already shows this window by default.
@@ -56,7 +52,7 @@ export function registerVoucherQueryRoutes(app: Express) {
 
       // Strip totalAmount from Stock Transfer vouchers for POS users
       let sanitizedVouchers = isPOS
-        ? vouchers.map((v: any) => {
+        ? vouchers.map((v) => {
             // Check for all variants of Stock Transfer voucher type
             const isStockTransfer =
               v.voucherType === "Stock Transfer" ||
@@ -77,10 +73,8 @@ export function registerVoucherQueryRoutes(app: Express) {
         const assignedLocs = await db
           .select({ locationId: userLocations.locationId })
           .from(userLocations)
-          .where(
-            and(eq(userLocations.userId, req.user.id), eq(userLocations.companyId, access.activeCompanyId))
-          );
-        const allowedLocIds = assignedLocs.map((l: any) => l.locationId);
+          .where(and(eq(userLocations.userId, req.user.id), eq(userLocations.companyId, access.activeCompanyId)));
+        const allowedLocIds = assignedLocs.map((l) => l.locationId);
         if (allowedLocIds.length > 0) {
           sanitizedVouchers = sanitizedVouchers.filter(
             (v: any) => v.locationId === null || allowedLocIds.includes(v.locationId)
@@ -120,13 +114,15 @@ export function registerVoucherQueryRoutes(app: Express) {
             supplierId,
             allowedCompanyId,
             startDate as string | undefined,
-            endDate as string | undefined,
-          ),
-        ),
+            endDate as string | undefined
+          )
+        )
       );
       const voucherEntries = voucherEntryGroups.flat();
 
-      const companyRows = await Promise.all(companyIds.map((allowedCompanyId) => storage.getCompanyById(allowedCompanyId)));
+      const companyRows = await Promise.all(
+        companyIds.map((allowedCompanyId) => storage.getCompanyById(allowedCompanyId))
+      );
       const companyMap = new Map(companyRows.filter(Boolean).map((company) => [company!.id, company!] as const));
 
       // Combine all transactions with company information
@@ -214,8 +210,8 @@ export function registerVoucherQueryRoutes(app: Express) {
           .where(
             and(
               inArray(containers.companyId, companyIds),
-              inArray(containers.containerNumber, Array.from(containerNumberSet)),
-            ),
+              inArray(containers.containerNumber, Array.from(containerNumberSet))
+            )
           );
         for (const c of containerRows) {
           containerIdMap.set(c.containerNumber, c.id);
@@ -255,9 +251,11 @@ export function registerVoucherQueryRoutes(app: Express) {
           ? [...(await getAccessibleCompanyIds(access.userId))].sort((left, right) => left - right)
           : [access.activeCompanyId];
 
-      const companyRows = await Promise.all(companyIds.map((allowedCompanyId) => storage.getCompanyById(allowedCompanyId)));
+      const companyRows = await Promise.all(
+        companyIds.map((allowedCompanyId) => storage.getCompanyById(allowedCompanyId))
+      );
       const companyNameMap = new Map(
-        companyRows.filter(Boolean).map((company) => [company!.id, company!.name] as const),
+        companyRows.filter(Boolean).map((company) => [company!.id, company!.name] as const)
       );
       const purchaseOrderGroups = await Promise.all(
         companyIds.map(async (allowedCompanyId) => {
@@ -266,7 +264,7 @@ export function registerVoucherQueryRoutes(app: Express) {
             ...purchaseOrder,
             companyName: companyNameMap.get(allowedCompanyId) ?? `Company ${allowedCompanyId}`,
           }));
-        }),
+        })
       );
 
       return res.json(purchaseOrderGroups.flat());
@@ -374,7 +372,7 @@ export function registerVoucherQueryRoutes(app: Express) {
       // returns accountName, so we just find the debit entry and use its accountName.
       let customerName: string | null = null;
       if (voucher.isCreditSale) {
-        const debitEntry = entries.find((e: any) => parseFloat(e.debitAmount || "0") > 0);
+        const debitEntry = entries.find((e) => parseFloat(e.debitAmount || "0") > 0);
         if (debitEntry?.accountName && debitEntry.accountName !== "Unknown Account") {
           customerName = debitEntry.accountName;
         }

@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../../lib/httpHandlers";
 import { db } from "../../../../db";
 import { requireAuth } from "../../../../auth";
@@ -13,7 +13,7 @@ import { eq, and, sql } from "drizzle-orm";
 
 export function registerFactoryEmployeeBulkPayrollRoutes(app: Express) {
   // POST /api/factory/employees/bulk-payroll - bulk payroll deposit for multiple employees
-  app.post("/api/factory/employees/bulk-payroll", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/employees/bulk-payroll", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -25,7 +25,7 @@ export function registerFactoryEmployeeBulkPayrollRoutes(app: Express) {
       if (!date) return res.status(400).json({ message: "Date is required" });
 
       // Validate: at least amount or deduction must be > 0
-      const validDeposits = deposits.filter((d: any) => {
+      const validDeposits = deposits.filter((d) => {
         const a = parseFloat(d.amount) || 0;
         const ded = parseFloat(d.deduction) || 0;
         return d.employeeId && (a > 0 || ded > 0);

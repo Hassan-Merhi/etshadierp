@@ -20,11 +20,15 @@ export function loadDraft(): Draft | null {
 export function saveDraft(d: Draft) {
   try {
     localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...d, savedAt: Date.now() }));
-  } catch {}
+  } catch {
+    // Storage is unavailable in private mode and can throw on quota; the value is a convenience, not state we need.
+  }
 }
 
 export function clearDraft() {
   try {
     localStorage.removeItem(DRAFT_KEY);
-  } catch {}
+  } catch {
+    // Storage is unavailable in private mode and can throw on quota; the value is a convenience, not state we need.
+  }
 }

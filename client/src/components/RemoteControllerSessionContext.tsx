@@ -152,8 +152,7 @@ export function RemoteControllerSessionProvider({ children }: { children: ReactN
     const existing = refreshInFlightRef.current;
     if (existing?.targetUserId === activeTarget.userId) return existing.promise;
 
-    let request: Promise<RemoteControllerSessionView | null>;
-    request = remoteControllerRequestJson<ControllerActiveResponse>(
+    const request: Promise<RemoteControllerSessionView | null> = remoteControllerRequestJson<ControllerActiveResponse>(
       "/api/screen-feed/control/sessions/controller-active"
     )
       .then((payload) => {
@@ -173,7 +172,7 @@ export function RemoteControllerSessionProvider({ children }: { children: ReactN
             ? {
                 ...next,
                 mouseAuthorization: next.mouseAuthorization ?? current.mouseAuthorization,
-                keyboardAuthorization: next.keyboardAuthorization ?? current.keyboardAuthorization,
+                keyboardAuthorization: next.keyboardAuthorization,
               }
             : next;
         setSession(merged);

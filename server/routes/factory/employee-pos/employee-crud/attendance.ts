@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../../lib/httpHandlers";
 import { db } from "../../../../db";
 import { requireAuth } from "../../../../auth";
@@ -13,7 +13,7 @@ import { eq, and, sql } from "drizzle-orm";
 import { sqlArray } from "../../../../lib/sqlArray";
 
 export function registerFactoryEmployeeAttendanceRoutes(app: Express) {
-  app.get("/api/factory/employee-attendance", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/employee-attendance", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -41,7 +41,7 @@ export function registerFactoryEmployeeAttendanceRoutes(app: Express) {
 
       if (emps.length === 0) return res.json({ employees: [], attendance: [] });
 
-      const empIds = emps.map((e: any) => e.id);
+      const empIds = emps.map((e) => e.id);
       const existing = await db.execute(sql`
         SELECT * FROM employee_attendance
         WHERE company_id = ${companyId} AND attendance_date = ${date}
@@ -61,7 +61,7 @@ export function registerFactoryEmployeeAttendanceRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/employee-attendance/bulk", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/employee-attendance/bulk", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -85,7 +85,7 @@ export function registerFactoryEmployeeAttendanceRoutes(app: Express) {
   });
 
   // GET /api/factory/employee-attendance/employee/:id — per-employee attendance for a date range
-  app.get("/api/factory/employee-attendance/employee/:id", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/employee-attendance/employee/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

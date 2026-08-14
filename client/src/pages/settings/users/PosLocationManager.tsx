@@ -46,7 +46,7 @@ export function PosLocationManager({
   };
 
   const selectAllLocations = () => {
-    const all = locations.map((l: any) => l.id);
+    const all = locations.map((l) => l.id);
     setSelectedLocationIds(all);
     if (all.length > 0) setAssignedLocationId(all[0]);
   };
@@ -82,7 +82,7 @@ export function PosLocationManager({
         <p className="text-xs text-muted-foreground">No locations for this company.</p>
       ) : (
         <div className="space-y-1 max-h-56 overflow-y-auto rounded-md border p-2" data-testid="select-locations">
-          {(locations as any[]).map((loc: any) => {
+          {(locations as any[]).map((loc) => {
             const checked = selectedLocationIds.includes(loc.id);
             return (
               <div key={loc.id} className="space-y-1">
@@ -109,7 +109,7 @@ export function PosLocationManager({
                         <SelectValue placeholder="Select cash account *" />
                       </SelectTrigger>
                       <SelectContent>
-                        {cashAccounts.map((a: any) => (
+                        {cashAccounts.map((a) => (
                           <SelectItem key={a.id} value={a.id.toString()}>
                             {a.name} ({a.code})
                           </SelectItem>

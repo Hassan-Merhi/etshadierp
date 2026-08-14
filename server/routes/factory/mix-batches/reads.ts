@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { parseId } from "../../../lib/parseId";
@@ -16,7 +16,7 @@ import { getLockedSupplierRatesReadOnlyBulk } from "../../../services/factory/ra
 import Decimal from "decimal.js";
 
 export function registerFactoryMixBatchReadRoutes(app: Express) {
-  app.get("/api/factory/mix-batches", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/mix-batches", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -28,7 +28,7 @@ export function registerFactoryMixBatchReadRoutes(app: Express) {
         .orderBy(desc(factoryMixBatches.createdAt));
 
       // ── Display-blend calculation (read-only, no DB writes) ──
-      const batchIds = results.map((b: any) => b.id);
+      const batchIds = results.map((b) => b.id);
       let sourceRows: any[] = [];
       if (batchIds.length > 0) {
         // Only read the fields needed to compute list display totals. The old
@@ -47,7 +47,7 @@ export function registerFactoryMixBatchReadRoutes(app: Express) {
       }
 
       const uniqueSupplierIds = [
-        ...new Set(sourceRows.filter((s: any) => s.supplierId != null).map((s: any) => Number(s.supplierId))),
+        ...new Set(sourceRows.filter((s) => s.supplierId != null).map((s) => Number(s.supplierId))),
       ].filter((id) => Number.isInteger(id) && id > 0);
 
       // Phase 3: persisted supplier locked rates are loaded in one query rather
@@ -61,7 +61,7 @@ export function registerFactoryMixBatchReadRoutes(app: Express) {
         sourcesByBatch.get(src.mixBatchId)!.push(src);
       }
 
-      const enriched = results.map((b: any) => {
+      const enriched = results.map((b) => {
         const total = parseFloat(b.totalWeightKg) || 0;
         const used = parseFloat(b.usedKg) || 0;
 
@@ -114,7 +114,7 @@ export function registerFactoryMixBatchReadRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/mix-batches/:id", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/mix-batches/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

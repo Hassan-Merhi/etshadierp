@@ -156,7 +156,7 @@ export function SupplierStatement({
 
   if (!statementData) return null;
 
-  const activeSt = (statementData.statement || []).filter((c: any) => c.status !== "OFFLOADED");
+  const activeSt = (statementData.statement || []).filter((c) => c.status !== "OFFLOADED");
   const activeContainerCount = activeSt.length;
   const activeKg = activeSt.reduce(
     (sum: number, c: any) => sum + parseFloat(c.actualReceivedKg || c.totalKg || "0"),
@@ -526,7 +526,9 @@ export function SupplierStatement({
             }}
           />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRename(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setShowRename(false)}>
+              Cancel
+            </Button>
             <Button
               onClick={() => {
                 if (renameDraft.trim()) {
@@ -554,7 +556,9 @@ export function SupplierStatement({
             This cannot be undone.
           </p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+              Cancel
+            </Button>
             <Button
               variant="destructive"
               onClick={() => {

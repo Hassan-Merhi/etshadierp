@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { db } from "../../../db";
@@ -16,7 +16,7 @@ export function registerFactoryCustomerStatementRoutes(app: Express) {
   // CUSTOMER STATEMENT
   // ───────────────────────────────────────────────
 
-  app.get("/api/factory/customers/:id/statement", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/customers/:id/statement", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -60,25 +60,23 @@ export function registerFactoryCustomerStatementRoutes(app: Express) {
 
       // Build orderId → various field maps for enriching statement rows
       const containerByOrderId = new Map<number, string | null>(
-        invoices.map((inv: any) => [inv.id, inv.containerNumber ?? null])
+        invoices.map((inv) => [inv.id, inv.containerNumber ?? null])
       );
       const destinationByOrderId = new Map<number, string | null>(
-        invoices.map((inv: any) => [inv.id, inv.destination ?? null])
+        invoices.map((inv) => [inv.id, inv.destination ?? null])
       );
-      const totalQtyBalesByOrderId = new Map<number, number>(
-        invoices.map((inv: any) => [inv.id, inv.totalQtyBales ?? 0])
-      );
+      const totalQtyBalesByOrderId = new Map<number, number>(invoices.map((inv) => [inv.id, inv.totalQtyBales ?? 0]));
       const totalWeightKgByOrderId = new Map<number, number>(
-        invoices.map((inv: any) => [inv.id, parseFloat(inv.totalWeightKg ?? "0")])
+        invoices.map((inv) => [inv.id, parseFloat(inv.totalWeightKg ?? "0")])
       );
 
       // Build a map of orderId → current grandTotal so we can correct stale
       // INVOICE rows on the fly (read-only — no DB writes from a GET).
-      const invoiceGrandTotalMap = new Map<number, string>(invoices.map((inv: any) => [inv.id, inv.grandTotal]));
+      const invoiceGrandTotalMap = new Map<number, string>(invoices.map((inv) => [inv.id, inv.grandTotal]));
 
       // Map orderId → finalized date (date portion of finalizedAt, or orderDate fallback for legacy rows)
       const invoiceFinalizedDateMap = new Map<number, string>(
-        invoices.map((inv: any) => {
+        invoices.map((inv) => {
           const d: Date | null = inv.finalizedAt ?? null;
           return [inv.id, d ? d.toISOString().slice(0, 10) : (inv.orderDate as string)];
         })
@@ -91,7 +89,7 @@ export function registerFactoryCustomerStatementRoutes(app: Express) {
         .where(and(eq(customerBalances.companyId, companyId), eq(customerBalances.customerId, customerId)))
         .orderBy(customerBalances.transactionDate, customerBalances.id);
 
-      const balanceRows = rawBalanceRows.map((row: any) => {
+      const balanceRows = rawBalanceRows.map((row) => {
         if (row.referenceType === "INVOICE" && row.referenceId) {
           const overrides: Record<string, unknown> = {};
           if (invoiceGrandTotalMap.has(row.referenceId)) {
@@ -110,7 +108,7 @@ export function registerFactoryCustomerStatementRoutes(app: Express) {
       // Also pull voucher entries for this customer (by ledgerAccountId or direct customerId link)
       // to include manual accounting vouchers that don't flow through customerBalances.
       // Exclude CHARGE-* vouchers (those are already included via invoices).
-      const voucherRows: any[] = [];
+      const voucherRows = [];
       const ledgerAccountId = (customer as any).ledgerAccountId;
       const voucherConditions = ledgerAccountId
         ? sql`(${voucherEntries.ledgerAccountId} = ${ledgerAccountId} OR ${voucherEntries.customerId} = ${customerId})`
@@ -163,7 +161,7 @@ export function registerFactoryCustomerStatementRoutes(app: Express) {
       }
 
       // Merge customerBalances + voucher rows, sort by date then id
-      const allRows = [...balanceRows.map((r: any) => ({ ...r, _fromVoucher: false })), ...voucherRows].sort((a, b) => {
+      const allRows = [...balanceRows.map((r) => ({ ...r, _fromVoucher: false })), ...voucherRows].sort((a, b) => {
         const da = (a.transactionDate || "").toString();
         const db2 = (b.transactionDate || "").toString();
         if (da < db2) return -1;
@@ -179,7 +177,7 @@ export function registerFactoryCustomerStatementRoutes(app: Express) {
       const openingSide = customer.openingBalanceSide || "Dr";
       let runningBalance = openingSide === "Dr" ? openingBalance : -openingBalance;
 
-      const balanceHistory = allRows.map((row: any) => {
+      const balanceHistory = allRows.map((row) => {
         const debit = parseFloat(row.debitAmount || "0");
         const credit = parseFloat(row.creditAmount || "0");
         runningBalance += debit - credit;
@@ -227,7 +225,7 @@ export function registerFactoryCustomerStatementRoutes(app: Express) {
   });
 
   // ── Save Statement Note ─────────────────────────────────────────────────
-  app.patch("/api/factory/customers/:id/statement-note", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/customers/:id/statement-note", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -251,33 +249,37 @@ export function registerFactoryCustomerStatementRoutes(app: Express) {
   });
 
   // ── Save Row Note on a balance entry ────────────────────────────────────
-  app.patch("/api/factory/customers/:customerId/balance/:entryId/note", requireAuth, async (req: any, res: any) => {
-    try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const customerId = parseInt(req.params.customerId);
-      const entryId = parseInt(req.params.entryId);
-      if (isNaN(customerId) || isNaN(entryId)) return res.status(400).json({ message: "Invalid IDs" });
-      const { rowNote } = req.body;
-      if (typeof rowNote !== "string") return res.status(400).json({ message: "rowNote must be a string" });
-      const [entry] = await db
-        .select()
-        .from(customerBalances)
-        .where(
-          and(
-            eq(customerBalances.id, entryId),
-            eq(customerBalances.customerId, customerId),
-            eq(customerBalances.companyId, companyId)
-          )
-        );
-      if (!entry) return res.status(404).json({ message: "Entry not found" });
-      await db
-        .update(customerBalances)
-        .set({ rowNote: rowNote || null })
-        .where(eq(customerBalances.id, entryId));
-      res.json({ ok: true });
-    } catch (error: unknown) {
-      res.status(500).json({ message: getErrorMessage(error) });
+  app.patch(
+    "/api/factory/customers/:customerId/balance/:entryId/note",
+    requireAuth,
+    async (req: Request, res: Response) => {
+      try {
+        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        const customerId = parseInt(req.params.customerId);
+        const entryId = parseInt(req.params.entryId);
+        if (isNaN(customerId) || isNaN(entryId)) return res.status(400).json({ message: "Invalid IDs" });
+        const { rowNote } = req.body;
+        if (typeof rowNote !== "string") return res.status(400).json({ message: "rowNote must be a string" });
+        const [entry] = await db
+          .select()
+          .from(customerBalances)
+          .where(
+            and(
+              eq(customerBalances.id, entryId),
+              eq(customerBalances.customerId, customerId),
+              eq(customerBalances.companyId, companyId)
+            )
+          );
+        if (!entry) return res.status(404).json({ message: "Entry not found" });
+        await db
+          .update(customerBalances)
+          .set({ rowNote: rowNote || null })
+          .where(eq(customerBalances.id, entryId));
+        res.json({ ok: true });
+      } catch (error: unknown) {
+        res.status(500).json({ message: getErrorMessage(error) });
+      }
     }
-  });
+  );
 }

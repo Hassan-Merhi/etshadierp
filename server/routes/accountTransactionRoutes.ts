@@ -15,13 +15,7 @@ import { requireAuth } from "../auth";
 import { authorizeCompanyIdParam } from "./helpers/supplierBalanceHelpers";
 import { getClientDate } from "../lib/dateUtils";
 import { buildFactoryCustomerLedgerEntries, getCustomerByLedgerId } from "../lib/factoryCustomerLedger";
-import {
-  bankAccounts,
-  customers,
-  employees,
-  fixedAssets,
-  ledgerAccounts,
-} from "@shared/schema";
+import { bankAccounts, customers, employees, fixedAssets, ledgerAccounts } from "@shared/schema";
 
 export function registerAccountTransactionRoutes(app: Express) {
   // Get transactions for a specific ledger account with optional date filtering
@@ -36,13 +30,9 @@ export function registerAccountTransactionRoutes(app: Express) {
       const asOfDate = getClientDate(req);
       const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
       const rawStart =
-        typeof req.query.startDate === "string" && ISO_DATE.test(req.query.startDate)
-          ? req.query.startDate
-          : undefined;
+        typeof req.query.startDate === "string" && ISO_DATE.test(req.query.startDate) ? req.query.startDate : undefined;
       const rawEnd =
-        typeof req.query.endDate === "string" && ISO_DATE.test(req.query.endDate)
-          ? req.query.endDate
-          : undefined;
+        typeof req.query.endDate === "string" && ISO_DATE.test(req.query.endDate) ? req.query.endDate : undefined;
       // Cap the end date at today so future-dated vouchers are never shown
       const effectiveEndDate = rawEnd && rawEnd < asOfDate ? rawEnd : asOfDate;
 
@@ -94,7 +84,7 @@ export function registerAccountTransactionRoutes(app: Express) {
       //    For All Time (no rawStart), preNetBalance = 0 — the stored opening balance suffices.
       let preNetBalance = 0;
       if (rawStart) {
-        const bfParams: any[] = [ledgerAccountId, rawStart];
+        const bfParams = [ledgerAccountId, rawStart];
         let bfCompanyFilter = "";
         if (companyId) {
           bfParams.push(companyId);
@@ -137,11 +127,9 @@ export function registerAccountTransactionRoutes(app: Express) {
       const asOfDate = getClientDate(req);
       const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
       const rawStart =
-        typeof req.query.startDate === "string" && ISO_DATE.test(req.query.startDate)
-          ? req.query.startDate : undefined;
+        typeof req.query.startDate === "string" && ISO_DATE.test(req.query.startDate) ? req.query.startDate : undefined;
       const rawEnd =
-        typeof req.query.endDate === "string" && ISO_DATE.test(req.query.endDate)
-          ? req.query.endDate : undefined;
+        typeof req.query.endDate === "string" && ISO_DATE.test(req.query.endDate) ? req.query.endDate : undefined;
       const effectiveEndDate = rawEnd && rawEnd < asOfDate ? rawEnd : asOfDate;
 
       // Load account to get authoritative company scope
@@ -201,11 +189,9 @@ export function registerAccountTransactionRoutes(app: Express) {
       const asOfDate = getClientDate(req);
       const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
       const rawStart =
-        typeof req.query.startDate === "string" && ISO_DATE.test(req.query.startDate)
-          ? req.query.startDate : undefined;
+        typeof req.query.startDate === "string" && ISO_DATE.test(req.query.startDate) ? req.query.startDate : undefined;
       const rawEnd =
-        typeof req.query.endDate === "string" && ISO_DATE.test(req.query.endDate)
-          ? req.query.endDate : undefined;
+        typeof req.query.endDate === "string" && ISO_DATE.test(req.query.endDate) ? req.query.endDate : undefined;
       const effectiveEndDate = rawEnd && rawEnd < asOfDate ? rawEnd : asOfDate;
 
       // Load account to get authoritative company scope
@@ -265,11 +251,9 @@ export function registerAccountTransactionRoutes(app: Express) {
       const asOfDate = getClientDate(req);
       const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
       const rawStart =
-        typeof req.query.startDate === "string" && ISO_DATE.test(req.query.startDate)
-          ? req.query.startDate : undefined;
+        typeof req.query.startDate === "string" && ISO_DATE.test(req.query.startDate) ? req.query.startDate : undefined;
       const rawEnd =
-        typeof req.query.endDate === "string" && ISO_DATE.test(req.query.endDate)
-          ? req.query.endDate : undefined;
+        typeof req.query.endDate === "string" && ISO_DATE.test(req.query.endDate) ? req.query.endDate : undefined;
       const effectiveEndDate = rawEnd && rawEnd < asOfDate ? rawEnd : asOfDate;
 
       const requestedCompanyId = req.query.companyId ? parseInt(req.query.companyId as string) : undefined;
@@ -301,7 +285,7 @@ export function registerAccountTransactionRoutes(app: Express) {
           `v.deleted_at IS NULL`,
           `COALESCE(v.effective_date::date, v.voucher_date::date) < $2::date`,
         ];
-        const params: any[] = [supplierId, rawStart];
+        const params = [supplierId, rawStart];
         if (filterCompanyId) {
           conditions.push("v.company_id = $" + (params.length + 1));
           params.push(filterCompanyId);
@@ -339,11 +323,9 @@ export function registerAccountTransactionRoutes(app: Express) {
       const asOfDate = getClientDate(req);
       const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
       const rawStart =
-        typeof req.query.startDate === "string" && ISO_DATE.test(req.query.startDate)
-          ? req.query.startDate : undefined;
+        typeof req.query.startDate === "string" && ISO_DATE.test(req.query.startDate) ? req.query.startDate : undefined;
       const rawEnd =
-        typeof req.query.endDate === "string" && ISO_DATE.test(req.query.endDate)
-          ? req.query.endDate : undefined;
+        typeof req.query.endDate === "string" && ISO_DATE.test(req.query.endDate) ? req.query.endDate : undefined;
       const effectiveEndDate = rawEnd && rawEnd < asOfDate ? rawEnd : asOfDate;
 
       // Load employee to get authoritative company scope
@@ -357,12 +339,7 @@ export function registerAccountTransactionRoutes(app: Express) {
         return res.status(403).json({ message: "No access to this account's company" });
       }
 
-      const transactions = await storage.getVoucherEntriesByEmployee(
-        employeeId,
-        companyId,
-        rawStart,
-        effectiveEndDate
-      );
+      const transactions = await storage.getVoucherEntriesByEmployee(employeeId, companyId, rawStart, effectiveEndDate);
 
       let preNetBalance = 0;
       if (rawStart) {
@@ -403,11 +380,9 @@ export function registerAccountTransactionRoutes(app: Express) {
       const asOfDate = getClientDate(req);
       const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
       const rawStart =
-        typeof req.query.startDate === "string" && ISO_DATE.test(req.query.startDate)
-          ? req.query.startDate : undefined;
+        typeof req.query.startDate === "string" && ISO_DATE.test(req.query.startDate) ? req.query.startDate : undefined;
       const rawEnd =
-        typeof req.query.endDate === "string" && ISO_DATE.test(req.query.endDate)
-          ? req.query.endDate : undefined;
+        typeof req.query.endDate === "string" && ISO_DATE.test(req.query.endDate) ? req.query.endDate : undefined;
       const effectiveEndDate = rawEnd && rawEnd < asOfDate ? rawEnd : asOfDate;
 
       // Load customer to get authoritative company scope
@@ -421,12 +396,7 @@ export function registerAccountTransactionRoutes(app: Express) {
         return res.status(403).json({ message: "No access to this account's company" });
       }
 
-      const statement = await storage.getCustomerStatement(
-        customerId,
-        companyId,
-        rawStart,
-        effectiveEndDate
-      );
+      const statement = await storage.getCustomerStatement(customerId, companyId, rawStart, effectiveEndDate);
       // Map CustomerBalance rows to the same shape the Accounts page expects for transactions
       const mapped = statement.map((row) => ({
         id: row.id,

@@ -22,7 +22,7 @@ export function registerAdminOrphanedPosRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const results: any[] = [];
+      const results = [];
 
       // 1. Find orphaned salesItems for THIS COMPANY (voucher is deleted but companyId matches)
       // We only clean up items where we can verify the company to prevent cross-company data loss

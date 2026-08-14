@@ -122,16 +122,16 @@ export function registerFactoryDocsRoutes(app: Express) {
       }
       const rawDocs = await db.select().from(containerDocuments).where(eq(containerDocuments.containerId, containerId));
       const docTypes = await db.select().from(containerDocumentTypes).orderBy(containerDocumentTypes.label);
-      const requiredTypes = docTypes.filter((dt: any) => dt.isRequired);
-      const uploadedTypeIds = new Set(rawDocs.map((d: any) => d.docTypeId));
+      const requiredTypes = docTypes.filter((dt) => dt.isRequired);
+      const uploadedTypeIds = new Set(rawDocs.map((d) => d.docTypeId));
       const completeness = {
         total: requiredTypes.length,
-        uploaded: requiredTypes.filter((rt: any) => uploadedTypeIds.has(rt.id)).length,
-        complete: requiredTypes.every((rt: any) => uploadedTypeIds.has(rt.id)),
+        uploaded: requiredTypes.filter((rt) => uploadedTypeIds.has(rt.id)).length,
+        complete: requiredTypes.every((rt) => uploadedTypeIds.has(rt.id)),
       };
       // Mark ghost docs (no storage key AND no file data) so the client
       // can show a delete-only state instead of a broken download button.
-      const docs = rawDocs.map((d: any) => ({
+      const docs = rawDocs.map((d) => ({
         ...d,
         fileData: undefined, // strip large blob from listing response
         isGhost: !d.storageKey && !d.fileData,
@@ -214,9 +214,9 @@ export function registerFactoryDocsRoutes(app: Express) {
             .from(containerDocuments)
             .where(eq(containerDocuments.containerId, containerId));
           const allDocTypes = await db.select().from(containerDocumentTypes);
-          const requiredTypes = allDocTypes.filter((dt: any) => dt.isRequired);
-          const uploadedTypeIds = new Set(allDocs.map((d: any) => d.docTypeId));
-          const allComplete = requiredTypes.every((rt: any) => uploadedTypeIds.has(rt.id));
+          const requiredTypes = allDocTypes.filter((dt) => dt.isRequired);
+          const uploadedTypeIds = new Set(allDocs.map((d) => d.docTypeId));
+          const allComplete = requiredTypes.every((rt) => uploadedTypeIds.has(rt.id));
           await db.update(containers).set({ docReceived: allComplete }).where(eq(containers.id, containerId));
 
           res.json(doc);
@@ -264,9 +264,9 @@ export function registerFactoryDocsRoutes(app: Express) {
 
       const allDocs = await db.select().from(containerDocuments).where(eq(containerDocuments.containerId, containerId));
       const allDocTypes = await db.select().from(containerDocumentTypes);
-      const requiredTypes = allDocTypes.filter((dt: any) => dt.isRequired);
-      const uploadedTypeIds = new Set(allDocs.map((d: any) => d.docTypeId));
-      const allComplete = requiredTypes.length > 0 && requiredTypes.every((rt: any) => uploadedTypeIds.has(rt.id));
+      const requiredTypes = allDocTypes.filter((dt) => dt.isRequired);
+      const uploadedTypeIds = new Set(allDocs.map((d) => d.docTypeId));
+      const allComplete = requiredTypes.length > 0 && requiredTypes.every((rt) => uploadedTypeIds.has(rt.id));
       await db.update(containers).set({ docReceived: allComplete }).where(eq(containers.id, containerId));
 
       res.json({ success: true });

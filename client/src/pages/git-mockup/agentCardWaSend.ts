@@ -1,4 +1,3 @@
-import { apiRequest } from "@/lib/queryClient";
 import { fmt, fmtD, clientReallocate } from "./helpers";
 import type { AgentDutySummary, ApiAllocatedRow, ApiAllocStatus } from "./types";
 
@@ -40,7 +39,7 @@ export async function sendAgentCardToWhatsApp(params: SendAgentDutyWaParams): Pr
     const ledgerBalance = agent.ledgerBalance;
     const openBalance = agent.openBalance;
     const hasBalance = ledgerBalance !== null;
-    const activePreviewRows = agent.activePreviewRows.filter((r: any) => !!(r.numberPlate ?? "").trim());
+    const activePreviewRows = agent.activePreviewRows.filter((r) => !!(r.numberPlate ?? "").trim());
     const cbClearedRows = agent.clearedRows as ApiAllocatedRow[];
     const cbAllOpenPartial: ApiAllocatedRow[] = [
       ...(agent.partialRows as ApiAllocatedRow[]),
@@ -88,8 +87,8 @@ export async function sendAgentCardToWhatsApp(params: SendAgentDutyWaParams): Pr
     const isReconciledWa = hasAdj && hasBalance && Math.abs(adjustedBal) <= 0.01;
 
     const waPrepaidSet = new Set<number>(dbPrepaidIds);
-    const waPrepaidRows = activePreviewRows.filter((r: any) => waPrepaidSet.has(r.id));
-    const waRemainingRows = activePreviewRows.filter((r: any) => !waPrepaidSet.has(r.id));
+    const waPrepaidRows = activePreviewRows.filter((r) => waPrepaidSet.has(r.id));
+    const waRemainingRows = activePreviewRows.filter((r) => !waPrepaidSet.has(r.id));
     const designatedPrepaidSum = waPrepaidRows.reduce((s: number, r: any) => s + Number(r.dutyFee ?? 0), 0);
     const waPrepaidBudget = Math.max(0, ledgerBalance ?? 0);
     const minOpenRem =
@@ -141,7 +140,7 @@ export async function sendAgentCardToWhatsApp(params: SendAgentDutyWaParams): Pr
     } else if (isReconciledWa && waPrepaidRows.length === 0) {
       openRowsHtml = `<tr><td colspan="11" style="padding:16px;text-align:center;color:#065f46;font-style:italic;font-size:11px;border:1px solid #a7f3d0;background:#d1fae5;">All containers reconciled by manual entries — no outstanding balance.</td></tr>`;
     } else {
-      waPrepaidRows.forEach((r: any) => {
+      waPrepaidRows.forEach((r) => {
         openRowsHtml += `<tr style="background:#d1fae5">
           <td style="${tdOpen("left", true)}">${esc(r.containerNumber)}</td>
           <td style="${tdOpen()}">${esc(r.supplierCode ?? r.supplierName ?? "—")}</td>
@@ -217,7 +216,7 @@ export async function sendAgentCardToWhatsApp(params: SendAgentDutyWaParams): Pr
 
     let transitHtml = "";
     const waTransitRows = transitTransporterFilter
-      ? waRemainingRows.filter((r: any) => r.transporter === transitTransporterFilter)
+      ? waRemainingRows.filter((r) => r.transporter === transitTransporterFilter)
       : waRemainingRows;
     if (waTransitRows.length > 0) {
       const transitTotal = waTransitRows.reduce((s: number, r: any) => s + r.dutyFee, 0);
@@ -230,7 +229,7 @@ export async function sendAgentCardToWhatsApp(params: SendAgentDutyWaParams): Pr
         const sB = (b.supplierCode ?? b.supplierName ?? "").toLowerCase();
         return sA < sB ? -1 : sA > sB ? 1 : 0;
       });
-      sortedWaTransitRows.forEach((r: any, i: number) => {
+      sortedWaTransitRows.forEach((r, i: number) => {
         const bg = i % 2 === 0 ? "#f0f9ff" : "#e0f2fe";
         transitRowsHtml += `<tr style="background:${bg}">
           <td style="${tdTransit("left", true)}">${esc(r.containerNumber)}</td>
@@ -293,7 +292,9 @@ export async function sendAgentCardToWhatsApp(params: SendAgentDutyWaParams): Pr
 
     document.body.appendChild(capture);
     const canvas = await html2canvas(capture, {
-      scale: 3,
+      // 2x is still crisp on WhatsApp but is much faster and far smaller than
+      // the old 3x PNG path, especially for agents with dozens of containers.
+      scale: 2,
       useCORS: true,
       allowTaint: true,
       backgroundColor: "#ffffff",
@@ -305,13 +306,31 @@ export async function sendAgentCardToWhatsApp(params: SendAgentDutyWaParams): Pr
     });
     document.body.removeChild(capture);
 
-    const imageBase64 = canvas.toDataURL("image/png");
-    const todayStr = new Date().toISOString().substring(0, 10);
-    await apiRequest("POST", "/api/git/send-agent-duty-whatsapp", {
-      imageBase64,
-      agentName: agent.agentName,
-      fileName: `AgentDuty_${agent.agentName}_${todayStr}.png`,
+    const imageBlob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error());
+        },
+        "image/jpeg",
+        0.86
+      );
     });
+    const todayStr = new Date().toISOString().substring(0, 10);
+    const fileName = `AgentDuty_${agent.agentName}_${todayStr}.jpg`;
+    const formData = new FormData();
+    formData.append("image", imageBlob, fileName);
+    formData.append("agentName", agent.agentName);
+    formData.append("fileName", fileName);
+
+    const response = await fetch("/api/git/send-agent-duty-whatsapp", {
+      method: "POST",
+      body: formData,
+      credentials: "include",
+    });
+    const responseBody = (await response.json().catch(() => ({}))) as { message?: string };
+    if (!response.ok) throw new Error(responseBody.message || response.statusText);
+
     toast({ title: "Sent", description: `Balance allocation sent to ${agent.agentName} WhatsApp group.` });
   } catch (err: any) {
     toast({ title: "Failed to send", description: err.message, variant: "destructive" });

@@ -15,6 +15,8 @@ const translator = requireFile("client/src/components/ApplicationInterfaceTransl
 const audit = requireFile("scripts/audit-i18n-phase14.mjs");
 const backendAggregator = requireFile("client/src/i18n/backendMessagesPhase7Translations.ts");
 const backendPart9 = requireFile("client/src/i18n/backendMessagesPhase7Translations.part9.ts");
+const backendPart10 = requireFile("client/src/i18n/backendMessagesPhase7Translations.part10.ts");
+const backendPart11 = requireFile("client/src/i18n/backendMessagesPhase7Translations.part11.ts");
 
 const bundles = [
   {
@@ -48,10 +50,10 @@ const bundles = [
     phase: 7,
     name: "Backend Messages",
     aggregator: "client/src/i18n/backendMessagesPhase7Translations.ts",
-    parts: 9,
+    parts: 11,
     translatorImport: "translatePhase7BackendMessageText",
     test: "tests/phase7-backend-messages-translations.test.ts",
-    expectedCount: 573,
+    expectedCount: 593,
   },
 ];
 
@@ -107,6 +109,15 @@ for (const token of [
   }
 }
 
+for (const [part, source] of [
+  [10, backendPart10],
+  [11, backendPart11],
+]) {
+  if (!source.includes("export const backendMessagesPhase7TranslationsPart")) {
+    failures.push(`Backend Messages part ${part} does not export its reviewed translation bundle`);
+  }
+}
+
 for (const token of [
   'en: "start"',
   'fr: "début"',
@@ -149,7 +160,7 @@ console.log(
       phases: [4, 5, 6, 7],
       status: "reconciled-on-current-main",
       languages: ["en", "ar", "fr"],
-      reviewedEntries: 230 + 182 + 251 + 573,
+      reviewedEntries: 230 + 182 + 251 + 593,
       storedBusinessValuesProtected: true,
       sqlRequired: false,
     },

@@ -605,7 +605,9 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
         try {
           const body = await revisionResponse.json();
           message = body?.message || body?.error || message;
-        } catch {}
+        } catch {
+          // Failure here is non-fatal and the surrounding flow continues deliberately.
+        }
         throw new Error(message);
       }
       const transferRevisionPath = `/api/stock-transfers/${transferId}/revisions`;
@@ -664,7 +666,9 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
               rate: inv?.averageRate || "0",
             };
           }
-        } catch {}
+        } catch {
+          // Failure here is non-fatal and the surrounding flow continues deliberately.
+        }
         return { stockItemId: entry.stockItemId, sourceLocationId: entry.sourceLocationId, rate: "0" };
       });
       const fetchedRates = await Promise.all(ratePromises);
@@ -681,7 +685,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       (e) => !(e.stockItemId > 0 && e.sourceLocationId > 0 && parseFloat(e.quantity) === 0)
     );
     const isEditMode = !!voucherIdToEdit;
-    let originalItems: any[] = [];
+    let originalItems = [];
     if (isEditMode && voucherIdToEdit) {
       let st = stockTransferToEdit as any | undefined;
       if (!st) {
@@ -691,7 +695,9 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
             const d = await res.json();
             st = Array.isArray(d) ? d[0] : d;
           }
-        } catch {}
+        } catch {
+          // Best-effort side request; the user-visible flow does not depend on it completing.
+        }
       }
       if (st?.items) originalItems = st.items;
     }

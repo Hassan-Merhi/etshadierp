@@ -230,7 +230,7 @@ export function ExchangeRateSettings() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {exchangeRates.slice(0, 10).map((rate: any) => (
+                {exchangeRates.slice(0, 10).map((rate) => (
                   <TableRow key={rate.id} data-testid={`row-exchange-rate-${rate.id}`}>
                     <TableCell>{formatDisplayDate(rate.effectiveDate)}</TableCell>
                     <TableCell className="font-mono">{parseFloat(rate.rate).toLocaleString()}</TableCell>

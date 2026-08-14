@@ -131,7 +131,7 @@ export function registerEmployeeGroupRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
       const allGroups = await storage.getAllEmployeeGroups(req.session.currentCompanyId);
-      const workerGroups = allGroups.filter((g: any) => (g.groupType || g.group_type) === "Worker");
+      const workerGroups = allGroups.filter((g) => (g.groupType || g.group_type) === "Worker");
       res.json(workerGroups);
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
@@ -145,7 +145,7 @@ export function registerEmployeeGroupRoutes(app: Express) {
       }
       const companyId = req.session.currentCompanyId;
       const allGroups = await storage.getAllEmployeeGroups(companyId);
-      const workerGroups = allGroups.filter((g: any) => {
+      const workerGroups = allGroups.filter((g) => {
         const type = g.groupType || g.group_type;
         return type === "Worker";
       });

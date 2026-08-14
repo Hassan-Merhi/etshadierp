@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { getClientDate } from "../../../lib/dateUtils";
 import { logger } from "../../../lib/logger";
@@ -23,7 +23,7 @@ import { eq } from "drizzle-orm";
 import { normFactoryEntry } from "./_helpers";
 
 export function registerFactoryContainerCreateRoutes(app: Express) {
-  app.post("/api/factory/containers", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/containers", requireAuth, async (req: Request, res: Response) => {
     const _t = Date.now();
     const _uid = (req.session as any).userId;
     const _cid = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
@@ -54,7 +54,7 @@ export function registerFactoryContainerCreateRoutes(app: Express) {
       const fxRateNum = parseFloat(fxRate);
       const ratePerKgUsd = currencyCode === "USD" ? ratePerKg : ratePerKg * fxRateNum;
 
-      const values: any = {
+      const values = {
         ...parsed,
         currencyCode,
         fxRateToUsd: fxRate,

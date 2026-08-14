@@ -2,29 +2,13 @@
  * rentalPaymentPostingService.ts
  *
  * Single authoritative source for rental payment accounting.
- *
- * Design:
- *  - createRentalPaymentGroup: always creates SCHEDULED rows first, then posts
- *    immediately when paymentDate <= clientDate using the identical accounting
- *    path as the scheduled-to-posted transition.
- *  - postDueScheduledRentalPayments: transitions SCHEDULED → POSTED on their date.
- *  - Both paths share postGroupCore so accounting is always identical.
- *  - Advisory lock + idempotency guard prevents double-posting.
- *  - usedAdvanceAccount / usedPrepaidAccount flags are set atomically with posting.
- *
- * Shop payment accounting per period type:
- *   A. Accrued (accrualVoucherId set): Dr Accrued Rent Payable / Cr Cash
- *   B. Due-unaccrued:
- *        Payment voucher:    Dr Advance Rent Paid / Cr Cash
- *        Recognition journal: Dr Rent Expense    / Cr Advance Rent Paid (same tx)
- *   C. Not-yet-due (prepaid): Dr Prepaid Rent / Cr Cash
- *   D. Mixed: one balanced Cash voucher with all three debit accounts
+ * Allocation selection lives in rentalPaymentAllocationService so this service
+ * stays focused on posting and scheduling behavior.
  */
 
-import { db } from "../../db";
+import { db, pool } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
-import { pool } from "../../db";
 import {
   propertyPayments,
   propertyMonthlyLedger,
@@ -39,8 +23,9 @@ import type { RentalModule } from "../../routes/rental/shared";
 import { normalizeVoucherEntryAmounts } from "../accounting/currencyAmounts";
 import { findOrCreateLedgerAccount, maybeRunAutoTransfer } from "../../routes/rental/shared";
 import { isRentalPeriodDue, getRentalBillingDay, getRentalPeriodDueDate } from "./rentalPeriodService";
+import { buildAllocationsForPayment, findEarliestOutstandingMonth } from "./rentalPaymentAllocationService";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+export { buildAllocationsForPayment, findEarliestOutstandingMonth } from "./rentalPaymentAllocationService";
 
 export interface RentalPaymentGroupOptions {
   companyId: number;
@@ -61,8 +46,6 @@ export interface RentalPaymentGroupOptions {
   isSharedPayment?: boolean;
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
 /** Deterministic int64 advisory-lock key for a payment group ID. */
 function hashGroupId(groupId: string): bigint {
   let h = 5381n;
@@ -71,147 +54,6 @@ function hashGroupId(groupId: string): bigint {
   }
   if (h > 9223372036854775807n) h -= 18446744073709551616n;
   return h;
-}
-
-/**
- * Billing-day-aware "earliest outstanding month" finder.
- * Uses POSTED property_payments rows as the authoritative paid total —
- * NOT the paidAmount cache which can be stale or include future SCHEDULED rows.
- *
- * Returns the earliest month where:
- *   1. billingDate(year, month, billingDay) <= paymentDate  (month is due by payment time)
- *   2. SUM(POSTED payments for that month) < expectedAmount
- *
- * Falls back to the payment month (as the start of prepaid allocations) if
- * every due month is fully paid.
- */
-export async function findEarliestOutstandingMonth(
-  contractId: number,
-  billingDay: number,
-  paymentDate: string
-): Promise<{ year: number; month: number }> {
-  // Load all ledger rows for this contract, ordered chronologically
-  const ledgerRows = await db
-    .select({
-      year: propertyMonthlyLedger.year,
-      month: propertyMonthlyLedger.month,
-      expectedAmount: propertyMonthlyLedger.expectedAmount,
-    })
-    .from(propertyMonthlyLedger)
-    .where(eq(propertyMonthlyLedger.contractId, contractId))
-    .orderBy(propertyMonthlyLedger.year, propertyMonthlyLedger.month);
-
-  // Sum POSTED payments per month from property_payments (authoritative)
-  const { rows: postedRows } = await pool.query<{
-    for_year: string;
-    for_month: string;
-    paid_total: string;
-  }>(
-    `SELECT for_year, for_month, COALESCE(SUM(amount::numeric), 0) AS paid_total
-     FROM property_payments
-     WHERE contract_id = $1 AND posting_status = 'POSTED'
-     GROUP BY for_year, for_month`,
-    [contractId]
-  );
-
-  const postedByMonth = new Map<string, number>();
-  for (const r of postedRows) {
-    postedByMonth.set(`${r.for_year}-${r.for_month}`, parseFloat(r.paid_total));
-  }
-
-  for (const row of ledgerRows) {
-    const billingDate = getRentalPeriodDueDate(row.year, row.month, billingDay);
-    if (billingDate > paymentDate) continue; // not yet due at payment time
-    const posted = postedByMonth.get(`${row.year}-${row.month}`) ?? 0;
-    const expected = parseFloat(row.expectedAmount as string) || 0;
-    if (expected - posted > 0.005) {
-      return { year: row.year, month: row.month };
-    }
-  }
-
-  // No outstanding due months → start allocations from the payment month
-  const pd = new Date(paymentDate + "T00:00:00Z");
-  return { year: pd.getUTCFullYear(), month: pd.getUTCMonth() + 1 };
-}
-
-/**
- * Build allocations for a payment starting from (startYear, startMonth).
- * Uses billingDay + paymentDate to distinguish due vs. prepaid months.
- * Uses POSTED payments as the authoritative paid total.
- */
-export async function buildAllocationsForPayment(
-  contractId: number,
-  startYear: number,
-  startMonth: number,
-  totalAmount: number,
-  rentalAmount: number,
-  billingDay: number,
-  paymentDate: string
-): Promise<Array<{ year: number; month: number; chunk: string }>> {
-  // Load ledger map
-  const ledgerRows = await db
-    .select({
-      year: propertyMonthlyLedger.year,
-      month: propertyMonthlyLedger.month,
-      expectedAmount: propertyMonthlyLedger.expectedAmount,
-    })
-    .from(propertyMonthlyLedger)
-    .where(eq(propertyMonthlyLedger.contractId, contractId));
-
-  const ledgerMap = new Map<string, number>();
-  for (const r of ledgerRows) {
-    ledgerMap.set(`${r.year}-${r.month}`, parseFloat(r.expectedAmount as string) || rentalAmount);
-  }
-
-  // POSTED payments per month
-  const { rows: postedRows } = await pool.query<{
-    for_year: string;
-    for_month: string;
-    paid_total: string;
-  }>(
-    `SELECT for_year, for_month, COALESCE(SUM(amount::numeric), 0) AS paid_total
-     FROM property_payments
-     WHERE contract_id = $1 AND posting_status = 'POSTED'
-     GROUP BY for_year, for_month`,
-    [contractId]
-  );
-  const postedByMonth = new Map<string, number>();
-  for (const r of postedRows) {
-    postedByMonth.set(`${r.for_year}-${r.for_month}`, parseFloat(r.paid_total));
-  }
-
-  const allocations: Array<{ year: number; month: number; chunk: string }> = [];
-  let remaining = new Decimal(totalAmount);
-  let ay = startYear,
-    am = startMonth;
-  let skipped = 0;
-
-  while (remaining.gt(0.005)) {
-    const billingDate = getRentalPeriodDueDate(ay, am, billingDay);
-    const isDue = billingDate <= paymentDate;
-    const expected = ledgerMap.get(`${ay}-${am}`) ?? rentalAmount;
-    const posted = postedByMonth.get(`${ay}-${am}`) ?? 0;
-    // For due months: outstanding = expected - posted; for prepaid: capacity = rentalAmount - posted
-    const capacity = isDue ? Math.max(0, expected - posted) : Math.max(0, rentalAmount - posted);
-
-    if (capacity <= 0.005) {
-      ay = am === 12 ? ay + 1 : ay;
-      am = am === 12 ? 1 : am + 1;
-      skipped++;
-      if (skipped > 500) break;
-      continue;
-    }
-
-    skipped = 0;
-    const chunk = new Decimal(Math.min(remaining.toNumber(), capacity));
-    allocations.push({ year: ay, month: am, chunk: chunk.toFixed(2) });
-    remaining = remaining.minus(chunk);
-    ay = am === 12 ? ay + 1 : ay;
-    am = am === 12 ? 1 : am + 1;
-    if (allocations.length >= 120) break;
-  }
-
-  return allocations;
 }
 
 // ── Core accounting engine ────────────────────────────────────────────────────
@@ -296,7 +138,6 @@ async function postGroupCore(
   if (isShop) {
     const billingDay = contract ? getRentalBillingDay(contract.startDate as string) : 1;
 
-    // Classify each allocation
     let accrualAmt = new Decimal(0);
     let advanceAmt = new Decimal(0);
     let prepaidAmt = new Decimal(0);
@@ -307,7 +148,6 @@ async function postGroupCore(
 
     for (const alloc of allocs) {
       const chunk = new Decimal(alloc.chunk);
-      // FIX #2: classify using paymentDate, not asOfDate
       const due = isRentalPeriodDue(alloc.forYear, alloc.forMonth, billingDay, paymentDate);
 
       if (due) {
@@ -332,7 +172,6 @@ async function postGroupCore(
       }
     }
 
-    // Sanity: if everything rounds to zero, fall back to full expense
     const sumCheck = accrualAmt.plus(advanceAmt).plus(prepaidAmt);
     if (sumCheck.lt(0.005) && new Decimal(totalAmountStr).gt(0.005)) {
       advanceAmt = new Decimal(totalAmountStr);
@@ -341,7 +180,6 @@ async function postGroupCore(
       }
     }
 
-    // ONE payment voucher (all debits + one Cash credit)
     const voucherNum = `RENT-${paymentDate.replace(/-/g, "")}-${groupId.slice(-6)}`;
     const [v] = await tx
       .insert(vouchers)
@@ -399,7 +237,6 @@ async function postGroupCore(
 
     await tx.insert(voucherEntries).values(payEntries);
 
-    // Recognition journal for Advance Rent Paid portion (same transaction)
     let recognitionVoucherId: number | null = null;
     if (advanceAmt.gt(0.005)) {
       const recNarr = `Advance rent recognition - ${narration}`;
@@ -442,14 +279,12 @@ async function postGroupCore(
       ]);
     }
 
-    // Update flags on monthly ledger rows
     if (advanceLedgerIds.length > 0) {
       await tx
         .update(propertyMonthlyLedger)
         .set({
           usedAdvanceAccount: true,
           usedPrepaidAccount: false,
-          // Set accrualVoucherId so Pass 1.5 won't re-run for these rows
           accrualVoucherId: recognitionVoucherId,
         })
         .where(inArray(propertyMonthlyLedger.id, advanceLedgerIds));
@@ -478,11 +313,6 @@ async function postGroupCore(
       "Indirect Income"
     );
 
-    // Properties-mode landlord receipts are cash-basis by product decision:
-    // every dollar received is Rental Income immediately, even when the rental
-    // ledger allocates part of the payment to future months. We keep those month
-    // allocations for operational tracking only; they no longer drive a deferred
-    // revenue liability or a later recognition journal.
     if (mod === "PROPERTIES") {
       const voucherNum = `RENT-${paymentDate.replace(/-/g, "")}-${groupId.slice(-6)}`;
       const [v] = await tx
@@ -525,8 +355,6 @@ async function postGroupCore(
       return v.id;
     }
 
-    // Legacy ERP/Factory landlord accounting remains accrual-based:
-    // Dr Cash / Cr Rental Income [/ Cr Deferred Rent Revenue].
     const pd = new Date(paymentDate + "T00:00:00Z");
     const payYear = pd.getUTCFullYear();
     const payMonth = pd.getUTCMonth() + 1;
@@ -551,7 +379,12 @@ async function postGroupCore(
       .returning();
 
     const lEntries: any[] = [
-      { voucherId: v.id, ledgerAccountId: cashAccountId, ...normEntry(totalAmountStr, "0"), narration },
+      {
+        voucherId: v.id,
+        ledgerAccountId: cashAccountId,
+        ...normEntry(totalAmountStr, "0"),
+        narration,
+      },
     ];
     if (earnedChunk > 0.005) {
       lEntries.push({
@@ -575,7 +408,6 @@ async function postGroupCore(
         ...normEntry("0", deferredChunk.toFixed(2)),
         narration,
       });
-      // Mark prepaid rows
       const futureIds = futureAllocs.map((a) => a.ledgerRowId).filter(Boolean) as number[];
       if (futureIds.length > 0) {
         await tx
@@ -592,15 +424,6 @@ async function postGroupCore(
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-/**
- * Creates a rental payment group:
- *  - Always creates one SCHEDULED row per allocation in a transaction.
- *  - If paymentDate <= clientDate, immediately posts the group using the same
- *    postGroupCore accounting path as the scheduled-to-posted transition.
- *
- * Throws { status: 400, message: "..." } when:
- *   - paymentDate > clientDate AND scheduleFuturePayment !== true
- */
 export async function createRentalPaymentGroup(
   opts: RentalPaymentGroupOptions
 ): Promise<{ paymentGroupId: string; scheduled: boolean; payments: any[] }> {
@@ -623,7 +446,6 @@ export async function createRentalPaymentGroup(
     isSharedPayment,
   } = opts;
 
-  // Guard: future date requires explicit flag
   if (paymentDate > clientDate && !scheduleFuturePayment) {
     const err: any = new Error("Future payment dates require Schedule future payment.");
     err.status = 400;
@@ -634,10 +456,8 @@ export async function createRentalPaymentGroup(
   const totalAmountNum = parseFloat(amount);
   const rentalAmountNum = parseFloat(contract.rentalAmount as string);
 
-  // Find earliest outstanding month based on payment date
   const { year: startY, month: startM } = await findEarliestOutstandingMonth(contract.id, billingDay, paymentDate);
 
-  // Build allocations
   const allocations = await buildAllocationsForPayment(
     contract.id,
     startY,
@@ -650,11 +470,7 @@ export async function createRentalPaymentGroup(
 
   const paymentGroupId = `PG-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${contract.id}`;
 
-  // Create SCHEDULED rows + ensure ledger rows exist
   const scheduledRows = await db.transaction(async (tx) => {
-    // Upsert ledger rows for every allocated month.
-    // FIX #1: expected_amount = 0 for future months (not yet due at paymentDate).
-    //          ensureMonthlyLedgerRows() will promote 0 → rentalAmount when the billing date arrives.
     for (const alloc of allocations) {
       const allocDueDate = getRentalPeriodDueDate(alloc.year, alloc.month, billingDay);
       const allocIsDue = allocDueDate <= paymentDate;
@@ -689,7 +505,6 @@ export async function createRentalPaymentGroup(
           )
         );
 
-      // FIX #3: payment row belongs to the PAYER company so payer can list/post its own scheduled payments
       const [p] = await tx
         .insert(propertyPayments)
         .values({
@@ -716,7 +531,6 @@ export async function createRentalPaymentGroup(
     return created;
   });
 
-  // If payment is on or before clientDate: post immediately
   if (paymentDate <= clientDate) {
     await postScheduledGroup(
       companyId,
@@ -752,9 +566,6 @@ export async function createRentalPaymentGroup(
   return { paymentGroupId, scheduled: true, payments: scheduledRows };
 }
 
-/**
- * Posts all SCHEDULED payment groups whose paymentDate <= asOfDate.
- */
 export async function postDueScheduledRentalPayments(
   companyId: number,
   module: RentalModule,
@@ -785,7 +596,6 @@ export async function postDueScheduledRentalPayments(
   let posted = 0;
   for (const row of rows) {
     try {
-      // Load contract + unit for each group
       const groupRows = await db
         .select()
         .from(propertyPayments)
@@ -802,8 +612,6 @@ export async function postDueScheduledRentalPayments(
 
       const isShared = !!contract?.linkedCompanyId;
 
-      // FIX #3 follow-up: contractCompanyId comes from the contract, not the payment row
-      // (after fix #3 firstRow.companyId is the payer, not the contract owner)
       const didPost = await postScheduledGroup(
         companyId,
         contract.companyId,
@@ -831,10 +639,6 @@ export async function postDueScheduledRentalPayments(
   return posted;
 }
 
-/**
- * Posts one SCHEDULED payment group atomically.
- * Returns true if posted, false if already posted (idempotent).
- */
 async function postScheduledGroup(
   companyId: number,
   contractCompanyId: number,
@@ -858,7 +662,6 @@ async function postScheduledGroup(
   await db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(${lockKey})`);
 
-    // Idempotency check
     groupRows = await tx
       .select()
       .from(propertyPayments)
@@ -866,7 +669,7 @@ async function postScheduledGroup(
         and(eq(propertyPayments.paymentGroupId, groupId), sql`${propertyPayments.postingStatus} = 'SCHEDULED'` as any)
       );
 
-    if (groupRows.length === 0) return; // already posted
+    if (groupRows.length === 0) return;
 
     const totalAmount = groupRows.reduce((s, r) => s + parseFloat(r.amount as string), 0);
     const totalAmountStr = new Decimal(totalAmount).toFixed(2);
@@ -885,7 +688,6 @@ async function postScheduledGroup(
         : `${String(allocs[0].forMonth).padStart(2, "0")}/${allocs[0].forYear}`;
     const narration = `Rent paid - ${unitLabel} - ${monthSpan}`;
 
-    // Derive the exchange rate from the first scheduled row — all rows in a group share the same rate
     const groupExchangeRate = String((groupRows[0] as any)?.exchangeRate || exchangeRate || "1");
 
     const voucherId = await postGroupCore(tx, {
@@ -907,7 +709,6 @@ async function postScheduledGroup(
       groupId,
     });
 
-    // Update paid_amount cache on ledger rows
     for (const alloc of allocs) {
       if (alloc.ledgerRowId) {
         await tx.execute(sql`
@@ -918,7 +719,6 @@ async function postScheduledGroup(
       }
     }
 
-    // Mark all rows POSTED
     const rowIds = groupRows.map((r) => r.id);
     await tx
       .update(propertyPayments)
@@ -932,7 +732,6 @@ async function postScheduledGroup(
 
   if (groupRows.length === 0) return false;
 
-  // Auto-transfer (best-effort, outside transaction)
   try {
     const firstRow = groupRows[0];
     if (firstRow.cashAccountId && unit) {
@@ -950,7 +749,9 @@ async function postScheduledGroup(
       );
     }
   } catch (e: unknown) {
-    logger.warn("[rentalPostingService] auto-transfer failed:", { error: getErrorMessage(e).split("\n")[0] });
+    logger.warn("[rentalPostingService] auto-transfer failed:", {
+      error: getErrorMessage(e).split("\n")[0],
+    });
   }
 
   return true;

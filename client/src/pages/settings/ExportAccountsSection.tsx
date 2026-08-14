@@ -72,7 +72,7 @@ export function ExportAccountsSection() {
     "factorySupplier",
   ];
 
-  const filtered = allAccounts.filter((a: any) => a.name.toLowerCase().includes(search.toLowerCase()));
+  const filtered = allAccounts.filter((a) => a.name.toLowerCase().includes(search.toLowerCase()));
 
   const grouped = filtered.reduce<Record<string, any[]>>((acc, account: any) => {
     const type = account.type || "ledger";
@@ -99,9 +99,7 @@ export function ExportAccountsSection() {
   const selectAll = () =>
     setSelectedIds(
       new Set(
-        filtered
-          .filter((a: any) => a.type !== "customer" && parseFloat(a.balance ?? "0") !== 0)
-          .map((a: any) => a.accountId)
+        filtered.filter((a) => a.type !== "customer" && parseFloat(a.balance ?? "0") !== 0).map((a) => a.accountId)
       )
     );
   const clearAll = () => setSelectedIds(new Set());
@@ -130,7 +128,7 @@ export function ExportAccountsSection() {
   ) => {
     const suffix = totalParts > 1 ? ` ${part}` : "";
     const rawName = `${baseName}${suffix}`;
-    const sheetName = rawName.replace(/[\\\/\?\*\[\]:]/g, "").substring(0, 31);
+    const sheetName = rawName.replace(/[\\/?*[\]:]/g, "").substring(0, 31);
     const ws = wb.addWorksheet(sheetName);
 
     ws.columns = [
@@ -203,16 +201,18 @@ export function ExportAccountsSection() {
       wb.created = new Date();
 
       for (const accId of selectedIds) {
-        const acc = allAccounts.find((a: any) => a.accountId === accId);
+        const acc = allAccounts.find((a) => a.accountId === accId);
         if (!acc) continue;
 
-        let txns: any[] = [];
+        let txns = [];
         try {
           const res = await fetch(getTransactionUrl(acc), { credentials: "include" });
           if (res.ok) txns = await res.json();
-        } catch {}
+        } catch {
+          // Best-effort side request; the user-visible flow does not depend on it completing.
+        }
 
-        const baseName = acc.name.replace(/[\\\/\?\*\[\]:]/g, "").substring(0, 28) || `Acct_${accId}`;
+        const baseName = acc.name.replace(/[\\/?*[\]:]/g, "").substring(0, 28) || `Acct_${accId}`;
 
         if (txns.length <= MAX_ROWS_PER_SHEET) {
           addSheetForChunk(wb, baseName, 1, 1, txns, 0);
@@ -288,7 +288,7 @@ export function ExportAccountsSection() {
                   <div className="text-xs font-semibold text-muted-foreground px-3 py-2 bg-muted/40 uppercase tracking-wide sticky top-0">
                     {typeLabels[type] || type}
                   </div>
-                  {grouped[type].map((acc: any) => (
+                  {grouped[type].map((acc) => (
                     <label
                       key={acc.accountId}
                       className="flex items-center gap-3 px-3 py-2 cursor-pointer hover-elevate"

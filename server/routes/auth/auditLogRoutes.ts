@@ -1,3 +1,4 @@
+import { releaseDebtEnglish } from "../../i18n/finalCloseoutEnglish";
 import type { Express } from "express";
 
 import { requireAuth } from "../../auth";
@@ -62,7 +63,7 @@ function deriveModuleLabel(name: string): string {
     name
       .replace(/^(factory_|payroll_|rental_|pos_)/, "")
       .replace(/_/g, " ")
-      .replace(/\w/g, (character) => character.toUpperCase()) ||
+      .replace(/\b\w/g, (character) => character.toUpperCase()) ||
     "Unknown"
   );
 }
@@ -75,7 +76,7 @@ function summarizeChanges(changes: unknown): string | null {
     field
       .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
       .replace(/_/g, " ")
-      .replace(/\w/g, (character) => character.toUpperCase())
+      .replace(/\b\w/g, (character) => character.toUpperCase())
   );
   return `${labels.join(", ")}${fields.length > labels.length ? ` and ${fields.length - labels.length} more` : ""}`;
 }
@@ -94,7 +95,7 @@ function formatAuditRow(row: any) {
       (rest.action
         ? String(rest.action)
             .replace(/_/g, " ")
-            .replace(/\w/g, (character) => character.toUpperCase())
+            .replace(/\b\w/g, (character) => character.toUpperCase())
         : "Unknown"),
     targetUrl: null as string | null,
   };
@@ -124,7 +125,7 @@ export function registerAuthAuditLogRoutes(app: Express) {
         "settings_change",
         "approve",
       ];
-      const baseConditions: any[] = [
+      const baseConditions = [
         sql`${auditLog.userId} NOT IN (SELECT user_id FROM user_company_roles WHERE role = 'Developer')`,
         sql`${auditLog.tableName} != 'security_events'`,
         sql`lower(${auditLog.action}) NOT IN (${sql.join(
@@ -133,7 +134,7 @@ export function registerAuthAuditLogRoutes(app: Express) {
         )})`,
         ...(companyId ? [eq(auditLog.companyId, companyId)] : []),
       ];
-      const filterConditions: any[] = [];
+      const filterConditions = [];
       if (resolvedTable) filterConditions.push(eq(auditLog.tableName, resolvedTable));
       if (query.userId) filterConditions.push(eq(auditLog.userId, query.userId));
       if (query.action && query.action !== "all") {
@@ -187,7 +188,8 @@ export function registerAuthAuditLogRoutes(app: Express) {
 
       if (query.detailId) {
         const detailId = Number.parseInt(query.detailId, 10);
-        if (!Number.isFinite(detailId)) return res.status(400).json({ message: "Invalid audit log id" });
+        if (!Number.isFinite(detailId))
+          return res.status(400).json({ message: releaseDebtEnglish("Invalid audit log id") });
         const [rawDetail] = await db
           .select(selection)
           .from(auditLog)
@@ -202,7 +204,7 @@ export function registerAuthAuditLogRoutes(app: Express) {
           .leftJoin(companies, eq(companies.id, auditLog.companyId))
           .where(and(...baseConditions, eq(auditLog.id, detailId)))
           .limit(1);
-        if (!rawDetail) return res.status(404).json({ message: "Audit log entry not found" });
+        if (!rawDetail) return res.status(404).json({ message: releaseDebtEnglish("Audit log entry not found") });
         return res.json(formatAuditRow(rawDetail));
       }
 

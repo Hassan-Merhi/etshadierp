@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { logger } from "../../lib/logger";
 import { z } from "zod";
 import { and, desc, eq } from "drizzle-orm";
@@ -52,7 +52,7 @@ async function findOrCreateLedger(companyId: number, name: string, accountType: 
 }
 
 export function registerFactoryInsuranceRoutes(app: Express) {
-  app.get("/api/insurance/members", requireAuth, async (req: any, res: any) => {
+  app.get("/api/insurance/members", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = resolveRequestCompanyId(req);
       const includeInactive = req.query.includeInactive === "true";
@@ -67,7 +67,7 @@ export function registerFactoryInsuranceRoutes(app: Express) {
     }
   });
 
-  app.get("/api/insurance/members/:id/entries", requireAuth, async (req: any, res: any) => {
+  app.get("/api/insurance/members/:id/entries", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = Number(req.params.id);
       if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "Invalid id" });
@@ -103,7 +103,7 @@ export function registerFactoryInsuranceRoutes(app: Express) {
     }
   });
 
-  app.post("/api/insurance/members", requireAuth, async (req: any, res: any) => {
+  app.post("/api/insurance/members", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = resolveRequestCompanyId(req);
       const parsed = insertInsuranceMemberSchema.safeParse({ ...req.body, companyId });
@@ -139,7 +139,7 @@ export function registerFactoryInsuranceRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/insurance/members/:id", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/insurance/members/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = Number(req.params.id);
       if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "Invalid id" });
@@ -174,7 +174,7 @@ export function registerFactoryInsuranceRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/insurance/members/:id/toggle", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/insurance/members/:id/toggle", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = Number(req.params.id);
       if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "Invalid id" });
@@ -197,7 +197,7 @@ export function registerFactoryInsuranceRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/insurance/members/:id", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/insurance/members/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = Number(req.params.id);
       if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "Invalid id" });
@@ -224,7 +224,7 @@ export function registerFactoryInsuranceRoutes(app: Express) {
     }
   });
 
-  app.post("/api/insurance/generate", requireAuth, async (req: any, res: any) => {
+  app.post("/api/insurance/generate", requireAuth, async (req: Request, res: Response) => {
     try {
       const parsed = z
         .object({ month: z.number().min(1).max(12), year: z.number().min(2000).max(2100) })

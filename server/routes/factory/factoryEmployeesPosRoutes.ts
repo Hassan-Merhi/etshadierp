@@ -1,16 +1,9 @@
 import type { Express } from "express";
-import { registerEmployeeCrudRoutes } from "./employee-pos/employee-crud";
-import { registerEmployeeAdvancesBonusRoutes } from "./employee-pos/employeeAdvancesBonusRoutes";
-import { registerEmployeeLedgerWasteRoutes } from "./employee-pos/employeeLedgerWasteRoutes";
-import { registerEmployeePosFinancialRoutes } from "./employee-pos/pos-financial";
-import { registerEmployeeNetPositionRoutes } from "./employee-pos/employeeNetPositionRoutes";
-import { registerEmployeeAttendanceRoutes } from "./employee-pos/employeeAttendanceRoutes";
+import { registerFactoryEmployeesPosRoutes as registerCanonicalFactoryEmployeesPosRoutes } from "./employee-pos/index";
 
+// Compatibility entry point used by factoryRoutes.ts. Keep the actual employee/POS
+// route list in one canonical registrar so new routes cannot be added to one
+// aggregator and silently omitted from production.
 export function registerFactoryEmployeesPosRoutes(app: Express) {
-  registerEmployeeCrudRoutes(app);
-  registerEmployeeAdvancesBonusRoutes(app);
-  registerEmployeeLedgerWasteRoutes(app);
-  registerEmployeePosFinancialRoutes(app);
-  registerEmployeeNetPositionRoutes(app);
-  registerEmployeeAttendanceRoutes(app);
+  registerCanonicalFactoryEmployeesPosRoutes(app);
 }

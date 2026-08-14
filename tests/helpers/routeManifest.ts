@@ -123,12 +123,16 @@ export function extractRouteManifest(app: Express): RouteManifest {
 
   for (const layer of stack) {
     if (layer.route) {
-      const path = layer.route.path;
-      // Express permits array and RegExp paths; this codebase uses strings, and
-      // a non-string would otherwise serialise unstably.
-      if (typeof path !== "string") {
-        throw new Error(`Unsupported non-string route path: ${String(path)}`);
-      }
+      const rawPath = layer.route.path;
+      // Express supports string arrays for one handler registered at multiple
+      // paths. Expand them in declared order so the manifest stays stable and
+      // each concrete route remains independently diffable.
+      const paths = (Array.isArray(rawPath) ? rawPath : [rawPath]).map((path) => {
+        if (typeof path !== "string") {
+          throw new Error(`Unsupported non-string route path: ${String(path)}`);
+        }
+        return path;
+      });
 
       const routeStack = layer.route.stack ?? [];
       // Sorted so a multi-method registration cannot reorder between runs.
@@ -137,15 +141,17 @@ export function extractRouteManifest(app: Express): RouteManifest {
         .map((method) => method.toUpperCase())
         .sort();
 
-      for (const method of methods) {
-        // Select only the handlers that actually run for this method. Without
-        // this filter an `app.all()` registration reports every method's chain
-        // on every method, which is both wrong and unreadable.
-        const guards = routeStack
-          .filter((handlerLayer) => handlerLayer.method === undefined || handlerLayer.method.toUpperCase() === method)
-          .map(handlerName);
+      for (const path of paths) {
+        for (const method of methods) {
+          // Select only the handlers that actually run for this method. Without
+          // this filter an `app.all()` registration reports every method's chain
+          // on every method, which is both wrong and unreadable.
+          const guards = routeStack
+            .filter((handlerLayer) => handlerLayer.method === undefined || handlerLayer.method.toUpperCase() === method)
+            .map(handlerName);
 
-        routes.push({ method, path, guards });
+          routes.push({ method, path, guards });
+        }
       }
       continue;
     }

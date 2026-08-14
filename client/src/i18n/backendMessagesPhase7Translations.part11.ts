@@ -42,4 +42,74 @@ export const backendMessagesPhase7TranslationsPart11: readonly Phase7BackendMess
     ar: "معرّف المنتج غير صالح",
     fr: "productId invalide",
   },
+  {
+    en: "No location found for this user",
+    ar: "لم يتم العثور على موقع لهذا المستخدم",
+    fr: "Aucun emplacement trouvé pour cet utilisateur",
+  },
+  {
+    en: "Location not found",
+    ar: "لم يتم العثور على الموقع",
+    fr: "Emplacement introuvable",
+  },
+  {
+    en: "No WhatsApp group configured for this location",
+    ar: "لم يتم إعداد مجموعة واتساب لهذا الموقع",
+    fr: "Aucun groupe WhatsApp configuré pour cet emplacement",
+  },
+  {
+    en: "PDF pagination error detected: ${pageCount} pages generated for ${rowCount} stock items (expected ≤${maxAllowedPages}). Report not sent to WhatsApp.",
+    ar: "تم اكتشاف خطأ في تقسيم صفحات PDF: تم إنشاء {0} صفحة لـ {1} عنصر مخزون (المتوقع ≤{2}). لم يتم إرسال التقرير إلى واتساب.",
+    fr: "Erreur de pagination PDF détectée : {0} pages générées pour {1} articles en stock (≤{2} attendu). Le rapport n’a pas été envoyé sur WhatsApp.",
+  },
+  {
+    en: "voucherId is required",
+    ar: "voucherId مطلوب",
+    fr: "voucherId est requis",
+  },
+  {
+    en: "Invalid voucherId",
+    ar: "voucherId غير صالح",
+    fr: "voucherId invalide",
+  },
+  {
+    en: "Voucher has no location",
+    ar: "القسيمة ليس لها موقع",
+    fr: "Le bon n’a aucun emplacement",
+  },
+  {
+    en: "PDF generation failed: invalid or empty PDF",
+    ar: "فشل إنشاء PDF: الملف غير صالح أو فارغ",
+    fr: "Échec de génération du PDF : PDF invalide ou vide",
+  },
+  {
+    en: "PDF page count (${pageCount}) is excessive for ${itemCount} items — aborting WhatsApp send",
+    ar: "عدد صفحات PDF ({0}) كبير جدًا بالنسبة إلى {1} عنصر — تم إيقاف الإرسال عبر واتساب",
+    fr: "Le nombre de pages PDF ({0}) est excessif pour {1} articles — envoi WhatsApp annulé",
+  },
+  {
+    en: "pdfBase64 is required",
+    ar: "pdfBase64 مطلوب",
+    fr: "pdfBase64 est requis",
+  },
+  {
+    en: "locationId is required",
+    ar: "locationId مطلوب",
+    fr: "locationId est requis",
+  },
+  {
+    en: "No WhatsApp target configured for this account",
+    ar: "لم يتم إعداد وجهة واتساب لهذا الحساب",
+    fr: "Aucune destination WhatsApp configurée pour ce compte",
+  },
+  {
+    en: "Green API blocked this WhatsApp group because the configured Developer plan has reached its monthly chat limit. The ERP also tried its fallback delivery path. Configure/upgrade an instance that is allowed to message this group.",
+    ar: "حظرت Green API مجموعة واتساب هذه لأن خطة المطور المهيأة وصلت إلى حد المحادثات الشهري. حاول نظام ERP أيضًا مسار الإرسال الاحتياطي. قم بتهيئة أو ترقية مثيل مسموح له بمراسلة هذه المجموعة.",
+    fr: "Green API a bloqué ce groupe WhatsApp car le forfait Developer configuré a atteint sa limite mensuelle de conversations. L’ERP a également essayé le mode d’envoi de secours. Configurez ou mettez à niveau une instance autorisée à envoyer des messages à ce groupe.",
+  },
+  {
+    en: "Green API monthly quota has been reached. The ERP also tried its fallback delivery path, but the provider still blocked the send.",
+    ar: "تم بلوغ الحصة الشهرية لـ Green API. حاول نظام ERP أيضًا مسار الإرسال الاحتياطي، لكن المزود ما زال يمنع الإرسال.",
+    fr: "Le quota mensuel de Green API a été atteint. L’ERP a également essayé le mode d’envoi de secours, mais le fournisseur bloque toujours l’envoi.",
+  },
 ];

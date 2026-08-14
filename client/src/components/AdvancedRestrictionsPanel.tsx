@@ -101,7 +101,7 @@ export function AdvancedRestrictionsPanel({ role, companyId, companyName }: Adva
 
   const permMap = useMemo(() => {
     const map = new Map<string, boolean>();
-    allPermissions.forEach((p: any) => {
+    allPermissions.forEach((p) => {
       if (p.role === role) map.set(p.featureKey, p.enabled);
     });
     return map;

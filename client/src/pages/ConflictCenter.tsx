@@ -56,7 +56,9 @@ function ConflictCard({ conflict, onResolved }: { conflict: Conflict; onResolved
           tempId: null,
           description: `Conflict retry: ${conflict.entityType}`,
         });
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
     }
     await resolveConflict(conflict.id, "local");
     toast({

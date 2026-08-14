@@ -26,6 +26,7 @@ import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
 
 const ROOT = resolve(__dirname, "..");
+const FACTORY_WORKERS_ROSTER = "client/src/pages/factory/factoryworkers/FactoryWorkersRosterPanel.tsx";
 
 function src(relPath: string): string {
   const fullPath = resolve(ROOT, relPath);
@@ -39,19 +40,19 @@ function src(relPath: string): string {
 
 describe("Desktop table structure is preserved", () => {
   it("FactoryWorkers.tsx — table-fixed class present (desktop table not removed)", () => {
-    expect(src("client/src/pages/factory/FactoryWorkers.tsx")).toContain("table-fixed");
+    expect(src(FACTORY_WORKERS_ROSTER)).toContain("table-fixed");
   });
 
   it("FactoryWorkers.tsx — overflow-auto container present (table scrollable)", () => {
-    expect(src("client/src/pages/factory/FactoryWorkers.tsx")).toContain("overflow-auto");
+    expect(src(FACTORY_WORKERS_ROSTER)).toContain("overflow-auto");
   });
 
   it("FactoryWorkers.tsx — <TableHeader present (column headers intact)", () => {
-    expect(src("client/src/pages/factory/FactoryWorkers.tsx")).toContain("TableHeader");
+    expect(src(FACTORY_WORKERS_ROSTER)).toContain("TableHeader");
   });
 
   it("FactoryWorkers.tsx — <TableBody present (rows intact)", () => {
-    expect(src("client/src/pages/factory/FactoryWorkers.tsx")).toContain("TableBody");
+    expect(src(FACTORY_WORKERS_ROSTER)).toContain("TableBody");
   });
 
   it("Accounts.tsx — <Table or table structure imported", () => {
@@ -73,12 +74,12 @@ describe("Mobile-compatible layout patterns", () => {
 
   it("FactoryWorkers.tsx — filter panel can be toggled (filtersOpen state)", () => {
     // Collapsible filter panel is a mobile UX pattern
-    expect(src("client/src/pages/factory/FactoryWorkers.tsx")).toContain("filtersOpen");
+    expect(src(FACTORY_WORKERS_ROSTER)).toContain("filtersOpen");
   });
 
   it("FactoryWorkers.tsx — responsive max-height container present", () => {
     // max-h-[calc(100vh-...)] allows table to scroll within viewport on mobile
-    const s = src("client/src/pages/factory/FactoryWorkers.tsx");
+    const s = src(FACTORY_WORKERS_ROSTER);
     expect(s).toMatch(/max-h-\[calc\(100vh/);
   });
 
@@ -98,14 +99,14 @@ describe("Critical action buttons are always visible (not hover-only)", () => {
   // on mobile (no hover). Critical actions must always be visible.
 
   it("FactoryWorkers.tsx — primary action buttons exist in source", () => {
-    const s = src("client/src/pages/factory/FactoryWorkers.tsx");
+    const s = src(FACTORY_WORKERS_ROSTER);
     // Worker pages need at minimum an Add button or Edit link
     const hasAction = s.includes("button") || s.includes("Button");
     expect(hasAction).toBe(true);
   });
 
   it("FactoryWorkers.tsx — clear-filters action accessible (not hover-only)", () => {
-    const s = src("client/src/pages/factory/FactoryWorkers.tsx");
+    const s = src(FACTORY_WORKERS_ROSTER);
     // Clear filters button must exist
     expect(s).toContain("clearAllFilters");
   });

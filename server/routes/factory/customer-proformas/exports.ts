@@ -5,7 +5,7 @@ import { toArrayBuffer } from "../../../lib/bufferCompatibility";
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { parseId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
@@ -26,7 +26,7 @@ import path from "path";
 import fs from "fs";
 
 export function registerFactoryCustomerProformaExportRoutes(app: Express) {
-  app.get("/api/factory/customer-proformas/:id/export/excel", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/customer-proformas/:id/export/excel", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -51,7 +51,7 @@ export function registerFactoryCustomerProformaExportRoutes(app: Express) {
         .catch(() => [null]);
 
       // Fetch weight per bale + canonical name from factoryBaleProducts by articleCode
-      const articleCodes = [...new Set(rawLines.map((l: any) => l.articleCode).filter(Boolean))];
+      const articleCodes = [...new Set(rawLines.map((l) => l.articleCode).filter(Boolean))];
       const wMap = new Map<string, number>();
       const nameMap = new Map<string, string>();
       if (articleCodes.length > 0) {
@@ -68,7 +68,7 @@ export function registerFactoryCustomerProformaExportRoutes(app: Express) {
               inArray(factoryBaleProducts.articleCode, articleCodes as string[])
             )
           );
-        prods.forEach((p: any) => {
+        prods.forEach((p) => {
           if (p.articleCode) {
             wMap.set(p.articleCode, parseFloat(p.weightPerBaleKg || "0"));
             nameMap.set(p.articleCode, p.name || "");
@@ -110,7 +110,7 @@ export function registerFactoryCustomerProformaExportRoutes(app: Express) {
       const sheet = workbook.addWorksheet("Proforma Invoice");
 
       const COL_COUNT = hideSellingExcel ? 6 : 8;
-      const baseCols: any[] = [
+      const baseCols = [
         { key: "num", width: 6 },
         { key: "articleCode", width: 18 },
         { key: "productName", width: 32 },
@@ -131,7 +131,9 @@ export function registerFactoryCustomerProformaExportRoutes(app: Express) {
           pxLogoRow.height = 90;
           sheet.addImage(pxId, { tl: { col: 2.5, row: 0 }, ext: { width: 300, height: 90 } });
         }
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
       const r1 = sheet.addRow(["HMD INTERNATIONAL GROUP"]);
       r1.getCell(1).font = { bold: true, size: 16, color: { argb: "FF1F3864" } };
       r1.getCell(1).alignment = { horizontal: "center" };
@@ -166,7 +168,7 @@ export function registerFactoryCustomerProformaExportRoutes(app: Express) {
       let totalQty = 0,
         totalKgAll = 0,
         totalPriceAll = 0;
-      rawLines.forEach((line: any, idx: number) => {
+      rawLines.forEach((line, idx: number) => {
         const qty = parseInt(String(line.quantity));
         const kgPerBale = wMap.get(line.articleCode) || 0;
         const price = parseFloat(String(line.pricePerBale));
@@ -176,7 +178,7 @@ export function registerFactoryCustomerProformaExportRoutes(app: Express) {
         totalKgAll += totalKg;
         totalPriceAll += totalPrice;
 
-        const rowArr: any[] = [
+        const rowArr = [
           idx + 1,
           line.articleCode,
           nameMap.get(line.articleCode) || line.productName || "",
@@ -202,7 +204,7 @@ export function registerFactoryCustomerProformaExportRoutes(app: Express) {
       });
 
       sheet.addRow([]);
-      const totArr: any[] = ["", "", "GRAND TOTAL", totalQty, ""];
+      const totArr = ["", "", "GRAND TOTAL", totalQty, ""];
       if (!hideSellingExcel) totArr.push("");
       totArr.push(fmtKg(totalKgAll));
       if (!hideSellingExcel) totArr.push(fmtPrice(totalPriceAll));
@@ -226,7 +228,7 @@ export function registerFactoryCustomerProformaExportRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/customer-proformas/:id/export/pdf", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/customer-proformas/:id/export/pdf", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -251,7 +253,7 @@ export function registerFactoryCustomerProformaExportRoutes(app: Express) {
         .catch(() => [null]);
 
       // Fetch weight per bale + canonical name from factoryBaleProducts by articleCode
-      const articleCodes = [...new Set(rawLines.map((l: any) => l.articleCode).filter(Boolean))];
+      const articleCodes = [...new Set(rawLines.map((l) => l.articleCode).filter(Boolean))];
       const wMap = new Map<string, number>();
       const nameMap = new Map<string, string>();
       if (articleCodes.length > 0) {
@@ -268,7 +270,7 @@ export function registerFactoryCustomerProformaExportRoutes(app: Express) {
               inArray(factoryBaleProducts.articleCode, articleCodes as string[])
             )
           );
-        prods.forEach((p: any) => {
+        prods.forEach((p) => {
           if (p.articleCode) {
             wMap.set(p.articleCode, parseFloat(p.weightPerBaleKg || "0"));
             nameMap.set(p.articleCode, p.name || "");
@@ -321,7 +323,9 @@ export function registerFactoryCustomerProformaExportRoutes(app: Express) {
       if (fs.existsSync(hmdProformaLogo)) {
         try {
           doc.image(hmdProformaLogo, (doc.page.width - logoW) / 2, headerY, { width: logoW });
-        } catch {}
+        } catch {
+          // Failure here is non-fatal and the surrounding flow continues deliberately.
+        }
       }
       // Title goes below the logo — use doc.y which pdfkit advances after placing the image
       const titleY = Math.max(doc.y, headerY + 10) + 6;
@@ -392,7 +396,7 @@ export function registerFactoryCustomerProformaExportRoutes(app: Express) {
         totalKgAll = 0,
         totalPriceAll = 0;
 
-      rawLines.forEach((line: any, idx: number) => {
+      rawLines.forEach((line, idx: number) => {
         const qty = parseInt(String(line.quantity));
         const kgPerBale = wMap.get(line.articleCode) || 0;
         const price = parseFloat(String(line.pricePerBale));

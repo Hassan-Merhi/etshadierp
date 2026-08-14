@@ -6,7 +6,10 @@ const activeUsers = readFileSync("client/src/pages/settings/ActiveUsersSection.t
 
 describe("remote support fast viewer", () => {
   it("uses the runtime flag to choose live transport in the unified viewer", () => {
-    expect(viewer).toContain('queryKey: ["/api/screen-feed/admin/runtime"]');
+    // The capability probe must be readable by every authorized watcher, not
+    // just Developers, or non-Developer watchers are pinned to polling mode.
+    expect(viewer).toContain('queryKey: ["/api/screen-feed/capabilities"]');
+    expect(viewer).not.toContain('apiRequest("GET", "/api/screen-feed/admin/runtime")');
     expect(viewer).toContain("runtime?.flags?.fastScreenFeed === true");
     expect(viewer).toContain("<ScreenFeedDialog");
     expect(activeUsers).toContain("<RemoteSupportWatchDialog");
@@ -23,6 +26,6 @@ describe("remote support fast viewer", () => {
     expect(viewer).toContain("pollAbortRef.current?.abort()");
     expect(viewer).toContain("eventSource?.close()");
     expect(viewer).toContain("window.clearInterval(intervalId)");
-    expect(viewer).toContain("stateRef.current = { etag: null, frame: null }");
+    expect(viewer).toContain("stateRef.current = { etag: null, frame: null, failure: null }");
   });
 });

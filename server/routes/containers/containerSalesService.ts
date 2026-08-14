@@ -35,7 +35,7 @@ async function resolveCommissionAccountId(companyId: number, requestedAccountId?
   }
 
   const accounts = await storage.getAllLedgerAccounts(companyId);
-  let commissionAccount = accounts.find((account: any) => account.code === "COMMISSION_REVENUE");
+  let commissionAccount = accounts.find((account) => account.code === "COMMISSION_REVENUE");
   if (!commissionAccount) {
     commissionAccount = await storage.createLedgerAccount({
       companyId,

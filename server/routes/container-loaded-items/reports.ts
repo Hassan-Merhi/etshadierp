@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { eq, and } from "drizzle-orm";
@@ -26,7 +26,7 @@ export function registerContainerLoadedItemReportRoutes(app: Express, requireAut
   app.get(
     "/api/suppliers/:supplierId/containers/:containerId/verification-summary",
     requireAuth,
-    async (req: any, res: any) => {
+    async (req: Request, res: Response) => {
       try {
         const companyId = req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -174,7 +174,7 @@ export function registerContainerLoadedItemReportRoutes(app: Express, requireAut
   app.get(
     "/api/suppliers/:supplierId/containers/:containerId/verification-export.xlsx",
     requireAuth,
-    async (req: any, res: any) => {
+    async (req: Request, res: Response) => {
       try {
         const companyId = req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -591,7 +591,7 @@ export function registerContainerLoadedItemReportRoutes(app: Express, requireAut
         summarySheet.getColumn(1).width = 28;
         summarySheet.getColumn(2).width = 18;
 
-        workbook.worksheets.forEach((ws: any, idx: number) => {
+        workbook.worksheets.forEach((ws, idx: number) => {
           if (idx > 0) return;
         });
 

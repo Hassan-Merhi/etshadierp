@@ -49,7 +49,7 @@ export function fmt12h(hour: number): string {
 }
 
 export function tzLabel(tz: string): string {
-  return TIMEZONES.find((t: any) => t.value === tz)?.label ?? tz;
+  return TIMEZONES.find((t) => t.value === tz)?.label ?? tz;
 }
 
 export function formatHour(h: number): string {
@@ -65,7 +65,7 @@ export function scheduleLabel(cfg: NpSettings | undefined): string {
   if (cfg.frequency === "daily") return `Daily at ${time} EST`;
   if (cfg.frequency === "monthly") return `Monthly (1st) at ${time} EST`;
   if (cfg.frequency === "weekly") {
-    const day = DAYS.find((d: any) => d.value === String(cfg.sendDayOfWeek))?.label ?? "Monday";
+    const day = DAYS.find((d) => d.value === String(cfg.sendDayOfWeek))?.label ?? "Monday";
     return `Every ${day} at ${time} EST`;
   }
   return "Auto-Send On";

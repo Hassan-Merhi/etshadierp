@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { db } from "../../../db";
@@ -17,7 +17,7 @@ import { getCompanyId, safeDownloadName, scrUpload } from "./_helpers";
 
 export function registerShippingContainerDocumentRoutes(app: Express) {
   // ── GET documents for a row ───────────────────────────────────────────────────
-  app.get("/api/factory/shipping-container-rows/:id/documents", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/shipping-container-rows/:id/documents", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -94,139 +94,150 @@ export function registerShippingContainerDocumentRoutes(app: Express) {
   });
 
   // ── POST upload document ──────────────────────────────────────────────────────
-  app.post("/api/factory/shipping-container-rows/:id/documents", requireAuth, scrUpload, async (req: any, res: any) => {
-    try {
-      const companyId = getCompanyId(req);
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
-
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
-      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
-      if (!req.file.buffer || req.file.buffer.length === 0) {
-        return res.status(400).json({ message: "Uploaded file is empty" });
-      }
-      if (!req.file.originalname || req.file.originalname.trim() === "") {
-        return res.status(400).json({ message: "File name is required" });
-      }
-
-      const [row] = await db
-        .select({ id: factoryShippingContainerRows.id })
-        .from(factoryShippingContainerRows)
-        .where(and(eq(factoryShippingContainerRows.id, id), eq(factoryShippingContainerRows.companyId, companyId)));
-      if (!row) return res.status(404).json({ message: "Row not found" });
-
-      const displayName: string =
-        (req.body.displayName as string)?.trim() || req.file.originalname.replace(/\.[^.]+$/, "");
-      const ext = path.extname(req.file.originalname);
-      const generatedFilename = `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
-      if (!generatedFilename || generatedFilename.trim() === "") {
-        return res.status(400).json({ message: "Failed to generate file name" });
-      }
-      const fileUrl = `/api/factory/shipping-container-docs/${generatedFilename}`;
-      const fileData = req.file.buffer.toString("base64");
-      if (!fileData || fileData.trim() === "") {
-        return res.status(400).json({ message: "Failed to encode file data" });
-      }
-
-      // Disk cache (non-fatal — DB is source of truth)
+  app.post(
+    "/api/factory/shipping-container-rows/:id/documents",
+    requireAuth,
+    scrUpload,
+    async (req: Request, res: Response) => {
       try {
-        const dir = path.join(process.cwd(), "uploads", "shipping-container-docs");
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-        fs.writeFileSync(path.join(dir, generatedFilename), req.file.buffer);
-      } catch (e) {
-        logger.warn("Shipping container doc disk cache write failed (non-fatal):", { error: e });
+        const companyId = getCompanyId(req);
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+        if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+        if (!req.file.buffer || req.file.buffer.length === 0) {
+          return res.status(400).json({ message: "Uploaded file is empty" });
+        }
+        if (!req.file.originalname || req.file.originalname.trim() === "") {
+          return res.status(400).json({ message: "File name is required" });
+        }
+
+        const [row] = await db
+          .select({ id: factoryShippingContainerRows.id })
+          .from(factoryShippingContainerRows)
+          .where(and(eq(factoryShippingContainerRows.id, id), eq(factoryShippingContainerRows.companyId, companyId)));
+        if (!row) return res.status(404).json({ message: "Row not found" });
+
+        const displayName: string =
+          (req.body.displayName as string)?.trim() || req.file.originalname.replace(/\.[^.]+$/, "");
+        const ext = path.extname(req.file.originalname);
+        const generatedFilename = `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
+        if (!generatedFilename || generatedFilename.trim() === "") {
+          return res.status(400).json({ message: "Failed to generate file name" });
+        }
+        const fileUrl = `/api/factory/shipping-container-docs/${generatedFilename}`;
+        const fileData = req.file.buffer.toString("base64");
+        if (!fileData || fileData.trim() === "") {
+          return res.status(400).json({ message: "Failed to encode file data" });
+        }
+
+        // Disk cache (non-fatal — DB is source of truth)
+        try {
+          const dir = path.join(process.cwd(), "uploads", "shipping-container-docs");
+          if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+          fs.writeFileSync(path.join(dir, generatedFilename), req.file.buffer);
+        } catch (e) {
+          logger.warn("Shipping container doc disk cache write failed (non-fatal):", { error: e });
+        }
+
+        const username: string =
+          (req.session as any).username || (req.session as any).email || (req.session as any).name || null;
+
+        const [doc] = await db
+          .insert(factoryShippingContainerDocuments)
+          .values({
+            companyId,
+            scrId: id,
+            displayName,
+            fileName: generatedFilename,
+            originalName: req.file.originalname,
+            fileUrl,
+            fileType: req.file.mimetype,
+            fileSize: req.file.size,
+            fileData,
+            uploadedBy: username,
+          })
+          .returning({
+            id: factoryShippingContainerDocuments.id,
+            scrId: factoryShippingContainerDocuments.scrId,
+            displayName: factoryShippingContainerDocuments.displayName,
+            fileName: factoryShippingContainerDocuments.fileName,
+            originalName: factoryShippingContainerDocuments.originalName,
+            fileUrl: factoryShippingContainerDocuments.fileUrl,
+            fileType: factoryShippingContainerDocuments.fileType,
+            fileSize: factoryShippingContainerDocuments.fileSize,
+            uploadedBy: factoryShippingContainerDocuments.uploadedBy,
+            uploadedAt: factoryShippingContainerDocuments.uploadedAt,
+          });
+
+        if (!doc || !doc.id || !doc.fileName || !doc.fileUrl) {
+          return res.status(500).json({ message: "Upload failed: database did not return a valid document record" });
+        }
+
+        res.json({ ...doc, isGhost: false });
+      } catch (error: unknown) {
+        logger.error("Error uploading document:", { error: error });
+        res.status(400).json({ message: getErrorMessage(error) });
       }
-
-      const username: string =
-        (req.session as any).username || (req.session as any).email || (req.session as any).name || null;
-
-      const [doc] = await db
-        .insert(factoryShippingContainerDocuments)
-        .values({
-          companyId,
-          scrId: id,
-          displayName,
-          fileName: generatedFilename,
-          originalName: req.file.originalname,
-          fileUrl,
-          fileType: req.file.mimetype,
-          fileSize: req.file.size,
-          fileData,
-          uploadedBy: username,
-        })
-        .returning({
-          id: factoryShippingContainerDocuments.id,
-          scrId: factoryShippingContainerDocuments.scrId,
-          displayName: factoryShippingContainerDocuments.displayName,
-          fileName: factoryShippingContainerDocuments.fileName,
-          originalName: factoryShippingContainerDocuments.originalName,
-          fileUrl: factoryShippingContainerDocuments.fileUrl,
-          fileType: factoryShippingContainerDocuments.fileType,
-          fileSize: factoryShippingContainerDocuments.fileSize,
-          uploadedBy: factoryShippingContainerDocuments.uploadedBy,
-          uploadedAt: factoryShippingContainerDocuments.uploadedAt,
-        });
-
-      if (!doc || !doc.id || !doc.fileName || !doc.fileUrl) {
-        return res.status(500).json({ message: "Upload failed: database did not return a valid document record" });
-      }
-
-      res.json({ ...doc, isGhost: false });
-    } catch (error: unknown) {
-      logger.error("Error uploading document:", { error: error });
-      res.status(400).json({ message: getErrorMessage(error) });
     }
-  });
+  );
 
   // ── DELETE document ───────────────────────────────────────────────────────────
-  app.delete("/api/factory/shipping-container-rows/:id/documents/:docId", requireAuth, async (req: any, res: any) => {
-    try {
-      const companyId = getCompanyId(req);
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
+  app.delete(
+    "/api/factory/shipping-container-rows/:id/documents/:docId",
+    requireAuth,
+    async (req: Request, res: Response) => {
+      try {
+        const companyId = getCompanyId(req);
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const id = parseInt(req.params.id);
-      const docId = parseInt(req.params.docId);
-      if (isNaN(id) || isNaN(docId)) return res.status(400).json({ message: "Invalid id" });
+        const id = parseInt(req.params.id);
+        const docId = parseInt(req.params.docId);
+        if (isNaN(id) || isNaN(docId)) return res.status(400).json({ message: "Invalid id" });
 
-      // Verify ownership through both tables in one query
-      const [doc] = await db
-        .select({
-          id: factoryShippingContainerDocuments.id,
-          fileName: factoryShippingContainerDocuments.fileName,
-        })
-        .from(factoryShippingContainerDocuments)
-        .innerJoin(
-          factoryShippingContainerRows,
-          eq(factoryShippingContainerDocuments.scrId, factoryShippingContainerRows.id)
-        )
-        .where(
-          and(
-            eq(factoryShippingContainerDocuments.id, docId),
-            eq(factoryShippingContainerDocuments.scrId, id),
-            eq(factoryShippingContainerRows.companyId, companyId)
+        // Verify ownership through both tables in one query
+        const [doc] = await db
+          .select({
+            id: factoryShippingContainerDocuments.id,
+            fileName: factoryShippingContainerDocuments.fileName,
+          })
+          .from(factoryShippingContainerDocuments)
+          .innerJoin(
+            factoryShippingContainerRows,
+            eq(factoryShippingContainerDocuments.scrId, factoryShippingContainerRows.id)
           )
-        );
-      if (!doc) return res.status(404).json({ message: "Document not found" });
+          .where(
+            and(
+              eq(factoryShippingContainerDocuments.id, docId),
+              eq(factoryShippingContainerDocuments.scrId, id),
+              eq(factoryShippingContainerRows.companyId, companyId)
+            )
+          );
+        if (!doc) return res.status(404).json({ message: "Document not found" });
 
-      await db.delete(factoryShippingContainerDocuments).where(eq(factoryShippingContainerDocuments.id, docId));
+        await db.delete(factoryShippingContainerDocuments).where(eq(factoryShippingContainerDocuments.id, docId));
 
-      // Remove disk cache (non-fatal) — skip if fileName is blank/ghost
-      if (doc.fileName && doc.fileName.trim() !== "" && doc.fileName.trim() !== "-") {
-        try {
-          const diskPath = path.join(process.cwd(), "uploads", "shipping-container-docs", doc.fileName);
-          if (fs.existsSync(diskPath)) fs.unlinkSync(diskPath);
-        } catch {}
+        // Remove disk cache (non-fatal) — skip if fileName is blank/ghost
+        if (doc.fileName && doc.fileName.trim() !== "" && doc.fileName.trim() !== "-") {
+          try {
+            const diskPath = path.join(process.cwd(), "uploads", "shipping-container-docs", doc.fileName);
+            if (fs.existsSync(diskPath)) fs.unlinkSync(diskPath);
+          } catch {
+            // Failure here is non-fatal and the surrounding flow continues deliberately.
+          }
+        }
+
+        res.json({ success: true, deletedId: docId });
+      } catch (error: unknown) {
+        logger.error("Error deleting document:", { error: error });
+        res.status(400).json({ message: getErrorMessage(error) });
       }
-
-      res.json({ success: true, deletedId: docId });
-    } catch (error: unknown) {
-      logger.error("Error deleting document:", { error: error });
-      res.status(400).json({ message: getErrorMessage(error) });
     }
-  });
+  );
 
   // ── GET serve document file ───────────────────────────────────────────────────
-  app.get("/api/factory/shipping-container-docs/:filename", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/shipping-container-docs/:filename", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -288,7 +299,7 @@ export function registerShippingContainerDocumentRoutes(app: Express) {
     "/api/factory/shipping-container-rows/:id/shipping-invoice",
     requireAuth,
     scrUpload,
-    async (req: any, res: any) => {
+    async (req: Request, res: Response) => {
       try {
         const companyId = getCompanyId(req);
         if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -337,52 +348,61 @@ export function registerShippingContainerDocumentRoutes(app: Express) {
   );
 
   // ── DELETE shipping-company invoice ───────────────────────────────────────────
-  app.delete("/api/factory/shipping-container-rows/:id/shipping-invoice", requireAuth, async (req: any, res: any) => {
-    try {
-      const companyId = getCompanyId(req);
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+  app.delete(
+    "/api/factory/shipping-container-rows/:id/shipping-invoice",
+    requireAuth,
+    async (req: Request, res: Response) => {
+      try {
+        const companyId = getCompanyId(req);
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
 
-      const [row] = await db
-        .select({ id: factoryShippingContainerRows.id, fileName: factoryShippingContainerRows.shippingInvoiceFileName })
-        .from(factoryShippingContainerRows)
-        .where(and(eq(factoryShippingContainerRows.id, id), eq(factoryShippingContainerRows.companyId, companyId)));
-      if (!row) return res.status(404).json({ message: "Row not found" });
+        const [row] = await db
+          .select({
+            id: factoryShippingContainerRows.id,
+            fileName: factoryShippingContainerRows.shippingInvoiceFileName,
+          })
+          .from(factoryShippingContainerRows)
+          .where(and(eq(factoryShippingContainerRows.id, id), eq(factoryShippingContainerRows.companyId, companyId)));
+        if (!row) return res.status(404).json({ message: "Row not found" });
 
-      // Remove disk cache (non-fatal)
-      if (row.fileName) {
-        try {
-          const base = path.resolve(process.cwd(), "uploads", "shipping-invoice-docs");
-          const target = path.resolve(base, row.fileName);
-          const relative = path.relative(base, target);
-          if (relative.startsWith("..") || path.isAbsolute(relative))
-            return res.status(400).json({ message: "Invalid file path" });
-          if (fs.existsSync(target)) fs.unlinkSync(target);
-        } catch {}
+        // Remove disk cache (non-fatal)
+        if (row.fileName) {
+          try {
+            const base = path.resolve(process.cwd(), "uploads", "shipping-invoice-docs");
+            const target = path.resolve(base, row.fileName);
+            const relative = path.relative(base, target);
+            if (relative.startsWith("..") || path.isAbsolute(relative))
+              return res.status(400).json({ message: "Invalid file path" });
+            if (fs.existsSync(target)) fs.unlinkSync(target);
+          } catch {
+            // Failure here is non-fatal and the surrounding flow continues deliberately.
+          }
+        }
+
+        await db
+          .update(factoryShippingContainerRows)
+          .set({
+            shippingInvoiceFileName: null,
+            shippingInvoiceOriginalName: null,
+            shippingInvoiceFileUrl: null,
+            shippingInvoiceFileData: null,
+            shippingInvoiceFileType: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(factoryShippingContainerRows.id, id));
+
+        res.json({ ok: true });
+      } catch (error: unknown) {
+        logger.error("Error deleting shipping invoice:", { error: error });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
-
-      await db
-        .update(factoryShippingContainerRows)
-        .set({
-          shippingInvoiceFileName: null,
-          shippingInvoiceOriginalName: null,
-          shippingInvoiceFileUrl: null,
-          shippingInvoiceFileData: null,
-          shippingInvoiceFileType: null,
-          updatedAt: new Date(),
-        })
-        .where(eq(factoryShippingContainerRows.id, id));
-
-      res.json({ ok: true });
-    } catch (error: unknown) {
-      logger.error("Error deleting shipping invoice:", { error: error });
-      res.status(500).json({ message: getErrorMessage(error) });
     }
-  });
+  );
 
   // ── GET serve shipping-company invoice file ───────────────────────────────────
-  app.get("/api/factory/shipping-invoice-docs/:filename", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/shipping-invoice-docs/:filename", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -430,7 +450,7 @@ export function registerShippingContainerDocumentRoutes(app: Express) {
 
   // ── POST cleanup ghost document records ──────────────────────────────────────
   // Admin/dev utility: removes rows with no real file content.
-  app.post("/api/factory/shipping-container-docs/cleanup-ghosts", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/shipping-container-docs/cleanup-ghosts", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });

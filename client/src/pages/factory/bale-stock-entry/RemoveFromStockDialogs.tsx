@@ -138,8 +138,8 @@ export function AssignWorkerDialog({
               </SelectTrigger>
               <SelectContent>
                 {workers
-                  .filter((w: any) => w.active !== false)
-                  .map((w: any) => (
+                  .filter((w) => w.active !== false)
+                  .map((w) => (
                     <SelectItem key={w.id} value={String(w.id)}>
                       {w.fullName || w.name}
                     </SelectItem>

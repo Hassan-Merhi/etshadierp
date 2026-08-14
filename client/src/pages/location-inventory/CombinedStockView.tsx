@@ -28,12 +28,7 @@ interface CombinedStockViewProps {
   allStockCategoryFilter: string[];
   setAllStockCategoryFilter: (cats: string[] | ((prev: string[]) => string[])) => void;
   allStockSelectedRowIndex: number;
-  openMovement: (
-    locId: number | null,
-    locName: string | null,
-    stockItemId: number,
-    stockItemName: string
-  ) => void;
+  openMovement: (locId: number | null, locName: string | null, stockItemId: number, stockItemName: string) => void;
   formatAmount: (amt: number) => string;
   posUser?: any;
   allStockTableRef: React.RefObject<HTMLDivElement>;
@@ -66,9 +61,10 @@ export function CombinedStockView({
 
   // Dropdown options: full location list so empty locations are still selectable.
   // Falls back to inventory-derived list if allLocations wasn't passed.
-  const dropdownLocations = allLocations && allLocations.length > 0
-    ? [...allLocations].sort((a, b) => (a.name || "").localeCompare(b.name || ""))
-    : uniqueLocationNames;
+  const dropdownLocations =
+    allLocations && allLocations.length > 0
+      ? [...allLocations].sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+      : uniqueLocationNames;
   // Deduplicate categories by id (guard against any API-level duplicates)
   const uniqueCategories = Array.from(new Map(categoriesList.map((c) => [c.id, c])).values());
 
@@ -257,7 +253,7 @@ export function CombinedStockView({
               </thead>
               <tbody className="divide-y divide-border">
                 {(() => {
-                  const rows: any[] = [];
+                  const rows = [];
                   let lastGroup = "";
                   let rowIdx = 0;
                   for (const row of filteredCombinedRows) {

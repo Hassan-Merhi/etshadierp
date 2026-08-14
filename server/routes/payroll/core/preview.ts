@@ -5,7 +5,7 @@ import { toArrayBuffer } from "../../../lib/bufferCompatibility";
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { db } from "../../../db";
@@ -25,7 +25,7 @@ import { computeMonthlyPay, computeMonthlyPayFromAttendance, getFactoryCompanyId
 
 export function registerPayrollPreviewRoutes(app: Express) {
   // POST /api/factory/payrolls/preview - Preview payroll calculation with attendance breakdown (no DB writes)
-  app.post("/api/factory/payrolls/preview", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/payrolls/preview", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -51,7 +51,7 @@ export function registerPayrollPreviewRoutes(app: Express) {
       }
 
       // Fetch all attendance records for the period in one query
-      const workerIdList = targetWorkers.map((w: any) => w.id);
+      const workerIdList = targetWorkers.map((w) => w.id);
       const attendanceRecords = workerIdList.length
         ? await db
             .select()
@@ -129,7 +129,7 @@ export function registerPayrollPreviewRoutes(app: Express) {
         return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
       })();
 
-      const result = targetWorkers.map((worker: any) => {
+      const result = targetWorkers.map((worker) => {
         const baseSal = parseFloat(worker.baseSalary || "0");
         const freq = worker.payFrequency || worker.salaryType || "Monthly";
         let base: number;
@@ -244,7 +244,7 @@ export function registerPayrollPreviewRoutes(app: Express) {
     }
   });
   // POST /api/factory/payrolls/preview-excel — styled ExcelJS export of the payroll preview
-  app.post("/api/factory/payrolls/preview-excel", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/payrolls/preview-excel", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId: number = req.body.companyId || getFactoryCompanyId(req);
       const { periodStart, periodEnd, rows } = req.body as {
@@ -284,7 +284,9 @@ export function registerPayrollPreviewRoutes(app: Express) {
           const buf = fs.readFileSync(logoPath);
           logoId = wb.addImage({ buffer: toArrayBuffer(buf), extension: "jpeg" });
         }
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
 
       const NUM_COLS = 13;
 

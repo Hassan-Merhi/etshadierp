@@ -21,5 +21,7 @@ export function loadFactoryDaybookState(): FactoryDaybookUIState | null {
 export function saveFactoryDaybookState(state: FactoryDaybookUIState): void {
   try {
     sessionStorage.setItem(FACTORY_DAYBOOK_STATE_KEY, JSON.stringify(state));
-  } catch {}
+  } catch {
+    // Storage is unavailable in private mode and can throw on quota; the value is a convenience, not state we need.
+  }
 }

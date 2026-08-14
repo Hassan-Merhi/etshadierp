@@ -75,7 +75,7 @@ export function ContainerSpView({
   });
 
   // Normalize sp_containers rows to a common display shape
-  const spNative: any[] = (Array.isArray(spContainersList) ? spContainersList : []).map((c) => {
+  const spNative = (Array.isArray(spContainersList) ? spContainersList : []).map((c) => {
     const statusCancelled = c.status === "cancelled";
     const statusOffloaded = c.status === "offloaded";
     return {
@@ -96,8 +96,8 @@ export function ContainerSpView({
   });
 
   // Normalize regular containers (from PO Import) to same shape
-  const erpNormalized: any[] = allContainers.map((c) => {
-    const sup = suppliers.find((s: any) => s.id === c.supplierId);
+  const erpNormalized = allContainers.map((c) => {
+    const sup = suppliers.find((s) => s.id === c.supplierId);
     const isOffloaded = c.status === "OFFLOADED";
     return {
       _key: `erp-${c.id}`,
@@ -173,7 +173,7 @@ export function ContainerSpView({
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map((c: any) => {
+          {filtered.map((c) => {
             const detailPath = c._source === "erp" ? `/containers/${c.id}?src=erp` : `/containers/${c.id}`;
             const rowIsNavigable = !c.statusCancelled;
             return (

@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
@@ -24,7 +24,7 @@ import { resultRows } from "../../lib/queryResult";
 
 export function registerBalanceRepairScanRoutes(app: Express) {
   // ── GET /api/admin/repair-balances/scan ──────────────────────────────────
-  app.get("/api/admin/repair-balances/scan", requireAuth, requireRole("Admin"), async (req: any, res: any) => {
+  app.get("/api/admin/repair-balances/scan", requireAuth, requireRole("Admin"), async (req: Request, res: Response) => {
     try {
       const companyId: number | undefined = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

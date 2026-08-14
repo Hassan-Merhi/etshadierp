@@ -1247,7 +1247,7 @@
     },
     "/api/reports/stock-in-sales": {
       "status": 200,
-      "shape": "{filters:{grouping:scalar,locationIds:[],profitFilter:scalar,stockGroupIds:[]},generatedAt:scalar,rowCount:scalar,rows:[],summary:{avgProfitPerBale:scalar,costOfSales:scalar,costProfit:scalar,stockInAvgRate:scalar,stockInQty:scalar,stockInValue:scalar,stockOutQty:scalar,totalSales:scalar}}"
+      "shape": "{filters:{grouping:scalar,locationIds:[scalar],profitFilter:scalar,stockGroupIds:[]},generatedAt:scalar,reconciliation:{actualStockQty:scalar,actualStockValue:scalar,asOfDate:scalar,differenceQty:scalar,differenceValue:scalar,expectedClosingQty:scalar,expectedClosingValue:scalar,matches:scalar},rowCount:scalar,rows:[],summary:{avgProfitPerBale:scalar,closingStockQty:scalar,closingStockValue:scalar,costOfSales:scalar,costProfit:scalar,netSalesQty:scalar,openingStockQty:scalar,openingStockValue:scalar,otherStockOutQty:scalar,otherStockOutValue:scalar,salesOutQty:scalar,salesOutValue:scalar,stockAdjustmentQty:scalar,stockAdjustmentValue:scalar,stockInAvgRate:scalar,stockInQty:scalar,stockInValue:scalar,stockOutQty:scalar,stockOutValue:scalar,totalAvailableQty:scalar,totalSales:scalar,transferOutQty:scalar,transferOutValue:scalar}}"
     },
     "/api/reports/stock-in-sales/comparison": {
       "status": 400,
@@ -1285,6 +1285,10 @@
       "status": 200,
       "shape": "{fast:scalar,lastWatcherPollAgeMs:scalar,userId:scalar,watched:scalar}"
     },
+    "/api/screen-feed/capabilities": {
+      "status": 200,
+      "shape": "{flags:{fastScreenFeed:scalar,keyboardControl:scalar,remoteControl:scalar,screenFeedEnabled:scalar}}"
+    },
     "/api/screen-feed/control/audit": {
       "status": 200,
       "shape": "{knownModules:[scalar],logs:[],page:scalar,pageSize:scalar,total:scalar,totalPages:scalar}"
@@ -1306,8 +1310,8 @@
       "shape": "{message:scalar}"
     },
     "/api/screen-feed/live/status": {
-      "status": 204,
-      "shape": "{}"
+      "status": 200,
+      "shape": "{fast:scalar,watched:scalar}"
     },
     "/api/settings/role-permissions": {
       "status": 200,

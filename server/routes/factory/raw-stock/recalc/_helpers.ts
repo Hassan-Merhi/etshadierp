@@ -73,10 +73,10 @@ export async function captureRecalcSnapshot(companyId: number, containerIds: num
     ),
   ]);
 
-  const batchIds = [...new Set(mixBatchSources.map((s: any) => s.mixBatchId as number))];
+  const batchIds = [...new Set(mixBatchSources.map((s) => s.mixBatchId as number))];
 
-  let mixBatches: any[] = [];
-  let bales: any[] = [];
+  let mixBatches = [];
+  let bales = [];
   if (batchIds.length > 0) {
     const [{ rows: batchRows }, { rows: baleRows }] = await Promise.all([
       pool.query(

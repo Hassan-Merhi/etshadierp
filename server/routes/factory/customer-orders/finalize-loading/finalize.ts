@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../../lib/httpHandlers";
 import { logger } from "../../../../lib/logger";
 import { parseId } from "../../../../lib/parseId";
@@ -30,7 +30,7 @@ import {
 import { eq, and, sql, inArray } from "drizzle-orm";
 
 export function registerOrderFinalizeRoutes(app: Express) {
-  app.post("/api/factory/customer-orders/:id/finalize", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/customer-orders/:id/finalize", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -51,9 +51,32 @@ export function registerOrderFinalizeRoutes(app: Express) {
         const bales = await tx.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
         if (bales.length === 0) throw new Error("Order has no bales");
 
+        // Validate every linked bale with one set-based read instead of one query
+        // per bale. Preserve the existing rule: only missing/DELETED bales block
+        // finalization; other statuses are accepted here.
+        const baleIds: number[] = [
+          ...new Set<number>(
+            bales
+              .map((b: { baleId: number | null }) => Number(b.baleId))
+              .filter((id: number) => Number.isSafeInteger(id) && id > 0)
+          ),
+        ];
+        const factoryBaleRows =
+          baleIds.length > 0
+            ? await tx
+                .select({ id: factoryBales.id, status: factoryBales.status })
+                .from(factoryBales)
+                .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, baleIds)))
+            : [];
+        const factoryBaleById = new Map<number, { id: number; status: string | null }>(
+          factoryBaleRows.map((b: { id: number; status: string | null }) => [
+            Number(b.id),
+            { id: Number(b.id), status: b.status ?? null },
+          ])
+        );
+
         for (const b of bales) {
-          // Just verify the bale still exists — status is not checked here.
-          const [factoryBale] = await tx.select().from(factoryBales).where(eq(factoryBales.id, b.baleId));
+          const factoryBale = factoryBaleById.get(Number(b.baleId));
           if (!factoryBale || factoryBale.status === "DELETED") {
             throw new Error(`Bale ${b.baleReference} is no longer available`);
           }
@@ -73,11 +96,12 @@ export function registerOrderFinalizeRoutes(app: Express) {
           .where(eq(customerInvoiceSequences.companyId, companyId));
         const invoiceNumber = `INV-${String(invoiceNum).padStart(6, "0")}`;
 
-        for (const b of bales) {
+        // One set-based status write replaces the previous per-bale UPDATE loop.
+        if (baleIds.length > 0) {
           await tx
             .update(factoryBales)
             .set({ status: "SOLD", updatedAt: new Date() })
-            .where(eq(factoryBales.id, b.baleId));
+            .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, baleIds)));
         }
 
         await recalculateOrderTotals(tx, orderId);
@@ -274,7 +298,7 @@ export function registerOrderFinalizeRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/customer-orders/:id/finalize-preview", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/customer-orders/:id/finalize-preview", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -304,7 +328,7 @@ export function registerOrderFinalizeRoutes(app: Express) {
         .from(factoryBales)
         .where(inArray(factoryBales.id, baleIds));
 
-      const locIds = [...new Set(baleRows.map((b: any) => b.erpLocationId).filter(Boolean))];
+      const locIds = [...new Set(baleRows.map((b) => b.erpLocationId).filter(Boolean))];
       const locationRecords =
         locIds.length > 0
           ? await db

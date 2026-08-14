@@ -19,6 +19,7 @@ import {
   wasteDispatchItems,
   updateStockAdjustmentSchema,
 } from "@shared/schema";
+import { stockAdjustmentCreateHandler } from "./stockAdjustmentCreateHandler";
 
 export function registerStockAdjustmentWasteRoutes(app: Express) {
   // Stock Adjustments - GET endpoint
@@ -39,69 +40,11 @@ export function registerStockAdjustmentWasteRoutes(app: Express) {
   });
 
   // Stock Adjustments - POST endpoint
-  app.post("/api/stock-adjustments", requireAuth, requireNonPOS, async (req, res) => {
-    const _t = Date.now();
-    const _uid = req.session.userId;
-    const _cid = req.session.currentCompanyId;
-    try {
-      const { voucherId, locationId, adjustmentType, notes, items } = req.body;
-
-      // Validate required fields
-      if (!voucherId) {
-        return res.status(400).json({ message: "Voucher ID is required" });
-      }
-      if (!locationId) {
-        return res.status(400).json({ message: "Location is required" });
-      }
-      if (!adjustmentType) {
-        return res.status(400).json({ message: "Adjustment type is required" });
-      }
-      if (adjustmentType !== "Production" && adjustmentType !== "Consumption" && adjustmentType !== "Mixed") {
-        return res.status(400).json({
-          message: "Adjustment type must be 'Production', 'Consumption', or 'Mixed'",
-        });
-      }
-      if (!items || !Array.isArray(items) || items.length === 0) {
-        return res.status(400).json({ message: "Items are required" });
-      }
-
-      // Validate that location exists
-      const location = await storage.getLocationById(locationId);
-      if (!location) {
-        return res.status(404).json({ message: "Location not found" });
-      }
-
-      // Validate that voucher exists
-      const voucher = await storage.getVoucherById(voucherId);
-      if (!voucher) {
-        return res.status(404).json({ message: "Voucher not found" });
-      }
-
-      // Validate items
-      for (const item of items) {
-        if (!item.stockItemId) {
-          return res.status(400).json({ message: "Stock item ID is required for all items" });
-        }
-        if (!item.quantity || parseFloat(item.quantity) === 0) {
-          return res.status(400).json({ message: "Quantity cannot be zero for any items" });
-        }
-        // Note: Negative quantities are allowed for consumption items
-        if (!item.rate || parseFloat(item.rate) < 0) {
-          return res.status(400).json({ message: "Rate must be non-negative for all items" });
-        }
-      }
-
-      logger.info("stock adjustment create started", { module: "stockAdjustment", action: "create", userId: _uid, companyId: _cid, adjustmentType, itemCount: items.length });
-
-      const adjustment = await storage.createStockAdjustment(voucherId, locationId, adjustmentType, notes || "", items);
-
-      logger.info("stock adjustment create succeeded", { module: "stockAdjustment", action: "create", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, adjustmentId: adjustment.adjustment.id });
-      res.status(201).json(adjustment);
-    } catch (error: unknown) {
-      logger.error("stock adjustment create failed", { module: "stockAdjustment", action: "create", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
-      res.status(500).json({ message: getErrorMessage(error) });
-    }
-  });
+  //
+  // The create path lives in ./stockAdjustmentCreateHandler so it can align the
+  // voucher with the company's native/base currency rather than the browser's
+  // display-currency toggle. The route position and guard chain are unchanged.
+  app.post("/api/stock-adjustments", requireAuth, requireNonPOS, stockAdjustmentCreateHandler);
 
   // Stock Adjustments - PUT endpoint (update)
   app.put("/api/stock-adjustments/:id", requireAuth, requireNonPOS, async (req, res) => {
@@ -260,7 +203,7 @@ export function registerStockAdjustmentWasteRoutes(app: Express) {
       if (!location) return res.status(400).json({ message: "Location not found" });
 
       // Calculate total (will be updated after createStockAdjustment to use actual rates)
-      const itemsForAdj = items.map((item: any) => ({
+      const itemsForAdj = items.map((item) => ({
         stockItemId: parseInt(item.stockItemId),
         quantity: (-Math.abs(parseFloat(item.quantity))).toFixed(3), // negative = consumption
         rate: "0", // rate will be determined from inventory by createStockAdjustment

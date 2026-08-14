@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../../lib/httpHandlers";
 import { logger } from "../../../../lib/logger";
 import { parseId } from "../../../../lib/parseId";
@@ -22,7 +22,7 @@ import { eq, and, or, sql, inArray } from "drizzle-orm";
 import { resultRows, firstRow } from "../../../../lib/queryResult";
 
 export function registerOrderBaleBulkImportRoutes(app: Express) {
-  app.post("/api/factory/customer-orders/:id/bales/bulk-import", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/customer-orders/:id/bales/bulk-import", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -72,7 +72,7 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
         .select({ baleId: customerOrderBales.baleId })
         .from(customerOrderBales)
         .where(eq(customerOrderBales.orderId, orderId));
-      const alreadyAddedBaleIds = new Set(existingOrderBales.map((b: any) => b.baleId));
+      const alreadyAddedBaleIds = new Set(existingOrderBales.map((b) => b.baleId));
 
       let totalAdded = 0;
       const notFound: Array<{ articleCode: string; requestedQty: number; foundQty: number }> = [];
@@ -156,11 +156,11 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
               }
             }
             if (priceUsed === "0" && bale.productId) {
-              const product = allProducts.find((p: any) => p.id === bale.productId);
+              const product = allProducts.find((p) => p.id === bale.productId);
               if (product?.sellingPrice) priceUsed = product.sellingPrice;
             }
 
-            const baleProductForName1 = bale.productId ? allProducts.find((p: any) => p.id === bale.productId) : null;
+            const baleProductForName1 = bale.productId ? allProducts.find((p) => p.id === bale.productId) : null;
 
             await tx.insert(customerOrderBales).values({
               orderId,
@@ -322,11 +322,11 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
               }
             }
             if (priceUsed === "0" && bale.productId) {
-              const product = allProducts.find((p: any) => p.id === bale.productId);
+              const product = allProducts.find((p) => p.id === bale.productId);
               if (product?.sellingPrice) priceUsed = product.sellingPrice;
             }
 
-            const baleProductForName2 = bale.productId ? allProducts.find((p: any) => p.id === bale.productId) : null;
+            const baleProductForName2 = bale.productId ? allProducts.find((p) => p.id === bale.productId) : null;
 
             await tx.insert(customerOrderBales).values({
               orderId,

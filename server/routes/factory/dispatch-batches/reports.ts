@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
@@ -16,7 +16,7 @@ import { firstRow, resultRows } from "../../../lib/queryResult";
 export function registerDispatchReportRoutes(app: Express) {
   // ── GET /api/factory/dispatch-reports/summary ──────────────────────────────
   // Summary counts for the dispatch reports dashboard
-  app.get("/api/factory/dispatch-reports/summary", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/dispatch-reports/summary", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -72,7 +72,7 @@ export function registerDispatchReportRoutes(app: Express) {
 
   // ── GET /api/factory/dispatch-batches/:id/audit ───────────────────────────
   // Full scan history for a batch including removed scans
-  app.get("/api/factory/dispatch-batches/:id/audit", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/dispatch-batches/:id/audit", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });

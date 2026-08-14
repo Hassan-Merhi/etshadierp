@@ -4,6 +4,8 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import { heavyListPaginationPlugin } from "./build/viteHeavyListPaginationPlugin";
+import { salesReportBandwidthPlugin } from "./build/viteSalesReportBandwidthPlugin";
+import { salesReportInvalidationPlugin } from "./build/viteSalesReportInvalidationPlugin";
 import { phase1PaginationPlugin } from "./build/vitePhase1PaginationGuardPlugin";
 import { lazyHeavyImportsPlugin } from "./build/viteLazyHeavyImportsPlugin";
 import { labelAssetExtractionPlugin } from "./build/viteLabelAssetExtractionPlugin";
@@ -11,6 +13,13 @@ import { labelAssetExtractionPlugin } from "./build/viteLabelAssetExtractionPlug
 export default defineConfig({
   plugins: [
     heavyListPaginationPlugin(),
+    // The Phase 3 Sales Report bandwidth transform rewrites the working legacy
+    // report at build time. Keep the transform available for controlled testing,
+    // but fail safe to the proven legacy report until the compact path is
+    // production-hardened. This restores the ERP Sales Report immediately while
+    // preserving the bandwidth implementation and its verification markers.
+    ...(process.env.ENABLE_SALES_REPORT_BANDWIDTH === "true" ? [salesReportBandwidthPlugin()] : []),
+    salesReportInvalidationPlugin(),
     phase1PaginationPlugin(),
     lazyHeavyImportsPlugin(),
     labelAssetExtractionPlugin(),

@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { parseId } from "../../../../lib/parseId";
 import { getErrorMessage } from "../../../../lib/httpHandlers";
 import { db } from "../../../../db";
@@ -23,7 +23,7 @@ export function registerSupplierBulkFxPrefetchRoutes(app: Express) {
   // GET /api/factory/suppliers/:brokerId/bulk-fx-prefetch?currency=EUR
   // Returns per-linked-supplier available balance for the given currency so the
   // client can run the greedy allocation algorithm offline.
-  app.get("/api/factory/suppliers/:brokerId/bulk-fx-prefetch", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/suppliers/:brokerId/bulk-fx-prefetch", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -45,7 +45,7 @@ export function registerSupplierBulkFxPrefetchRoutes(app: Express) {
         );
       if (linkedSuppliers.length === 0) return res.json({ suppliers: [] });
 
-      const linkedIds = linkedSuppliers.map((s: any) => s.id);
+      const linkedIds = linkedSuppliers.map((s) => s.id);
 
       const allContainers = (
         await db
@@ -115,7 +115,7 @@ export function registerSupplierBulkFxPrefetchRoutes(app: Express) {
         newestDate: string | null;
       }> = [];
       for (const sup of linkedSuppliers) {
-        const supContainers = allContainers.filter((c: any) => c.supplierId === sup.id);
+        const supContainers = allContainers.filter((c) => c.supplierId === sup.id);
         const totalValue = supContainers.reduce((s: number, c: any) => {
           const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
           const rate = parseFloat(c.ratePerKg || "0");
@@ -127,7 +127,7 @@ export function registerSupplierBulkFxPrefetchRoutes(app: Express) {
           return s + (kg * rate + (freightCc === currency ? freight : 0) + (commCc === currency ? commAmt : 0));
         }, 0);
         const available = Math.max(0, totalValue - (paymentsBySupplier[sup.id] || 0) - (fxOutBySupplier[sup.id] || 0));
-        const dates = supContainers.map((c: any) => c.arrivalDate || c.createdAt).filter(Boolean) as string[];
+        const dates = supContainers.map((c) => c.arrivalDate || c.createdAt).filter(Boolean) as string[];
         const oldestDate = dates.length ? dates.reduce((a, b) => (new Date(a) < new Date(b) ? a : b)) : null;
         const newestDate = dates.length ? dates.reduce((a, b) => (new Date(a) > new Date(b) ? a : b)) : null;
         if (available > 0.001) result.push({ id: sup.id, name: sup.name, available, oldestDate, newestDate });

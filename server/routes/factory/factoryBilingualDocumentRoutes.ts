@@ -139,7 +139,7 @@ async function sendInvoiceExcel(req: Request, res: Response, data: NonNullable<A
   }
   sheet.addRow([]);
 
-  const hasPerKg = data.lines.some((line: any) => line.pricingMode === "per_kg");
+  const hasPerKg = data.lines.some((line) => line.pricingMode === "per_kg");
   const headers = [
     "#",
     labels.articleCode,
@@ -155,7 +155,7 @@ async function sendInvoiceExcel(req: Request, res: Response, data: NonNullable<A
   let qtyTotal = 0;
   let weightTotal = 0;
   let lineTotal = 0;
-  data.lines.forEach((line: any, index: number) => {
+  data.lines.forEach((line, index: number) => {
     const qty = safeNumber(line.qty);
     const totalWeight = safeNumber(line.totalWeight);
     const totalPrice = safeNumber(line.totalPrice);
@@ -203,7 +203,16 @@ async function sendInvoiceExcel(req: Request, res: Response, data: NonNullable<A
       row.getCell(8).numFmt = "#,##0.00";
     }
     for (const charge of data.charges) {
-      const row = sheet.addRow(["", "", "", "", "", charge.name || labels.otherCharges, money, safeNumber(charge.amount)]);
+      const row = sheet.addRow([
+        "",
+        "",
+        "",
+        "",
+        "",
+        charge.name || labels.otherCharges,
+        money,
+        safeNumber(charge.amount),
+      ]);
       row.getCell(8).numFmt = "#,##0.00";
     }
   }
@@ -237,7 +246,11 @@ async function sendInvoicePdf(req: Request, res: Response, data: NonNullable<Awa
   const pageWidth = doc.page.width - 72;
   const logo = path.join(process.cwd(), "server", "hmd-logo.png");
   if (fs.existsSync(logo)) {
-    try { doc.image(logo, (doc.page.width - 180) / 2, 24, { width: 180 }); } catch {}
+    try {
+      doc.image(logo, (doc.page.width - 180) / 2, 24, { width: 180 });
+    } catch {
+      // Failure here is non-fatal and the surrounding flow continues deliberately.
+    }
   }
   doc.moveDown(5);
   doc.fontSize(16).text(labels.invoice, 36, doc.y, { width: pageWidth, align: "center" });
@@ -291,7 +304,12 @@ async function sendInvoicePdf(req: Request, res: Response, data: NonNullable<Awa
     doc.moveDown(1.2);
   }
   doc.moveDown(0.5);
-  doc.fontSize(10).text(`${labels.totals}: ${totalQty} | ${totalWeight.toFixed(2)} kg${hideSelling ? "" : ` | ${totalAmount.toFixed(2)}`}`, { align });
+  doc
+    .fontSize(10)
+    .text(
+      `${labels.totals}: ${totalQty} | ${totalWeight.toFixed(2)} kg${hideSelling ? "" : ` | ${totalAmount.toFixed(2)}`}`,
+      { align }
+    );
   if (!hideSelling && !noCharges) {
     doc.text(`${labels.subtotal}: ${safeNumber(data.order.subtotalBales).toFixed(2)}`, { align });
     doc.text(`${labels.freight}: ${safeNumber(data.order.freightAmount).toFixed(2)}`, { align });
@@ -302,16 +320,24 @@ async function sendInvoicePdf(req: Request, res: Response, data: NonNullable<Awa
 }
 
 async function loadBales(orderId: number) {
-  const links = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId)).orderBy(customerOrderBales.id);
+  const links = await db
+    .select()
+    .from(customerOrderBales)
+    .where(eq(customerOrderBales.orderId, orderId))
+    .orderBy(customerOrderBales.id);
   const rows = await db.select().from(factoryBales).where(eq(factoryBales.companyId, -1));
-  const map = new Map<number, any>(rows.map((row: any) => [row.id, row]));
+  const map = new Map<number, any>(rows.map((row) => [row.id, row]));
   return { links, map };
 }
 
 async function sendLoadingExcel(req: Request, res: Response, data: NonNullable<Awaited<ReturnType<typeof loadOrder>>>) {
   const language = parseFactoryDocumentLanguage(req.query.lang);
   const labels = FACTORY_DOCUMENT_LABELS[language];
-  const links = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, data.order.id)).orderBy(customerOrderBales.id);
+  const links = await db
+    .select()
+    .from(customerOrderBales)
+    .where(eq(customerOrderBales.orderId, data.order.id))
+    .orderBy(customerOrderBales.id);
   const ExcelJS = (await import("exceljs")).default;
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet(labels.loadingList.slice(0, 31), {
@@ -322,10 +348,17 @@ async function sendLoadingExcel(req: Request, res: Response, data: NonNullable<A
   sheet.mergeCells(title.number, 1, title.number, 6);
   title.font = { bold: true, size: 14 };
   title.alignment = { horizontal: "center", readingOrder: language === "ar" ? "rtl" : "ltr" };
-  const header = sheet.addRow(["#", labels.reference, labels.articleCode, labels.product, labels.weightKg, labels.cumulativeWeight]);
+  const header = sheet.addRow([
+    "#",
+    labels.reference,
+    labels.articleCode,
+    labels.product,
+    labels.weightKg,
+    labels.cumulativeWeight,
+  ]);
   header.font = { bold: true };
   let cumulative = 0;
-  links.forEach((link: any, index: number) => {
+  links.forEach((link, index: number) => {
     const weight = safeNumber(link.weight);
     cumulative += weight;
     const row = sheet.addRow([

@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { sql } from "drizzle-orm";
 import { db } from "../../db";
 import { logger } from "../../lib/logger";
@@ -47,7 +47,7 @@ function exactConfirmation(req: any, expected: string, sourceName: string): stri
 }
 
 async function invokeMigrationHandler(
-  handler: (req: any, res: any) => Promise<any>,
+  handler: (req: Request, res: Response) => Promise<any>,
   req: any,
   body: any
 ): Promise<any> {
@@ -138,7 +138,7 @@ async function loadCutoverById(cutoverId: number): Promise<any | null> {
   return firstRow(result) ?? null;
 }
 
-async function prepareCutover(req: any, res: any): Promise<any> {
+async function prepareCutover(req: Request, res: Response): Promise<any> {
   const pair = await validateMigrationPair(req, res, false);
   if (!pair) return;
   const confirmationError = exactConfirmation(req, "PREPARE CUTOVER", pair.sourceCompany.name);
@@ -181,7 +181,7 @@ async function prepareCutover(req: any, res: any): Promise<any> {
   });
 }
 
-async function finalizeCutover(req: any, res: any): Promise<any> {
+async function finalizeCutover(req: Request, res: Response): Promise<any> {
   const pair = await validateMigrationPair(req, res, false);
   if (!pair) return;
   const confirmationError = exactConfirmation(req, "FINALIZE CUTOVER", pair.sourceCompany.name);
@@ -279,7 +279,7 @@ async function finalizeCutover(req: any, res: any): Promise<any> {
   }
 }
 
-async function rollbackCutover(req: any, res: any): Promise<any> {
+async function rollbackCutover(req: Request, res: Response): Promise<any> {
   const cutoverId = pn(req.body?.cutoverId);
   if (!cutoverId) return res.status(400).json({ message: "cutoverId is required" });
   await ensureCutoverColumns();
@@ -325,7 +325,7 @@ async function rollbackCutover(req: any, res: any): Promise<any> {
   });
 }
 
-async function cancelPreparedCutover(req: any, res: any): Promise<any> {
+async function cancelPreparedCutover(req: Request, res: Response): Promise<any> {
   const cutoverId = pn(req.body?.cutoverId);
   if (!cutoverId) return res.status(400).json({ message: "cutoverId is required" });
   await ensureCutoverColumns();
@@ -352,7 +352,7 @@ async function cancelPreparedCutover(req: any, res: any): Promise<any> {
   });
 }
 
-async function statusCutover(req: any, res: any): Promise<any> {
+async function statusCutover(req: Request, res: Response): Promise<any> {
   const pair = await validateMigrationPair(req, res, false);
   if (!pair) return;
   await ensureCutoverColumns();
@@ -369,7 +369,7 @@ async function statusCutover(req: any, res: any): Promise<any> {
   });
 }
 
-async function mapSuspenseEntry(req: any, res: any): Promise<any> {
+async function mapSuspenseEntry(req: Request, res: Response): Promise<any> {
   const pair = await validateMigrationPair(req, res, false);
   if (!pair) return;
   const targetEntryId = pn(req.params.targetEntryId);
@@ -402,7 +402,7 @@ async function mapSuspenseEntry(req: any, res: any): Promise<any> {
   return res.json({ success: true, targetEntryId, targetLedgerAccountId });
 }
 
-async function mapContainerCharge(req: any, res: any): Promise<any> {
+async function mapContainerCharge(req: Request, res: Response): Promise<any> {
   const pair = await validateMigrationPair(req, res, false);
   if (!pair) return;
   const chargeId = pn(req.params.chargeId);
@@ -447,7 +447,7 @@ export function registerSpMigrationCutoverRoutes(app: Express): void {
   app.post("/api/sp/migration/cutover/cancel", ...developer, cancelPreparedCutover);
 
   // Compatibility endpoint replacing the previous hard-disabled POST /cutover.
-  app.post("/api/sp/migration/cutover", ...developer, async (req: any, res: any) => {
+  app.post("/api/sp/migration/cutover", ...developer, async (req: Request, res: Response) => {
     if (req.body?.action === "prepare") return prepareCutover(req, res);
     if (req.body?.action === "finalize") return finalizeCutover(req, res);
     if (req.body?.action === "rollback") return rollbackCutover(req, res);

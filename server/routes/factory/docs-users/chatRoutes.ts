@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { db } from "../../../db";
 import { broadcast } from "../../../wsServer";
@@ -32,7 +32,7 @@ export function registerFactoryChatRoutes(app: Express) {
 
   const typingStatus = new Map<string, { receiverId: string; until: number }>();
 
-  app.post("/api/chat/upload", requireAuth, chatUpload.single("file"), async (req: any, res: any) => {
+  app.post("/api/chat/upload", requireAuth, chatUpload.single("file"), async (req: Request, res: Response) => {
     try {
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
       const fileUrl = `/uploads/chat/${req.file.filename}`;
@@ -47,7 +47,7 @@ export function registerFactoryChatRoutes(app: Express) {
     }
   });
 
-  app.post("/api/chat/typing", requireAuth, async (req: any, res: any) => {
+  app.post("/api/chat/typing", requireAuth, async (req: Request, res: Response) => {
     try {
       const senderId = (req.session as any).userId;
       const { receiverId, isTyping } = req.body;
@@ -63,7 +63,7 @@ export function registerFactoryChatRoutes(app: Express) {
     }
   });
 
-  app.get("/api/chat/typing/:userId", requireAuth, async (req: any, res: any) => {
+  app.get("/api/chat/typing/:userId", requireAuth, async (req: Request, res: Response) => {
     try {
       const currentUserId = (req.session as any).userId;
       const otherUserId = req.params.userId;
@@ -75,7 +75,7 @@ export function registerFactoryChatRoutes(app: Express) {
     }
   });
 
-  app.get("/api/chat/users", requireAuth, async (req: any, res: any) => {
+  app.get("/api/chat/users", requireAuth, async (req: Request, res: Response) => {
     try {
       const currentUserId = (req.session as any).userId;
       const allUsers = await db
@@ -87,7 +87,7 @@ export function registerFactoryChatRoutes(app: Express) {
         .from(users)
         .where(eq(users.active, true));
 
-      const filtered = allUsers.filter((u: any) => u.id !== currentUserId);
+      const filtered = allUsers.filter((u) => u.id !== currentUserId);
 
       // Fetch all presence records in one query
       const presenceRecords = await db.select().from(userPresence);
@@ -116,7 +116,7 @@ export function registerFactoryChatRoutes(app: Express) {
             );
 
           // Find most recent presence record for this user
-          const userPresenceRecords = presenceRecords.filter((p: any) => p.userId === u.id);
+          const userPresenceRecords = presenceRecords.filter((p) => p.userId === u.id);
           const latestPresence = userPresenceRecords.sort(
             (a: any, b: any) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime()
           )[0];
@@ -139,7 +139,7 @@ export function registerFactoryChatRoutes(app: Express) {
     }
   });
 
-  app.get("/api/chat/conversations/:userId", requireAuth, async (req: any, res: any) => {
+  app.get("/api/chat/conversations/:userId", requireAuth, async (req: Request, res: Response) => {
     try {
       const currentUserId = (req.session as any).userId;
       const otherUserId = req.params.userId;
@@ -161,7 +161,7 @@ export function registerFactoryChatRoutes(app: Express) {
     }
   });
 
-  app.post("/api/chat/messages", requireAuth, async (req: any, res: any) => {
+  app.post("/api/chat/messages", requireAuth, async (req: Request, res: Response) => {
     try {
       const currentUserId = (req.session as any).userId;
       const parsed = insertDirectMessageSchema.parse({
@@ -191,7 +191,7 @@ export function registerFactoryChatRoutes(app: Express) {
     }
   });
 
-  app.post("/api/chat/mark-read/:userId", requireAuth, async (req: any, res: any) => {
+  app.post("/api/chat/mark-read/:userId", requireAuth, async (req: Request, res: Response) => {
     try {
       const currentUserId = (req.session as any).userId;
       const senderId = req.params.userId;
@@ -213,7 +213,7 @@ export function registerFactoryChatRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/chat/messages/:userId", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/chat/messages/:userId", requireAuth, async (req: Request, res: Response) => {
     try {
       const currentUserId = (req.session as any).userId;
       const otherUserId = req.params.userId;
@@ -233,7 +233,7 @@ export function registerFactoryChatRoutes(app: Express) {
     }
   });
 
-  app.get("/api/chat/unread-count", requireAuth, async (req: any, res: any) => {
+  app.get("/api/chat/unread-count", requireAuth, async (req: Request, res: Response) => {
     try {
       const currentUserId = (req.session as any).userId;
       const [result] = await db

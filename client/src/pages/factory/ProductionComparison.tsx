@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +31,7 @@ import {
 import { MultiSelectFilter } from "./productioncomparison/components/MultiSelectFilter";
 import { DiffCell } from "./productioncomparison/components/DiffCell";
 import { StatCard } from "./productioncomparison/components/StatCard";
+import { buildWorkerSummaryByArticle, WorkerSummaryHover } from "./productioncomparison/components/WorkerSummaryHover";
 // ── Date helpers ─────────────────────────────────────────────────────────────
 
 export default function ProductionComparison() {
@@ -50,6 +51,13 @@ export default function ProductionComparison() {
 
   const { data: workers = [] } = useQuery<{ id: number; fullName: string; active?: boolean }[]>({
     queryKey: ["/api/factory/workers"],
+    staleTime: 60_000,
+  });
+
+  const { data: baleProducts = [] } = useQuery<
+    Array<{ code: string; articleCode?: string | null; nameAr?: string | null }>
+  >({
+    queryKey: ["/api/factory/bale-products"],
     staleTime: 60_000,
   });
 
@@ -79,6 +87,20 @@ export default function ProductionComparison() {
       .sort((a, b) => (a.fullName || "").localeCompare(b.fullName || ""))
       .map((w) => ({ value: String(w.id), label: w.fullName }));
   }, [workers, workerCategories]);
+
+  const arabicNameByArticle = useMemo(() => {
+    const map = new Map<string, string>();
+    const add = (key: string | null | undefined, nameAr: string | null | undefined) => {
+      const normalized = (key || "").trim().toUpperCase();
+      const name = (nameAr || "").trim();
+      if (normalized && name) map.set(normalized, name);
+    };
+    for (const product of baleProducts) {
+      add(product.articleCode, product.nameAr);
+      add(product.code, product.nameAr);
+    }
+    return map;
+  }, [baleProducts]);
 
   // Stable key for the query cache / request param.
   const workerIdsParam = useMemo(() => [...filterWorkers].sort().join(","), [filterWorkers]);
@@ -114,6 +136,7 @@ export default function ProductionComparison() {
   const qA = useQuery<ReportData>({
     queryKey: ["/api/factory/production-value-report", rangeA[0], rangeA[1], workerIdsParam],
     staleTime: 0,
+    placeholderData: keepPreviousData,
     queryFn: async () => {
       const params = new URLSearchParams({ from: rangeA[0], to: rangeA[1] });
       if (workerIdsParam) params.set("workerIds", workerIdsParam);
@@ -126,6 +149,7 @@ export default function ProductionComparison() {
   const qB = useQuery<ReportData>({
     queryKey: ["/api/factory/production-value-report", rangeB[0], rangeB[1], workerIdsParam],
     staleTime: 0,
+    placeholderData: keepPreviousData,
     queryFn: async () => {
       const params = new URLSearchParams({ from: rangeB[0], to: rangeB[1] });
       if (workerIdsParam) params.set("workerIds", workerIdsParam);
@@ -148,6 +172,11 @@ export default function ProductionComparison() {
     }
     return { categories: [...catSet].sort(), grades: [...gradeSet].sort() };
   }, [qA.data, qB.data]);
+
+  const workerSummaryByArticle = useMemo(
+    () => buildWorkerSummaryByArticle(qA.data?.production.byProduct ?? [], qB.data?.production.byProduct ?? []),
+    [qA.data, qB.data]
+  );
 
   const mergedAll = useMemo<MergedRow[]>(() => {
     const map = new Map<string, MergedRow>();
@@ -212,10 +241,15 @@ export default function ProductionComparison() {
         .filter((r) => {
           if (!filterProduct) return true;
           const q = filterProduct.toLowerCase();
-          return r.articleCode.toLowerCase().includes(q) || r.productName.toLowerCase().includes(q);
+          const arabicName = arabicNameByArticle.get(r.articleCode.trim().toUpperCase()) ?? "";
+          return (
+            r.articleCode.toLowerCase().includes(q) ||
+            r.productName.toLowerCase().includes(q) ||
+            arabicName.toLowerCase().includes(q)
+          );
         })
         .sort((a, b) => (a.productName || a.articleCode).localeCompare(b.productName || b.articleCode)),
-    [mergedAll, filterCategories, filterGrades, filterProduct]
+    [mergedAll, filterCategories, filterGrades, filterProduct, arabicNameByArticle]
   );
 
   const totalABales = filtered.reduce((s, r) => s + r.aQty, 0);
@@ -709,6 +743,12 @@ export default function ProductionComparison() {
                       </th>
                       <th
                         rowSpan={2}
+                        className="px-3 py-3 text-right text-xs font-bold uppercase tracking-wider text-muted-foreground border-r border-border/50 align-bottom min-w-[180px]"
+                      >
+                        Product (Arabic)
+                      </th>
+                      <th
+                        rowSpan={2}
                         className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground border-r border-border/50 align-bottom"
                       >
                         Category
@@ -721,9 +761,9 @@ export default function ProductionComparison() {
                       </th>
                       <th
                         rowSpan={2}
-                        className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground border-r border-border/50 align-bottom min-w-[140px]"
+                        className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground border-r border-border/50 align-bottom min-w-[100px]"
                       >
-                        Worker
+                        Workers
                       </th>
                       <th
                         colSpan={3}
@@ -762,6 +802,8 @@ export default function ProductionComparison() {
                     {filtered.map((row, idx) => {
                       const qDiff = row.aQty - row.bQty;
                       const kDiff = row.aKg - row.bKg;
+                      const workerSummary = workerSummaryByArticle.get(row.articleCode) ?? [];
+                      const arabicName = arabicNameByArticle.get(row.articleCode.trim().toUpperCase()) ?? "";
                       return (
                         <tr
                           key={row.articleCode}
@@ -773,6 +815,14 @@ export default function ProductionComparison() {
                           <td className="px-4 py-2.5 border-r border-border/30">
                             <span className="font-medium text-sm leading-snug">
                               {row.productName || row.articleCode}
+                            </span>
+                          </td>
+                          <td
+                            className="px-3 py-2.5 text-sm text-right border-r border-border/30 min-w-[180px]"
+                            dir="rtl"
+                          >
+                            <span className={arabicName ? "font-medium" : "text-muted-foreground"}>
+                              {arabicName || "—"}
                             </span>
                           </td>
                           <td className="px-3 py-2.5 text-sm text-muted-foreground border-r border-border/30">
@@ -788,17 +838,7 @@ export default function ProductionComparison() {
                             )}
                           </td>
                           <td className="px-3 py-2.5 border-r border-border/30">
-                            {row.workers.length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
-                                {row.workers.map((w) => (
-                                  <Badge key={w} variant="outline" className="text-xs font-normal">
-                                    {w}
-                                  </Badge>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground text-xs">—</span>
-                            )}
+                            <WorkerSummaryHover workers={workerSummary} labelA={labelA} labelB={labelB} />
                           </td>
                           <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-foreground">
                             {fmtNum(row.aQty)}

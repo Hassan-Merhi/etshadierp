@@ -81,7 +81,7 @@ export function registerStockItemMergeRoutes(app: Express) {
       const keptMap = new Map(keptInv.map((r) => [r.locationId, r]));
       const dupMap = new Map(dupInv.map((r) => [r.locationId, r]));
 
-      const impactLocations: any[] = [];
+      const impactLocations = [];
       for (const locId of Array.from(dupMap.keys())) {
         const dupRow = dupMap.get(locId)!;
         const keptRow = keptMap.get(locId);

@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { db, pool } from "../../../db";
@@ -26,7 +26,7 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
   // ───────────────────────────────────────────────
   // 8. Daily Production Value Report
   // ───────────────────────────────────────────────
-  app.get("/api/factory/production-value-report", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/production-value-report", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -265,7 +265,7 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
       // ── Recompute each batch's display cost using current supplier locked rates ──
       // Mirrors GET /api/factory/mix-batches and EditMixBatchDialog: never uses the stored
       // batch cost fields directly; supplier-source rows always use the current locked USD rate.
-      const reportBatchIds = mixBatchRows.map((r: any) => r.id);
+      const reportBatchIds = mixBatchRows.map((r) => r.id);
       let mixSourceRows: any[] = [];
       if (reportBatchIds.length > 0) {
         mixSourceRows = await db
@@ -276,7 +276,7 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
 
       // Resolve current locked USD rate for every unique supplier referenced by sources
       const reportSupplierIds = [
-        ...new Set(mixSourceRows.filter((s: any) => s.supplierId != null).map((s: any) => s.supplierId as number)),
+        ...new Set(mixSourceRows.filter((s) => s.supplierId != null).map((s) => s.supplierId as number)),
       ];
       const reportSupplierRateMap = new Map<number, number>();
       for (const sid of reportSupplierIds) {
@@ -292,7 +292,7 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
       }
 
       // Build corrected batch objects for the report (read-only; no DB writes)
-      const correctedBatchRows = mixBatchRows.map((b: any) => {
+      const correctedBatchRows = mixBatchRows.map((b) => {
         const sources = reportSourcesByBatch.get(b.id) || [];
         let displayWeightKg = new Decimal(0);
         let displayCost = new Decimal(0);
@@ -318,8 +318,8 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
         if (displayWeightKg.gt(0)) {
           displayCostPerKg = displayCost.dividedBy(displayWeightKg);
         } else {
-          // No source rows — fall back to stored batch values
-          displayWeightKg = new Decimal(b.totalWeightKg || 0);
+          // No source rows — fall back to stored batch values. Only cost and
+          // cost/kg are read past this branch; the weight is not projected out.
           displayCost = new Decimal(b.totalCost || 0);
           displayCostPerKg = new Decimal(b.costPerKg || 0);
         }
@@ -392,9 +392,7 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
       // even when the immediate source is another mix batch.
       const inventorySupplierIds = [
         ...new Set(
-          mixSourceRows
-            .filter((s: any) => s.inventorySupplierId != null)
-            .map((s: any) => s.inventorySupplierId as number)
+          mixSourceRows.filter((s) => s.inventorySupplierId != null).map((s) => s.inventorySupplierId as number)
         ),
       ];
 
@@ -415,8 +413,8 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
       const containerIds = [
         ...new Set(
           mixSourceRows
-            .filter((s: any) => s.inventorySupplierId == null && s.containerId != null)
-            .map((s: any) => s.containerId as number)
+            .filter((s) => s.inventorySupplierId == null && s.containerId != null)
+            .map((s) => s.containerId as number)
         ),
       ];
       const containerSupplierIdMap = new Map<number, number | null>();

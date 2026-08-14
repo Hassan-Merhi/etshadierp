@@ -393,7 +393,12 @@ export default function FactoryContainerCreate() {
               {commissionFxRateLoading
                 ? `Fetching ${commissionCcy}/USD rate…`
                 : parseFloat(commissionFxRate) > 0
-                  ? `1 ${commissionCcy} = ${parseFloat(commissionFxRate).toFixed(8).replace(/\.?0+$/, "")} USD${commissionCcy === currency.toUpperCase() ? " (using container rate)" : commissionFxRateDate ? ` · ${commissionFxRateDate}` : ""}`
+                  ? `1 ${commissionCcy} = ${parseFloat(commissionFxRate)
+                      .toFixed(8)
+                      .replace(
+                        /\.?0+$/,
+                        ""
+                      )} USD${commissionCcy === currency.toUpperCase() ? " (using container rate)" : commissionFxRateDate ? ` · ${commissionFxRateDate}` : ""}`
                   : `No ${commissionCcy}/USD rate available — container creation blocked until resolved.`}
             </div>
           )}
@@ -473,7 +478,7 @@ export default function FactoryContainerCreate() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">Auto (Freight)</SelectItem>
-                {ledgerAccounts.map((acc: any) => (
+                {ledgerAccounts.map((acc) => (
                   <SelectItem key={acc.id} value={String(acc.id)}>
                     {acc.name}
                     {acc.code ? ` (${acc.code})` : ""}
@@ -549,7 +554,7 @@ export default function FactoryContainerCreate() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__none__">No account</SelectItem>
-                        {ledgerAccounts.map((acc: any) => (
+                        {ledgerAccounts.map((acc) => (
                           <SelectItem key={acc.id} value={String(acc.id)}>
                             {acc.name}
                             {acc.code ? ` (${acc.code})` : ""}

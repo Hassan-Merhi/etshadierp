@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { db } from "../../../db";
@@ -14,14 +14,14 @@ import { eq, and, asc, desc, sql, inArray, isNull } from "drizzle-orm";
 import { resultRows } from "../../../lib/queryResult";
 
 export function registerFactoryStockQueryRoutes(app: Express) {
-  app.get("/api/factory/stock-entry/in-stock", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/stock-entry/in-stock", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { locationId } = req.query;
 
-      const conditions: any[] = [eq(factoryBales.companyId, companyId), eq(factoryBales.status, "IN_STOCK")];
+      const conditions = [eq(factoryBales.companyId, companyId), eq(factoryBales.status, "IN_STOCK")];
 
       if (locationId) {
         conditions.push(eq(factoryBales.erpLocationId, parseInt(locationId as string)));
@@ -55,7 +55,7 @@ export function registerFactoryStockQueryRoutes(app: Express) {
   // GET /api/factory/stock-entry/in-stock-locations
   // Returns distinct locations that have at least one IN_STOCK factory bale,
   // including the bale count per location. Used by Ground Scan to auto-scope verification.
-  app.get("/api/factory/stock-entry/in-stock-locations", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/stock-entry/in-stock-locations", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -70,7 +70,7 @@ export function registerFactoryStockQueryRoutes(app: Express) {
             GROUP BY l.id, l.name
             ORDER BY count DESC`
       );
-      const result = resultRows(rows).map((r: any) => ({
+      const result = resultRows(rows).map((r) => ({
         id: Number(r.id),
         name: r.name as string,
         count: Number(r.count),
@@ -84,7 +84,7 @@ export function registerFactoryStockQueryRoutes(app: Express) {
 
   // GET /api/factory/bale-stock-list?articleCode=HMD123&locationId=3
   // Returns array of IN_STOCK bales with referenceNumber, weightKg, etc. for a single articleCode.
-  app.get("/api/factory/bale-stock-list", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/bale-stock-list", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -95,7 +95,7 @@ export function registerFactoryStockQueryRoutes(app: Express) {
       const rawLocationId = req.query.locationId;
       const locationId = rawLocationId ? parseInt(rawLocationId as string) : null;
 
-      const conditions: any[] = [
+      const conditions = [
         eq(factoryBales.companyId, companyId),
         eq(factoryBales.status, "IN_STOCK"),
         isNull(factoryBales.deletedAt),
@@ -147,7 +147,7 @@ export function registerFactoryStockQueryRoutes(app: Express) {
   // GET /api/factory/bale-stock-count?articleCodes=HMD123,HMD456&locationId=3
   // Returns { HMD123: 4, HMD456: 0, ... } — IN_STOCK bale counts per article code
   // Optional locationId filters to only bales at that ERP location (mirrors location-inventory page).
-  app.get("/api/factory/bale-stock-count", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/bale-stock-count", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -162,7 +162,7 @@ export function registerFactoryStockQueryRoutes(app: Express) {
       const rawLocationId = req.query.locationId;
       const locationId = rawLocationId ? parseInt(rawLocationId as string) : null;
 
-      const conditions: any[] = [
+      const conditions = [
         eq(factoryBales.companyId, companyId),
         eq(factoryBales.status, "IN_STOCK"),
         isNull(factoryBales.deletedAt),

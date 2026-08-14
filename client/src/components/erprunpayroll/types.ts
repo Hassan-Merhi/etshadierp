@@ -18,6 +18,8 @@ export interface Employee {
 export interface WorkerGroup {
   id: number;
   name: string;
+  groupType?: string | null;
+  group_type?: string | null;
   members: { id: number }[];
 }
 

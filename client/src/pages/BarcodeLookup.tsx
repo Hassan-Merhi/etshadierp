@@ -910,7 +910,7 @@ export default function BarcodeLookup() {
                         )}
                       {(referenceResult.baleInfo.deletedAt || referenceResult.baleInfo.status === "DELETED") &&
                         (() => {
-                          const deleteEntry = referenceResult.auditHistory?.find((e: any) => e.action === "delete");
+                          const deleteEntry = referenceResult.auditHistory?.find((e) => e.action === "delete");
                           return (
                             <div>
                               <p className="text-xs text-destructive flex items-center gap-1 mb-0.5">

@@ -118,7 +118,7 @@ export function registerLedgerAccountDeleteRoutes(app: Express) {
                 .from(voucherEntries)
                 .where(inArray(voucherEntries.ledgerAccountId, allAccountIds))
             : [];
-        const usedIds = new Set(usedRows.map((r: any) => r.accountId));
+        const usedIds = new Set(usedRows.map((r) => r.accountId));
         const parentIds = new Set(allAccounts.filter((a) => a.parentId !== null).map((a) => a.parentId as number));
 
         const deleted: number[] = [];

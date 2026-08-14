@@ -2,7 +2,7 @@ import { parseId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { getClientDate } from "../../../lib/dateUtils";
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { db } from "../../../db";
 import { requireAuth, requireRole } from "../../../auth";
 import { applyPostOffloadChargeMutation, type AccountingContext } from "../../../services/factory/post-offload-charge";
@@ -69,7 +69,7 @@ async function resolvePostOffloadChargeFx(opts: {
 }
 
 export function registerRawStockContainerRoutes(app: Express) {
-  app.patch("/api/factory/containers/:id/confirm-duty", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/containers/:id/confirm-duty", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -218,7 +218,7 @@ export function registerRawStockContainerRoutes(app: Express) {
   });
 
   // ── Post-offload charges: add duties/charges after a container has been offloaded ──
-  app.post("/api/factory/containers/:id/post-offload-charges", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/containers/:id/post-offload-charges", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -416,7 +416,7 @@ export function registerRawStockContainerRoutes(app: Express) {
 
   // ── GET /api/factory/containers/:id/post-offload-charges ─────────────────────
   // Returns charge history (active + undone) for a container, newest first.
-  app.get("/api/factory/containers/:id/post-offload-charges", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/containers/:id/post-offload-charges", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -447,7 +447,7 @@ export function registerRawStockContainerRoutes(app: Express) {
     "/api/factory/containers/:id/post-offload-charges/:chargeId",
     requireAuth,
     requireRole(...ADMIN_ROLES),
-    async (req: any, res: any) => {
+    async (req: Request, res: Response) => {
       try {
         const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -590,7 +590,7 @@ export function registerRawStockContainerRoutes(app: Express) {
     "/api/factory/containers/:id/post-offload-charges/:chargeId",
     requireAuth,
     requireRole(...ADMIN_ROLES),
-    async (req: any, res: any) => {
+    async (req: Request, res: Response) => {
       try {
         const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -663,7 +663,7 @@ export function registerRawStockContainerRoutes(app: Express) {
     "/api/factory/containers/:id/post-offload-charges/:chargeId/legacy-rebuild",
     requireAuth,
     requireRole(...ADMIN_ROLES),
-    async (req: any, res: any) => {
+    async (req: Request, res: Response) => {
       try {
         const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -717,7 +717,7 @@ export function registerRawStockContainerRoutes(app: Express) {
     }
   );
 
-  app.get("/api/factory/containers/:id/duty-audit-log", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/containers/:id/duty-audit-log", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -738,7 +738,7 @@ export function registerRawStockContainerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/container-commissions/:containerId", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/container-commissions/:containerId", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

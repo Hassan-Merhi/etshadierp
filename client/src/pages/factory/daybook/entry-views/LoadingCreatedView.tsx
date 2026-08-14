@@ -141,7 +141,7 @@ export function LoadingCreatedView({
                       </tr>
                     </thead>
                     <tbody>
-                      {lines.map((l: any, i: number) => {
+                      {lines.map((l, i: number) => {
                         const qty = parseInt(l.quantity || "0") || 0;
                         const price = n(l.pricePerBale || l.unitPrice || "0");
                         const total = n(l.totalAmount || l.lineTotal || String(qty * price));

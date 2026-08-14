@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { getClientDate } from "../../../lib/dateUtils";
 import { logger } from "../../../lib/logger";
@@ -19,7 +19,7 @@ export function registerFactoryContainerImportRoutes(app: Express) {
   // 4b. Factory Containers - Excel Import
   // ───────────────────────────────────────────────
 
-  app.post("/api/factory/containers/import-excel", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/containers/import-excel", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -35,9 +35,9 @@ export function registerFactoryContainerImportRoutes(app: Express) {
       const allSuppliers = await db.select().from(factorySuppliers).where(eq(factorySuppliers.companyId, companyId));
 
       const supplierMap = new Map<string, number>();
-      allSuppliers.forEach((s: any) => supplierMap.set(s.name.toLowerCase().trim(), s.id));
+      allSuppliers.forEach((s) => supplierMap.set(s.name.toLowerCase().trim(), s.id));
 
-      const results: any[] = [];
+      const results = [];
       const errors: string[] = [];
 
       for (let i = 0; i < rows.length; i++) {

@@ -26,7 +26,7 @@ export function registerStockItemBulkRoutes(app: Express) {
         return res.status(400).json({ message: "Invalid or empty ids array" });
       }
       // Explicitly parse all IDs as integers to prevent "operator does not exist: integer = text"
-      const ids = rawIds.map((id: any) => parseInt(id, 10)).filter((n: number) => !isNaN(n) && n > 0);
+      const ids = rawIds.map((id) => parseInt(id, 10)).filter((n: number) => !isNaN(n) && n > 0);
       if (ids.length === 0) {
         return res.status(400).json({ message: "No valid numeric IDs provided" });
       }
@@ -47,7 +47,7 @@ export function registerStockItemBulkRoutes(app: Express) {
         )}]) GROUP BY stock_item_id`
       );
       if ((inventoryCheck.rows as any[]).length > 0) {
-        const blockedIds = new Set((inventoryCheck.rows as any[]).map((r: any) => parseInt(r.stock_item_id)));
+        const blockedIds = new Set((inventoryCheck.rows as any[]).map((r) => parseInt(r.stock_item_id)));
         const blockedCodes = validItems.filter((item) => blockedIds.has(item.id)).map((item) => item.code);
         return res.status(400).json({
           message: `Cannot delete ${blockedCodes.length} item(s) — they have existing inventory records: ${blockedCodes.join(", ")}. Please clear all inventory first.`,
@@ -103,7 +103,7 @@ export function registerStockItemBulkRoutes(app: Express) {
       if (!Array.isArray(rawIds) || rawIds.length === 0) {
         return res.status(400).json({ message: "Invalid or empty ids array" });
       }
-      const ids = rawIds.map((id: any) => parseInt(id, 10)).filter((n: number) => !isNaN(n) && n > 0);
+      const ids = rawIds.map((id) => parseInt(id, 10)).filter((n: number) => !isNaN(n) && n > 0);
       if (ids.length === 0) {
         return res.status(400).json({ message: "No valid numeric IDs provided" });
       }
@@ -365,7 +365,7 @@ export function registerStockItemBulkRoutes(app: Express) {
       const failures: { id: number; name: string; reason: string }[] = [];
 
       const validItems = await storage.bulkGetStockItemsByIds(
-        itemIds.map((id: any) => Number(id)),
+        itemIds.map((id) => Number(id)),
         req.session.currentCompanyId
       );
 

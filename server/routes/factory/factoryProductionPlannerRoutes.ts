@@ -1,4 +1,5 @@
 import { Express } from "express";
+import type { Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
@@ -12,7 +13,7 @@ export function registerProductionPlannerRoutes(app: Express) {
     (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId || null;
 
   // ── GET plan for a date ──────────────────────────────────────────────────────
-  app.get("/api/factory/production-planner/:date", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/production-planner/:date", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -23,7 +24,7 @@ export function registerProductionPlannerRoutes(app: Express) {
         FROM factory_production_plans
         WHERE company_id = ${companyId} AND plan_date = ${date}
       `);
-      const planRows: any[] = Array.isArray(plans) ? plans : resultRows(plans);
+      const planRows = Array.isArray(plans) ? plans : resultRows(plans);
       const plan = planRows[0] ?? null;
 
       if (!plan) return res.json({ plan: null, entries: [], actuals: {} });
@@ -39,9 +40,9 @@ export function registerProductionPlannerRoutes(app: Express) {
         WHERE e.plan_id = ${planId}
         ORDER BY w.full_name
       `);
-      const entries: any[] = Array.isArray(entryResult) ? entryResult : resultRows(entryResult);
+      const entries = Array.isArray(entryResult) ? entryResult : resultRows(entryResult);
 
-      const workerIds = entries.map((e: any) => Number(e.workerId));
+      const workerIds = entries.map((e) => Number(e.workerId));
       let categoryIds: number[] = [];
       try {
         const parsed = JSON.parse(plan.category_ids || "[]");
@@ -60,8 +61,8 @@ export function registerProductionPlannerRoutes(app: Express) {
             WHERE company_id = ${companyId}
               AND id = ANY(${sqlArray(categoryIds)})
           `);
-          const wcRows: any[] = Array.isArray(wcResult) ? wcResult : resultRows(wcResult);
-          const teamWorkerIds = wcRows.flatMap((r: any) => {
+          const wcRows = Array.isArray(wcResult) ? wcResult : resultRows(wcResult);
+          const teamWorkerIds = wcRows.flatMap((r) => {
             const ids = r.worker_ids;
             if (Array.isArray(ids)) return ids.map(Number);
             try {
@@ -88,7 +89,7 @@ export function registerProductionPlannerRoutes(app: Express) {
               ${teamWorkerFilter}
             GROUP BY fb.finalized_by
           `);
-          const actualRows: any[] = Array.isArray(actualResult) ? actualResult : resultRows(actualResult);
+          const actualRows = Array.isArray(actualResult) ? actualResult : resultRows(actualResult);
           for (const row of actualRows) {
             actuals[Number(row.worker_id)] = Number(row.bale_count);
           }
@@ -116,7 +117,7 @@ export function registerProductionPlannerRoutes(app: Express) {
   });
 
   // ── POST — upsert plan for a date ───────────────────────────────────────────
-  app.post("/api/factory/production-planner/:date", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/production-planner/:date", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -140,7 +141,7 @@ export function registerProductionPlannerRoutes(app: Express) {
         SELECT id FROM factory_production_plans
         WHERE company_id = ${companyId} AND plan_date = ${date}
       `);
-      const planRows: any[] = Array.isArray(planResult) ? planResult : resultRows(planResult);
+      const planRows = Array.isArray(planResult) ? planResult : resultRows(planResult);
       const planId = Number(planRows[0].id);
 
       await db.execute(sql`DELETE FROM factory_production_plan_entries WHERE plan_id = ${planId}`);
@@ -163,7 +164,7 @@ export function registerProductionPlannerRoutes(app: Express) {
   });
 
   // ── GET — copy previous day's plan entries ──────────────────────────────────
-  app.get("/api/factory/production-planner/:date/copy-previous", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/production-planner/:date/copy-previous", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -175,7 +176,7 @@ export function registerProductionPlannerRoutes(app: Express) {
         WHERE company_id = ${companyId} AND plan_date < ${date}
         ORDER BY plan_date DESC LIMIT 1
       `);
-      const prevRows: any[] = Array.isArray(prevResult) ? prevResult : resultRows(prevResult);
+      const prevRows = Array.isArray(prevResult) ? prevResult : resultRows(prevResult);
       if (!prevRows[0]) return res.json({ entries: [], categoryIds: [], fromDate: null });
 
       const prevPlanId = Number(prevRows[0].id);
@@ -189,7 +190,7 @@ export function registerProductionPlannerRoutes(app: Express) {
         WHERE e.plan_id = ${prevPlanId}
         ORDER BY w.full_name
       `);
-      const entries: any[] = Array.isArray(entryResult) ? entryResult : resultRows(entryResult);
+      const entries = Array.isArray(entryResult) ? entryResult : resultRows(entryResult);
 
       let prevCategoryIds: number[] = [];
       try {
@@ -211,7 +212,7 @@ export function registerProductionPlannerRoutes(app: Express) {
   });
 
   // ── GET — worker plan map for a date (used by StockEntryHistory) ─────────────
-  app.get("/api/factory/production-planner/:date/worker-targets", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/production-planner/:date/worker-targets", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -221,7 +222,7 @@ export function registerProductionPlannerRoutes(app: Express) {
         SELECT id FROM factory_production_plans
         WHERE company_id = ${companyId} AND plan_date = ${date}
       `);
-      const planRows: any[] = Array.isArray(planResult) ? planResult : resultRows(planResult);
+      const planRows = Array.isArray(planResult) ? planResult : resultRows(planResult);
       if (!planRows[0]) return res.json({});
 
       const planId = Number(planRows[0].id);
@@ -233,7 +234,7 @@ export function registerProductionPlannerRoutes(app: Express) {
         FROM factory_production_plan_entries e
         WHERE e.plan_id = ${planId}
       `);
-      const entries: any[] = Array.isArray(entryResult) ? entryResult : resultRows(entryResult);
+      const entries = Array.isArray(entryResult) ? entryResult : resultRows(entryResult);
 
       const map: Record<number, { targetBales: number; workerCount: number }> = {};
       for (const e of entries) {
@@ -247,7 +248,7 @@ export function registerProductionPlannerRoutes(app: Express) {
   });
 
   // ── DELETE plan for a date ──────────────────────────────────────────────────
-  app.delete("/api/factory/production-planner/:date", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/production-planner/:date", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -257,7 +258,7 @@ export function registerProductionPlannerRoutes(app: Express) {
         SELECT id FROM factory_production_plans
         WHERE company_id = ${companyId} AND plan_date = ${date}
       `);
-      const planRows: any[] = Array.isArray(planResult) ? planResult : resultRows(planResult);
+      const planRows = Array.isArray(planResult) ? planResult : resultRows(planResult);
       if (planRows[0]) {
         const planId = Number(planRows[0].id);
         await db.execute(sql`DELETE FROM factory_production_plan_entries WHERE plan_id = ${planId}`);

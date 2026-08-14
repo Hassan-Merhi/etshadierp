@@ -75,7 +75,7 @@ export default function BatchDetail({ batchId, onBack, onDeleted }: BatchDetailP
     queryKey: ["/api/factory/suppliers"],
   });
 
-  const supplierMap = Object.fromEntries((suppliers || []).map((s: any) => [s.id, s.name]));
+  const supplierMap = Object.fromEntries((suppliers || []).map((s) => [s.id, s.name]));
 
   const editMutation = useMutation({
     mutationFn: async () => {
@@ -340,7 +340,7 @@ export default function BatchDetail({ batchId, onBack, onDeleted }: BatchDetailP
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {bales.map((row: any) => {
+                    {bales.map((row) => {
                       const bale = row.bale;
                       const product = row.product;
                       const location = row.location;

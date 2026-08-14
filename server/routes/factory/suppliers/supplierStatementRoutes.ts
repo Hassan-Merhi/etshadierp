@@ -1,7 +1,7 @@
 import { parseId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { sqlArray } from "../../../lib/sqlArray";
@@ -24,7 +24,7 @@ import { isSupplierPaidFreight } from "./_supplierStatementHelpers";
 import { buildLinkedSupplierGroups } from "./linkedSupplierGroups";
 
 export function registerSupplierStatementRoutes(app: Express) {
-  app.get("/api/factory/suppliers/:id/statement", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/suppliers/:id/statement", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -108,7 +108,7 @@ export function registerSupplierStatementRoutes(app: Express) {
                   eq(factoryRawStock.companyId, companyId),
                   inArray(
                     factoryRawStock.containerId,
-                    containers.map((c: any) => c.id)
+                    containers.map((c) => c.id)
                   )
                 )
               )
@@ -159,14 +159,14 @@ export function registerSupplierStatementRoutes(app: Express) {
       // Use otherChargesCurrencyCode when set, otherwise default to USD
       const allSupplierCharges = [
         ...(supplierOffloadCharges as any[]),
-        ...(containerColCharges as any[]).map((c: any) => ({
+        ...(containerColCharges as any[]).map((c) => ({
           ...c,
           amount: c.amount,
           currencyCode: c.otherChargesCurrencyCode || "USD",
         })),
       ];
 
-      const statement = containers.map((c: any) => {
+      const statement = containers.map((c) => {
         // Use totalKg (declared/agreed weight) for the payable value shown to the supplier.
         // actualReceivedKg only affects inventory — not the agreed purchase amount.
         const kg = parseFloat(c.totalKg || "0");
@@ -181,13 +181,13 @@ export function registerSupplierStatementRoutes(app: Express) {
         const freightCc = c.freightCurrencyCode || containerCc;
         // Only include freight in value when it shares the container's currency; cross-currency freight is a separate obligation.
         const value = kg * rate + (freightCc === containerCc ? freight : 0);
-        const containerCommissions = commissions.filter((cm: any) => cm.containerId === c.id);
+        const containerCommissions = commissions.filter((cm) => cm.containerId === c.id);
         const totalCommission = containerCommissions.reduce(
           (sum: number, cm: any) => sum + parseFloat(cm.commissionTotal || "0"),
           0
         );
 
-        const hasRawStock = obRawStockWithCommission.some((r: any) => r.containerId === c.id);
+        const hasRawStock = obRawStockWithCommission.some((r) => r.containerId === c.id);
         const effectiveStatus = c.status === "ARRIVED" && hasRawStock ? "OFFLOADED" : c.status;
         return {
           id: c.id,
@@ -407,7 +407,7 @@ export function registerSupplierStatementRoutes(app: Express) {
 
       // Phase 3: Enrich FX transfers with counterparty supplier names for bilateral visibility
       const fxSupplierIds = [
-        ...new Set((fxTransfers as any[]).flatMap((t: any) => [t.fromSupplierId, t.toSupplierId]).filter(Boolean)),
+        ...new Set((fxTransfers as any[]).flatMap((t) => [t.fromSupplierId, t.toSupplierId]).filter(Boolean)),
       ];
       const fxSupplierNames: Record<number, string> = {};
       if (fxSupplierIds.length > 0) {
@@ -418,9 +418,7 @@ export function registerSupplierStatementRoutes(app: Express) {
         for (const s of fxSups) fxSupplierNames[s.id] = s.name;
       }
       // Enrich incoming FX transfers with the container numbers they cover (cross-reference)
-      const incomingFxIds = (fxTransfers as any[])
-        .filter((t: any) => t.toSupplierId === supplierId)
-        .map((t: any) => t.id);
+      const incomingFxIds = (fxTransfers as any[]).filter((t) => t.toSupplierId === supplierId).map((t) => t.id);
       const fxContainerRefsMap: Record<number, Array<{ containerNumber: string; allocatedAmount: string }>> = {};
       if (incomingFxIds.length > 0) {
         const fxAllocs = await db
@@ -442,7 +440,7 @@ export function registerSupplierStatementRoutes(app: Express) {
         }
       }
 
-      const enrichedFxTransfers = (fxTransfers as any[]).map((t: any) => ({
+      const enrichedFxTransfers = (fxTransfers as any[]).map((t) => ({
         ...t,
         fromSupplierName: fxSupplierNames[t.fromSupplierId] || "",
         toSupplierName: fxSupplierNames[t.toSupplierId] || "",
@@ -592,7 +590,7 @@ export function registerSupplierStatementRoutes(app: Express) {
         // Weighted-average fxRateToUsd across this currency's containers whose rate actually
         // looks resolved (confirmed non-USD rate, or legacy heuristic where no flag exists yet).
         const ctrs: any[] = cg.containers;
-        const resolvedCtrs = ctrs.filter((c: any) => {
+        const resolvedCtrs = ctrs.filter((c) => {
           const { looksSet } = resolveStoredFxRate(cg.currencyCode, c.fxRateToUsd, (c as any).fxRateConfirmed);
           return looksSet;
         });
@@ -613,7 +611,7 @@ export function registerSupplierStatementRoutes(app: Express) {
       // Offload charges may reference containers belonging to child suppliers (broker receives a charge
       // on a child's container). Fetch any missing containers so we can show the real container number.
       const missingContainerIds = [
-        ...new Set(allSupplierCharges.map((oc: any) => oc.containerId).filter((id: number) => !containerMap[id])),
+        ...new Set(allSupplierCharges.map((oc) => oc.containerId).filter((id: number) => !containerMap[id])),
       ];
       if (missingContainerIds.length > 0) {
         const extraContainers = await db
@@ -633,9 +631,7 @@ export function registerSupplierStatementRoutes(app: Express) {
       }
 
       // Fetch commission supplier names for the statement
-      const commSupplierIds = (obRawStockWithCommission as any[])
-        .map((r: any) => r.commissionSupplierId)
-        .filter(Boolean);
+      const commSupplierIds = (obRawStockWithCommission as any[]).map((r) => r.commissionSupplierId).filter(Boolean);
       const commSupplierMap: Record<number, string> = {};
       if (commSupplierIds.length > 0) {
         const commSuppliers = await db
@@ -645,8 +641,8 @@ export function registerSupplierStatementRoutes(app: Express) {
         for (const s of commSuppliers) commSupplierMap[s.id] = s.name;
       }
       const obCommissions = (obRawStockWithCommission as any[])
-        .filter((r: any) => r.commissionAmount && parseFloat(r.commissionAmount) > 0)
-        .map((r: any) => ({
+        .filter((r) => r.commissionAmount && parseFloat(r.commissionAmount) > 0)
+        .map((r) => ({
           rawStockId: r.id,
           containerId: r.containerId,
           containerNumber: containerMap[r.containerId]?.containerNumber || "",
@@ -671,7 +667,7 @@ export function registerSupplierStatementRoutes(app: Express) {
       const linkedSupplierGroups = await buildLinkedSupplierGroups(supplierId, companyId, commissions);
 
       // ── Phase 1: Fetch per-container FX allocations ──────────────────────────
-      const containerIds = containers.map((c: any) => c.id);
+      const containerIds = containers.map((c) => c.id);
       const allocationsByContainer: Record<number, number> = {};
       if (containerIds.length > 0) {
         const allocs = await db
@@ -689,7 +685,7 @@ export function registerSupplierStatementRoutes(app: Express) {
         }
       }
       // Enrich each statement row with allocatedAmount + remainingAmount
-      const enrichedStatement = statement.map((s: any) => {
+      const enrichedStatement = statement.map((s) => {
         const val = parseFloat(s.value || "0");
         const comm = parseFloat(s.totalCommission || "0");
         const netVal = val - comm;
@@ -707,7 +703,7 @@ export function registerSupplierStatementRoutes(app: Express) {
         return `${sign}${prefix}${parseFloat(amt || "0").toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       };
       const ledger: any[] = [
-        ...enrichedStatement.map((s: any) => ({
+        ...enrichedStatement.map((s) => ({
           key: `c-${s.id}`,
           date: s.date,
           type: "purchase",
@@ -719,7 +715,7 @@ export function registerSupplierStatementRoutes(app: Express) {
           allocatedAmount: s.allocatedAmount,
           remainingAmount: s.remainingAmount,
         })),
-        ...(payments as any[]).map((p: any) => ({
+        ...(payments as any[]).map((p) => ({
           key: `p-${p.id}`,
           date: p.date,
           type: "payment",
@@ -729,7 +725,7 @@ export function registerSupplierStatementRoutes(app: Express) {
           amountIsNeg: true,
           notes: p.notes,
         })),
-        ...(voucherPaymentRows as any[]).map((p: any) => ({
+        ...(voucherPaymentRows as any[]).map((p) => ({
           key: `vp-${p.id}`,
           date: p.voucherDate,
           type: "payment",
@@ -740,7 +736,7 @@ export function registerSupplierStatementRoutes(app: Express) {
           notes: null,
           optional: !!p.optional,
         })),
-        ...enrichedFxTransfers.map((t: any) => {
+        ...enrichedFxTransfers.map((t) => {
           const isOut = t.fromSupplierId === supplierId;
           const isSelf = t.fromSupplierId === t.toSupplierId;
           const cc = isOut ? t.fromCurrencyCode || "USD" : "USD";
@@ -759,7 +755,7 @@ export function registerSupplierStatementRoutes(app: Express) {
             notes: t.notes,
           };
         }),
-        ...obCommissions.map((oc: any) => ({
+        ...obCommissions.map((oc) => ({
           key: `oc-${oc.rawStockId}`,
           date: oc.date,
           type: "commission",
@@ -769,7 +765,7 @@ export function registerSupplierStatementRoutes(app: Express) {
           amountIsNeg: true,
           notes: null,
         })),
-        ...allSupplierCharges.map((oc: any) => {
+        ...allSupplierCharges.map((oc) => {
           const cc = oc.currencyCode || "USD";
           return {
             key: `oac-${oc.id}`,

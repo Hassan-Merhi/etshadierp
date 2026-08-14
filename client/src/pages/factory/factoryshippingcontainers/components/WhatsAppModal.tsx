@@ -3,19 +3,19 @@
  *
  * Extracted from FactoryShippingContainers.tsx during the Phase 4 god-file split.
  */
-import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Separator } from "@/components/ui/separator";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { MessageCircle, Download, Copy, ExternalLink, Eye, Check, RefreshCw, Loader2 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import type { WaFileWithChecked, WhatsAppPreview } from "../types";
-import { LIST_KEY } from "../utils";
+import {useState, useEffect} from "react";
+import {useQuery} from "@tanstack/react-query";
+import {Button} from "@/components/ui/button";
+import {Badge} from "@/components/ui/badge";
+import {Textarea} from "@/components/ui/textarea";
+import {Checkbox} from "@/components/ui/checkbox";
+import {Separator} from "@/components/ui/separator";
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
+import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog";
+import {MessageCircle, Download, Copy, ExternalLink, Eye, Check, RefreshCw, Loader2} from "lucide-react";
+import {useToast} from "@/hooks/use-toast";
+import type {WaFileWithChecked, WhatsAppPreview} from "../types";
+import {LIST_KEY} from "../utils";
 
 export function WhatsAppModal({
   open,
@@ -108,6 +108,9 @@ export function WhatsAppModal({
         throw new Error(err.message || "Download failed");
       }
       const blob = await res.blob();
+      if (blob.size === 0) {
+        throw new Error("The ZIP package was empty. Refresh the file list and try again.");
+      }
       const disposition = res.headers.get("Content-Disposition") || "";
       const nameMatch = disposition.match(/filename="([^"]+)"/);
       const filename = nameMatch ? nameMatch[1] : "shipping-package.zip";
@@ -118,7 +121,9 @@ export function WhatsAppModal({
       document.body.appendChild(a);
       a.click();
       a.remove();
-      URL.revokeObjectURL(blobUrl);
+      // Revoking synchronously can race Chrome's download hand-off and produce a
+      // zero-byte file on some machines. Keep the object URL alive briefly.
+      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 30_000);
     } catch (err: any) {
       toast({ title: "Download failed", description: err.message, variant: "destructive" });
     } finally {

@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
@@ -30,7 +30,7 @@ import {
 
 export function registerPayrollGenerateRoutes(app: Express) {
   // POST /api/factory/payrolls/generate-bulk - Generate draft payrolls for multiple workers
-  app.post("/api/factory/payrolls/generate-bulk", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/payrolls/generate-bulk", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -286,7 +286,7 @@ export function registerPayrollGenerateRoutes(app: Express) {
               sourceModule: "FACTORY",
             })
             .returning();
-          const journalEntries: any[] = [];
+          const journalEntries = [];
           // DR entries per worker (one salary line + one bonus line each)
           for (const { workerId, workerName, salAmt, bonAmt } of workerExpenses) {
             const accs = workerAccCache.get(workerId)!;

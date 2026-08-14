@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { eq, and, sql, gte, lte } from "drizzle-orm";
@@ -18,7 +18,7 @@ import {
 } from "@shared/schema";
 
 export function registerFactorySupplierScoreRoutes(app: Express, requireAuth: any, db: any) {
-  app.get("/api/factory/suppliers/score", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/suppliers/score", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

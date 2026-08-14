@@ -442,7 +442,7 @@ export async function buildGcMigrationPreview(sourceId: number, targetId: number
     SELECT alias_code FROM stock_item_code_aliases WHERE company_id = ${targetId}
   `)
   ).rows as any[];
-  const existingAliasCodes = new Set(existingAliases.map((r: any) => r.alias_code));
+  const existingAliasCodes = new Set(existingAliases.map((r) => r.alias_code));
 
   // Real mapping check: has this source stock item already been linked to a target
   // stock item by a prior staged migration run (sp_migration_source_links)?
@@ -455,15 +455,15 @@ export async function buildGcMigrationPreview(sourceId: number, targetId: number
       JOIN stock_items ti ON ti.id = l.target_id AND ti.company_id = ${targetId} AND ti.deleted_at IS NULL
       WHERE l.source_table = 'stock_items' AND l.target_table = 'stock_items'
         AND l.source_id IN (${sql.join(
-          stockRows.map((r: any) => sql`${pn(r.stock_item_id)}`),
+          stockRows.map((r) => sql`${pn(r.stock_item_id)}`),
           sql`, `
         )})
     `)
     ).rows as any[];
-    mappedSourceIds = new Set(linkedRows.map((r: any) => pn(r.source_id)));
+    mappedSourceIds = new Set(linkedRows.map((r) => pn(r.source_id)));
   }
 
-  const stockItems = stockRows.map((r: any) => ({
+  const stockItems = stockRows.map((r) => ({
     code: r.code,
     name: r.name,
     quantity: pn(r.quantity),
@@ -505,7 +505,7 @@ export async function buildGcMigrationPreview(sourceId: number, targetId: number
     WHERE company_id = ${targetId} AND deleted_at IS NULL AND sub_type LIKE 'sp_%'
   `)
   ).rows as any[];
-  const existingSpSubTypes = new Set(spAcctRows.map((r: any) => r.sub_type));
+  const existingSpSubTypes = new Set(spAcctRows.map((r) => r.sub_type));
   const spAccountsStatus = SP_ACCOUNTS.map((a) => ({
     subType: a.subType,
     name: a.name,
@@ -520,7 +520,7 @@ export async function buildGcMigrationPreview(sourceId: number, targetId: number
     WHERE company_id = ${targetId} AND deleted_at IS NULL AND sub_type = ANY(${sqlArray(gcAllSubTypes)})
   `)
   ).rows as any[];
-  const existingGcSubTypes = new Map(gcAcctRows.map((r: any) => [r.sub_type, r.name]));
+  const existingGcSubTypes = new Map(gcAcctRows.map((r) => [r.sub_type, r.name]));
 
   const totalQty = stockItems.reduce((s: number, i: any) => s + i.quantity, 0);
   const totalValue = stockItems.reduce((s: number, i: any) => s + i.totalValueUsd, 0);

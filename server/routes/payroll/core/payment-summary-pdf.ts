@@ -1,7 +1,7 @@
 /**
  * payrollCoreRoutes: PayrollPaymentSummaryPdf endpoints.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
@@ -13,7 +13,7 @@ import { getFactoryCompanyId } from "./_helpers";
 import { getProductionBonusTotalsForPayrollIds } from "../../../services/payroll/productionBonusPayrollService";
 
 export function registerPayrollPaymentSummaryPdfRoutes(app: Express) {
-  app.post("/api/factory/payrolls/payment-summary-pdf", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/payrolls/payment-summary-pdf", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -28,14 +28,14 @@ export function registerPayrollPaymentSummaryPdfRoutes(app: Express) {
 
       const productionTotals = await getProductionBonusTotalsForPayrollIds(
         db,
-        payrollRows.map((payroll: any) => payroll.id)
+        payrollRows.map((payroll) => payroll.id)
       );
-      const workerIdList = [...new Set(payrollRows.map((payroll: any) => payroll.workerId))];
+      const workerIdList = [...new Set(payrollRows.map((payroll) => payroll.workerId))];
       const workerRows = await db
         .select({ id: factoryWorkers.id, fullName: factoryWorkers.fullName })
         .from(factoryWorkers)
         .where(inArray(factoryWorkers.id, workerIdList));
-      const workerMap = new Map(workerRows.map((worker: any) => [worker.id, worker.fullName]));
+      const workerMap = new Map(workerRows.map((worker) => [worker.id, worker.fullName]));
       const [companyRow] = await db.select({ name: companies.name }).from(companies).where(eq(companies.id, companyId));
 
       const PDFDocument = (await import("pdfkit")).default;
@@ -63,7 +63,9 @@ export function registerPayrollPaymentSummaryPdfRoutes(app: Express) {
       try {
         convertArabic = (require("arabic-reshaper") as any).convertArabic;
         bidi = (require("bidi-js") as any)();
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
 
       const containsArabic = (text: string) => /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text);
       const shapeText = (text: string): string => {
@@ -99,7 +101,9 @@ export function registerPayrollPaymentSummaryPdfRoutes(app: Express) {
         try {
           doc.image(logoPath, (doc.page.width - 220) / 2, doc.y, { width: 220 });
           doc.moveDown(0.5);
-        } catch {}
+        } catch {
+          // Failure here is non-fatal and the surrounding flow continues deliberately.
+        }
       }
       doc
         .fontSize(11)
@@ -110,7 +114,7 @@ export function registerPayrollPaymentSummaryPdfRoutes(app: Express) {
       doc.fontSize(8).fillColor("#666666").text(`Generated: ${new Date().toLocaleDateString()}`, { align: "center" });
       doc.moveDown(0.8);
 
-      const periods = [...new Set(payrollRows.map((payroll: any) => `${payroll.periodStart} – ${payroll.periodEnd}`))];
+      const periods = [...new Set(payrollRows.map((payroll) => `${payroll.periodStart} – ${payroll.periodEnd}`))];
       doc
         .fontSize(8)
         .fillColor("#333333")
@@ -136,7 +140,7 @@ export function registerPayrollPaymentSummaryPdfRoutes(app: Express) {
       let totalNet = 0;
       let totalProduction = 0;
       let totalOther = 0;
-      payrollRows.forEach((payroll: any, index: number) => {
+      payrollRows.forEach((payroll, index: number) => {
         const name = (workerMap.get(payroll.workerId) as string) || `Worker #${payroll.workerId}`;
         const present = payroll.presentDays != null ? Number(payroll.presentDays) : null;
         const absent = payroll.absentDays != null ? Number(payroll.absentDays) : null;

@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express, Request } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
@@ -25,7 +25,7 @@ import { firstRow, resultRows } from "../../../lib/queryResult";
 export function registerDispatchInvoiceRoutes(app: Express) {
   // ── GET /api/factory/dispatch-batches/:id/invoice-preview ─────────────────
   // Preview the final invoice before generation — proforma-aware
-  app.get("/api/factory/dispatch-batches/:id/invoice-preview", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/dispatch-batches/:id/invoice-preview", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -62,8 +62,8 @@ export function registerDispatchInvoiceRoutes(app: Express) {
           and(eq(customerDispatchTruckRides.batchId, batchId), eq(customerDispatchTruckRides.companyId, companyId))
         );
 
-      const loadingRides = allRides.filter((r: any) => r.status === "LOADING" || r.status === "DRAFT");
-      const dispatchedRides = allRides.filter((r: any) => r.status === "DISPATCHED");
+      const loadingRides = allRides.filter((r) => r.status === "LOADING" || r.status === "DRAFT");
+      const dispatchedRides = allRides.filter((r) => r.status === "DISPATCHED");
 
       // Scanned bales grouped by article (active scans only)
       const articleSummary = await db.execute(sql`
@@ -110,11 +110,11 @@ export function registerDispatchInvoiceRoutes(app: Express) {
               : sql`AND 1=0`
           }
       `);
-      const mismatches = resultRows(mismatchRows).map((r: any) => r.articleCode);
+      const mismatches = resultRows(mismatchRows).map((r) => r.articleCode);
 
       // Proforma progress per article
-      const proformaProgress = proformaLines.map((pl: any) => {
-        const scanned = articleRows.find((a: any) => a.articleCode === pl.articleCode);
+      const proformaProgress = proformaLines.map((pl) => {
+        const scanned = articleRows.find((a) => a.articleCode === pl.articleCode);
         return {
           articleCode: pl.articleCode,
           productName: pl.productName,
@@ -171,7 +171,7 @@ export function registerDispatchInvoiceRoutes(app: Express) {
 
   // ── POST /api/factory/dispatch-batches/:id/generate-invoice ───────────────
   // Generate one final invoice from all dispatched truck rides
-  app.post("/api/factory/dispatch-batches/:id/generate-invoice", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/dispatch-batches/:id/generate-invoice", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -216,7 +216,7 @@ export function registerDispatchInvoiceRoutes(app: Express) {
           WHERE batch_id = ${batchId} AND company_id = ${companyId}
         `);
         const rides = resultRows(rideRows);
-        const loadingRides = rides.filter((r: any) => r.status === "LOADING" || r.status === "DRAFT");
+        const loadingRides = rides.filter((r) => r.status === "LOADING" || r.status === "DRAFT");
         if (loadingRides.length > 0)
           throw new Error(
             `${loadingRides.length} ride(s) are still in LOADING status. All rides must be DISPATCHED first.`
@@ -343,7 +343,7 @@ export function registerDispatchInvoiceRoutes(app: Express) {
         }
 
         // 10. Mark all scanned bales as SOLD
-        const baleIds = scans.map((s: any) => s.bale_id);
+        const baleIds = scans.map((s) => s.bale_id);
         await tx.execute(sql`
           UPDATE factory_bales SET status = 'SOLD', updated_at = now()
           WHERE id = ANY(${baleIds}::int[])
@@ -386,11 +386,11 @@ export function registerDispatchInvoiceRoutes(app: Express) {
             invoicedCounts[r.article_code] = parseInt(r.cnt || "0");
           }
 
-          const allFulfilled = proformaLines.every((pl: any) => {
+          const allFulfilled = proformaLines.every((pl) => {
             const invoiced = invoicedCounts[pl.article_code] || 0;
             return invoiced >= pl.quantity;
           });
-          const anyFulfilled = proformaLines.some((pl: any) => {
+          const anyFulfilled = proformaLines.some((pl) => {
             const invoiced = invoicedCounts[pl.article_code] || 0;
             return invoiced > 0;
           });

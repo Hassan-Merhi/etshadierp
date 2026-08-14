@@ -36,9 +36,12 @@ function frameEtag(userId: string, frame: any): string {
     Number(frame?.cursor?.ts) || 0,
     latestClickTs,
     Number(frame?.capture?.encodedBytes) || 0,
+    frame?.captureFailure?.occurredAt ?? "",
+    frame?.captureFailure?.stage ?? "",
+    frame?.captureFailure?.reason ?? "",
   ].join(":");
   const digest = createHash("sha1").update(identity).digest("hex");
-  return `W/\"screen-feed-${digest}\"`;
+  return `W/"screen-feed-${digest}"`;
 }
 
 function matchesEtag(header: string | string[] | undefined, etag: string): boolean {
@@ -143,7 +146,7 @@ export function registerScreenFeedTransportHardening(app: Express): void {
     if (req.method === "GET") {
       const match = pathname.match(/^\/api\/screen-feed\/([^/]+)$/);
       if (match) {
-        let watchedUserId = "";
+        let watchedUserId: string;
         try {
           watchedUserId = decodeURIComponent(match[1]);
         } catch {

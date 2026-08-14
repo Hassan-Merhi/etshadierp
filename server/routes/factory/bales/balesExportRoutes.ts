@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { db } from "../../../db";
@@ -19,7 +19,7 @@ export function registerBalesExportRoutes(app: Express) {
   // 10. Factory Bales queries
   // ───────────────────────────────────────────────
 
-  app.get("/api/factory/bales/export-full.xlsx", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/bales/export-full.xlsx", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -121,7 +121,7 @@ export function registerBalesExportRoutes(app: Express) {
   });
 
   // GET /api/factory/bales/stock-register.xlsx — Full stock register: all bales, all statuses
-  app.get("/api/factory/bales/stock-register.xlsx", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/bales/stock-register.xlsx", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

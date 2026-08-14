@@ -21,6 +21,12 @@ export interface TransferWAItem {
 
 export interface SendTransferWAOptions {
   destinationLocationId: number;
+  /**
+   * POS notifications must use the location assigned to the POS user, not the
+   * transfer destination. The destination is still kept separately for the
+   * rendered transfer context.
+   */
+  recipientLocationId?: number;
   sourceLocationName: string;
   destLocationName: string;
   items: TransferWAItem[];
@@ -36,9 +42,20 @@ export interface SendTransferWAOptions {
  * Designed to be called fire-and-forget inside setImmediate — never throws.
  */
 export async function sendTransferWhatsApp(opts: SendTransferWAOptions): Promise<void> {
-  const { destinationLocationId, sourceLocationName, destLocationName, items, voucherNumber, voucherDate } = opts;
+  const {
+    destinationLocationId,
+    recipientLocationId,
+    sourceLocationName,
+    destLocationName,
+    items,
+    voucherNumber,
+    voucherDate,
+  } = opts;
+  const routingLocationId = recipientLocationId ?? destinationLocationId;
 
-  logger.info(`[TransferWA] Starting for ${voucherNumber} → destLocId=${destinationLocationId}, items=${items.length}`);
+  logger.info(
+    `[TransferWA] Starting for ${voucherNumber} → destLocId=${destinationLocationId}, recipientLocId=${routingLocationId}, items=${items.length}`
+  );
 
   if (!items || items.length === 0) {
     logger.warn(`[TransferWA] No items provided for ${voucherNumber} — skipping`);
@@ -48,27 +65,29 @@ export async function sendTransferWhatsApp(opts: SendTransferWAOptions): Promise
   // Collect all target chat IDs (deduped)
   const chatIds = new Set<string>();
 
-  // Look up destination location
-  const [destLoc] = await db
+  // Look up the configured recipient location. For POS-created transfers this
+  // is the POS user's assigned location; for other callers it remains the
+  // transfer destination.
+  const [recipientLocation] = await db
     .select({
       companyId: locations.companyId,
       transferWaGroupChatId: locations.transferWaGroupChatId,
     })
     .from(locations)
-    .where(eq(locations.id, destinationLocationId));
+    .where(eq(locations.id, routingLocationId));
 
-  logger.info(`[TransferWA] destLoc=${JSON.stringify(destLoc)}`);
+  logger.info(`[TransferWA] recipientLocation=${JSON.stringify(recipientLocation)}`);
 
   // 1. Per-location transfer WA group (takes priority — location-specific group)
-  if (destLoc?.transferWaGroupChatId) {
-    logger.info(`[TransferWA] location.transferWaGroupChatId=${destLoc.transferWaGroupChatId}`);
-    chatIds.add(destLoc.transferWaGroupChatId);
-  } else if (destLoc?.companyId) {
+  if (recipientLocation?.transferWaGroupChatId) {
+    logger.info(`[TransferWA] location.transferWaGroupChatId=${recipientLocation.transferWaGroupChatId}`);
+    chatIds.add(recipientLocation.transferWaGroupChatId);
+  } else if (recipientLocation?.companyId) {
     // 2. Fall back to per-company transfer WA group from Settings
     const [company] = await db
       .select({ transferWaGroupChatId: companies.transferWaGroupChatId })
       .from(companies)
-      .where(eq(companies.id, destLoc.companyId));
+      .where(eq(companies.id, recipientLocation.companyId));
     logger.info(`[TransferWA] company.transferWaGroupChatId=${company?.transferWaGroupChatId}`);
     if (company?.transferWaGroupChatId) {
       chatIds.add(company.transferWaGroupChatId);

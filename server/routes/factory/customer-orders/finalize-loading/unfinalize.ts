@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../../lib/httpHandlers";
 import { logger } from "../../../../lib/logger";
 import { parseId } from "../../../../lib/parseId";
@@ -26,62 +26,66 @@ import {
 import { eq, and, sql, inArray } from "drizzle-orm";
 
 export function registerOrderUnfinalizeRoutes(app: Express) {
-  app.post("/api/factory/customer-orders/:id/force-sync-bale-status", requireAuth, async (req: any, res: any) => {
-    try {
-      const session = req.session as any;
-      const companyId = session.factoryCompanyId || session.currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
+  app.post(
+    "/api/factory/customer-orders/:id/force-sync-bale-status",
+    requireAuth,
+    async (req: Request, res: Response) => {
+      try {
+        const session = req.session as any;
+        const companyId = session.factoryCompanyId || session.currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const role = (session.currentRole || session.role || "").toLowerCase();
-      if (role !== "admin" && role !== "owner" && role !== "developer") {
-        return res.status(403).json({ message: "Only admin/owner can force-sync bale statuses" });
-      }
-
-      const orderId = parseId(req.params.id);
-
-      if (orderId === null) return res.status(400).json({ message: "Invalid id" });
-      const [order] = await db
-        .select()
-        .from(customerOrders)
-        .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
-      if (!order) return res.status(404).json({ message: "Order not found" });
-      if (!["VERIFIED", "FINALIZED"].includes(order.status)) {
-        return res.status(400).json({ message: "Order must be VERIFIED or FINALIZED to force-sync bale statuses" });
-      }
-      if (!order.invoiceNumber) {
-        return res
-          .status(400)
-          .json({ message: "Order must have an invoice number (previously finalized) to use force-sync" });
-      }
-
-      const orderBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
-      if (orderBales.length === 0) return res.status(400).json({ message: "Order has no bales" });
-
-      let updated = 0;
-      for (const b of orderBales) {
-        const [existing] = await db
-          .select({ status: factoryBales.status })
-          .from(factoryBales)
-          .where(eq(factoryBales.id, b.baleId));
-        if (existing && existing.status !== "SOLD") {
-          await db
-            .update(factoryBales)
-            .set({ status: "SOLD", updatedAt: new Date() })
-            .where(eq(factoryBales.id, b.baleId));
-          updated++;
+        const role = (session.currentRole || session.role || "").toLowerCase();
+        if (role !== "admin" && role !== "owner" && role !== "developer") {
+          return res.status(403).json({ message: "Only admin/owner can force-sync bale statuses" });
         }
-      }
 
-      res.json({ message: `${updated} bale(s) marked as SOLD`, updated, total: orderBales.length });
-    } catch (error: unknown) {
-      logger.error("Error force-syncing bale status:", { error: error });
-      res.status(400).json({ message: getErrorMessage(error) });
+        const orderId = parseId(req.params.id);
+
+        if (orderId === null) return res.status(400).json({ message: "Invalid id" });
+        const [order] = await db
+          .select()
+          .from(customerOrders)
+          .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
+        if (!order) return res.status(404).json({ message: "Order not found" });
+        if (!["VERIFIED", "FINALIZED"].includes(order.status)) {
+          return res.status(400).json({ message: "Order must be VERIFIED or FINALIZED to force-sync bale statuses" });
+        }
+        if (!order.invoiceNumber) {
+          return res
+            .status(400)
+            .json({ message: "Order must have an invoice number (previously finalized) to use force-sync" });
+        }
+
+        const orderBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
+        if (orderBales.length === 0) return res.status(400).json({ message: "Order has no bales" });
+
+        let updated = 0;
+        for (const b of orderBales) {
+          const [existing] = await db
+            .select({ status: factoryBales.status })
+            .from(factoryBales)
+            .where(eq(factoryBales.id, b.baleId));
+          if (existing && existing.status !== "SOLD") {
+            await db
+              .update(factoryBales)
+              .set({ status: "SOLD", updatedAt: new Date() })
+              .where(eq(factoryBales.id, b.baleId));
+            updated++;
+          }
+        }
+
+        res.json({ message: `${updated} bale(s) marked as SOLD`, updated, total: orderBales.length });
+      } catch (error: unknown) {
+        logger.error("Error force-syncing bale status:", { error: error });
+        res.status(400).json({ message: getErrorMessage(error) });
+      }
     }
-  });
+  );
 
   // Export a single customer order to Excel with full bale detail
 
-  app.post("/api/factory/customer-orders/:id/unfinalize", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/customer-orders/:id/unfinalize", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

@@ -53,17 +53,16 @@ export function ContainerDetailDialog({
   const commAmt = parseFloat(vc.commissionAmount || "0");
   const commCcy = vc.commissionCurrencyCode || "USD";
   const brokerSupId = vc.commissionSupplierId;
-  const brokerName = brokerSupId ? (suppliers?.find((s: any) => s.id === brokerSupId)?.name ?? null) : null;
+  const brokerName = brokerSupId ? (suppliers?.find((s) => s.id === brokerSupId)?.name ?? null) : null;
   const freightAccName = vc.freightAccountId
-    ? (ledgerAccounts.find((a: any) => a.id === vc.freightAccountId)?.name ?? `Account #${vc.freightAccountId}`)
+    ? (ledgerAccounts.find((a) => a.id === vc.freightAccountId)?.name ?? `Account #${vc.freightAccountId}`)
     : null;
   const commAccName = vc.commissionAccountId
-    ? (ledgerAccounts.find((a: any) => a.id === vc.commissionAccountId)?.name ?? `Account #${vc.commissionAccountId}`)
+    ? (ledgerAccounts.find((a) => a.id === vc.commissionAccountId)?.name ?? `Account #${vc.commissionAccountId}`)
     : null;
   const legacyOtherAmt = parseFloat(vc.otherCharges || "0");
   const legacyOtherAccName = vc.otherChargesAccountId
-    ? (ledgerAccounts.find((a: any) => a.id === vc.otherChargesAccountId)?.name ??
-      `Account #${vc.otherChargesAccountId}`)
+    ? (ledgerAccounts.find((a) => a.id === vc.otherChargesAccountId)?.name ?? `Account #${vc.otherChargesAccountId}`)
     : null;
   const fxRate = parseFloat(vc.fxRateToUsd || "1");
 
@@ -153,9 +152,9 @@ export function ContainerDetailDialog({
                       )}
                     </div>
                   )}
-                  {viewContainerCharges.map((ch: any) => {
+                  {viewContainerCharges.map((ch) => {
                     const accName = ch.ledgerAccountId
-                      ? (ledgerAccounts.find((a: any) => a.id === ch.ledgerAccountId)?.name ??
+                      ? (ledgerAccounts.find((a) => a.id === ch.ledgerAccountId)?.name ??
                         `Account #${ch.ledgerAccountId}`)
                       : null;
                     return (

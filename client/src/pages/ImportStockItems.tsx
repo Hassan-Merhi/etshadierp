@@ -79,7 +79,7 @@ function NewItemsTab() {
         return;
       }
       const headerRow = utils.sheet_to_json<string[]>(worksheet, { header: 1 })[0] || [];
-      const columns = headerRow.map((h: any) => String(h || "").trim());
+      const columns = headerRow.map((h) => String(h || "").trim());
       const missingCols = ["code", "name"].filter((c) => !columns.includes(c));
       if (missingCols.length > 0) {
         toast({
@@ -135,7 +135,7 @@ function NewItemsTab() {
     setIsProcessing(true);
     try {
       const stockGroupsData: any[] = await fetch("/api/stock-groups", { credentials: "include" }).then((r) => r.json());
-      const stockGroupMap = new Map(stockGroupsData.map((sg: any) => [sg.code, sg.id]));
+      const stockGroupMap = new Map(stockGroupsData.map((sg) => [sg.code, sg.id]));
       const itemsToImport = previewData.map((row) => {
         const item: any = {
           companyId: selectedCompany.id,
@@ -630,7 +630,7 @@ function UpdateCategoriesTab() {
       const catKey = keys.find((k) => k.toLowerCase().replace(/[\s_]/g, "") === "categoryname") ?? keys[1];
 
       const seen = new Set<string>();
-      const parsed: CategoryRow[] = jsonData.map((row: any) => {
+      const parsed: CategoryRow[] = jsonData.map((row) => {
         const itemCode = String(row[itemCodeKey] || "").trim();
         const categoryName = String(row[catKey] || "").trim();
         const key = itemCode.toLowerCase();

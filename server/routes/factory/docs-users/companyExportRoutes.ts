@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getClientDate } from "../../../lib/dateUtils";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
@@ -62,7 +62,7 @@ import {
 import { eq, inArray } from "drizzle-orm";
 
 export function registerFactoryCompanyExportRoutes(app: Express) {
-  app.get("/api/factory/export-company-data", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/export-company-data", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -83,7 +83,7 @@ export function registerFactoryCompanyExportRoutes(app: Express) {
       data.customer_balances = await db.select().from(customerBalances).where(byCompany(customerBalances));
       data.vouchers = await db.select().from(vouchers).where(byCompany(vouchers));
 
-      const voucherIds = data.vouchers.map((v: any) => v.id);
+      const voucherIds = data.vouchers.map((v) => v.id);
       if (voucherIds.length > 0) {
         data.voucher_entries = await db
           .select()
@@ -115,7 +115,7 @@ export function registerFactoryCompanyExportRoutes(app: Express) {
       data.factory_duty_audit_log = await db.select().from(factoryDutyAuditLog).where(byCompany(factoryDutyAuditLog));
       data.factory_mix_batches = await db.select().from(factoryMixBatches).where(byCompany(factoryMixBatches));
 
-      const mixBatchIds = data.factory_mix_batches.map((b: any) => b.id);
+      const mixBatchIds = data.factory_mix_batches.map((b) => b.id);
       if (mixBatchIds.length > 0) {
         data.factory_mix_batch_sources = await db
           .select()
@@ -146,7 +146,7 @@ export function registerFactoryCompanyExportRoutes(app: Express) {
         .from(factoryDaybookEntries)
         .where(byCompany(factoryDaybookEntries));
 
-      const daybookIds = data.factory_daybook_entries.map((e: any) => e.id);
+      const daybookIds = data.factory_daybook_entries.map((e) => e.id);
       if (daybookIds.length > 0) {
         data.factory_daybook_entry_edits = await db
           .select()
@@ -177,7 +177,7 @@ export function registerFactoryCompanyExportRoutes(app: Express) {
         .where(byCompany(factoryContainerProfitSnapshots));
 
       data.customer_proformas = await db.select().from(customerProformas).where(byCompany(customerProformas));
-      const proformaIds = data.customer_proformas.map((p: any) => p.id);
+      const proformaIds = data.customer_proformas.map((p) => p.id);
       if (proformaIds.length > 0) {
         data.customer_proforma_lines = await db
           .select()
@@ -192,7 +192,7 @@ export function registerFactoryCompanyExportRoutes(app: Express) {
         .from(customerInvoiceSequences)
         .where(eq(customerInvoiceSequences.companyId, companyId));
       data.customer_orders = await db.select().from(customerOrders).where(byCompany(customerOrders));
-      const orderIds = data.customer_orders.map((o: any) => o.id);
+      const orderIds = data.customer_orders.map((o) => o.id);
       if (orderIds.length > 0) {
         data.customer_order_lines = await db
           .select()

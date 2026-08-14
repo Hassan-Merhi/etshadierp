@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { db } from "../../../db";
 import { storage } from "../../../storage";
@@ -38,7 +38,7 @@ export function registerStockItemLookupRoutes(app: Express) {
   });
 
   // Offload item search — find all offloaded containers that contain a given item
-  app.get("/api/offload-item-search", requireAuth, async (req: any, res: any) => {
+  app.get("/api/offload-item-search", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -74,7 +74,7 @@ export function registerStockItemLookupRoutes(app: Express) {
   });
 
   // Export last 4 sales per stock item (for Excel export)
-  app.get("/api/stock-items/last-sales-export", requireAuth, async (req: any, res: any) => {
+  app.get("/api/stock-items/last-sales-export", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

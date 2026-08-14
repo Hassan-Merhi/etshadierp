@@ -63,7 +63,7 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
             .then((r) => r.json())
             .then((locs) => {
               if (Array.isArray(locs) && locs.length > 0) {
-                setSelectedLocationIds(locs.map((l: any) => l.locationId));
+                setSelectedLocationIds(locs.map((l) => l.locationId));
               } else {
                 setSelectedLocationIds(editingRole.assignedLocationId ? [editingRole.assignedLocationId] : []);
               }
@@ -76,7 +76,7 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
             .then((mappings) => {
               if (Array.isArray(mappings)) {
                 const record: Record<number, number> = {};
-                mappings.forEach((m: any) => {
+                mappings.forEach((m) => {
                   record[m.locationId] = m.cashAccountId;
                 });
                 setLocationCashAccounts(record);
@@ -117,7 +117,7 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
     enabled: !!selectedCompanyId && open,
   });
 
-  const cashAccounts = roleDialogLedgerAccounts.filter((a: any) => a.accountType === "Cash");
+  const cashAccounts = roleDialogLedgerAccounts.filter((a) => a.accountType === "Cash");
 
   const saveMutation = useMutation({
     mutationFn: async (data: RoleAssignmentData) => {
@@ -125,7 +125,7 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
         const missing = selectedLocationIds.filter((id) => !locationCashAccounts[id]);
         if (missing.length > 0) {
           const locNames = missing.map((id) => {
-            const loc = (locations as any[]).find((l: any) => l.id === id);
+            const loc = (locations as any[]).find((l) => l.id === id);
             return loc?.name || `Location #${id}`;
           });
           throw new Error(`Cash account required for: ${locNames.join(", ")}`);
@@ -197,7 +197,7 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {companies.map((c: any) => (
+                      {companies.map((c) => (
                         <SelectItem key={c.id} value={c.id.toString()}>
                           {c.name}
                         </SelectItem>
@@ -247,7 +247,7 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
                         className="border rounded-md p-3 space-y-3 max-h-56 overflow-y-auto"
                         data-testid="select-locations"
                       >
-                        {(locations as any[]).map((loc: any) => {
+                        {(locations as any[]).map((loc) => {
                           const isChecked = selectedLocationIds.includes(loc.id);
                           return (
                             <div key={loc.id} className="space-y-1.5">
@@ -292,7 +292,7 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
                                       <SelectValue placeholder="Select cash account *" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      {cashAccounts.map((a: any) => (
+                                      {cashAccounts.map((a) => (
                                         <SelectItem key={a.id} value={a.id.toString()}>
                                           {a.name} ({a.code})
                                         </SelectItem>
@@ -390,7 +390,7 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {cashAccounts.map((a: any) => (
+                        {cashAccounts.map((a) => (
                           <SelectItem key={a.id} value={a.id.toString()}>
                             {a.name} ({a.code})
                           </SelectItem>

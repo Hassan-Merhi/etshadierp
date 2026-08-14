@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { db } from "../../../db";
 import { storage } from "../../../storage";
@@ -15,7 +15,7 @@ import { eq, and, or, asc, sql, isNull, ilike } from "drizzle-orm";
 
 export function registerStockItemRoutes(app: Express) {
   // Stock Items
-  app.get("/api/stock-items", requireAuth, async (req: any, res: any) => {
+  app.get("/api/stock-items", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
       if (!companyId) {
@@ -88,7 +88,7 @@ export function registerStockItemRoutes(app: Express) {
 
   // Bulk rename existing stock items by primary code. Intentionally name-only:
   // inventory, costs, prices, barcodes, groups, grades and categories are untouched.
-  app.post("/api/stock-items/update-names-by-code", requireAuth, requireNonPOS, async (req: any, res: any) => {
+  app.post("/api/stock-items/update-names-by-code", requireAuth, requireNonPOS, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

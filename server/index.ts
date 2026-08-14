@@ -8,6 +8,8 @@ import path from "path";
 import fs from "fs";
 import { randomBytes } from "crypto";
 import { registerRoutes } from "./routes";
+import { markStartupMigrationsComplete, recordStartupMigrationFailures } from "./startupMigrationReport";
+import { registerDbHealthRoute } from "./health/dbHealthRoute";
 import { blockViewOnlyWrites } from "./auth";
 import { setupWS } from "./wsServer";
 import { startScheduler, checkAndRecoverDailyExport } from "./services/scheduler";
@@ -102,6 +104,7 @@ declare module "express-session" {
     userId?: string;
     username?: string;
     currentCompanyId?: number;
+    factoryCompanyId?: number;
     currentRole?: string;
     currentLocationId?: number | null;
     currentPOSStation?: number | null;
@@ -346,7 +349,7 @@ app.use((req, res, next) => {
 // CSRF_ENFORCE=0 to fall back to warn-only mode if a regression surfaces.
 const CSRF_ENFORCE = process.env.CSRF_ENFORCE !== "0";
 app.get("/api/csrf-token", (req, res) => {
-  const sess: any = req.session as any;
+  const sess = req.session as any;
   if (!sess.csrfToken) {
     sess.csrfToken = randomBytes(32).toString("hex");
   }
@@ -359,7 +362,7 @@ app.use((req, res, next) => {
   if (ORIGIN_GUARD_EXEMPT_PATHS.has(req.path)) return next();
   if (req.path === "/api/csrf-token") return next();
 
-  const sess: any = req.session as any;
+  const sess = req.session as any;
   const expected: string | undefined = sess?.csrfToken;
   const got = req.headers["x-csrf-token"];
 
@@ -391,14 +394,7 @@ let migrationsDone = false;
 (async () => {
   const migrations = startupMigrations;
 
-  // /api/health/db — reports migration status but does NOT block deployment.
-  // The deployment health check uses /api/health (always 200) so Render never times out.
-  app.get("/api/health/db", (_req, res) => {
-    res.json({
-      status: migrationsDone ? "ok" : "starting",
-      message: migrationsDone ? "Database ready" : "Running startup migrations, please wait...",
-    });
-  });
+  registerDbHealthRoute(app, () => migrationsDone);
 
   // Build info endpoint for frontend version checking (must be before registerRoutes)
   app.get("/api/build-info", (_req, res) => {
@@ -613,6 +609,8 @@ END $mig$`;
         }
       }
 
+      recordStartupMigrationFailures(failedMigrations); // published to /api/health/db
+
       if (failedMigrations.length > 0) {
         logger.error(`✗ ${failedMigrations.length} migration(s) failed at startup:`);
         for (const { sql, error } of failedMigrations) {
@@ -637,7 +635,7 @@ END $mig$`;
            WHERE table_schema = 'public' AND table_name = ANY($1)`,
           [IC_TABLES]
         );
-        const found = new Set<string>(tableCheck.rows.map((r: any) => r.table_name as string));
+        const found = new Set<string>(tableCheck.rows.map((r) => r.table_name as string));
         const missing = IC_TABLES.filter((t) => !found.has(t));
         if (missing.length > 0) {
           logger.error(
@@ -1066,7 +1064,7 @@ END $mig$`;
           }
 
           // Re-point all voucher_entries from the old accounts to the unified one
-          const oldIds: number[] = oldAccts.rows.map((r: any) => Number(r.id));
+          const oldIds: number[] = oldAccts.rows.map((r) => Number(r.id));
           if (oldIds.length > 0) {
             const idList = oldIds.join(",");
             await migrationClient.query(
@@ -1131,7 +1129,7 @@ END $mig$`;
         `);
 
         if (badVariance.rows.length > 0) {
-          const companyIds: number[] = [...new Set<number>(badVariance.rows.map((r: any) => Number(r.company_id)))];
+          const companyIds: number[] = [...new Set<number>(badVariance.rows.map((r) => Number(r.company_id)))];
           let totalFixed = 0;
 
           for (const cid of companyIds) {
@@ -1171,7 +1169,7 @@ END $mig$`;
             }
             if (!accountId!) continue;
 
-            const entryIds = badVariance.rows.filter((r: any) => Number(r.company_id) === cid).map((r: any) => r.id);
+            const entryIds = badVariance.rows.filter((r) => Number(r.company_id) === cid).map((r) => r.id);
 
             await migrationClient.query(`UPDATE voucher_entries SET ledger_account_id = $1 WHERE id = ANY($2)`, [
               accountId,
@@ -1299,6 +1297,7 @@ END $mig$`;
     } finally {
       await migrationClient.end();
       migrationsDone = true;
+      markStartupMigrationsComplete();
     }
   };
 
@@ -1379,7 +1378,7 @@ END $mig$`;
         `);
         if (r.rowCount && r.rowCount > 0) {
           logger.info(`[BaleStatusFix] Fixed ${r.rowCount} bale(s) with deletedAt set but status != DELETED`, {
-            detail: r.rows.map((x: any) => x.reference_number).join(", "),
+            detail: r.rows.map((x) => x.reference_number).join(", "),
           });
         }
       } catch (e: unknown) {
@@ -1401,7 +1400,7 @@ END $mig$`;
         `);
         if (r.rowCount && r.rowCount > 0) {
           logger.info(`[ExportRun] Startup: marked ${r.rowCount} orphaned run(s) as failed`, {
-            detail: r.rows.map((x: any) => `#${x.id} ${x.run_type}`).join(", "),
+            detail: r.rows.map((x) => `#${x.id} ${x.run_type}`).join(", "),
           });
         }
       } catch (e: unknown) {
@@ -1422,7 +1421,7 @@ END $mig$`;
         `);
         if (r.rowCount && r.rowCount > 0) {
           logger.info(`[ExportRun] Periodic: timed out ${r.rowCount} hung run(s)`, {
-            detail: r.rows.map((x: any) => `#${x.id} ${x.run_type}`).join(", "),
+            detail: r.rows.map((x) => `#${x.id} ${x.run_type}`).join(", "),
           });
         }
       } catch (e: unknown) {
@@ -1457,7 +1456,9 @@ END $mig$`;
       try {
         const { execSync } = require("child_process");
         execSync(`fuser -k ${port}/tcp`, { stdio: "ignore" });
-      } catch {}
+      } catch {
+        // Failure here is non-fatal and the surrounding flow continues deliberately.
+      }
       setTimeout(() => {
         server.removeAllListeners("error");
         server.on("error", (e: any) => {
@@ -1496,6 +1497,7 @@ END $mig$`;
   if (!migrationsEnabled) {
     logger.info("⚠ Startup migrations DISABLED via RUN_STARTUP_MIGRATIONS=false");
     migrationsDone = true;
+    markStartupMigrationsComplete({ skipped: true });
   }
 
   warmupDb()
@@ -1702,6 +1704,7 @@ END $mig$`;
             error: getErrorMessage(err) ?? err,
           });
           migrationsDone = true;
+          markStartupMigrationsComplete();
         }
       }
     })

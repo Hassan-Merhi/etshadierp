@@ -3,7 +3,11 @@ import { getSupplierBalanceForContext, resolveParentCompanyId } from "../helpers
 import { SupplierRouteError } from "./supplierErrors";
 import type { SupplierAuditActor } from "./supplierRequestContext";
 import { supplierRepository } from "./supplierRepository";
-import { parseCreateSupplierInput, parseSupplierStockGroupId, parseUpdateSupplierInput } from "./supplierValidation";
+import {
+  parseCreateSupplierInput,
+  parseSupplierStockGroupId,
+  parseUpdateSupplierInput,
+} from "./supplierValidation";
 
 async function requireSupplier(supplierId: number, companyId: number) {
   const supplier = await supplierRepository.getById(supplierId, companyId);
@@ -52,15 +56,15 @@ function supplierAuditChanges(existing: any, updated: any) {
 }
 
 export const supplierService = {
-  async list(companyId: number, search: string) {
+  async list(companyId: number, search: string, allowParentFallback = false) {
     const suppliers = await supplierRepository.list(companyId, search);
-    if (suppliers.length > 0) return suppliers;
+    if (suppliers.length > 0 || !allowParentFallback) return suppliers;
 
-    // A newly created non-parent company can legitimately have no company-owned
-    // supplier rows yet. PO Import still needs access to the configured parent
-    // company's supplier master list so the first container can be imported.
-    // Only fall back when the active company has no suppliers at all; an empty
-    // search result in a populated company must remain empty.
+    // PO Import is the one compatibility flow that may intentionally resolve
+    // the configured parent supplier master when a new child company has no
+    // company-owned suppliers yet. Every normal supplier/accounting picker must
+    // remain strict to the active company so a foreign supplier ID can never be
+    // selected and then rejected by the central posting ownership guard.
     const companySuppliers = search ? await supplierRepository.listAll(companyId) : suppliers;
     if (companySuppliers.length > 0) return suppliers;
 
@@ -87,7 +91,7 @@ export const supplierService = {
           openingBalance: balanceResult.openingBalance,
           hasActivity: containerCount > 0 || balanceResult.hasActivity || purchaseOrders.length > 0,
         };
-      })
+      }),
     );
   },
 
@@ -97,10 +101,8 @@ export const supplierService = {
 
   async balance(supplierId: number, companyId: number) {
     const supplier = await requireSupplier(supplierId, companyId);
-    const { balance, openingBalance, balancesByCurrency, historicalBaseBalance } = await getSupplierBalanceForContext(
-      supplier,
-      companyId
-    );
+    const { balance, openingBalance, balancesByCurrency, historicalBaseBalance } =
+      await getSupplierBalanceForContext(supplier, companyId);
     return { balance, openingBalance, balancesByCurrency, historicalBaseBalance };
   },
 
@@ -180,7 +182,12 @@ export const supplierService = {
     });
   },
 
-  async assignStockGroup(supplierId: number, companyId: number, input: unknown, actor: SupplierAuditActor) {
+  async assignStockGroup(
+    supplierId: number,
+    companyId: number,
+    input: unknown,
+    actor: SupplierAuditActor,
+  ) {
     const supplier = await requireSupplier(supplierId, companyId);
     const stockGroupId = parseSupplierStockGroupId(input);
     if (stockGroupId !== null && !(await supplierRepository.stockGroupExists(stockGroupId, companyId))) {

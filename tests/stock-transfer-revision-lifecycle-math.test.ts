@@ -80,4 +80,39 @@ describe("stock transfer revision lifecycle math", () => {
       },
     ]);
   });
+
+  it.each([
+    [[], /at least one changed item/i],
+    [
+      [{ stockItemId: 0, stockItemName: "Invalid", sourceLocationId: 2, originalQuantity: 1, newQuantity: 2 }],
+      /stock item id/i,
+    ],
+    [
+      [{ stockItemId: 1, stockItemName: "Invalid", sourceLocationId: 0, originalQuantity: 1, newQuantity: 2 }],
+      /source location id/i,
+    ],
+    [
+      [{ stockItemId: 1, stockItemName: "Invalid", sourceLocationId: 2, originalQuantity: -1, newQuantity: 2 }],
+      /original quantity/i,
+    ],
+  ])("rejects an invalid pending snapshot %#", (items, message) => {
+    expect(() => normalizePendingRevisionItems(items)).toThrow(message);
+  });
+
+  it("rejects a merged revision item that lost its source-location ownership", () => {
+    expect(() =>
+      mergePendingRevisionTargets(
+        [{ id: 7, revisionNumber: 1 }],
+        [
+          {
+            revisionId: 7,
+            stockItemId: 10,
+            sourceLocationId: null,
+            originalQuantity: "10",
+            newQuantity: "12",
+          },
+        ]
+      )
+    ).toThrow(/missing its source location/i);
+  });
 });

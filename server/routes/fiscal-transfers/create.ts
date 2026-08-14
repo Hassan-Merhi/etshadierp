@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { getErrorMessage, getErrorStack } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { storage } from "../../storage";
@@ -15,6 +15,15 @@ import { inventory, stockTransferVouchers, stockTransferItems, vouchers, locatio
 import { eq, and } from "drizzle-orm";
 import { adjustInventory } from "../../inventoryHelper";
 import { sendTransferWhatsApp } from "../../helpers/sendTransferWhatsApp";
+import { getActiveCompanyPermissionContext } from "../../services/security/activeCompanyPermissionContext";
+
+async function resolvePosTransferRecipientLocationId(req: Request): Promise<number | null> {
+  const context = await getActiveCompanyPermissionContext(req);
+  if (context.role !== "POS" || !context.assignedLocationId) {
+    return null;
+  }
+  return context.assignedLocationId;
+}
 
 export function registerStockTransferCreateRoutes(app: Express) {
   // Stock Transfers - POST endpoint (supports both creating new and using existing voucher)
@@ -203,10 +212,19 @@ export function registerStockTransferCreateRoutes(app: Express) {
           voucher: txResult.newVoucher,
         });
 
-        // Fire-and-forget: send transfer image to destination WA group (POS users only)
+        // Fire-and-forget: POS notifications go to the group configured for
+        // the POS user's assigned location, not the transfer destination.
         if (req.user?.role === "POS")
           setImmediate(async () => {
             try {
+              const recipientLocationId = await resolvePosTransferRecipientLocationId(req);
+              if (!recipientLocationId) {
+                logger.warn("[TransferWA] POS user has no active assigned location; skipping notification", {
+                  userId: req.session.userId,
+                  companyId: req.session.currentCompanyId,
+                });
+                return;
+              }
               const waSourceId = txResult.transfer.sourceLocationId;
               let sourceName = "Multiple Sources";
               if (waSourceId) {
@@ -218,6 +236,7 @@ export function registerStockTransferCreateRoutes(app: Express) {
               }
               await sendTransferWhatsApp({
                 destinationLocationId,
+                recipientLocationId,
                 sourceLocationName: sourceName,
                 destLocationName: destLocation.name,
                 items: txResult.transferItems.map((i) => ({
@@ -336,10 +355,19 @@ export function registerStockTransferCreateRoutes(app: Express) {
       });
       res.status(201).json(transfer);
 
-      // Fire-and-forget: send transfer image to destination WA group (POS users only, original-flow / voucherId path)
+      // Fire-and-forget: POS notifications go to the group configured for the
+      // POS user's assigned location, not the transfer destination.
       if (req.user?.role === "POS")
         setImmediate(async () => {
           try {
+            const recipientLocationId = await resolvePosTransferRecipientLocationId(req);
+            if (!recipientLocationId) {
+              logger.warn("[TransferWA] POS user has no active assigned location; skipping notification", {
+                userId: req.session.userId,
+                companyId: req.session.currentCompanyId,
+              });
+              return;
+            }
             const uniqueSrcIds = [
               ...new Set(itemsWithRate.map((i: any) => Number(i.sourceLocationId)).filter(Boolean)),
             ];
@@ -353,6 +381,7 @@ export function registerStockTransferCreateRoutes(app: Express) {
             }
             await sendTransferWhatsApp({
               destinationLocationId,
+              recipientLocationId,
               sourceLocationName: sourceName,
               destLocationName: destLocation.name,
               items: transfer.items.map((i: any) => ({

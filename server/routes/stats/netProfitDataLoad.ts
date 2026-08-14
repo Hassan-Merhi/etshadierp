@@ -30,7 +30,7 @@ export interface NetProfitData {
  * config/report-characterization.json pins the endpoint's output across the move.
  */
 export async function loadNetProfitData(companyId: number, toDate: string | null | undefined): Promise<NetProfitData> {
-  const voucherConditions: any[] = [
+  const voucherConditions = [
     eq(vouchers.companyId, companyId),
     eq(vouchers.optional, false),
     isNull(vouchers.deletedAt),

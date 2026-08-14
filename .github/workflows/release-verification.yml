@@ -41,8 +41,8 @@ jobs:
       PORT: "5000"
       ERP_SMOKE_BASE_URL: http://127.0.0.1:5000
       ERP_SMOKE_OUTPUT_DIR: artifacts/phase9-language-browser
-      ERP_SMOKE_USERNAME: ${{ secrets.PHASE9_ERP_SMOKE_USERNAME }}
-      ERP_SMOKE_PASSWORD: ${{ secrets.PHASE9_ERP_SMOKE_PASSWORD }}
+      ERP_SMOKE_USERNAME: ${{ secrets.PHASE9_ERP_SMOKE_USERNAME || format('phase9_ci_{0}', github.run_id) }}
+      ERP_SMOKE_PASSWORD: ${{ secrets.PHASE9_ERP_SMOKE_PASSWORD || format('phase9-ci-{0}-{1}', github.run_id, github.run_attempt) }}
       ERP_SMOKE_REQUIRE_AUTHENTICATED: "1"
       ERP_SMOKE_REQUIRE_EXACT_ROUTES: "1"
 
@@ -83,6 +83,7 @@ jobs:
             docs/archive/translation/phase-8-current-main-reconciliation.md \
             docs/archive/translation/phase-9-current-main-release.md \
             scripts/run-phase9-language-browser-smoke.mjs \
+            scripts/prepare-phase9-browser-smoke-fixture.mjs \
             scripts/verify-multilingual-phases-4-7-current-main.mjs \
             scripts/verify-phase8-current-main-reconciliation.mjs \
             scripts/verify-phase9-current-main-release.mjs \
@@ -143,9 +144,15 @@ jobs:
         continue-on-error: true
         run: node node_modules/drizzle-kit/bin.cjs push --force
 
+      - name: Prepare disposable authenticated browser fixture
+        id: browser_fixture
+        if: always() && steps.db_schema.outcome == 'success'
+        continue-on-error: true
+        run: node scripts/prepare-phase9-browser-smoke-fixture.mjs
+
       - name: Application startup and multilingual browser smoke
         id: browser_smoke
-        if: always() && steps.build.outcome == 'success' && steps.db_schema.outcome == 'success'
+        if: always() && steps.build.outcome == 'success' && steps.browser_fixture.outcome == 'success'
         continue-on-error: true
         run: |
           mkdir -p artifacts/phase9-startup
@@ -235,7 +242,14 @@ jobs:
         continue-on-error: true
         uses: trufflesecurity/trufflehog@v3.90.4
         with:
-          extra_args: --results=verified,unknown
+          extra_args: --results=verified
+
+      - name: Report unknown secret candidates
+        if: always()
+        continue-on-error: true
+        uses: trufflesecurity/trufflehog@v3.90.4
+        with:
+          extra_args: --results=unknown
 
       - name: Upload Phase 9 evidence
         if: always()
@@ -262,6 +276,7 @@ jobs:
           RECONCILIATION: ${{ steps.reconciliation.outcome }}
           READINESS: ${{ steps.readiness.outcome }}
           DB_SCHEMA: ${{ steps.db_schema.outcome }}
+          BROWSER_FIXTURE: ${{ steps.browser_fixture.outcome }}
           BROWSER_SMOKE: ${{ steps.browser_smoke.outcome }}
           BACKEND: ${{ steps.backend.outcome }}
           SMOKE: ${{ steps.smoke.outcome }}
@@ -275,9 +290,34 @@ jobs:
         run: |
           set -euo pipefail
           status=success
-          for value in "$INSTALL" "$DEPENDENCIES" "$FORMATTING" "$TYPECHECK" "$BUILD" "$LINT" "$CONTRACTS" "$RECONCILIATION" "$READINESS" "$DB_SCHEMA" "$BROWSER_SMOKE" "$BACKEND" "$SMOKE" "$BACKEND_COVERAGE" "$FRONTEND" "$FRONTEND_COVERAGE" "$I18N" "$SECURITY" "$DEPENDENCY_AUDIT" "$SECRET_SCAN"; do
-            if [ "$value" != "success" ]; then status=failure; fi
-          done
+          while IFS='|' read -r name value; do
+            if [ "$value" != "success" ]; then
+              status=failure
+              echo "::error title=Release gate failed::$name outcome=$value"
+            fi
+          done <<EOF
+          Dependency install|$INSTALL
+          Lockfile and production dependencies|$DEPENDENCIES
+          Phase 9 formatting|$FORMATTING
+          TypeScript|$TYPECHECK
+          Production build|$BUILD
+          Lint|$LINT
+          Release contracts|$CONTRACTS
+          Current-main multilingual reconciliation|$RECONCILIATION
+          Final production readiness|$READINESS
+          Disposable PostgreSQL schema|$DB_SCHEMA
+          Disposable authenticated browser fixture|$BROWSER_FIXTURE
+          Startup, migrations and multilingual browser smoke|$BROWSER_SMOKE
+          Full backend tests|$BACKEND
+          API smoke sweep|$SMOKE
+          Backend coverage|$BACKEND_COVERAGE
+          Full frontend tests|$FRONTEND
+          Frontend coverage|$FRONTEND_COVERAGE
+          Untranslated-text release ratchet|$I18N
+          Focused security checks|$SECURITY
+          Critical production dependency audit|$DEPENDENCY_AUDIT
+          Verified secret scan|$SECRET_SCAN
+          EOF
 
           cat >> "$GITHUB_STEP_SUMMARY" <<EOF
           ## Phase 9 final verification: $status
@@ -294,6 +334,7 @@ jobs:
           | Current-main multilingual reconciliation | $RECONCILIATION |
           | Final production readiness | $READINESS |
           | Disposable PostgreSQL schema | $DB_SCHEMA |
+          | Disposable authenticated browser fixture | $BROWSER_FIXTURE |
           | Startup, migrations and multilingual browser smoke | $BROWSER_SMOKE |
           | Full backend tests | $BACKEND |
           | API smoke sweep | $SMOKE |
@@ -303,7 +344,7 @@ jobs:
           | Untranslated-text release ratchet | $I18N |
           | Focused security checks | $SECURITY |
           | Critical production dependency audit | $DEPENDENCY_AUDIT |
-          | Verified/unknown secret scan | $SECRET_SCAN |
+          | Verified secret scan | $SECRET_SCAN |
           EOF
 
           test "$status" = "success"

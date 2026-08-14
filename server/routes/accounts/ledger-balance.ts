@@ -210,7 +210,7 @@ export function registerAccountLedgerBalanceRoutes(app: Express) {
         )
         .groupBy(vouchers.currency);
 
-      const result = rows.map((r: any) => ({
+      const result = rows.map((r) => ({
         currency: r.currency || "USD",
         totalDebit: parseFloat(r.totalDebit || "0"),
         totalCredit: parseFloat(r.totalCredit || "0"),

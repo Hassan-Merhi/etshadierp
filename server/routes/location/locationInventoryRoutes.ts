@@ -89,6 +89,37 @@ export function registerLocationInventoryRoutes(app: Express) {
         });
       }
 
+      const includeZero = req.query.includeZero === "true";
+
+      // High-frequency interactive callers can request only the identity/quantity
+      // fields they need without registering a second route or downloading the
+      // full inventory/reporting payload.
+      if (req.query.profile === "light") {
+        const includePricing = req.query.includePricing === "true";
+        const rows = await storage.getLocationInventory(location.companyId, locationId, includeZero);
+        const isPOS = req.user?.role === "POS";
+        const compactRows = rows.map((item) => {
+          const compact: Record<string, unknown> = {
+            locationId: item.locationId,
+            stockItemId: item.stockItemId,
+            quantity: item.quantity,
+            stockItemCode: item.stockItemCode ?? "",
+            stockItemName: item.stockItemName ?? "",
+            stockItemUom: item.stockItemUom ?? "",
+          };
+
+          if (includePricing) {
+            compact.averageRate = isPOS ? null : (item.averageRate ?? null);
+            compact.lastSellingPrice = item.lastSellingPrice ?? null;
+          }
+
+          return compact;
+        });
+
+        res.setHeader("Cache-Control", "private, no-cache");
+        return res.json(compactRows);
+      }
+
       // Check for asOfDate query parameter for historical inventory
       const rawAsOfDate = req.query.asOfDate as string | undefined;
 
@@ -117,8 +148,6 @@ export function registerLocationInventoryRoutes(app: Express) {
         }
       }
 
-      const includeZero = req.query.includeZero === "true";
-
       // Use the location's own companyId as source of truth (not session, which
       // may lag or differ in multi-company contexts). Access check above already
       // confirmed location.companyId === session.currentCompanyId.
@@ -134,7 +163,7 @@ export function registerLocationInventoryRoutes(app: Express) {
       // Filter sensitive data for POS users (they should only see quantity)
       const isPOS = req.user?.role === "POS";
       if (isPOS) {
-        const filteredInventory = inventory.map((item: any) => ({
+        const filteredInventory = inventory.map((item) => ({
           ...item,
           averageRate: null,
           totalValue: null,
@@ -144,7 +173,9 @@ export function registerLocationInventoryRoutes(app: Express) {
         res.json(inventory);
       }
     } catch (error: unknown) {
-      logger.error(`[inventory] ERROR locationId=${req.params.locationId}:`, { error: getErrorMessage(error) ?? error });
+      logger.error(`[inventory] ERROR locationId=${req.params.locationId}:`, {
+        error: getErrorMessage(error) ?? error,
+      });
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
@@ -171,10 +202,10 @@ export function registerLocationInventoryRoutes(app: Express) {
       const inventory = await storage.getLocationInventory(req.session.currentCompanyId!, locationId);
 
       // Filter out zero-quantity items
-      const filteredInventory = inventory.filter((item: any) => parseFloat(item.quantity || "0") !== 0);
+      const filteredInventory = inventory.filter((item) => parseFloat(item.quantity || "0") !== 0);
 
       // Build Excel workbook data
-      const workbookData = filteredInventory.map((item: any) => ({
+      const workbookData = filteredInventory.map((item) => ({
         "Item Code": item.stockItemCode || "",
         "Item Name": item.stockItemName || "",
         "Group Code": item.stockGroupCode || "",
@@ -247,7 +278,7 @@ export function registerLocationInventoryRoutes(app: Express) {
       const { buffer } = await generateStockPdf(companyId, companyName, locationId, location.name, includeCost);
 
       const safeDate = getClientDate(req).replace(/-/g, "");
-      const safeName = location.name.replace(/[^\w\s.\-]/g, "_").replace(/\s+/g, "_");
+      const safeName = location.name.replace(/[^\w\s.-]/g, "_").replace(/\s+/g, "_");
       const suffix = includeCost ? "with_cost" : "no_cost";
       const fileName = `${safeName}_Godown_${safeDate}_${suffix}.pdf`;
 
@@ -311,10 +342,10 @@ export function registerLocationInventoryRoutes(app: Express) {
             .from(stockGroups)
             .where(eq(stockGroups.id, stockGroupId))
             .limit(1);
-          groupNameForFile = (grp?.name || String(stockGroupId)).replace(/[^\w\s.\-]/g, "_").replace(/\s+/g, "_");
+          groupNameForFile = (grp?.name || String(stockGroupId)).replace(/[^\w\s.-]/g, "_").replace(/\s+/g, "_");
         }
         const safeDate = getClientDate(req).replace(/-/g, "");
-        const safeName = location.name.replace(/[^\w\s.\-]/g, "_").replace(/\s+/g, "_");
+        const safeName = location.name.replace(/[^\w\s.-]/g, "_").replace(/\s+/g, "_");
         const suffix = includeCost ? "with_cost" : "no_cost";
         const fileName = `${safeName}_${groupNameForFile}_${safeDate}_${suffix}.pdf`;
 

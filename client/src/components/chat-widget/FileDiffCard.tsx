@@ -3,6 +3,12 @@ import { EyeOff, Eye, Check, Copy, FileCode, Plus, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FilePatchDraft } from "./chatWidgetTypes";
 
+// Built by concatenation so the literal `</script>` never appears contiguously
+// in the bundle. Written inline it would end the enclosing script block early
+// wherever this bundle is inlined into a document; written as `<\/script>` it
+// is the same string but reads to ESLint as a pointless escape.
+const SCRIPT_CLOSE = ["</", "scr", "ipt>"].join("");
+
 // ── Provider display helpers ─────────────────────────────────────────
 export const PROVIDER_LABELS: Record<string, string> = {
   chatgpt: "ChatGPT",
@@ -25,7 +31,7 @@ export function CodeBlock({ code, lang }: { code: string; lang: string }) {
 
   const getPreviewSrcdoc = () => {
     if (normalizedLang === "javascript" || normalizedLang === "js") {
-      return `<!DOCTYPE html><html><body><script>\n${code}\n<\/script></body></html>`;
+      return `<!DOCTYPE html><html><body><script>\n${code}\n${SCRIPT_CLOSE}</body></html>`;
     }
     return code;
   };

@@ -1,4 +1,6 @@
 import { Switch, Route, Redirect } from "wouter";
+import POSContainerTracking from "@/pages/pos/POSContainerTracking";
+import POSContainerDetail from "@/pages/pos/POSContainerDetail";
 import {
   POS,
   LocationInventory,
@@ -29,8 +31,11 @@ interface PosRoutesProps {
 export function PosRoutes({ user, posImportEnabled }: PosRoutesProps) {
   return (
     <Switch>
-      <Route path="/">{() => <POS posUser={user} />}</Route>
+      <Route path="/">{() => <POSContainerTracking posUser={user} />}</Route>
+      <Route path="/pos">{() => <POS posUser={user} />}</Route>
       <Route path="/pos/edit/:id">{(params) => <POS posUser={user} editVoucherId={params.id} />}</Route>
+      <Route path="/pos-containers/:id">{() => <POSContainerDetail />}</Route>
+      <Route path="/pos-containers">{() => <POSContainerTracking posUser={user} />}</Route>
       <Route path="/location-inventory">{() => <LocationInventory posUser={user} />}</Route>
       <Route path="/locations/:locationId/stock-items/:stockItemId/history">
         {() => <LocationMonthlySummary posUser={user} />}
@@ -48,7 +53,7 @@ export function PosRoutes({ user, posImportEnabled }: PosRoutesProps) {
       <Route path="/pos-price-list">{() => <POSPriceList posUser={user} />}</Route>
       <Route path="/pos-transfer-orders">{() => <PosTransferOrders posUser={user} />}</Route>
       <Route path="/my-settings" component={MySettings} />
-      <Route>{() => <POS posUser={user} />}</Route>
+      <Route>{() => <Redirect to="/" />}</Route>
     </Switch>
   );
 }

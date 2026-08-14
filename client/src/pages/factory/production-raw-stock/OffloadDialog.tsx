@@ -346,7 +346,7 @@ export function OffloadDialog({
       const commCcy = (container.commissionCurrencyCode || ccy).toUpperCase();
       setContainerCommissionCcy(commCcy);
       const broker = container.commissionSupplierId
-        ? factorySuppliers?.find((s: any) => s.id === container.commissionSupplierId)
+        ? factorySuppliers?.find((s) => s.id === container.commissionSupplierId)
         : null;
       setCommissionPersonName(broker?.name || "Commission");
       // Initialize commission FX: prefer the container's stored commission-specific rate,

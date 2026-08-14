@@ -470,7 +470,7 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
     },
     onError: (error: any, formData: JournalFormData) => {
       if (error.name === "OfflineQueued") {
-        const syntheticVoucher: any = {
+        const syntheticVoucher = {
           id: -Date.now(),
           voucherNumber: "PENDING",
           voucherType: "Journal",

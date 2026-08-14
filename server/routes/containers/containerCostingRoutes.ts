@@ -27,7 +27,7 @@ export function registerContainerCostingRoutes(app: Express) {
       if (containerPOs.length === 0) {
         return res.status(400).json({ message: "No purchase orders found for this container" });
       }
-      const poIds = containerPOs.map((po: any) => po.id);
+      const poIds = containerPOs.map((po) => po.id);
 
       // Load all line items for those POs in one query
       const allLineItems =
@@ -60,12 +60,12 @@ export function registerContainerCostingRoutes(app: Express) {
           if (!stockItem) return { barcode, status: "not_found", itemName: null, currentRate: null, newRate };
 
           // Find matching line items in container POs
-          const matched = allLineItems.filter((li: any) => li.stockItemId === stockItem.id);
+          const matched = allLineItems.filter((li) => li.stockItemId === stockItem.id);
           if (matched.length === 0) {
             return { barcode, itemName: stockItem.name, status: "not_in_container", currentRate: null, newRate };
           }
 
-          const lineItemIds = matched.map((li: any) => li.id);
+          const lineItemIds = matched.map((li) => li.id);
           const currentRate = parseFloat(matched[0].rate);
           const noChange = Math.abs(currentRate - newRate) < 0.001;
 
@@ -124,7 +124,7 @@ export function registerContainerCostingRoutes(app: Express) {
 
         // Recalculate itemsTotal for all affected POs, then the container
         const containerPOs = await storage.getPurchaseOrdersByContainer(containerId);
-        const poIds = containerPOs.map((po: any) => po.id);
+        const poIds = containerPOs.map((po) => po.id);
 
         let containerItemsTotal = 0;
         let containerChargesTotal = 0;

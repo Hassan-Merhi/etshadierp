@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { parseId } from "../../../../lib/parseId";
 import { getErrorMessage } from "../../../../lib/httpHandlers";
 import { logger } from "../../../../lib/logger";
@@ -27,7 +27,7 @@ export function registerSupplierBulkFxSettlementRoutes(app: Express) {
   // Distributes a total foreign-currency amount across all linked suppliers of
   // a broker, creating individual FX transfer records for each, capped at each
   // supplier's outstanding balance.
-  app.post("/api/factory/suppliers/:brokerId/bulk-fx-settlement", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/suppliers/:brokerId/bulk-fx-settlement", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -65,7 +65,7 @@ export function registerSupplierBulkFxSettlementRoutes(app: Express) {
       if (linkedSuppliers.length === 0)
         return res.status(400).json({ message: "No active linked suppliers found for this broker" });
 
-      const linkedIds = linkedSuppliers.map((s: any) => s.id);
+      const linkedIds = linkedSuppliers.map((s) => s.id);
 
       // Get all payable containers for linked suppliers in the given currency
       const allContainers = (
@@ -136,7 +136,7 @@ export function registerSupplierBulkFxSettlementRoutes(app: Express) {
         fxOutBySupplier[f.fromSupplierId] = (fxOutBySupplier[f.fromSupplierId] || 0) + parseFloat(f.fromAmount || "0");
 
       // Previous container-level allocations (to avoid over-allocating)
-      const allContainerIds = allContainers.map((c: any) => c.id);
+      const allContainerIds = allContainers.map((c) => c.id);
       const prevAllocs =
         allContainerIds.length > 0
           ? await db
@@ -161,7 +161,7 @@ export function registerSupplierBulkFxSettlementRoutes(app: Express) {
       // Build per-supplier data: available balance + their containers
       const supplierData: Array<{ supplierId: number; name: string; available: number; containers: any[] }> = [];
       for (const sup of linkedSuppliers) {
-        const supContainers = allContainers.filter((c: any) => c.supplierId === sup.id);
+        const supContainers = allContainers.filter((c) => c.supplierId === sup.id);
         const totalValue = supContainers.reduce((s: number, c: any) => {
           const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
           const rate = parseFloat(c.ratePerKg || "0");
@@ -273,7 +273,7 @@ export function registerSupplierBulkFxSettlementRoutes(app: Express) {
       // Create FX transfers and allocation rows in a transaction
       const settlementDate = date || getClientDate(req);
       const results = await db.transaction(async (tx: any) => {
-        const created: any[] = [];
+        const created = [];
         for (const alloc of allocations) {
           const [fxTransfer] = await tx
             .insert(factorySupplierFxTransfers)
@@ -298,7 +298,7 @@ export function registerSupplierBulkFxSettlementRoutes(app: Express) {
               : new Date(a.arrivalDate || a.createdAt).getTime() - new Date(b.arrivalDate || b.createdAt).getTime()
           );
           let allocRem = alloc.allocated;
-          const allocRows: any[] = [];
+          const allocRows = [];
           for (const c of sortedCont) {
             if (allocRem <= 0.001) break;
             const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");

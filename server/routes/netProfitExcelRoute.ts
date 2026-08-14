@@ -36,7 +36,7 @@ export function registerNetProfitExcelRoute(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const allCompanies = await storage.getAllCompanies();
-      const company = allCompanies.find((c: any) => c.id === companyId);
+      const company = allCompanies.find((c) => c.id === companyId);
       const companyName = company?.name || "Company";
 
       const startDate = req.query.startDate ? new Date(req.query.startDate as string) : null;
@@ -46,7 +46,7 @@ export function registerNetProfitExcelRoute(app: Express) {
       const companyAccounts = await storage.getAllLedgerAccounts(companyId, true);
 
       // Fetch period vouchers WITH their dates for monthly grouping
-      const voucherConditions: any[] = [
+      const voucherConditions = [
         eq(vouchers.companyId, companyId),
         isNull(vouchers.deletedAt),
         eq(vouchers.optional, false),
@@ -95,7 +95,7 @@ export function registerNetProfitExcelRoute(app: Express) {
       }
 
       // Fetch ALL sales with dates for the period
-      const salesConditions: any[] = [
+      const salesConditions = [
         eq(vouchers.companyId, companyId),
         isNull(vouchers.deletedAt),
         eq(vouchers.optional, false),
@@ -122,7 +122,7 @@ export function registerNetProfitExcelRoute(app: Express) {
 
       // ERP voucher-based income: income accounts excluded from directIncomes/indirectIncomes
       // (SALES-named accounts and uncategorized income) that appear in non-POS vouchers.
-      const xlsxMissedIncomeAccounts = companyAccounts.filter((acc: any) => {
+      const xlsxMissedIncomeAccounts = companyAccounts.filter((acc) => {
         if (acc.accountType !== "Income") return false;
         if (acc.subType === "Indirect Income") return false;
         if (
@@ -151,7 +151,7 @@ export function registerNetProfitExcelRoute(app: Express) {
       for (const v of allPeriodVouchers) voucherDateMap.set(v.id, v.voucherDate as string);
 
       if (xlsxMissedIncomeAccounts.length > 0 && nonPosVIdsXlsx.length > 0) {
-        const missedAccIdsXlsx = xlsxMissedIncomeAccounts.map((a: any) => a.id);
+        const missedAccIdsXlsx = xlsxMissedIncomeAccounts.map((a) => a.id);
         const erpIncEntries = await db
           .select({
             ledgerAccountId: voucherEntries.ledgerAccountId,
@@ -182,7 +182,7 @@ export function registerNetProfitExcelRoute(app: Express) {
       }
 
       // allTimeAccountBalances for Net Position (no startDate filter)
-      const allTimeConds: any[] = [
+      const allTimeConds = [
         eq(vouchers.companyId, companyId),
         isNull(vouchers.deletedAt),
         eq(vouchers.optional, false),
@@ -387,11 +387,11 @@ export function registerNetProfitExcelRoute(app: Express) {
       const netPositionValue = npRound2(npForUs - npOnUs);
 
       // Import charges IDs
-      const importChargesParent = companyAccounts.find((acc: any) => acc.code === "IMPORT_CHARGES");
+      const importChargesParent = companyAccounts.find((acc) => acc.code === "IMPORT_CHARGES");
       const importChargesIds = new Set<number>();
       if (importChargesParent) {
         importChargesIds.add((importChargesParent as any).id);
-        companyAccounts.forEach((acc: any) => {
+        companyAccounts.forEach((acc) => {
           if (acc.parentId === (importChargesParent as any).id) importChargesIds.add(acc.id);
         });
       }

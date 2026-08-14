@@ -1,3 +1,4 @@
+import { releaseDebtEnglish } from "@/i18n/finalCloseoutTranslations";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -346,7 +347,7 @@ export default function CustomerInvoiceCreate() {
                   data-testid="text-no-bales"
                 >
                   <ScanLine className="h-12 w-12 mb-3 opacity-40" />
-                  <p>No bales scanned yet</p>
+                  <p>{releaseDebtEnglish("No bales scanned yet")}</p>
                   <p className="text-sm mt-1">Select a customer and location, then scan bales</p>
                 </div>
               ) : (
@@ -516,7 +517,7 @@ export default function CustomerInvoiceCreate() {
                 value={scanCode}
                 onChange={(e) => setScanCode(e.target.value)}
                 onKeyDown={handleScan}
-                placeholder="Scan or type bale code..."
+                placeholder={releaseDebtEnglish("Scan or type bale code...")}
                 disabled={!orderId || !selectedLocationId}
                 className={scanInputClass}
                 data-testid="input-scan-code"
@@ -569,8 +570,8 @@ export default function CustomerInvoiceCreate() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="FREIGHT">Freight</SelectItem>
-                  <SelectItem value="OTHER">Other</SelectItem>
+                  <SelectItem value="FREIGHT">{releaseDebtEnglish("Freight")}</SelectItem>
+                  <SelectItem value="OTHER">{releaseDebtEnglish("Other")}</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -578,7 +579,7 @@ export default function CustomerInvoiceCreate() {
                 <Input
                   value={chargeName}
                   onChange={(e) => setChargeName(e.target.value)}
-                  placeholder="Charge name..."
+                  placeholder={releaseDebtEnglish("Charge name...")}
                   data-testid="input-charge-name"
                 />
               )}
@@ -613,7 +614,7 @@ export default function CustomerInvoiceCreate() {
               </span>
             </div>
             <div className="flex items-center justify-between gap-2 text-sm">
-              <span>Freight</span>
+              <span>{releaseDebtEnglish("Freight")}</span>
               <span className="font-mono" data-testid="text-summary-freight">
                 {freightCharges.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
               </span>

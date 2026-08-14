@@ -1,3 +1,4 @@
+import { releaseDebtEnglish } from "../../i18n/finalCloseoutEnglish";
 export const SP_RELEASE_CURRENCY = "USD" as const;
 export const SP_RELEASE_EXCHANGE_RATE = "1" as const;
 
@@ -27,7 +28,9 @@ export function assertSpReleaseCurrency(currency: unknown, exchangeRate: unknown
 
   if (normalizedCurrency !== SP_RELEASE_CURRENCY || !Number.isFinite(normalizedRate) || normalizedRate !== 1) {
     throw new Error(
-      `Supplier Partner is USD-only for this release. Expected ${SP_RELEASE_CURRENCY} at exchange rate 1.`
+      releaseDebtEnglish(
+        `Supplier Partner is USD-only for this release. Expected ${SP_RELEASE_CURRENCY} at exchange rate 1.`
+      )
     );
   }
 }

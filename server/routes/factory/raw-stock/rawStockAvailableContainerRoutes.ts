@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { factoryContainers, factoryRawStock, factorySuppliers } from "@shared/schema";
 import { requireAuth } from "../../../auth";
@@ -19,7 +19,7 @@ import { isCompanyIsolationError, resolveRequestCompanyId } from "../../../servi
  * diagnostics, notes, historical FX metadata, and other unrelated columns).
  */
 export function registerRawStockAvailableContainerRoutes(app: Express): void {
-  app.get("/api/factory/raw-stock/available-containers", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/raw-stock/available-containers", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = resolveRequestCompanyId(req);
       const containers = await db

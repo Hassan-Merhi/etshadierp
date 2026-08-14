@@ -299,7 +299,7 @@ export default function OrphanedRecordsPage() {
                   <SelectValue placeholder="Select new location" />
                 </SelectTrigger>
                 <SelectContent>
-                  {locations.map((loc: any) => (
+                  {locations.map((loc) => (
                     <SelectItem key={loc.id} value={loc.id.toString()} data-testid={`option-location-${loc.id}`}>
                       {loc.name}
                     </SelectItem>

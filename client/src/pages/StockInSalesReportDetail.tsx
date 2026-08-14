@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import {
@@ -11,6 +11,7 @@ import {
   PackageMinus,
   PackagePlus,
   RefreshCw,
+  Scale,
   TrendingDown,
 } from "lucide-react";
 
@@ -32,28 +33,41 @@ import { ExcelJS, writeFile } from "@/lib/excelHelper";
 import { formatNumber } from "@/lib/formatNumber";
 
 interface Metrics {
+  openingStockQty: number;
+  openingStockValue: number;
   stockInQty: number;
   stockInValue: number;
   stockInAvgRate: number;
+  stockAdjustmentQty: number;
+  stockAdjustmentValue: number;
+  totalAvailableQty: number;
   stockOutQty: number;
+  stockOutValue: number;
+  closingStockQty: number;
+  closingStockValue: number;
   totalSales: number;
   costOfSales: number;
   costProfit: number;
   avgProfitPerBale: number;
+  salesOutQty?: number;
+  salesOutValue?: number;
+  transferOutQty?: number;
+  transferOutValue?: number;
+  otherStockOutQty?: number;
+  otherStockOutValue?: number;
+  netSalesQty?: number;
+}
+
+interface Location {
+  id: number;
+  name: string;
 }
 
 interface StockInRow {
   id: number;
   activityDate: string;
-  containerId: number;
   containerNumber: string;
-  offloadId: number;
-  locationId: number;
   locationName: string;
-  stockGroupId: number | null;
-  stockGroupName: string;
-  stockItemId: number;
-  stockItemCode: string;
   stockItemName: string;
   quantity: number;
   avgRate: number;
@@ -64,23 +78,27 @@ interface StockOutRow {
   id: number;
   sourceType: "Sale" | "Credit Note" | "Debit Note";
   activityDate: string;
-  voucherId: number;
-  voucherNumber: string;
   isCreditSale: boolean | null;
-  locationId: number | null;
   locationName: string;
-  stockGroupId: number | null;
-  stockGroupName: string;
-  stockItemId: number;
-  stockItemCode: string;
   stockItemName: string;
   quantity: number;
-  sellingRate: number;
-  unitCost: number;
   totalSales: number;
   totalCost: number;
   costProfit: number;
   avgProfitPerBale: number;
+}
+
+interface MovementRow {
+  key: string;
+  activityDate: string;
+  movementType: "Transfer In" | "Transfer Out" | "Adjustment";
+  locationId: number | null;
+  counterpartyLocationId: number | null;
+  stockItemName: string;
+  quantity: number;
+  unitRate: number;
+  value: number;
+  adjustmentType: string | null;
 }
 
 interface PagedRows<T> {
@@ -100,11 +118,26 @@ interface DetailResponse {
   stockOut: PagedRows<StockOutRow>;
 }
 
+interface MovementResponse {
+  generatedAt: string;
+  rows: MovementRow[];
+  rowCount: number;
+  truncated: boolean;
+}
+
 const EMPTY_METRICS: Metrics = {
+  openingStockQty: 0,
+  openingStockValue: 0,
   stockInQty: 0,
   stockInValue: 0,
   stockInAvgRate: 0,
+  stockAdjustmentQty: 0,
+  stockAdjustmentValue: 0,
+  totalAvailableQty: 0,
   stockOutQty: 0,
+  stockOutValue: 0,
+  closingStockQty: 0,
+  closingStockValue: 0,
   totalSales: 0,
   costOfSales: 0,
   costProfit: 0,
@@ -122,7 +155,10 @@ function Pagination({
   total: number;
   onChange: (page: number) => void;
 }) {
-  if (totalPages <= 1) return <p className="text-xs text-muted-foreground">{formatNumber(total, 0)} rows</p>;
+  if (totalPages <= 1) {
+    return <p className="px-3 py-2 text-xs text-muted-foreground">{formatNumber(total, 0)} rows</p>;
+  }
+
   return (
     <div className="flex items-center justify-between gap-3 border-t px-3 py-2 print:hidden">
       <p className="text-xs text-muted-foreground">
@@ -138,6 +174,17 @@ function Pagination({
       </div>
     </div>
   );
+}
+
+function compareDateLocationItem(
+  a: { activityDate: string; locationName: string; stockItemName: string },
+  b: { activityDate: string; locationName: string; stockItemName: string }
+): number {
+  const date = b.activityDate.localeCompare(a.activityDate);
+  if (date !== 0) return date;
+  const location = a.locationName.localeCompare(b.locationName, undefined, { numeric: true, sensitivity: "base" });
+  if (location !== 0) return location;
+  return a.stockItemName.localeCompare(b.stockItemName, undefined, { numeric: true, sensitivity: "base" });
 }
 
 export default function StockInSalesReportDetail() {
@@ -172,15 +219,81 @@ export default function StockInSalesReportDetail() {
     query.set("limit", "100");
     return `/api/reports/stock-in-sales/detail?${query.toString()}`;
   }, [baseParams, stockInPage, stockOutPage]);
+  const movementUrl = useMemo(() => `/api/reports/stock-in-sales/movements?${baseParams.toString()}`, [baseParams]);
 
   const { data, isLoading, isFetching, isError, error, refetch } = useQuery<DetailResponse, Error>({
     queryKey: [queryUrl, selectedCompany?.id],
     enabled: !!selectedCompany?.id && !!startDate && !!endDate,
     staleTime: 30_000,
   });
+  const { data: movements, isLoading: movementsLoading } = useQuery<MovementResponse, Error>({
+    queryKey: [movementUrl, selectedCompany?.id],
+    enabled: !!selectedCompany?.id && !!startDate && !!endDate,
+    staleTime: 30_000,
+  });
+  const { data: locations = [] } = useQuery<Location[]>({
+    queryKey: ["/api/locations", selectedCompany?.id],
+    enabled: !!selectedCompany?.id,
+    staleTime: 60_000,
+  });
+
+  const locationNameById = useMemo(
+    () => new Map(locations.map((location) => [location.id, location.name])),
+    [locations]
+  );
+  const locationName = useCallback(
+    (id: number | null) => (id ? locationNameById.get(id) || "Location #" + id : "—"),
+    [locationNameById]
+  );
+  const sourceLocationName = useCallback(
+    (row: MovementRow) =>
+      row.movementType === "Transfer In" ? locationName(row.counterpartyLocationId) : locationName(row.locationId),
+    [locationName]
+  );
+  const destinationLocationName = useCallback(
+    (row: MovementRow) =>
+      row.movementType === "Transfer In"
+        ? locationName(row.locationId)
+        : row.movementType === "Transfer Out"
+          ? locationName(row.counterpartyLocationId)
+          : "—",
+    [locationName]
+  );
+
+  const sortedMovements = useMemo(
+    () =>
+      [...(movements?.rows || [])].sort((a, b) => {
+        const date = b.activityDate.localeCompare(a.activityDate);
+        if (date !== 0) return date;
+        const source = sourceLocationName(a).localeCompare(sourceLocationName(b), undefined, {
+          numeric: true,
+          sensitivity: "base",
+        });
+        if (source !== 0) return source;
+        const destination = destinationLocationName(a).localeCompare(destinationLocationName(b), undefined, {
+          numeric: true,
+          sensitivity: "base",
+        });
+        if (destination !== 0) return destination;
+        return a.stockItemName.localeCompare(b.stockItemName, undefined, { numeric: true, sensitivity: "base" });
+      }),
+    [movements?.rows, sourceLocationName, destinationLocationName]
+  );
+
+  const sortedStockIn = useMemo(
+    () => [...(data?.stockIn.rows || [])].sort(compareDateLocationItem),
+    [data?.stockIn.rows]
+  );
+  const sortedStockOut = useMemo(
+    () => [...(data?.stockOut.rows || [])].sort(compareDateLocationItem),
+    [data?.stockOut.rows]
+  );
 
   const summary = data?.summary ?? EMPTY_METRICS;
   const money = (value: number) => (value < 0 ? `-${formatAmount(Math.abs(value))}` : formatAmount(value));
+  const roundedMoney = (value: number) =>
+    value < 0 ? `-${formatAmount(Math.round(Math.abs(value)))}` : formatAmount(Math.round(value));
+  const signedQty = (value: number) => `${value > 0 ? "+" : ""}${formatNumber(value, 0)}`;
   const rate = (value: number) =>
     selectedCurrency === "CFA" ? `CFA ${formatNumber(convertToDisplay(value), 2)}` : `$ ${formatNumber(value, 6)}`;
   const displayDate = (value: string) => {
@@ -197,11 +310,15 @@ export default function StockInSalesReportDetail() {
       const workbook = new ExcelJS.Workbook();
       const exportParams = new URLSearchParams(baseParams);
       exportParams.set("exportAll", "true");
-      const response = await fetch(`/api/reports/stock-in-sales/detail?${exportParams.toString()}`, {
-        credentials: "include",
-      });
-      if (!response.ok) throw new Error("Failed to load export details");
-      const exportData = (await response.json()) as DetailResponse;
+      const [detailResponse, movementResponse] = await Promise.all([
+        fetch(`/api/reports/stock-in-sales/detail?${exportParams.toString()}`, { credentials: "include" }),
+        fetch(`/api/reports/stock-in-sales/movements?${exportParams.toString()}`, { credentials: "include" }),
+      ]);
+      if (!detailResponse.ok || !movementResponse.ok) throw new Error("Failed to load export details");
+
+      const exportData = (await detailResponse.json()) as DetailResponse;
+      const exportMovements = (await movementResponse.json()) as MovementResponse;
+
       const summarySheet = workbook.addWorksheet("Summary");
       summarySheet.columns = [
         { header: "Metric", key: "metric", width: 28 },
@@ -209,36 +326,39 @@ export default function StockInSalesReportDetail() {
       ];
       [
         ["Period", periodLabel],
+        ["Opening Stock Qty", exportData.summary.openingStockQty],
+        ["Opening Stock Value", exportData.summary.openingStockValue],
         ["Stock In Qty", exportData.summary.stockInQty],
         ["Stock In Value", exportData.summary.stockInValue],
-        ["Average In Rate", exportData.summary.stockInAvgRate],
+        ["Stock Adjustments", exportData.summary.stockAdjustmentQty],
+        ["Total Available Qty", exportData.summary.totalAvailableQty],
         ["Stock Out Qty", exportData.summary.stockOutQty],
+        ["Sales Out Qty", exportData.summary.salesOutQty || 0],
+        ["Transfer Out Qty", exportData.summary.transferOutQty || 0],
+        ["Closing Stock Qty", exportData.summary.closingStockQty],
+        ["Closing Stock Value", exportData.summary.closingStockValue],
         ["Total Sales", exportData.summary.totalSales],
         ["Cost of Sales", exportData.summary.costOfSales],
-        ["Cost Profit", exportData.summary.costProfit],
+        ["Gross Profit", exportData.summary.costProfit],
         ["Average Profit / Bale", exportData.summary.avgProfitPerBale],
       ].forEach(([metric, value]) => summarySheet.addRow({ metric, value }));
       summarySheet.getRow(1).font = { bold: true };
 
-      const stockInSheet = workbook.addWorksheet("Stock In");
+      const stockInSheet = workbook.addWorksheet("Container Stock In");
       stockInSheet.columns = [
         { header: "Date", key: "date", width: 14 },
         { header: "Container", key: "container", width: 18 },
-        { header: "Location", key: "location", width: 18 },
-        { header: "Group", key: "group", width: 16 },
-        { header: "Item Code", key: "code", width: 16 },
-        { header: "Item", key: "item", width: 32 },
+        { header: "Location", key: "location", width: 20 },
+        { header: "Item", key: "item", width: 34 },
         { header: "Qty", key: "qty", width: 14 },
         { header: "Avg Rate", key: "rate", width: 16 },
         { header: "Value", key: "value", width: 18 },
       ];
-      exportData.stockIn.rows.forEach((row) =>
+      [...exportData.stockIn.rows].sort(compareDateLocationItem).forEach((row) =>
         stockInSheet.addRow({
           date: row.activityDate,
           container: row.containerNumber,
           location: row.locationName,
-          group: row.stockGroupName,
-          code: row.stockItemCode,
           item: row.stockItemName,
           qty: row.quantity,
           rate: row.avgRate,
@@ -247,57 +367,82 @@ export default function StockInSalesReportDetail() {
       );
       stockInSheet.getRow(1).font = { bold: true };
 
-      const stockOutSheet = workbook.addWorksheet("Stock Out");
-      stockOutSheet.columns = [
+      const movementSheet = workbook.addWorksheet("Inventory Movements");
+      movementSheet.columns = [
+        { header: "Date", key: "date", width: 14 },
+        { header: "Type", key: "type", width: 18 },
+        { header: "Source Location", key: "source", width: 22 },
+        { header: "Destination Location", key: "destination", width: 22 },
+        { header: "Item", key: "item", width: 34 },
+        { header: "Qty +/-", key: "qty", width: 14 },
+        { header: "Rate", key: "rate", width: 16 },
+        { header: "Value +/-", key: "value", width: 18 },
+      ];
+      [...exportMovements.rows]
+        .sort((a, b) => {
+          const date = b.activityDate.localeCompare(a.activityDate);
+          if (date !== 0) return date;
+          const source = sourceLocationName(a).localeCompare(sourceLocationName(b), undefined, {
+            numeric: true,
+            sensitivity: "base",
+          });
+          if (source !== 0) return source;
+          return a.stockItemName.localeCompare(b.stockItemName, undefined, { numeric: true, sensitivity: "base" });
+        })
+        .forEach((row) =>
+          movementSheet.addRow({
+            date: row.activityDate,
+            type: row.adjustmentType ? `${row.movementType} · ${row.adjustmentType}` : row.movementType,
+            source: sourceLocationName(row),
+            destination: destinationLocationName(row),
+            item: row.stockItemName,
+            qty: row.quantity,
+            rate: row.unitRate,
+            value: row.value,
+          })
+        );
+      movementSheet.getRow(1).font = { bold: true };
+
+      const salesSheet = workbook.addWorksheet("Sales and Returns");
+      salesSheet.columns = [
         { header: "Date", key: "date", width: 14 },
         { header: "Type", key: "type", width: 16 },
-        { header: "Voucher", key: "voucher", width: 18 },
-        { header: "Location", key: "location", width: 18 },
-        { header: "Group", key: "group", width: 16 },
-        { header: "Item Code", key: "code", width: 16 },
-        { header: "Item", key: "item", width: 32 },
+        { header: "Location", key: "location", width: 20 },
+        { header: "Item", key: "item", width: 34 },
         { header: "Qty", key: "qty", width: 14 },
-        { header: "Selling Rate", key: "sellingRate", width: 16 },
-        { header: "Unit Cost", key: "unitCost", width: 16 },
         { header: "Sales", key: "sales", width: 18 },
         { header: "Cost", key: "cost", width: 18 },
         { header: "Profit", key: "profit", width: 18 },
         { header: "Profit / Bale", key: "profitPerBale", width: 18 },
       ];
-      exportData.stockOut.rows.forEach((row) =>
-        stockOutSheet.addRow({
+      [...exportData.stockOut.rows].sort(compareDateLocationItem).forEach((row) =>
+        salesSheet.addRow({
           date: row.activityDate,
           type: row.sourceType === "Sale" && row.isCreditSale ? "Credit Sale" : row.sourceType,
-          voucher: row.voucherNumber,
           location: row.locationName,
-          group: row.stockGroupName,
-          code: row.stockItemCode,
           item: row.stockItemName,
           qty: row.quantity,
-          sellingRate: row.sellingRate,
-          unitCost: row.unitCost,
           sales: row.totalSales,
           cost: row.totalCost,
           profit: row.costProfit,
           profitPerBale: row.avgProfitPerBale,
         })
       );
-      stockOutSheet.getRow(1).font = { bold: true };
+      salesSheet.getRow(1).font = { bold: true };
 
       const safeLabel = periodLabel.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-|-$/g, "");
-      await writeFile(workbook, `stock-in-sales-detail-${safeLabel || format(new Date(), "yyyy-MM-dd")}.xlsx`);
-
-      if (exportData.stockIn.truncated || exportData.stockOut.truncated) {
+      await writeFile(workbook, `stock-flow-detail-${safeLabel || format(new Date(), "yyyy-MM-dd")}.xlsx`);
+      if (exportData.stockIn.truncated || exportData.stockOut.truncated || exportMovements.truncated) {
         toast({
           title: "Export capped",
-          description: "The export reached the 20,000-row safety limit for at least one section.",
+          description: "At least one section reached the 20,000-row safety limit.",
           variant: "destructive",
         });
       }
-    } catch (exportError: any) {
+    } catch (exportError: unknown) {
       toast({
         title: "Export failed",
-        description: exportError?.message || "Unable to create the Excel file.",
+        description: (exportError instanceof Error ? exportError.message : "") || "Unable to create the Excel file.",
         variant: "destructive",
       });
     } finally {
@@ -308,7 +453,7 @@ export default function StockInSalesReportDetail() {
   if (!startDate || !endDate) {
     return (
       <div className="container mx-auto p-6">
-        <PageHeader title="Stock In & Sales Details" />
+        <PageHeader title="Stock Flow Details" />
         <p className="mt-3 text-sm text-muted-foreground">A valid report period is required.</p>
         <Button className="mt-4" variant="outline" onClick={() => (window.location.href = "/stock-in-sales-report")}>
           Back to report
@@ -330,7 +475,7 @@ export default function StockInSalesReportDetail() {
             <ArrowLeft className="h-4 w-4" /> Back
           </Button>
           <div>
-            <PageHeader title="Stock In & Sales Details" />
+            <PageHeader title="Stock Flow Details" />
             <p className="text-sm text-muted-foreground">
               {periodLabel}
               {selectedCompany?.name ? ` · ${selectedCompany.name}` : ""}
@@ -340,8 +485,7 @@ export default function StockInSalesReportDetail() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="gap-2 print:hidden" disabled={isLoading || isExporting}>
-              {isExporting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-              Export
+              {isExporting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Export
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
@@ -355,24 +499,34 @@ export default function StockInSalesReportDetail() {
         </DropdownMenu>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
         {isLoading
-          ? Array.from({ length: 8 }).map((_, index) => <Skeleton key={index} className="h-20 rounded-xl" />)
+          ? Array.from({ length: 10 }).map((_, index) => <Skeleton key={index} className="h-20 rounded-xl" />)
           : [
-              ["Stock In Qty", formatNumber(summary.stockInQty, 3)],
-              ["Stock In Value", formatAmount(summary.stockInValue)],
-              ["Avg In Rate", rate(summary.stockInAvgRate)],
-              ["Stock Out Qty", formatNumber(summary.stockOutQty, 3)],
-              ["Total Sales", formatAmount(summary.totalSales)],
-              ["Cost", formatAmount(summary.costOfSales)],
-              ["Cost Profit", money(summary.costProfit)],
-              ["Avg Profit / Bale", money(summary.avgProfitPerBale)],
+              ["Opening Qty", formatNumber(summary.openingStockQty, 0)],
+              ["Opening Value", roundedMoney(summary.openingStockValue)],
+              ["Stock In Qty", formatNumber(summary.stockInQty, 0)],
+              ["Adjustments", signedQty(summary.stockAdjustmentQty)],
+              ["Available", formatNumber(summary.totalAvailableQty, 0)],
+              ["Stock Out", formatNumber(summary.stockOutQty, 0)],
+              ["Closing / In Hand", formatNumber(summary.closingStockQty, 0)],
+              ["Closing Value", roundedMoney(summary.closingStockValue)],
+              ["Gross Profit", roundedMoney(summary.costProfit)],
+              ["Avg Profit / Bale", roundedMoney(summary.avgProfitPerBale)],
             ].map(([label, value]) => (
               <div key={label} className="rounded-xl border bg-muted/30 p-3">
                 <p className="text-xs text-muted-foreground">{label}</p>
                 <p className="mt-1 font-mono text-lg font-semibold">{value}</p>
               </div>
             ))}
+      </div>
+
+      <div className="rounded-xl border bg-muted/20 p-3 text-sm">
+        <span className="font-medium">Outbound breakdown:</span> Sales/returns{" "}
+        <span className="font-mono font-semibold">{formatNumber(summary.salesOutQty || 0, 0)}</span> · Transfer out{" "}
+        <span className="font-mono font-semibold">{formatNumber(summary.transferOutQty || 0, 0)}</span> · Other out{" "}
+        <span className="font-mono font-semibold">{formatNumber(summary.otherStockOutQty || 0, 0)}</span>. Transfers
+        reduce stock but do not create sales or profit.
       </div>
 
       {isFetching && !isLoading && (
@@ -394,19 +548,92 @@ export default function StockInSalesReportDetail() {
         <>
           <section className="space-y-2">
             <div className="flex items-center gap-2">
+              <Scale className="h-5 w-5" />
+              <h2 className="text-lg font-semibold">Inventory Movements</h2>
+              <span className="text-xs text-muted-foreground">
+                Transfers and stock adjustments · {formatNumber(movements?.rowCount || 0, 0)} lines
+              </span>
+            </div>
+            <div className="overflow-hidden rounded-xl border">
+              <div className="max-h-[520px] overflow-auto">
+                <Table className="min-w-[980px]">
+                  <TableHeader>
+                    <TableRow className="bg-muted/40 hover:bg-muted/40">
+                      <TableHead>Date</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Source Location</TableHead>
+                      <TableHead>Destination Location</TableHead>
+                      <TableHead>Item</TableHead>
+                      <TableHead className="text-right">Qty +/-</TableHead>
+                      <TableHead className="text-right">Rate</TableHead>
+                      <TableHead className="text-right">Value +/-</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {movementsLoading ? (
+                      Array.from({ length: 4 }).map((_, i) => (
+                        <TableRow key={i}>
+                          <TableCell colSpan={8}>
+                            <Skeleton className="h-5 w-full" />
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : sortedMovements.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
+                          No transfers or stock adjustments found.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      sortedMovements.map((row) => (
+                        <TableRow key={row.key}>
+                          <TableCell>{displayDate(row.activityDate)}</TableCell>
+                          <TableCell>
+                            {row.movementType}
+                            {row.adjustmentType ? ` · ${row.adjustmentType}` : ""}
+                          </TableCell>
+                          <TableCell>{sourceLocationName(row)}</TableCell>
+                          <TableCell>{destinationLocationName(row)}</TableCell>
+                          <TableCell className="font-medium">{row.stockItemName}</TableCell>
+                          <TableCell
+                            className={`text-right font-mono ${row.quantity < 0 ? "text-red-600" : row.quantity > 0 ? "text-emerald-600" : ""}`}
+                          >
+                            {signedQty(row.quantity)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">{rate(row.unitRate)}</TableCell>
+                          <TableCell
+                            className={`text-right font-mono ${row.value < 0 ? "text-red-600" : row.value > 0 ? "text-emerald-600" : ""}`}
+                          >
+                            {money(row.value)}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+              {movements?.truncated && (
+                <p className="border-t px-3 py-2 text-xs text-amber-600">
+                  Movement list reached the 20,000-row safety limit.
+                </p>
+              )}
+            </div>
+          </section>
+
+          <section className="space-y-2">
+            <div className="flex items-center gap-2">
               <PackagePlus className="h-5 w-5" />
               <h2 className="text-lg font-semibold">Container Stock In</h2>
               <span className="text-xs text-muted-foreground">{formatNumber(data?.stockIn.total || 0, 0)} lines</span>
             </div>
             <div className="overflow-hidden rounded-xl border">
               <div className="overflow-x-auto">
-                <Table className="min-w-[1050px]">
+                <Table className="min-w-[850px]">
                   <TableHeader>
                     <TableRow className="bg-muted/40 hover:bg-muted/40">
                       <TableHead>Date</TableHead>
                       <TableHead>Container</TableHead>
                       <TableHead>Location</TableHead>
-                      <TableHead>Group</TableHead>
                       <TableHead>Item</TableHead>
                       <TableHead className="text-right">Qty</TableHead>
                       <TableHead className="text-right">Avg Rate</TableHead>
@@ -415,31 +642,27 @@ export default function StockInSalesReportDetail() {
                   </TableHeader>
                   <TableBody>
                     {isLoading ? (
-                      Array.from({ length: 5 }).map((_, index) => (
-                        <TableRow key={index}>
-                          <TableCell colSpan={8}>
+                      Array.from({ length: 4 }).map((_, i) => (
+                        <TableRow key={i}>
+                          <TableCell colSpan={7}>
                             <Skeleton className="h-5 w-full" />
                           </TableCell>
                         </TableRow>
                       ))
-                    ) : (data?.stockIn.rows.length || 0) === 0 ? (
+                    ) : sortedStockIn.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
+                        <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
                           No direct container offloads found.
                         </TableCell>
                       </TableRow>
                     ) : (
-                      data?.stockIn.rows.map((row) => (
+                      sortedStockIn.map((row) => (
                         <TableRow key={row.id}>
                           <TableCell>{displayDate(row.activityDate)}</TableCell>
                           <TableCell className="font-mono">{row.containerNumber}</TableCell>
                           <TableCell>{row.locationName}</TableCell>
-                          <TableCell>{row.stockGroupName}</TableCell>
-                          <TableCell>
-                            <div className="font-medium">{row.stockItemName}</div>
-                            <div className="text-xs text-muted-foreground">{row.stockItemCode}</div>
-                          </TableCell>
-                          <TableCell className="text-right font-mono">{formatNumber(row.quantity, 3)}</TableCell>
+                          <TableCell className="font-medium">{row.stockItemName}</TableCell>
+                          <TableCell className="text-right font-mono">{formatNumber(row.quantity, 0)}</TableCell>
                           <TableCell className="text-right font-mono">{rate(row.avgRate)}</TableCell>
                           <TableCell className="text-right font-mono">{formatAmount(row.totalValue)}</TableCell>
                         </TableRow>
@@ -462,19 +685,19 @@ export default function StockInSalesReportDetail() {
           <section className="space-y-2">
             <div className="flex items-center gap-2">
               <PackageMinus className="h-5 w-5" />
-              <h2 className="text-lg font-semibold">Stock Out / Sales</h2>
-              <span className="text-xs text-muted-foreground">{formatNumber(data?.stockOut.total || 0, 0)} lines</span>
+              <h2 className="text-lg font-semibold">Sales / Returns</h2>
+              <span className="text-xs text-muted-foreground">
+                Sales, credit notes and debit notes only · {formatNumber(data?.stockOut.total || 0, 0)} lines
+              </span>
             </div>
             <div className="overflow-hidden rounded-xl border">
               <div className="overflow-x-auto">
-                <Table className="min-w-[1350px]">
+                <Table className="min-w-[1050px]">
                   <TableHeader>
                     <TableRow className="bg-muted/40 hover:bg-muted/40">
                       <TableHead>Date</TableHead>
                       <TableHead>Type</TableHead>
-                      <TableHead>Voucher</TableHead>
                       <TableHead>Location</TableHead>
-                      <TableHead>Group</TableHead>
                       <TableHead>Item</TableHead>
                       <TableHead className="text-right">Qty</TableHead>
                       <TableHead className="text-right">Sales</TableHead>
@@ -485,53 +708,45 @@ export default function StockInSalesReportDetail() {
                   </TableHeader>
                   <TableBody>
                     {isLoading ? (
-                      Array.from({ length: 5 }).map((_, index) => (
-                        <TableRow key={index}>
-                          <TableCell colSpan={11}>
+                      Array.from({ length: 4 }).map((_, i) => (
+                        <TableRow key={i}>
+                          <TableCell colSpan={9}>
                             <Skeleton className="h-5 w-full" />
                           </TableCell>
                         </TableRow>
                       ))
-                    ) : (data?.stockOut.rows.length || 0) === 0 ? (
+                    ) : sortedStockOut.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={11} className="py-8 text-center text-sm text-muted-foreground">
+                        <TableCell colSpan={9} className="py-8 text-center text-sm text-muted-foreground">
                           No sales, credit notes, or debit notes found.
                         </TableCell>
                       </TableRow>
                     ) : (
-                      data?.stockOut.rows.map((row) => {
-                        const positive = row.costProfit >= 0;
-                        return (
-                          <TableRow key={`${row.sourceType}-${row.id}`}>
-                            <TableCell>{displayDate(row.activityDate)}</TableCell>
-                            <TableCell>
-                              {row.sourceType === "Sale" && row.isCreditSale ? "Credit Sale" : row.sourceType}
-                            </TableCell>
-                            <TableCell className="font-mono">{row.voucherNumber}</TableCell>
-                            <TableCell>{row.locationName}</TableCell>
-                            <TableCell>{row.stockGroupName}</TableCell>
-                            <TableCell>
-                              <div className="font-medium">{row.stockItemName}</div>
-                              <div className="text-xs text-muted-foreground">{row.stockItemCode}</div>
-                            </TableCell>
-                            <TableCell className="text-right font-mono">{formatNumber(row.quantity, 3)}</TableCell>
-                            <TableCell className="text-right font-mono">{money(row.totalSales)}</TableCell>
-                            <TableCell className="text-right font-mono text-muted-foreground">
-                              {money(row.totalCost)}
-                            </TableCell>
-                            <TableCell
-                              className={`text-right font-mono font-semibold ${positive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}
-                            >
-                              {money(row.costProfit)}
-                            </TableCell>
-                            <TableCell
-                              className={`text-right font-mono ${row.avgProfitPerBale >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}
-                            >
-                              {money(row.avgProfitPerBale)}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
+                      sortedStockOut.map((row) => (
+                        <TableRow key={`${row.sourceType}-${row.id}`}>
+                          <TableCell>{displayDate(row.activityDate)}</TableCell>
+                          <TableCell>
+                            {row.sourceType === "Sale" && row.isCreditSale ? "Credit Sale" : row.sourceType}
+                          </TableCell>
+                          <TableCell>{row.locationName}</TableCell>
+                          <TableCell className="font-medium">{row.stockItemName}</TableCell>
+                          <TableCell className="text-right font-mono">{formatNumber(row.quantity, 0)}</TableCell>
+                          <TableCell className="text-right font-mono">{money(row.totalSales)}</TableCell>
+                          <TableCell className="text-right font-mono text-muted-foreground">
+                            {money(row.totalCost)}
+                          </TableCell>
+                          <TableCell
+                            className={`text-right font-mono font-semibold ${row.costProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}
+                          >
+                            {money(row.costProfit)}
+                          </TableCell>
+                          <TableCell
+                            className={`text-right font-mono ${row.avgProfitPerBale >= 0 ? "text-emerald-600" : "text-red-600"}`}
+                          >
+                            {money(row.avgProfitPerBale)}
+                          </TableCell>
+                        </TableRow>
+                      ))
                     )}
                   </TableBody>
                 </Table>

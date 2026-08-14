@@ -42,7 +42,12 @@ export function registerPosCustomerRoutes(app: Express): void {
       const customersWithBalances = await Promise.all(
         customers.map(async (customer) => {
           if (customer.ledgerAccountId) {
-            const entries = await storage.getVoucherEntriesByLedger(customer.ledgerAccountId, undefined, undefined, req.session.currentCompanyId);
+            const entries = await storage.getVoucherEntriesByLedger(
+              customer.ledgerAccountId,
+              undefined,
+              undefined,
+              req.session.currentCompanyId
+            );
             const openingBalance = parseFloat(customer.openingBalance || "0");
             const openingSide = customer.openingBalanceSide || "Dr";
 
@@ -168,7 +173,7 @@ export function registerPosCustomerRoutes(app: Express): void {
       if (customer.companyId !== companyId) return res.status(403).json({ message: "Access denied" });
 
       const { startDate, endDate } = req.query;
-      let transactions: any[] = [];
+      let transactions = [];
       if (customer.ledgerAccountId) {
         transactions = await storage.getVoucherEntriesByLedger(
           customer.ledgerAccountId,

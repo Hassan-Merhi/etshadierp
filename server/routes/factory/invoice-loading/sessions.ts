@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
@@ -22,7 +22,7 @@ import { buildLoadingSummary, getCompanyId } from "./_helpers";
 
 export function registerInvoiceLoadingSessionRoutes(app: Express) {
   // GET /api/factory/invoices/:invoiceId/loading-summary
-  app.get("/api/factory/invoices/:invoiceId/loading-summary", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/invoices/:invoiceId/loading-summary", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -45,7 +45,7 @@ export function registerInvoiceLoadingSessionRoutes(app: Express) {
   });
 
   // POST /api/factory/invoices/:invoiceId/loading-sessions
-  app.post("/api/factory/invoices/:invoiceId/loading-sessions", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/invoices/:invoiceId/loading-sessions", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });

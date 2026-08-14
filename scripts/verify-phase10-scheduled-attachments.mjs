@@ -53,11 +53,12 @@ try {
   assert(Buffer.isBuffer(sourceBytes), "Managed ZIP result must remain Buffer-compatible");
   assert(sourcePayload?.kind === "file", "ZIP concat should become a file-backed marker");
   assert(sourcePayload.managedAttachment === true, "ZIP marker should be managed");
-  assert(sourceBytes.length === 256 * 1024 + 4, "ZIP marker must preserve the real byte length");
+  assert(sourceBytes.length === 0, "ZIP marker must preserve native Buffer bounds");
+  assert(sourcePayload.length === 256 * 1024 + 4, "ZIP payload must preserve the real byte length");
   pathsToRemove.add(sourcePayload.path);
 
   const sourceStat = await stat(sourcePayload.path);
-  assert(sourceStat.size === sourceBytes.length, "Managed ZIP file size does not match marker length");
+  assert(sourceStat.size === sourcePayload.length, "Managed ZIP file size does not match payload length");
   const sourceOnDisk = await readFile(sourcePayload.path);
   assert(sourceOnDisk.subarray(0, 4).equals(zipPrefix), "Managed ZIP file lost its signature");
 
@@ -120,7 +121,8 @@ try {
   const workbookPayload = markerPayload(workbookResult);
 
   assert(workbookPayload?.kind === "file", "Background workbook should become a file-backed marker");
-  assert(workbookResult.length > 0, "Workbook marker should expose its real length");
+  assert(workbookResult.length === 0, "Workbook marker must preserve native Buffer bounds");
+  assert(workbookPayload.length > 0, "Workbook payload should expose its real length");
   pathsToRemove.add(workbookPayload.path);
   const workbookBytes = await readFile(workbookPayload.path);
   assert(workbookBytes[0] === 0x50 && workbookBytes[1] === 0x4b, "Managed workbook is not a valid XLSX ZIP");
@@ -129,12 +131,12 @@ try {
     JSON.stringify(
       {
         success: true,
-        zipBytes: sourceBytes.length,
-        workbookBytes: workbookResult.length,
+        zipBytes: sourcePayload.length,
+        workbookBytes: workbookPayload.length,
         maxConcurrentMultipartUploads: maxActiveRequests,
         verified: [
           "file-backed ZIP marker",
-          "real marker length",
+          "native-safe marker bounds",
           "deferred WhatsApp multipart body",
           "serialized WhatsApp uploads",
           "file-backed background workbook",

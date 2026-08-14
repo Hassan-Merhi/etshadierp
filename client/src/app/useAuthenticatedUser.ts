@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { authenticatedUserQueryOptions } from "@/contracts/sessionQueryContracts";
@@ -6,22 +5,12 @@ import { authenticatedUserQueryOptions } from "@/contracts/sessionQueryContracts
 /**
  * Manages the authenticated user session:
  *   - /api/auth/me query with runtime response validation
- *   - 30-minute stale time
- *   - 12-second loading timeout (forces redirect to /login if auth is stuck)
+ *   - transient auth transport failures stay in a recoverable loading/error state
+ *   - only a confirmed 401 resolves the user to null and permits a login redirect
  *   - handleLogout — clears cache, clears biometric credentials, redirects
  */
 export function useAuthenticatedUser() {
   const { data: user, isLoading, error } = useQuery(authenticatedUserQueryOptions());
-
-  const [loadingTimedOut, setLoadingTimedOut] = useState(false);
-  useEffect(() => {
-    if (!isLoading) {
-      setLoadingTimedOut(false);
-      return;
-    }
-    const timer = window.setTimeout(() => setLoadingTimedOut(true), 12000);
-    return () => window.clearTimeout(timer);
-  }, [isLoading]);
 
   const handleLogout = async (): Promise<void> => {
     try {
@@ -39,5 +28,5 @@ export function useAuthenticatedUser() {
     }
   };
 
-  return { user, isLoading, error, loadingTimedOut, handleLogout };
+  return { user, isLoading, error, handleLogout };
 }

@@ -16,7 +16,8 @@ export function registerSupplierRoutes(app: Express) {
       const companyId = getActiveSupplierCompanyId(req);
       enforceSupplierCompanyQuery(req, companyId);
       const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
-      return res.json(await supplierService.list(companyId, search));
+      const allowParentFallback = req.query.allowParentFallback === "true";
+      return res.json(await supplierService.list(companyId, search, allowParentFallback));
     } catch (error: unknown) {
       return sendSupplierRouteError(res, error, 500);
     }
@@ -67,7 +68,12 @@ export function registerSupplierRoutes(app: Express) {
     try {
       const companyId = getActiveSupplierCompanyId(req);
       const supplierId = parseSupplierId(req.params.id);
-      const supplier = await supplierService.update(supplierId, companyId, req.body, getSupplierAuditActor(req));
+      const supplier = await supplierService.update(
+        supplierId,
+        companyId,
+        req.body,
+        getSupplierAuditActor(req),
+      );
       return res.json(supplier);
     } catch (error: unknown) {
       return sendSupplierRouteError(res, error, 400);
@@ -93,7 +99,7 @@ export function registerSupplierRoutes(app: Express) {
         supplierId,
         companyId,
         req.body,
-        getSupplierAuditActor(req)
+        getSupplierAuditActor(req),
       );
       return res.json({ success: true, supplier });
     } catch (error: unknown) {

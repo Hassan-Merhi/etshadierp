@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
@@ -27,24 +27,29 @@ const JSONCARGO_ADMIN_ROLES = ["Admin", "Developer", "Owner"];
 
 export function registerFactoryContainerTrackingRoutes(app: Express) {
   // POST /api/factory/containers/:id/refresh-eta — JSONCargo ETA-only refresh
-  app.post("/api/factory/containers/:id/refresh-eta", requireAuth, requireNonPOS, async (req: any, res: any) => {
-    try {
-      const containerId = parseId(req.params.id);
-      if (containerId === null) return res.status(400).json({ message: "Invalid container id" });
+  app.post(
+    "/api/factory/containers/:id/refresh-eta",
+    requireAuth,
+    requireNonPOS,
+    async (req: Request, res: Response) => {
+      try {
+        const containerId = parseId(req.params.id);
+        if (containerId === null) return res.status(400).json({ message: "Invalid container id" });
 
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
-      const forceRefresh = !!req.body?.forceRefresh;
+        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const forceRefresh = !!req.body?.forceRefresh;
 
-      const result = await refreshFactoryContainerEta(containerId, { forceRefresh, companyId });
-      res.json(result);
-    } catch (err: unknown) {
-      const status = getErrorMessage(err)?.includes("not found") ? 404 : 500;
-      res.status(status).json({ message: getErrorMessage(err) || "Failed to refresh ETA" });
+        const result = await refreshFactoryContainerEta(containerId, { forceRefresh, companyId });
+        res.json(result);
+      } catch (err: unknown) {
+        const status = getErrorMessage(err)?.includes("not found") ? 404 : 500;
+        res.status(status).json({ message: getErrorMessage(err) || "Failed to refresh ETA" });
+      }
     }
-  });
+  );
 
   // POST /api/factory/containers/refresh-etas — bulk JSONCargo ETA refresh (admin-only)
-  app.post("/api/factory/containers/refresh-etas", requireAuth, requireNonPOS, async (req: any, res: any) => {
+  app.post("/api/factory/containers/refresh-etas", requireAuth, requireNonPOS, async (req: Request, res: Response) => {
     try {
       const role = (req.session as any)?.user?.role || req.user?.role;
       if (!JSONCARGO_ADMIN_ROLES.includes(role)) {
@@ -66,18 +71,23 @@ export function registerFactoryContainerTrackingRoutes(app: Express) {
   });
 
   // GET /api/factory/containers/eta-tracking-summary — dashboard summary, no secrets
-  app.get("/api/factory/containers/eta-tracking-summary", requireAuth, requireNonPOS, async (req: any, res: any) => {
-    try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
-      const summary = await getFactoryEtaTrackingSummary(companyId);
-      res.json(summary);
-    } catch (err: unknown) {
-      res.status(500).json({ message: getErrorMessage(err) || "Failed to fetch ETA tracking summary" });
+  app.get(
+    "/api/factory/containers/eta-tracking-summary",
+    requireAuth,
+    requireNonPOS,
+    async (req: Request, res: Response) => {
+      try {
+        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const summary = await getFactoryEtaTrackingSummary(companyId);
+        res.json(summary);
+      } catch (err: unknown) {
+        res.status(500).json({ message: getErrorMessage(err) || "Failed to fetch ETA tracking summary" });
+      }
     }
-  });
+  );
 
   // GET /api/factory/container-tracking/:id/events — tracking event history
-  app.get("/api/factory/container-tracking/:id/events", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/container-tracking/:id/events", requireAuth, async (req: Request, res: Response) => {
     try {
       const containerId = parseId(req.params.id);
       if (containerId === null) return res.status(400).json({ message: "Invalid container id" });
@@ -104,7 +114,7 @@ export function registerFactoryContainerTrackingRoutes(app: Express) {
   });
 
   // GET /api/factory/container-tracking/:id/checks — tracking check history
-  app.get("/api/factory/container-tracking/:id/checks", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/container-tracking/:id/checks", requireAuth, async (req: Request, res: Response) => {
     try {
       const containerId = parseId(req.params.id);
       if (containerId === null) return res.status(400).json({ message: "Invalid container id" });
@@ -137,7 +147,7 @@ export function registerFactoryContainerTrackingRoutes(app: Express) {
   });
 
   // GET /api/factory/container-tracking/:id/progress — live tracking progress (SSE or polling)
-  app.get("/api/factory/container-tracking/:id/progress", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/container-tracking/:id/progress", requireAuth, async (req: Request, res: Response) => {
     try {
       const containerId = parseId(req.params.id);
       if (containerId === null) return res.status(400).json({ message: "Invalid container id" });
@@ -149,7 +159,7 @@ export function registerFactoryContainerTrackingRoutes(app: Express) {
   });
 
   // POST /api/factory/container-tracking/:id/track-now — manually trigger tracking
-  app.post("/api/factory/container-tracking/:id/track-now", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/container-tracking/:id/track-now", requireAuth, async (req: Request, res: Response) => {
     try {
       const containerId = parseId(req.params.id);
       if (containerId === null) return res.status(400).json({ message: "Invalid container id" });
@@ -197,7 +207,7 @@ export function registerFactoryContainerTrackingRoutes(app: Express) {
   });
 
   // PATCH /api/factory/container-tracking/:id/settings — enable/disable tracking
-  app.patch("/api/factory/container-tracking/:id/settings", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/container-tracking/:id/settings", requireAuth, async (req: Request, res: Response) => {
     try {
       const containerId = parseId(req.params.id);
       if (containerId === null) return res.status(400).json({ message: "Invalid container id" });

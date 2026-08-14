@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { db } from "../../../db";
@@ -24,7 +24,7 @@ export function registerOrphanedVoucherRepairRoutes(app: Express) {
   // POST /api/factory/repair-orphaned-vouchers
   // Finds and deletes vouchers that were created for payroll/advance events that have
   // since been undone or deleted, leaving stale ledger entries (wrong cash balance etc).
-  app.post("/api/factory/repair-orphaned-vouchers", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/repair-orphaned-vouchers", requireAuth, async (req: Request, res: Response) => {
     try {
       const currentRole = (req.session as any).currentRole;
       if (!["Admin", "Owner", "Developer"].includes(currentRole)) {
@@ -155,7 +155,7 @@ export function registerOrphanedVoucherRepairRoutes(app: Express) {
           const periodStart = v.voucherDate as string;
           const periodEnd = periodMatch ? periodMatch[2] : null;
 
-          const whereConditions: any[] = [
+          const whereConditions = [
             eq(factoryPayrolls.companyId, companyId),
             eq(factoryPayrolls.periodStart, periodStart),
           ];

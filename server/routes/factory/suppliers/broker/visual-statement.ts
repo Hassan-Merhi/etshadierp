@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { parseId } from "../../../../lib/parseId";
 import { getErrorMessage } from "../../../../lib/httpHandlers";
 import { logger } from "../../../../lib/logger";
@@ -24,7 +24,7 @@ import { eq, and, sql, inArray } from "drizzle-orm";
 
 export function registerSupplierBrokerVisualStatementRoutes(app: Express) {
   // ── Broker Visual Statement (container-centric view for the new dedicated page) ──
-  app.get("/api/factory/suppliers/:id/broker-visual-statement", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/suppliers/:id/broker-visual-statement", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -44,7 +44,7 @@ export function registerSupplierBrokerVisualStatementRoutes(app: Express) {
         .select()
         .from(factorySuppliers)
         .where(and(eq(factorySuppliers.parentId, brokerId), eq(factorySuppliers.companyId, companyId)));
-      const allSupplierIds = [broker.id, ...linked.map((s: any) => s.id)];
+      const allSupplierIds = [broker.id, ...linked.map((s) => s.id)];
       const nameMap: Record<number, string> = {};
       for (const s of [broker, ...linked]) nameMap[(s as any).id] = (s as any).name;
 
@@ -59,7 +59,7 @@ export function registerSupplierBrokerVisualStatementRoutes(app: Express) {
       const containers = await containerQuery.orderBy(factoryContainers.arrivalDate, factoryContainers.createdAt);
 
       // Build container rows
-      const containerRows = (containers as any[]).map((c: any) => {
+      const containerRows = (containers as any[]).map((c) => {
         const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
         const rate = parseFloat(c.ratePerKg || "0");
         return {
@@ -259,7 +259,7 @@ export function registerSupplierBrokerVisualStatementRoutes(app: Express) {
 
       return res.json({
         broker: { id: broker.id, name: (broker as any).name },
-        linkedSuppliers: linked.map((s: any) => ({ id: s.id, name: s.name })),
+        linkedSuppliers: linked.map((s) => ({ id: s.id, name: s.name })),
         containers: containerRows,
         payments: paymentRows,
         creditByCurrency,

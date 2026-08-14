@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../../lib/httpHandlers";
 import { parseId } from "../../../../lib/parseId";
 import { logger } from "../../../../lib/logger";
@@ -16,7 +16,7 @@ import { eq, and, sql, inArray } from "drizzle-orm";
 import { resultRows } from "../../../../lib/queryResult";
 
 export function registerOrderVerificationSummaryRoutes(app: Express) {
-  app.get("/api/factory/customer-orders/:id/verification-summary", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/customer-orders/:id/verification-summary", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -69,7 +69,7 @@ export function registerOrderVerificationSummaryRoutes(app: Express) {
 
       const rawBalesResult = await db.execute(sql`SELECT * FROM customer_order_bales WHERE order_id = ${orderId}`);
       const rawBaleRows: any[] = resultRows(rawBalesResult);
-      const orderBales = rawBaleRows.map((r: any) => ({
+      const orderBales = rawBaleRows.map((r) => ({
         id: r.id,
         order_id: r.order_id,
         bale_id: r.bale_id,
@@ -102,7 +102,7 @@ export function registerOrderVerificationSummaryRoutes(app: Express) {
       if (orderBales.length === 0 && order.totalQtyBales > 0) {
         const rawLinesResult = await db.execute(sql`SELECT * FROM customer_order_lines WHERE order_id = ${orderId}`);
         const linesRows: any[] = resultRows(rawLinesResult);
-        const hasLines = linesRows.some((r: any) => (r.qty ?? 0) > 0);
+        const hasLines = linesRows.some((r) => (r.qty ?? 0) > 0);
 
         if (hasLines) {
           dataSource = "order_lines";

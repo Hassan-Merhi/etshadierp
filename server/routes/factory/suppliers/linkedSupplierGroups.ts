@@ -34,7 +34,7 @@ export async function buildLinkedSupplierGroups(
     .from(factorySuppliers)
     .where(and(eq(factorySuppliers.parentId, supplierId), eq(factorySuppliers.companyId, companyId)));
 
-  const linkedSupplierGroups: any[] = [];
+  const linkedSupplierGroups = [];
   for (const linked of linkedSuppliers) {
     const linkedContainers = await db
       .select()
@@ -68,7 +68,7 @@ export async function buildLinkedSupplierGroups(
       const freightSameCcy = freightCc === cc;
       // Only include freight in this currency's value when it shares the container's currency
       const value = kg * rate + (freightSameCcy ? freight : 0);
-      const cComms = commissions.filter((cm: any) => cm.containerId === c.id);
+      const cComms = commissions.filter((cm) => cm.containerId === c.id);
       const totalComm = cComms.reduce((s: number, cm: any) => s + parseFloat(cm.commissionTotal || "0"), 0);
       const commCc = (c as any).commissionCurrencyCode || "USD";
       if (!linkedByCurrency[cc]) linkedByCurrency[cc] = { containers: [], totalValue: 0, totalCommission: 0 };

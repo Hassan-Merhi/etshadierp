@@ -57,11 +57,15 @@ export function authenticatedUserQueryOptions() {
     queryKey: authenticatedUserQueryKey,
     queryFn: ({ signal }) => fetchAuthenticatedUser(signal),
     select: (cachedValue) => parseAuthenticatedUser(cachedValue),
-    retry: false,
+    // A confirmed 401 resolves to null above and is not retried. These retries
+    // are only for transport/5xx failures so brief server hiccups cannot look
+    // like an expired login session.
+    retry: 3,
+    retryDelay: (attempt) => Math.min(500 * 2 ** attempt, 2_000),
     staleTime: 30 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    refetchOnReconnect: true,
   });
 }
 

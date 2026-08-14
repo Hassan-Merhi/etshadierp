@@ -108,7 +108,7 @@ export function registerExportRoutes(app: Express) {
         );
       } else {
         const setParts: string[] = [];
-        const params: any[] = [];
+        const params = [];
         let idx = 1;
         if (gmailUser !== undefined) {
           setParts.push(`gmail_user = $${idx++}`);
@@ -215,7 +215,7 @@ export function registerExportRoutes(app: Express) {
           companies,
           fromDate,
           toDate,
-          (message, level) => addStep(job, message, level ?? "info"),
+          (message, level) => addStep(job, message, level ?? "info")
         );
 
         try {
@@ -378,7 +378,7 @@ export function registerExportRoutes(app: Express) {
       `);
       const count = r.rowCount ?? 0;
       logger.info(`[ExportRun] Manual dismiss: cleared ${count} stuck run(s)`);
-      res.json({ cleared: count, ids: r.rows.map((x: any) => x.id) });
+      res.json({ cleared: count, ids: r.rows.map((x) => x.id) });
     } catch (e: unknown) {
       logger.error("[ExportRun] Manual dismiss failed:", { error: getErrorMessage(e) });
       res.status(500).json({ message: getErrorMessage(e) });
@@ -467,7 +467,7 @@ export function registerExportRoutes(app: Express) {
               skippedReason: row.skipped_reason,
             }
           : null,
-        recentRuns: recentQ.rows.map((r: any) => ({
+        recentRuns: recentQ.rows.map((r) => ({
           id: r.id,
           runType: r.run_type,
           status: r.status,

@@ -216,7 +216,7 @@ export function EmployeeCrudDialogs({
                         <SelectItem value="none" data-testid="option-no-group">
                           No Group
                         </SelectItem>
-                        {employeeGroups.map((group: any) => (
+                        {employeeGroups.map((group) => (
                           <SelectItem
                             key={group.id}
                             value={group.id.toString()}
@@ -394,7 +394,7 @@ export function EmployeeCrudDialogs({
           </DialogHeader>
           <div className="space-y-3 max-h-96 overflow-y-auto">
             {(employeeStaff || []).map((worker) => {
-              const isMember = groupMembers.some((m: any) => m.id === worker.id);
+              const isMember = groupMembers.some((m) => m.id === worker.id);
               return (
                 <div key={worker.id} className="flex items-center gap-2 p-2 rounded border">
                   <Checkbox

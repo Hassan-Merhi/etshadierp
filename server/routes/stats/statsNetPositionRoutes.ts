@@ -21,20 +21,20 @@ export function registerStatsNetPositionRoutes(app: Express) {
       const toDate = req.query.toDate ? String(req.query.toDate) : null;
 
       const allCompanies = await storage.getAllCompanies();
-      const company = allCompanies.find((c: any) => c.id === companyId);
+      const company = allCompanies.find((c) => c.id === companyId);
       const companyName = company?.name || "Company";
 
       // ── 1. Accounts & voucher entries (cumulative up to toDate) ──────────
       const companyAccounts = await storage.getAllLedgerAccounts(companyId, true);
 
-      const voucherConds: any[] = [
+      const voucherConds = [
         eq(vouchers.companyId, companyId),
         eq(vouchers.optional, false),
         isNull(vouchers.deletedAt),
       ];
       if (toDate) voucherConds.push(lte(vouchers.voucherDate, toDate));
 
-      const voucherAcctConds: any[] = [eq(vouchers.optional, false), isNull(vouchers.deletedAt)];
+      const voucherAcctConds = [eq(vouchers.optional, false), isNull(vouchers.deletedAt)];
       if (toDate) voucherAcctConds.push(lte(vouchers.voucherDate, toDate));
 
       // Two separate queries — see net-profit route for rationale:
@@ -113,7 +113,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
       // SP formula: Cash + Stock (inventory) → What We Have; sp_payable only → What We Owe.
       const isSupplierPartner = (company as any)?.companyType === "supplier_partner";
       const accountsForClassify = isSupplierPartner
-        ? companyAccounts.filter((a: any) => a.accountType === "Cash" || a.subType === "sp_payable")
+        ? companyAccounts.filter((a) => a.accountType === "Cash" || a.subType === "sp_payable")
         : companyAccounts.filter(
             (a: any) =>
               a.subType !== "sp_stock" &&
@@ -125,8 +125,8 @@ export function registerStatsNetPositionRoutes(app: Express) {
       });
       let forUsTotal = classified.forUsTotal;
       let onUsTotal = classified.onUsTotal;
-      const forUsAccounts: any[] = [...classified.forUsAccounts];
-      const onUsAccounts: any[] = [...classified.onUsAccounts];
+      const forUsAccounts = [...classified.forUsAccounts];
+      const onUsAccounts = [...classified.onUsAccounts];
 
       // ── 3. Stock In Hand — historical as of toDate ────────────────────────
       const activeLocsData = await db
@@ -134,7 +134,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
         .from(locations)
         .where(and(eq(locations.companyId, companyId), eq(locations.active, true), isNull(locations.deletedAt)))
         .execute();
-      const activeLocIds = activeLocsData.map((l: any) => l.id);
+      const activeLocIds = activeLocsData.map((l) => l.id);
       let stockOnFloor = 0;
       if (activeLocIds.length > 0) {
         if (toDate) {

@@ -1,3 +1,4 @@
+import type { Request, Response } from "express";
 import { parseId } from "../../lib/parseId";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { and, eq, sql } from "drizzle-orm";
@@ -22,7 +23,7 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
   // GET /api/factory/v3/stock-overview
   // Per-article-code FTP: IN_STOCK - v3 expected_to_load - v3 loading
   // ──────────────────────────────────────────────────────────────
-  app.get("/api/factory/v3/stock-overview", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/v3/stock-overview", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -94,7 +95,7 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
   // ──────────────────────────────────────────────────────────────
   // GET /api/factory/v3/loads
   // ──────────────────────────────────────────────────────────────
-  app.get("/api/factory/v3/loads", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/v3/loads", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -142,7 +143,7 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
   // GET /api/factory/v3/loads/:id
   // Single load with full bale list
   // ──────────────────────────────────────────────────────────────
-  app.get("/api/factory/v3/loads/:id", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/v3/loads/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -217,7 +218,7 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
   // ──────────────────────────────────────────────────────────────
   // POST /api/factory/v3/loads  — create load from proforma
   // ──────────────────────────────────────────────────────────────
-  app.post("/api/factory/v3/loads", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/v3/loads", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -249,7 +250,7 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
   // ──────────────────────────────────────────────────────────────
   // PATCH /api/factory/v3/loads/:id/start — expected_to_load → loading
   // ──────────────────────────────────────────────────────────────
-  app.patch("/api/factory/v3/loads/:id/start", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/v3/loads/:id/start", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -280,7 +281,7 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
   // POST /api/factory/v3/loads/:id/bales — scan bale into load
   // Same matching logic as existing system: referenceNumber, baleCode, articleCode
   // ──────────────────────────────────────────────────────────────
-  app.post("/api/factory/v3/loads/:id/bales", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/v3/loads/:id/bales", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -416,7 +417,7 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
   // ──────────────────────────────────────────────────────────────
   // DELETE /api/factory/v3/loads/:id/bales/:baleId — soft-remove
   // ──────────────────────────────────────────────────────────────
-  app.delete("/api/factory/v3/loads/:id/bales/:baleId", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/v3/loads/:id/bales/:baleId", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -449,7 +450,7 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
   // POST /api/factory/v3/loads/:id/finalize
   // Marks all non-removed scanned bales as SOLD in factory_bales
   // ──────────────────────────────────────────────────────────────
-  app.post("/api/factory/v3/loads/:id/finalize", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/v3/loads/:id/finalize", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -497,7 +498,7 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
   // ──────────────────────────────────────────────────────────────
   // PATCH /api/factory/v3/loads/:id/cancel
   // ──────────────────────────────────────────────────────────────
-  app.patch("/api/factory/v3/loads/:id/cancel", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/v3/loads/:id/cancel", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -527,7 +528,7 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
   // GET /api/factory/v3/proformas
   // Active proformas with line counts + linked v3 load summary
   // ──────────────────────────────────────────────────────────────
-  app.get("/api/factory/v3/proformas", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/v3/proformas", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -576,7 +577,7 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
   // GET /api/factory/v3/proformas/:id/loads
   // All v3 loads linked to a specific proforma
   // ──────────────────────────────────────────────────────────────
-  app.get("/api/factory/v3/proformas/:id/loads", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/v3/proformas/:id/loads", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });

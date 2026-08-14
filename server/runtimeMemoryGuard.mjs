@@ -53,20 +53,57 @@ function sampleMemory(trigger = "interval") {
   }
 
   if (pressureState.level !== "normal") {
-    console.warn(JSON.stringify({ timestamp: new Date().toISOString(), level: pressureState.level === "critical" ? "ERROR" : "WARN", message: "Runtime memory pressure detected", module: "memory-guard", action: "memory-sample", trigger, rssMb: pressureState.rssMb, heapUsedMb: pressureState.heapUsedMb, externalMb: pressureState.externalMb, arrayBuffersMb: pressureState.arrayBuffersMb, softLimitMb: SOFT_RSS_MB, hardLimitMb: HARD_RSS_MB, hardSamples: pressureState.hardSamples }));
+    console.warn(
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        level: pressureState.level === "critical" ? "ERROR" : "WARN",
+        message: "Runtime memory pressure detected",
+        module: "memory-guard",
+        action: "memory-sample",
+        trigger,
+        rssMb: pressureState.rssMb,
+        heapUsedMb: pressureState.heapUsedMb,
+        externalMb: pressureState.externalMb,
+        arrayBuffersMb: pressureState.arrayBuffersMb,
+        softLimitMb: SOFT_RSS_MB,
+        hardLimitMb: HARD_RSS_MB,
+        hardSamples: pressureState.hardSamples,
+      })
+    );
   }
 
   if (pressureState.level === "critical" && typeof globalThis.gc === "function") {
-    try { globalThis.gc(); } catch {}
+    try {
+      globalThis.gc();
+    } catch {}
   }
 
   if (pressureState.hardSamples >= HARD_SAMPLES_BEFORE_EXIT) {
-    console.error(JSON.stringify({ timestamp: new Date().toISOString(), level: "FATAL", message: "Memory stayed above the hard RSS limit; exiting before an OOM kill", module: "memory-guard", action: "controlled-restart", rssMb: pressureState.rssMb, hardLimitMb: HARD_RSS_MB, samples: pressureState.hardSamples }));
+    console.error(
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        level: "FATAL",
+        message: "Memory stayed above the hard RSS limit; exiting before an OOM kill",
+        module: "memory-guard",
+        action: "controlled-restart",
+        rssMb: pressureState.rssMb,
+        hardLimitMb: HARD_RSS_MB,
+        samples: pressureState.hardSamples,
+      })
+    );
     const shutdown = globalThis.__erpRequestGracefulShutdown;
     if (typeof shutdown === "function") {
       shutdown("memory-hard-limit", 1, null);
     } else {
-      console.error(JSON.stringify({ timestamp: new Date().toISOString(), level: "FATAL", module: "memory-guard", action: "shutdown-fallback", message: "Graceful shutdown unavailable — calling process.exit directly" }));
+      console.error(
+        JSON.stringify({
+          timestamp: new Date().toISOString(),
+          level: "FATAL",
+          module: "memory-guard",
+          action: "shutdown-fallback",
+          message: "Graceful shutdown unavailable — calling process.exit directly",
+        })
+      );
       process.exit(1);
     }
   }
@@ -92,8 +129,54 @@ const pathLimits = [
 const activeByName = new Map();
 // Exposed for the lifecycle guard's runtime snapshot.
 globalThis.__erpConcurrencyCounters = activeByName;
+
+// Instead of instantly rejecting when a heavy endpoint is saturated, hold the
+// request in a short FIFO queue and start it as soon as a slot frees up. Users
+// double-clicking an export or two POS users opening the same report used to
+// see a raw ENDPOINT_BUSY JSON page; now the second request simply waits.
+const QUEUE_MAX_WAIT_MS = parsePositiveInt(process.env.ENDPOINT_QUEUE_MAX_WAIT_MS, 20_000);
+const QUEUE_MAX_DEPTH = parsePositiveInt(process.env.ENDPOINT_QUEUE_MAX_DEPTH, 8);
+const queuesByName = new Map();
+
+function queueFor(name) {
+  let queue = queuesByName.get(name);
+  if (!queue) {
+    queue = [];
+    queuesByName.set(name, queue);
+  }
+  return queue;
+}
+
+function tryAcquire(rule) {
+  const current = activeByName.get(rule.name) ?? 0;
+  if (current >= rule.max) return false;
+  activeByName.set(rule.name, current + 1);
+  return true;
+}
+
+function drainQueue(rule) {
+  const queue = queuesByName.get(rule.name);
+  while (queue && queue.length > 0 && tryAcquire(rule)) {
+    const waiter = queue.shift();
+    clearTimeout(waiter.timer);
+    if (waiter.res.writableEnded || waiter.res.destroyed || waiter.req.destroyed) {
+      // Client went away while waiting — free the slot for the next waiter.
+      releaseSlot(rule);
+      continue;
+    }
+    waiter.start();
+  }
+}
+
+function releaseSlot(rule) {
+  activeByName.set(rule.name, Math.max(0, (activeByName.get(rule.name) ?? 1) - 1));
+}
 function pathnameOf(req) {
-  try { return new URL(req.url || "/", "http://localhost").pathname; } catch { return req.url || "/"; }
+  try {
+    return new URL(req.url || "/", "http://localhost").pathname;
+  } catch {
+    return req.url || "/";
+  }
 }
 function reject(res, statusCode, code, message, retryAfterSeconds = 5) {
   if (res.headersSent || res.writableEnded) return;
@@ -109,7 +192,14 @@ Server.prototype.emit = function patchedEmit(event, ...args) {
   if (event !== "request") return originalEmit.call(this, event, ...args);
   const [req, res] = args;
   const path = pathnameOf(req);
-  if (path === "/api/health" || path === "/api/health/db" || path === "/api/health/live" || path === "/api/health/ready" || path === "/api/health/metrics") return originalEmit.call(this, event, ...args);
+  if (
+    path === "/api/health" ||
+    path === "/api/health/db" ||
+    path === "/api/health/live" ||
+    path === "/api/health/ready" ||
+    path === "/api/health/metrics"
+  )
+    return originalEmit.call(this, event, ...args);
   if (globalThis.__erpRuntimeShuttingDown) {
     reject(res, 503, "SERVER_SHUTTING_DOWN", "Server is restarting. Please retry shortly.", 5);
     return true;
@@ -121,24 +211,58 @@ Server.prototype.emit = function patchedEmit(event, ...args) {
   }
   const rule = pathLimits.find((candidate) => candidate.test(path));
   if (!rule) return originalEmit.call(this, event, ...args);
-  const current = activeByName.get(rule.name) ?? 0;
-  if (current >= rule.max) {
+
+  const server = this;
+  const start = () => {
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      releaseSlot(rule);
+      drainQueue(rule);
+    };
+    res.once("finish", release);
+    res.once("close", release);
+    originalEmit.call(server, event, req, res);
+  };
+
+  if (tryAcquire(rule)) {
+    start();
+    return true;
+  }
+
+  const queue = queueFor(rule.name);
+  if (queue.length >= QUEUE_MAX_DEPTH) {
+    // Queue is saturated too — shed load the old way rather than piling up.
     reject(res, 429, "ENDPOINT_BUSY", "This heavy operation is already running. Please retry shortly.", 5);
     return true;
   }
-  activeByName.set(rule.name, current + 1);
-  let released = false;
-  const release = () => {
-    if (released) return;
-    released = true;
-    activeByName.set(rule.name, Math.max(0, (activeByName.get(rule.name) ?? 1) - 1));
-  };
-  res.once("finish", release);
-  res.once("close", release);
-  return originalEmit.call(this, event, ...args);
+
+  const waiter = { req, res, start: null, timer: null };
+  waiter.start = start;
+  waiter.timer = setTimeout(() => {
+    const index = queue.indexOf(waiter);
+    if (index !== -1) queue.splice(index, 1);
+    reject(res, 429, "ENDPOINT_BUSY", "This heavy operation is still busy. Please retry shortly.", 5);
+  }, QUEUE_MAX_WAIT_MS);
+  waiter.timer.unref?.();
+  queue.push(waiter);
+  return true;
 };
 
 const timer = setInterval(() => sampleMemory("interval"), SAMPLE_INTERVAL_MS);
 timer.unref();
 sampleMemory("startup");
-console.log(JSON.stringify({ timestamp: new Date().toISOString(), level: "INFO", message: "Runtime memory guard enabled", module: "memory-guard", action: "startup", softRssMb: SOFT_RSS_MB, hardRssMb: HARD_RSS_MB, sampleIntervalMs: SAMPLE_INTERVAL_MS, hardSamplesBeforeExit: HARD_SAMPLES_BEFORE_EXIT }));
+console.log(
+  JSON.stringify({
+    timestamp: new Date().toISOString(),
+    level: "INFO",
+    message: "Runtime memory guard enabled",
+    module: "memory-guard",
+    action: "startup",
+    softRssMb: SOFT_RSS_MB,
+    hardRssMb: HARD_RSS_MB,
+    sampleIntervalMs: SAMPLE_INTERVAL_MS,
+    hardSamplesBeforeExit: HARD_SAMPLES_BEFORE_EXIT,
+  })
+);

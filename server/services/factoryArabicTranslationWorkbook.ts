@@ -1,9 +1,6 @@
 import { createHash } from "node:crypto";
 import ExcelJS from "exceljs";
-import {
-  normalizeFactoryArticleCode,
-  type FactoryArabicImportMode,
-} from "@shared/factoryBilingualContract";
+import { normalizeFactoryArticleCode, type FactoryArabicImportMode } from "@shared/factoryBilingualContract";
 
 export type TranslationImportMode = FactoryArabicImportMode;
 
@@ -87,6 +84,7 @@ export const ARABIC_TRANSLATION_TEMPLATE_HEADERS = [
 
 const MAX_WORKBOOK_ROWS = 50_000;
 const MAX_TRANSLATION_LENGTH = 2_000;
+// eslint-disable-next-line no-control-regex -- the pattern exists to find control characters — Excel rejects a workbook containing them, so a translation carrying C0/DEL must be caught before the sheet is written
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
 const RTL_FROZEN_VIEW: ExcelJS.WorksheetView = {
   state: "frozen",
@@ -141,11 +139,7 @@ function translationStatus(product: TranslationCatalogProduct): string {
   return "Complete";
 }
 
-function selectedValue(
-  currentValue: string | null,
-  workbookValue: string,
-  mode: TranslationImportMode
-): string | null {
+function selectedValue(currentValue: string | null, workbookValue: string, mode: TranslationImportMode): string | null {
   const current = clean(currentValue);
   const supplied = clean(workbookValue);
   return mode === "fill-missing" ? current || supplied || null : supplied || current || null;
@@ -200,7 +194,9 @@ export function createArabicTranslationPreviewToken(input: {
   workbookSha256: string;
   preview: TranslationPreview;
 }): string {
-  return createHash("sha256").update(JSON.stringify(previewFingerprintPayload(input))).digest("hex");
+  return createHash("sha256")
+    .update(JSON.stringify(previewFingerprintPayload(input)))
+    .digest("hex");
 }
 
 export function createArabicTranslationPreviewEnvelope(input: {
@@ -354,7 +350,7 @@ export function previewArabicTranslationImport(
       descriptionAr: clean(sourceRow.descriptionAr),
     };
     const reasons: string[] = [];
-    const matches = row.articleCode ? catalogByCode.get(row.articleCode) ?? [] : [];
+    const matches = row.articleCode ? (catalogByCode.get(row.articleCode) ?? []) : [];
     const duplicateInFile = Boolean(row.articleCode) && (codeCounts.get(row.articleCode) ?? 0) > 1;
 
     if (!row.articleCode) reasons.push("Missing article code");
@@ -418,9 +414,7 @@ export function previewArabicTranslationImport(
   const categoryIdsToUpdate = new Set(
     updateRows.flatMap((row) => (row.categoryId && row.changes.categoryNameAr ? [row.categoryId] : []))
   );
-  const duplicateArticleCodes = uniqueSorted(
-    [...codeCounts].filter(([, count]) => count > 1).map(([code]) => code)
-  );
+  const duplicateArticleCodes = uniqueSorted([...codeCounts].filter(([, count]) => count > 1).map(([code]) => code));
   const unknownArticleCodes = uniqueSorted(
     previewRows.filter((row) => row.status === "unknown").map((row) => row.articleCode)
   );
@@ -440,8 +434,7 @@ export function previewArabicTranslationImport(
     ambiguousArticleCodes,
     blankOrInvalidArabicNames: previewRows.filter((row) => row.status === "invalid").length,
     categoryConflicts: conflictingCategoryIds.size,
-    blocked:
-      duplicateArticleCodes.length > 0 || conflictingCategoryIds.size > 0 || ambiguousArticleCodes.length > 0,
+    blocked: duplicateArticleCodes.length > 0 || conflictingCategoryIds.size > 0 || ambiguousArticleCodes.length > 0,
     rows: previewRows,
   };
 }

@@ -17,6 +17,31 @@ export function getRentalBillingDay(startDate: string | Date): number {
 }
 
 /**
+ * Returns the contract's first allocatable rental period.
+ * A payment may be received before the contract starts, but it must never be
+ * allocated to a month before this year/month.
+ */
+export function getRentalContractStartPeriod(startDate: string | Date): { year: number; month: number } {
+  const d = typeof startDate === "string" ? new Date(startDate + "T00:00:00Z") : startDate;
+  return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1 };
+}
+
+/**
+ * Clamps an allocation period so it can never precede the contract start
+ * period. This is intentionally month-based because rental allocations are
+ * stored by (year, month), while the billing day is handled separately.
+ */
+export function clampRentalPeriodToContractStart(
+  year: number,
+  month: number,
+  startDate: string | Date
+): { year: number; month: number } {
+  const start = getRentalContractStartPeriod(startDate);
+  if (year < start.year || (year === start.year && month < start.month)) return start;
+  return { year, month };
+}
+
+/**
  * Returns the exact due date (YYYY-MM-DD) for a given (year, month, billingDay).
  * If billingDay is greater than the last day of the month (e.g. 31 in February),
  * the last calendar day of that month is used instead.
@@ -39,12 +64,7 @@ export function getRentalPeriodDueDate(year: number, month: number, billingDay: 
  * that would incorrectly include e.g. July when today is July 16 and the
  * billing day is 20.
  */
-export function isRentalPeriodDue(
-  year: number,
-  month: number,
-  billingDay: number,
-  asOfDate: string
-): boolean {
+export function isRentalPeriodDue(year: number, month: number, billingDay: number, asOfDate: string): boolean {
   const dueDate = getRentalPeriodDueDate(year, month, billingDay);
   return asOfDate >= dueDate;
 }

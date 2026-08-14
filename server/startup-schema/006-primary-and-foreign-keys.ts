@@ -217,7 +217,12 @@ export const primaryAndForeignKeys: string[] = [
   `DO $$ BEGIN ALTER TABLE containers ADD CONSTRAINT containers_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
   `DO $$ BEGIN ALTER TABLE container_freight ADD CONSTRAINT container_freight_vendor_supplier_id_fkey FOREIGN KEY (vendor_supplier_id) REFERENCES suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
   `DO $$ BEGIN ALTER TABLE purchase_orders ADD CONSTRAINT purchase_orders_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
-  `DO $$ BEGIN ALTER TABLE supplier_containers ADD CONSTRAINT supplier_containers_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  // supplier_containers is no longer part of the schema — it is created neither
+  // here nor in shared/schema, so on a database built from the current schema this
+  // failed every startup with 'relation "supplier_containers" does not exist'. The
+  // statement is kept and guarded rather than deleted: a long-lived database may
+  // still carry the table, and it should still gain the key.
+  `DO $$ BEGIN IF to_regclass('public.supplier_containers') IS NOT NULL THEN ALTER TABLE supplier_containers ADD CONSTRAINT supplier_containers_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE RESTRICT; END IF; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
   `DO $$ BEGIN ALTER TABLE supplier_proformas ADD CONSTRAINT supplier_proformas_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
   `DO $$ BEGIN ALTER TABLE voucher_entries ADD CONSTRAINT voucher_entries_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
 
@@ -370,7 +375,11 @@ export const primaryAndForeignKeys: string[] = [
   //     stock_transfer_vouchers.destination_location_id (128/316), stock_transfer_vouchers.source_location_id (128/314).
   // RESTRICT on all — locations tie to inventory positions, sales records, transfers; deletion must be blocked.
   // Idempotent: ALTER guarded by EXCEPTION duplicate_object. NOT VALID preserves existing orphans.
-  `DO $$ BEGIN ALTER TABLE bales ADD CONSTRAINT bales_erp_location_id_fkey FOREIGN KEY (erp_location_id) REFERENCES locations(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  // bales.erp_location_id no longer exists in the current schema — only
+  // factory_bales carries that column now — so this failed every startup with
+  // 'column "erp_location_id" referenced in foreign key constraint does not
+  // exist'. Guarded on the column for the same reason as supplier_containers above.
+  `DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'bales' AND column_name = 'erp_location_id') THEN ALTER TABLE bales ADD CONSTRAINT bales_erp_location_id_fkey FOREIGN KEY (erp_location_id) REFERENCES locations(id) ON DELETE RESTRICT; END IF; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
   `DO $$ BEGIN ALTER TABLE employees ADD CONSTRAINT employees_sales_bonus_pct_location_id_fkey FOREIGN KEY (sales_bonus_pct_location_id) REFERENCES locations(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
   `DO $$ BEGIN ALTER TABLE factory_bales ADD CONSTRAINT factory_bales_erp_location_id_fkey FOREIGN KEY (erp_location_id) REFERENCES locations(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
   `DO $$ BEGIN ALTER TABLE factory_pressing_batches ADD CONSTRAINT factory_pressing_batches_finalized_location_id_fkey FOREIGN KEY (finalized_location_id) REFERENCES locations(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,

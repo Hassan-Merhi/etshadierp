@@ -33,37 +33,63 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
   // ── All state & refs ───────────────────────────────────────────────────────
   const {
-    posSelectedLocation, setPosSelectedLocation,
-    rows, setRows,
-    selectedCell, setSelectedCell,
-    paymentAccountType, setPaymentAccountType,
-    paymentAccountId, setPaymentAccountId,
-    isCreditSale, setIsCreditSale,
-    selectedCustomerId, setSelectedCustomerId,
-    notes, setNotes,
-    saleDate, setSaleDate,
-    searchTerm, setSearchTerm,
-    activeRow, setActiveRow,
-    highlightedIndex, setHighlightedIndex,
-    zeroStockAlert, setZeroStockAlert,
-    zeroStockItem, setZeroStockItem,
-    savedSale, setSavedSale,
-    showPrintDialog, setShowPrintDialog,
-    showDraftDialog, setShowDraftDialog,
-    currentDraftId, setCurrentDraftId,
-    customerComboOpen, setCustomerComboOpen,
-    mobileCustomerComboOpen, setMobileCustomerComboOpen,
+    posSelectedLocation,
+    setPosSelectedLocation,
+    rows,
+    setRows,
+    selectedCell,
+    setSelectedCell,
+    paymentAccountType,
+    setPaymentAccountType,
+    paymentAccountId,
+    setPaymentAccountId,
+    isCreditSale,
+    setIsCreditSale,
+    selectedCustomerId,
+    setSelectedCustomerId,
+    notes,
+    setNotes,
+    saleDate,
+    setSaleDate,
+    searchTerm,
+    setSearchTerm,
+    activeRow,
+    setActiveRow,
+    highlightedIndex,
+    setHighlightedIndex,
+    zeroStockAlert,
+    setZeroStockAlert,
+    zeroStockItem,
+    setZeroStockItem,
+    savedSale,
+    setSavedSale,
+    showPrintDialog,
+    setShowPrintDialog,
+    showDraftDialog,
+    setShowDraftDialog,
+    currentDraftId,
+    setCurrentDraftId,
+    customerComboOpen,
+    setCustomerComboOpen,
+    mobileCustomerComboOpen,
+    setMobileCustomerComboOpen,
     setSaleJustCompleted,
-    showStockPrompt, setShowStockPrompt,
-    invoiceWaStatus, setInvoiceWaStatus,
-    stockWaStatus, setStockWaStatus,
+    showStockPrompt,
+    setShowStockPrompt,
+    invoiceWaStatus,
+    setInvoiceWaStatus,
+    stockWaStatus,
+    setStockWaStatus,
     setSendingInvoiceWhatsApp,
     sendingInvoiceWhatsApp,
     setSendingWhatsApp,
     sendingWhatsApp,
-    lastAutosaved, setLastAutosaved,
-    pendingAutoSend, setPendingAutoSend,
-    pendingStockSend, setPendingStockSend,
+    lastAutosaved,
+    setLastAutosaved,
+    pendingAutoSend,
+    setPendingAutoSend,
+    pendingStockSend,
+    setPendingStockSend,
     setMobileTab,
     inputRefs,
     itemListRef,
@@ -186,26 +212,30 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
   // Effect 1: Populate rows / notes / date from the voucher — runs once.
   useEffect(() => {
-    if (!editVoucherId) { editRowsInitRef.current = false; return; }
+    if (!editVoucherId) {
+      editRowsInitRef.current = false;
+      return;
+    }
     if (editRowsInitRef.current) return; // already populated; never reset user edits
 
     // Primary source: salesItems attached to the voucher object.
     // Fallback: view-entries endpoint (populated when salesItems is missing from the voucher).
-    const resolvedItems: any[] = Array.isArray(editVoucher?.salesItems) && editVoucher.salesItems.length > 0
-      ? editVoucher.salesItems
-      : (editVoucherViewEntries ?? [])
-          .filter((e: any) => e.isStockItem || e.stockItemId)
-          .map((e: any) => ({
-            id: e.id,
-            stockItemId: e.stockItemId,
-            stockItemName: e.stockItemName || e.accountName || "",
-            stockItemCode: e.stockItemCode || e.accountCode || "",
-            quantity: e.quantity,
-            sellingPrice: e.rate ?? e.sellingPrice ?? "0",
-            totalSales: e.totalAmount ?? e.totalSales ?? e.creditAmount ?? "0",
-            costPrice: e.costPrice,
-            configuredPrice: e.configuredPrice,
-          }));
+    const resolvedItems =
+      Array.isArray(editVoucher?.salesItems) && editVoucher.salesItems.length > 0
+        ? editVoucher.salesItems
+        : (editVoucherViewEntries ?? [])
+            .filter((e: any) => e.isStockItem || e.stockItemId)
+            .map((e: any) => ({
+              id: e.id,
+              stockItemId: e.stockItemId,
+              stockItemName: e.stockItemName || e.accountName || "",
+              stockItemCode: e.stockItemCode || e.accountCode || "",
+              quantity: e.quantity,
+              sellingPrice: e.rate ?? e.sellingPrice ?? "0",
+              totalSales: e.totalAmount ?? e.totalSales ?? e.creditAmount ?? "0",
+              costPrice: e.costPrice,
+              configuredPrice: e.configuredPrice,
+            }));
 
     if (!editVoucher || resolvedItems.length === 0) return;
 
@@ -352,22 +382,56 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     handleDetailedExport,
     makeHandleKeyDown,
   } = usePosHandlers({
-    rows, isCreditSale, paymentAccountType, paymentAccountId,
-    selectedCustomerId, currentDraftId, notes, saleDate,
-    activeRow, highlightedIndex,
-    setRows, setSelectedCell, setNotes,
-    setPaymentAccountType, setPaymentAccountId,
-    setIsCreditSale, setSelectedCustomerId,
-    setCurrentDraftId, setShowDraftDialog, setShowPrintDialog,
-    setSavedSale, setSaleJustCompleted, setLastAutosaved, setMobileTab,
-    setPendingStockSend, setStockWaStatus, setInvoiceWaStatus,
-    setZeroStockItem, setZeroStockAlert, setSearchTerm, setHighlightedIndex,
-    lastSavedFingerprintRef, inputRefs, printRef, stockPrintRef, clientSaleIdRef,
-    activeCurrency, exchangeRate, dailyExchangeRate,
-    activeLocation, editVoucherId, editVoucher,
-    inventory, apiInventory, lastSoldPrices,
-    currentShift, authUser, posUser,
-    saveMutation, toast,
+    rows,
+    isCreditSale,
+    paymentAccountType,
+    paymentAccountId,
+    selectedCustomerId,
+    currentDraftId,
+    notes,
+    saleDate,
+    activeRow,
+    highlightedIndex,
+    setRows,
+    setSelectedCell,
+    setNotes,
+    setPaymentAccountType,
+    setPaymentAccountId,
+    setIsCreditSale,
+    setSelectedCustomerId,
+    setCurrentDraftId,
+    setShowDraftDialog,
+    setShowPrintDialog,
+    setSavedSale,
+    setSaleJustCompleted,
+    setLastAutosaved,
+    setMobileTab,
+    setPendingStockSend,
+    setStockWaStatus,
+    setInvoiceWaStatus,
+    setZeroStockItem,
+    setZeroStockAlert,
+    setSearchTerm,
+    setHighlightedIndex,
+    lastSavedFingerprintRef,
+    inputRefs,
+    printRef,
+    stockPrintRef,
+    clientSaleIdRef,
+    activeCurrency,
+    exchangeRate,
+    dailyExchangeRate,
+    activeLocation,
+    editVoucherId,
+    editVoucher,
+    inventory,
+    apiInventory,
+    lastSoldPrices,
+    currentShift,
+    authUser,
+    posUser,
+    saveMutation,
+    toast,
   });
 
   const handleKeyDown = makeHandleKeyDown(searchTerm);
@@ -397,20 +461,20 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       });
 
       // ── Column widths ────────────────────────────────────────────────────────
-      ws.getColumn(1).width = 5;   // #
-      ws.getColumn(2).width = 30;  // Item
-      ws.getColumn(3).width = 14;  // Code
-      ws.getColumn(4).width = 8;   // Qty
-      ws.getColumn(5).width = 10;  // Rate
-      ws.getColumn(6).width = 12;  // Amt
-      ws.getColumn(7).width = 10;  // P/L
-      ws.getColumn(8).width = 12;  // T.P/L
+      ws.getColumn(1).width = 5; // #
+      ws.getColumn(2).width = 30; // Item
+      ws.getColumn(3).width = 14; // Code
+      ws.getColumn(4).width = 8; // Qty
+      ws.getColumn(5).width = 10; // Rate
+      ws.getColumn(6).width = 12; // Amt
+      ws.getColumn(7).width = 10; // P/L
+      ws.getColumn(8).width = 12; // T.P/L
 
       // ── Data rows ────────────────────────────────────────────────────────────
       validRows.forEach((row, i) => {
         const rateUSD = row.rateUSD ?? row.rate;
-        const cfgUSD  = row.configuredPrice ?? 0;
-        const plBale  = rateUSD - cfgUSD;
+        const cfgUSD = row.configuredPrice ?? 0;
+        const plBale = rateUSD - cfgUSD;
         const totalPL = plBale * row.quantity;
         const dataRow = ws.addRow([
           i + 1,
@@ -517,8 +581,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         onSummaryExport={handleSummaryExport}
         onDetailedExport={handleDetailedExport}
         onExportTransaction={
-          editVoucherId &&
-          (authUser?.role === "Admin" || authUser?.role === "Developer")
+          editVoucherId && (authUser?.role === "Admin" || authUser?.role === "Developer")
             ? handleExportTransaction
             : undefined
         }

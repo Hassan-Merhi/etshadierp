@@ -92,7 +92,7 @@ export default function Suppliers() {
   });
 
   const handleTransactionClick = async (txn: any) => {
-    const targetCompany = companies.find((c: any) => c.id === txn.companyId);
+    const targetCompany = companies.find((c) => c.id === txn.companyId);
     if (targetCompany && (!selectedCompany || selectedCompany.id !== txn.companyId)) {
       await apiRequest("POST", "/api/auth/set-company", { companyId: txn.companyId });
       selectCompany(targetCompany);
@@ -170,7 +170,7 @@ export default function Suppliers() {
   };
 
   const handlePOClick = async (po: any) => {
-    const targetCompany = companies.find((c: any) => c.id === po.companyId);
+    const targetCompany = companies.find((c) => c.id === po.companyId);
     if (targetCompany && (!selectedCompany || selectedCompany.id !== po.companyId)) {
       await apiRequest("POST", "/api/auth/set-company", { companyId: po.companyId });
       selectCompany(targetCompany);
@@ -181,7 +181,7 @@ export default function Suppliers() {
 
   const handleContainerClick = async (po: any) => {
     if (!po.containerId) return;
-    const targetCompany = companies.find((c: any) => c.id === po.companyId);
+    const targetCompany = companies.find((c) => c.id === po.companyId);
     if (targetCompany && (!selectedCompany || selectedCompany.id !== po.companyId)) {
       await apiRequest("POST", "/api/auth/set-company", { companyId: po.companyId });
       selectCompany(targetCompany);
@@ -192,7 +192,7 @@ export default function Suppliers() {
 
   const handleExportToExcel = async () => {
     if (!selectedSupplier || unifiedLedger.length === 0) return;
-    const exportData = unifiedLedger.map((txn: any) => ({
+    const exportData = unifiedLedger.map((txn) => ({
       Date: txn.date ? format(new Date(txn.date), "yyyy-MM-dd") : "",
       Company: txn.companyName,
       "Doc Number": txn.docNumber,
@@ -207,8 +207,8 @@ export default function Suppliers() {
     await writeFile(workbook, fileName);
   };
 
-  const openingEntry = unifiedLedger.find((t: any) => t.type === "opening");
-  const ledgerRows = unifiedLedger.filter((t: any) => t.type !== "opening");
+  const openingEntry = unifiedLedger.find((t) => t.type === "opening");
+  const ledgerRows = unifiedLedger.filter((t) => t.type !== "opening");
 
   // Date filter helpers
   const todayStr = format(new Date(), "yyyy-MM-dd");
@@ -218,16 +218,16 @@ export default function Suppliers() {
     dateFilter === "all"
       ? ledgerRows
       : dateFilter === "today"
-        ? ledgerRows.filter((t: any) => t.date && format(new Date(t.date), "yyyy-MM-dd") === todayStr)
+        ? ledgerRows.filter((t) => t.date && format(new Date(t.date), "yyyy-MM-dd") === todayStr)
         : dateFilter === "yesterday"
-          ? ledgerRows.filter((t: any) => t.date && format(new Date(t.date), "yyyy-MM-dd") === yesterdayStr)
+          ? ledgerRows.filter((t) => t.date && format(new Date(t.date), "yyyy-MM-dd") === yesterdayStr)
           : dateFilter === "this_month"
-            ? ledgerRows.filter((t: any) => {
+            ? ledgerRows.filter((t) => {
                 if (!t.date) return false;
                 const d = new Date(t.date);
                 return d.getFullYear() === nowDate.getFullYear() && d.getMonth() === nowDate.getMonth();
               })
-            : ledgerRows.filter((t: any) => {
+            : ledgerRows.filter((t) => {
                 if (!t.date) return false;
                 return new Date(t.date).getFullYear() === nowDate.getFullYear();
               });
@@ -242,10 +242,8 @@ export default function Suppliers() {
 
   // Display rows — optionally hide payment/debit rows from the table (KPIs are always full)
   const isPaymentRow = (t: any) => t.debit > 0 || t.voucherType === "Payment" || t.voucherType === "Receipt";
-  const displayedLedgerRows = hidePayments
-    ? filteredLedgerRows.filter((t: any) => !isPaymentRow(t))
-    : filteredLedgerRows;
-  const hiddenPaymentsCount = hidePayments ? filteredLedgerRows.filter((t: any) => isPaymentRow(t)).length : 0;
+  const displayedLedgerRows = hidePayments ? filteredLedgerRows.filter((t) => !isPaymentRow(t)) : filteredLedgerRows;
+  const hiddenPaymentsCount = hidePayments ? filteredLedgerRows.filter((t) => isPaymentRow(t)).length : 0;
 
   const typeBadgeClass: Record<string, string> = {
     Payment: "bg-green-500/10 text-green-600 dark:text-green-400",
@@ -499,7 +497,7 @@ export default function Suppliers() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Companies</SelectItem>
-                  {companies.map((company: any) => (
+                  {companies.map((company) => (
                     <SelectItem key={company.id} value={company.id.toString()}>
                       {company.name}
                     </SelectItem>
@@ -680,7 +678,7 @@ export default function Suppliers() {
                           </TableCell>
                         </TableRow>
                       ) : (
-                        displayedLedgerRows.map((txn: any, idx: number) => {
+                        displayedLedgerRows.map((txn, idx: number) => {
                           const isPayment = txn.voucherType === "Payment" || txn.debit > 0;
                           return (
                             <TableRow key={`${txn.type}-${txn.docNumber}-${idx}`} className="text-xs">
@@ -777,7 +775,7 @@ export default function Suppliers() {
                         new Date(b.importDate || b.createdAt).getTime() -
                         new Date(a.importDate || a.createdAt).getTime()
                     )
-                    .map((po: any) => {
+                    .map((po) => {
                       const itemsTotal = parseFloat(po.itemsTotal || "0");
                       const freight = parseFloat(po.freight || "0");
                       const surcharge = parseFloat(po.surcharge || "0");
@@ -803,7 +801,7 @@ export default function Suppliers() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {sortedPOs.map((po: any, idx: number) => (
+                          {sortedPOs.map((po, idx: number) => (
                             <TableRow key={po.id} className="text-sm cursor-pointer" onClick={() => handlePOClick(po)}>
                               <TableCell className="py-3">
                                 {po.containerId ? (

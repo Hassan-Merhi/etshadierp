@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
@@ -26,7 +26,7 @@ import { sqlArray } from "../../../lib/sqlArray";
 export function registerDispatchBatchCrudRoutes(app: Express) {
   // ── GET /api/factory/dispatch-batches ─────────────────────────────────────
   // List all batches for the company with optional filters
-  app.get("/api/factory/dispatch-batches", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/dispatch-batches", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -78,7 +78,7 @@ export function registerDispatchBatchCrudRoutes(app: Express) {
 
   // ── POST /api/factory/dispatch-batches ────────────────────────────────────
   // Create a new dispatch batch (optionally linked to a proforma)
-  app.post("/api/factory/dispatch-batches", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/dispatch-batches", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -167,7 +167,7 @@ export function registerDispatchBatchCrudRoutes(app: Express) {
 
   // ── GET /api/factory/dispatch-batches/:id ─────────────────────────────────
   // Full detail: batch + proforma summary + rides + bale counts
-  app.get("/api/factory/dispatch-batches/:id", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/dispatch-batches/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -268,7 +268,7 @@ export function registerDispatchBatchCrudRoutes(app: Express) {
 
   // ── PATCH /api/factory/dispatch-batches/:id ───────────────────────────────
   // Update batch notes / destination / date (only while not INVOICED)
-  app.patch("/api/factory/dispatch-batches/:id", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/dispatch-batches/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -302,7 +302,7 @@ export function registerDispatchBatchCrudRoutes(app: Express) {
 
   // ── DELETE /api/factory/dispatch-batches/:id ──────────────────────────────
   // Cancel a batch (returns bales to IN_STOCK)
-  app.delete("/api/factory/dispatch-batches/:id", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/dispatch-batches/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -323,7 +323,7 @@ export function registerDispatchBatchCrudRoutes(app: Express) {
           SELECT bale_id FROM customer_dispatch_bale_scans
           WHERE batch_id = ${batchId} AND company_id = ${companyId} AND removed_at IS NULL
         `);
-        const ids = resultRows(activeBaleIds).map((r: any) => Number(r.bale_id));
+        const ids = resultRows(activeBaleIds).map((r) => Number(r.bale_id));
         if (ids.length > 0) {
           // sqlArray, not a bare array: Drizzle renders a bare JS array as
           // tuple syntax, which ANY() rejects outright — so this statement used

@@ -229,11 +229,39 @@ export function RemoteMouseControllerOverlay() {
     }
   }, [enqueueOrderedCommand]);
 
+  const [screenImage, setScreenImage] = useState<HTMLImageElement | null>(null);
+
+  // The screen image only exists once a frame has arrived, which is usually
+  // after control was enabled — and it is replaced whenever the viewer drops
+  // back to the waiting placeholder. Tracking it keeps the input listeners
+  // bound to whatever image is on screen right now instead of binding once.
   useEffect(() => {
-    if (!controlEnabled || !sessionTargetUserId || !portalHost) return;
+    if (!sessionTargetUserId || !portalHost) {
+      setScreenImage(null);
+      return;
+    }
     const dialog = portalHost.closest<HTMLElement>("[data-testid='dialog-watch-user']");
-    if (!dialog || dialog.dataset.watchedUserId !== sessionTargetUserId) return;
-    const image = dialog.querySelector<HTMLImageElement>("[data-testid='img-screen-feed']");
+    if (!dialog || dialog.dataset.watchedUserId !== sessionTargetUserId) {
+      setScreenImage(null);
+      return;
+    }
+
+    const syncImage = () => {
+      const next = dialog.querySelector<HTMLImageElement>("[data-testid='img-screen-feed']");
+      setScreenImage((current) => (current === next ? current : next));
+    };
+    syncImage();
+    const observer = new MutationObserver(syncImage);
+    observer.observe(dialog, { childList: true, subtree: true });
+    return () => {
+      observer.disconnect();
+      setScreenImage(null);
+    };
+  }, [portalHost, sessionTargetUserId]);
+
+  useEffect(() => {
+    if (!controlEnabled) return;
+    const image = screenImage;
     if (!image) return;
 
     image.style.cursor = "crosshair";
@@ -295,7 +323,7 @@ export function RemoteMouseControllerOverlay() {
       pointerTimerRef.current = null;
       scrollTimerRef.current = null;
     };
-  }, [controlEnabled, enqueueOrderedCommand, flushPointer, flushScroll, portalHost, sessionTargetUserId]);
+  }, [controlEnabled, enqueueOrderedCommand, flushPointer, flushScroll, screenImage]);
 
   useEffect(() => {
     if (!controlEnabled || !sessionId) return;

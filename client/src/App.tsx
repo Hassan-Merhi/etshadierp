@@ -115,10 +115,14 @@ function ServerRestartWatcher() {
 }
 
 function AuthenticatedRoot() {
-  const { user, isLoading, error, loadingTimedOut, handleLogout } = useAuthenticatedUser();
+  const { user, isLoading, error, handleLogout } = useAuthenticatedUser();
 
-  if (loadingTimedOut || (!isLoading && (error || !user))) return <Redirect to="/login" />;
-  if (isLoading || !user) return <AppLoadingState />;
+  // fetchAuthenticatedUser returns null only for a confirmed 401. Temporary
+  // network/server failures remain errors and must never masquerade as logout.
+  if (!isLoading && !error && user === null) return <Redirect to="/login" />;
+  if (isLoading || error || !user) {
+    return <AppLoadingState message={error ? "Reconnecting to your session" : undefined} />;
+  }
 
   return (
     <ApplicationLanguageProvider>
@@ -149,7 +153,11 @@ export default function App() {
         <ThemeProvider>
           <ConnectivityProvider>
             <Switch>
-              <Route path="/login" component={Login} />
+              <Route path="/login">
+                <ApplicationLanguageProvider>
+                  <Login />
+                </ApplicationLanguageProvider>
+              </Route>
               <Route>
                 <AuthenticatedRoot />
               </Route>

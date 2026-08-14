@@ -190,7 +190,7 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
         optional: voucherData.optional || false,
         entries:
           voucherData.entries && voucherData.entries.length > 0
-            ? voucherData.entries.map((entry: any) => ({
+            ? voucherData.entries.map((entry) => ({
                 ledgerAccountId: entry.ledgerAccountId || null,
                 bankAccountId: entry.bankAccountId || null,
                 fixedAssetId: entry.fixedAssetId || null,

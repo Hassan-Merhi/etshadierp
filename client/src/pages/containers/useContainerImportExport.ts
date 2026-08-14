@@ -135,7 +135,7 @@ export function useContainerImportExport({
             `Tip: Download the template to see the expected format.`
         );
       }
-      const rows = jsonData.map((row: any) => ({
+      const rows = jsonData.map((row) => ({
         containerNumber: cellStr(row["Container #"] || row["Container Number"] || row["containerNumber"]),
         shopName: cellStr(row["Shop"] || row["Shop Name"] || row["shopName"]),
         eta: excelDateToString(cellVal(row["ETA"] || row["eta"])),

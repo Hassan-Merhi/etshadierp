@@ -70,8 +70,8 @@ export function registerSilentTransferRoutes(app: Express) {
 
         // Three output buckets
         const errorLines: Array<{ rowNum: number; barcode: string; reason: string }> = [];
-        const validItems: any[] = [];
-        const warnItems: any[] = []; // insufficient stock but can still be applied
+        const validItems = [];
+        const warnItems = []; // insufficient stock but can still be applied
 
         // Track barcodes already seen to detect duplicates in the file
         const seenBarcodes = new Map<string, number>(); // barcode → first rowNum
@@ -152,8 +152,7 @@ export function registerSilentTransferRoutes(app: Express) {
           errorLines,
           sourceLocation: sourceLocation.name,
           destLocation: destLocation.name,
-          totalRows: rawData.filter((r: any) => (r.Barcode || r.barcode || r.Code || r.code || "").toString().trim())
-            .length,
+          totalRows: rawData.filter((r) => (r.Barcode || r.barcode || r.Code || r.code || "").toString().trim()).length,
         });
       } catch (err: unknown) {
         logger.error("Silent transfer parse error:", { error: err });

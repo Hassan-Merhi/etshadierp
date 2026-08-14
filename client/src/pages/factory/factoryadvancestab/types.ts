@@ -19,6 +19,24 @@ export interface AdvanceRecord {
   workerName: string;
 }
 
+export interface AuditAdvance {
+  id: number;
+  workerId: number;
+  workerName: string;
+  advanceDate: string;
+  amount: string;
+  remainingBalance: string;
+  fullyPaid: boolean;
+  caseType: "missing_voucher" | "no_repayment";
+  repayments: { id: number; repaymentDate: string; amount: string; cashAccountId: number | null }[];
+  missingVoucherRepayments: {
+    id: number;
+    repaymentDate: string;
+    amount: string;
+    cashAccountId: number | null;
+  }[];
+}
+
 export interface RepaymentRecord {
   id: number;
   advanceId: number;

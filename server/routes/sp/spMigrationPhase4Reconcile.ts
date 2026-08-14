@@ -59,7 +59,7 @@ async function existingSourceLinks(
       AND l.target_table = ${targetTable}
     ORDER BY l.source_id, r.created_at DESC
   `);
-  return new Map(resultRows(result).map((row: any) => [pn(row.source_id), pn(row.target_id)]));
+  return new Map(resultRows(result).map((row) => [pn(row.source_id), pn(row.target_id)]));
 }
 
 export async function reconcileHistoricalSalesCopy(params: {
@@ -215,9 +215,9 @@ export async function reconcileHistoricalSalesCopy(params: {
       `);
       entriesUpdated++;
     }
-    const unlinkedSources = sourceEntries.filter((entry: any) => !entryLinks.has(pn(entry.id)));
+    const unlinkedSources = sourceEntries.filter((entry) => !entryLinks.has(pn(entry.id)));
     const linkedTargetEntryIds = new Set(Array.from(entryLinks.values()));
-    const unlinkedTargets = targetEntries.filter((entry: any) => !linkedTargetEntryIds.has(pn(entry.id)));
+    const unlinkedTargets = targetEntries.filter((entry) => !linkedTargetEntryIds.has(pn(entry.id)));
 
     if (
       unlinkedSources.length > 0 &&
@@ -372,8 +372,8 @@ export async function reconcileMigrationOwnedContainers(params: {
       WHERE company_id = ${targetId} AND container_id = ${spContainerId}
       ORDER BY id ASC
     `);
-    const trackedLineIds = new Set(resultRows(trackedLinesResult).map((row: any) => pn(row.row_id)));
-    const allLineIds = resultRows(allLinesResult).map((row: any) => pn(row.id));
+    const trackedLineIds = new Set(resultRows(trackedLinesResult).map((row) => pn(row.row_id)));
+    const allLineIds = resultRows(allLinesResult).map((row) => pn(row.id));
     const untrackedLineIds = allLineIds.filter((id: number) => !trackedLineIds.has(id));
 
     if (untrackedLineIds.length > 0) {

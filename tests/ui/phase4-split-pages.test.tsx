@@ -171,6 +171,18 @@ describe("Phase 4 split pages mount", () => {
     expect(document.body.textContent?.length).toBeGreaterThan(0);
   });
 
+  it("FactoryPayroll", async () => {
+    const { default: Page } = await import("@/pages/factory/FactoryPayroll");
+    renderWithProviders(<Page />);
+    expect(document.body.textContent?.length).toBeGreaterThan(0);
+  });
+
+  it("Payroll", async () => {
+    const { default: Page } = await import("@/pages/Payroll");
+    renderWithProviders(<Page />);
+    expect(document.body.textContent?.length).toBeGreaterThan(0);
+  });
+
   it("AdvancesView", async () => {
     const { AdvancesView } = await import("@/pages/factory/factoryadvancestab/components/AdvancesView");
     renderWithProviders(<AdvancesView />);

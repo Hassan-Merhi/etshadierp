@@ -6,7 +6,7 @@
  * factoryBalesRoutes.ts as a sub-registrar, matching the pattern already
  * used for mix-batch and bale-export routes; behaviour is unchanged.
  */
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "../../db";
@@ -16,13 +16,13 @@ import { getOrFetchFxRateToUsd } from "./_helpers";
 import { factoryFxRates, insertFactoryFxRateSchema } from "@shared/schema";
 
 export function registerFactoryFxRatesRoutes(app: Express) {
-  app.get("/api/factory/fx-rates", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/fx-rates", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { currencyCode } = req.query;
       // Only return manually-set rates in the UI list (auto rows are internal cache only)
-      const conditions: any[] = [eq(factoryFxRates.companyId, companyId), eq(factoryFxRates.source, "manual")];
+      const conditions = [eq(factoryFxRates.companyId, companyId), eq(factoryFxRates.source, "manual")];
       if (currencyCode) conditions.push(eq(factoryFxRates.currencyCode, currencyCode as string));
       const results = await db
         .select()
@@ -35,7 +35,7 @@ export function registerFactoryFxRatesRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/fx-rates/latest/:currencyCode", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/fx-rates/latest/:currencyCode", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -62,7 +62,7 @@ export function registerFactoryFxRatesRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/fx-rates/:currencyCode/:date", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/fx-rates/:currencyCode/:date", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -78,7 +78,7 @@ export function registerFactoryFxRatesRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/fx-rates", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/fx-rates", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -97,7 +97,7 @@ export function registerFactoryFxRatesRoutes(app: Express) {
   });
 
   // DELETE by currency code — removes all rows (manual + auto) for that currency
-  app.delete("/api/factory/fx-rates/:currency", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/fx-rates/:currency", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

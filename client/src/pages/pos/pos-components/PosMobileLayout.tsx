@@ -280,7 +280,7 @@ export function PosMobileLayout({
                   <User className="h-4 w-4 shrink-0 text-muted-foreground" />
                   <span className="min-w-0 flex-1 truncate text-left">
                     {selectedCustomerId
-                      ? customerAccounts.find((account: any) => String(account.id) === selectedCustomerId)?.name ||
+                      ? customerAccounts.find((account) => String(account.id) === selectedCustomerId)?.name ||
                         "Customer"
                       : "Select customer…"}
                   </span>
@@ -293,7 +293,7 @@ export function PosMobileLayout({
                   <CommandList>
                     <CommandEmpty>No customer found.</CommandEmpty>
                     <CommandGroup>
-                      {customerAccounts.map((account: any) => (
+                      {customerAccounts.map((account) => (
                         <CommandItem
                           key={account.id}
                           value={account.name}
@@ -340,12 +340,12 @@ export function PosMobileLayout({
                 </SelectTrigger>
                 <SelectContent>
                   {paymentAccountType === "bank"
-                    ? (Array.isArray(bankAccounts) ? bankAccounts : []).map((account: any) => (
+                    ? (Array.isArray(bankAccounts) ? bankAccounts : []).map((account) => (
                         <SelectItem key={account.id} value={String(account.id)}>
                           {account.name} ({account.code})
                         </SelectItem>
                       ))
-                    : cashLedgerAccounts.map((account: any) => (
+                    : cashLedgerAccounts.map((account) => (
                         <SelectItem key={account.id} value={String(account.id)}>
                           {account.name}
                         </SelectItem>
