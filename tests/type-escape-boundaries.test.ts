@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { auditTypeEscapes, countFileEscapes } from "../scripts/audit-type-escapes.mjs";
 
@@ -19,8 +19,18 @@ const config = JSON.parse(
 ) as TypeEscapeConfig;
 
 describe("type-escape ratchet", () => {
+  // The audit parses every source file in the repository, so it is run once and
+  // read by each assertion below. Running it per test did the same work five
+  // times over, which stayed inside the default timeout unmeasured and stopped
+  // doing so under coverage instrumentation — the suite failed for being slow
+  // rather than for anything it asserts.
+  let report: ReturnType<typeof auditTypeEscapes>;
+
+  beforeAll(() => {
+    report = auditTypeEscapes();
+  }, 180_000);
+
   it("never lets a file gain a type escape", () => {
-    const report = auditTypeEscapes();
     const grown = report.files
       .filter((file) => file.severity === "failure")
       .map((file) => `${file.path}: ${file.total} escapes, baseline ${file.cap}`);
@@ -34,26 +44,22 @@ describe("type-escape ratchet", () => {
   });
 
   it("holds the repository ceiling as a falling number", () => {
-    const report = auditTypeEscapes();
     expect(report.summary.typeEscapeTotal).toBeLessThanOrEqual(config.totals.typeEscapeCeiling);
   });
 
   it("keeps the baseline free of entries for deleted files", () => {
-    const report = auditTypeEscapes();
     // A stale entry is harmless to correctness but inflates the ceiling, which
     // is the number the drawdown is measured against.
     expect(report.staleBaselineEntries).toEqual([]);
   });
 
   it("keeps compiler suppressions at effectively zero", () => {
-    const report = auditTypeEscapes();
     // @ts-ignore / @ts-expect-error switch the compiler off for a whole line
     // rather than widening one type, so they are held far tighter than `any`.
     expect(report.summary.suppressions).toBeLessThanOrEqual(2);
   });
 
   it("keeps shared/ — the schema layer types flow from — free of escapes", () => {
-    const report = auditTypeEscapes();
     const sharedEscapes = report.files.filter((file) => file.path.startsWith("shared/") && file.total > 0);
 
     // Every escape elsewhere in the repository discards a type that *was*
