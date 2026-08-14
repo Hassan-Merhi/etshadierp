@@ -2115,8 +2115,8 @@
         0
       ],
       "client/src/pages/pos/hooks/usePosQueries.ts": [
-        11,
-        1,
+        10,
+        0,
         0
       ],
       "client/src/pages/pos/hooks/usePosRowCalculations.ts": [
@@ -6497,6 +6497,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 8829
+    "typeEscapeCeiling": 8827
   }
 }
