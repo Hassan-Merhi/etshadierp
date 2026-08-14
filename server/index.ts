@@ -21,8 +21,7 @@ import { resolveDatabaseSsl } from "./lib/databaseSsl.mjs";
 import { requestLogger } from "./middleware/requestLogger";
 import { bandwidthDebugMiddleware } from "./middleware/bandwidthDebug";
 import { logger } from "./lib/logger";
-import { startupMigrations } from "./startup-schema";
-import { ensureCanonicalStockMovementJournal } from "./services/inventory/ensureCanonicalStockMovementJournal";
+import { startupMigrations, ensureCanonicalStockMovementJournal } from "./startup-schema";
 
 // Global error handlers
 // In production: log and exit so the process manager (Render/Replit) restarts cleanly.
@@ -115,8 +114,6 @@ declare module "express-session" {
     daybookEditDays?: number;
     canAccessCustomers?: boolean;
     canDeleteRecords?: boolean;
-    /** Display name of the active company, cached for presence/session reads. */
-    currentCompanyName?: string | null;
     /** Unix timestamp (ms) when user last confirmed their password via POST /api/auth/confirm-password */
     passwordConfirmedAt?: number;
   }
@@ -1699,9 +1696,7 @@ END $mig$`;
         // if the columns are genuinely absent.
       }
 
-      // Runs in every migration mode and rejects on failure (see the module).
       await ensureCanonicalStockMovementJournal(pool);
-
       if (migrationsEnabled) {
         try {
           await runMigrations();

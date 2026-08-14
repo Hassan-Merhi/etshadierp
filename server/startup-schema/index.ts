@@ -58,3 +58,8 @@ export const startupMigrations: string[] = [
   // tables that create them.
   ...canonicalStockMovementJournal,
 ];
+
+// Re-exported so server/index.ts can bootstrap the journal from the module it
+// already imports for the ordered pass: the journal has to exist in every
+// migration mode, including the production one that skips that pass.
+export { ensureCanonicalStockMovementJournal } from "../services/inventory/ensureCanonicalStockMovementJournal";

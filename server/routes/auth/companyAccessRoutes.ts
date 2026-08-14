@@ -14,6 +14,13 @@ import { storage } from "../../storage";
 import { companies } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
+declare module "express-session" {
+  interface SessionData {
+    /** Display name of the active company, cached for presence/session reads. Set below when the company is switched. */
+    currentCompanyName?: string | null;
+  }
+}
+
 function disableSessionResponseCaching(res: { setHeader: (name: string, value: string) => void }) {
   res.setHeader("Cache-Control", "private, no-store, max-age=0");
   res.setHeader("Pragma", "no-cache");
