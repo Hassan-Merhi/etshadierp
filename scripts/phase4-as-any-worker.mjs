@@ -1,10 +1,16 @@
 #!/usr/bin/env node
 import fs from "node:fs";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import ts from "typescript";
 
 const roots = ["client/src", "server", "shared"];
 const exts = new Set([".ts", ".tsx"]);
+const sessionFields = new Set([
+  "userId", "username", "currentCompanyId", "factoryCompanyId", "currentRole",
+  "currentLocationId", "currentPOSStation", "cashAccountId", "canSellNegativeStock",
+  "posViewOnly", "daybookEditDays", "canAccessCustomers", "canDeleteRecords", "passwordConfirmedAt"
+]);
 
 function walk(dir, out = []) {
   if (!fs.existsSync(dir)) return out;
@@ -15,98 +21,138 @@ function walk(dir, out = []) {
   }
   return out;
 }
-
-function outer(node) {
-  let current = node;
-  while (current.parent && ts.isParenthesizedExpression(current.parent)) current = current.parent;
-  return current;
-}
-
-function contextOf(node) {
-  const wrapped = outer(node);
-  const p = wrapped.parent;
-  if (!p) return "root";
-  if (ts.isPropertyAccessExpression(p) && p.expression === wrapped) return `property-receiver:.${p.name.text}`;
-  if (ts.isElementAccessExpression(p) && p.expression === wrapped) return "element-receiver";
-  if (ts.isCallExpression(p) && p.expression === wrapped) return "call-receiver";
-  if (ts.isNewExpression(p) && p.expression === wrapped) return "new-receiver";
-  if (ts.isCallExpression(p) && p.arguments.includes(wrapped)) return "call-argument";
-  if (ts.isNewExpression(p) && p.arguments?.includes(wrapped)) return "new-argument";
-  if (ts.isVariableDeclaration(p) && p.initializer === wrapped) return "variable-initializer";
-  if (ts.isPropertyAssignment(p) && p.initializer === wrapped) return "object-property-initializer";
-  if (ts.isJsxExpression(p)) return "jsx-expression";
-  if (ts.isReturnStatement(p)) return "return-expression";
-  if (ts.isArrayLiteralExpression(p)) return "array-element";
-  if (ts.isSpreadElement(p)) return "spread-element";
-  if (ts.isSpreadAssignment(p)) return "spread-assignment";
-  if (ts.isBinaryExpression(p)) return p.right === wrapped ? `binary-rhs:${ts.tokenToString(p.operatorToken.kind) ?? p.operatorToken.kind}` : `binary-lhs:${ts.tokenToString(p.operatorToken.kind) ?? p.operatorToken.kind}`;
-  if (ts.isConditionalExpression(p)) return "conditional-part";
-  if (ts.isTemplateSpan(p)) return "template-span";
-  if (ts.isAsExpression(p)) return `chained-as:${p.type.getText()}`;
-  if (ts.isTypeAssertionExpression(p)) return "type-assertion-parent";
-  if (ts.isAwaitExpression(p)) return "await-expression";
-  if (ts.isPrefixUnaryExpression(p)) return `prefix:${ts.tokenToString(p.operator) ?? p.operator}`;
-  return ts.SyntaxKind[p.kind] ?? `kind-${p.kind}`;
-}
-
 const files = roots.flatMap((root) => walk(root)).sort();
-const contexts = new Map();
-const expressionKinds = new Map();
-const receiverProps = new Map();
-const identifierNames = new Map();
-const samples = new Map();
-const perFile = [];
-let total = 0;
 
-function bump(map, key, n = 1) { map.set(key, (map.get(key) ?? 0) + n); }
-function sample(key, value) {
-  if (!samples.has(key)) samples.set(key, []);
-  if (samples.get(key).length < 6) samples.get(key).push(value);
+function run(cmd, args, opts = {}) {
+  const r = spawnSync(cmd, args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, ...opts });
+  return { code: r.status ?? 1, output: `${r.stdout ?? ""}${r.stderr ?? ""}` };
+}
+function changedSourceFiles() {
+  const r = run("git", ["diff", "--name-only", "--", ...roots]);
+  return r.output.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+}
+function restore(paths) {
+  for (let i = 0; i < paths.length; i += 100) run("git", ["restore", "--source=HEAD", "--", ...paths.slice(i, i + 100)]);
+}
+function diagnosticsFiles(output) {
+  const found = new Set();
+  for (const m of output.matchAll(/^(.+?\.(?:ts|tsx))\(\d+,\d+\):\s+error\s+TS\d+:/gm)) found.add(m[1].replace(/^\.\//, "").split(path.sep).join("/"));
+  return [...found];
+}
+function countAsAny() {
+  let total = 0;
+  const byFile = [];
+  for (const file of files) {
+    const source = fs.readFileSync(file, "utf8");
+    const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+    let n = 0;
+    const visit = (node) => {
+      if (ts.isAsExpression(node) && node.type.kind === ts.SyntaxKind.AnyKeyword) n += 1;
+      ts.forEachChild(node, visit);
+    };
+    visit(sf);
+    if (n) byFile.push([file, n]);
+    total += n;
+  }
+  byFile.sort((a,b) => b[1]-a[1] || a[0].localeCompare(b[0]));
+  return { total, byFile };
 }
 
-for (const file of files) {
-  const source = fs.readFileSync(file, "utf8");
+function targetedBlockerPass(file) {
+  let source = fs.readFileSync(file, "utf8");
   const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
-  let fileCount = 0;
+  const edits = [];
   const visit = (node) => {
-    if (ts.isAsExpression(node) && node.type.kind === ts.SyntaxKind.AnyKeyword) {
-      total += 1;
-      fileCount += 1;
-      const context = contextOf(node);
-      bump(contexts, context);
-      const kind = ts.SyntaxKind[node.expression.kind] ?? String(node.expression.kind);
-      bump(expressionKinds, kind);
-      if (ts.isIdentifier(node.expression)) bump(identifierNames, node.expression.text);
-      const wrapped = outer(node);
-      const p = wrapped.parent;
-      if (p && ts.isPropertyAccessExpression(p) && p.expression === wrapped) bump(receiverProps, p.name.text);
-      const pos = sf.getLineAndCharacterOfPosition(node.getStart(sf));
-      const text = node.getText(sf).replace(/\s+/g, " ").slice(0, 180);
-      sample(context.split(":")[0], `${file}:${pos.line + 1}  ${text}`);
+    if (ts.isPropertyAccessExpression(node)) {
+      let receiver = node.expression;
+      while (ts.isParenthesizedExpression(receiver)) receiver = receiver.expression;
+      if (ts.isAsExpression(receiver) && receiver.type.kind === ts.SyntaxKind.AnyKeyword) {
+        const field = node.name.text;
+        const inner = receiver.expression;
+        if (field === "_handledGlobally") {
+          edits.push([receiver.getStart(sf), receiver.end, `${inner.getText(sf)} as { _handledGlobally?: boolean }`]);
+        } else if (sessionFields.has(field) && ts.isPropertyAccessExpression(inner) && inner.name.text === "session") {
+          edits.push([receiver.getStart(sf), receiver.end, inner.getText(sf)]);
+        }
+      }
     }
     ts.forEachChild(node, visit);
   };
   visit(sf);
-  if (fileCount) perFile.push([file, fileCount]);
+  for (const [start, end, replacement] of edits.sort((a,b) => b[0]-a[0])) source = source.slice(0,start) + replacement + source.slice(end);
+  if (edits.length) fs.writeFileSync(file, source);
+  return edits.length;
 }
 
-function printTop(title, map, limit = 80) {
-  console.log(`\n${title}`);
-  for (const [key, value] of [...map.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, limit)) {
-    console.log(`${value}\t${key}`);
+function stripAllRemainingInFile(file) {
+  let source = fs.readFileSync(file, "utf8");
+  const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+  const spans = [];
+  const visit = (node) => {
+    if (ts.isAsExpression(node) && node.type.kind === ts.SyntaxKind.AnyKeyword) {
+      const asToken = node.getChildren(sf).find((child) => child.kind === ts.SyntaxKind.AsKeyword);
+      if (asToken) spans.push([asToken.getStart(sf), node.type.end]);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  for (const [start,end] of spans.sort((a,b)=>b[0]-a[0])) source = source.slice(0,start) + source.slice(end);
+  if (spans.length) fs.writeFileSync(file, source);
+  return spans.length;
+}
+
+const before = countAsAny();
+let targeted = 0;
+for (const [file] of before.byFile) targeted += targetedBlockerPass(file);
+console.log(`PHASE4_WAVE_BEFORE=${before.total}`);
+console.log(`PHASE4_TARGETED_BLOCKERS=${targeted}`);
+
+// First prove the targeted substitutions themselves are sound.
+let targetedCheck = run("npm", ["run", "check"]);
+if (targetedCheck.code !== 0) {
+  console.error(targetedCheck.output);
+  throw new Error("Targeted blocker substitutions failed TypeScript; refusing to mask them with restores.");
+}
+
+let attempted = 0;
+for (const [file] of countAsAny().byFile) attempted += stripAllRemainingInFile(file);
+console.log(`PHASE4_WAVE_ATTEMPTED_REMAINDER=${attempted}`);
+
+for (let iteration=1; iteration<=35; iteration++) {
+  const check = run("npm", ["run", "check"]);
+  if (check.code === 0) { console.log(`TypeScript passed after ${iteration} remainder pass(es).`); break; }
+  const changed = new Set(changedSourceFiles());
+  const diag = diagnosticsFiles(check.output);
+  const direct = diag.filter((f)=>changed.has(f));
+  if (direct.length) {
+    // Preserve targeted blocker improvements while restoring only the blanket-removal part:
+    // restore file then reapply its targeted blocker substitutions.
+    restore(direct);
+    for (const f of direct) targetedBlockerPass(f);
+    console.log(`Pass ${iteration}: restored ${direct.length} directly failing files, retained targeted substitutions.`);
+    continue;
   }
+  const remaining = [...changed];
+  if (!remaining.length) { console.error(check.output); throw new Error("TypeScript red with no changed source."); }
+  const clusters = new Map();
+  for (const f of remaining) {
+    const parts=f.split("/"); const key=parts.slice(0,Math.min(parts.length-1,4)).join("/");
+    if(!clusters.has(key)) clusters.set(key,[]); clusters.get(key).push(f);
+  }
+  const [,cluster]=[...clusters.entries()].sort((a,b)=>b[1].length-a[1].length||a[0].localeCompare(b[0]))[0];
+  restore(cluster);
+  for (const f of cluster) targetedBlockerPass(f);
+  console.log(`Pass ${iteration}: restored ${cluster.length} files from cross-module cluster, retained targeted substitutions.`);
 }
 
-console.log(`PHASE4_SEMANTIC_AS_ANY=${total}`);
-console.log(`PHASE4_SEMANTIC_FILES=${perFile.length}`);
-printTop("CONTEXT_COUNTS", contexts, 120);
-printTop("EXPRESSION_KIND_COUNTS", expressionKinds, 60);
-printTop("PROPERTY_RECEIVER_NAMES", receiverProps, 120);
-printTop("IDENTIFIER_EXPRESSION_NAMES", identifierNames, 100);
-console.log("\nSAMPLES_BY_CONTEXT");
-for (const [key, values] of [...samples.entries()].sort()) {
-  console.log(`\n[${key}]`);
-  for (const value of values) console.log(value);
-}
-console.log("\nTOP_FILES");
-for (const [file, n] of perFile.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 120)) console.log(`${n}\t${file}`);
+const finalCheck=run("npm",["run","check"]);
+if(finalCheck.code!==0){console.error(finalCheck.output);throw new Error("Phase 4 blocker wave left TypeScript red.");}
+const changed=changedSourceFiles();
+for(let i=0;i<changed.length;i+=80){const fmt=run("node",["node_modules/prettier/bin/prettier.cjs","--write",...changed.slice(i,i+80)]);if(fmt.code!==0)throw new Error(fmt.output);}
+const formattedCheck=run("npm",["run","check"]);if(formattedCheck.code!==0){console.error(formattedCheck.output);throw new Error("TypeScript failed after formatting.");}
+const after=countAsAny();
+console.log(`PHASE4_WAVE_AFTER=${after.total}`);
+console.log(`PHASE4_WAVE_REMOVED=${before.total-after.total}`);
+console.log(`PHASE4_WAVE_CHANGED_FILES=${changedSourceFiles().length}`);
+console.log(`PHASE4_WAVE_REMAINING_FILES=${after.byFile.length}`);
+for(const [file,n] of after.byFile.slice(0,80)) console.log(`${n}\t${file}`);
