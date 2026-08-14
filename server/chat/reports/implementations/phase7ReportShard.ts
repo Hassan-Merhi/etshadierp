@@ -192,7 +192,11 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         };
         break;
       }
-      const ctr7 = containerRow7.rows[0] as any;
+      const ctr7 = containerRow7.rows[0] as unknown as { id: unknown } & { container_number: unknown } & {
+        status: unknown;
+      } & { eta: unknown } & { eta: Parameters<typeof String>[0] } & { transporter: unknown } & {
+        tracking_last_location: unknown;
+      } & { tracking_last_description: unknown } & { tracking_last_description: string };
       const evtRows = await db.execute(sql`
         SELECT cte.event_time, cte.event_status, cte.event_location, cte.event_description, cte.provider
         FROM container_tracking_events cte
@@ -414,7 +418,17 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         };
         break;
       }
-      const w7 = wRow.rows[0] as any;
+      const w7 = wRow.rows[0] as unknown as { full_name: unknown } & { employee_code: unknown } & {
+        position: unknown;
+      } & { department: unknown } & { active: unknown } & { salary_type: unknown } & { base_salary: string } & {
+        per_bale_rate: string;
+      } & { phone1: unknown } & { nationality: unknown } & { gender: unknown } & { date_of_birth: unknown } & {
+        date_of_birth: Parameters<typeof String>[0];
+      } & { date_joined: unknown } & { date_joined: Parameters<typeof String>[0] } & { shift_type: unknown } & {
+        bank_name: unknown;
+      } & { payment_method: unknown } & { visa_expiry: unknown } & { visa_expiry: Parameters<typeof String>[0] } & {
+        work_permit_expiry: unknown;
+      } & { work_permit_expiry: Parameters<typeof String>[0] } & { transport_allowance: string };
       const baleStats7 = await db.execute(sql`
         SELECT COUNT(id) AS total_bales,
           COALESCE(SUM(CAST(weight_kg AS numeric)), 0) AS total_kg
@@ -424,7 +438,7 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
           AND CAST(pressed_at AS text) BETWEEN ${dateFrom} AND ${dateTo}
           AND worker_name ILIKE ${"%" + workerName7 + "%"}
       `);
-      const bs7 = baleStats7.rows[0] as any;
+      const bs7 = baleStats7.rows[0] as unknown as { total_bales: Parameters<typeof String>[0] } & { total_kg: string };
       const stats7 = [
         { label: "Name", value: w7.full_name },
         { label: "Code", value: w7.employee_code || "—" },

@@ -124,7 +124,25 @@ export function ContainerFormDialog({
       resetForm();
       return;
     }
-    const c = editingContainer as any;
+    const c = editingContainer as unknown as { containerNumber: string | null | undefined } & {
+      supplierId: { toString: (...args: unknown[]) => string };
+    } & { origin: string | null | undefined } & { totalKg: string | number | null | undefined } & {
+      ratePerKg: string | number | null | undefined;
+    } & { arrivalDate: string | null | undefined } & { notes: string | null | undefined } & { status: string } & {
+      commissionAmount: string | number | null | undefined;
+    } & { commissionCurrencyCode: string } & { commissionAccountId: unknown } & {
+      commissionAccountId: Parameters<typeof String>[0];
+    } & { commissionSupplierId: unknown } & { commissionSupplierId: Parameters<typeof String>[0] } & {
+      commissionNotes: string | null | undefined;
+    } & { freight: string | number | null | undefined } & { freightCurrencyCode: string } & {
+      freightAccountId: unknown;
+    } & { freightAccountId: Parameters<typeof String>[0] } & { freightPaidBy: "supplier" | "own" } & {
+      freightOwnAccountId: unknown;
+    } & { freightOwnAccountId: Parameters<typeof String>[0] } & { otherCharges: string | number | null | undefined } & {
+      otherChargesAccountId: unknown;
+    } & { otherChargesAccountId: Parameters<typeof String>[0] } & { currencyCode: React.SetStateAction<string> } & {
+      fxRateToUsd: string | number | null | undefined;
+    } & { fxRateSource: React.SetStateAction<"auto" | "manual"> } & { fxRateDateImport: React.SetStateAction<string> };
     setFormData({
       containerNumber: normalizeText(c.containerNumber),
       supplierId: c.supplierId?.toString() || "",

@@ -143,7 +143,7 @@ export default function CombinedInventory() {
 
     containerDetailsQueries.forEach((q) => {
       if (!q.data) return;
-      const containerData = q.data as any;
+      const containerData = q.data as unknown as { pos: { forEach: (...args: unknown[]) => unknown } };
       containerData?.pos?.forEach((po: any) => {
         po.items?.forEach((item: any) => {
           const qty = parseFloat(item.quantity || "0");

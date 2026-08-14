@@ -121,7 +121,9 @@ export function registerGitAgentRoutes(app: Express) {
             VALUES (${companyId}, ${agentName}, ${description}, ${amount}, ${type})
             RETURNING id, description, amount, type, created_at`
       );
-      const r = result.rows[0] as any;
+      const r = result.rows[0] as unknown as { id: unknown } & { description: unknown } & { amount: string } & {
+        type: unknown;
+      } & { created_at: unknown };
       res.json({
         id: r.id,
         description: r.description,

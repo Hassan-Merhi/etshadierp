@@ -192,7 +192,11 @@ export function registerOrderPdfRoutes(app: Express) {
         totalAmt = 0;
 
       for (let idx = 0; idx < sortedLines.length; idx++) {
-        const line = sortedLines[idx] as any;
+        const line = sortedLines[idx] as unknown as { qty: string } & { weightPerBale: string } & {
+          totalWeight: string;
+        } & { pricePerBale: string } & { totalPrice: string } & { articleCode: string } & { baleName: unknown } & {
+          articleCode: unknown;
+        };
         const qty = parseFloat(line.qty || "0");
         const wtBale = parseFloat(line.weightPerBale || "0");
         const totWt = parseFloat(line.totalWeight || "0") || qty * wtBale;

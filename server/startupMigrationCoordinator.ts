@@ -33,23 +33,19 @@ export function getMigrationLockOptions(env: NodeJS.ProcessEnv = process.env): M
 const rawClientQuery = Client.prototype.query as unknown as (
   this: Client,
   queryText: string,
-  values?: unknown[],
+  values?: unknown[]
 ) => Promise<{ rows: Array<Record<string, unknown>> }>;
 
 export async function acquireStartupMigrationLock(
   client: Client,
-  options: MigrationLockOptions = getMigrationLockOptions(),
+  options: MigrationLockOptions = getMigrationLockOptions()
 ): Promise<boolean> {
   const deadline = Date.now() + options.waitMs;
   let attempts = 0;
 
   while (Date.now() <= deadline) {
     attempts += 1;
-    const result = await rawClientQuery.call(
-      client,
-      "SELECT pg_try_advisory_lock($1) AS acquired",
-      [STARTUP_LOCK_KEY],
-    );
+    const result = await rawClientQuery.call(client, "SELECT pg_try_advisory_lock($1) AS acquired", [STARTUP_LOCK_KEY]);
     if (result.rows[0]?.acquired === true) {
       logger.info("Startup migration advisory lock acquired", {
         module: "startup-migrations",
@@ -98,8 +94,8 @@ export function installStartupMigrationCoordinator(): void {
   if (prototype[PATCH_MARKER]) return;
   prototype[PATCH_MARKER] = true;
 
-  const originalQuery = Client.prototype.query as any;
-  const originalEnd = Client.prototype.end as any;
+  const originalQuery = Client.prototype.query as unknown as { call: (...args: unknown[]) => unknown };
+  const originalEnd = Client.prototype.end as unknown as { call: (...args: unknown[]) => unknown };
   const coordinatedClients = new WeakSet<Client>();
   const lockedClients = new WeakSet<Client>();
 

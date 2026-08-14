@@ -1,12 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { and, eq, isNull } from "drizzle-orm";
-import {
-  ledgerAccounts,
-  locations,
-  userLocationCashAccounts,
-  userLocations,
-  vouchers,
-} from "@shared/schema";
+import { ledgerAccounts, locations, userLocationCashAccounts, userLocations, vouchers } from "@shared/schema";
 import { db } from "../db";
 import { logger } from "../lib/logger";
 import {
@@ -51,24 +45,24 @@ function deny(
 
 function applyLiveContextToRequest(req: Request, context: ActiveCompanyPermissionContext): void {
   if (!req.user) return;
-  const user = req.user as any;
+  const user = req.user as unknown as { role: unknown } & { assignedLocationId: unknown } & { posStation: unknown } & {
+    cashAccountId: unknown;
+  } & { canSellNegativeStock: unknown } & { posViewOnly: unknown } & { daybookEditDays: unknown } & {
+    canAccessCustomers: unknown;
+  } & { canDeleteRecords: unknown };
   user.role = context.role;
   user.assignedLocationId = context.assignedLocationId;
   user.posStation = context.posStation;
   user.cashAccountId = context.cashAccountId;
   user.canSellNegativeStock =
-    ["Developer", "Admin", "Owner", "Manager"].includes(context.role) ||
-    context.canSellNegativeStock;
+    ["Developer", "Admin", "Owner", "Manager"].includes(context.role) || context.canSellNegativeStock;
   user.posViewOnly = context.posViewOnly;
   user.daybookEditDays = context.daybookEditDays;
   user.canAccessCustomers = context.canAccessCustomers;
   user.canDeleteRecords = context.canDeleteRecords;
 }
 
-async function validateAssignedLocation(
-  context: ActiveCompanyPermissionContext,
-  locationId: number
-): Promise<boolean> {
+async function validateAssignedLocation(context: ActiveCompanyPermissionContext, locationId: number): Promise<boolean> {
   const [assignment] = await db
     .select({ id: userLocations.id })
     .from(userLocations)
@@ -207,14 +201,7 @@ export async function enforcePosOperationalPermissionScope(
     });
 
     if (explicitLocation.conflict) {
-      deny(
-        req,
-        res,
-        context,
-        400,
-        "POS_LOCATION_CONFLICT",
-        "All POS location identifiers in the request must match."
-      );
+      deny(req, res, context, 400, "POS_LOCATION_CONFLICT", "All POS location identifiers in the request must match.");
       return;
     }
 
@@ -252,30 +239,13 @@ export async function enforcePosOperationalPermissionScope(
     }
 
     if (requiredLocationId && !(await validateAssignedLocation(context, requiredLocationId))) {
-      deny(
-        req,
-        res,
-        context,
-        403,
-        "POS_LOCATION_ACCESS_DENIED",
-        "You are not allowed to use this POS location."
-      );
+      deny(req, res, context, 403, "POS_LOCATION_ACCESS_DENIED", "You are not allowed to use this POS location.");
       return;
     }
 
-    if (
-      isPosSaleCreate(req.method, path) &&
-      !(req.body as Record<string, unknown> | undefined)?.isCreditSale
-    ) {
+    if (isPosSaleCreate(req.method, path) && !(req.body as Record<string, unknown> | undefined)?.isCreditSale) {
       if (!requiredLocationId) {
-        deny(
-          req,
-          res,
-          context,
-          400,
-          "POS_LOCATION_REQUIRED",
-          "Location is required for POS sales."
-        );
+        deny(req, res, context, 400, "POS_LOCATION_REQUIRED", "Location is required for POS sales.");
         return;
       }
       const cashValidation = await validatePosCashAccount(context, requiredLocationId);

@@ -768,7 +768,9 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
                   label="Unsaved journal draft found"
                   onRestore={() => {
                     if (journalDraft?.data) {
-                      const d = journalDraft.data as any;
+                      const d = journalDraft.data as unknown as object & { voucherDate: unknown } & {
+                        voucherDate: string | number | Date;
+                      };
                       journalForm.reset({ ...d, voucherDate: d.voucherDate ? new Date(d.voucherDate) : new Date() });
                     }
                     discardJournalDraft();

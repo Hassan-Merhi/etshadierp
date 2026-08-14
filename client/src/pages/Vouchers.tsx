@@ -559,7 +559,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                   label="Unsaved payment draft found"
                   onRestore={() => {
                     if (paymentDraft?.data) {
-                      const d = paymentDraft.data as any;
+                      const d = paymentDraft.data as unknown as object & { voucherDate: unknown } & {
+                        voucherDate: string | number | Date;
+                      };
                       form.reset({ ...d, voucherDate: d.voucherDate ? new Date(d.voucherDate) : new Date() });
                     }
                     discardPaymentDraft();
@@ -629,7 +631,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                   label="Unsaved receipt draft found"
                   onRestore={() => {
                     if (paymentDraft?.data) {
-                      const d = paymentDraft.data as any;
+                      const d = paymentDraft.data as unknown as object & { voucherDate: unknown } & {
+                        voucherDate: string | number | Date;
+                      };
                       form.reset({ ...d, voucherDate: d.voucherDate ? new Date(d.voucherDate) : new Date() });
                     }
                     discardPaymentDraft();

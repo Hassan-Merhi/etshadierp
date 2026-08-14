@@ -43,7 +43,9 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         WHERE company_id = ${companyId} AND status = 'COMPLETED'
           AND CAST(tx_date AS text) BETWEEN ${dateFrom} AND ${dateTo}
       `);
-      const t4 = totalsRow.rows[0] as any;
+      const t4 = totalsRow.rows[0] as unknown as { num_transactions: Parameters<typeof String>[0] } & {
+        grand_total: string;
+      };
       let grandRev = 0;
       const tableRows4 = (rows.rows as any[]).map((r) => {
         const rev = parseFloat(r.total_revenue || "0");

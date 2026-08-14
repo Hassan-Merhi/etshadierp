@@ -79,7 +79,9 @@ function normalizeExcelBuffer(value: unknown): Buffer {
   if (value instanceof ArrayBuffer) {
     return Buffer.from(value);
   }
-  const candidate = value as any;
+  const candidate = value as unknown as { buffer: unknown } & { byteOffset: unknown } & { byteLength: unknown } & {
+    buffer: Parameters<typeof Buffer.from>[0];
+  } & { byteOffset: number | undefined } & { byteLength: number | undefined };
   if (
     candidate?.buffer instanceof ArrayBuffer &&
     typeof candidate.byteOffset === "number" &&

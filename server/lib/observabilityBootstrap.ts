@@ -19,7 +19,9 @@ function safeDependencyName(input: RequestInfo | URL): string | undefined {
     if (host.includes("msc.com")) return "msc";
     if (host.includes("hapag") || host.includes("hlag")) return "hapag-lloyd";
     return undefined;
-  } catch { return undefined; }
+  } catch {
+    return undefined;
+  }
 }
 
 function installExternalFetchTracing(): void {
@@ -33,7 +35,13 @@ function installExternalFetchTracing(): void {
       const durationMs = performance.now() - startedAt;
       const failed = !response.ok;
       const trace = getTraceContext();
-      recordRuntimePerformance({ kind: "dependency", name: dependency, durationMs, failed, source: trace?.source || "background" });
+      recordRuntimePerformance({
+        kind: "dependency",
+        name: dependency,
+        durationMs,
+        failed,
+        source: trace?.source || "background",
+      });
       const configured = Number(process.env.EXTERNAL_DEPENDENCY_SLOW_MS);
       const thresholdMs = Number.isFinite(configured) ? Math.max(0, configured) : 1_500;
       const slow = durationMs >= thresholdMs;
@@ -54,15 +62,29 @@ function installExternalFetchTracing(): void {
     } catch (error) {
       const durationMs = performance.now() - startedAt;
       const trace = getTraceContext();
-      recordRuntimePerformance({ kind: "dependency", name: dependency, durationMs, failed: true, source: trace?.source || "background" });
-      logger.error("External dependency operation", { module: "dependency", action: "request_failed", dependency, durationMs: Math.round(durationMs), requestId: trace?.requestId, source: trace?.source, error });
+      recordRuntimePerformance({
+        kind: "dependency",
+        name: dependency,
+        durationMs,
+        failed: true,
+        source: trace?.source || "background",
+      });
+      logger.error("External dependency operation", {
+        module: "dependency",
+        action: "request_failed",
+        dependency,
+        durationMs: Math.round(durationMs),
+        requestId: trace?.requestId,
+        source: trace?.source,
+        error,
+      });
       throw error;
     }
   }) as typeof globalThis.fetch;
 }
 
 function installCronTracing(): void {
-  const cronAny = cron as any;
+  const cronAny = cron as unknown as { __erpTracePatched: unknown } & { schedule: unknown };
   if (cronAny.__erpTracePatched) return;
   cronAny.__erpTracePatched = true;
   const originalSchedule = cron.schedule.bind(cron);
@@ -72,8 +94,29 @@ function installCronTracing(): void {
       const requestId = `scheduler-${randomUUID()}`;
       let loggedFailure = false;
       return runWithTraceContext(
-        { requestId, routeTemplate: jobName, buildVersion: process.env.BUILD_VERSION || process.env.RENDER_GIT_COMMIT?.substring(0, 8) || "dev", source: "scheduler" },
-        () => withTraceSpan(jobName, async () => { const outcome = await captureRuntimeFailures(() => callback(...args)); loggedFailure = outcome.failed; return outcome.result; }, ({ durationMs, failed }) => recordRuntimePerformance({ kind: "background", name: jobName, durationMs, failed: failed || loggedFailure, source: "scheduler" }))
+        {
+          requestId,
+          routeTemplate: jobName,
+          buildVersion: process.env.BUILD_VERSION || process.env.RENDER_GIT_COMMIT?.substring(0, 8) || "dev",
+          source: "scheduler",
+        },
+        () =>
+          withTraceSpan(
+            jobName,
+            async () => {
+              const outcome = await captureRuntimeFailures(() => callback(...args));
+              loggedFailure = outcome.failed;
+              return outcome.result;
+            },
+            ({ durationMs, failed }) =>
+              recordRuntimePerformance({
+                kind: "background",
+                name: jobName,
+                durationMs,
+                failed: failed || loggedFailure,
+                source: "scheduler",
+              })
+          )
       );
     };
     return originalSchedule(expression, wrapped, options);

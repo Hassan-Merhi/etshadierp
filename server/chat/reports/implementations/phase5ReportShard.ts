@@ -123,7 +123,11 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         };
         break;
       }
-      const po5 = poRow.rows[0] as any;
+      const po5 = poRow.rows[0] as unknown as { id: unknown } & { freight: string } & { surcharge: string } & {
+        fumigation: string;
+      } & { doc_charges: string } & { other_charges: string } & { discount: string } & { items_total: string } & {
+        supplier: unknown;
+      } & { container_number: unknown } & { currency: unknown } & { status: unknown } & { po_number: unknown };
       const lineRows = await db.execute(sql`
         SELECT pli.item_name, si.code, si.uom,
           CAST(pli.quantity AS numeric) AS qty,
@@ -138,13 +142,7 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       const tableRows5 = (lineRows.rows as any[]).map((r) => {
         const lt = parseFloat(r.line_total || "0");
         lineTotal += lt;
-        return [
-          r.item_name,
-          r.code,
-          `${fmtDec(parseFloat(r.qty))} ${r.uom}`,
-          fmtDec(parseFloat(r.rate)),
-          fmt(lt),
-        ];
+        return [r.item_name, r.code, `${fmtDec(parseFloat(r.qty))} ${r.uom}`, fmtDec(parseFloat(r.rate)), fmt(lt)];
       });
       const charges = [
         ["Freight", fmt(parseFloat(po5.freight || "0"))],
@@ -218,7 +216,13 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         };
         break;
       }
-      const cc = cRow.rows[0] as any;
+      const cc = cRow.rows[0] as unknown as { supplier: unknown } & { status: unknown } & {
+        import_date: Parameters<typeof String>[0];
+      } & { total_kg: string } & { rate_per_kg: string } & { grand_total: string } & { currency: string } & {
+        items_total: string;
+      } & { charges_total: string } & { transport_fee: string } & { duty_fee: string } & {
+        container_number: unknown;
+      } & { transporter: unknown } & { agent: unknown };
       const poRows5 = await db.execute(sql`
         SELECT po.po_number, po.currency,
           CAST(po.items_total AS numeric) AS items_total,
@@ -259,19 +263,13 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         if (parseFloat(po.doc_charges || "0") > 0)
           breakdownRows.push([`Doc Charges (${po.po_number})`, po.currency, fmt(parseFloat(po.doc_charges))]);
         if (parseFloat(po.discount || "0") > 0)
-          breakdownRows.push([
-            `Discount (${po.po_number})`,
-            po.currency,
-            `(${fmt(parseFloat(po.discount))})`,
-          ]);
+          breakdownRows.push([`Discount (${po.po_number})`, po.currency, `(${fmt(parseFloat(po.discount))})`]);
       }
       breakdownRows.push(["GRAND TOTAL", cc.currency, fmt(parseFloat(cc.grand_total || "0"))]);
       dataQueryResult = {
         queryType: "container_cost_breakdown",
         title: `Cost Breakdown: ${cc.container_number}`,
-        subtitle: cc.transporter
-          ? `Transporter: ${cc.transporter}${cc.agent ? ` · Agent: ${cc.agent}` : ""}`
-          : "",
+        subtitle: cc.transporter ? `Transporter: ${cc.transporter}${cc.agent ? ` · Agent: ${cc.agent}` : ""}` : "",
         stats: stats5,
         table: { headers: ["Component", "Currency", "Amount"], rows: breakdownRows },
         noData: false,
@@ -309,14 +307,7 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         const isExpired = (d: string) => d !== "—" && d < todayStr;
         const label = (d: string) => (isExpired(d) ? `${d} ⚠ EXPIRED` : d);
         if (isExpired(visaExp) || isExpired(wpExp) || isExpired(rpExp)) expired.push(r.full_name);
-        return [
-          r.full_name,
-          r.employee_code || "—",
-          r.nationality || "—",
-          label(visaExp),
-          label(wpExp),
-          label(rpExp),
-        ];
+        return [r.full_name, r.employee_code || "—", r.nationality || "—", label(visaExp), label(wpExp), label(rpExp)];
       });
       const stats5 = [
         { label: "Workers With Expiring Docs", value: String(tableRows5.length) },
@@ -477,7 +468,9 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         };
         break;
       }
-      const la5 = acctRow5.rows[0] as any;
+      const la5 = acctRow5.rows[0] as unknown as { id: unknown } & { opening_balance: string } & {
+        opening_balance_side: unknown;
+      } & { code: unknown } & { code: string } & { name: unknown } & { account_type: unknown };
       const txRows5 = await db.execute(sql`
         SELECT v.voucher_date, v.voucher_type, v.voucher_number, v.description,
           CAST(ve.debit_amount AS numeric) AS dr,

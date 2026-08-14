@@ -35,7 +35,7 @@ export function registerSpMigrationSetupRoutes(app: Express) {
         if (!name || !code) return res.status(400).json({ message: "name and code are required" });
 
         // Check for duplicate code
-        const existing = (await db.execute(sql`SELECT id FROM companies WHERE code = ${code} LIMIT 1`)).rows[0] as any;
+        const existing = (await db.execute(sql`SELECT id FROM companies WHERE code = ${code} LIMIT 1`)).rows[0];
         if (existing) return res.status(409).json({ message: `Company code "${code}" already exists` });
 
         const [row] = (
@@ -272,7 +272,7 @@ export function registerSpMigrationSetupRoutes(app: Express) {
         SELECT id, name, account_type FROM ledger_accounts
         WHERE id = ${cashId} AND company_id = ${targetId} AND deleted_at IS NULL LIMIT 1
       `)
-        ).rows[0] as any;
+        ).rows[0] as unknown as { account_type: string } & { name: unknown } & { account_type: unknown };
         if (!cashAcctRow) {
           return res.status(400).json({ message: "Selected cash account not found in target company" });
         }

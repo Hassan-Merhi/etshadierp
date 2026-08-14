@@ -205,7 +205,17 @@ export function registerPasskeyRoutes(app: Express) {
       req.session.loginAt = new Date().toISOString();
 
       if (userCompanies.length > 0) {
-        const fc = userCompanies[0] as any;
+        const fc = userCompanies[0] as unknown as { companyId: typeof req.session.currentCompanyId } & {
+          role: typeof req.session.currentRole;
+        } & { assignedLocationId: typeof req.session.currentLocationId } & {
+          posStation: typeof req.session.currentPOSStation;
+        } & { cashAccountId: typeof req.session.cashAccountId } & {
+          canSellNegativeStock: typeof req.session.canSellNegativeStock;
+        } & { daybookEditDays: typeof req.session.daybookEditDays } & {
+          canAccessCustomers: typeof req.session.canAccessCustomers;
+        } & { canDeleteRecords: typeof req.session.canDeleteRecords } & {
+          companyName: typeof req.session.currentCompanyName;
+        };
         req.session.currentCompanyId = fc.companyId;
         req.session.currentRole = fc.role;
         req.session.currentLocationId = fc.assignedLocationId;
