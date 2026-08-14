@@ -21,13 +21,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/PageHeader";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { baleMatchesSearch, fetchGroupBales, fetchHistoryBales, readWasteJson } from "./wastedispatch/optimizedData";
 import { printDispatchDocument } from "./wastedispatch/optimizedPrint";
+import { ConfirmDisposalDialog, DeleteDispatchDialog, PrintDispatchDialog } from "./wastedispatch/OptimizedDialogs";
 import type {
   GroupSummary,
   HistoryBale,
@@ -838,149 +838,26 @@ export default function WasteDispatchOptimized() {
         </Card>
       </div>
 
-      <Dialog open={confirming} onOpenChange={setConfirming}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <Trash2 className="h-5 w-5" /> Confirm Waste Disposal
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <p className="text-sm text-muted-foreground">
-              You are about to remove the selected bales from stock as waste.
-            </p>
-            <div className="space-y-1.5 rounded-md border border-destructive/20 bg-destructive/5 p-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Bales</span>
-                <span className="font-medium">{selected.size}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Total Weight</span>
-                <span className="font-medium">{fmtKg(selectedTotals.weight)} kg</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Cost Written Off</span>
-                <span className="font-medium text-destructive">{fmt(selectedTotals.cost)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Date</span>
-                <span className="font-medium">{dispatchDate}</span>
-              </div>
-              {notes && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Notes</span>
-                  <span className="max-w-xs text-right font-medium">{notes}</span>
-                </div>
-              )}
-            </div>
-          </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setConfirming(false)} disabled={submitMutation.isPending}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => submitMutation.mutate()}
-              disabled={submitMutation.isPending || selected.size === 0}
-              data-testid="button-confirm-dispatch"
-            >
-              {submitMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="mr-2 h-4 w-4" /> Confirm Disposal
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDisposalDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        baleCount={selected.size}
+        weight={selectedTotals.weight}
+        cost={selectedTotals.cost}
+        dispatchDate={dispatchDate}
+        notes={notes}
+        isPending={submitMutation.isPending}
+        onConfirm={() => submitMutation.mutate()}
+      />
 
-      <Dialog
-        open={deleteDispatchId !== null}
-        onOpenChange={(open) => {
-          if (!open) setDeleteDispatchId(null);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <Trash2 className="h-5 w-5" /> Delete Waste Dispatch?
-            </DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            This will delete the dispatch record, restore all linked bales to stock, and remove its daybook entry.
-          </p>
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setDeleteDispatchId(null)}
-              disabled={deleteDispatchMutation.isPending}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={deleteDispatchMutation.isPending}
-              onClick={() => {
-                if (deleteDispatchId !== null) deleteDispatchMutation.mutate(deleteDispatchId);
-              }}
-              data-testid="button-confirm-delete-dispatch"
-            >
-              {deleteDispatchMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Deleting...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="mr-2 h-4 w-4" /> Delete & Restore Bales
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DeleteDispatchDialog
+        dispatchId={deleteDispatchId}
+        onClose={() => setDeleteDispatchId(null)}
+        isPending={deleteDispatchMutation.isPending}
+        onConfirm={(id) => deleteDispatchMutation.mutate(id)}
+      />
 
-      <Dialog
-        open={printData !== null}
-        onOpenChange={(open) => {
-          if (!open) setPrintData(null);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Waste Dispatch Created</DialogTitle>
-          </DialogHeader>
-          {printData && (
-            <div className="space-y-2 text-sm">
-              <p>
-                <span className="text-muted-foreground">Dispatch:</span> {printData.dispatch.dispatchNumber}
-              </p>
-              <p>
-                <span className="text-muted-foreground">Bales:</span> {printData.bales.length}
-              </p>
-              <p>
-                <span className="text-muted-foreground">Weight:</span>{" "}
-                {fmtKg(printData.bales.reduce((sum, bale) => sum + bale.weightKg, 0))} kg
-              </p>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPrintData(null)}>
-              Close
-            </Button>
-            <Button
-              onClick={() => {
-                if (printData) printDispatchDocument(printData.dispatch, printData.bales);
-              }}
-            >
-              <Printer className="mr-2 h-4 w-4" /> Print
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <PrintDispatchDialog printData={printData} onClose={() => setPrintData(null)} />
     </div>
   );
 }
