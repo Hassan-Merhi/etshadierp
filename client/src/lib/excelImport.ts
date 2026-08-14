@@ -168,7 +168,7 @@ export async function excelToFortune(buf: ArrayBuffer): Promise<FortuneSheet[]> 
     ws.eachRow({ includeEmpty: false }, (row) => {
       row.eachCell({ includeEmpty: false }, (cell) => {
         // Skip non-primary merged cells
-        if ((cell as any).type === ExcelJS.ValueType.Merge) return;
+        if ((cell as { type: ExcelJS.ValueType.Merge }).type === ExcelJS.ValueType.Merge) return;
 
         const r = (cell.row as unknown as number) - 1;
         const c = (cell.col as unknown as number) - 1;
@@ -213,7 +213,7 @@ export async function excelToFortune(buf: ArrayBuffer): Promise<FortuneSheet[]> 
           if (font.underline && (font.underline === true || (font.underline as string) !== "none")) v.un = 1;
           if (font.strike) v.cl = 1;
           if (font.size) v.fs = font.size;
-          const fc = argbToHex((font.color as any)?.argb);
+          const fc = argbToHex((font.color as { argb: string | undefined })?.argb);
           if (fc) v.fc = fc;
           if (font.name) v.ff = font.name;
         }
@@ -248,7 +248,7 @@ export async function excelToFortune(buf: ArrayBuffer): Promise<FortuneSheet[]> 
             if (bd?.style && bd.style in BORDER_STYLE_MAP) {
               b[fsKey] = {
                 style: BORDER_STYLE_MAP[bd.style],
-                color: argbToHex((bd.color as any)?.argb) ?? "#000000",
+                color: argbToHex((bd.color as { argb: string | undefined })?.argb) ?? "#000000",
               };
             }
           }
@@ -301,7 +301,7 @@ export async function excelToFortune(buf: ArrayBuffer): Promise<FortuneSheet[]> 
       if (row.height && (row.height as number) > 0) {
         rowlen[ri] = Math.round((row.height as number) * 1.333);
       }
-      if ((row as any).hidden) rowhidden[ri] = 0;
+      if ((row as { hidden: unknown }).hidden) rowhidden[ri] = 0;
     });
 
     if (Object.keys(rowlen).length > 0) config.rowlen = rowlen;
@@ -309,7 +309,7 @@ export async function excelToFortune(buf: ArrayBuffer): Promise<FortuneSheet[]> 
 
     // ── Auto filter ──────────────────────────────────────────────────────
     let filter_select: any = null;
-    const af = (ws as any).autoFilter;
+    const af = (ws as { autoFilter: unknown }).autoFilter;
     if (af) {
       filter_select = decodeAutoFilter(af);
     }

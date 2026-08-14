@@ -263,7 +263,11 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
             .set({ ratePerKg: String(newRate.toFixed(6)), currencyCode: ccy, updatedAt: new Date() })
             .where(eq(factoryContainers.id, containerId!));
         } else if (sourceType === "FREIGHT" || entry.txType === "FREIGHT") {
-          const ccy = newCurrencyCode || (container as any).freightCurrencyCode || container.currencyCode || "USD";
+          const ccy =
+            newCurrencyCode ||
+            (container as { freightCurrencyCode: unknown }).freightCurrencyCode ||
+            container.currencyCode ||
+            "USD";
           let fx: string;
           if (newFxRate) {
             fx = String(newFxRate); // fresh explicit request input — trust it even if it equals 1
@@ -385,7 +389,7 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
             const { fxRate: containerFx, looksSet: containerFxLooksSet } = resolveStoredFxRate(
               containerCcy,
               container.fxRateToUsd,
-              (container as any).fxRateConfirmed
+              (container as { fxRateConfirmed: boolean | undefined }).fxRateConfirmed
             );
             if (!containerFxLooksSet) throw new UnresolvedExchangeRateError(containerCcy);
             const totalUsd = containerCcy === "USD" ? totalCost : totalCost * containerFx;

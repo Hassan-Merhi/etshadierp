@@ -111,7 +111,7 @@ function applyFortuneStyleToCell(excelCell: ExcelJS.Cell, v: any): void {
 
   // Value / formula
   if (v.f) {
-    excelCell.value = { formula: v.f, result: v.v ?? undefined } as any;
+    excelCell.value = { formula: v.f, result: v.v ?? undefined } as ExcelJS.CellValue;
   } else if (v.v !== undefined && v.v !== null) {
     excelCell.value = v.v;
   } else if (v.m !== undefined && v.m !== "") {
@@ -168,7 +168,7 @@ function applyFortuneStyleToCell(excelCell: ExcelJS.Cell, v: any): void {
       if (bd?.style) {
         const style = FS_TO_XL_BORDER[Number(bd.style)];
         if (style) {
-          (border as any)[xlKey] = {
+          (border as { [key: string]: unknown })[xlKey] = {
             style,
             color: { argb: hexToArgb(bd.color) },
           };

@@ -504,7 +504,7 @@ export function registerBankAssetRoutes(app: Express) {
       const entryCheck = await db.execute(
         sql`SELECT COUNT(*) as cnt FROM voucher_entries WHERE fixed_asset_id = ${id}`
       );
-      const entryCount = parseInt((entryCheck.rows[0] as any)?.cnt || "0");
+      const entryCount = parseInt((entryCheck.rows[0] as { cnt: string })?.cnt || "0");
       if (entryCount > 0) {
         return res.status(400).json({
           message: `Cannot delete: this asset has ${entryCount} voucher entry/entries. Remove related transactions first.`,

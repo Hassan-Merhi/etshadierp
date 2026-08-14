@@ -62,16 +62,19 @@ export default function EditSupplier() {
   useEffect(() => {
     if (supplier) {
       form.reset({
-        code: String((supplier as any).code || ""),
-        legalName: String((supplier as any).legalName || ""),
-        email: String((supplier as any).email || ""),
-        phone: String((supplier as any).phone || ""),
-        address: String((supplier as any).address || ""),
-        taxId: String((supplier as any).taxId || ""),
-        paymentTerms: String((supplier as any).paymentTerms || ""),
-        openingBalance: String((supplier as any).openingBalance || "0.00"),
-        active: Boolean((supplier as any).active),
-        stockGroupId: (supplier as any).stockGroupId ?? (supplier as any).stock_group_id ?? null,
+        code: String((supplier as { code: unknown }).code || ""),
+        legalName: String((supplier as { legalName: unknown }).legalName || ""),
+        email: String((supplier as { email: unknown }).email || ""),
+        phone: String((supplier as { phone: unknown }).phone || ""),
+        address: String((supplier as { address: unknown }).address || ""),
+        taxId: String((supplier as { taxId: unknown }).taxId || ""),
+        paymentTerms: String((supplier as { paymentTerms: unknown }).paymentTerms || ""),
+        openingBalance: String((supplier as { openingBalance: unknown }).openingBalance || "0.00"),
+        active: Boolean((supplier as { active: unknown }).active),
+        stockGroupId:
+          (supplier as { stockGroupId: number | null | undefined }).stockGroupId ??
+          (supplier as { stock_group_id: number | null | undefined }).stock_group_id ??
+          null,
       });
     }
   }, [supplier]);

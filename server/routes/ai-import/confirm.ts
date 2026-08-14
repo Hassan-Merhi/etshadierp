@@ -47,7 +47,7 @@ export function registerAiImportConfirmRoutes(app: Express) {
       });
     } catch (error: unknown) {
       logger.error("[AI Import] confirm error:", { error: getErrorMessage(error) });
-      res.status((error as any).status ?? 500).json({ message: getErrorMessage(error) });
+      res.status((error as { status: number }).status ?? 500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -141,7 +141,7 @@ export function registerAiImportConfirmRoutes(app: Express) {
         correctionsApplied: corrections.length,
       });
     } catch (error: unknown) {
-      res.status((error as any).status ?? 500).json({ message: getErrorMessage(error) });
+      res.status((error as { status: number }).status ?? 500).json({ message: getErrorMessage(error) });
     }
   });
 }

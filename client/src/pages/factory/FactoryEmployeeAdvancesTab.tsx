@@ -223,7 +223,10 @@ export default function FactoryEmployeeAdvancesTab() {
             ))}
           </SelectContent>
         </Select>
-        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+        <Select
+          value={statusFilter}
+          onValueChange={(v) => setStatusFilter(v as React.SetStateAction<"open" | "all" | "paid">)}
+        >
           <SelectTrigger className="w-36" data-testid="select-status-filter">
             <SelectValue />
           </SelectTrigger>

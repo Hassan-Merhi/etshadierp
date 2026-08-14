@@ -44,7 +44,7 @@ export function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrac
     const fc = c as any;
     return fc.trackingLastCheckedAt && new Date(fc.trackingLastCheckedAt).toDateString() === today;
   }).length;
-  const withErrors = containers.filter((c) => !!(c as any).trackingError).length;
+  const withErrors = containers.filter((c) => !!(c as { trackingError: unknown }).trackingError).length;
   const timelineContainer = containers.find((c) => c.id === timelineId) ?? null;
 
   const trackNowMutation = useMutation({
@@ -72,7 +72,7 @@ export function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrac
     },
   });
 
-  const totalWeightKg = containers.reduce((sum, c) => sum + (parseFloat((c as any).totalKg) || 0), 0);
+  const totalWeightKg = containers.reduce((sum, c) => sum + (parseFloat((c as { totalKg: string }).totalKg) || 0), 0);
 
   if (isLoading) {
     return (

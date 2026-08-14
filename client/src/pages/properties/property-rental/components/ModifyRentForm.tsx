@@ -65,7 +65,7 @@ function ModifyRentForm({
           <Label>Effective From</Label>
           <RadioGroup
             value={effectiveFrom}
-            onValueChange={(v) => setEffectiveFrom(v as any)}
+            onValueChange={(v) => setEffectiveFrom(v as React.SetStateAction<"current" | "next">)}
             className="flex gap-4 pt-2"
           >
             <div className="flex items-center gap-1.5">

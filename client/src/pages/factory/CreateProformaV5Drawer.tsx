@@ -132,7 +132,7 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
       }
       return next;
     });
-    setAppliedPrice("customer" as any);
+    setAppliedPrice("customer" as React.SetStateAction<"sell" | "prod" | null>);
   }, [customerPriceListQuery.data, articleRows]);
 
   const productMap = useCallback((): Map<string, BaleProduct> => {
@@ -705,7 +705,7 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
                       }
                       return next;
                     });
-                    setAppliedPrice("customer" as any);
+                    setAppliedPrice("customer" as React.SetStateAction<"sell" | "prod" | null>);
                   }}
                   disabled={!customerPriceListQuery.data?.length}
                   data-testid="button-v5-apply-customer-price"

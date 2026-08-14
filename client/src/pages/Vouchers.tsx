@@ -109,7 +109,18 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
   const [activeTab, setActiveTab] = useState<
     "payment" | "receipt" | "journal" | "transfer" | "transferorder" | "adjustment" | "creditnote"
-  >((tabParam as any) || "payment");
+  >(
+    (tabParam as
+      | "payment"
+      | "receipt"
+      | "journal"
+      | "transfer"
+      | "transferorder"
+      | "adjustment"
+      | "creditnote"
+      | (() => "payment" | "receipt" | "journal" | "transfer" | "transferorder" | "adjustment" | "creditnote")) ||
+      "payment"
+  );
   const [editVoucherId, setEditVoucherId] = useState<number | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [accountPickersNeeded, setAccountPickersNeeded] = useState(() => !!voucherIdToEdit);
@@ -241,7 +252,12 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   });
 
   useEffect(() => {
-    if (tabParam) setActiveTab(tabParam as any);
+    if (tabParam)
+      setActiveTab(
+        tabParam as React.SetStateAction<
+          "payment" | "receipt" | "journal" | "transfer" | "transferorder" | "adjustment" | "creditnote"
+        >
+      );
     else setActiveTab("payment");
 
     if (voucherIdToEdit) {
@@ -423,7 +439,19 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const handleAccountCreated = async (account: { id: number; name: string; type: string }) => {
     if (!createAccountContext) return;
     if (createAccountContext.tab === "payment" || createAccountContext.tab === "receipt") {
-      const accountObj: Account = { id: account.id, name: account.name, type: account.type as any, code: "" };
+      const accountObj: Account = {
+        id: account.id,
+        name: account.name,
+        type: account.type as
+          | "customer"
+          | "ledger"
+          | "bank"
+          | "supplier"
+          | "employee"
+          | "fixedAsset"
+          | "factorySupplier",
+        code: "",
+      };
       handleSidebarAccountSelect(accountObj);
     }
     setCreateAccountContext(null);

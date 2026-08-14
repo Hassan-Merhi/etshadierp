@@ -158,7 +158,7 @@ export function ContainerFormDialog({
       setOtherChargeLines([]);
       return;
     }
-    const containerCcy = (editingContainer as any).currencyCode || "USD";
+    const containerCcy = (editingContainer as { currencyCode: unknown }).currencyCode || "USD";
     factoryApiRequest("GET", `/api/factory/containers/${editingContainer.id}/other-charges`)
       .then((res) => (res.ok ? res.json() : []))
       .then((charges: any[]) => {

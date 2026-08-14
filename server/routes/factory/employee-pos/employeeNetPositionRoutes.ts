@@ -56,7 +56,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         if (fc) companyId = fc.id;
       }
 
-      if (!companyId) companyId = (req.session as any).currentCompanyId;
+      if (!companyId) companyId = (req.session as { currentCompanyId: number | null }).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       // Pin it for subsequent requests this session

@@ -41,7 +41,7 @@ export function registerNetPositionMonthlyExcelRoute(app: Express) {
       res.end();
     } catch (error: unknown) {
       logger.error("Net position monthly Excel error:", { error });
-      if ((error as any)?.name === "CompanyAccessError") {
+      if ((error as { name: "CompanyAccessError" })?.name === "CompanyAccessError") {
         return sendCompanyAccessError(res, error);
       }
       res.status(500).json({ message: getErrorMessage(error) });

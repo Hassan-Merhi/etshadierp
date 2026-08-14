@@ -608,7 +608,7 @@ export function registerGitImportRoutes(app: Express) {
           const [current] = await db.select().from(containers).where(eq(containers.id, match.id)).limit(1);
           if (current) {
             for (const key of Object.keys(updateData)) {
-              prevData[key] = (current as any)[key] ?? null;
+              prevData[key] = (current as { [key: string]: unknown })[key] ?? null;
             }
           }
 

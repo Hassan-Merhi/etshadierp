@@ -86,7 +86,7 @@ export function registerStockCategoryRoutes(app: Express) {
           recordId: id,
           recordIdentifier: updated.name,
           changes: Object.fromEntries(
-            Object.entries(updates).map(([k, v]) => [k, { old: (existing as any)[k], new: v }])
+            Object.entries(updates).map(([k, v]) => [k, { old: (existing as { [key: string]: unknown })[k], new: v }])
           ),
         });
       } catch {

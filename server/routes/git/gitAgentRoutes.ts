@@ -19,7 +19,7 @@ export function registerGitAgentRoutes(app: Express) {
       const row = await db.execute(
         sql`SELECT note FROM git_agent_notes WHERE company_id = ${companyId} AND agent_name = ${agentName} LIMIT 1`
       );
-      const note = (row.rows[0] as any)?.note ?? "";
+      const note = (row.rows[0] as { note: unknown })?.note ?? "";
       res.json({ note });
     } catch (err: unknown) {
       res.status(500).json({ message: getErrorMessage(err) });
@@ -175,7 +175,7 @@ export function registerGitAgentRoutes(app: Express) {
       const companyId = parseInt(req.params.companyId, 10);
       const agentName = req.params.agentName;
       const containerIds: number[] = (req.body.containerIds ?? []).map(Number).filter((n: number) => !isNaN(n));
-      const userId = (req as any).user?.id ?? null;
+      const userId = (req as { user: { id: unknown } }).user?.id ?? null;
       // Enforce uniqueness: no container can be prepaid for two agents at once for same company.
       // We simply replace the list for this agent atomically.
       await db.execute(
@@ -201,7 +201,7 @@ export function registerGitAgentRoutes(app: Express) {
       const companyId = parseInt(req.params.companyId, 10);
       const agentName = req.params.agentName;
       const { oldContainerId, newContainerId, confirmDifferentAmount } = req.body;
-      const userId = (req as any).user?.id ?? null;
+      const userId = (req as { user: { id: unknown } }).user?.id ?? null;
 
       if (!oldContainerId || !newContainerId) {
         return res.status(400).json({ message: "oldContainerId and newContainerId are required." });

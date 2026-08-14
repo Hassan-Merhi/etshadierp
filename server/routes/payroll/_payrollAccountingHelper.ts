@@ -48,11 +48,7 @@ export async function findOrCreateLedger(
     .select({ id: ledgerAccounts.id })
     .from(ledgerAccounts)
     .where(
-      and(
-        eq(ledgerAccounts.companyId, companyId),
-        eq(ledgerAccounts.name, name),
-        isNull(ledgerAccounts.deletedAt)
-      )
+      and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, name), isNull(ledgerAccounts.deletedAt))
     );
   if (existing) return existing;
 
@@ -61,7 +57,7 @@ export async function findOrCreateLedger(
       .select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
       .from(ledgerAccounts)
       .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\\d+$'`));
-    const nextCode = String((parseInt((maxCodeRow as any)?.maxCode || "0") || 0) + 1 + attempt);
+    const nextCode = String((parseInt((maxCodeRow as { maxCode: string })?.maxCode || "0") || 0) + 1 + attempt);
     try {
       const insertVals: any = {
         companyId,
@@ -74,10 +70,7 @@ export async function findOrCreateLedger(
       if (opts?.parentId) insertVals.parentId = opts.parentId;
       if (opts?.subType) insertVals.subType = opts.subType;
 
-      const [created] = await globalDb
-        .insert(ledgerAccounts)
-        .values(insertVals)
-        .returning({ id: ledgerAccounts.id });
+      const [created] = await globalDb.insert(ledgerAccounts).values(insertVals).returning({ id: ledgerAccounts.id });
       return created;
     } catch (err: unknown) {
       if ((err as { code?: string }).code === "23505" || getErrorMessage(err)?.includes("unique")) {
@@ -176,10 +169,7 @@ export async function rebuildPayrollGenVoucher(
 
   for (const p of remaining) {
     const workerName = (p.fullName as string | null) || `Worker #${p.workerId}`;
-    const salAmt =
-      parseFloat(p.baseSalary || "0") +
-      parseFloat(p.transport || "0") -
-      parseFloat(p.deductions || "0");
+    const salAmt = parseFloat(p.baseSalary || "0") + parseFloat(p.transport || "0") - parseFloat(p.deductions || "0");
     const bonAmt = parseFloat(p.bonuses || "0");
     workerRows.push({ workerId: p.workerId, workerName, salAmt, bonAmt });
     totalNet += parseFloat(p.netSalary || "0");
@@ -195,7 +185,7 @@ export async function rebuildPayrollGenVoucher(
 
   // Ensure salary/bonus group parents exist
   const salaryGroup = await findOrCreateLedger(companyId, "Salary Expense - Workers", "Expense", { subType: "Group" });
-  const bonusGroup  = await findOrCreateLedger(companyId, "Bonus Expense - Workers",  "Expense", { subType: "Group" });
+  const bonusGroup = await findOrCreateLedger(companyId, "Bonus Expense - Workers", "Expense", { subType: "Group" });
 
   // Ensure both headers carry subType="Group" even if they existed without it
   await globalDb.execute(
@@ -205,8 +195,12 @@ export async function rebuildPayrollGenVoucher(
   const workerAccCache = new Map<number, { salaryId: number; bonusId: number }>();
   for (const { workerId, workerName } of workerRows) {
     if (workerAccCache.has(workerId)) continue;
-    const sa = await findOrCreateLedger(companyId, `Salary Expense - ${workerName}`, "Expense", { parentId: salaryGroup.id });
-    const ba = await findOrCreateLedger(companyId, `Bonus Expense - ${workerName}`,  "Expense", { parentId: bonusGroup.id });
+    const sa = await findOrCreateLedger(companyId, `Salary Expense - ${workerName}`, "Expense", {
+      parentId: salaryGroup.id,
+    });
+    const ba = await findOrCreateLedger(companyId, `Bonus Expense - ${workerName}`, "Expense", {
+      parentId: bonusGroup.id,
+    });
     // Ensure parentId is set even for pre-existing accounts that were created without it
     await globalDb.execute(
       sql`UPDATE ledger_accounts SET parent_id = ${salaryGroup.id} WHERE id = ${sa.id} AND (parent_id IS NULL OR parent_id <> ${salaryGroup.id})`

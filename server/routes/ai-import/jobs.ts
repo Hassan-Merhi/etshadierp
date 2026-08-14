@@ -96,7 +96,7 @@ export function registerAiImportJobRoutes(app: Express) {
       const job = await assertJobOwnership(jobId, companyId);
       res.json(job);
     } catch (error: unknown) {
-      res.status((error as any).status ?? 500).json({ message: getErrorMessage(error) });
+      res.status((error as { status: number }).status ?? 500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -124,7 +124,7 @@ export function registerAiImportJobRoutes(app: Express) {
 
       res.json(rows);
     } catch (error: unknown) {
-      res.status((error as any).status ?? 500).json({ message: getErrorMessage(error) });
+      res.status((error as { status: number }).status ?? 500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -197,7 +197,7 @@ export function registerAiImportJobRoutes(app: Express) {
       });
     } catch (error: unknown) {
       logger.error("[AI Import] validate error:", { error: getErrorMessage(error) });
-      res.status((error as any).status ?? 500).json({ message: getErrorMessage(error) });
+      res.status((error as { status: number }).status ?? 500).json({ message: getErrorMessage(error) });
     }
   });
 }

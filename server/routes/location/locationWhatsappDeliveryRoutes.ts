@@ -123,7 +123,7 @@ function requireRetryCostAccess(req: Request, res: Response, next: NextFunction)
 
 function isoOrNull(value: unknown): string | null {
   if (!value) return null;
-  const date = new Date(value as any);
+  const date = new Date(value as string | number | Date);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
@@ -353,7 +353,7 @@ export function registerLocationWhatsappDeliveryRoutes(app: Express) {
 
         res.json({ message: "Stock report retry sent successfully", ...result });
       } catch (error: unknown) {
-        if ((error as any)?.code === "23505") {
+        if ((error as { code: "23505" })?.code === "23505") {
           return res
             .status(409)
             .json({ message: "A retry for this delivery is already in progress or has already succeeded" });

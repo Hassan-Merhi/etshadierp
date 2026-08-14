@@ -225,7 +225,15 @@ export function useVoucherHydration({
         .filter((entry: any) => parseFloat(entry.amount || "0") > 0);
 
       form.reset({
-        paymentAccountType: paymentType as any,
+        paymentAccountType: paymentType as
+          | "customer"
+          | "ledger"
+          | "bank"
+          | "supplier"
+          | "employee"
+          | "fixedAsset"
+          | "factorySupplier"
+          | undefined,
         paymentAccountId: paymentId,
         paymentAccountName: paymentName,
         voucherDate: parseDateLocal(voucherToEdit.voucherDate),

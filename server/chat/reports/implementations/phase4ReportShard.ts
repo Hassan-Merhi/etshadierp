@@ -156,7 +156,7 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
           fmt(val),
         ];
       });
-      const cn = (rows.rows[0] as any)?.container_number || cnFilter;
+      const cn = (rows.rows[0] as { container_number: unknown })?.container_number || cnFilter;
       dataQueryResult = {
         queryType: "container_offload_details",
         title: `Offload Details: ${cn}`,

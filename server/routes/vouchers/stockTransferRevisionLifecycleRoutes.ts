@@ -33,8 +33,8 @@ const pendingRevisionSchema = z.object({
 });
 
 function errorStatus(error: unknown): number {
-  const code = String((error as any)?.code ?? "");
-  const message = String((error as any)?.message ?? "");
+  const code = String((error as { code: unknown })?.code ?? "");
+  const message = String((error as { message: unknown })?.message ?? "");
   if (
     code === "STOCK_TRANSFER_INSUFFICIENT_STOCK" ||
     code === "STOCK_TRANSFER_DESTINATION_STOCK_CONFLICT" ||
@@ -57,10 +57,13 @@ function sendError(res: Response, error: unknown, context: string) {
   const status = errorStatus(error);
   if (status === 500) logger.error(`[StockTransferRevisionLifecycle ${context}]`, { error: error });
   const payload: Record<string, unknown> = {
-    message: String((error as any)?.message ?? `Failed to ${context.toLowerCase()} stock transfer revision`),
+    message: String(
+      (error as { message: unknown })?.message ?? `Failed to ${context.toLowerCase()} stock transfer revision`
+    ),
   };
   for (const field of ["code", "stockItemId", "sourceLocationId", "requiredQuantity", "availableQuantity"]) {
-    if ((error as any)?.[field] !== undefined) payload[field] = (error as any)[field];
+    if ((error as { [key: string]: undefined })?.[field] !== undefined)
+      payload[field] = (error as { [key: string]: unknown })[field];
   }
   return res.status(status).json(payload);
 }

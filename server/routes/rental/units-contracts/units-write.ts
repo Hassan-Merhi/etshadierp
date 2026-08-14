@@ -73,7 +73,7 @@ export function registerRentalUnitsWriteRoutes(app: Express, ctx: RentalRoutesCo
       try {
         const changes: Record<string, { old: any; new: any }> = {};
         for (const k of Object.keys(updates)) {
-          changes[k] = { old: (existing as any)[k] ?? null, new: updates[k] };
+          changes[k] = { old: (existing as { [key: string]: unknown })[k] ?? null, new: updates[k] };
         }
         await logAudit({
           userId: req.session.userId!,

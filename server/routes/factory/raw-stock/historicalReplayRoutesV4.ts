@@ -73,9 +73,14 @@ function parseReplayWriteScope(value: unknown): ReplayWriteScope | null {
   const availableBaleIdsToUpdate = numberArray(input.availableBaleIdsToUpdate);
   const finalizedBaleIdsToUpdate = numberArray(input.finalizedBaleIdsToUpdate);
   if (
-    !supplierIds || !containerIdsToUpdate || !rawStockIdsToUpdate || !sourceIdsToUpdate
-    || !batchIdsToUpdate || !availableBaleIdsToUpdate || !finalizedBaleIdsToUpdate
-    || !Array.isArray(input.blockedBatches)
+    !supplierIds ||
+    !containerIdsToUpdate ||
+    !rawStockIdsToUpdate ||
+    !sourceIdsToUpdate ||
+    !batchIdsToUpdate ||
+    !availableBaleIdsToUpdate ||
+    !finalizedBaleIdsToUpdate ||
+    !Array.isArray(input.blockedBatches)
   ) {
     return null;
   }
@@ -85,11 +90,11 @@ function parseReplayWriteScope(value: unknown): ReplayWriteScope | null {
     if (!raw || typeof raw !== "object") return null;
     const row = raw as Record<string, unknown>;
     if (
-      typeof row.batchId !== "number"
-      || !Number.isInteger(row.batchId)
-      || typeof row.batchCode !== "string"
-      || !Array.isArray(row.reasons)
-      || row.reasons.some((reason) => typeof reason !== "string")
+      typeof row.batchId !== "number" ||
+      !Number.isInteger(row.batchId) ||
+      typeof row.batchCode !== "string" ||
+      !Array.isArray(row.reasons) ||
+      row.reasons.some((reason) => typeof reason !== "string")
     ) {
       return null;
     }
@@ -119,16 +124,18 @@ function parseExactUndoEnvelope(value: unknown): ExactReplayUndoEnvelope | null 
   const scope = parseReplayWriteScope(input.scope);
   const baleIds = numberArray(input.baleIds);
   if (
-    !scope
-    || !baleIds
-    || typeof input.algorithmVersion !== "string"
-    || typeof input.fingerprint !== "string"
-    || typeof input.includeCompletedBatches !== "boolean"
-    || typeof input.includeFinalizedBales !== "boolean"
-    || !input.before
-    || !input.after
+    !scope ||
+    !baleIds ||
+    typeof input.algorithmVersion !== "string" ||
+    typeof input.fingerprint !== "string" ||
+    typeof input.includeCompletedBatches !== "boolean" ||
+    typeof input.includeFinalizedBales !== "boolean" ||
+    !input.before ||
+    !input.after
   ) {
-    throw Object.assign(new Error("Historical replay undo snapshot is malformed"), { code: "HISTORICAL_REPLAY_UNDO_INVALID" });
+    throw Object.assign(new Error("Historical replay undo snapshot is malformed"), {
+      code: "HISTORICAL_REPLAY_UNDO_INVALID",
+    });
   }
   return {
     kind: EXACT_UNDO_KIND,
@@ -247,8 +254,8 @@ export function registerHistoricalReplayRoutesV4(app: Express): void {
            WHERE id = $1 AND company_id = $2`,
           [undoLogId, companyId]
         );
-        if (!probe.rows[0] || !(probe.rows[0].snapshot as any)?.kind) return next();
-        if ((probe.rows[0].snapshot as any).kind !== EXACT_UNDO_KIND) return next();
+        if (!probe.rows[0] || !(probe.rows[0].snapshot as { kind: unknown })?.kind) return next();
+        if ((probe.rows[0].snapshot as { kind: "HISTORICAL_REPLAY_EXACT_V1" }).kind !== EXACT_UNDO_KIND) return next();
 
         const client = await pool.connect();
         const executor = client as unknown as ReplayQueryExecutor;
@@ -283,22 +290,12 @@ export function registerHistoricalReplayRoutesV4(app: Express): void {
           }
 
           await lockExactReplayScopeRows(executor, companyId, envelope.scope, envelope.baleIds);
-          const current = await captureExactReplaySnapshot(
-            executor,
-            companyId,
-            envelope.scope,
-            envelope.baleIds
-          );
+          const current = await captureExactReplaySnapshot(executor, companyId, envelope.scope, envelope.baleIds);
           assertExactReplayNonCostInvariants(envelope.after, current);
           assertExactReplayCurrentCostsMatchApplied(envelope.after, current);
 
           await restoreExactReplayCosts(executor, companyId, envelope.before);
-          const restored = await captureExactReplaySnapshot(
-            executor,
-            companyId,
-            envelope.scope,
-            envelope.baleIds
-          );
+          const restored = await captureExactReplaySnapshot(executor, companyId, envelope.scope, envelope.baleIds);
           assertExactReplayNonCostInvariants(envelope.before, restored);
           assertExactReplayCurrentCostsMatchApplied(envelope.before, restored);
 
@@ -416,9 +413,8 @@ export function registerHistoricalReplayRoutesV4(app: Express): void {
             const previewSafeIds = selectionPreview.supplierRows
               .filter((supplier) => supplier.safeToRepair)
               .map((supplier) => supplier.supplierId);
-            const selectedSafeIds = requestedIds.length > 0
-              ? requestedIds.filter((id) => previewSafeIds.includes(id))
-              : previewSafeIds;
+            const selectedSafeIds =
+              requestedIds.length > 0 ? requestedIds.filter((id) => previewSafeIds.includes(id)) : previewSafeIds;
 
             const internalScope = await buildHistoricalReplayScopeInternal({
               companyId,
@@ -478,12 +474,8 @@ export function registerHistoricalReplayRoutesV4(app: Express): void {
                 supplierSources: normalizedScope.sourceIdsToUpdate.length,
                 batches: normalizedScope.batchIdsToUpdate.length,
                 availableBales: normalizedScope.availableBaleIdsToUpdate.length,
-                finalizedBales: wantsFinalizedBales
-                  ? normalizedScope.finalizedBaleIdsToUpdate.length
-                  : 0,
-                excludedFinalizedBales: wantsFinalizedBales
-                  ? 0
-                  : normalizedScope.finalizedBaleIdsToUpdate.length,
+                finalizedBales: wantsFinalizedBales ? normalizedScope.finalizedBaleIdsToUpdate.length : 0,
+                excludedFinalizedBales: wantsFinalizedBales ? 0 : normalizedScope.finalizedBaleIdsToUpdate.length,
                 blockedBatches: normalizedScope.blockedBatches.length,
               },
             });
@@ -526,13 +518,14 @@ export function registerHistoricalReplayRoutesV4(app: Express): void {
           return res.status(400).json({ message: "Token supplier scope is inconsistent." });
         }
 
-        const supplierNameResult = signedSupplierIds.length > 0
-          ? await pool.query<{ name: string }>(
-              `SELECT name FROM factory_suppliers
+        const supplierNameResult =
+          signedSupplierIds.length > 0
+            ? await pool.query<{ name: string }>(
+                `SELECT name FROM factory_suppliers
                WHERE id = ANY($1) AND company_id = $2 ORDER BY id`,
-              [signedSupplierIds, companyId]
-            )
-          : { rows: [] as Array<{ name: string }> };
+                [signedSupplierIds, companyId]
+              )
+            : { rows: [] as Array<{ name: string }> };
         const supplierNames = supplierNameResult.rows.map((row) => row.name).join(", ");
         const tokenHash = crypto.createHash("sha256").update(providedToken).digest("hex");
         const baleIds = replayBaleIdsForScope(signedScope, payload.includeFinalizedBales === true);
@@ -607,10 +600,10 @@ export function registerHistoricalReplayRoutesV4(app: Express): void {
         return res.json({ success: true, ...result });
       } catch (error: unknown) {
         if (
-          error instanceof StaleTokenError
-          || (error as { code?: string }).code === "STALE_TOKEN"
-          || (error as { code?: string }).code === "HISTORICAL_REPLAY_SCOPE_VIOLATION"
-          || (error as { code?: string }).code === "HISTORICAL_REPLAY_INVARIANT_VIOLATION"
+          error instanceof StaleTokenError ||
+          (error as { code?: string }).code === "STALE_TOKEN" ||
+          (error as { code?: string }).code === "HISTORICAL_REPLAY_SCOPE_VIOLATION" ||
+          (error as { code?: string }).code === "HISTORICAL_REPLAY_INVARIANT_VIOLATION"
         ) {
           return res.status(409).json({
             message: getErrorMessage(error),

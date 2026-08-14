@@ -93,7 +93,18 @@ export const customerService = {
       companyId,
     });
     const code = await nextCustomerCode(companyId);
-    const customer = await storage.createCustomer({ ...parsed, code } as any);
+    const customer = await storage.createCustomer({ ...parsed, code } as {
+      companyId: number;
+      legalName: string;
+      phone?: string | null | undefined;
+      active?: boolean | undefined;
+      statementNote?: string | null | undefined;
+      deletedAt?: Date | null | undefined;
+      openingBalance?: string | undefined;
+      openingBalanceSide?: "" | "Dr" | "Cr" | undefined;
+      ledgerAccountId?: number | undefined;
+      paymentTermsDays?: number | null | undefined;
+    });
 
     await writeCustomerAudit({
       ...actor,
@@ -159,7 +170,40 @@ export const customerService = {
         ledgerUpdate.openingBalanceSide = updated.openingBalanceSide ?? "Dr";
       }
       if (Object.keys(ledgerUpdate).length > 0) {
-        await storage.updateLedgerAccount({ id: updated.ledgerAccountId, ...ledgerUpdate } as any);
+        await storage.updateLedgerAccount({ id: updated.ledgerAccountId, ...ledgerUpdate } as {
+          id: number;
+          active?: boolean | undefined;
+          deletedAt?: Date | null | undefined;
+          isHidden?: boolean | undefined;
+          companyId?: number | undefined;
+          code?: string | undefined;
+          name?: string | undefined;
+          accountType?:
+            | "Asset"
+            | "Liability"
+            | "Equity"
+            | "Income"
+            | "Expense"
+            | "Bank"
+            | "Cash"
+            | "Indirect Expense"
+            | "Direct Expense"
+            | "Government Taxes"
+            | "Loans"
+            | "Duty Agent"
+            | "Transporter Agent"
+            | "Accounts Payable"
+            | "Profit"
+            | undefined;
+          subType?: string | null | undefined;
+          openingBalance?: string | undefined;
+          openingBalanceSide?: "" | "Dr" | "Cr" | undefined;
+          openingBalanceNativeAmount?: string | null | undefined;
+          openingBalanceCurrency?: "USD" | "CFA" | null | undefined;
+          openingBalanceHistoricalRate?: string | null | undefined;
+          openingBalanceBaseAmount?: string | null | undefined;
+          parentId?: number | null | undefined;
+        });
       }
     }
 

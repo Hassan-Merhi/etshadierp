@@ -213,7 +213,7 @@ export function registerRawStockContainerRoutes(app: Express) {
       res.json({ message: "Duty confirmed and costs recalculated", newCostPerKg: resultCostPerKg });
     } catch (error: unknown) {
       logger.error("Error confirming duty:", { error: error });
-      res.status((error as any).status || 500).json({ message: getErrorMessage(error) });
+      res.status((error as { status: number }).status || 500).json({ message: getErrorMessage(error) });
     }
   });
 

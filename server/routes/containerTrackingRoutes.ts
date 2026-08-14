@@ -46,7 +46,7 @@ function isInactiveStatus(status: string): boolean {
 
 function requireAllowedRole(req: Request, res: Response): boolean {
   const role = req.user?.role;
-  if (!ALLOWED_ROLES.includes(role as any)) {
+  if (!ALLOWED_ROLES.includes(role as "Developer" | "Admin" | "Owner")) {
     res.status(403).json({ message: "Insufficient permissions" });
     return false;
   }

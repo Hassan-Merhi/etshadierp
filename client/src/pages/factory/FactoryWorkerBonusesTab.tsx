@@ -197,7 +197,10 @@ export default function FactoryWorkerBonusesTab() {
           </div>
           <div>
             <Label className="text-xs text-muted-foreground mb-1 block">Status</Label>
-            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+            <Select
+              value={statusFilter}
+              onValueChange={(v) => setStatusFilter(v as React.SetStateAction<"all" | "pending" | "paid">)}
+            >
               <SelectTrigger className="w-32" data-testid="select-bonus-status-filter">
                 <SelectValue />
               </SelectTrigger>

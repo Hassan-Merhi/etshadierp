@@ -29,7 +29,7 @@ export function registerWorkerDeleteRoutes(app: Express) {
       const baleCheck = await db.execute(
         sql`SELECT COUNT(*) as cnt FROM factory_bales WHERE worker_id = ${id} AND company_id = ${companyId} AND status NOT IN ('REMOVED','DELETED')`
       );
-      const baleCount = parseInt((baleCheck.rows[0] as any)?.cnt || "0");
+      const baleCount = parseInt((baleCheck.rows[0] as { cnt: string })?.cnt || "0");
       if (baleCount > 0) {
         return res.status(400).json({
           message: `Cannot delete: this worker has ${baleCount} bale entries. Remove all bale entries first.`,
@@ -40,7 +40,7 @@ export function registerWorkerDeleteRoutes(app: Express) {
       const payrollCheck = await db.execute(
         sql`SELECT COUNT(*) as cnt FROM factory_payrolls WHERE worker_id = ${id} AND company_id = ${companyId}`
       );
-      const payrollCount = parseInt((payrollCheck.rows[0] as any)?.cnt || "0");
+      const payrollCount = parseInt((payrollCheck.rows[0] as { cnt: string })?.cnt || "0");
       if (payrollCount > 0) {
         return res.status(400).json({ message: `Cannot delete: this worker has ${payrollCount} payroll record(s).` });
       }

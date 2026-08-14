@@ -183,7 +183,9 @@ function normalizePosEntry(
     };
   } catch (e) {
     // Fallback for legacy paths: if normalization fails (missing rate etc.) store as-is
-    logger.warn("[POS] normalizeVoucherEntryAmounts failed, using legacy storage:", { error: (e as any)?.message });
+    logger.warn("[POS] normalizeVoucherEntryAmounts failed, using legacy storage:", {
+      error: (e as { message: unknown })?.message,
+    });
     const dStr = Math.abs(debitAmt).toFixed(2);
     const cStr = Math.abs(creditAmt).toFixed(2);
     return {

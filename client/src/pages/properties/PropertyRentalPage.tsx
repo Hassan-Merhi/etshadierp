@@ -413,7 +413,10 @@ export default function PropertyRentalPage({
                                   <Checkbox
                                     checked={selectedContractIds.has(u.contract.id)}
                                     onCheckedChange={() =>
-                                      toggleSelect(u.contract!.id, { stopPropagation: () => {} } as any)
+                                      toggleSelect(u.contract!.id, { stopPropagation: () => {} } as React.MouseEvent<
+                                        Element,
+                                        MouseEvent
+                                      >)
                                     }
                                     onClick={(e) => e.stopPropagation()}
                                     data-testid={`checkbox-unit-${u.id}`}
@@ -489,13 +492,13 @@ export default function PropertyRentalPage({
                                   : "—"}
                               </td>
                               <td
-                                className={`px-3 py-2 text-right tabular-nums font-semibold ${(u.outstanding ?? 0) > 0 ? "text-red-600 dark:text-red-400" : (u as any).prepaidCredit > 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}
+                                className={`px-3 py-2 text-right tabular-nums font-semibold ${(u.outstanding ?? 0) > 0 ? "text-red-600 dark:text-red-400" : (u as { prepaidCredit: 0 }).prepaidCredit > 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}
                               >
                                 {u.outstanding !== null
                                   ? fmtMoneyCurrency(
                                       (u.outstanding ?? 0) > 0
                                         ? u.outstanding!
-                                        : (u as any).prepaidCredit > 0
+                                        : (u as { prepaidCredit: 0 }).prepaidCredit > 0
                                           ? u.prepaidCredit
                                           : 0,
                                       u.contract?.currency
@@ -503,7 +506,7 @@ export default function PropertyRentalPage({
                                   : "—"}
                               </td>
                               <td className="px-3 py-2 text-right tabular-nums text-muted-foreground text-xs">
-                                {(u as any).scheduledAmount > 0
+                                {(u as { scheduledAmount: 0 }).scheduledAmount > 0
                                   ? fmtMoneyCurrency(u.scheduledAmount, u.contract?.currency)
                                   : "—"}
                               </td>

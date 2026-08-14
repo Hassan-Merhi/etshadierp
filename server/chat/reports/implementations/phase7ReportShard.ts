@@ -34,13 +34,7 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       const actionMap: Record<string, number> = {};
       const tableRows7 = (rows.rows as any[]).map((r) => {
         actionMap[r.action] = (actionMap[r.action] || 0) + 1;
-        return [
-          String(r.created_at).slice(0, 16),
-          r.username,
-          r.action,
-          r.table_name,
-          r.record_identifier || "—",
-        ];
+        return [String(r.created_at).slice(0, 16), r.username, r.action, r.table_name, r.record_identifier || "—"];
       });
       const stats7 = [
         { label: "Total Events", value: String(tableRows7.length) },
@@ -334,7 +328,7 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
           (r.item_name || "—").slice(0, 25),
         ];
       });
-      const supplier7 = (rows.rows[0] as any)?.supplier || suppName7;
+      const supplier7 = (rows.rows[0] as { supplier: unknown })?.supplier || suppName7;
       const stats7 = [
         { label: "Supplier", value: supplier7 },
         { label: "Total Containers", value: String(tableRows7.length) },

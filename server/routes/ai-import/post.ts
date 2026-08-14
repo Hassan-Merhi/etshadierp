@@ -79,7 +79,7 @@ export function registerAiImportPostRoutes(app: Express) {
       });
     } catch (error: unknown) {
       logger.error("[AI Import] post error:", { error: getErrorMessage(error) });
-      res.status((error as any).status ?? 500).json({ message: getErrorMessage(error) });
+      res.status((error as { status: number }).status ?? 500).json({ message: getErrorMessage(error) });
     }
   });
 }

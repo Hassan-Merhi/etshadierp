@@ -209,9 +209,9 @@ export default function FactoryContainers() {
 
   const filteredContainers = containers?.filter((c) => {
     if (statusFilter === "HAS_WEIGHT") {
-      if (!(parseFloat((c as any).totalKg) > 0)) return false;
+      if (!(parseFloat((c as { totalKg: string }).totalKg) > 0)) return false;
     } else if (statusFilter === "NO_WEIGHT") {
-      if (parseFloat((c as any).totalKg) > 0) return false;
+      if (parseFloat((c as { totalKg: string }).totalKg) > 0) return false;
     } else if (statusFilter !== "all" && c.status !== statusFilter) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();

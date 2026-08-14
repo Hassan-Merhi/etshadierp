@@ -359,7 +359,19 @@ export default function BatchDetail({ batchId, onBack, onDeleted }: BatchDetailP
                           </TableCell>
                           <TableCell>
                             <Badge
-                              variant={(STATUS_COLORS[bale.status] || "secondary") as any}
+                              variant={
+                                (STATUS_COLORS[bale.status] || "secondary") as
+                                  | "default"
+                                  | "outline"
+                                  | "secondary"
+                                  | "destructive"
+                                  | "success"
+                                  | "warning"
+                                  | "info"
+                                  | "muted"
+                                  | null
+                                  | undefined
+                              }
                               data-testid={`badge-status-${bale.id}`}
                             >
                               {bale.status.replace(/_/g, " ")}

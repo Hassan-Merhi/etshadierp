@@ -11,7 +11,7 @@ import * as seventeenTrack from "../../lib/trackingProviders/seventeenTrackProvi
 const INACTIVE_LOWER = ["offloaded", "closed", "completed"] as const;
 
 export function isInactiveStatus(status: string): boolean {
-  return INACTIVE_LOWER.includes(status.toLowerCase() as any);
+  return INACTIVE_LOWER.includes(status.toLowerCase() as "closed" | "offloaded" | "completed");
 }
 
 export const activeStatusFilter = sql`LOWER(${factoryContainers.status}) NOT IN ('offloaded','closed','completed')`;

@@ -274,10 +274,10 @@ function BatchDetailView({ batch, onBack }: { batch: any; onBack: () => void }) 
             const bale = baleMap.get(lp.productionBaleId) || {};
             return {
               referenceNumber: lp.referenceNumber,
-              articleCode: lp.articleCode || (bale as any).articleCode || "",
+              articleCode: lp.articleCode || (bale as { articleCode: unknown }).articleCode || "",
               pieces: lp.pieces || 1,
-              approxWeightKg: lp.approxWeightKg || (bale as any).weightKg || "0",
-              productName: (bale as any).productName || "",
+              approxWeightKg: lp.approxWeightKg || (bale as { weightKg: unknown }).weightKg || "0",
+              productName: (bale as { productName: unknown }).productName || "",
               locationName: locName,
             };
           });

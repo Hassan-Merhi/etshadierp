@@ -241,7 +241,7 @@ export function CurrencyPools({
                                   sourceType = hasBalance ? "supplier" : "commission";
                                 }
                                 setFxConversionForm(form);
-                                setFxSourceType(sourceType as any);
+                                setFxSourceType(sourceType as "supplier" | "commission" | "both");
                                 setFxConversionOpen(true);
                               }}
                               data-testid={`button-convert-${group.currencyCode}`}

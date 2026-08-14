@@ -119,7 +119,7 @@ export function registerPosWhatsAppRoutes(app: Express): void {
     } catch (error: unknown) {
       logger.error("[/api/pos/send-shift-report]", {
         locationId: req.body.locationId,
-        chatId: (error as any)?.chatId ?? undefined,
+        chatId: (error as { chatId: unknown })?.chatId ?? undefined,
         error: getErrorMessage(error) ?? error,
       });
       res.status(500).json({ message: getErrorMessage(error) });

@@ -1084,7 +1084,23 @@ export default function BalesHistory() {
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
                           {uniqueStatuses.map((s) => (
-                            <Badge key={s} variant={(STATUS_COLORS[s] || "secondary") as any} className="text-xs">
+                            <Badge
+                              key={s}
+                              variant={
+                                (STATUS_COLORS[s] || "secondary") as
+                                  | "default"
+                                  | "outline"
+                                  | "secondary"
+                                  | "destructive"
+                                  | "success"
+                                  | "warning"
+                                  | "info"
+                                  | "muted"
+                                  | null
+                                  | undefined
+                              }
+                              className="text-xs"
+                            >
                               {s.replace(/_/g, " ")}
                             </Badge>
                           ))}
@@ -1189,7 +1205,19 @@ export default function BalesHistory() {
                                     data-testid={`select-status-${bale.id}`}
                                   >
                                     <Badge
-                                      variant={(STATUS_COLORS[bale.status] || "secondary") as any}
+                                      variant={
+                                        (STATUS_COLORS[bale.status] || "secondary") as
+                                          | "default"
+                                          | "outline"
+                                          | "secondary"
+                                          | "destructive"
+                                          | "success"
+                                          | "warning"
+                                          | "info"
+                                          | "muted"
+                                          | null
+                                          | undefined
+                                      }
                                       className="text-xs"
                                     >
                                       {bale.status.replace(/_/g, " ")}

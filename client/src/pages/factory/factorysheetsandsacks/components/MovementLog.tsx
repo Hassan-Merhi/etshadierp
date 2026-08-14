@@ -3,18 +3,27 @@
  *
  * Extracted from FactorySheetsAndSacks.tsx during the Phase 4 god-file split.
  */
-import {useState, useMemo} from "react";
-import {useQuery} from "@tanstack/react-query";
-import {apiRequest} from "@/lib/queryClient";
-import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
-import {Badge} from "@/components/ui/badge";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Loader2, History, ArrowDownCircle, ArrowUpCircle, TrendingDown, TrendingUp, BarChart3, Calendar} from "lucide-react";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Loader2,
+  History,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  TrendingDown,
+  TrendingUp,
+  BarChart3,
+  Calendar,
+} from "lucide-react";
 
-import type {LogEntry, SheetsAndSacksItem} from "../types";
-import {DATE_PRESETS, fmt, fmtDate, fmtDateTime, getPresetDates, localDayOf} from "../utils";
+import type { LogEntry, SheetsAndSacksItem } from "../types";
+import { DATE_PRESETS, fmt, fmtDate, fmtDateTime, getPresetDates, localDayOf } from "../utils";
 
 export function MovementLog({ items }: { items: SheetsAndSacksItem[] }) {
   const [preset, setPreset] = useState("week");
@@ -134,7 +143,10 @@ export function MovementLog({ items }: { items: SheetsAndSacksItem[] }) {
 
         <div className="flex items-center gap-1.5 ml-auto">
           {/* Direction filter */}
-          <Select value={direction} onValueChange={(v) => setDirection(v as any)}>
+          <Select
+            value={direction}
+            onValueChange={(v) => setDirection(v as React.SetStateAction<"all" | "IN" | "OUT">)}
+          >
             <SelectTrigger className="h-7 text-xs w-28">
               <SelectValue />
             </SelectTrigger>

@@ -75,7 +75,7 @@ export function registerRawStockZeroCostSourceRoutes(app: Express) {
         if (manualRates && typeof manualRates === "object") {
           for (const [key, value] of Object.entries(manualRates)) {
             const id = parseInt(key);
-            const rate = parseFloat(value as any);
+            const rate = parseFloat(value as string);
             if (!isNaN(id) && !isNaN(rate) && rate > 0) parsedManualRates[id] = rate;
           }
         }

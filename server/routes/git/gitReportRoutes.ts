@@ -51,8 +51,8 @@ export function registerGitReportRoutes(app: Express) {
    */
   app.get("/api/git/agent-duty-summary", requireAuth, requireRole("Admin", "Owner"), async (req, res) => {
     try {
-      const userId = String((req.user as any).id);
-      const role = String(req.session?.currentRole ?? (req.user as any).role ?? "");
+      const userId = String((req.user as { id: unknown }).id);
+      const role = String(req.session?.currentRole ?? (req.user as { role: unknown }).role ?? "");
       const sessionCompanyId: number | undefined = req.session?.currentCompanyId;
       const scope = await resolveGitCompanyScope(
         userId,
@@ -102,8 +102,8 @@ export function registerGitReportRoutes(app: Express) {
     preFilter?: (rows: EnrichedContainer[]) => EnrichedContainer[]
   ): Promise<void> {
     try {
-      const userId: string = (req.user as any).id;
-      const role = String(req.session?.currentRole ?? (req.user as any).role ?? "");
+      const userId: string = (req.user as { id: string }).id;
+      const role = String(req.session?.currentRole ?? (req.user as { role: unknown }).role ?? "");
       const sessionCompanyId: number | undefined = req.session?.currentCompanyId;
 
       const scope = await resolveGitCompanyScope(
@@ -209,8 +209,8 @@ export function registerGitReportRoutes(app: Express) {
       if (!Number.isFinite(containerId) || containerId <= 0) {
         return res.status(400).json({ message: "Invalid container ID" });
       }
-      const userId: string = (req.user as any).id;
-      const role = String(req.session?.currentRole ?? (req.user as any).role ?? "");
+      const userId: string = (req.user as { id: string }).id;
+      const role = String(req.session?.currentRole ?? (req.user as { role: unknown }).role ?? "");
       const sessionCompanyId: number | undefined = req.session?.currentCompanyId;
       const scope = await resolveGitCompanyScope(
         userId,
@@ -252,8 +252,8 @@ export function registerGitReportRoutes(app: Express) {
    */
   app.get("/api/git/summary", requireAuth, requireRole("Admin", "Owner"), async (req, res) => {
     try {
-      const userId: string = (req.user as any).id;
-      const role = String(req.session?.currentRole ?? (req.user as any).role ?? "");
+      const userId: string = (req.user as { id: string }).id;
+      const role = String(req.session?.currentRole ?? (req.user as { role: unknown }).role ?? "");
       const sessionCompanyId: number | undefined = req.session?.currentCompanyId;
 
       const scope = await resolveGitCompanyScope(
