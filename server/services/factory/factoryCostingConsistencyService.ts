@@ -1,9 +1,5 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
-import {
-  factoryBales,
-  factoryMixBatches,
-  factoryMixBatchSources,
-} from "@shared/schema";
+import { factoryBales, factoryMixBatches, factoryMixBatchSources } from "@shared/schema";
 import { db } from "../../db";
 import {
   calculateCostLine,
@@ -52,16 +48,17 @@ export interface FactoryCostingConsistencyReport {
 }
 
 function totalsEqual(left: unknown, right: unknown): boolean {
-  return formatFactoryTotal(left as any) === formatFactoryTotal(right as any);
+  return (
+    formatFactoryTotal(left as unknown as Parameters<typeof formatFactoryTotal>[0]) ===
+    formatFactoryTotal(right as unknown as Parameters<typeof formatFactoryTotal>[0])
+  );
 }
 
 /**
  * Read-only reconciliation of the persisted factory costing chain:
  * source values -> batch header -> bales. No write or lazy backfill is allowed.
  */
-export async function getFactoryCostingConsistencyReport(
-  companyId: number,
-): Promise<FactoryCostingConsistencyReport> {
+export async function getFactoryCostingConsistencyReport(companyId: number): Promise<FactoryCostingConsistencyReport> {
   const [batches, sourceRows, baleRows] = await Promise.all([
     db
       .select({
@@ -100,8 +97,8 @@ export async function getFactoryCostingConsistencyReport(
         and(
           eq(factoryMixBatches.companyId, companyId),
           isNull(factoryMixBatches.deletedAt),
-          sql`${factoryBales.status} NOT IN ('DELETED', 'REMOVED')`,
-        ),
+          sql`${factoryBales.status} NOT IN ('DELETED', 'REMOVED')`
+        )
       ),
   ]);
 
@@ -124,7 +121,7 @@ export async function getFactoryCostingConsistencyReport(
           quantityKg: source.weightKg,
           unitCostPerKg: source.costPerKg,
           totalCost: source.totalCost,
-        })),
+        }))
       );
       sourceValueMismatchCount += aggregate.sourceMismatchCount;
 

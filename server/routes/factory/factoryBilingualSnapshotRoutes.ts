@@ -192,13 +192,19 @@ export function registerFactoryBilingualSnapshotRoutes(app: Express): void {
 
         const result = await db.transaction(async (tx) => {
           await tx.execute(sql`SELECT pg_advisory_xact_lock(7347, ${companyId})`);
-          const before = await buildFactoryBilingualSnapshotPlan(companyId, tx as any);
+          const before = await buildFactoryBilingualSnapshotPlan(
+            companyId,
+            tx as unknown as Parameters<typeof buildFactoryBilingualSnapshotPlan>[1]
+          );
           const applied = await applyFactoryBilingualSnapshotBackfill(
             companyId,
             { includeFinalized, overwrite },
-            tx as any
+            tx as unknown as Parameters<typeof applyFactoryBilingualSnapshotBackfill>[2]
           );
-          const after = await buildFactoryBilingualSnapshotPlan(companyId, tx as any);
+          const after = await buildFactoryBilingualSnapshotPlan(
+            companyId,
+            tx as unknown as Parameters<typeof buildFactoryBilingualSnapshotPlan>[1]
+          );
           await writeAuditEvent(
             {
               action: "factory_bilingual_snapshot_backfill",

@@ -57,7 +57,10 @@ function normalizePosEntry(
       rateConvention: norm.rateConvention,
     };
   } catch (e) {
-    logger.warn("[POS Edit] normalizeVoucherEntryAmounts failed, using legacy storage:", (e as any)?.message);
+    logger.warn(
+      "[POS Edit] normalizeVoucherEntryAmounts failed, using legacy storage:",
+      (e as unknown as { message: Parameters<typeof logger.warn>[1] })?.message
+    );
     const dStr = Math.abs(debitAmt).toFixed(2);
     const cStr = Math.abs(creditAmt).toFixed(2);
     return {

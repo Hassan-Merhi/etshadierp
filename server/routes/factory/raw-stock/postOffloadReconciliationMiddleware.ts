@@ -76,8 +76,8 @@ export function postOffloadReconciliationMiddleware(req: Request, res: Response,
   const pathMatch = POST_OFFLOAD_PATH.exec(req.originalUrl);
   if (!action || !pathMatch) return next();
 
-  if ((req as any)[INTERCEPTED]) return next();
-  (req as any)[INTERCEPTED] = true;
+  if ((req as unknown as Record<PropertyKey, unknown>)[INTERCEPTED]) return next();
+  (req as unknown as Record<PropertyKey, unknown>)[INTERCEPTED] = true;
 
   const containerId = Number.parseInt(pathMatch[1], 10);
   const originalJson = res.json.bind(res);

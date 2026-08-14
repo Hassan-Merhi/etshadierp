@@ -84,9 +84,12 @@ async function enforceCredentialAwareSession(
   options: { requireCompanyContext: boolean; requireRecentPasswordConfirmation?: boolean }
 ) {
   if (req.session.userId) {
-    await hydrateActiveCredentialVersion(db, req.session as any);
+    await hydrateActiveCredentialVersion(
+      db,
+      req.session as unknown as Parameters<typeof hydrateActiveCredentialVersion>[1]
+    );
   }
-  return enforceRuntimeSession(req.session as any, options);
+  return enforceRuntimeSession(req.session as unknown as Parameters<typeof enforceRuntimeSession>[0], options);
 }
 
 function authorizeExplicitCompanyScope(req: Request, res: Response): boolean {

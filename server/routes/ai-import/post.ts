@@ -47,7 +47,14 @@ export function registerAiImportPostRoutes(app: Express) {
 
       // Run everything in a single transaction
       const created = await db.transaction(async (tx) => {
-        const results = await postRows(companyId, userId, username, job.importType, rowsToPost, tx as any);
+        const results = await postRows(
+          companyId,
+          userId,
+          username,
+          job.importType,
+          rowsToPost,
+          tx as unknown as Parameters<typeof postRows>[5]
+        );
 
         // Update each row with the created record info
         for (const r of results) {

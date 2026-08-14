@@ -82,7 +82,7 @@ async function runMonthlyRentalAccrual() {
     for (const { id: companyId } of rows) {
       for (const { module, income, expense } of modules) {
         try {
-          await ensureMonthlyForCompany(companyId, module as any);
+          await ensureMonthlyForCompany(companyId, module as unknown as Parameters<typeof ensureMonthlyForCompany>[1]);
           const { accrued } = await postRentAccrualForCompany(companyId, expense, module, income);
           totalAccrued += accrued;
         } catch (err: unknown) {

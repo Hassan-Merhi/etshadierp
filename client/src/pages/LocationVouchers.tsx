@@ -421,7 +421,7 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
           <CardTitle className="text-base">
             {showAllMonths
               ? `All Transactions — ${year}`
-              : `Transactions — ${"monthName" in ((data as any) ?? {}) ? (data as { monthName: unknown }).monthName : ""} ${year}`}
+              : `Transactions — ${"monthName" in (data ?? {}) ? (data as { monthName: unknown }).monthName : ""} ${year}`}
           </CardTitle>
         </CardHeader>
         <CardContent className="overflow-auto flex-1 p-0" ref={tableScrollContainer}>
