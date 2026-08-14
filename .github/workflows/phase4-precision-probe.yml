@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: phase4-precision-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   precision:
     if: ${{ !contains(github.event.head_commit.message, '[phase4-precision]') }}
