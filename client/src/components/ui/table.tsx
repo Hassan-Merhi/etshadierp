@@ -30,14 +30,37 @@ const Table = React.forwardRef<HTMLTableElement, TableProps>(
     ref
   ) => {
     const descriptionId = React.useId();
+    const wrapperRef = React.useRef<HTMLDivElement>(null);
+    const [usesParentScroll, setUsesParentScroll] = React.useState(false);
 
     // Some callers opt out of clipping so menus and popovers rendered inside a row can escape
     // the box. Those must not get a height cap either: with `overflow: visible` a capped table
     // would spill over whatever follows it instead of scrolling. They forgo the sticky header.
     const unclipped = /overflow-visible/.test(wrapperClassName ?? "");
 
+    React.useLayoutEffect(() => {
+      const wrapper = wrapperRef.current;
+      const parent = wrapper?.parentElement;
+
+      // If this table already sits directly inside a constrained vertical scroll container,
+      // let that parent own vertical scrolling instead of creating a second nested scrollbar.
+      // Explicit Table maxHeight/wrapper overflow settings still win because those callers
+      // intentionally asked the table to manage its own scroll region.
+      if (!wrapper || !parent || maxHeight || unclipped || /overflow-y-/.test(wrapperClassName ?? "")) {
+        setUsesParentScroll(false);
+        return;
+      }
+
+      const parentStyle = window.getComputedStyle(parent);
+      const parentCanScrollVertically = parentStyle.overflowY === "auto" || parentStyle.overflowY === "scroll";
+      const parentIsConstrained = parentStyle.maxHeight !== "none" || parent.scrollHeight > parent.clientHeight;
+
+      setUsesParentScroll(parentCanScrollVertically && parentIsConstrained);
+    }, [maxHeight, unclipped, wrapperClassName]);
+
     return (
       <div
+        ref={wrapperRef}
         role="region"
         aria-label={scrollLabel}
         aria-describedby={descriptionId}
@@ -45,15 +68,16 @@ const Table = React.forwardRef<HTMLTableElement, TableProps>(
         data-horizontal-scroll="true"
         data-table-scroll-region="true"
         className={cn(
-          "relative max-w-full touch-pan-x overflow-x-auto overscroll-x-contain rounded-md border border-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 dark:border-slate-600",
+          "relative max-w-full touch-pan-x overscroll-x-contain rounded-md border border-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 dark:border-slate-600",
           // A sticky `thead` sticks to its nearest scrollport, which is this wrapper (declaring
           // overflow on one axis makes the other `auto` too). Without a height cap the scrollport
           // is exactly as tall as the table, so the header has no room to stick and scrolls away
           // with the page. Capping the height gives long tables their own scroll and makes the
           // header behave. Short tables never reach the cap, so their layout is unchanged.
           // Printing must never clip rows, so the cap lifts and the table paginates naturally.
-          !unclipped && "max-h-[70vh] overflow-y-auto overscroll-y-contain",
-          !unclipped && "print:max-h-none print:overflow-visible",
+          !unclipped && !usesParentScroll && "max-h-[70vh] overflow-x-auto overflow-y-auto overscroll-y-contain",
+          !unclipped && !usesParentScroll && "print:max-h-none print:overflow-visible",
+          usesParentScroll && "max-h-none overflow-x-auto overflow-y-auto",
           wrapperClassName
         )}
         style={{ maxHeight }}
