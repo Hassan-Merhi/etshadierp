@@ -43,9 +43,9 @@ const Table = React.forwardRef<HTMLTableElement, TableProps>(
       const parent = wrapper?.parentElement;
 
       // If this table already sits directly inside a constrained vertical scroll container,
-      // let that parent own scrolling instead of creating a second nested scrollbar. Explicit
-      // Table maxHeight/wrapper overflow settings still win because those callers intentionally
-      // asked the table to manage its own scroll region.
+      // let that parent own vertical scrolling instead of creating a second nested scrollbar.
+      // Explicit Table maxHeight/wrapper overflow settings still win because those callers
+      // intentionally asked the table to manage its own scroll region.
       if (!wrapper || !parent || maxHeight || unclipped || /overflow-y-/.test(wrapperClassName ?? "")) {
         setUsesParentScroll(false);
         return;
