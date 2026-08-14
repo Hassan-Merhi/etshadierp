@@ -39,28 +39,22 @@ describe("session security policy", () => {
   });
 
   it("rejects idle and absolute expiry", () => {
-    expect(
-      decideSessionSecurity(
-        input({ session: { ...input().session!, lastSeenAt: now - 31 * 60_000 } })
-      ).code
-    ).toBe("SESSION_IDLE_EXPIRED");
-    expect(
-      decideSessionSecurity(
-        input({ session: { ...input().session!, absoluteExpiresAt: now } })
-      ).code
-    ).toBe("SESSION_ABSOLUTE_EXPIRED");
-  });
-
-  it("rejects sessions created before a credential-version change", () => {
-    expect(decideSessionSecurity(input({ activeCredentialVersion: 5 })).code).toBe(
-      "SESSION_CREDENTIALS_REVOKED"
+    expect(decideSessionSecurity(input({ session: { ...input().session!, lastSeenAt: now - 31 * 60_000 } })).code).toBe(
+      "SESSION_IDLE_EXPIRED"
+    );
+    expect(decideSessionSecurity(input({ session: { ...input().session!, absoluteExpiresAt: now } })).code).toBe(
+      "SESSION_ABSOLUTE_EXPIRED"
     );
   });
 
+  it("rejects sessions created before a credential-version change", () => {
+    expect(decideSessionSecurity(input({ activeCredentialVersion: 5 })).code).toBe("SESSION_CREDENTIALS_REVOKED");
+  });
+
   it("requires valid company context", () => {
-    expect(
-      decideSessionSecurity(input({ session: { ...input().session!, currentCompanyId: null } })).code
-    ).toBe("SESSION_COMPANY_REQUIRED");
+    expect(decideSessionSecurity(input({ session: { ...input().session!, currentCompanyId: null } })).code).toBe(
+      "SESSION_COMPANY_REQUIRED"
+    );
   });
 
   it("requires recent password confirmation for sensitive actions", () => {

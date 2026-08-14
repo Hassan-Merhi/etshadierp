@@ -22,7 +22,13 @@ describe("session enforcement adapter", () => {
   });
 
   it("upgrades an existing authenticated legacy session once", () => {
-    const state = session({ createdAt: undefined, lastSeenAt: undefined, absoluteExpiresAt: undefined, credentialVersion: undefined, loginAt: "1970-01-01T00:00:01.000Z" });
+    const state = session({
+      createdAt: undefined,
+      lastSeenAt: undefined,
+      absoluteExpiresAt: undefined,
+      credentialVersion: undefined,
+      loginAt: "1970-01-01T00:00:01.000Z",
+    });
     const result = enforceRuntimeSession(state, { requireCompanyContext: true, now: 2_000 });
     expect(result.valid).toBe(true);
     expect(state.createdAt).toBe(1_000);
@@ -72,10 +78,10 @@ describe("session enforcement adapter", () => {
   });
 
   it("enforces credential revocation when an active version is supplied", () => {
-    const result = enforceRuntimeSession(
-      session({ credentialVersion: 1, activeCredentialVersion: 2 }),
-      { requireCompanyContext: true, now: 2_000 }
-    );
+    const result = enforceRuntimeSession(session({ credentialVersion: 1, activeCredentialVersion: 2 }), {
+      requireCompanyContext: true,
+      now: 2_000,
+    });
     expect(result).toMatchObject({ valid: false, code: "SESSION_CREDENTIALS_REVOKED", destroySession: true });
   });
 

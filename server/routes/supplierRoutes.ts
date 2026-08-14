@@ -67,12 +67,7 @@ export function registerSupplierRoutes(app: Express) {
     try {
       const companyId = getActiveSupplierCompanyId(req);
       const supplierId = parseSupplierId(req.params.id);
-      const supplier = await supplierService.update(
-        supplierId,
-        companyId,
-        req.body,
-        getSupplierAuditActor(req),
-      );
+      const supplier = await supplierService.update(supplierId, companyId, req.body, getSupplierAuditActor(req));
       return res.json(supplier);
     } catch (error: unknown) {
       return sendSupplierRouteError(res, error, 400);
@@ -98,7 +93,7 @@ export function registerSupplierRoutes(app: Express) {
         supplierId,
         companyId,
         req.body,
-        getSupplierAuditActor(req),
+        getSupplierAuditActor(req)
       );
       return res.json({ success: true, supplier });
     } catch (error: unknown) {
