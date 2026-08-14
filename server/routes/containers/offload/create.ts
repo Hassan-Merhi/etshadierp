@@ -216,7 +216,9 @@ export function registerContainerOffloadCreateRoutes(app: Express) {
       const spCompanyRow = await db.execute(
         sql`SELECT company_type FROM companies WHERE id = ${container.companyId} LIMIT 1`
       );
-      const spCompanyType = firstRow(spCompanyRow)?.company_type ?? (spCompanyRow as any)[0]?.company_type;
+      const spCompanyType =
+        firstRow(spCompanyRow)?.company_type ??
+        (spCompanyRow as unknown as { [key: string]: { company_type: unknown } })[0]?.company_type;
       const isSpCompany = spCompanyType === "supplier_partner";
 
       if (isSpCompany) {

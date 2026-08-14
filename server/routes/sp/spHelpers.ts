@@ -19,7 +19,7 @@ export async function requireSpCompany(req: Request, res: Response): Promise<num
     return null;
   }
   const rows = await db.execute(sql`SELECT company_type FROM companies WHERE id = ${companyId} LIMIT 1`);
-  const row = firstRow(rows) ?? (rows as any)[0];
+  const row = firstRow(rows) ?? (rows as unknown as { [key: string]: Record<string, unknown> | undefined })[0];
   if (!row || row.company_type !== "supplier_partner") {
     res.status(403).json({ message: "Not a supplier_partner company" });
     return null;

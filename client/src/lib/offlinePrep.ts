@@ -395,8 +395,17 @@ export async function runOfflinePrep(companyId: number, onProgress: (p: PrepProg
         if (dataset.tableKey && db[dataset.tableKey]) {
           const table = db[dataset.tableKey] as ReturnType<typeof db.users.toCollection>["db"]["table"];
           // Clear existing data for this company, then bulk-insert
-          await (db as any)[dataset.tableKey].where("companyId").equals(companyId).delete();
-          await (db as any)[dataset.tableKey].bulkPut(items);
+          await (
+            db as unknown as {
+              [key: string]: { where: (arg0: "companyId") => { equals: (arg0: number) => { delete: () => unknown } } };
+            }
+          )[dataset.tableKey]
+            .where("companyId")
+            .equals(companyId)
+            .delete();
+          await (db as unknown as { [key: string]: { bulkPut: (arg0: CachedEntity[]) => unknown } })[
+            dataset.tableKey
+          ].bulkPut(items);
         } else {
           // Save as offlinePackages blob
           const existing = await db.offlinePackages.where("key").equals(`pkg_${dataset.id}_${companyId}`).first();

@@ -74,7 +74,7 @@ export async function getCompanyRow(companyId: number) {
   const rows = await db.execute(
     sql`SELECT id, code, name, company_type FROM companies WHERE id = ${companyId} LIMIT 1`
   );
-  return firstRow(rows) ?? (rows as any)[0] ?? null;
+  return firstRow(rows) ?? (rows as unknown as { [key: string]: Record<string, unknown> | undefined })[0] ?? null;
 }
 
 export async function logRun(

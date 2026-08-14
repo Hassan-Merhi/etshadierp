@@ -112,7 +112,9 @@ export function CurrencyPools({
                   const netPay = parseFloat(group.netPayable);
                   const isOverpaid = netPay < -0.005;
                   const ccPrefix = group.currencyCode !== "USD" ? `${group.currencyCode} ` : "$";
-                  const autoSettledFreight = parseFloat((group as any).autoSettledFreight || "0");
+                  const autoSettledFreight = parseFloat(
+                    (group as unknown as { autoSettledFreight: string }).autoSettledFreight || "0"
+                  );
                   const isAutoSettled = autoSettledFreight > 0.005 && Math.abs(netPay) <= 0.005;
                   return (
                     <TableRow key={group.currencyCode}>

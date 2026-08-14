@@ -55,7 +55,8 @@ export function registerStockItemReconcileRoutes(app: Express) {
               AND si.deleted_at IS NOT NULL`
       );
       const deletedRefs: { stockItemId: number; code: string }[] =
-        (deletedRefsRaw as any).rows ?? (deletedRefsRaw as unknown as any[]);
+        (deletedRefsRaw as unknown as { rows: { stockItemId: number; code: string }[] }).rows ??
+        (deletedRefsRaw as unknown as any[]);
 
       // Only process those NOT already handled by a merge log
       const uncovered = deletedRefs.filter((r) => !coveredByLog.has(r.stockItemId));

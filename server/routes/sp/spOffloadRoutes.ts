@@ -29,7 +29,8 @@ export function registerSpOffloadRoutes(app: Express) {
       if (!companyId) return;
 
       const parentRows = await db.execute(sql`SELECT parent_company_id FROM companies WHERE id = ${companyId} LIMIT 1`);
-      const parentRow = firstRow(parentRows) ?? (parentRows as any)[0];
+      const parentRow =
+        firstRow(parentRows) ?? (parentRows as unknown as { [key: string]: Record<string, unknown> | undefined })[0];
       const parentId = parentRow?.parent_company_id ?? 1;
 
       const agents = await db.execute(sql`
@@ -198,7 +199,9 @@ export function registerSpOffloadRoutes(app: Express) {
             const prepaidRows = await tx.execute(
               sql`SELECT amount_paid_usd, amount_used_usd FROM sp_prepaid_charges WHERE id = ${parseInt(charge.prepaidChargeId)} FOR UPDATE`
             );
-            const prepaidRow = firstRow(prepaidRows) ?? (prepaidRows as any)[0];
+            const prepaidRow =
+              firstRow(prepaidRows) ??
+              (prepaidRows as unknown as { [key: string]: Record<string, unknown> | undefined })[0];
             if (!prepaidRow) throw new Error(`Prepaid charge #${charge.prepaidChargeId} not found`);
             const alreadyUsed = parseNum(prepaidRow.amount_used_usd);
             const totalPaid = parseNum(prepaidRow.amount_paid_usd);
