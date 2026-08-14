@@ -56,27 +56,30 @@ Implemented scope:
 
 Status: **local certification run complete; GitHub-side certification outstanding**
 
-The matrix below was run against the branch head in a container with a local
-PostgreSQL, one gate at a time. It is evidence, not a substitute for the
-GitHub run: the runners, the database and the secrets differ.
+The matrix below was run against the branch head — rebased onto `main` at
+`075100900` — in a container with a local PostgreSQL, one gate at a time. It
+is evidence, not a substitute for the GitHub run: the runners, the database
+and the secrets differ.
 
 Passing:
 
 - Static contracts: environment documentation, type-escape ratchet, documentation state index, write-route coverage ratchet, toolchain coherence, script inventory, readable-logging contract, migration registry, i18n classifier and phase-14 audit, bandwidth phases 1–4 (with the phase-3 and phase-4 verifiers), accessibility/RTL contract, mobile-responsive regression, lockfile registry, dependency audit, observability contract, mobile/web routing, production dependencies, final production readiness.
 - Type-check, production build, server-bundle and runtime-dependency verification.
-- Lint: 0 errors, 9441 warnings against a ceiling of 9441; lint warning ratchet holds.
+- Lint: 0 errors, 9270 warnings against a ceiling of 9270; lint warning ratchet holds. Type escapes 8646 against a ceiling of 8646. Both ceilings came down through the rebase: main had already drawn them to 9282 and 8658, and the merged tree measures lower still.
 - Program-6 focused security checks.
 - Disposable schema preparation, application startup migrations (0 failures against a ceiling of 0), and the startup-migration ratchet.
-- Backend suite: 417 files, 3260 tests. API smoke sweep. Frontend suite: 102 files, 665 tests.
-- Coverage: backend 31.43% lines (28195/89686), frontend 13.59% lines (8927/65686). Every floor met, no floor more than five points below measured.
+- Backend suite: 418 files, 3266 tests. API smoke sweep. Frontend suite: 102 files, 665 tests.
+- Coverage: backend 31.41% lines (28184/89722), frontend 13.61% lines (8946/65708). Every floor met, no floor more than five points below measured.
+- God-file backlog 25,437 excess lines, back at its ceiling: the journal bootstrap had cost `server/index.ts` six lines that main had just removed, and they were given back rather than absorbed by a raised ceiling.
 
 Known limitations of this run, both to be resolved on GitHub rather than papered over here:
 
 - `tests/type-escape-boundaries.test.ts` exceeds its 30-second per-test timeout when the suite runs under v8 coverage instrumentation in this container: the audit it calls scans every source file. It passes 8/8 without instrumentation, and the coverage figures above come from a run with that one suite excluded. On a faster runner the same audit finishes inside the timeout; if it ever does not, the fix is a longer timeout for that suite, not a narrower audit.
 - Phase 2's coverage targets — 35% backend, 20% frontend — are not met. The floors were raised to hold the measured gains (backend statements 27→28 and functions 32→33, frontend lines 11→12 and functions 7→8) rather than left where they were.
+- `client/src/pages/factory/WasteDispatchOptimized.tsx` is 987 lines against the repository maximum of 900, so `npm run audit:god-files` exits non-zero. The file and its baseline are byte-identical to `main`: the breach is inherited, not introduced here.
 
 Outstanding for the pull request:
 
-- No GitHub Actions run exists for this branch since 13 August: pushes made by the automation token do not create workflow runs, and `workflow_dispatch` is not available to it. CI, CircleCI Parity, Security, I18n Audit, RTL/Accessibility, Mobile Responsiveness and the bandwidth workflows need to be started from the repository — by marking the pull request ready for review, by pushing once from an account whose pushes trigger workflows, or from the Actions tab.
+- No GitHub Actions run exists for this branch since 13 August, including for the rebased head: pushes made by the automation token do not create workflow runs, and `workflow_dispatch` is not available to it. CI, CircleCI Parity, Security, I18n Audit, RTL/Accessibility, Mobile Responsiveness and the bandwidth workflows need to be started from the repository — by marking the pull request ready for review, by pushing once from an account whose pushes trigger workflows, or from the Actions tab.
 - Release Verification has still never run. It is deliberately left alone here: it belongs to a deployed environment and its secrets, and running it is the owner's call.
-- The branch is behind `main`, which moved on 14 August. Certification is only meaningful at the exact head that will merge, so the matrix has to be repeated after the base is brought forward.
+- The branch was rebased onto `075100900` on 14 August and the matrix above was re-run afterwards. Certification is only meaningful at the exact head that will merge, so it has to be repeated again if `main` moves before this lands.
