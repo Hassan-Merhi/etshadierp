@@ -24,9 +24,7 @@ interface PosCheckoutParams {
   setLastAutosaved: React.Dispatch<React.SetStateAction<Date | null>>;
   setMobileTab: React.Dispatch<React.SetStateAction<"items" | "cart">>;
   setPendingStockSend: React.Dispatch<React.SetStateAction<boolean>>;
-  setStockWaStatus: React.Dispatch<
-    React.SetStateAction<"idle" | "sending" | "sent" | "failed" | "not_configured">
-  >;
+  setStockWaStatus: React.Dispatch<React.SetStateAction<"idle" | "sending" | "sent" | "failed" | "not_configured">>;
   setInvoiceWaStatus: React.Dispatch<React.SetStateAction<"idle" | "sending" | "sent" | "failed">>;
   lastSavedFingerprintRef: React.MutableRefObject<string>;
   clientSaleIdRef: React.MutableRefObject<string>;
@@ -208,7 +206,11 @@ export function usePosCheckout({
       setShowDraftDialog(false);
       toast({ title: "Draft Loaded", description: "Transaction has been loaded from draft" });
     } catch (error) {
-      toast({ title: "Error", description: getErrorDetails(error).message || "Failed to load draft", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: getErrorDetails(error).message || "Failed to load draft",
+        variant: "destructive",
+      });
     }
   };
 

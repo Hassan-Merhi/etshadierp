@@ -200,7 +200,11 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
       const detail = await loadContainerDetail(c.id, c.companyId);
       setDrawerContainer((current) => (current?.id === c.id ? detail : current));
     } catch (detailError) {
-      toast({ title: "Failed to load container details", description: getErrorDetails(detailError).message, variant: "destructive" });
+      toast({
+        title: "Failed to load container details",
+        description: getErrorDetails(detailError).message,
+        variant: "destructive",
+      });
     }
   }
 

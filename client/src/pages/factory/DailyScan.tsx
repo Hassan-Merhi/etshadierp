@@ -204,7 +204,11 @@ export default function DailyScan() {
         message: `${bale.weight_kg ? formatNumber(parseFloat(bale.weight_kg)) + " kg · " : ""}Verified`,
       });
     } catch (error) {
-      showFeedback({ type: "error", refCode: ref, message: getErrorDetails(error).optionalMessage || "Failed to record scan" });
+      showFeedback({
+        type: "error",
+        refCode: ref,
+        message: getErrorDetails(error).optionalMessage || "Failed to record scan",
+      });
     } finally {
       setScanning(false);
       setTimeout(() => scanRef.current?.focus(), 50);

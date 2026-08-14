@@ -108,7 +108,11 @@ export default function FactoryInvoices() {
           URL.revokeObjectURL(blobUrl);
         }, 10000);
       } catch (e) {
-        toast({ title: "Download failed", description: getErrorDetails(e).message || "Network error", variant: "destructive" });
+        toast({
+          title: "Download failed",
+          description: getErrorDetails(e).message || "Network error",
+          variant: "destructive",
+        });
       }
     },
     [toast]

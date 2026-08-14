@@ -104,7 +104,11 @@ function OfflineSyncPanelContent() {
       void loadLogs();
       void refreshCounts();
     } catch (e) {
-      toast({ title: "Error", description: getErrorDetails(e).optionalMessage || "Failed to clear data.", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: getErrorDetails(e).optionalMessage || "Failed to clear data.",
+        variant: "destructive",
+      });
     } finally {
       setClearing(false);
     }

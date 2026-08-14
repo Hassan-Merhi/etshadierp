@@ -83,11 +83,7 @@ export function DiagnosticsSection({
               </p>
             </div>
           </div>
-          <Button
-            variant="outline"
-            onClick={() => navigate("/balance-repair")}
-            data-testid="button-net-position-check"
-          >
+          <Button variant="outline" onClick={() => navigate("/balance-repair")} data-testid="button-net-position-check">
             Open Check
           </Button>
         </div>
@@ -106,11 +102,7 @@ export function DiagnosticsSection({
               <p className="text-sm text-muted-foreground">Analyze offloads for duplicates and quantity issues</p>
             </div>
           </div>
-          <Button
-            variant="outline"
-            onClick={() => navigate("/containers")}
-            data-testid="button-container-analysis"
-          >
+          <Button variant="outline" onClick={() => navigate("/containers")} data-testid="button-container-analysis">
             View Containers
           </Button>
         </div>

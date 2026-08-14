@@ -119,7 +119,11 @@ function OfflinePrepPanelContent() {
       await loadReadiness();
       toast({ title: "Device prepared", description: "All offline data downloaded and ready." });
     } catch (e) {
-      toast({ title: "Preparation failed", description: getErrorDetails(e).optionalMessage || "Unknown error", variant: "destructive" });
+      toast({
+        title: "Preparation failed",
+        description: getErrorDetails(e).optionalMessage || "Unknown error",
+        variant: "destructive",
+      });
     } finally {
       setRunning(false);
     }

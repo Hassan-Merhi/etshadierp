@@ -232,7 +232,11 @@ export default function Login() {
       }
       loginMutation.mutate(savedCreds);
     } catch (err) {
-      if (getErrorDetails(err).code !== "userCancel" && getErrorDetails(err).code !== "systemCancel" && getErrorDetails(err).code !== "appCancel") {
+      if (
+        getErrorDetails(err).code !== "userCancel" &&
+        getErrorDetails(err).code !== "systemCancel" &&
+        getErrorDetails(err).code !== "appCancel"
+      ) {
         toast({ title: "Biometric failed", description: "Please sign in with your password.", variant: "destructive" });
       }
     } finally {

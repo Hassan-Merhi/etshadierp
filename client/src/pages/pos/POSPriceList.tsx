@@ -522,7 +522,11 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/pos/price-list-by-masters"] });
       queryClient.invalidateQueries({ queryKey: ["/api/pos/price-list", selectedLocationId] });
     } catch (err) {
-      toast({ title: "Upload failed", description: getErrorDetails(err).message || "Something went wrong.", variant: "destructive" });
+      toast({
+        title: "Upload failed",
+        description: getErrorDetails(err).message || "Something went wrong.",
+        variant: "destructive",
+      });
     } finally {
       setImporting(false);
     }

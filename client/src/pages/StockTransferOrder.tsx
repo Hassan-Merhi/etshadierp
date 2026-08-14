@@ -51,7 +51,6 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
-
 import type {
   ImportPreviewRow,
   Location,
@@ -71,13 +70,11 @@ export default function StockTransferOrder() {
   const [_location, navigate] = useLocation();
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
-
   const editVoucherId = (() => {
     const params = new URLSearchParams(window.location.search);
     const v = params.get("edit");
     return v ? parseInt(v) : null;
   })();
-
   const [selectedLocationIds, setSelectedLocationIds] = useState<number[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -1192,7 +1189,11 @@ export default function StockTransferOrder() {
 
       setImportPreview(preview);
     } catch (err) {
-      toast({ title: "Parse Error", description: getErrorDetails(err).message || "Failed to read file", variant: "destructive" });
+      toast({
+        title: "Parse Error",
+        description: getErrorDetails(err).message || "Failed to read file",
+        variant: "destructive",
+      });
     } finally {
       setImportLoading(false);
     }
@@ -1339,7 +1340,11 @@ export default function StockTransferOrder() {
       toast({ title: "Revision Saved", description: `Rev ${nextRevNum} recorded and order updated` });
       navigate("/daybook");
     } catch (error) {
-      toast({ title: "Error", description: getErrorDetails(error).message || "Failed to save revision", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: getErrorDetails(error).message || "Failed to save revision",
+        variant: "destructive",
+      });
     } finally {
       setIsSavingRevision(false);
     }

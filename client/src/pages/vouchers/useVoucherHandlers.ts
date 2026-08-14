@@ -131,7 +131,11 @@ export function useVoucherHandlers({
         balance: 0,
       };
     } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: getErrorDetails(error).message || "Failed to create account" });
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: getErrorDetails(error).message || "Failed to create account",
+      });
       return null;
     } finally {
       setIsAutoCreating(false);

@@ -355,7 +355,10 @@ export function useChatActions(state: ChatActionsState) {
         [filePath]: { success: true, commitHash: data.commitHash, branch: data.branch },
       }));
     } catch (err) {
-      setPerFilePushResult((prev) => ({ ...prev, [filePath]: { success: false, error: getErrorDetails(err).message } }));
+      setPerFilePushResult((prev) => ({
+        ...prev,
+        [filePath]: { success: false, error: getErrorDetails(err).message },
+      }));
     }
   };
 

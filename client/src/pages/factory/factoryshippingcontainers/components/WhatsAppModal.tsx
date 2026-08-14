@@ -4,19 +4,19 @@ import { getErrorDetails } from "@shared/errorUtils";
  *
  * Extracted from FactoryShippingContainers.tsx during the Phase 4 god-file split.
  */
-import {useState, useEffect} from "react";
-import {useQuery} from "@tanstack/react-query";
-import {Button} from "@/components/ui/button";
-import {Badge} from "@/components/ui/badge";
-import {Textarea} from "@/components/ui/textarea";
-import {Checkbox} from "@/components/ui/checkbox";
-import {Separator} from "@/components/ui/separator";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog";
-import {MessageCircle, Download, Copy, ExternalLink, Eye, Check, RefreshCw, Loader2} from "lucide-react";
-import {useToast} from "@/hooks/use-toast";
-import type {WaFileWithChecked, WhatsAppPreview} from "../types";
-import {LIST_KEY} from "../utils";
+import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { MessageCircle, Download, Copy, ExternalLink, Eye, Check, RefreshCw, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import type { WaFileWithChecked, WhatsAppPreview } from "../types";
+import { LIST_KEY } from "../utils";
 
 export function WhatsAppModal({
   open,

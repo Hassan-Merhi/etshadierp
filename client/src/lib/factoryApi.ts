@@ -306,7 +306,10 @@ async function requestWithPreparedReplayState(
     // OfflineQueued means the exact body (including clientRequestId) is persisted.
     // A 4xx is a definite rejection. Keep the identity only for network errors,
     // timeouts, and 5xx responses where the commit outcome may be uncertain.
-    if (getErrorDetails(error).name === "OfflineQueued" || (Number(getErrorDetails(error).status) >= 400 && Number(getErrorDetails(error).status) < 500)) {
+    if (
+      getErrorDetails(error).name === "OfflineQueued" ||
+      (Number(getErrorDetails(error).status) >= 400 && Number(getErrorDetails(error).status) < 500)
+    ) {
       releaseAccountingRequestIdentity(method, url, outboundData);
     }
     throw error;

@@ -628,7 +628,8 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       toast({
         title: "Revision Not Saved",
         description:
-          getErrorDetails(error).message || "The transfer was updated, but the revision record failed to save. Please try again.",
+          getErrorDetails(error).message ||
+          "The transfer was updated, but the revision record failed to save. Please try again.",
         variant: "destructive",
       });
     } finally {

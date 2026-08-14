@@ -12,7 +12,10 @@ export function getActiveTransferCompanyId(req: Request): number {
   try {
     return getCompanyAccessContext(req).activeCompanyId;
   } catch (error) {
-    throw new TransferRouteError(getErrorDetails(error).status ?? 400, getErrorDetails(error).optionalMessage ?? "No company selected");
+    throw new TransferRouteError(
+      getErrorDetails(error).status ?? 400,
+      getErrorDetails(error).optionalMessage ?? "No company selected"
+    );
   }
 }
 
@@ -20,7 +23,10 @@ export function getTransferUserId(req: Request): string {
   try {
     return getCompanyAccessContext(req).userId;
   } catch (error) {
-    throw new TransferRouteError(getErrorDetails(error).status ?? 401, getErrorDetails(error).optionalMessage ?? "Authentication required");
+    throw new TransferRouteError(
+      getErrorDetails(error).status ?? 401,
+      getErrorDetails(error).optionalMessage ?? "Authentication required"
+    );
   }
 }
 
@@ -28,14 +34,17 @@ export async function requireCompanyAccess(userId: string, companyIds: number[])
   try {
     await assertCompaniesAccess(userId, companyIds);
   } catch (error) {
-    throw new TransferRouteError(getErrorDetails(error).status ?? 403, getErrorDetails(error).optionalMessage ?? "No access to one or both companies");
+    throw new TransferRouteError(
+      getErrorDetails(error).status ?? 403,
+      getErrorDetails(error).optionalMessage ?? "No access to one or both companies"
+    );
   }
 }
 
 export async function requireCompanyAccountAccess(
   userId: string,
   requestedCompanyId: number,
-  activeCompanyId: number | undefined,
+  activeCompanyId: number | undefined
 ): Promise<void> {
   try {
     if (activeCompanyId === requestedCompanyId) {
@@ -44,6 +53,9 @@ export async function requireCompanyAccountAccess(
     }
     await assertCompanyAccess(userId, requestedCompanyId);
   } catch (error) {
-    throw new TransferRouteError(getErrorDetails(error).status ?? 403, getErrorDetails(error).optionalMessage ?? "No access to this company");
+    throw new TransferRouteError(
+      getErrorDetails(error).status ?? 403,
+      getErrorDetails(error).optionalMessage ?? "No access to this company"
+    );
   }
 }

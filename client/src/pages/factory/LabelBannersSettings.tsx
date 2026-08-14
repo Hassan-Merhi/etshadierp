@@ -311,11 +311,7 @@ export default function LabelBannersSettings() {
                         Custom images use the original URL with stable ?t= cache key (now immutable-cached). */}
                     <img
                       key={ts}
-                      src={
-                        ts > 0
-                          ? `/labels/hmd-${c.slug}.jpg?t=${ts}`
-                          : `/labels/previews/hmd-${c.slug}-preview.webp`
-                      }
+                      src={ts > 0 ? `/labels/hmd-${c.slug}.jpg?t=${ts}` : `/labels/previews/hmd-${c.slug}-preview.webp`}
                       alt={`${c.label} banner`}
                       className="w-full h-full object-cover"
                       loading="lazy"

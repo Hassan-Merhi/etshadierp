@@ -204,7 +204,11 @@ export default function PressingBales() {
       printWindow.focus();
       setTimeout(() => printWindow.print(), 500);
     } catch (error) {
-      toast({ title: "Error", description: getErrorDetails(error).message || "Failed to generate labels", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: getErrorDetails(error).message || "Failed to generate labels",
+        variant: "destructive",
+      });
     }
   };
 

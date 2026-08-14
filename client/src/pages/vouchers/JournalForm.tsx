@@ -710,7 +710,11 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
         balance: 0,
       };
     } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: getErrorDetails(error).message || "Failed to create account" });
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: getErrorDetails(error).message || "Failed to create account",
+      });
       return null;
     } finally {
       setIsAutoCreating(false);

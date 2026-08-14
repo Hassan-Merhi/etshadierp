@@ -53,18 +53,15 @@ import {
 import { useLabelDesignColors } from "@/hooks/useLabelDesignColors";
 import type { FactoryBaleProduct, Location, FactoryCategory } from "@shared/schema";
 import * as XLSX from "@/lib/excelHelper";
-
 import type { CartItem, CreatedBale } from "./wipersreentry/types";
 import { isWipers, isWipersBale } from "./wipersreentry/utils";
 import { productMatchesSearch } from "@shared/factoryProductSearch";
-
 export default function WipersReEntry() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { colors } = useLabelDesignColors();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
-
   const [entryDate, setEntryDate] = useState<string>(new Date().toLocaleDateString("en-CA"));
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -286,7 +283,11 @@ export default function WipersReEntry() {
         toast({ title: "Labels sent to Zebra printer" });
         return;
       } catch (err) {
-        toast({ title: "Zebra failed", description: getErrorDetails(err).message + " — using browser print", variant: "destructive" });
+        toast({
+          title: "Zebra failed",
+          description: getErrorDetails(err).message + " — using browser print",
+          variant: "destructive",
+        });
       }
     }
     openBrowserPrint(labels, format);

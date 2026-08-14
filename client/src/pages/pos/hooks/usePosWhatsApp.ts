@@ -52,7 +52,11 @@ export function usePosWhatsApp({
         }
       } catch (e) {
         setInvoiceWaStatus("failed");
-        toast({ title: "WhatsApp", description: getErrorDetails(e).message || "Could not send invoice.", variant: "destructive" });
+        toast({
+          title: "WhatsApp",
+          description: getErrorDetails(e).message || "Could not send invoice.",
+          variant: "destructive",
+        });
       } finally {
         setSendingInvoiceWhatsApp(false);
       }
@@ -112,7 +116,11 @@ export function usePosWhatsApp({
       }
     } catch (e) {
       setInvoiceWaStatus("failed");
-      toast({ title: "Error", description: getErrorDetails(e).message || "Could not reach the server.", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: getErrorDetails(e).message || "Could not reach the server.",
+        variant: "destructive",
+      });
     } finally {
       setSendingInvoiceWhatsApp(false);
     }
@@ -137,7 +145,11 @@ export function usePosWhatsApp({
       toast({ title: "Sent", description: "Stock report sent to WhatsApp group." });
     } catch (e) {
       setStockWaStatus("failed");
-      toast({ title: "Failed to send", description: getErrorDetails(e).message || "WhatsApp send failed.", variant: "destructive" });
+      toast({
+        title: "Failed to send",
+        description: getErrorDetails(e).message || "WhatsApp send failed.",
+        variant: "destructive",
+      });
     } finally {
       setSendingWhatsApp(false);
     }
