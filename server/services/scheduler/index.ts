@@ -9,6 +9,7 @@ import cron from "node-cron";
 import { logger } from "../../lib/logger";
 import { startScheduler as startCoreScheduler } from "./scheduled-jobs";
 import { checkAndRunLocationStockReports } from "./location-stock-report";
+import { createSchedulerTick } from "./schedulerTickGuard";
 
 let locationStockCronStarted = false;
 
@@ -22,20 +23,16 @@ export function startScheduler(): void {
   if (locationStockCronStarted) return;
   locationStockCronStarted = true;
 
-  cron.schedule("* * * * *", async () => {
-    const startedAt = Date.now();
-    try {
-      // Successful no-op checks are deliberately silent; this runs every minute
-      // and should not flood production logs when no location is due.
-      await checkAndRunLocationStockReports();
-    } catch (error: unknown) {
-      logger.error("cron locationStockWhatsApp failed", {
-        module: "scheduler",
-        action: "locationStockWhatsApp",
-        durationMs: Date.now() - startedAt,
-        error,
-      });
-    }
+  // Sending a report is network work that can outlast the minute it started in,
+  // so the tick refuses to start a second pass while the first is still going.
+  // Successful no-op checks stay silent: this runs every minute and should not
+  // flood production logs when no location is due.
+  const locationStockTick = createSchedulerTick("locationStockWhatsApp", checkAndRunLocationStockReports, {
+    quiet: true,
+  });
+
+  cron.schedule("* * * * *", () => {
+    void locationStockTick();
   });
 
   logger.info("Location stock WhatsApp scheduler registered", {

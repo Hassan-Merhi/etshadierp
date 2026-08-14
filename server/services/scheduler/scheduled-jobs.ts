@@ -4,6 +4,7 @@ import { logger } from "../../lib/logger";
 import { pool } from "../../db";
 import { ensureMonthlyForCompany, postRentAccrualForCompany } from "../../routes/rental/shared";
 import { hasTodayExportSucceeded, isTodayExportRunning, runDailyExport } from "./daily-export";
+import { createSchedulerTick } from "./schedulerTickGuard";
 
 // Guards startScheduler against a double start. Declared here rather than in
 // daily-export because this is the only module that reads or writes it, and a
@@ -101,151 +102,47 @@ export function startScheduler() {
   schedulerStarted = true;
 
   // Run on the 1st of every month at 7:00 AM EST — send net-position Excel via WhatsApp
-  cron.schedule(
-    "0 7 1 * *",
-    async () => {
-      const _t = Date.now();
-      logger.info("cron monthlyNetPosition started", { module: "scheduler", action: "monthlyNetPosition" });
-      try {
-        await runMonthlyWhatsAppNetPosition();
-        logger.info("cron monthlyNetPosition succeeded", {
-          module: "scheduler",
-          action: "monthlyNetPosition",
-          durationMs: Date.now() - _t,
-        });
-      } catch (err: unknown) {
-        logger.error("cron monthlyNetPosition failed", {
-          module: "scheduler",
-          action: "monthlyNetPosition",
-          durationMs: Date.now() - _t,
-          error: err,
-        });
-      }
-    },
-    {
-      timezone: "America/New_York",
-    }
-  );
+  cron.schedule("0 7 1 * *", createSchedulerTick("monthlyNetPosition", runMonthlyWhatsAppNetPosition), {
+    timezone: "America/New_York",
+  });
 
   // Run on the 2nd of every month at 6:00 AM EST — auto-post rent accrual vouchers
-  cron.schedule(
-    "0 6 2 * *",
-    async () => {
-      const _t = Date.now();
-      logger.info("cron monthlyRentalAccrual started", { module: "scheduler", action: "monthlyRentalAccrual" });
-      try {
-        await runMonthlyRentalAccrual();
-        logger.info("cron monthlyRentalAccrual succeeded", {
-          module: "scheduler",
-          action: "monthlyRentalAccrual",
-          durationMs: Date.now() - _t,
-        });
-      } catch (err: unknown) {
-        logger.error("cron monthlyRentalAccrual failed", {
-          module: "scheduler",
-          action: "monthlyRentalAccrual",
-          durationMs: Date.now() - _t,
-          error: err,
-        });
-      }
-    },
-    {
-      timezone: "America/New_York",
-    }
-  );
+  cron.schedule("0 6 2 * *", createSchedulerTick("monthlyRentalAccrual", runMonthlyRentalAccrual), {
+    timezone: "America/New_York",
+  });
 
   // Every hour: check stock report, net position export, AND the configurable daily export.
   // The daily export fires when the current local hour (in the stored timezone) matches
   // the stored schedule_hour — this replaces the old hardcoded 6 PM EST cron.
   cron.schedule(
     "0 * * * *",
-    async () => {
-      const _t = Date.now();
-      logger.info("cron hourlyChecks started", { module: "scheduler", action: "hourlyChecks" });
-      try {
-        await checkAndRunStockReport();
-        await checkAndRunNetPositionExport();
-        await checkAndRunScheduledDailyExport();
-        await checkAndRunContainersWhatsApp();
-        logger.info("cron hourlyChecks succeeded", {
-          module: "scheduler",
-          action: "hourlyChecks",
-          durationMs: Date.now() - _t,
-        });
-      } catch (err: unknown) {
-        logger.error("cron hourlyChecks failed", {
-          module: "scheduler",
-          action: "hourlyChecks",
-          durationMs: Date.now() - _t,
-          error: err,
-        });
-      }
-    },
+    createSchedulerTick("hourlyChecks", async () => {
+      await checkAndRunStockReport();
+      await checkAndRunNetPositionExport();
+      await checkAndRunScheduledDailyExport();
+      await checkAndRunContainersWhatsApp();
+    }),
     {
       timezone: "America/New_York",
     }
   );
 
   // Overdue customer payment reminder — runs every day at 9:00 AM EST
-  cron.schedule(
-    "0 9 * * *",
-    async () => {
-      const _t = Date.now();
-      logger.info("cron overdueCheck started", { module: "scheduler", action: "overdueCheck" });
-      try {
-        await checkOverdueCustomers();
-        logger.info("cron overdueCheck succeeded", {
-          module: "scheduler",
-          action: "overdueCheck",
-          durationMs: Date.now() - _t,
-        });
-      } catch (err: unknown) {
-        logger.error("cron overdueCheck failed", {
-          module: "scheduler",
-          action: "overdueCheck",
-          durationMs: Date.now() - _t,
-          error: err,
-        });
-      }
-    },
-    {
-      timezone: "America/New_York",
-    }
-  );
+  cron.schedule("0 9 * * *", createSchedulerTick("overdueCheck", checkOverdueCustomers), {
+    timezone: "America/New_York",
+  });
 
   // Purge soft-deleted items older than 30 days — runs daily at 2:00 AM EST
-  cron.schedule(
-    "0 2 * * *",
-    async () => {
-      const _t = Date.now();
-      logger.info("cron softDeletePurge started", { module: "scheduler", action: "softDeletePurge" });
-      try {
-        await purgeOldSoftDeletes();
-        logger.info("cron softDeletePurge succeeded", {
-          module: "scheduler",
-          action: "softDeletePurge",
-          durationMs: Date.now() - _t,
-        });
-      } catch (err: unknown) {
-        logger.error("cron softDeletePurge failed", {
-          module: "scheduler",
-          action: "softDeletePurge",
-          durationMs: Date.now() - _t,
-          error: err,
-        });
-      }
-    },
-    {
-      timezone: "America/New_York",
-    }
-  );
+  cron.schedule("0 2 * * *", createSchedulerTick("softDeletePurge", purgeOldSoftDeletes), {
+    timezone: "America/New_York",
+  });
 
   // Container auto-tracking — runs every 6 hours (00:00, 06:00, 12:00, 18:00 EST)
   cron.schedule(
     "0 */6 * * *",
-    async () => {
-      const _t = Date.now();
-      logger.info("cron containerTracking started", { module: "scheduler", action: "containerTracking" });
+    createSchedulerTick("containerTracking", async () => {
+      // ERP and factory tracking are reported separately on purpose: one
+      // failing is not a reason to skip the other.
       try {
         const { trackDueContainers } = await import("../container-tracking");
         await trackDueContainers();
@@ -253,27 +150,12 @@ export function startScheduler() {
         logger.error("cron containerTracking (ERP) failed", {
           module: "scheduler",
           action: "containerTracking",
-          durationMs: Date.now() - _t,
           error: err,
         });
       }
-      try {
-        const { trackDueFactoryContainers } = await import("../factory-container-tracking");
-        await trackDueFactoryContainers();
-        logger.info("cron containerTracking succeeded", {
-          module: "scheduler",
-          action: "containerTracking",
-          durationMs: Date.now() - _t,
-        });
-      } catch (err: unknown) {
-        logger.error("cron containerTracking (factory) failed", {
-          module: "scheduler",
-          action: "containerTracking",
-          durationMs: Date.now() - _t,
-          error: err,
-        });
-      }
-    },
+      const { trackDueFactoryContainers } = await import("../factory-container-tracking");
+      await trackDueFactoryContainers();
+    }),
     {
       timezone: "America/New_York",
     }

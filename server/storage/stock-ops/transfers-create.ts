@@ -17,6 +17,38 @@ import { postStockMovementTx } from "../../services/inventory/stockMovementInteg
 
 const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
+/**
+ * A second stock adjustment was created for a voucher that already had one.
+ *
+ * The route checks for this before it calls in, but a check made in one
+ * connection and an insert made in another are two separate moments: two
+ * submissions arriving together both find nothing and both apply their items to
+ * inventory. The check below is made under a lock on the voucher row inside the
+ * same transaction as the insert, so the second one loses.
+ */
+export class DuplicateStockAdjustmentError extends Error {
+  readonly code = "STOCK_ADJUSTMENT_ALREADY_EXISTS";
+
+  constructor(voucherId: number) {
+    super(`Voucher ${voucherId} already has a stock adjustment`);
+    this.name = "DuplicateStockAdjustmentError";
+  }
+}
+
+/**
+ * A second stock transfer document was created for a voucher that already had
+ * one. The endpoint that attaches items to an existing voucher had no guard at
+ * all: submitting it twice built a second transfer and moved the stock again.
+ */
+export class DuplicateStockTransferError extends Error {
+  readonly code = "STOCK_TRANSFER_ALREADY_EXISTS";
+
+  constructor(voucherId: number) {
+    super(`Voucher ${voucherId} already has a stock transfer`);
+    this.name = "DuplicateStockTransferError";
+  }
+}
+
 export async function createStockTransfer(
   voucherId: number,
   destinationLocationId: number,
@@ -24,9 +56,18 @@ export async function createStockTransfer(
   items: Array<{ sourceLocationId: number; stockItemId: number; quantity: string; rate: string }>
 ): Promise<any> {
   return await db.transaction(async (tx) => {
-    const [voucher] = await tx.select().from(schema.vouchers).where(eq(schema.vouchers.id, voucherId));
+    // The lock makes the duplicate check below decisive: two submissions for the
+    // same voucher are ordered, and the second one finds the first one's row.
+    const [voucher] = await tx.select().from(schema.vouchers).where(eq(schema.vouchers.id, voucherId)).for("update");
     if (!voucher) throw new Error(`Voucher ${voucherId} not found`);
     const isOptional = voucher.optional;
+
+    const [duplicate] = await tx
+      .select({ id: schema.stockTransferVouchers.id })
+      .from(schema.stockTransferVouchers)
+      .where(eq(schema.stockTransferVouchers.voucherId, voucherId))
+      .limit(1);
+    if (duplicate) throw new DuplicateStockTransferError(voucherId);
 
     if (!items || items.length === 0) throw new Error("No items provided for stock transfer");
 
@@ -174,9 +215,18 @@ export async function createStockAdjustment(
   consumptionAccountOverride?: { code: string; name: string }
 ): Promise<any> {
   return await db.transaction(async (tx) => {
-    const [voucher] = await tx.select().from(schema.vouchers).where(eq(schema.vouchers.id, voucherId));
+    // Locking the voucher row serialises everyone who wants to adjust it, so the
+    // duplicate check below cannot be overtaken between reading and inserting.
+    const [voucher] = await tx.select().from(schema.vouchers).where(eq(schema.vouchers.id, voucherId)).for("update");
     if (!voucher) throw new Error(`Voucher ${voucherId} not found`);
     const isOptional = voucher.optional;
+
+    const [duplicate] = await tx
+      .select({ id: schema.stockAdjustmentVouchers.id })
+      .from(schema.stockAdjustmentVouchers)
+      .where(eq(schema.stockAdjustmentVouchers.voucherId, voucherId))
+      .limit(1);
+    if (duplicate) throw new DuplicateStockAdjustmentError(voucherId);
 
     const [adjustment] = await tx
       .insert(schema.stockAdjustmentVouchers)

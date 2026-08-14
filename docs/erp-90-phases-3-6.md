@@ -31,11 +31,26 @@ Safety / deferred evidence:
 
 ## Phase 4 — Accounting & Inventory Convergence
 
-Status: **next**.
+Status: **implementation complete — final verification deferred to Phase 6**
+
+Implemented scope:
+
+- A canonical stock movement journal (`canonical_stock_movements` and its request/audit siblings) records every applied inventory movement as append-only evidence, written inside the same transaction that mutates inventory. Its tables are created by the startup schema, alongside the existing startup-only tables.
+- Evidence is posted by the live write paths rather than by a service nobody calls: stock transfers (both branches of the create endpoint), stock adjustments, POS sale issue and POS edit reversal/reissue, container offload receipts, factory stock entry, factory bale finalisation, and credit/debit note movements.
+- Convergence reconciliation compares Voucher, VoucherEntry, Factory Daybook and stock documents against that evidence. It is read-only and never repairs; untrustworthy evidence fails closed rather than being aggregated away.
+- Each voucher type states what ledger evidence it owes — balanced, single-sided, or none — instead of being excluded from the comparison by name. A voucher type nobody has classified is reported rather than skipped.
+- The Factory Daybook mirror is withdrawn in the same transaction that cancels its voucher, and a mirror that outlives its voucher is reported by reconciliation.
+- `GET /api/admin/convergence-reconciliation` exposes the report for the session's own company, for Admin and Owner.
 
 ## Phase 5 — Production Resilience
 
-Status: pending Phase 4 completion.
+Status: **in progress**.
+
+Implemented scope:
+
+- Stock transfers created from scratch accept a caller-supplied `clientRequestId` and are recorded under a deterministic idempotency key inside their own transaction, so a retry or a double submission answers with the original transfer instead of moving stock twice. Concurrent submissions of the same key serialise on a transaction-scoped advisory lock. The client attaches that identity through the same mechanism protected accounting writes already use.
+- Stock adjustments check for an existing adjustment under a lock on the voucher row inside the inserting transaction, closing the check-then-act window in which two submissions could both apply their items to inventory.
+- Scheduled jobs run through a tick guard so a run that outlives its interval is not overtaken by the next tick; a skipped tick is logged rather than dropped, and the guard is released on failure.
 
 ## Phase 6 — Quality & Final Certification
 
