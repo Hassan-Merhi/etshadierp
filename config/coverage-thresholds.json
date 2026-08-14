@@ -126,9 +126,9 @@
   },
   "frontend": {
     "global": {
-      "lines": 11,
+      "lines": 12,
       "statements": 11,
-      "functions": 7,
+      "functions": 8,
       "branches": 8
     },
     "perFile": {
