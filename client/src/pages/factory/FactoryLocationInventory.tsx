@@ -605,7 +605,11 @@ export default function FactoryLocationInventory() {
     return applySortProducts(
       activeInventoryData.filter((p) => {
         const matchesSearch = productMatchesSearch(
-          { name: p.productName, nameAr: (p as any).productNameAr, articleCode: p.articleCode },
+          {
+            name: p.productName,
+            nameAr: (p as unknown as FactoryBaleProduct & { productNameAr: string | null | undefined }).productNameAr,
+            articleCode: p.articleCode,
+          },
           productSearch
         );
         const matchesCat = categoryFilter.length === 0 || categoryFilter.includes(p.category ?? "Uncategorized");

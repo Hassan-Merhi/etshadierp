@@ -175,7 +175,14 @@ export default function ContainerLoadingScan() {
       setShowScanSuccessPopup(true);
       const speechMsg = variables.allowBypassProforma ? "Bypass confirmed. Item added." : "Scanned successfully";
       try {
-        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const ctx = new (
+          window.AudioContext ||
+          (
+            window as unknown as (Window & typeof globalThis) & {
+              webkitAudioContext: { new (contextOptions?: AudioContextOptions): AudioContext; prototype: AudioContext };
+            }
+          ).webkitAudioContext
+        )();
         const osc = ctx.createOscillator();
         osc.connect(ctx.destination);
         osc.frequency.value = 1000;
@@ -217,12 +224,22 @@ export default function ContainerLoadingScan() {
       scannerRef.current?.focus();
     },
     onError: (error: Error, variables: any) => {
-      if ((error as any).overloaded) {
+      if ((error as unknown as Error & { overloaded: unknown }).overloaded) {
         setPendingBypassOverloadRef(variables.scanCode);
         setPendingBypassBaleRef(null);
         setScanFlash("error");
         try {
-          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const ctx = new (
+            window.AudioContext ||
+            (
+              window as unknown as (Window & typeof globalThis) & {
+                webkitAudioContext: {
+                  new (contextOptions?: AudioContextOptions): AudioContext;
+                  prototype: AudioContext;
+                };
+              }
+            ).webkitAudioContext
+          )();
           const osc = ctx.createOscillator();
           osc.connect(ctx.destination);
           osc.frequency.value = 550;
@@ -241,12 +258,22 @@ export default function ContainerLoadingScan() {
         scannerRef.current?.focus();
         return;
       }
-      if ((error as any).notInProforma) {
+      if ((error as unknown as Error & { notInProforma: unknown }).notInProforma) {
         setPendingBypassBaleRef(variables.scanCode);
         setPendingBypassOverloadRef(null);
         setScanFlash("error");
         try {
-          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const ctx = new (
+            window.AudioContext ||
+            (
+              window as unknown as (Window & typeof globalThis) & {
+                webkitAudioContext: {
+                  new (contextOptions?: AudioContextOptions): AudioContext;
+                  prototype: AudioContext;
+                };
+              }
+            ).webkitAudioContext
+          )();
           const osc = ctx.createOscillator();
           osc.connect(ctx.destination);
           osc.frequency.value = 600;
@@ -268,7 +295,14 @@ export default function ContainerLoadingScan() {
       setScanFlash("error");
       setShowScanErrorPopup(true);
       try {
-        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const ctx = new (
+          window.AudioContext ||
+          (
+            window as unknown as (Window & typeof globalThis) & {
+              webkitAudioContext: { new (contextOptions?: AudioContextOptions): AudioContext; prototype: AudioContext };
+            }
+          ).webkitAudioContext
+        )();
         const osc = ctx.createOscillator();
         osc.type = "sawtooth";
         osc.connect(ctx.destination);

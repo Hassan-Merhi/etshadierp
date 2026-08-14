@@ -23,7 +23,8 @@ export function setPrinterName(name: string) {
 let qzInstance = null;
 
 async function loadQzTray(): Promise<any> {
-  if ((window as any).qz) return (window as any).qz;
+  if ((window as unknown as (Window & typeof globalThis) & { qz: unknown }).qz)
+    return (window as unknown as (Window & typeof globalThis) & { qz: unknown }).qz;
 
   return new Promise((resolve, reject) => {
     const script = document.createElement("script");

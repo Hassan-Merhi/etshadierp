@@ -182,7 +182,35 @@ export async function calculateNetPositionAsOf(
   let employeeLiabilityTotal = 0;
   for (const emp of companyEmployees) {
     const opening = parseFloat(emp.openingBalance || "0");
-    const openingSide = (emp as any).openingBalanceSide === "Dr" ? 1 : -1;
+    const openingSide =
+      (
+        emp as unknown as {
+          id: number;
+          companyId: number;
+          code: string;
+          firstName: string;
+          lastName: string;
+          email: string | null;
+          phone: string | null;
+          joinDate: string;
+          department: string | null;
+          employeeType: string;
+          monthlySalary: string;
+          openingBalance: string | null;
+          currentBalance: string;
+          totalDeposits: string;
+          totalWithdrawals: string;
+          active: boolean;
+          salesBonusPct: string | null;
+          salesBonusPctSourceCompanyId: number | null;
+          salesBonusPctLocationId: number | null;
+          balesBonusRate: string | null;
+          deletedAt: Date | null;
+          createdAt: Date;
+        } & { openingBalanceSide: "Dr" }
+      ).openingBalanceSide === "Dr"
+        ? 1
+        : -1;
     const signedOpening = opening * openingSide;
     const balance = employeeBalances.get(emp.id) || { debit: 0, credit: 0 };
     const netBalance = signedOpening + balance.debit - balance.credit;

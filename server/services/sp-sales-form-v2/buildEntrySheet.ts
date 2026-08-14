@@ -537,9 +537,15 @@ export async function buildEntrySheet(
       // Subsequent days: link to previous day Balance Cash
       const prevCL = colLetter(dayBase + (d - 1) * COLS_PER_DAY);
       const prevBL = colLetter(dayBase + (d - 1) * COLS_PER_DAY + 1);
-      cashC.value = { formula: `${prevCL}${balanceRow}`, result: null } as any;
+      cashC.value = { formula: `${prevCL}${balanceRow}`, result: null } as unknown as {
+        formula: string;
+        result: null;
+      } & ExcelJS.CellValue;
       cashC.protection = { locked: true };
-      bankC.value = { formula: `${prevBL}${balanceRow}`, result: null } as any;
+      bankC.value = { formula: `${prevBL}${balanceRow}`, result: null } as unknown as {
+        formula: string;
+        result: null;
+      } & ExcelJS.CellValue;
       bankC.protection = { locked: true };
     }
   }
@@ -559,7 +565,10 @@ export async function buildEntrySheet(
     cashC.alignment = right;
     cashC.protection = { locked: false };
     const bankC = ws.getCell(depositRow, b + 1);
-    bankC.value = { formula: `${cL}${depositRow}`, result: null } as any;
+    bankC.value = { formula: `${cL}${depositRow}`, result: null } as unknown as {
+      formula: string;
+      result: null;
+    } & ExcelJS.CellValue;
     bankC.numFmt = MONEY_FMT;
     bankC.fill = fill(BANK_GRN);
     bankC.border = thin;

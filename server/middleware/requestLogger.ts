@@ -161,7 +161,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
   const buildVersion = process.env.BUILD_VERSION || process.env.RENDER_GIT_COMMIT?.substring(0, 8) || "dev";
   let responseBytes = 0;
 
-  (req as any).requestId = requestId;
+  (req as unknown as { requestId: string }).requestId = requestId;
   res.setHeader("X-Request-Id", requestId);
 
   const originalWrite = res.write.bind(res);

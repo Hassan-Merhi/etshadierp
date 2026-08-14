@@ -613,7 +613,24 @@ export default function BarcodeLookup() {
                   </TableHeader>
                   <TableBody>
                     {articleResult.labelPrints.map((lp) => {
-                      const baleStatus = (lp as any).baleStatus as string | null;
+                      const baleStatus = (
+                        lp as unknown as {
+                          id: number;
+                          companyId: number;
+                          createdAt: Date;
+                          articleCode: string;
+                          productionBaleId: number | null;
+                          productId: number | null;
+                          referenceNumber: string;
+                          pieces: number;
+                          approxWeightKg: string;
+                          printedByUserId: string | null;
+                          printedAt: Date;
+                          scannedByUserId: string | null;
+                          scannedAt: Date | null;
+                          customerLogoId: number | null;
+                        } & { baleStatus: string | null }
+                      ).baleStatus as string | null;
                       const isDeleted = baleStatus === "DELETED" || baleStatus === "REMOVED";
                       return (
                         <TableRow
@@ -774,7 +791,9 @@ export default function BarcodeLookup() {
                         data-testid="text-ref-printed-at"
                       >
                         <Clock className="h-3 w-3" />
-                        {formatDateOnly(referenceResult.labelPrint.printedAt as any) ?? "N/A"}
+                        {formatDateOnly(
+                          referenceResult.labelPrint.printedAt as unknown as Date & (string | null | undefined)
+                        ) ?? "N/A"}
                       </p>
                     </div>
                     <div>
@@ -787,7 +806,24 @@ export default function BarcodeLookup() {
                         data-testid="text-ref-printed-by"
                       >
                         <User className="h-3 w-3" />
-                        {(referenceResult.labelPrint as any).printedByName ||
+                        {(
+                          referenceResult.labelPrint as unknown as {
+                            id: number;
+                            companyId: number;
+                            createdAt: Date;
+                            articleCode: string;
+                            productionBaleId: number | null;
+                            productId: number | null;
+                            referenceNumber: string;
+                            pieces: number;
+                            approxWeightKg: string;
+                            printedByUserId: string | null;
+                            printedAt: Date;
+                            scannedByUserId: string | null;
+                            scannedAt: Date | null;
+                            customerLogoId: number | null;
+                          } & { printedByName: React.ReactNode }
+                        ).printedByName ||
                           referenceResult.labelPrint.printedByUserId ||
                           "Unknown"}
                       </p>
@@ -854,7 +890,10 @@ export default function BarcodeLookup() {
                     {referenceResult.labelPrint.scannedAt ? (
                       <div className="ml-auto flex items-center gap-1.5 text-sm text-muted-foreground">
                         <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        Scanned {formatDateOnly(referenceResult.labelPrint.scannedAt as any)}
+                        Scanned{" "}
+                        {formatDateOnly(
+                          referenceResult.labelPrint.scannedAt as unknown as Date & (string | null | undefined)
+                        )}
                       </div>
                     ) : (
                       <div className="ml-auto">

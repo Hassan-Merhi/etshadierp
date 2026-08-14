@@ -419,8 +419,15 @@ async function waitForSharedResponse(
 }
 
 export function installRequestStormGuard(): void {
-  if (typeof window === "undefined" || (window as any).__requestStormGuardInstalled) return;
-  (window as any).__requestStormGuardInstalled = true;
+  if (
+    typeof window === "undefined" ||
+    (window as unknown as (Window & typeof globalThis) & { __requestStormGuardInstalled: boolean })
+      .__requestStormGuardInstalled
+  )
+    return;
+  (
+    window as unknown as (Window & typeof globalThis) & { __requestStormGuardInstalled: true }
+  ).__requestStormGuardInstalled = true;
 
   const originalFetch = window.fetch.bind(window);
   const invalidationChannel =

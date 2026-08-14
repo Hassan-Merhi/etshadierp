@@ -637,7 +637,11 @@ export function VoucherDetailsDialog({
                                     )}
                                     {isStockTransferType && (
                                       <TableCell className="text-sm text-muted-foreground">
-                                        {(entry as any).sourceLocationName || transferDetail?.sourceLocationName || "—"}
+                                        {(
+                                          entry as unknown as ViewVoucherEntry & { sourceLocationName: React.ReactNode }
+                                        ).sourceLocationName ||
+                                          transferDetail?.sourceLocationName ||
+                                          "—"}
                                       </TableCell>
                                     )}
                                     <TableCell className="text-right font-mono">

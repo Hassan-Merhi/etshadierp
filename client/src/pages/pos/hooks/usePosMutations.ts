@@ -137,7 +137,9 @@ export function usePosMutations({
       setShowPrintDialog(true);
 
       if (!editVoucherId) {
-        const waGroupId = (activeLocation as any)?.whatsappGroupChatId || (data.location as any)?.whatsappGroupChatId;
+        const waGroupId =
+          (activeLocation as unknown as (Location | null) & { whatsappGroupChatId: unknown })?.whatsappGroupChatId ||
+          (data.location as unknown as { whatsappGroupChatId: unknown })?.whatsappGroupChatId;
         if (waGroupId && data.voucher?.id) {
           setPendingAutoSend({ voucherId: data.voucher.id, locationId: activeLocation?.id || data.location?.id });
           setStockWaStatus("sending");

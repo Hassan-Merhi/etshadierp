@@ -26,5 +26,9 @@ export const CAPACITOR_WS_URL: string = (typeof import.meta !== "undefined" && i
  * Safe to call anywhere — returns false in Node / SSR / regular browser.
  */
 export function isCapacitor(): boolean {
-  return typeof window !== "undefined" && (window.location.protocol === "capacitor:" || !!(window as any).Capacitor);
+  return (
+    typeof window !== "undefined" &&
+    (window.location.protocol === "capacitor:" ||
+      !!(window as unknown as (Window & typeof globalThis) & { Capacitor: number }).Capacitor)
+  );
 }

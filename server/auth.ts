@@ -195,7 +195,38 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       daybookEditDays: req.session.daybookEditDays ?? 0,
       canAccessCustomers: req.session.canAccessCustomers ?? false,
       canDeleteRecords: req.session.canDeleteRecords ?? false,
-    } as any;
+    } as unknown as {
+      id: string | undefined;
+      username: string | undefined;
+      role: string;
+      assignedLocationId: number | null;
+      posStation: number | null;
+      cashAccountId: number | null;
+      canSellNegativeStock: boolean;
+      posViewOnly: boolean;
+      daybookEditDays: number;
+      canAccessCustomers: boolean;
+      canDeleteRecords: boolean;
+    } & (
+      | ({
+          id: string;
+          active: boolean;
+          createdAt: Date;
+          username: string;
+          password: string;
+          chatbotEnabled: boolean;
+          hiddenErpCostFields: string[];
+        } & {
+          role?: string;
+          assignedLocationId?: number | null;
+          posStation?: number | null;
+          cashAccountId?: number | null;
+          canSellNegativeStock?: boolean;
+          daybookEditDays?: number;
+          canAccessCustomers?: boolean;
+        })
+      | undefined
+    );
 
     next();
   } catch (error) {

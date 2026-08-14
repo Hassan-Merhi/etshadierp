@@ -156,7 +156,7 @@ export function requireExplicitCompanyContext(options: CompanyContextOptions = {
     if (isPinnedCompanyRoute(requestPath)) {
       (req.session as { factoryCompanyId: unknown }).factoryCompanyId = decision.companyId;
     }
-    (req as any).securityCompanyId = decision.companyId;
+    (req as unknown as { securityCompanyId: number | null }).securityCompanyId = decision.companyId;
     next();
   };
 }

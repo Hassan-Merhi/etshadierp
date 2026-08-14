@@ -35,8 +35,15 @@ function parseJsonBody(init?: RequestInit): Record<string, unknown> | null {
  * uncertain. Successful and definite 4xx responses release it.
  */
 export function installAccountingRequestFetchGuard(): void {
-  if (typeof window === "undefined" || (window as any).__accountingRequestFetchGuardInstalled) return;
-  (window as any).__accountingRequestFetchGuardInstalled = true;
+  if (
+    typeof window === "undefined" ||
+    (window as unknown as (Window & typeof globalThis) & { __accountingRequestFetchGuardInstalled: boolean })
+      .__accountingRequestFetchGuardInstalled
+  )
+    return;
+  (
+    window as unknown as (Window & typeof globalThis) & { __accountingRequestFetchGuardInstalled: true }
+  ).__accountingRequestFetchGuardInstalled = true;
 
   const originalFetch = window.fetch.bind(window);
 

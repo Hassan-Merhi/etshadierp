@@ -25,8 +25,62 @@ export function registerEmployeeRoutes(app: Express) {
 
         return {
           ...emp,
-          firstName: emp.firstName || (emp as any).first_name,
-          lastName: emp.lastName || (emp as any).last_name,
+          firstName:
+            emp.firstName ||
+            (
+              emp as unknown as {
+                id: number;
+                companyId: number;
+                code: string;
+                phone: string | null;
+                openingBalance: string | null;
+                active: boolean;
+                deletedAt: Date | null;
+                createdAt: Date;
+                email: string | null;
+                firstName: string;
+                lastName: string;
+                joinDate: string;
+                department: string | null;
+                employeeType: string;
+                monthlySalary: string;
+                currentBalance: string;
+                totalDeposits: string;
+                totalWithdrawals: string;
+                salesBonusPct: string | null;
+                salesBonusPctSourceCompanyId: number | null;
+                salesBonusPctLocationId: number | null;
+                balesBonusRate: string | null;
+              } & { first_name: unknown }
+            ).first_name,
+          lastName:
+            emp.lastName ||
+            (
+              emp as unknown as {
+                id: number;
+                companyId: number;
+                code: string;
+                phone: string | null;
+                openingBalance: string | null;
+                active: boolean;
+                deletedAt: Date | null;
+                createdAt: Date;
+                email: string | null;
+                firstName: string;
+                lastName: string;
+                joinDate: string;
+                department: string | null;
+                employeeType: string;
+                monthlySalary: string;
+                currentBalance: string;
+                totalDeposits: string;
+                totalWithdrawals: string;
+                salesBonusPct: string | null;
+                salesBonusPctSourceCompanyId: number | null;
+                salesBonusPctLocationId: number | null;
+                balesBonusRate: string | null;
+              } & { last_name: unknown }
+            ).last_name,
           currentBalance: currentBalance.toFixed(2),
           calculatedBalance: currentBalance.toFixed(2),
         };

@@ -346,7 +346,38 @@ export function registerOrderCrudRoutes(app: Express) {
         action: "create",
         tableName: "factory_customer_orders",
         recordId: order.id,
-        recordIdentifier: (order as any).orderNumber || `Order #${order.id}`,
+        recordIdentifier:
+          (
+            order as unknown as {
+              id: number;
+              companyId: number;
+              deletedAt: Date | null;
+              createdAt: Date;
+              updatedAt: Date;
+              isHidden: boolean;
+              containerNumber: string | null;
+              status: string;
+              grandTotal: string;
+              customerId: number;
+              invoiceNumber: string | null;
+              orderDate: string;
+              proformaIdUsed: number | null;
+              subtotalBales: string;
+              freightAmount: string;
+              otherChargesTotal: string;
+              totalQtyBales: number;
+              shippingCompany: string | null;
+              containerNotes: string | null;
+              destination: string | null;
+              verifiedByUserId: number | null;
+              verifiedAt: Date | null;
+              loadingStartedAt: Date | null;
+              loadingFinalizedAt: Date | null;
+              finalizedAt: Date | null;
+              locationId: number | null;
+              dispatchBatchId: number | null;
+            } & { orderNumber: string | null | undefined }
+          ).orderNumber || `Order #${order.id}`,
         changes: null,
       });
       res.json(order);
@@ -473,7 +504,38 @@ export function registerOrderCrudRoutes(app: Express) {
         action: "update",
         tableName: "factory_customer_orders",
         recordId: orderId,
-        recordIdentifier: (order as any).orderNumber || `Order #${orderId}`,
+        recordIdentifier:
+          (
+            order as unknown as {
+              id: number;
+              companyId: number;
+              customerId: number;
+              invoiceNumber: string | null;
+              orderDate: string;
+              proformaIdUsed: number | null;
+              status: string;
+              subtotalBales: string;
+              freightAmount: string;
+              otherChargesTotal: string;
+              grandTotal: string;
+              totalQtyBales: number;
+              containerNumber: string | null;
+              shippingCompany: string | null;
+              containerNotes: string | null;
+              destination: string | null;
+              verifiedByUserId: number | null;
+              verifiedAt: Date | null;
+              loadingStartedAt: Date | null;
+              loadingFinalizedAt: Date | null;
+              finalizedAt: Date | null;
+              locationId: number | null;
+              dispatchBatchId: number | null;
+              isHidden: boolean;
+              deletedAt: Date | null;
+              createdAt: Date;
+              updatedAt: Date;
+            } & { orderNumber: string | null | undefined }
+          ).orderNumber || `Order #${orderId}`,
         changes: { loadingNote: { old: order.containerNotes ?? null, new: note?.trim() || null } },
       });
       res.json({ success: true, order: updated });
@@ -576,7 +638,38 @@ export function registerOrderCrudRoutes(app: Express) {
         action: "update",
         tableName: "factory_customer_orders",
         recordId: orderId,
-        recordIdentifier: (order as any).orderNumber || `Order #${orderId}`,
+        recordIdentifier:
+          (
+            order as unknown as {
+              id: number;
+              companyId: number;
+              customerId: number;
+              invoiceNumber: string | null;
+              orderDate: string;
+              proformaIdUsed: number | null;
+              status: string;
+              subtotalBales: string;
+              freightAmount: string;
+              otherChargesTotal: string;
+              grandTotal: string;
+              totalQtyBales: number;
+              containerNumber: string | null;
+              shippingCompany: string | null;
+              containerNotes: string | null;
+              destination: string | null;
+              verifiedByUserId: number | null;
+              verifiedAt: Date | null;
+              loadingStartedAt: Date | null;
+              loadingFinalizedAt: Date | null;
+              finalizedAt: Date | null;
+              locationId: number | null;
+              dispatchBatchId: number | null;
+              isHidden: boolean;
+              deletedAt: Date | null;
+              createdAt: Date;
+              updatedAt: Date;
+            } & { orderNumber: string | null | undefined }
+          ).orderNumber || `Order #${orderId}`,
         changes: { orderDate: { old: order.orderDate ?? null, new: orderDate } },
       });
       res.json(updated);
@@ -624,7 +717,38 @@ export function registerOrderCrudRoutes(app: Express) {
         action: "update",
         tableName: "factory_customer_orders",
         recordId: orderId,
-        recordIdentifier: (order as any).orderNumber || `Order #${orderId}`,
+        recordIdentifier:
+          (
+            order as unknown as {
+              id: number;
+              companyId: number;
+              customerId: number;
+              invoiceNumber: string | null;
+              orderDate: string;
+              proformaIdUsed: number | null;
+              status: string;
+              subtotalBales: string;
+              freightAmount: string;
+              otherChargesTotal: string;
+              grandTotal: string;
+              totalQtyBales: number;
+              containerNumber: string | null;
+              shippingCompany: string | null;
+              containerNotes: string | null;
+              destination: string | null;
+              verifiedByUserId: number | null;
+              verifiedAt: Date | null;
+              loadingStartedAt: Date | null;
+              loadingFinalizedAt: Date | null;
+              finalizedAt: Date | null;
+              locationId: number | null;
+              dispatchBatchId: number | null;
+              isHidden: boolean;
+              deletedAt: Date | null;
+              createdAt: Date;
+              updatedAt: Date;
+            } & { orderNumber: string | null | undefined }
+          ).orderNumber || `Order #${orderId}`,
         changes: {
           ...(containerNumber !== undefined
             ? { containerNumber: { old: order.containerNumber ?? null, new: containerNumber } }

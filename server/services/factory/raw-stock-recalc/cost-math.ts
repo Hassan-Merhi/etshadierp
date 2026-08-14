@@ -126,7 +126,24 @@ export function computeRecalcFingerprint(inputs: RecalcFingerprintInputs): strin
         currencyCode: oc.currencyCode,
         fxRateToUsd: oc.fxRateToUsd,
         fxRateConfirmed: oc.fxRateConfirmed,
-        version: toIso((oc as any).updatedAt) ?? toIso(oc.createdAt),
+        version:
+          toIso(
+            (
+              oc as unknown as {
+                id: number;
+                companyId: number;
+                ledgerAccountId: number | null;
+                createdAt: Date;
+                description: string;
+                amount: string;
+                currencyCode: string | null;
+                containerId: number;
+                fxRateToUsd: string | null;
+                fxRateConfirmed: boolean;
+                fxRateDate: string | null;
+              } & { updatedAt: string | Date | null | undefined }
+            ).updatedAt
+          ) ?? toIso(oc.createdAt),
       }))
       .sort((a, b) => a.id - b.id),
     commissionRecord: inputs.commissionRecord
@@ -136,7 +153,26 @@ export function computeRecalcFingerprint(inputs: RecalcFingerprintInputs): strin
           currencyCode: inputs.commissionRecord.currencyCode,
           fxRateToUsd: inputs.commissionRecord.fxRateToUsd,
           fxRateConfirmed: inputs.commissionRecord.fxRateConfirmed,
-          version: toIso((inputs.commissionRecord as any).updatedAt) ?? toIso(inputs.commissionRecord.createdAt),
+          version:
+            toIso(
+              (
+                inputs.commissionRecord as unknown as {
+                  id: number;
+                  companyId: number;
+                  ledgerAccountId: number | null;
+                  createdAt: Date;
+                  currencyCode: string;
+                  containerId: number;
+                  fxRateToUsd: string;
+                  fxRateConfirmed: boolean;
+                  personName: string;
+                  commissionType: string;
+                  commissionRate: string;
+                  commissionTotal: string;
+                  commissionTotalUsd: string | null;
+                } & { updatedAt: string | Date | null | undefined }
+              ).updatedAt
+            ) ?? toIso(inputs.commissionRecord.createdAt),
         }
       : null,
     currentCostPerKg: inputs.rawStock?.costPerKg ?? null,

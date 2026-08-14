@@ -486,7 +486,11 @@ export default function PropertyRentalPage({
                               >
                                 {u.contract
                                   ? fmtMoneyCurrency(
-                                      (u as any).guaranteeRemaining ?? u.contract.guaranteeAmount,
+                                      (
+                                        u as unknown as Unit & {
+                                          guaranteeRemaining: string | number | null | undefined;
+                                        }
+                                      ).guaranteeRemaining ?? u.contract.guaranteeAmount,
                                       u.contract.currency
                                     )
                                   : "—"}

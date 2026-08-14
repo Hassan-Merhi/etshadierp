@@ -17,12 +17,7 @@ import { adjustInventory } from "../inventoryHelper";
 import { readExcel, sheetToJson, createWorkbook, jsonToSheet, writeWorkbook } from "../excelHelper";
 import { getClientDate } from "../lib/dateUtils";
 import { sendTransferWhatsApp } from "../helpers/sendTransferWhatsApp";
-import {
-  inventory,
-  stockTransferVouchers,
-  stockTransferItems,
-  vouchers,
-} from "@shared/schema";
+import { inventory, stockTransferVouchers, stockTransferItems, vouchers } from "@shared/schema";
 
 export function registerStockTransferImportRoutes(app: Express) {
   // ============= Stock Transfer Import Endpoints =============
@@ -294,7 +289,8 @@ export function registerStockTransferImportRoutes(app: Express) {
           // Reduce source inventory
           await adjustInventory(
             tx,
-            (item as any).sourceLocationId || sourceLocationId,
+            (item as unknown as { stockItemId: number; quantity: string; rate: string } & { sourceLocationId: number })
+              .sourceLocationId || sourceLocationId,
             item.stockItemId,
             -parseFloat(item.quantity),
             req.session.currentCompanyId!

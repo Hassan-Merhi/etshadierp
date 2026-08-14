@@ -76,8 +76,8 @@ export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
     enabled: !!selectedCompany,
   });
 
-
-  const workerDeductionsBase = appMode === "factory" ? "/api/factory/worker-deductions" : "/api/payroll/worker-deductions";
+  const workerDeductionsBase =
+    appMode === "factory" ? "/api/factory/worker-deductions" : "/api/payroll/worker-deductions";
   const { data: workerDeductions = [], isLoading: deductionsLoading } = useQuery<any[]>({
     queryKey: [workerDeductionsBase, selectedCompany?.id],
     queryFn: async () => {
@@ -200,7 +200,11 @@ export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
 
   const deleteWorkerDeductionMutation = useMutation({
     mutationFn: async ({ workerId, deductionId }: { workerId: number; deductionId: number }) => {
-      return await modeApiRequest("DELETE", `${workerDeductionsWorkerBase}/${workerId}/deductions/${deductionId}`, undefined);
+      return await modeApiRequest(
+        "DELETE",
+        `${workerDeductionsWorkerBase}/${workerId}/deductions/${deductionId}`,
+        undefined
+      );
     },
     onSuccess: () => {
       toast({ title: "Deleted", description: "Worker deduction deleted." });
@@ -258,7 +262,9 @@ export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
         </TableCell>
         <TableCell>
           <Badge variant="outline" className="text-[10px]">
-            {(advance as any).isOpeningBalance ? "Opening Balance" : "Advance"}
+            {(advance as unknown as SalaryAdvance & { isOpeningBalance: React.ReactNode }).isOpeningBalance
+              ? "Opening Balance"
+              : "Advance"}
           </Badge>
         </TableCell>
         <TableCell>
@@ -552,9 +558,13 @@ export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
                         </TableCell>
                         <TableCell>
                           {d.applied ? (
-                            <Badge variant="default" className="bg-green-600">Applied</Badge>
+                            <Badge variant="default" className="bg-green-600">
+                              Applied
+                            </Badge>
                           ) : (
-                            <Badge variant="outline" className="border-amber-500 text-amber-500">Pending</Badge>
+                            <Badge variant="outline" className="border-amber-500 text-amber-500">
+                              Pending
+                            </Badge>
                           )}
                         </TableCell>
                         <TableCell className="text-right">
@@ -564,7 +574,11 @@ export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
                             className="text-destructive"
                             disabled={deleteWorkerDeductionMutation.isPending}
                             onClick={() => {
-                              if (confirm(`Delete this deduction of ${formatAmount(parseFloat(d.amount || "0"))} for ${d.workerName || "this worker"}?`)) {
+                              if (
+                                confirm(
+                                  `Delete this deduction of ${formatAmount(parseFloat(d.amount || "0"))} for ${d.workerName || "this worker"}?`
+                                )
+                              ) {
                                 deleteWorkerDeductionMutation.mutate({ workerId: d.workerId, deductionId: d.id });
                               }
                             }}
@@ -769,7 +783,14 @@ export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
                   <FormItem>
                     <FormLabel>Amount</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" min="0.01" placeholder="0.00" {...field} data-testid="input-deduction-amount" />
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        placeholder="0.00"
+                        {...field}
+                        data-testid="input-deduction-amount"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -795,7 +816,11 @@ export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
                   <FormItem>
                     <FormLabel>Reason (Optional)</FormLabel>
                     <FormControl>
-                      <Textarea placeholder="e.g. Damage, absence, etc." {...field} data-testid="textarea-deduction-reason" />
+                      <Textarea
+                        placeholder="e.g. Damage, absence, etc."
+                        {...field}
+                        data-testid="textarea-deduction-reason"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

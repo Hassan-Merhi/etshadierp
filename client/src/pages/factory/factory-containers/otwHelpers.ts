@@ -72,8 +72,21 @@ export function otwContainerByCurrency(c: ContainerWithSupplier): Record<string,
   otwAddToCurrency(amounts, c.freightCurrencyCode || containerCcy, otwNum(c.freight));
   otwAddToCurrency(amounts, c.commissionCurrencyCode || "USD", otwNum(c.commissionAmount));
   otwAddToCurrency(amounts, containerCcy, otwNum(c.otherCharges));
-  otwAddToCurrency(amounts, containerCcy, otwNum((c as any).additionalChargesSum));
-  otwAddToCurrency(amounts, containerCcy, otwNum((c as any).preRegisteredChargesSum));
+  otwAddToCurrency(
+    amounts,
+    containerCcy,
+    otwNum(
+      (c as unknown as ContainerWithSupplier & { additionalChargesSum: string | null | undefined }).additionalChargesSum
+    )
+  );
+  otwAddToCurrency(
+    amounts,
+    containerCcy,
+    otwNum(
+      (c as unknown as ContainerWithSupplier & { preRegisteredChargesSum: string | null | undefined })
+        .preRegisteredChargesSum
+    )
+  );
   return amounts;
 }
 

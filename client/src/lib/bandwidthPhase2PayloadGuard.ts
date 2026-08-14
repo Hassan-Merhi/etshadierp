@@ -106,8 +106,15 @@ function rewriteInput(input: RequestInfo | URL, url: URL): RequestInfo | URL {
 }
 
 export function installBandwidthPhase2PayloadGuard(): void {
-  if (typeof window === "undefined" || (window as any).__bandwidthPhase2PayloadGuardInstalled) return;
-  (window as any).__bandwidthPhase2PayloadGuardInstalled = true;
+  if (
+    typeof window === "undefined" ||
+    (window as unknown as (Window & typeof globalThis) & { __bandwidthPhase2PayloadGuardInstalled: boolean })
+      .__bandwidthPhase2PayloadGuardInstalled
+  )
+    return;
+  (
+    window as unknown as (Window & typeof globalThis) & { __bandwidthPhase2PayloadGuardInstalled: true }
+  ).__bandwidthPhase2PayloadGuardInstalled = true;
 
   installNavigationCacheIsolation();
   const originalFetch = window.fetch.bind(window);

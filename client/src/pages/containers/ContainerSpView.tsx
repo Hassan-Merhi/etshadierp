@@ -105,7 +105,48 @@ export function ContainerSpView({
       _source: "erp",
       displayName: c.containerNumber,
       subName: null,
-      supplierName: (sup as any)?.legalName ?? (sup as any)?.name ?? "",
+      supplierName:
+        (
+          sup as unknown as (
+            | {
+                id: number;
+                code: string;
+                legalName: string;
+                phone: string | null;
+                openingBalance: string | null;
+                active: boolean;
+                deletedAt: Date | null;
+                createdAt: Date;
+                email: string;
+                address: string | null;
+                taxId: string | null;
+                paymentTerms: string | null;
+                stockGroupId: number | null;
+              }
+            | undefined
+          ) & { legalName: unknown }
+        )?.legalName ??
+        (
+          sup as unknown as (
+            | {
+                id: number;
+                code: string;
+                legalName: string;
+                phone: string | null;
+                openingBalance: string | null;
+                active: boolean;
+                deletedAt: Date | null;
+                createdAt: Date;
+                email: string;
+                address: string | null;
+                taxId: string | null;
+                paymentTerms: string | null;
+                stockGroupId: number | null;
+              }
+            | undefined
+          ) & { name: unknown }
+        )?.name ??
+        "",
       status: c.status,
       statusLabel: isOffloaded ? "Offloaded" : c.status === "OTW" ? "On The Way" : c.status,
       statusOffloaded: isOffloaded,

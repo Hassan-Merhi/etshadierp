@@ -239,8 +239,14 @@ export function ContainerListView({
                   const freightCcy = c.freightCurrencyCode || ccy;
                   const freightSameCcy = freightCcy === ccy;
                   const legacyOtherAmt = parseFloat(c.otherCharges || "0");
-                  const preRegisteredAmt = parseFloat((c as any).preRegisteredChargesSum || "0");
-                  const additionalAmt = parseFloat((c as any).additionalChargesSum || "0");
+                  const preRegisteredAmt = parseFloat(
+                    (c as unknown as ContainerWithSupplier & { preRegisteredChargesSum: string })
+                      .preRegisteredChargesSum || "0"
+                  );
+                  const additionalAmt = parseFloat(
+                    (c as unknown as ContainerWithSupplier & { additionalChargesSum: string }).additionalChargesSum ||
+                      "0"
+                  );
                   const totalInCcy =
                     baseValue + (freightSameCcy ? freightAmt : 0) + legacyOtherAmt + preRegisteredAmt + additionalAmt;
                   groupTotals.set(ccy, (groupTotals.get(ccy) || 0) + totalInCcy);
@@ -293,8 +299,14 @@ export function ContainerListView({
                         const freightCcy = c.freightCurrencyCode || ccy;
                         const freightSameCcy = freightCcy === ccy;
                         const legacyOtherAmt = parseFloat(c.otherCharges || "0");
-                        const preRegisteredAmt = parseFloat((c as any).preRegisteredChargesSum || "0");
-                        const additionalAmt = parseFloat((c as any).additionalChargesSum || "0");
+                        const preRegisteredAmt = parseFloat(
+                          (c as unknown as ContainerWithSupplier & { preRegisteredChargesSum: string })
+                            .preRegisteredChargesSum || "0"
+                        );
+                        const additionalAmt = parseFloat(
+                          (c as unknown as ContainerWithSupplier & { additionalChargesSum: string })
+                            .additionalChargesSum || "0"
+                        );
                         const totalValue =
                           baseValue +
                           (freightSameCcy ? freightAmt : 0) +

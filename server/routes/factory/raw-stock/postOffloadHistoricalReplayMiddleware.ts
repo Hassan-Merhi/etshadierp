@@ -109,7 +109,8 @@ export function postOffloadHistoricalReplayMiddleware(req: Request, res: Respons
       }
 
       const repairRequired = historicalReplay.status === "blocked" || historicalReplay.status === "failed";
-      const approvedImpactPreview = (req as any).postOffloadImpactPreview ?? null;
+      const approvedImpactPreview =
+        (req as unknown as { postOffloadImpactPreview: unknown }).postOffloadImpactPreview ?? null;
       const responseBody = {
         ...body,
         impactPreview: approvedImpactPreview,

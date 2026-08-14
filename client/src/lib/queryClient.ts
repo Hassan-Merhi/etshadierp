@@ -171,8 +171,11 @@ export function _testOnly_setRedirectFn(fn: ((href: string) => void) | null) {
 //   • Falls through cleanly if the token cannot be fetched
 //   • Auto-retries once on CSRF_TOKEN_MISMATCH (stale cached token after
 //     server restart / session regeneration on Render)
-if (typeof window !== "undefined" && !(window as any).__csrfFetchPatched) {
-  (window as any).__csrfFetchPatched = true;
+if (
+  typeof window !== "undefined" &&
+  !(window as unknown as (Window & typeof globalThis) & { __csrfFetchPatched: number }).__csrfFetchPatched
+) {
+  (window as unknown as (Window & typeof globalThis) & { __csrfFetchPatched: true }).__csrfFetchPatched = true;
   const originalFetch = window.fetch.bind(window);
 
   async function fetchWithCsrf(input: RequestInfo | URL, init?: RequestInit, isRetry = false): Promise<Response> {

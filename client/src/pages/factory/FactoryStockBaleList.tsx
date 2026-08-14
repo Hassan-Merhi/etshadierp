@@ -41,7 +41,7 @@ export default function FactoryStockBaleList() {
 
   const handleBack = () => {
     if (backUrl) navigate(backUrl);
-    else navigate(-1 as any);
+    else navigate(-1 as unknown as -1 & (string | URL));
   };
   useEscapeBack(handleBack);
 
@@ -110,7 +110,7 @@ export default function FactoryStockBaleList() {
                   className={cn(
                     "border-b last:border-0 transition-colors",
                     idx % 2 === 0 ? "bg-background" : "bg-muted/20",
-                    bale.lockedInLoading && "opacity-60",
+                    bale.lockedInLoading && "opacity-60"
                   )}
                   data-testid={`row-bale-${bale.referenceNumber}`}
                 >

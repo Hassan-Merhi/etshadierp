@@ -245,11 +245,30 @@ export function registerNetProfitExcelRoute(app: Express) {
       // Build supplier balance map from all-time entries
       const xlsxSupplierBals = new Map<number, { debit: number; credit: number }>();
       for (const e of allTimeEntriesXlsx) {
-        if ((e as any).supplierId) {
+        if (
+          (
+            e as unknown as { ledgerAccountId: number | null; debitAmount: string; creditAmount: string } & {
+              supplierId: unknown;
+            }
+          ).supplierId
+        ) {
           const d = parseFloat(e.debitAmount || "0"),
             c = parseFloat(e.creditAmount || "0");
-          const cur = xlsxSupplierBals.get((e as any).supplierId) || { debit: 0, credit: 0 };
-          xlsxSupplierBals.set((e as any).supplierId, { debit: cur.debit + d, credit: cur.credit + c });
+          const cur = xlsxSupplierBals.get(
+            (
+              e as unknown as { ledgerAccountId: number | null; debitAmount: string; creditAmount: string } & {
+                supplierId: number;
+              }
+            ).supplierId
+          ) || { debit: 0, credit: 0 };
+          xlsxSupplierBals.set(
+            (
+              e as unknown as { ledgerAccountId: number | null; debitAmount: string; creditAmount: string } & {
+                supplierId: number;
+              }
+            ).supplierId,
+            { debit: cur.debit + d, credit: cur.credit + c }
+          );
         }
       }
 

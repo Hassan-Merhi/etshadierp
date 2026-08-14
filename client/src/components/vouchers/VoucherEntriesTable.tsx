@@ -141,7 +141,7 @@ export function VoucherEntriesTable({
     const found = sidebarAccounts.find((a) => {
       if (a.type !== entry.accountType) return false;
       if (entry.accountType === "employee") {
-        return (a as any).accountId === entry.accountId;
+        return (a as unknown as Account & { accountId: number }).accountId === entry.accountId;
       }
       return a.id === entry.accountId;
     });

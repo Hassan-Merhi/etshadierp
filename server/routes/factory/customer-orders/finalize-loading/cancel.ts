@@ -108,7 +108,38 @@ export function registerOrderCancelRoutes(app: Express) {
               action: "update",
               tableName: "factory_customer_orders",
               recordId: orderId,
-              recordIdentifier: (order as any).orderNumber || `Order #${orderId}`,
+              recordIdentifier:
+                (
+                  order as unknown as {
+                    id: number;
+                    companyId: number;
+                    customerId: number;
+                    invoiceNumber: string | null;
+                    orderDate: string;
+                    proformaIdUsed: number | null;
+                    status: string;
+                    subtotalBales: string;
+                    freightAmount: string;
+                    otherChargesTotal: string;
+                    grandTotal: string;
+                    totalQtyBales: number;
+                    containerNumber: string | null;
+                    shippingCompany: string | null;
+                    containerNotes: string | null;
+                    destination: string | null;
+                    verifiedByUserId: number | null;
+                    verifiedAt: Date | null;
+                    loadingStartedAt: Date | null;
+                    loadingFinalizedAt: Date | null;
+                    finalizedAt: Date | null;
+                    locationId: number | null;
+                    dispatchBatchId: number | null;
+                    isHidden: boolean;
+                    deletedAt: Date | null;
+                    createdAt: Date;
+                    updatedAt: Date;
+                  } & { orderNumber: string | null | undefined }
+                ).orderNumber || `Order #${orderId}`,
               changes: { status: { old: order.status, new: "CANCELLED" } },
             });
           } catch (auditErr) {
@@ -169,7 +200,38 @@ export function registerOrderCancelRoutes(app: Express) {
           action: "update",
           tableName: "factory_customer_orders",
           recordId: orderId,
-          recordIdentifier: (order as any).orderNumber || `Order #${orderId}`,
+          recordIdentifier:
+            (
+              order as unknown as {
+                id: number;
+                companyId: number;
+                customerId: number;
+                invoiceNumber: string | null;
+                orderDate: string;
+                proformaIdUsed: number | null;
+                status: string;
+                subtotalBales: string;
+                freightAmount: string;
+                otherChargesTotal: string;
+                grandTotal: string;
+                totalQtyBales: number;
+                containerNumber: string | null;
+                shippingCompany: string | null;
+                containerNotes: string | null;
+                destination: string | null;
+                verifiedByUserId: number | null;
+                verifiedAt: Date | null;
+                loadingStartedAt: Date | null;
+                loadingFinalizedAt: Date | null;
+                finalizedAt: Date | null;
+                locationId: number | null;
+                dispatchBatchId: number | null;
+                isHidden: boolean;
+                deletedAt: Date | null;
+                createdAt: Date;
+                updatedAt: Date;
+              } & { orderNumber: string | null | undefined }
+            ).orderNumber || `Order #${orderId}`,
           changes: { status: { old: order.status, new: "CANCELLED" } },
         });
       } catch (auditErr) {
@@ -239,7 +301,38 @@ export function registerOrderCancelRoutes(app: Express) {
           action: "update",
           tableName: "factory_customer_orders",
           recordId: orderId,
-          recordIdentifier: (order as any).orderNumber || `Order #${orderId}`,
+          recordIdentifier:
+            (
+              order as unknown as {
+                id: number;
+                companyId: number;
+                customerId: number;
+                invoiceNumber: string | null;
+                orderDate: string;
+                proformaIdUsed: number | null;
+                status: string;
+                subtotalBales: string;
+                freightAmount: string;
+                otherChargesTotal: string;
+                grandTotal: string;
+                totalQtyBales: number;
+                containerNumber: string | null;
+                shippingCompany: string | null;
+                containerNotes: string | null;
+                destination: string | null;
+                verifiedByUserId: number | null;
+                verifiedAt: Date | null;
+                loadingStartedAt: Date | null;
+                loadingFinalizedAt: Date | null;
+                finalizedAt: Date | null;
+                locationId: number | null;
+                dispatchBatchId: number | null;
+                isHidden: boolean;
+                deletedAt: Date | null;
+                createdAt: Date;
+                updatedAt: Date;
+              } & { orderNumber: string | null | undefined }
+            ).orderNumber || `Order #${orderId}`,
           changes: { status: { old: "CANCELLED", new: "LOADING" } },
         });
       } catch (auditErr) {

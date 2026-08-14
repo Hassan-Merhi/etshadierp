@@ -395,11 +395,11 @@ export function deriveEstimatedDeliveryDate(shipment: ParcelsAppShipment): strin
     shipment.estimatedDeliveryDate,
     shipment.estimatedDelivery,
     shipment.eta,
-    (shipment as any).estimatedTimeOfArrival,
-    (shipment as any).scheduledArrival,
-    (shipment as any).plannedArrival,
-    (shipment as any).predictedETA,
-    (shipment as any).ETA,
+    (shipment as unknown as ParcelsAppShipment & { estimatedTimeOfArrival: unknown }).estimatedTimeOfArrival,
+    (shipment as unknown as ParcelsAppShipment & { scheduledArrival: unknown }).scheduledArrival,
+    (shipment as unknown as ParcelsAppShipment & { plannedArrival: unknown }).plannedArrival,
+    (shipment as unknown as ParcelsAppShipment & { predictedETA: unknown }).predictedETA,
+    (shipment as unknown as ParcelsAppShipment & { ETA: unknown }).ETA,
   ];
   for (const raw of topLevel) {
     const d = tryDate(raw);

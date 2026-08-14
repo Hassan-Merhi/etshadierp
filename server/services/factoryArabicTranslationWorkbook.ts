@@ -276,7 +276,7 @@ export async function createArabicTranslationTemplate(products: TranslationCatal
 
 export async function parseArabicTranslationWorkbook(buffer: Buffer): Promise<TranslationWorkbookRow[]> {
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer as any);
+  await workbook.xlsx.load(buffer as unknown as Buffer<ArrayBufferLike> & ExcelJS.Buffer);
   const sheet = workbook.worksheets[0];
   if (!sheet) throw new Error("Workbook does not contain a worksheet");
   if (sheet.actualRowCount > MAX_WORKBOOK_ROWS + 1) {
