@@ -276,7 +276,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
   const [bulkTracking, setBulkTracking] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
   const [importing, setImporting] = useState(false);
-
   // ── Dev-only: Export filtered containers as CSV ──────────────────────────
   function exportCsv() {
     const rows = [["Container #", "Supplier", "ETA (YYYY-MM-DD)", "Status", "Cost", "Freight", "Weight (KG)", "Notes"]];
@@ -301,7 +300,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     a.click();
     URL.revokeObjectURL(url);
   }
-
   // ── Dev-only: Import CSV to bulk-update ETA ──────────────────────────────
   // Expected columns: Container # (col 0), ETA YYYY-MM-DD (col 2)
   async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -337,7 +335,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
         out.push(cur.trim());
         return out;
       }
-
       // Convert any recognisable date to YYYY-MM-DD or return null
       function normaliseDate(raw: string): string | null {
         const s = raw.trim();
@@ -380,7 +377,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
         }
         return null;
       }
-
       // Detect column positions from header row
       const headerCols = parseCsvLine(lines[0]).map((h) => h.toLowerCase());
       const containerCol = headerCols.findIndex((h) => h.includes("container"));
@@ -388,7 +384,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
       // Fall back to positional defaults if headers are unrecognised
       const cIdx = containerCol >= 0 ? containerCol : 0;
       const eIdx = etaCol >= 0 ? etaCol : 2;
-
       // Skip header row
       const dataLines = lines.slice(1);
       // Build lookup: containerNumber -> container id
@@ -429,7 +424,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
       setImporting(false);
     }
   }
-
   async function trackAll() {
     const eligible = otwContainers.filter((c) => {
       const fc = c as any;
@@ -487,7 +481,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
       if (elapsed >= MAX_MS) clearInterval(interval);
     }, POLL_MS);
   }
-
   if (isLoading) {
     return (
       <div className="space-y-4 p-4">
@@ -500,7 +493,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
       </div>
     );
   }
-
   if (otwContainers.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
@@ -509,7 +501,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
       </div>
     );
   }
-
   return (
     <div className="flex flex-col gap-4 p-4">
       {/* ── Summary Cards (ERP-style) ── */}
@@ -571,7 +562,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
           />
         ))}
       </div>
-
       {/* ── Search + Filters Toggle + Track All ── */}
       <div className="flex items-center gap-2 flex-wrap">
         <div className="relative flex-1 min-w-48">
@@ -652,7 +642,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
           </>
         )}
       </div>
-
       {/* ── Expandable Filters Panel ── */}
       {showFilters && (
         <div className="flex flex-wrap gap-3 rounded-md border bg-muted/30 p-3">
@@ -750,7 +739,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
           </div>
         </div>
       )}
-
       {/* ── Results count + Legend ── */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <p className="text-xs text-muted-foreground">
@@ -768,7 +756,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
           <span className="text-muted-foreground">{docsReceived} docs received</span>
         </div>
       </div>
-
       {/* ── Main Table ── */}
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
@@ -810,13 +797,11 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
               const delayDays = calcDelayDays(c);
               const overdue = isOverdue(c);
               const location = fc.trackingLastLocation || c.destination || null;
-
               const rowBg = overdue
                 ? "bg-red-50/50 dark:bg-red-950/20"
                 : hasError
                   ? "bg-amber-50/50 dark:bg-amber-950/20"
                   : "";
-
               return (
                 <TableRow
                   key={c.id}
@@ -826,7 +811,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
                 >
                   {/* # */}
                   <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
-
                   {/* Container # */}
                   <TableCell className="font-mono font-medium">
                     <div className="flex flex-col gap-0.5">

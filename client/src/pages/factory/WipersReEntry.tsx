@@ -77,7 +77,6 @@ export default function WipersReEntry() {
   const [designPickerOpen, setDesignPickerOpen] = useState(false);
   const [pendingLabels, setPendingLabels] = useState<LabelData[] | null>(null);
   const scanRef = useRef<HTMLInputElement>(null);
-
   const { data: baleProducts, isLoading: productsLoading } = useQuery<FactoryBaleProduct[]>({
     queryKey: ["/api/factory/bale-products"],
   });

@@ -53,7 +53,6 @@ import {
   History,
   Search,
 } from "lucide-react";
-
 import type { Location, StockItem, StockTransferFormData, StockTransferFormProps } from "./stocktransferform/types";
 import { stockTransferFormSchema } from "./stocktransferform/utils";
 import { ApproveRevisionDialog } from "./stock-transfer-form/dialogs/ApproveRevisionDialog";

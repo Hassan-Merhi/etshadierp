@@ -97,7 +97,6 @@ export default function StockTransferOrder() {
     }
     return null;
   })();
-
   const [expandedGroups, setExpandedGroups] = useState<Set<number>>(
     () => new Set<number>(_sessionSnapshot?.expandedGroups || [])
   );
@@ -106,7 +105,6 @@ export default function StockTransferOrder() {
     () => _sessionSnapshot?.destinationLocationId ?? null
   );
   const [orderItems, setOrderItems] = useState<OrderItem[]>(() => _sessionSnapshot?.orderItems || []);
-
   const [quantityPicker, setQuantityPicker] = useState<QuantityPickerState>({
     open: false,
     stockItem: null,
@@ -115,18 +113,15 @@ export default function StockTransferOrder() {
     availableQty: 0,
   });
   const [pickerQuantity, setPickerQuantity] = useState("");
-
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [transferDate, setTransferDate] = useState<Date>(new Date());
   const [isOptional, setIsOptional] = useState(false);
   const [editDataLoaded, setEditDataLoaded] = useState(false);
-
   const quantityInputRef = useRef<HTMLInputElement>(null);
   const matrixRef = useRef<HTMLDivElement>(null);
   const [focusedCell, setFocusedCell] = useState<{ row: number; col: number } | null>(null);
   const prevDialogOpen = useRef(false);
-
   // Autosave draft state (new transfers only)
   const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved" | "failed">("idle");
   const [hasDraft, setHasDraft] = useState<boolean>(false);

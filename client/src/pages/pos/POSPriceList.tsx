@@ -29,7 +29,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-
 import type {
   Location,
   MasterItem,
@@ -63,15 +62,12 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
   }, [editingItem?.stockItemId, editingItem?.locationId]);
   const lastSavedRef = useRef<{ stockItemId: number; locationId: number } | null>(null);
   const skipBlurSaveRef = useRef(false);
-
   const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const isPrivileged = ["Admin", "Owner", "Manager", "Developer"].includes(currentUser?.role || "");
-
   const { data: posAssignedLocations = [], isLoading: posLocationsLoading } = useQuery<Location[]>({
     queryKey: ["/api/my-locations"],
     enabled: !!posUser,
   });
-
   const { data: allLocations = [], isLoading: allLocationsLoading } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
     enabled: !posUser,
