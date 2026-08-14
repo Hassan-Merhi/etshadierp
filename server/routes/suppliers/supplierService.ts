@@ -3,7 +3,11 @@ import { getSupplierBalanceForContext, resolveParentCompanyId } from "../helpers
 import { SupplierRouteError } from "./supplierErrors";
 import type { SupplierAuditActor } from "./supplierRequestContext";
 import { supplierRepository } from "./supplierRepository";
-import { parseCreateSupplierInput, parseSupplierStockGroupId, parseUpdateSupplierInput } from "./supplierValidation";
+import {
+  parseCreateSupplierInput,
+  parseSupplierStockGroupId,
+  parseUpdateSupplierInput,
+} from "./supplierValidation";
 
 async function requireSupplier(supplierId: number, companyId: number) {
   const supplier = await supplierRepository.getById(supplierId, companyId);
@@ -87,7 +91,7 @@ export const supplierService = {
           openingBalance: balanceResult.openingBalance,
           hasActivity: containerCount > 0 || balanceResult.hasActivity || purchaseOrders.length > 0,
         };
-      })
+      }),
     );
   },
 
@@ -97,10 +101,8 @@ export const supplierService = {
 
   async balance(supplierId: number, companyId: number) {
     const supplier = await requireSupplier(supplierId, companyId);
-    const { balance, openingBalance, balancesByCurrency, historicalBaseBalance } = await getSupplierBalanceForContext(
-      supplier,
-      companyId
-    );
+    const { balance, openingBalance, balancesByCurrency, historicalBaseBalance } =
+      await getSupplierBalanceForContext(supplier, companyId);
     return { balance, openingBalance, balancesByCurrency, historicalBaseBalance };
   },
 
@@ -180,7 +182,12 @@ export const supplierService = {
     });
   },
 
-  async assignStockGroup(supplierId: number, companyId: number, input: unknown, actor: SupplierAuditActor) {
+  async assignStockGroup(
+    supplierId: number,
+    companyId: number,
+    input: unknown,
+    actor: SupplierAuditActor,
+  ) {
     const supplier = await requireSupplier(supplierId, companyId);
     const stockGroupId = parseSupplierStockGroupId(input);
     if (stockGroupId !== null && !(await supplierRepository.stockGroupExists(stockGroupId, companyId))) {

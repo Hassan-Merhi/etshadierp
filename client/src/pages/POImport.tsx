@@ -210,19 +210,11 @@ export default function POImport() {
 
   const handleParse = () => {
     if (!file) {
-      toast({
-        title: "No file selected",
-        description: "Please select an Excel file to upload",
-        variant: "destructive",
-      });
+      toast({ title: "No file selected", description: "Please select an Excel file to upload", variant: "destructive" });
       return;
     }
     if (!navigator.onLine) {
-      toast({
-        title: "Not available offline",
-        description: "File imports require a connection",
-        variant: "destructive",
-      });
+      toast({ title: "Not available offline", description: "File imports require a connection", variant: "destructive" });
       return;
     }
     const formData = new FormData();
@@ -255,11 +247,7 @@ export default function POImport() {
       return false;
     }
     if (!containerNumber) {
-      toast({
-        title: "Container number required",
-        description: "Please enter a container number",
-        variant: "destructive",
-      });
+      toast({ title: "Container number required", description: "Please enter a container number", variant: "destructive" });
       return false;
     }
     if (!preview) {
@@ -277,19 +265,11 @@ export default function POImport() {
   const handleImport = () => {
     if (!checkRequiredFields()) return;
     if (!isValidated) {
-      toast({
-        title: "Validation required",
-        description: "Please validate the data before importing",
-        variant: "destructive",
-      });
+      toast({ title: "Validation required", description: "Please validate the data before importing", variant: "destructive" });
       return;
     }
     if (hasValidationErrors) {
-      toast({
-        title: "Validation errors present",
-        description: "Please fix validation errors before importing",
-        variant: "destructive",
-      });
+      toast({ title: "Validation errors present", description: "Please fix validation errors before importing", variant: "destructive" });
       return;
     }
     if (freightPaidBy === "parent" && (selectedContainer?.charges?.freight || 0) > 0 && !freightParentAccountId) {
@@ -317,11 +297,7 @@ export default function POImport() {
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <PageHeader title="PO Import (Excel)" />
-        <Button
-          variant="outline"
-          onClick={() => window.open("/api/po-import/template", "_blank")}
-          data-testid="button-download-template"
-        >
+        <Button variant="outline" onClick={() => window.open("/api/po-import/template", "_blank")} data-testid="button-download-template">
           <Download className="w-4 h-4 mr-2" />
           Download Template
         </Button>
@@ -331,30 +307,16 @@ export default function POImport() {
         <CardHeader>
           <CardTitle>Upload Purchase Order Excel File</CardTitle>
           <CardDescription>
-            Three-step process: Parse → Validate → Import. Need help? Download the template above to see the required
-            format.
+            Three-step process: Parse → Validate → Import. Need help? Download the template above to see the required format.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="file-upload">Step 1: Select & Parse Excel File (.xlsx)</Label>
             <div className="flex flex-col sm:flex-row gap-2">
-              <Input
-                id="file-upload"
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={handleFileChange}
-                data-testid="input-file-upload"
-              />
+              <Input id="file-upload" type="file" accept=".xlsx,.xls" onChange={handleFileChange} data-testid="input-file-upload" />
               <Button onClick={handleParse} disabled={!file || parseMutation.isPending} data-testid="button-parse">
-                {parseMutation.isPending ? (
-                  "Parsing..."
-                ) : (
-                  <>
-                    <FileSpreadsheet className="w-4 h-4 mr-2" />
-                    Parse
-                  </>
-                )}
+                {parseMutation.isPending ? "Parsing..." : <><FileSpreadsheet className="w-4 h-4 mr-2" />Parse</>}
               </Button>
             </div>
             {file && <p className="text-sm text-muted-foreground">Selected: {file.name}</p>}
@@ -378,9 +340,7 @@ export default function POImport() {
                     isLoading={suppliersLoading}
                     hasError={suppliersError}
                   />
-                  {suppliersError && (
-                    <p className="text-sm text-destructive">Suppliers could not be loaded for the active company.</p>
-                  )}
+                  {suppliersError && <p className="text-sm text-destructive">Suppliers could not be loaded for the active company.</p>}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="container-number">Container Number *</Label>
@@ -397,13 +357,7 @@ export default function POImport() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="import-date">Import Date</Label>
-                  <Input
-                    id="import-date"
-                    type="date"
-                    value={importDate}
-                    onChange={(e) => setImportDate(e.target.value)}
-                    data-testid="input-import-date"
-                  />
+                  <Input id="import-date" type="date" value={importDate} onChange={(e) => setImportDate(e.target.value)} data-testid="input-import-date" />
                 </div>
               </div>
 
@@ -423,13 +377,7 @@ export default function POImport() {
                     >
                       By Supplier
                     </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={freightPaidBy === "parent" ? "default" : "outline"}
-                      onClick={() => setFreightPaidBy("parent")}
-                      data-testid="button-freight-by-parent"
-                    >
+                    <Button type="button" size="sm" variant={freightPaidBy === "parent" ? "default" : "outline"} onClick={() => setFreightPaidBy("parent")} data-testid="button-freight-by-parent">
                       Parent Co.
                     </Button>
                   </div>
@@ -437,14 +385,10 @@ export default function POImport() {
                     <div className="space-y-1">
                       <Label>Parent Freight Account *</Label>
                       <Select value={freightParentAccountId} onValueChange={setFreightParentAccountId}>
-                        <SelectTrigger data-testid="select-freight-parent-account">
-                          <SelectValue placeholder="Select account..." />
-                        </SelectTrigger>
+                        <SelectTrigger data-testid="select-freight-parent-account"><SelectValue placeholder="Select account..." /></SelectTrigger>
                         <SelectContent>
                           {parentFreightAccounts.map((acc) => (
-                            <SelectItem key={acc.id} value={String(acc.id)}>
-                              {acc.name} {acc.code ? `(${acc.code})` : ""}
-                            </SelectItem>
+                            <SelectItem key={acc.id} value={String(acc.id)}>{acc.name} {acc.code ? `(${acc.code})` : ""}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -461,9 +405,7 @@ export default function POImport() {
         <Card>
           <CardHeader>
             <CardTitle>Preview & Validation</CardTitle>
-            <CardDescription>
-              Review the data and validate before importing. {preview.preview.length} container(s) found
-            </CardDescription>
+            <CardDescription>Review the data and validate before importing. {preview.preview.length} container(s) found</CardDescription>
           </CardHeader>
           <CardContent>
             {validationResult && hasValidationErrors && (
@@ -473,9 +415,7 @@ export default function POImport() {
                   <div>
                     <h3 className="font-semibold text-destructive">Validation Errors Found</h3>
                     <ul className="mt-2 space-y-1 text-sm text-destructive">
-                      {validationResult.errors.map((error: any, idx: number) => (
-                        <li key={idx}>• {error}</li>
-                      ))}
+                      {validationResult.errors.map((error: any, idx: number) => <li key={idx}>• {error}</li>)}
                     </ul>
                   </div>
                 </div>
@@ -521,9 +461,7 @@ export default function POImport() {
                           <TableCell>{item.itemName}</TableCell>
                           <TableCell className="text-right">{formatCurrency(Number(item.quantity))}</TableCell>
                           <TableCell className="text-right">${formatCurrency(Number(item.rate))}</TableCell>
-                          <TableCell className="text-right font-medium">
-                            ${formatCurrency(Number(item.lineTotal))}
-                          </TableCell>
+                          <TableCell className="text-right font-medium">${formatCurrency(Number(item.lineTotal))}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -531,94 +469,29 @@ export default function POImport() {
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4 bg-muted rounded-md">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Items Total</p>
-                    <p className="text-lg font-semibold">${formatCurrency(Number(container.itemsTotal))}</p>
-                  </div>
-                  {container.charges.freight > 0 && (
-                    <div>
-                      <p className="text-sm text-muted-foreground">Freight</p>
-                      <p className="text-lg font-semibold">${formatCurrency(Number(container.charges.freight))}</p>
-                    </div>
-                  )}
-                  {container.charges.surcharge > 0 && (
-                    <div>
-                      <p className="text-sm text-muted-foreground">Surcharge</p>
-                      <p className="text-lg font-semibold">${formatCurrency(Number(container.charges.surcharge))}</p>
-                    </div>
-                  )}
-                  {container.charges.fumigation > 0 && (
-                    <div>
-                      <p className="text-sm text-muted-foreground">Fumigation</p>
-                      <p className="text-lg font-semibold">${formatCurrency(Number(container.charges.fumigation))}</p>
-                    </div>
-                  )}
-                  {container.charges.discount > 0 && (
-                    <div>
-                      <p className="text-sm text-muted-foreground">Discount</p>
-                      <p className="text-lg font-semibold text-red-500">
-                        -${formatCurrency(Number(container.charges.discount))}
-                      </p>
-                    </div>
-                  )}
-                  {container.charges.documentCharges > 0 && (
-                    <div>
-                      <p className="text-sm text-muted-foreground">Document Charges</p>
-                      <p className="text-lg font-semibold">
-                        ${formatCurrency(Number(container.charges.documentCharges))}
-                      </p>
-                    </div>
-                  )}
-                  <div className="col-span-full border-t pt-2">
-                    <p className="text-sm text-muted-foreground">Grand Total</p>
-                    <p className="text-xl font-bold">${formatCurrency(Number(container.grandTotal))}</p>
-                  </div>
+                  <div><p className="text-sm text-muted-foreground">Items Total</p><p className="text-lg font-semibold">${formatCurrency(Number(container.itemsTotal))}</p></div>
+                  {container.charges.freight > 0 && <div><p className="text-sm text-muted-foreground">Freight</p><p className="text-lg font-semibold">${formatCurrency(Number(container.charges.freight))}</p></div>}
+                  {container.charges.surcharge > 0 && <div><p className="text-sm text-muted-foreground">Surcharge</p><p className="text-lg font-semibold">${formatCurrency(Number(container.charges.surcharge))}</p></div>}
+                  {container.charges.fumigation > 0 && <div><p className="text-sm text-muted-foreground">Fumigation</p><p className="text-lg font-semibold">${formatCurrency(Number(container.charges.fumigation))}</p></div>}
+                  {container.charges.discount > 0 && <div><p className="text-sm text-muted-foreground">Discount</p><p className="text-lg font-semibold text-red-500">-${formatCurrency(Number(container.charges.discount))}</p></div>}
+                  {container.charges.documentCharges > 0 && <div><p className="text-sm text-muted-foreground">Document Charges</p><p className="text-lg font-semibold">${formatCurrency(Number(container.charges.documentCharges))}</p></div>}
+                  <div className="col-span-full border-t pt-2"><p className="text-sm text-muted-foreground">Grand Total</p><p className="text-xl font-bold">${formatCurrency(Number(container.grandTotal))}</p></div>
                 </div>
               </div>
             ))}
 
             <div className="flex flex-wrap gap-2 justify-end mt-4">
-              <Button variant="outline" onClick={handleCancel} data-testid="button-cancel">
-                Cancel
-              </Button>
+              <Button variant="outline" onClick={handleCancel} data-testid="button-cancel">Cancel</Button>
               <Button
                 onClick={handleValidate}
-                disabled={
-                  validateMutation.isPending ||
-                  suppliersLoading ||
-                  suppliersError ||
-                  !selectedSupplier ||
-                  !containerNumber
-                }
+                disabled={validateMutation.isPending || suppliersLoading || suppliersError || !selectedSupplier || !containerNumber}
                 variant={isValidated && !hasValidationErrors ? "secondary" : "default"}
                 data-testid="button-validate"
               >
-                {validateMutation.isPending ? (
-                  "Validating..."
-                ) : (
-                  <>
-                    {isValidated && !hasValidationErrors ? (
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                    ) : (
-                      <FileSpreadsheet className="w-4 h-4 mr-2" />
-                    )}
-                    {isValidated ? "Re-validate" : "Validate"}
-                  </>
-                )}
+                {validateMutation.isPending ? "Validating..." : <>{isValidated && !hasValidationErrors ? <CheckCircle className="w-4 h-4 mr-2" /> : <FileSpreadsheet className="w-4 h-4 mr-2" />}{isValidated ? "Re-validate" : "Validate"}</>}
               </Button>
-              <Button
-                onClick={handleImport}
-                disabled={importMutation.isPending || !isValidated || hasValidationErrors}
-                data-testid="button-import"
-              >
-                {importMutation.isPending ? (
-                  "Importing..."
-                ) : (
-                  <>
-                    <Upload className="w-4 h-4 mr-2" />
-                    Import
-                  </>
-                )}
+              <Button onClick={handleImport} disabled={importMutation.isPending || !isValidated || hasValidationErrors} data-testid="button-import">
+                {importMutation.isPending ? "Importing..." : <><Upload className="w-4 h-4 mr-2" />Import</>}
               </Button>
             </div>
           </CardContent>
@@ -630,8 +503,7 @@ export default function POImport() {
           <DialogHeader>
             <DialogTitle>Import Successful</DialogTitle>
             <DialogDescription>
-              Container {importResult?.containerNumber} was imported with {importResult?.itemsCount} items. Would you
-              like to print or view the container?
+              Container {importResult?.containerNumber} was imported with {importResult?.itemsCount} items. Would you like to print or view the container?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex gap-2">

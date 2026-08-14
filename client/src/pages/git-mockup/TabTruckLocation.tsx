@@ -70,9 +70,7 @@ export function TabTruckLocation() {
 
         for (const quality of qualities) {
           const candidate = candidateCanvas.toDataURL("image/jpeg", quality);
-          const payloadBytes = new TextEncoder().encode(
-            JSON.stringify({ imageBase64: candidate, fileName })
-          ).byteLength;
+          const payloadBytes = new TextEncoder().encode(JSON.stringify({ imageBase64: candidate, fileName })).byteLength;
           if (payloadBytes <= MAX_JSON_BYTES) {
             imageBase64 = candidate;
             break outer;
