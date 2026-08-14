@@ -46,3 +46,15 @@ export interface Location {
   cashAccountId?: number;
   cashAccountName?: string;
 }
+
+export interface PosAutoSaveState {
+  activeLocation: Pick<Location, "id"> | null;
+  rows: SaleRow[];
+  notes: string;
+  isCreditSale: boolean;
+  paymentAccountType: string;
+  paymentAccountId: string | null;
+  selectedCustomerId: string | null;
+  currentDraftId: number | null;
+  saveDraftIsPending: boolean;
+}
