@@ -6,14 +6,17 @@ on:
       - agent/lint-phase-4-fast
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   precision:
+    if: ${{ !contains(github.event.head_commit.message, '[phase4-precision]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22.14.0'
@@ -21,3 +24,14 @@ jobs:
       - run: npm ci
       - name: Test casts individually
         run: node scripts/phase4-precision-worker.mjs
+      - name: Persist safe precision removals
+        run: |
+          if git diff --quiet -- client/src server shared; then
+            echo "No safe precision removals to persist."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add client/src server shared
+          git commit -m "refactor: remove precision-safe as-any casts [phase4-precision]"
+          git push origin HEAD:${GITHUB_REF_NAME}
