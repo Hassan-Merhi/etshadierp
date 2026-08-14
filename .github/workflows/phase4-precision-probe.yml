@@ -1,4 +1,4 @@
-name: Phase 4 concrete bridge reduction
+name: Phase 4 structural semantic reduction
 
 on:
   push:
@@ -26,8 +26,8 @@ jobs:
           node-version: '22.14.0'
           cache: npm
       - run: npm ci
-      - name: Replace remaining inferable any casts with contextual targets
-        run: node scripts/phase4-expected-only-runner.mjs
+      - name: Retype remaining any casts with semantic structural contracts
+        run: node scripts/phase4-semantic-v2-runner.mjs
       - name: Format changed sources
         run: |
           FILES=$(git diff --name-only -- client/src server shared | tr '\n' ' ')
@@ -38,14 +38,14 @@ jobs:
         run: npm run check
       - name: Report remaining cast count
         run: node scripts/audit-type-escapes.mjs --json | tee phase4-bridge-audit.json || true
-      - name: Persist concrete bridge retyping
+      - name: Persist structural semantic retyping
         run: |
           if git diff --quiet -- client/src server shared; then
-            echo "No concrete Phase 4 bridge changes to persist."
+            echo "No structural semantic Phase 4 changes to persist."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add client/src server shared
-          git commit -m "refactor: replace remaining inferable any casts with concrete bridges [phase4-bridge]"
+          git commit -m "refactor: replace remaining any casts with structural contracts [phase4-bridge]"
           git push origin HEAD:${GITHUB_REF_NAME}
