@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { releaseDebtEnglish } from "@/i18n/finalCloseoutTranslations";
 import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -99,10 +100,10 @@ export function LocationInventoryHeader({
         title: result.duplicate ? "Stock report already sent" : "Stock sent to WhatsApp",
         description: `${result.itemCount ?? 0} items${result.duplicate ? " were already processed" : " sent"}${result.pageCount ? ` in ${result.pageCount} PDF page${result.pageCount === 1 ? "" : "s"}` : ""}${includeCost ? " with cost" : " without cost"}.`,
       });
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: releaseDebtEnglish("WhatsApp send failed"),
-        description: error?.message || "Could not send the stock report.",
+        description: getErrorDetails(error).optionalMessage || "Could not send the stock report.",
         variant: "destructive",
       });
     } finally {

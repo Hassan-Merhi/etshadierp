@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,7 +44,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-
 import type {
   BaleRemoval,
   Customer,
@@ -632,8 +632,8 @@ export default function FactoryContainerLoadingScan() {
             setImportRefNumbers([]);
             setShowImportDialog(true);
           }
-        } catch (err: any) {
-          toast({ title: "Parse error", description: err.message, variant: "destructive" });
+        } catch (err) {
+          toast({ title: "Parse error", description: getErrorDetails(err).message, variant: "destructive" });
         }
       };
       reader.readAsArrayBuffer(file);

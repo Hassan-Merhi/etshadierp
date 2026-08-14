@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation, useSearch } from "wouter";
@@ -202,8 +203,8 @@ export default function ContainerVerification() {
           return;
         }
         importMutation.mutate(items);
-      } catch (err: any) {
-        toast({ title: "Parse error", description: err.message, variant: "destructive" });
+      } catch (err) {
+        toast({ title: "Parse error", description: getErrorDetails(err).message, variant: "destructive" });
       }
     };
     reader.readAsArrayBuffer(file);
@@ -229,8 +230,8 @@ export default function ContainerVerification() {
         }
         const data = await res.json();
         setVerificationResult(data);
-      } catch (err: any) {
-        toast({ title: "Error", description: err.message, variant: "destructive" });
+      } catch (err) {
+        toast({ title: "Error", description: getErrorDetails(err).message, variant: "destructive" });
       }
     },
     [selectedSupplierId, selectedProformaId, containerId, toast]

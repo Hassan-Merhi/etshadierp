@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -84,10 +85,10 @@ export default function InventoryRepair() {
           ? `Found ${data.discrepanciesFound} discrepancies across ${data.totalInventoryRecords} inventory records.`
           : `Applied ${data.fixesApplied} fixes. Inventory has been corrected.`,
       });
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error",
-        description: error.message || "Failed to run inventory rebuild",
+        description: getErrorDetails(error).message || "Failed to run inventory rebuild",
         variant: "destructive",
       });
     } finally {
@@ -113,10 +114,10 @@ export default function InventoryRepair() {
             ? `Found ${data.rows.length} corrupted inventory value row(s).`
             : "No corrupted inventory rows found.",
       });
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error",
-        description: error.message || "Failed to preview value repair",
+        description: getErrorDetails(error).message || "Failed to preview value repair",
         variant: "destructive",
       });
       setValueRepairState("idle");
@@ -134,10 +135,10 @@ export default function InventoryRepair() {
       });
       setValueRepairRows([]);
       setValueRepairState("idle");
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error",
-        description: error.message || "Failed to finalize value repair",
+        description: getErrorDetails(error).message || "Failed to finalize value repair",
         variant: "destructive",
       });
       setValueRepairState("previewed");

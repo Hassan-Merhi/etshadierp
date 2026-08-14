@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useEffect, Fragment, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -1190,8 +1191,8 @@ export default function StockTransferOrder() {
         });
 
       setImportPreview(preview);
-    } catch (err: any) {
-      toast({ title: "Parse Error", description: err.message || "Failed to read file", variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Parse Error", description: getErrorDetails(err).message || "Failed to read file", variant: "destructive" });
     } finally {
       setImportLoading(false);
     }
@@ -1337,8 +1338,8 @@ export default function StockTransferOrder() {
       const nextRevNum = revisions.length + 1;
       toast({ title: "Revision Saved", description: `Rev ${nextRevNum} recorded and order updated` });
       navigate("/daybook");
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to save revision", variant: "destructive" });
+    } catch (error) {
+      toast({ title: "Error", description: getErrorDetails(error).message || "Failed to save revision", variant: "destructive" });
     } finally {
       setIsSavingRevision(false);
     }

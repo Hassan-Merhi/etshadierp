@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { formatNumber } from "@/lib/formatNumber";
@@ -164,8 +165,8 @@ export function CreateMixBatchDialog({ open, onOpenChange, onCreated }: CreateMi
                 queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
                 queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
                 toast({ title: "Undone", description: `${batchCode} has been reversed` });
-              } catch (e: any) {
-                toast({ title: "Undo failed", description: e.message, variant: "destructive" });
+              } catch (e) {
+                toast({ title: "Undo failed", description: getErrorDetails(e).message, variant: "destructive" });
               }
             }}
           >

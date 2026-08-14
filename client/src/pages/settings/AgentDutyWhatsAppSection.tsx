@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -64,8 +65,8 @@ export function AgentDutyWhatsAppSection() {
       if (!res.ok) throw new Error("Failed to fetch chats");
       const data = (await res.json()) as GreenChat[];
       setChats(data.filter((c) => c.type === "group" || String(c.id).endsWith("@g.us")));
-    } catch (e: any) {
-      toast({ title: "Could not load chats", description: e.message, variant: "destructive" });
+    } catch (e) {
+      toast({ title: "Could not load chats", description: getErrorDetails(e).message, variant: "destructive" });
     } finally {
       setChatsLoading(false);
     }

@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -284,8 +285,8 @@ export default function WipersReEntry() {
         await printRawZpl(zpl);
         toast({ title: "Labels sent to Zebra printer" });
         return;
-      } catch (err: any) {
-        toast({ title: "Zebra failed", description: err.message + " — using browser print", variant: "destructive" });
+      } catch (err) {
+        toast({ title: "Zebra failed", description: getErrorDetails(err).message + " — using browser print", variant: "destructive" });
       }
     }
     openBrowserPrint(labels, format);
@@ -317,10 +318,10 @@ export default function WipersReEntry() {
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "WipersReEntry");
       await XLSX.writeFile(wb, `wipers-re-entry-${entryDate}.xlsx`);
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Export failed",
-        description: err?.message || "Could not generate Excel file.",
+        description: getErrorDetails(err).optionalMessage || "Could not generate Excel file.",
         variant: "destructive",
       });
     }

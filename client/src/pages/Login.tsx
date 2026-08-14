@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { Input } from "@/components/ui/input";
@@ -230,8 +231,8 @@ export default function Login() {
         return;
       }
       loginMutation.mutate(savedCreds);
-    } catch (err: any) {
-      if (err?.code !== "userCancel" && err?.code !== "systemCancel" && err?.code !== "appCancel") {
+    } catch (err) {
+      if (getErrorDetails(err).code !== "userCancel" && getErrorDetails(err).code !== "systemCancel" && getErrorDetails(err).code !== "appCancel") {
         toast({ title: "Biometric failed", description: "Please sign in with your password.", variant: "destructive" });
       }
     } finally {
@@ -252,13 +253,13 @@ export default function Login() {
       if (!verifyRes.ok) throw new Error("Passkey registration failed");
       localStorage.setItem(passkeyStorageKey(pendingPasskeyUser.current), "1");
       setHasSavedPasskey(true);
-    } catch (err: any) {
-      if (err?.name === "NotAllowedError") {
+    } catch (err) {
+      if (getErrorDetails(err).name === "NotAllowedError") {
         // user cancelled
       } else {
         toast({
           title: "Passkey setup failed",
-          description: err.message || "Could not save passkey",
+          description: getErrorDetails(err).message || "Could not save passkey",
           variant: "destructive",
         });
       }
@@ -294,11 +295,11 @@ export default function Login() {
       }
       resetCsrfToken();
       window.location.href = "/";
-    } catch (err: any) {
-      if (err?.name === "NotAllowedError") return;
+    } catch (err) {
+      if (getErrorDetails(err).name === "NotAllowedError") return;
       toast({
         title: "Passkey failed",
-        description: err.message || "Could not sign in with passkey",
+        description: getErrorDetails(err).message || "Could not sign in with passkey",
         variant: "destructive",
       });
     } finally {

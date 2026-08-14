@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import {useState, useRef} from "react";
 import {Card, CardHeader, CardTitle, CardContent, CardDescription} from "@/components/ui/card";
 import {Button} from "@/components/ui/button";
@@ -243,8 +244,8 @@ export function DataToolsTab() {
         title: "Import Successful",
         description: `Updated ${response.updated} cost prices.`,
       });
-    } catch (error: any) {
-      toast({ title: "Import Failed", description: error.message || "Failed to import", variant: "destructive" });
+    } catch (error) {
+      toast({ title: "Import Failed", description: getErrorDetails(error).message || "Failed to import", variant: "destructive" });
     } finally {
       setIsImportingCostPrice(false);
     }
@@ -370,8 +371,8 @@ export function DataToolsTab() {
         title: "Import Successful",
         description: `Imported ${response.imported || stockPreview.length} inventory items`,
       });
-    } catch (error: any) {
-      toast({ title: "Import Failed", description: error.message || "Failed to import", variant: "destructive" });
+    } catch (error) {
+      toast({ title: "Import Failed", description: getErrorDetails(error).message || "Failed to import", variant: "destructive" });
     } finally {
       setIsImportingStock(false);
     }
@@ -471,8 +472,8 @@ export function DataToolsTab() {
         });
 
       setSilentImportPreview(preview);
-    } catch (err: any) {
-      toast({ title: "Parse Error", description: err.message || "Failed to read file", variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Parse Error", description: getErrorDetails(err).message || "Failed to read file", variant: "destructive" });
     } finally {
       setSilentImportLoading(false);
     }
@@ -556,8 +557,8 @@ export function DataToolsTab() {
       setSilentImportMode(false);
       queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
       queryClient.invalidateQueries({ queryKey: ["/api/location-summary"] });
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Error", description: getErrorDetails(err).message, variant: "destructive" });
     } finally {
       setSilentProdApplying(false);
     }
@@ -1139,7 +1140,7 @@ export function DataToolsTab() {
                             });
                             const data = await res.json();
                             setSilentProdDone(data.applied || validItems.length);
-                          } catch (err: any) {
+                          } catch (err) {
                             console.error("Silent production error:", err);
                           } finally {
                             setSilentProdApplying(false);
@@ -1469,8 +1470,8 @@ export function DataToolsTab() {
                       setSilentErrorLines(data.errorLines || []);
                       setSilentIncludeWarnings(false);
                       setSilentStep("validation");
-                    } catch (err: any) {
-                      setSilentParseError(err.message);
+                    } catch (err) {
+                      setSilentParseError(getErrorDetails(err).message);
                     } finally {
                       setIsSilentParsing(false);
                     }
@@ -1673,8 +1674,8 @@ export function DataToolsTab() {
                           queryClient.invalidateQueries({ queryKey: ["/api/location-summary"] });
                           setSilentAppliedCount(applyItems.length);
                           setSilentStep("done");
-                        } catch (err: any) {
-                          setSilentParseError(err.message);
+                        } catch (err) {
+                          setSilentParseError(getErrorDetails(err).message);
                           setSilentStep("setup");
                         } finally {
                           setIsSilentApplying(false);

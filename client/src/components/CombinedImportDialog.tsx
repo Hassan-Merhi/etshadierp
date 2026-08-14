@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -170,10 +171,10 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
       }
 
       importMutation.mutate(prices);
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error",
-        description: error.message || "Failed to read file",
+        description: getErrorDetails(error).message || "Failed to read file",
         variant: "destructive",
       });
       setIsProcessing(false);
@@ -255,10 +256,10 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
       }
 
       openingBalanceMutation.mutate(openingBalances);
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error",
-        description: error.message || "Failed to read file",
+        description: getErrorDetails(error).message || "Failed to read file",
         variant: "destructive",
       });
       setIsProcessingOpening(false);

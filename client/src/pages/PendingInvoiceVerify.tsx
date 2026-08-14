@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -259,8 +260,8 @@ export default function PendingInvoiceVerify() {
       const data = await res.json();
       setFinalizePreview(data);
       setShowFinalizePreview(true);
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } catch (error) {
+      toast({ title: "Error", description: getErrorDetails(error).message, variant: "destructive" });
     } finally {
       setPreviewLoading(false);
     }

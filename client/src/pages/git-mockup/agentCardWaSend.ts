@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { fmt, fmtD, clientReallocate } from "./helpers";
 import type { AgentDutySummary, ApiAllocatedRow, ApiAllocStatus } from "./types";
 
@@ -332,8 +333,8 @@ export async function sendAgentCardToWhatsApp(params: SendAgentDutyWaParams): Pr
     if (!response.ok) throw new Error(responseBody.message || response.statusText);
 
     toast({ title: "Sent", description: `Balance allocation sent to ${agent.agentName} WhatsApp group.` });
-  } catch (err: any) {
-    toast({ title: "Failed to send", description: err.message, variant: "destructive" });
+  } catch (err) {
+    toast({ title: "Failed to send", description: getErrorDetails(err).message, variant: "destructive" });
   } finally {
     setWaSending(false);
   }

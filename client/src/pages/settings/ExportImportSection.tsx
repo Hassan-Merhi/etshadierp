@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState } from "react";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -31,8 +32,8 @@ export function ExportImportSection({ companies }: { companies: any[] }) {
       a.click();
       window.URL.revokeObjectURL(url);
       toast({ title: "Success", description: "Company data exported" });
-    } catch (e: any) {
-      toast({ title: "Export Error", description: e.message, variant: "destructive" });
+    } catch (e) {
+      toast({ title: "Export Error", description: getErrorDetails(e).message, variant: "destructive" });
     } finally {
       setIsExporting(false);
     }
@@ -57,8 +58,8 @@ export function ExportImportSection({ companies }: { companies: any[] }) {
       toast({ title: "Success", description: "Company data imported" });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
-    } catch (e: any) {
-      toast({ title: "Import Error", description: e.message, variant: "destructive" });
+    } catch (e) {
+      toast({ title: "Import Error", description: getErrorDetails(e).message, variant: "destructive" });
     } finally {
       setIsImporting(false);
       e.target.value = "";

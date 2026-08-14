@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -97,8 +98,8 @@ export function TransferWhatsAppSection() {
       if (!res.ok) throw new Error("Failed to fetch chats");
       const data = (await res.json()) as GreenChat[];
       setChats(data.filter((c) => c.type === "group" || String(c.id).endsWith("@g.us")));
-    } catch (e: any) {
-      toast({ title: "Could not load chats", description: e.message, variant: "destructive" });
+    } catch (e) {
+      toast({ title: "Could not load chats", description: getErrorDetails(e).message, variant: "destructive" });
     } finally {
       setChatsLoading(false);
     }
@@ -114,8 +115,8 @@ export function TransferWhatsAppSection() {
       }
       queryClient.invalidateQueries({ queryKey: ["/api/git/transfer-wa-settings"] });
       toast({ title: "Saved", description: `Transfer WA group updated for company.` });
-    } catch (e: any) {
-      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } catch (e) {
+      toast({ title: "Error", description: getErrorDetails(e).message, variant: "destructive" });
     } finally {
       setSavingCompany(null);
     }

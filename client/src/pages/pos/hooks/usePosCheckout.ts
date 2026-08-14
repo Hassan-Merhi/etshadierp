@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import type { SaleRow, InventoryItem, Location } from "../pos-components/posTypes";
 
 interface PosCheckoutParams {
@@ -206,8 +207,8 @@ export function usePosCheckout({
       setCurrentDraftId(draftId);
       setShowDraftDialog(false);
       toast({ title: "Draft Loaded", description: "Transaction has been loaded from draft" });
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to load draft", variant: "destructive" });
+    } catch (error) {
+      toast({ title: "Error", description: getErrorDetails(error).message || "Failed to load draft", variant: "destructive" });
     }
   };
 

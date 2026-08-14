@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { db, type CachedEntity, type OfflineMeta } from "./db";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -422,8 +423,8 @@ export async function runOfflinePrep(companyId: number, onProgress: (p: PrepProg
           success: true,
           count: items.length,
         });
-      } catch (e: any) {
-        const msg = `${dataset.label}: ${e?.message ?? "Unknown error"}`;
+      } catch (e) {
+        const msg = `${dataset.label}: ${getErrorDetails(e).optionalMessage ?? "Unknown error"}`;
         errors.push(msg);
         results.push({
           datasetId: dataset.id,
@@ -431,7 +432,7 @@ export async function runOfflinePrep(companyId: number, onProgress: (p: PrepProg
           packId: pack.id,
           success: false,
           count: 0,
-          error: e?.message,
+          error: getErrorDetails(e).optionalMessage,
         });
       }
     }

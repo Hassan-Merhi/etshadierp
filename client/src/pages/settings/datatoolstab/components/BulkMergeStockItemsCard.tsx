@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 /**
  * BulkMergeStockItemsCard — extracted sub-component.
  *
@@ -56,8 +57,8 @@ export function BulkMergeStockItemsCard({ embedded }: { embedded?: boolean }) {
       if (parsed.length === 0)
         throw new Error("No valid rows found. Check that the file has old_code and keep_code columns.");
       setParsedRows(parsed);
-    } catch (err: any) {
-      setParseError(err.message);
+    } catch (err) {
+      setParseError(getErrorDetails(err).message);
     }
   }
 
@@ -74,8 +75,8 @@ export function BulkMergeStockItemsCard({ embedded }: { embedded?: boolean }) {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
       const succeeded = (data.results as BulkMergeResult[]).filter((r) => r.status === "success").length;
       toast({ title: `Bulk merge done — ${succeeded} of ${data.results.length} merged` });
-    } catch (err: any) {
-      toast({ title: "Bulk merge failed", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Bulk merge failed", description: getErrorDetails(err).message, variant: "destructive" });
     } finally {
       setIsRunning(false);
     }

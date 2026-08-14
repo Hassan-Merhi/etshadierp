@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 /**
  * WhatsAppModal — extracted sub-component.
  *
@@ -124,8 +125,8 @@ export function WhatsAppModal({
       // Revoking synchronously can race Chrome's download hand-off and produce a
       // zero-byte file on some machines. Keep the object URL alive briefly.
       window.setTimeout(() => URL.revokeObjectURL(blobUrl), 30_000);
-    } catch (err: any) {
-      toast({ title: "Download failed", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Download failed", description: getErrorDetails(err).message, variant: "destructive" });
     } finally {
       setIsZipDownloading(false);
     }

@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -190,8 +191,8 @@ export default function TestDataImport() {
       toast({ title: "Applied", description: `${drafts.length} test entries applied to calculations` });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } catch (error) {
+      toast({ title: "Error", description: getErrorDetails(error).message, variant: "destructive" });
     } finally {
       setIsApplyingAll(false);
     }
@@ -208,8 +209,8 @@ export default function TestDataImport() {
       toast({ title: "Removed", description: `${applied.length} test entries removed from calculations` });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } catch (error) {
+      toast({ title: "Error", description: getErrorDetails(error).message, variant: "destructive" });
     } finally {
       setIsRemovingAll(false);
     }
@@ -225,8 +226,8 @@ export default function TestDataImport() {
       toast({ title: "Deleted", description: `${testVouchers.length} test entries permanently deleted` });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } catch (error) {
+      toast({ title: "Error", description: getErrorDetails(error).message, variant: "destructive" });
     } finally {
       setIsDeletingAll(false);
     }

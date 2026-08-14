@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useEffect, useMemo, useRef } from "react";
 import { useLocation as useLocationContext } from "@/contexts/LocationContext";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -520,8 +521,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       a.download = `transaction-${num}-${dateStr}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch (err: any) {
-      toast({ title: "Export failed", description: err?.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Export failed", description: getErrorDetails(err).optionalMessage, variant: "destructive" });
     }
   }
 

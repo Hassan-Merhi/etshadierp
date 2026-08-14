@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { releaseDebtEnglish } from "../../i18n/finalCloseoutEnglish";
 import type { Express, NextFunction, Request, Response } from "express";
 import { sql } from "drizzle-orm";
@@ -220,8 +221,8 @@ async function enforceSpAccess(req: Request, res: Response, next: NextFunction):
           INSERT INTO sp_idempotency_keys(company_id, user_id, permission, idempotency_key, method, path)
           VALUES (${companyId}, ${userId}, ${permission}, ${idempotencyKey}, ${req.method}, ${req.originalUrl})
         `);
-      } catch (error: any) {
-        if (error?.code === "23505") {
+      } catch (error) {
+        if (getErrorDetails(error).code === "23505") {
           res.status(409).json({
             code: "SP_DUPLICATE_REQUEST",
             message: releaseDebtEnglish("This sensitive request has already been submitted."),

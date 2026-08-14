@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import {useState} from "react";
 import {useQuery, useMutation, useQueryClient as useTQClient} from "@tanstack/react-query";
 import {Button} from "@/components/ui/button";
@@ -181,8 +182,8 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
       await factoryApiRequest("PATCH", `/api/factory/containers/${id}`, { otwNote: val || null });
       patchCacheContainer(id, { otwNote: val || null } as any);
       tqClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
-    } catch (err: any) {
-      toast({ title: "Failed to save note", description: err?.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Failed to save note", description: getErrorDetails(err).optionalMessage, variant: "destructive" });
     }
   }
   async function toggleDoc(id: number, checked: boolean) {
@@ -190,8 +191,8 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
       await factoryApiRequest("PATCH", `/api/factory/containers/${id}`, { otwDocsReceived: checked });
       patchCacheContainer(id, { otwDocsReceived: checked });
       tqClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
-    } catch (err: any) {
-      toast({ title: "Failed to update docs", description: err?.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Failed to update docs", description: getErrorDetails(err).optionalMessage, variant: "destructive" });
     }
   }
 
@@ -406,8 +407,8 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
         title: `Import complete`,
         description: `${updated} ETA(s) updated, ${skipped} skipped.`,
       });
-    } catch (err: any) {
-      toast({ title: "Import failed", description: err?.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Import failed", description: getErrorDetails(err).optionalMessage, variant: "destructive" });
     } finally {
       setImporting(false);
     }

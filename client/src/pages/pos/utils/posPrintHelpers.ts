@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { apiRequest } from "@/lib/queryClient";
 
 // Server-side invoice PDF send with retry
@@ -19,8 +20,8 @@ export async function sendInvoicePdfWithRetry(
       if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) {
         return { ok: false, message: lastMessage };
       }
-    } catch (e: any) {
-      lastMessage = e?.message || "Network error";
+    } catch (e) {
+      lastMessage = getErrorDetails(e).optionalMessage || "Network error";
     }
     if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, delayMs * attempt));
   }
@@ -45,8 +46,8 @@ export async function sendStockPdfWithRetry(
       if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) {
         return { ok: false, message: lastMessage };
       }
-    } catch (e: any) {
-      lastMessage = e?.message || "Network error";
+    } catch (e) {
+      lastMessage = getErrorDetails(e).optionalMessage || "Network error";
     }
     if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, delayMs * attempt));
   }

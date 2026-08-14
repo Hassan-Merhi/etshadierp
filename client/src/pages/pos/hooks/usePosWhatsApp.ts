@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useEffect } from "react";
 import type { Location } from "../pos-components/posTypes";
 import { sendInvoicePdfWithRetry, sendStockPdfWithRetry } from "../utils/posPrintHelpers";
@@ -49,9 +50,9 @@ export function usePosWhatsApp({
         } else {
           setInvoiceWaStatus("sent");
         }
-      } catch (e: any) {
+      } catch (e) {
         setInvoiceWaStatus("failed");
-        toast({ title: "WhatsApp", description: e.message || "Could not send invoice.", variant: "destructive" });
+        toast({ title: "WhatsApp", description: getErrorDetails(e).message || "Could not send invoice.", variant: "destructive" });
       } finally {
         setSendingInvoiceWhatsApp(false);
       }
@@ -74,11 +75,11 @@ export function usePosWhatsApp({
         if (!result.ok) throw new Error(result.message);
         setStockWaStatus("sent");
         toast({ title: "Stock sent", description: "Stock report sent to WhatsApp group." });
-      } catch (e: any) {
+      } catch (e) {
         setStockWaStatus("failed");
         toast({
           title: "Stock send failed",
-          description: e.message || "Could not send stock report.",
+          description: getErrorDetails(e).message || "Could not send stock report.",
           variant: "destructive",
         });
       }
@@ -109,9 +110,9 @@ export function usePosWhatsApp({
         setInvoiceWaStatus("sent");
         toast({ title: "Sent", description: "Invoice sent to WhatsApp group." });
       }
-    } catch (e: any) {
+    } catch (e) {
       setInvoiceWaStatus("failed");
-      toast({ title: "Error", description: e.message || "Could not reach the server.", variant: "destructive" });
+      toast({ title: "Error", description: getErrorDetails(e).message || "Could not reach the server.", variant: "destructive" });
     } finally {
       setSendingInvoiceWhatsApp(false);
     }
@@ -134,9 +135,9 @@ export function usePosWhatsApp({
       if (!result.ok) throw new Error(result.message);
       setStockWaStatus("sent");
       toast({ title: "Sent", description: "Stock report sent to WhatsApp group." });
-    } catch (e: any) {
+    } catch (e) {
       setStockWaStatus("failed");
-      toast({ title: "Failed to send", description: e.message || "WhatsApp send failed.", variant: "destructive" });
+      toast({ title: "Failed to send", description: getErrorDetails(e).message || "WhatsApp send failed.", variant: "destructive" });
     } finally {
       setSendingWhatsApp(false);
     }

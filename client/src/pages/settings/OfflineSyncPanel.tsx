@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useEffect } from "react";
 import { OFFLINE_MODE_ENABLED } from "@/lib/featureFlags";
 import { useConnectivity } from "@/contexts/ConnectivityContext";
@@ -102,8 +103,8 @@ function OfflineSyncPanelContent() {
       toast({ title: "Cleared", description: "Offline IndexedDB data cleared." });
       void loadLogs();
       void refreshCounts();
-    } catch (e: any) {
-      toast({ title: "Error", description: e?.message || "Failed to clear data.", variant: "destructive" });
+    } catch (e) {
+      toast({ title: "Error", description: getErrorDetails(e).optionalMessage || "Failed to clear data.", variant: "destructive" });
     } finally {
       setClearing(false);
     }

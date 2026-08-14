@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -494,10 +495,10 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       }
       setImportPreview(preview);
       setImportDialogOpen(true);
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Could not read file",
-        description: err?.message || "Make sure it is a valid .xlsx file.",
+        description: getErrorDetails(err).optionalMessage || "Make sure it is a valid .xlsx file.",
         variant: "destructive",
       });
     }
@@ -520,8 +521,8 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       setImportPreview([]);
       queryClient.invalidateQueries({ queryKey: ["/api/pos/price-list-by-masters"] });
       queryClient.invalidateQueries({ queryKey: ["/api/pos/price-list", selectedLocationId] });
-    } catch (err: any) {
-      toast({ title: "Upload failed", description: err.message || "Something went wrong.", variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Upload failed", description: getErrorDetails(err).message || "Something went wrong.", variant: "destructive" });
     } finally {
       setImporting(false);
     }

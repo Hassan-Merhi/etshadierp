@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Trash2, List, LayoutList, Upload } from "lucide-react";
@@ -224,8 +225,8 @@ export function RemoveFromStockTab() {
         if (assignedColor) openBrowserPrint(labels, assignedColor);
         else printDirectNoDesign(labels);
       }
-    } catch (error: any) {
-      toast({ title: "Print Error", description: error.message, variant: "destructive" });
+    } catch (error) {
+      toast({ title: "Print Error", description: getErrorDetails(error).message, variant: "destructive" });
     }
   };
 
@@ -242,8 +243,8 @@ export function RemoveFromStockTab() {
       setPrintWorkerBale(null);
       setPrintWorkerIdSelected("");
       await printSingleBale(printWorkerBale);
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Error", description: getErrorDetails(err).message, variant: "destructive" });
     } finally {
       setAssigningWorker(false);
     }

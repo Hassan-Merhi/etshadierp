@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { Package, AlertTriangle, ShieldCheck, Layers } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -56,8 +57,8 @@ export function DiagnosticsSection({
                 } else {
                   toast({ title: "Error", description: result.message, variant: "destructive" });
                 }
-              } catch (error: any) {
-                toast({ title: "Error", description: error.message, variant: "destructive" });
+              } catch (error) {
+                toast({ title: "Error", description: getErrorDetails(error).message, variant: "destructive" });
               }
             }}
             data-testid="button-diagnose-vouchers"

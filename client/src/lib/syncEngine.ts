@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { db, appendSyncLog, upsertGlobalSyncState, addConflict, type SyncQueueItem } from "./db";
 import { getQueue, removeFromQueue, updateItemStatus as updateLegacyStatus, setLastSynced } from "./offlineQueue";
 
@@ -119,8 +120,8 @@ async function processIdbItem(item: SyncQueueItem): Promise<"ok" | "failed" | "c
     });
     await appendSyncLog("item_failed", `Retry ${newCount}/${MAX_RETRY_COUNT}: ${item.description}`, { url: item.url });
     return "failed";
-  } catch (err: any) {
-    const msg = err?.message || "Network error";
+  } catch (err) {
+    const msg = getErrorDetails(err).optionalMessage || "Network error";
     const newCount = (item.retryCount || 0) + 1;
     await db.syncQueue.update(item.id!, {
       status: newCount >= MAX_RETRY_COUNT ? "failed" : "pending",
@@ -266,8 +267,8 @@ export async function runSync(): Promise<void> {
       "sync_end",
       `Sync done: ${successCount} ok, ${failCount} failed${conflictDetected ? ", conflicts detected" : ""}`
     );
-  } catch (err: any) {
-    const msg = err?.message || "Sync error";
+  } catch (err) {
+    const msg = getErrorDetails(err).optionalMessage || "Sync error";
     await upsertGlobalSyncState({ status: "error", errorMessage: msg });
     emitSyncEvent({ syncing: false, error: msg });
     await appendSyncLog("error", `Sync error: ${msg}`);

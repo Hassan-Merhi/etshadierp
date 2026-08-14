@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 /**
  * MergeHistoryCard — extracted sub-component.
  *
@@ -48,8 +49,8 @@ export function MergeHistoryCard({ embedded }: { embedded?: boolean }) {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items/merge-logs"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
-    } catch (err: any) {
-      toast({ title: "Unmerge failed", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Unmerge failed", description: getErrorDetails(err).message, variant: "destructive" });
     } finally {
       setIsUnmerging(false);
     }
@@ -70,8 +71,8 @@ export function MergeHistoryCard({ embedded }: { embedded?: boolean }) {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items/merge-logs/historical"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
-    } catch (err: any) {
-      toast({ title: "Restore failed", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Restore failed", description: getErrorDetails(err).message, variant: "destructive" });
     } finally {
       setIsHistoricalRestoring(false);
     }

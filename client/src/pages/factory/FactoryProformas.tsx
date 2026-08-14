@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useQuery, useMutation, useQueries } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -529,8 +530,8 @@ export default function FactoryProformas() {
           .trim();
         setExcelImportName(base || "Imported Proforma");
       }
-    } catch (err: any) {
-      setExcelImportErrors([`Failed to read file: ${err?.message || "Unknown error"}`]);
+    } catch (err) {
+      setExcelImportErrors([`Failed to read file: ${getErrorDetails(err).optionalMessage || "Unknown error"}`]);
     } finally {
       setExcelImportLoading(false);
     }

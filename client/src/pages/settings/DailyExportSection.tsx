@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -101,8 +102,8 @@ export function DailyExportSection() {
       setGmailUser("");
       setGmailPassword("");
       toast({ title: "Settings saved" });
-    } catch (e: any) {
-      toast({ variant: "destructive", title: "Error", description: e.message });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Error", description: getErrorDetails(e).message });
     } finally {
       setSavingSettings(false);
     }
@@ -122,8 +123,8 @@ export function DailyExportSection() {
           ? `Schedule enabled — runs daily at ${fmt12h(effHour)} (${tzLabel(effTz)})`
           : "Schedule disabled",
       });
-    } catch (e: any) {
-      toast({ variant: "destructive", title: "Error", description: e.message });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Error", description: getErrorDetails(e).message });
     }
   };
 
@@ -139,8 +140,8 @@ export function DailyExportSection() {
       });
       qc.invalidateQueries({ queryKey: ["/api/export/settings"] });
       toast({ title: `Schedule time saved — runs daily at ${fmt12h(effHour)} (${tzLabel(effTz)})` });
-    } catch (e: any) {
-      toast({ variant: "destructive", title: "Error", description: e.message });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Error", description: getErrorDetails(e).message });
     } finally {
       setSavingScheduleTime(false);
     }
@@ -155,8 +156,8 @@ export function DailyExportSection() {
       setActiveJobId(result.jobId);
       setActiveMode(mode);
       setProgressOpen(true);
-    } catch (e: any) {
-      toast({ variant: "destructive", title: "Could not start export", description: e.message });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Could not start export", description: getErrorDetails(e).message });
     }
   };
 
@@ -189,8 +190,8 @@ export function DailyExportSection() {
       const data = (await (await apiRequest("POST", "/api/daily-export/trigger-whatsapp", body)).json()) as any;
       toast({ title: "WhatsApp export started", description: data.message || "Building ZIP and sending." });
       [5, 20, 45, 75, 120].forEach((s) => setTimeout(() => refetchBackup(), s * 1000));
-    } catch (e: any) {
-      toast({ variant: "destructive", title: "WhatsApp send failed", description: e.message });
+    } catch (e) {
+      toast({ variant: "destructive", title: "WhatsApp send failed", description: getErrorDetails(e).message });
     } finally {
       setSendingWa(false);
       refetchBackup();

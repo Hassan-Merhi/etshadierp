@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import {
   type LabelData,
   type A4DesignColor,
@@ -134,7 +135,7 @@ export const printLabels = async (
     } else {
       openBrowserPrint(labels, undefined, preOpenedWindowsRef);
     }
-  } catch (error: any) {
-    toast({ title: "Print Error", description: error.message, variant: "destructive" });
+  } catch (error) {
+    toast({ title: "Print Error", description: getErrorDetails(error).message, variant: "destructive" });
   }
 };

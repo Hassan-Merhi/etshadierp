@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 /**
  * ReconciliationRunner — extracted sub-component.
  *
@@ -34,9 +35,9 @@ export function ReconciliationRunner({
       const data = await r.json();
       if (!r.ok) throw new Error(data.message ?? `Request failed (${r.status})`);
       setReport(data);
-    } catch (err: any) {
+    } catch (err) {
       // Keep the previous report visible; surface the real error instead of silently clearing it.
-      setError(err.message ?? "Reconciliation failed");
+      setError(getErrorDetails(err).message ?? "Reconciliation failed");
     } finally {
       setLoading(false);
     }

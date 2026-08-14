@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -206,8 +207,8 @@ export default function FactoryLocationInventory() {
       if (!res.ok) throw new Error("Failed to fetch bales");
       const data = await res.json();
       setReprintBales(data);
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Error", description: getErrorDetails(err).message, variant: "destructive" });
       setReprintDialogOpen(false);
     } finally {
       setReprintLoading(false);
@@ -239,10 +240,10 @@ export default function FactoryLocationInventory() {
         const zpl = buildZplBatch(labels, true);
         await printRawZpl(zpl);
         toast({ title: `${labels.length} label(s) sent to Zebra printer` });
-      } catch (err: any) {
+      } catch (err) {
         toast({
           title: "Zebra print failed — falling back to browser",
-          description: err.message,
+          description: getErrorDetails(err).message,
           variant: "destructive",
         });
         openBrowserReprintLabels(labels);

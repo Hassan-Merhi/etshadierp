@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import {useState, useMemo, useCallback} from "react";
 import {useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
 import {apiRequest} from "@/lib/queryClient";
@@ -260,9 +261,9 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
       link.href = canvas.toDataURL("image/png");
       link.click();
       toast({ title: "Exported", description: "Statement saved as PNG image." });
-    } catch (err: any) {
+    } catch (err) {
       document.body.removeChild(el);
-      toast({ title: "Export failed", description: err.message, variant: "destructive" });
+      toast({ title: "Export failed", description: getErrorDetails(err).message, variant: "destructive" });
     } finally {
       setPdfExporting(false);
     }
@@ -294,9 +295,9 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
         imageBase64,
       });
       toast({ title: "WhatsApp sent", description: `Delivered to ${data?.sent ?? 0} recipient(s).` });
-    } catch (err: any) {
+    } catch (err) {
       if (el.parentNode) document.body.removeChild(el);
-      toast({ title: "WhatsApp failed", description: err?.message, variant: "destructive" });
+      toast({ title: "WhatsApp failed", description: getErrorDetails(err).optionalMessage, variant: "destructive" });
     } finally {
       setWaSending(false);
     }

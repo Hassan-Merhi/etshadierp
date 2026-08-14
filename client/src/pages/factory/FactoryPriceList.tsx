@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
@@ -204,8 +205,8 @@ export default function FactoryPriceList() {
         title: "Prices Updated",
         description: `${result.updated} product(s) updated${result.skipped > 0 ? `, ${result.skipped} skipped` : ""}.`,
       });
-    } catch (err: any) {
-      toast({ title: "Upload Failed", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Upload Failed", description: getErrorDetails(err).message, variant: "destructive" });
     } finally {
       setIsUploading(false);
     }

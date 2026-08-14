@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -290,8 +291,8 @@ export function ChatWidget() {
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.message || "Failed to parse file");
       setPoDraft(data as POImportDraft);
-    } catch (err: any) {
-      alert(`Could not parse file: ${err.message}`);
+    } catch (err) {
+      alert(`Could not parse file: ${getErrorDetails(err).message}`);
     } finally {
       setPoDraftUploading(false);
     }
@@ -310,8 +311,8 @@ export function ChatWidget() {
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.message || "Import failed");
       setPoDraftResult(data as POImportResult);
-    } catch (err: any) {
-      setPoDraftError(err.message);
+    } catch (err) {
+      setPoDraftError(getErrorDetails(err).message);
     } finally {
       setPoDraftSubmitting(false);
     }

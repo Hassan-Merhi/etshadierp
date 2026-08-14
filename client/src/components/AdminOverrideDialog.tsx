@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -51,10 +52,9 @@ export function AdminOverrideDialog({ open, actionLabel, onSuccess, onCancel }: 
     try {
       await verifyMutation.mutateAsync();
       onSuccess();
-    } catch (err: any) {
-      const body = err?.response ? await err.response.json().catch(() => null) : null;
+    } catch (err) {
       setPassword("");
-      setErrorMsg(body?.message || "Invalid credentials. Please try again.");
+      setErrorMsg(getErrorDetails(err).optionalMessage || "Invalid credentials. Please try again.");
       throw err;
     }
   };

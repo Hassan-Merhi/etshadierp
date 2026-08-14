@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -106,8 +107,8 @@ export default function SpReports() {
       a.click();
       URL.revokeObjectURL(url);
       toast({ title: "Sales form exported", description: filename });
-    } catch (e: any) {
-      toast({ title: "Export failed", description: e.message, variant: "destructive" });
+    } catch (e) {
+      toast({ title: "Export failed", description: getErrorDetails(e).message, variant: "destructive" });
     } finally {
       setExporting(false);
     }
@@ -139,8 +140,8 @@ export default function SpReports() {
       a.click();
       URL.revokeObjectURL(url);
       toast({ title: "System sales form exported", description: filename });
-    } catch (e: any) {
-      toast({ title: "Export failed", description: e.message, variant: "destructive" });
+    } catch (e) {
+      toast({ title: "Export failed", description: getErrorDetails(e).message, variant: "destructive" });
     } finally {
       setExportingV2(false);
     }

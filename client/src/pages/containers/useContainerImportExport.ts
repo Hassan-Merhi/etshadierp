@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useRef, useState } from "react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -54,8 +55,8 @@ export function useContainerImportExport({
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       toast({ title: "Export successful", description: "All containers exported with full details" });
-    } catch (error: any) {
-      toast({ title: "Export failed", description: error.message, variant: "destructive" });
+    } catch (error) {
+      toast({ title: "Export failed", description: getErrorDetails(error).message, variant: "destructive" });
     }
   };
 
@@ -162,8 +163,8 @@ export function useContainerImportExport({
       } else {
         toast({ title: "Import successful", description: `${result.updated} container(s) updated` });
       }
-    } catch (error: any) {
-      toast({ title: "Import failed", description: error.message, variant: "destructive" });
+    } catch (error) {
+      toast({ title: "Import failed", description: getErrorDetails(error).message, variant: "destructive" });
     } finally {
       setIsImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = "";

@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { resolveWhatsAppPrompt } from "@/lib/whatsapp-prompt";
 import type { WhatsAppPromptState } from "@/lib/whatsapp-prompt";
@@ -708,8 +709,8 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
         code: newAccount.code || "",
         balance: 0,
       };
-    } catch (error: any) {
-      toast({ variant: "destructive", title: "Error", description: error.message || "Failed to create account" });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: getErrorDetails(error).message || "Failed to create account" });
       return null;
     } finally {
       setIsAutoCreating(false);

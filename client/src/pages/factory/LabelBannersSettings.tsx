@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
@@ -164,8 +165,8 @@ export default function LabelBannersSettings() {
       if (addFileInputRef.current) addFileInputRef.current.value = "";
       setAddOpen(false);
       invalidate();
-    } catch (e: any) {
-      toast({ title: "Failed to add color", description: e.message, variant: "destructive" });
+    } catch (e) {
+      toast({ title: "Failed to add color", description: getErrorDetails(e).message, variant: "destructive" });
     } finally {
       setAddingColor(false);
     }

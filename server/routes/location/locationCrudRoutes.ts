@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import type { Express } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -41,11 +42,11 @@ async function getLocationWhatsAppSettingsMap(companyId: number): Promise<Map<nu
         },
       ])
     );
-  } catch (error: any) {
+  } catch (error) {
     // Startup migrations create this table before routes are served. Keeping the
     // fallback makes older test fixtures and partially migrated dev databases
     // readable instead of turning the whole Location Inventory page into a 500.
-    if (error?.code === "42P01") return new Map();
+    if (getErrorDetails(error).code === "42P01") return new Map();
     throw error;
   }
 }

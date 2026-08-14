@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -38,8 +39,8 @@ export function BackupStatusCard({
         description: data.cleared > 0 ? "They are now marked as failed." : undefined,
       });
       onRefresh();
-    } catch (e: any) {
-      toast({ variant: "destructive", title: "Dismiss failed", description: e.message });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Dismiss failed", description: getErrorDetails(e).message });
     } finally {
       setDismissing(false);
     }

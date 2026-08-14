@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 /**
  * MergeStockItemsCard — extracted sub-component.
  *
@@ -50,8 +51,8 @@ export function MergeStockItemsCard({ embedded }: { embedded?: boolean } = {}) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Preview failed");
       setPreview(data);
-    } catch (err: any) {
-      setPreviewError(err.message);
+    } catch (err) {
+      setPreviewError(getErrorDetails(err).message);
     } finally {
       setIsLoadingPreview(false);
     }
@@ -79,8 +80,8 @@ export function MergeStockItemsCard({ embedded }: { embedded?: boolean } = {}) {
       setPreview(null);
       setConfirmText("");
       setPreviewError(null);
-    } catch (err: any) {
-      toast({ title: "Merge failed", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Merge failed", description: getErrorDetails(err).message, variant: "destructive" });
     } finally {
       setIsMerging(false);
     }

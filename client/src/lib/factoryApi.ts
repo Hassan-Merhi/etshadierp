@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { queryClient, apiRequest } from "./queryClient";
 import { attachAccountingRequestIdentity, releaseAccountingRequestIdentity } from "./accountingRequestIdentity";
 import { isUnsafeFactoryLoadingScanRequest, purgeUnsafeFactoryLoadingScans } from "./factoryOfflineQueueSafety";
@@ -301,11 +302,11 @@ async function requestWithPreparedReplayState(
     }
     await invalidatePostOffloadReconciliationQueries(method, url, response);
     return await hydrateCompactBaleScanResponse(delegate, method, url, response);
-  } catch (error: any) {
+  } catch (error) {
     // OfflineQueued means the exact body (including clientRequestId) is persisted.
     // A 4xx is a definite rejection. Keep the identity only for network errors,
     // timeouts, and 5xx responses where the commit outcome may be uncertain.
-    if (error?.name === "OfflineQueued" || (Number(error?.status) >= 400 && Number(error?.status) < 500)) {
+    if (getErrorDetails(error).name === "OfflineQueued" || (Number(getErrorDetails(error).status) >= 400 && Number(getErrorDetails(error).status) < 500)) {
       releaseAccountingRequestIdentity(method, url, outboundData);
     }
     throw error;
@@ -331,8 +332,8 @@ async function factoryApiRequestBase(method: string, url: string, data?: unknown
 
   try {
     return await apiRequest(method, url, data);
-  } catch (error: any) {
-    if (unsafeLoadingScan && error?.name === "OfflineQueued") {
+  } catch (error) {
+    if (unsafeLoadingScan && getErrorDetails(error).name === "OfflineQueued") {
       purgeUnsafeFactoryLoadingScans();
       const onlineOnlyError: any = new Error(
         "Loading scans require an internet connection. Reconnect and scan this bale again; it was not queued."

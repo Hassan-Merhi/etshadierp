@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import type { Account } from "@/components/AccountSidebar";
 
 interface UseVoucherHandlersProps {
@@ -129,8 +130,8 @@ export function useVoucherHandlers({
         code: newAccount.code || "",
         balance: 0,
       };
-    } catch (error: any) {
-      toast({ variant: "destructive", title: "Error", description: error.message || "Failed to create account" });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: getErrorDetails(error).message || "Failed to create account" });
       return null;
     } finally {
       setIsAutoCreating(false);

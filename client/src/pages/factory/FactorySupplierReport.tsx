@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Download, FileText, Filter, Loader2, Package } from "lucide-react";
@@ -73,8 +74,8 @@ export default function FactorySupplierReport() {
       a.click();
       URL.revokeObjectURL(url);
       toast({ title: "Report generated successfully" });
-    } catch (error: any) {
-      toast({ title: "Export failed", description: error.message, variant: "destructive" });
+    } catch (error) {
+      toast({ title: "Export failed", description: getErrorDetails(error).message, variant: "destructive" });
     } finally {
       setIsGenerating(false);
     }

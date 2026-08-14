@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -346,8 +347,8 @@ export function ContainerFormDialog({
           throw new Error(err.message || "Failed to update container");
         }
         container = await res.json();
-      } catch (err: any) {
-        if (err?.name === "OfflineQueued" && validCharges.length > 0) {
+      } catch (err) {
+        if (getErrorDetails(err).name === "OfflineQueued" && validCharges.length > 0) {
           enqueueRequest(
             `/api/factory/containers/${id}/other-charges/sync`,
             "POST",

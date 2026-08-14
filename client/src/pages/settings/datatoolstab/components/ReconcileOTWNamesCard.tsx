@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 /**
  * ReconcileOTWNamesCard — extracted sub-component.
  *
@@ -29,8 +30,8 @@ export function ReconcileOTWNamesCard() {
       toast({
         title: data.fixed > 0 ? `Fixed ${data.fixed} OTW line item(s)` : "All OTW names are already up to date",
       });
-    } catch (err: any) {
-      toast({ title: "Reconcile failed", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Reconcile failed", description: getErrorDetails(err).message, variant: "destructive" });
     } finally {
       setRunning(false);
     }

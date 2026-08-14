@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef, useMemo, useEffect } from "react";
 import { addDays, format } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -165,8 +166,8 @@ export default function BalesHistory() {
       a.click();
       URL.revokeObjectURL(a.href);
       setShowExportDialog(false);
-    } catch (err: any) {
-      toast({ title: "Export Failed", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Export Failed", description: getErrorDetails(err).message, variant: "destructive" });
     } finally {
       setExportLoading(false);
     }
@@ -499,10 +500,10 @@ export default function BalesHistory() {
         const zpl = buildZplBatch([label], true);
         await printRawZpl(zpl);
         toast({ title: "Label sent to Zebra printer" });
-      } catch (err: any) {
+      } catch (err) {
         toast({
           title: "Zebra print failed — falling back to browser",
-          description: err.message,
+          description: getErrorDetails(err).message,
           variant: "destructive",
         });
         openBrowserReprint([label]);

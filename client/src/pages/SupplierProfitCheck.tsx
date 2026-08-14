@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 import {useState, useMemo, useCallback, useEffect, useRef} from "react";
 import {useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
 import {PeriodFilter, PeriodFilterValue} from "@/components/ui/period-filter";
@@ -13,7 +14,6 @@ import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter} from "@/
 import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
 import {TrendingUp, AlertTriangle, Search, Download, FileText, CheckCircle, Package, Loader2, BarChart2, Save, Hash, ShoppingCart, Columns, RotateCcw, Truck, Filter, ChevronDown, CircleDollarSign, MapPin, Container, Plus, Upload, X, FileSpreadsheet} from "lucide-react";
-
 import type {AnalysisRow, ColKey, ColVisibility, ComputedRow, LocationGroup, OtwContainer} from "./supplierprofitcheck/types";
 import {ALL_COLUMNS, DEFAULT_COL_VISIBILITY, STATUS_OPTIONS, STORAGE_KEY_COLS, fmt, loadColVisibility} from "./supplierprofitcheck/utils";
 import {ProfitCell} from "./supplierprofitcheck/components/ProfitCell";
@@ -267,13 +267,13 @@ export default function SupplierProfitCheck() {
           });
           const result = await res.json();
           setImportPreview(result);
-        } catch (err: any) {
-          toast({ title: "Import failed", description: err.message, variant: "destructive" });
+        } catch (err) {
+          toast({ title: "Import failed", description: getErrorDetails(err).message, variant: "destructive" });
         } finally {
           setImportLoading(false);
         }
-      } catch (err: any) {
-        toast({ title: "Failed to parse file", description: err.message, variant: "destructive" });
+      } catch (err) {
+        toast({ title: "Failed to parse file", description: getErrorDetails(err).message, variant: "destructive" });
       }
     },
     [supplierId, periodFilter, sellPriceSource, selectedLocationId, toast]
@@ -609,8 +609,8 @@ export default function SupplierProfitCheck() {
       } catch {
         // Non-fatal: the user can still click "Supplier Excel" to re-download
       }
-    } catch (err: any) {
-      toast({ title: "Save failed", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Save failed", description: getErrorDetails(err).message, variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
@@ -630,8 +630,8 @@ export default function SupplierProfitCheck() {
       a.download = `proforma-${savedProforma.reference}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch (err: any) {
-      toast({ title: "Export failed", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Export failed", description: getErrorDetails(err).message, variant: "destructive" });
     }
   }, [savedProforma, toast]);
 
@@ -658,8 +658,8 @@ export default function SupplierProfitCheck() {
       a.download = `profit-analysis-${savedProforma?.reference || "export"}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch (err: any) {
-      toast({ title: "Export failed", description: err.message, variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Export failed", description: getErrorDetails(err).message, variant: "destructive" });
     }
   }, [itemsWithQty, qtyMap, selectedSupplier, periodFilter, savedProforma, toast]);
 
