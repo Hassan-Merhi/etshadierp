@@ -26,8 +26,8 @@ jobs:
           node-version: '22.14.0'
           cache: npm
       - run: npm ci
-      - name: Replace remaining inferable any casts with concrete bridges
-        run: node scripts/phase4-bridge-worker.mjs
+      - name: Replace remaining inferable any casts with contextual targets
+        run: node scripts/phase4-expected-only-runner.mjs
       - name: Format changed sources
         run: |
           FILES=$(git diff --name-only -- client/src server shared | tr '\n' ' ')
