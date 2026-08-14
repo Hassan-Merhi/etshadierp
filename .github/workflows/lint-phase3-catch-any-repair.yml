@@ -14,14 +14,11 @@ jobs:
   repair:
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout Phase 3 branch
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
         with:
           ref: agent/lint-phase-3-catch-any
-          fetch-depth: 0
 
-      - name: Set up canonical Node.js
-        uses: actions/setup-node@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: "22.14"
           cache: npm
@@ -32,7 +29,7 @@ jobs:
           npm ci --no-audit --bin-links=true
           git checkout -- package-lock.json
 
-      - name: Add runtime-safe unknown error reader
+      - name: Add safe unknown-error details helper
         run: |
           cat > shared/errorUtils.ts <<'EOF'
           export interface ErrorDetails {
@@ -67,29 +64,28 @@ jobs:
           }
           EOF
 
-      - name: Narrow classified catch values from any to unknown
+      - name: Semantically narrow remaining catch-any sites
         run: |
           node --input-type=module <<'NODE'
           import fs from "node:fs";
           import path from "node:path";
           import ts from "typescript";
 
-          const roots = ["client/src", "server", "shared"];
           const files = [];
-          const walk = (dir) => {
+          function walk(dir) {
             if (!fs.existsSync(dir)) return;
             for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
               const full = path.join(dir, entry.name);
               if (entry.isDirectory()) walk(full);
               else if (/\.(?:ts|tsx)$/.test(entry.name) && full !== "shared/errorUtils.ts") files.push(full);
             }
-          };
-          roots.forEach(walk);
+          }
+          ["client/src", "server", "shared"].forEach(walk);
 
-          const handledFields = new Set(["message", "name", "status", "code"]);
-          let narrowed = 0;
-          const changedFiles = [];
+          const handled = new Set(["message", "name", "status", "code"]);
+          const changed = new Set();
           const skipped = [];
+          let narrowed = 0;
 
           for (const file of files) {
             let source = fs.readFileSync(file, "utf8");
@@ -103,18 +99,19 @@ jobs:
             const edits = [];
             let needsHelper = false;
 
-            const visit = (node) => {
+            function visit(node) {
               if (
                 ts.isCatchClause(node) &&
                 node.variableDeclaration &&
                 ts.isIdentifier(node.variableDeclaration.name) &&
                 node.variableDeclaration.type?.getText(sf) === "any"
               ) {
-                const name = node.variableDeclaration.name.text;
+                const binding = node.variableDeclaration.name;
+                const name = binding.text;
                 const properties = [];
                 const unsupported = new Set();
 
-                const scan = (child) => {
+                function scan(child) {
                   if (child !== node && ts.isCatchClause(child)) return;
                   if (
                     ts.isPropertyAccessExpression(child) &&
@@ -123,53 +120,50 @@ jobs:
                   ) {
                     const field = child.name.text;
                     properties.push(child);
-                    if (!handledFields.has(field)) unsupported.add(field);
+                    if (!handled.has(field)) unsupported.add(field);
                   }
                   ts.forEachChild(child, scan);
-                };
+                }
                 scan(node.block);
 
-                if (unsupported.size > 0) {
-                  skipped.push(`${file}:${sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1} ${[
-                    ...unsupported,
-                  ].join(",")}`);
+                if (unsupported.size) {
+                  skipped.push(
+                    `${file}:${sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1} ${[
+                      ...unsupported,
+                    ].join(",")}`
+                  );
                 } else {
                   const type = node.variableDeclaration.type;
-                  edits.push({ start: type.getFullStart(), end: type.getEnd(), text: "" });
+                  edits.push({ start: binding.getEnd(), end: type.getEnd(), text: "" });
                   narrowed += 1;
-
                   for (const property of properties) {
                     const field = property.name.text;
-                    const replacementField =
-                      field === "message" && property.questionDotToken ? "optionalMessage" : field;
+                    const detail = field === "message" && property.questionDotToken ? "optionalMessage" : field;
                     edits.push({
                       start: property.getStart(sf),
                       end: property.getEnd(),
-                      text: `getErrorDetails(${name}).${replacementField}`,
+                      text: `getErrorDetails(${name}).${detail}`,
                     });
                     needsHelper = true;
                   }
                 }
               }
               ts.forEachChild(node, visit);
-            };
+            }
             visit(sf);
 
-            if (edits.length) {
-              edits.sort((a, b) => b.start - a.start || b.end - a.end);
-              for (const edit of edits) {
-                source = `${source.slice(0, edit.start)}${edit.text}${source.slice(edit.end)}`;
-              }
-              if (needsHelper && !source.includes('from "@shared/errorUtils"')) {
-                source = `import { getErrorDetails } from "@shared/errorUtils";\n${source}`;
-              }
-              fs.writeFileSync(file, source);
-              changedFiles.push(file);
+            if (!edits.length) continue;
+            edits.sort((a, b) => b.start - a.start || b.end - a.end);
+            for (const edit of edits) {
+              source = `${source.slice(0, edit.start)}${edit.text}${source.slice(edit.end)}`;
             }
+            if (needsHelper && !source.includes('from "@shared/errorUtils"')) {
+              source = `import { getErrorDetails } from "@shared/errorUtils";\n${source}`;
+            }
+            fs.writeFileSync(file, source);
+            changed.add(file);
           }
 
-          // apiRequest throws Error objects carrying the parsed response message/status;
-          // the legacy .response branch here is no longer part of that contract.
           const adminPath = "client/src/components/AdminOverrideDialog.tsx";
           let admin = fs.readFileSync(adminPath, "utf8");
           const oldAdmin = `    } catch (err: any) {\n      const body = err?.response ? await err.response.json().catch(() => null) : null;\n      setPassword(\"\");\n      setErrorMsg(body?.message || \"Invalid credentials. Please try again.\");\n      throw err;\n    }`;
@@ -180,48 +174,48 @@ jobs:
             admin = `import { getErrorDetails } from "@shared/errorUtils";\n${admin}`;
           }
           fs.writeFileSync(adminPath, admin);
+          changed.add(adminPath);
           narrowed += 1;
-          if (!changedFiles.includes(adminPath)) changedFiles.push(adminPath);
 
-          fs.writeFileSync("/tmp/phase3-semantic-files.txt", changedFiles.sort().join("\n") + "\n");
-          console.log(`Semantically narrowed ${narrowed} catch-any site(s) across ${changedFiles.length} files.`);
-          console.log(`Unsupported catches left before compile: ${skipped.length}`);
+          fs.writeFileSync("/tmp/phase3-files.txt", [...changed].sort().join("\n") + "\n");
+          console.log(`Narrowed ${narrowed} catch-any sites across ${changed.size} files.`);
+          console.log(`Unsupported before the Admin-specific migration: ${skipped.length}`);
           if (skipped.length) console.log(skipped.join("\n"));
           NODE
 
-      - name: Format semantic changes
+      - name: Format and type-check semantic changes
         run: |
-          mapfile -t files < /tmp/phase3-semantic-files.txt
+          mapfile -t files < /tmp/phase3-files.txt
           files+=(shared/errorUtils.ts)
           node node_modules/prettier/bin/prettier.cjs --write "${files[@]}"
-
-      - name: Verify strict TypeScript after semantic narrowing
-        run: npm run check
+          npm run check
 
       - name: Verify structural and i18n boundaries
         run: |
           npm run audit:god-files
           node scripts/audit-i18n-phase14.mjs --json-out /tmp/phase3-i18n.json --markdown-out /tmp/phase3-i18n.md
 
-      - name: Require the catch-any cluster to be empty
+      - name: Require zero catch-any annotations
         run: |
-          count=$(python3 - <<'PY'
+          python3 - <<'PY'
           from pathlib import Path
           import re
           pattern = re.compile(r"catch\s*\(\s*[A-Za-z_$][A-Za-z0-9_$]*\s*:\s*any\s*\)")
-          total = 0
+          sites = []
           for root in [Path("client/src"), Path("server"), Path("shared")]:
               if not root.exists():
                   continue
               for file in list(root.rglob("*.ts")) + list(root.rglob("*.tsx")):
-                  total += len(pattern.findall(file.read_text(encoding="utf-8")))
-          print(total)
+                  text = file.read_text(encoding="utf-8")
+                  for match in pattern.finditer(text):
+                      sites.append(f"{file}:{text.count(chr(10), 0, match.start()) + 1}")
+          print(f"Remaining catch-any sites: {len(sites)}")
+          if sites:
+              print("\n".join(sites))
+              raise SystemExit(1)
           PY
-          )
-          echo "Remaining catch-any sites: $count"
-          test "$count" -eq 0
 
-      - name: Lock exact lint and type-escape gains
+      - name: Lock exact ratchet gains
         run: |
           UPDATE_TYPE_ESCAPE_BASELINE=1 node scripts/audit-type-escapes.mjs
           node scripts/run-lint.mjs --quiet
@@ -232,8 +226,8 @@ jobs:
           import re
 
           lint_path = Path("config/lint-warning-ratchet.json")
-          lint = json.loads(lint_path.read_text(encoding="utf-8"))
-          report = json.loads(Path(lint["scan"]["reportPath"]).read_text(encoding="utf-8"))
+          lint = json.loads(lint_path.read_text())
+          report = json.loads(Path(lint["scan"]["reportPath"]).read_text())
           warnings = 0
           errors = 0
           by_rule = Counter()
@@ -244,16 +238,16 @@ jobs:
                   if message.get("severity") == 1:
                       by_rule[message.get("ruleId") or "(no-rule)"] += 1
           if errors:
-              raise SystemExit(f"Refusing to ratchet a lint run with {errors} error(s)")
-          old_ceiling = lint["totals"]["warningCeiling"]
-          if warnings > old_ceiling:
-              raise SystemExit(f"Warnings increased from ceiling {old_ceiling} to {warnings}")
+              raise SystemExit(f"Lint has {errors} error(s)")
+          old = lint["totals"]["warningCeiling"]
+          if warnings > old:
+              raise SystemExit(f"Warnings rose from {old} to {warnings}")
           lint["totals"]["warningCeiling"] = warnings
           for rule in list(lint.get("perRule", {})):
               lint["perRule"][rule] = by_rule.get(rule, 0)
 
           type_path = Path("config/type-escape-boundaries.json")
-          type_cfg = json.loads(type_path.read_text(encoding="utf-8"))
+          type_cfg = json.loads(type_path.read_text())
           type_total = type_cfg["totals"]["typeEscapeCeiling"]
           suppressions = sum(values[2] for values in type_cfg["scan"]["baseline"].values())
           no_any = by_rule.get("@typescript-eslint/no-explicit-any", 0)
@@ -265,28 +259,19 @@ jobs:
               "stronger than a repository total. This ceiling exists so the two cannot disagree - it must be lowered "
               "whenever the type-escape ceiling is."
           )
-          lint_path.write_text(json.dumps(lint, indent=2) + "\n", encoding="utf-8")
+          lint_path.write_text(json.dumps(lint, indent=2) + "\n")
 
           doc_path = Path("docs/system-quality-program.md")
-          doc = doc_path.read_text(encoding="utf-8")
-          doc, n1 = re.subn(
-              r"(Type escapes \(AST\) \| )[\d,]+( total)",
-              lambda m: f"{m.group(1)}{type_total:,}{m.group(2)}",
-              doc,
-          )
-          doc, n2 = re.subn(
-              r"(ESLint warnings \| )[\d,]+( total)",
-              lambda m: f"{m.group(1)}{warnings:,}{m.group(2)}",
-              doc,
-          )
+          doc = doc_path.read_text()
+          doc, n1 = re.subn(r"(Type escapes \(AST\) \| )[\d,]+( total)", lambda m: f"{m.group(1)}{type_total:,}{m.group(2)}", doc)
+          doc, n2 = re.subn(r"(ESLint warnings \| )[\d,]+( total)", lambda m: f"{m.group(1)}{warnings:,}{m.group(2)}", doc)
           if n1 != 1 or n2 != 1:
-              raise SystemExit(f"Expected one documented figure each, got type={n1}, lint={n2}")
-          doc_path.write_text(doc, encoding="utf-8")
-          print(f"Locked lint warnings {old_ceiling} -> {warnings}")
-          print(f"Locked no-explicit-any -> {no_any}; type escapes -> {type_total}")
+              raise SystemExit(f"Metric doc replacement mismatch: type={n1}, lint={n2}")
+          doc_path.write_text(doc)
+          print(f"Lint warnings {old} -> {warnings}; no-explicit-any -> {no_any}; type escapes -> {type_total}")
           PY
 
-      - name: Run final Phase 3 quality gates
+      - name: Run final Phase 3 gates
         run: |
           npm run check
           npm run lint
@@ -302,7 +287,7 @@ jobs:
           mapfile -t changed < <(git diff --name-only HEAD -- client/src server shared config/lint-warning-ratchet.json config/type-escape-boundaries.json docs/system-quality-program.md)
           node node_modules/prettier/bin/prettier.cjs --check "${changed[@]}"
 
-      - name: Commit completed Phase 3 catch cleanup
+      - name: Commit completed Phase 3
         run: |
           git checkout -- package-lock.json || true
           git config user.name "github-actions[bot]"
