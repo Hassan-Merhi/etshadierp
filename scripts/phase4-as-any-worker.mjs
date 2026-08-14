@@ -11,6 +11,8 @@ const sessionFields = new Set([
   "currentLocationId", "currentPOSStation", "cashAccountId", "canSellNegativeStock",
   "posViewOnly", "daybookEditDays", "canAccessCustomers", "canDeleteRecords", "passwordConfirmedAt"
 ]);
+const skipSessionFiles = new Set();
+const skipAllTargetFiles = new Set();
 
 function walk(dir, out = []) {
   if (!fs.existsSync(dir)) return out;
@@ -59,6 +61,7 @@ function countAsAny() {
 }
 
 function targetedBlockerPass(file) {
+  if (skipAllTargetFiles.has(file)) return 0;
   let source = fs.readFileSync(file, "utf8");
   const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   const edits = [];
@@ -71,7 +74,7 @@ function targetedBlockerPass(file) {
         const inner = receiver.expression;
         if (field === "_handledGlobally") {
           edits.push([receiver.getStart(sf), receiver.end, `${inner.getText(sf)} as { _handledGlobally?: boolean }`]);
-        } else if (sessionFields.has(field) && ts.isPropertyAccessExpression(inner) && inner.name.text === "session") {
+        } else if (!skipSessionFiles.has(file) && sessionFields.has(field) && ts.isPropertyAccessExpression(inner) && inner.name.text === "session") {
           edits.push([receiver.getStart(sf), receiver.end, inner.getText(sf)]);
         }
       }
@@ -107,11 +110,27 @@ for (const [file] of before.byFile) targeted += targetedBlockerPass(file);
 console.log(`PHASE4_WAVE_BEFORE=${before.total}`);
 console.log(`PHASE4_TARGETED_BLOCKERS=${targeted}`);
 
-// First prove the targeted substitutions themselves are sound.
+// Keep the targeted wins that type-check, but do not reject the whole wave because
+// a few authenticated routes relied on `any` to erase optional session fields.
 let targetedCheck = run("npm", ["run", "check"]);
 if (targetedCheck.code !== 0) {
-  console.error(targetedCheck.output);
-  throw new Error("Targeted blocker substitutions failed TypeScript; refusing to mask them with restores.");
+  const badTargetFiles = diagnosticsFiles(targetedCheck.output).filter((file) => changedSourceFiles().includes(file));
+  console.log(`PHASE4_TARGETED_DIRECT_FAILURE_FILES=${badTargetFiles.length}`);
+  for (const file of badTargetFiles) skipSessionFiles.add(file);
+  restore(badTargetFiles);
+  for (const file of badTargetFiles) targetedBlockerPass(file);
+  targetedCheck = run("npm", ["run", "check"]);
+  if (targetedCheck.code !== 0) {
+    const stillBad = diagnosticsFiles(targetedCheck.output).filter((file) => changedSourceFiles().includes(file));
+    console.log(`PHASE4_TARGETED_ALL_RESTORE_FILES=${stillBad.length}`);
+    for (const file of stillBad) skipAllTargetFiles.add(file);
+    restore(stillBad);
+    targetedCheck = run("npm", ["run", "check"]);
+  }
+  if (targetedCheck.code !== 0) {
+    console.error(targetedCheck.output);
+    throw new Error("Targeted blocker wave still failed after restoring directly failing files.");
+  }
 }
 
 let attempted = 0;
@@ -125,11 +144,14 @@ for (let iteration=1; iteration<=35; iteration++) {
   const diag = diagnosticsFiles(check.output);
   const direct = diag.filter((f)=>changed.has(f));
   if (direct.length) {
-    // Preserve targeted blocker improvements while restoring only the blanket-removal part:
-    // restore file then reapply its targeted blocker substitutions.
     restore(direct);
     for (const f of direct) targetedBlockerPass(f);
-    console.log(`Pass ${iteration}: restored ${direct.length} directly failing files, retained targeted substitutions.`);
+    const postRestore = run("npm", ["run", "check"]);
+    if (postRestore.code !== 0) {
+      const rebad = diagnosticsFiles(postRestore.output).filter((f)=>direct.includes(f));
+      for (const f of rebad) { skipSessionFiles.add(f); restore([f]); targetedBlockerPass(f); }
+    }
+    console.log(`Pass ${iteration}: restored ${direct.length} directly failing files while preserving safe targeted substitutions.`);
     continue;
   }
   const remaining = [...changed];
@@ -142,7 +164,7 @@ for (let iteration=1; iteration<=35; iteration++) {
   const [,cluster]=[...clusters.entries()].sort((a,b)=>b[1].length-a[1].length||a[0].localeCompare(b[0]))[0];
   restore(cluster);
   for (const f of cluster) targetedBlockerPass(f);
-  console.log(`Pass ${iteration}: restored ${cluster.length} files from cross-module cluster, retained targeted substitutions.`);
+  console.log(`Pass ${iteration}: restored ${cluster.length} files from cross-module cluster while preserving safe targeted substitutions.`);
 }
 
 const finalCheck=run("npm",["run","check"]);
