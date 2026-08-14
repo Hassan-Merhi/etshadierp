@@ -1,4 +1,4 @@
-name: Phase 4 fast reduction
+name: Phase 4 contextual reduction
 
 on:
   push:
@@ -9,14 +9,14 @@ permissions:
   contents: write
 
 concurrency:
-  group: phase4-fast-${{ github.ref }}
+  group: phase4-contextual-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  fast-reduction:
-    if: ${{ !contains(github.event.head_commit.message, '[phase4-fast]') }}
+  contextual-reduction:
+    if: ${{ !contains(github.event.head_commit.message, '[phase4-contextual]') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
         with:
@@ -26,10 +26,8 @@ jobs:
           node-version: '22.14.0'
           cache: npm
       - run: npm ci
-      - name: Remove typed session and handled-error casts
-        run: node scripts/phase4-family-worker.mjs
-      - name: Remove diagnostic-safe remaining casts
-        run: node scripts/phase4-diagnostic-worker.mjs
+      - name: Retype compiler-required casts from contextual contracts
+        run: node scripts/phase4-contextual-worker.mjs
       - name: Format changed sources
         run: |
           FILES=$(git diff --name-only -- client/src server shared | tr '\n' ' ')
@@ -38,14 +36,16 @@ jobs:
           fi
       - name: Verify TypeScript after formatting
         run: npm run check
-      - name: Persist fast reduction
+      - name: Report remaining cast count
+        run: node scripts/audit-type-escapes.mjs --json | tee phase4-contextual-audit.json || true
+      - name: Persist contextual retyping
         run: |
           if git diff --quiet -- client/src server shared; then
-            echo "No fast reduction to persist."
+            echo "No contextual Phase 4 changes to persist."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add client/src server shared
-          git commit -m "refactor: remove diagnostic-safe Phase 4 casts [phase4-fast]"
+          git commit -m "refactor: replace compiler-required any casts with concrete contracts [phase4-contextual]"
           git push origin HEAD:${GITHUB_REF_NAME}
