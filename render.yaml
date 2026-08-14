@@ -20,7 +20,7 @@ services:
       - key: SESSION_SECRET
         generateValue: true
     healthCheckPath: /api/health/ready
-    autoDeploy: true
+    autoDeployTrigger: checksPass
 
 databases:
   - name: erp-database
