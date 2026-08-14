@@ -1,21 +1,10 @@
 import { useEffect } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { upsertPosDraftSummary } from "@/api/posApi";
-
-interface AutoSaveState {
-  activeLocation: any;
-  rows: any[];
-  notes: string;
-  isCreditSale: boolean;
-  paymentAccountType: string;
-  paymentAccountId: string | null;
-  selectedCustomerId: string | null;
-  currentDraftId: number | null;
-  saveDraftIsPending: boolean;
-}
+import type { PosAutoSaveState } from "../pos-components/posTypes";
 
 interface PosAutosaveParams {
-  autoSaveStateRef: React.MutableRefObject<AutoSaveState>;
+  autoSaveStateRef: React.MutableRefObject<PosAutoSaveState>;
   autoSaveInProgressRef: React.MutableRefObject<boolean>;
   lastSavedFingerprintRef: React.MutableRefObject<string>;
   setCurrentDraftId: (id: number | null) => void;
@@ -83,7 +72,7 @@ export function usePosAutosave({
         lastSavedFingerprintRef.current = fingerprint;
         setLastAutosaved(new Date());
       } catch (err: unknown) {
-        if (err && typeof err === "object" && "status" in err && (err as any).status === 401) {
+        if (err && typeof err === "object" && "status" in err && err.status === 401) {
           sessionLost = true;
         }
       } finally {
