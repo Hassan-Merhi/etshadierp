@@ -128,7 +128,7 @@ export const printLabels = async (
           if (preOpenedWindowsRef.current.sticker) preOpenedWindowsRef.current.sticker.close();
           preOpenedWindowsRef.current = null;
         }
-      } catch (err: any) {
+      } catch (err) {
         openBrowserPrint(labels, undefined, preOpenedWindowsRef);
       }
     } else {

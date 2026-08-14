@@ -822,7 +822,7 @@ export default function BaleProducts() {
       XLSX.utils.book_append_sheet(wb, ws, "Bale Products");
       await XLSX.writeFile(wb, "bale_products_template.xlsx");
       toast({ title: "Template downloaded" });
-    } catch (err: any) {
+    } catch (err) {
       toast({ title: "Error", description: "Failed to generate template", variant: "destructive" });
     }
   };

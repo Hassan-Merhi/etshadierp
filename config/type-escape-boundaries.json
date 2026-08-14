@@ -430,7 +430,7 @@
         0
       ],
       "client/src/pages/BaleProducts.tsx": [
-        11,
+        10,
         9,
         0
       ],
@@ -1360,7 +1360,7 @@
         0
       ],
       "client/src/pages/factory/bale-stock-entry/RemoveFromStockTab.tsx": [
-        11,
+        10,
         0,
         0
       ],
@@ -1380,7 +1380,7 @@
         0
       ],
       "client/src/pages/factory/bale-stock-entry/StockEntryPrinting.ts": [
-        7,
+        6,
         0,
         0
       ],
@@ -6497,6 +6497,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 8827
+    "typeEscapeCeiling": 8824
   }
 }

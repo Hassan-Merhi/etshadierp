@@ -216,7 +216,7 @@ export function RemoveFromStockTab() {
         try {
           await printRawZpl(buildZplBatch(labels, true));
           toast({ title: "Label sent to Zebra printer" });
-        } catch (err: any) {
+        } catch (err) {
           if (assignedColor) openBrowserPrint(labels, assignedColor);
           else printDirectNoDesign(labels);
         }
