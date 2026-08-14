@@ -1,4 +1,4 @@
-name: Phase 4 family reduction
+name: Phase 4 fast reduction
 
 on:
   push:
@@ -13,10 +13,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  family:
-    if: ${{ !contains(github.event.head_commit.message, '[phase4-family]') }}
+  fast-reduction:
+    if: ${{ !contains(github.event.head_commit.message, '[phase4-fast]') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -28,14 +28,24 @@ jobs:
       - run: npm ci
       - name: Remove typed session and handled-error casts
         run: node scripts/phase4-family-worker.mjs
-      - name: Persist family reduction
+      - name: Remove diagnostic-safe remaining casts
+        run: node scripts/phase4-diagnostic-worker.mjs
+      - name: Format changed sources
+        run: |
+          FILES=$(git diff --name-only -- client/src server shared | tr '\n' ' ')
+          if [ -n "$FILES" ]; then
+            node node_modules/prettier/bin/prettier.cjs --write $FILES
+          fi
+      - name: Verify TypeScript after formatting
+        run: npm run check
+      - name: Persist fast reduction
         run: |
           if git diff --quiet -- client/src server shared; then
-            echo "No family reduction to persist."
+            echo "No fast reduction to persist."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add client/src server shared
-          git commit -m "refactor: remove typed Phase 4 cast families [phase4-family]"
+          git commit -m "refactor: remove diagnostic-safe Phase 4 casts [phase4-fast]"
           git push origin HEAD:${GITHUB_REF_NAME}
