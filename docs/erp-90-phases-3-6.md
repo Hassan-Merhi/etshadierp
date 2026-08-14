@@ -54,6 +54,29 @@ Implemented scope:
 
 ## Phase 6 — Quality & Final Certification
 
-Status: pending Phase 5 completion.
+Status: **local certification run complete; GitHub-side certification outstanding**
 
-When all Phase 6 implementation is complete, the combined PR must run and pass the full exact-head certification matrix before merge to `main`.
+The matrix below was run against the branch head in a container with a local
+PostgreSQL, one gate at a time. It is evidence, not a substitute for the
+GitHub run: the runners, the database and the secrets differ.
+
+Passing:
+
+- Static contracts: environment documentation, type-escape ratchet, documentation state index, write-route coverage ratchet, toolchain coherence, script inventory, readable-logging contract, migration registry, i18n classifier and phase-14 audit, bandwidth phases 1–4 (with the phase-3 and phase-4 verifiers), accessibility/RTL contract, mobile-responsive regression, lockfile registry, dependency audit, observability contract, mobile/web routing, production dependencies, final production readiness.
+- Type-check, production build, server-bundle and runtime-dependency verification.
+- Lint: 0 errors, 9441 warnings against a ceiling of 9441; lint warning ratchet holds.
+- Program-6 focused security checks.
+- Disposable schema preparation, application startup migrations (0 failures against a ceiling of 0), and the startup-migration ratchet.
+- Backend suite: 417 files, 3260 tests. API smoke sweep. Frontend suite: 102 files, 665 tests.
+- Coverage: backend 31.43% lines (28195/89686), frontend 13.59% lines (8927/65686). Every floor met, no floor more than five points below measured.
+
+Known limitations of this run, both to be resolved on GitHub rather than papered over here:
+
+- `tests/type-escape-boundaries.test.ts` exceeds its 30-second per-test timeout when the suite runs under v8 coverage instrumentation in this container: the audit it calls scans every source file. It passes 8/8 without instrumentation, and the coverage figures above come from a run with that one suite excluded. On a faster runner the same audit finishes inside the timeout; if it ever does not, the fix is a longer timeout for that suite, not a narrower audit.
+- Phase 2's coverage targets — 35% backend, 20% frontend — are not met. The floors were raised to hold the measured gains (backend statements 27→28 and functions 32→33, frontend lines 11→12 and functions 7→8) rather than left where they were.
+
+Outstanding for the pull request:
+
+- No GitHub Actions run exists for this branch since 13 August: pushes made by the automation token do not create workflow runs, and `workflow_dispatch` is not available to it. CI, CircleCI Parity, Security, I18n Audit, RTL/Accessibility, Mobile Responsiveness and the bandwidth workflows need to be started from the repository — by marking the pull request ready for review, by pushing once from an account whose pushes trigger workflows, or from the Actions tab.
+- Release Verification has still never run. It is deliberately left alone here: it belongs to a deployed environment and its secrets, and running it is the owner's call.
+- The branch is behind `main`, which moved on 14 August. Certification is only meaningful at the exact head that will merge, so the matrix has to be repeated after the base is brought forward.
