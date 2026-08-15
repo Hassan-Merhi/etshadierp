@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import {
@@ -11,7 +11,6 @@ import {
   PackageMinus,
   PackagePlus,
   RefreshCw,
-  Scale,
   TrendingDown,
 } from "lucide-react";
 
@@ -58,11 +57,6 @@ interface Metrics {
   netSalesQty?: number;
 }
 
-interface Location {
-  id: number;
-  name: string;
-}
-
 interface StockInRow {
   id: number;
   activityDate: string;
@@ -88,19 +82,6 @@ interface StockOutRow {
   avgProfitPerBale: number;
 }
 
-interface MovementRow {
-  key: string;
-  activityDate: string;
-  movementType: "Transfer In" | "Transfer Out" | "Adjustment";
-  locationId: number | null;
-  counterpartyLocationId: number | null;
-  stockItemName: string;
-  quantity: number;
-  unitRate: number;
-  value: number;
-  adjustmentType: string | null;
-}
-
 interface PagedRows<T> {
   rows: T[];
   total: number;
@@ -116,13 +97,6 @@ interface DetailResponse {
   summary: Metrics;
   stockIn: PagedRows<StockInRow>;
   stockOut: PagedRows<StockOutRow>;
-}
-
-interface MovementResponse {
-  generatedAt: string;
-  rows: MovementRow[];
-  rowCount: number;
-  truncated: boolean;
 }
 
 const EMPTY_METRICS: Metrics = {
@@ -219,66 +193,12 @@ export default function StockInSalesReportDetail() {
     query.set("limit", "100");
     return `/api/reports/stock-in-sales/detail?${query.toString()}`;
   }, [baseParams, stockInPage, stockOutPage]);
-  const movementUrl = useMemo(() => `/api/reports/stock-in-sales/movements?${baseParams.toString()}`, [baseParams]);
 
   const { data, isLoading, isFetching, isError, error, refetch } = useQuery<DetailResponse, Error>({
     queryKey: [queryUrl, selectedCompany?.id],
     enabled: !!selectedCompany?.id && !!startDate && !!endDate,
     staleTime: 30_000,
   });
-  const { data: movements, isLoading: movementsLoading } = useQuery<MovementResponse, Error>({
-    queryKey: [movementUrl, selectedCompany?.id],
-    enabled: !!selectedCompany?.id && !!startDate && !!endDate,
-    staleTime: 30_000,
-  });
-  const { data: locations = [] } = useQuery<Location[]>({
-    queryKey: ["/api/locations", selectedCompany?.id],
-    enabled: !!selectedCompany?.id,
-    staleTime: 60_000,
-  });
-
-  const locationNameById = useMemo(
-    () => new Map(locations.map((location) => [location.id, location.name])),
-    [locations]
-  );
-  const locationName = useCallback(
-    (id: number | null) => (id ? locationNameById.get(id) || "Location #" + id : "—"),
-    [locationNameById]
-  );
-  const sourceLocationName = useCallback(
-    (row: MovementRow) =>
-      row.movementType === "Transfer In" ? locationName(row.counterpartyLocationId) : locationName(row.locationId),
-    [locationName]
-  );
-  const destinationLocationName = useCallback(
-    (row: MovementRow) =>
-      row.movementType === "Transfer In"
-        ? locationName(row.locationId)
-        : row.movementType === "Transfer Out"
-          ? locationName(row.counterpartyLocationId)
-          : "—",
-    [locationName]
-  );
-
-  const sortedMovements = useMemo(
-    () =>
-      [...(movements?.rows || [])].sort((a, b) => {
-        const date = b.activityDate.localeCompare(a.activityDate);
-        if (date !== 0) return date;
-        const source = sourceLocationName(a).localeCompare(sourceLocationName(b), undefined, {
-          numeric: true,
-          sensitivity: "base",
-        });
-        if (source !== 0) return source;
-        const destination = destinationLocationName(a).localeCompare(destinationLocationName(b), undefined, {
-          numeric: true,
-          sensitivity: "base",
-        });
-        if (destination !== 0) return destination;
-        return a.stockItemName.localeCompare(b.stockItemName, undefined, { numeric: true, sensitivity: "base" });
-      }),
-    [movements?.rows, sourceLocationName, destinationLocationName]
-  );
 
   const sortedStockIn = useMemo(
     () => [...(data?.stockIn.rows || [])].sort(compareDateLocationItem),
@@ -310,14 +230,12 @@ export default function StockInSalesReportDetail() {
       const workbook = new ExcelJS.Workbook();
       const exportParams = new URLSearchParams(baseParams);
       exportParams.set("exportAll", "true");
-      const [detailResponse, movementResponse] = await Promise.all([
-        fetch(`/api/reports/stock-in-sales/detail?${exportParams.toString()}`, { credentials: "include" }),
-        fetch(`/api/reports/stock-in-sales/movements?${exportParams.toString()}`, { credentials: "include" }),
-      ]);
-      if (!detailResponse.ok || !movementResponse.ok) throw new Error("Failed to load export details");
+      const detailResponse = await fetch(`/api/reports/stock-in-sales/detail?${exportParams.toString()}`, {
+        credentials: "include",
+      });
+      if (!detailResponse.ok) throw new Error("Failed to load export details");
 
       const exportData = (await detailResponse.json()) as DetailResponse;
-      const exportMovements = (await movementResponse.json()) as MovementResponse;
 
       const summarySheet = workbook.addWorksheet("Summary");
       summarySheet.columns = [
@@ -367,42 +285,6 @@ export default function StockInSalesReportDetail() {
       );
       stockInSheet.getRow(1).font = { bold: true };
 
-      const movementSheet = workbook.addWorksheet("Inventory Movements");
-      movementSheet.columns = [
-        { header: "Date", key: "date", width: 14 },
-        { header: "Type", key: "type", width: 18 },
-        { header: "Source Location", key: "source", width: 22 },
-        { header: "Destination Location", key: "destination", width: 22 },
-        { header: "Item", key: "item", width: 34 },
-        { header: "Qty +/-", key: "qty", width: 14 },
-        { header: "Rate", key: "rate", width: 16 },
-        { header: "Value +/-", key: "value", width: 18 },
-      ];
-      [...exportMovements.rows]
-        .sort((a, b) => {
-          const date = b.activityDate.localeCompare(a.activityDate);
-          if (date !== 0) return date;
-          const source = sourceLocationName(a).localeCompare(sourceLocationName(b), undefined, {
-            numeric: true,
-            sensitivity: "base",
-          });
-          if (source !== 0) return source;
-          return a.stockItemName.localeCompare(b.stockItemName, undefined, { numeric: true, sensitivity: "base" });
-        })
-        .forEach((row) =>
-          movementSheet.addRow({
-            date: row.activityDate,
-            type: row.adjustmentType ? `${row.movementType} · ${row.adjustmentType}` : row.movementType,
-            source: sourceLocationName(row),
-            destination: destinationLocationName(row),
-            item: row.stockItemName,
-            qty: row.quantity,
-            rate: row.unitRate,
-            value: row.value,
-          })
-        );
-      movementSheet.getRow(1).font = { bold: true };
-
       const salesSheet = workbook.addWorksheet("Sales and Returns");
       salesSheet.columns = [
         { header: "Date", key: "date", width: 14 },
@@ -432,7 +314,7 @@ export default function StockInSalesReportDetail() {
 
       const safeLabel = periodLabel.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-|-$/g, "");
       await writeFile(workbook, `stock-flow-detail-${safeLabel || format(new Date(), "yyyy-MM-dd")}.xlsx`);
-      if (exportData.stockIn.truncated || exportData.stockOut.truncated || exportMovements.truncated) {
+      if (exportData.stockIn.truncated || exportData.stockOut.truncated) {
         toast({
           title: "Export capped",
           description: "At least one section reached the 20,000-row safety limit.",
@@ -546,80 +428,6 @@ export default function StockInSalesReportDetail() {
         </div>
       ) : (
         <>
-          <section className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Scale className="h-5 w-5" />
-              <h2 className="text-lg font-semibold">Inventory Movements</h2>
-              <span className="text-xs text-muted-foreground">
-                Transfers and stock adjustments · {formatNumber(movements?.rowCount || 0, 0)} lines
-              </span>
-            </div>
-            <div className="overflow-hidden rounded-xl border">
-              <div className="max-h-[520px] overflow-auto">
-                <Table className="min-w-[980px]">
-                  <TableHeader>
-                    <TableRow className="bg-muted/40 hover:bg-muted/40">
-                      <TableHead>Date</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Source Location</TableHead>
-                      <TableHead>Destination Location</TableHead>
-                      <TableHead>Item</TableHead>
-                      <TableHead className="text-right">Qty +/-</TableHead>
-                      <TableHead className="text-right">Rate</TableHead>
-                      <TableHead className="text-right">Value +/-</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {movementsLoading ? (
-                      Array.from({ length: 4 }).map((_, i) => (
-                        <TableRow key={i}>
-                          <TableCell colSpan={8}>
-                            <Skeleton className="h-5 w-full" />
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    ) : sortedMovements.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
-                          No transfers or stock adjustments found.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      sortedMovements.map((row) => (
-                        <TableRow key={row.key}>
-                          <TableCell>{displayDate(row.activityDate)}</TableCell>
-                          <TableCell>
-                            {row.movementType}
-                            {row.adjustmentType ? ` · ${row.adjustmentType}` : ""}
-                          </TableCell>
-                          <TableCell>{sourceLocationName(row)}</TableCell>
-                          <TableCell>{destinationLocationName(row)}</TableCell>
-                          <TableCell className="font-medium">{row.stockItemName}</TableCell>
-                          <TableCell
-                            className={`text-right font-mono ${row.quantity < 0 ? "text-red-600" : row.quantity > 0 ? "text-emerald-600" : ""}`}
-                          >
-                            {signedQty(row.quantity)}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">{rate(row.unitRate)}</TableCell>
-                          <TableCell
-                            className={`text-right font-mono ${row.value < 0 ? "text-red-600" : row.value > 0 ? "text-emerald-600" : ""}`}
-                          >
-                            {money(row.value)}
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-              {movements?.truncated && (
-                <p className="border-t px-3 py-2 text-xs text-amber-600">
-                  Movement list reached the 20,000-row safety limit.
-                </p>
-              )}
-            </div>
-          </section>
-
           <section className="space-y-2">
             <div className="flex items-center gap-2">
               <PackagePlus className="h-5 w-5" />
