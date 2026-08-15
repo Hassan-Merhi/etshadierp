@@ -74,9 +74,7 @@ describe("reconciliation by ledger expectation", () => {
     const result = await reconcileConvergenceTx(
       tx,
       7,
-      adapterFor([
-        snapshot({ voucherId: 11, ledgerExpectation: "balanced", ledgerBaseCredit: "40" }),
-      ])
+      adapterFor([snapshot({ voucherId: 11, ledgerExpectation: "balanced", ledgerBaseCredit: "40" })])
     );
 
     expect(result.clean).toBe(false);

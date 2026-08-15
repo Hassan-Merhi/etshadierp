@@ -103,10 +103,9 @@ beforeAll(async () => {
 }, 60000);
 
 afterAll(async () => {
-  await pool.query(
-    `DELETE FROM factory_daybook_entries WHERE company_id = $1 AND reference_table = 'vouchers'`,
-    [ctx.companyId]
-  );
+  await pool.query(`DELETE FROM factory_daybook_entries WHERE company_id = $1 AND reference_table = 'vouchers'`, [
+    ctx.companyId,
+  ]);
   if (factorySettingsCreated) {
     await pool.query(`DELETE FROM factory_settings WHERE company_id = $1`, [ctx.companyId]);
   }
@@ -158,9 +157,7 @@ describe("Daybook mirror is written exactly once", () => {
       agent.post("/api/vouchers/payment-receipt").send(body),
     ]);
 
-    const succeeded = [first, second].filter(
-      (outcome) => outcome.status === "fulfilled" && outcome.value.status < 300
-    );
+    const succeeded = [first, second].filter((outcome) => outcome.status === "fulfilled" && outcome.value.status < 300);
     expect(succeeded.length).toBeGreaterThanOrEqual(1);
 
     const voucherId = voucherIdFrom(

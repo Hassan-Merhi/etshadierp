@@ -70,10 +70,7 @@ describe("scheduler tick guard", () => {
   });
 
   it("releases the guard when a run throws", async () => {
-    const run = vi
-      .fn()
-      .mockRejectedValueOnce(new Error("report generation failed"))
-      .mockResolvedValueOnce(undefined);
+    const run = vi.fn().mockRejectedValueOnce(new Error("report generation failed")).mockResolvedValueOnce(undefined);
     const tick = createSchedulerTick("probeJob", run);
 
     // A failed run that left the guard held would silence the job for the
@@ -100,9 +97,13 @@ describe("scheduler tick guard", () => {
     await tick();
     expect(logger.info).not.toHaveBeenCalled();
 
-    const failing = createSchedulerTick("quietJob", async () => {
-      throw new Error("send failed");
-    }, { quiet: true });
+    const failing = createSchedulerTick(
+      "quietJob",
+      async () => {
+        throw new Error("send failed");
+      },
+      { quiet: true }
+    );
     await failing();
     expect(logger.error).toHaveBeenCalledWith("cron quietJob failed", expect.objectContaining({ action: "quietJob" }));
   });
