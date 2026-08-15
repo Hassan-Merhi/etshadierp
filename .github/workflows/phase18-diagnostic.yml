@@ -1,4 +1,4 @@
-name: Phase 18 Recovery
+name: Phase 18 Safe Inference Cleanup
 
 on:
   push:
@@ -8,8 +8,8 @@ permissions:
   contents: write
 
 jobs:
-  recover:
-    if: contains(github.event.head_commit.message, '[phase18-recover]')
+  safe-inference:
+    if: contains(github.event.head_commit.message, '[phase18-safe1]')
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -21,91 +21,184 @@ jobs:
         with:
           node-version: '22.14.0'
           cache: npm
-      - name: Revert unsafe mechanical exhaustion passes
+      - run: npm ci
+      - name: Confirm recovered baseline is type-green
+        run: npm run check
+      - name: Remove only inference-backed explicit-any annotations
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const ts = require('typescript');
+          const fs = require('fs');
+          const path = require('path');
+
+          const configPath = ts.findConfigFile(process.cwd(), ts.sys.fileExists, 'tsconfig.json');
+          if (!configPath) throw new Error('tsconfig.json not found');
+          const configFile = ts.readConfigFile(configPath, ts.sys.readFile);
+          const parsed = ts.parseJsonConfigFileContent(configFile.config, ts.sys, path.dirname(configPath));
+          const program = ts.createProgram(parsed.fileNames, parsed.options);
+          const checker = program.getTypeChecker();
+          const changed = [];
+          let paramEdits = 0;
+          let variableEdits = 0;
+
+          function typeContainsAny(t, seen = new Set()) {
+            if (!t || seen.has(t.id)) return false;
+            if (t.flags & ts.TypeFlags.Any) return true;
+            seen.add(t.id);
+            if (t.isUnionOrIntersection && t.isUnionOrIntersection()) {
+              return t.types.some(x => typeContainsAny(x, seen));
+            }
+            if (t.aliasTypeArguments && t.aliasTypeArguments.some(x => typeContainsAny(x, seen))) return true;
+            if (t.typeArguments && t.typeArguments.some(x => typeContainsAny(x, seen))) return true;
+            const s = checker.typeToString(t);
+            return /(^|[^A-Za-z0-9_])any([^A-Za-z0-9_]|$)/.test(s);
+          }
+
+          function nodeTypeContainsAny(n) {
+            if (!n) return false;
+            if (n.kind === ts.SyntaxKind.AnyKeyword) return true;
+            let found = false;
+            function walk(x) {
+              if (x.kind === ts.SyntaxKind.AnyKeyword) found = true;
+              if (!found) ts.forEachChild(x, walk);
+            }
+            walk(n);
+            return found;
+          }
+
+          function annotationRange(node, sf) {
+            if (!node.type) return null;
+            const text = sf.text;
+            const typeStart = node.type.getStart(sf);
+            const anchor = node.questionToken ? node.questionToken.end : node.name.end;
+            const between = text.slice(anchor, typeStart);
+            const colonRel = between.lastIndexOf(':');
+            if (colonRel < 0) return null;
+            return { start: anchor + colonRel, end: node.type.end };
+          }
+
+          for (const sf of program.getSourceFiles()) {
+            const fn = path.relative(process.cwd(), sf.fileName).replaceAll('\\', '/');
+            if (sf.isDeclarationFile || fn.startsWith('node_modules/') || fn.startsWith('.github/')) continue;
+            if (!/\.(ts|tsx)$/.test(fn)) continue;
+            const edits = [];
+
+            function visit(node) {
+              if (ts.isParameter(node) && node.type && nodeTypeContainsAny(node.type)) {
+                const parent = node.parent;
+                if (ts.isArrowFunction(parent) || ts.isFunctionExpression(parent)) {
+                  const contextual = checker.getContextualType(parent);
+                  const sig = contextual && contextual.getCallSignatures()[0];
+                  const idx = parent.parameters.indexOf(node);
+                  if (sig && idx >= 0) {
+                    const ps = sig.getParameters();
+                    const sym = ps[Math.min(idx, ps.length - 1)];
+                    if (sym) {
+                      const ct = checker.getTypeOfSymbolAtLocation(sym, node);
+                      if (ct && !(ct.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Never)) && !typeContainsAny(ct)) {
+                        const r = annotationRange(node, sf);
+                        if (r) { edits.push(r); paramEdits++; }
+                      }
+                    }
+                  }
+                }
+              }
+
+              if (ts.isVariableDeclaration(node) && node.type && node.initializer && nodeTypeContainsAny(node.type)) {
+                const it = checker.getTypeAtLocation(node.initializer);
+                const badFlags = ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Never | ts.TypeFlags.Undefined | ts.TypeFlags.Null;
+                if (it && !(it.flags & badFlags) && !typeContainsAny(it)) {
+                  const init = node.initializer;
+                  if (!ts.isArrayLiteralExpression(init) || init.elements.length > 0) {
+                    if (!ts.isObjectLiteralExpression(init) || init.properties.length > 0) {
+                      const r = annotationRange(node, sf);
+                      if (r) { edits.push(r); variableEdits++; }
+                    }
+                  }
+                }
+              }
+              ts.forEachChild(node, visit);
+            }
+            visit(sf);
+
+            if (edits.length) {
+              edits.sort((a,b) => b.start - a.start);
+              let text = sf.text;
+              for (const e of edits) text = text.slice(0, e.start) + text.slice(e.end);
+              fs.writeFileSync(sf.fileName, text);
+              changed.push(fn);
+            }
+          }
+          fs.writeFileSync('/tmp/safe1-files.txt', changed.join('\n') + (changed.length ? '\n' : ''));
+          console.log(`SAFE1_CHANGED_FILES=${changed.length}`);
+          console.log(`SAFE1_PARAMETER_ANNOTATIONS_REMOVED=${paramEdits}`);
+          console.log(`SAFE1_VARIABLE_ANNOTATIONS_REMOVED=${variableEdits}`);
+          NODE
+          git diff --stat
+      - name: Compiler-gate transformed files and retain only green files
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            set +e
+            npm run check > /tmp/safe1-check.log 2>&1
+            rc=$?
+            set -e
+            if [ $rc -eq 0 ]; then
+              echo "SAFE1_TYPESCRIPT_GREEN_AT_ATTEMPT=$attempt"
+              break
+            fi
+            echo "SAFE1_ATTEMPT_${attempt}_FAILED"
+            python - <<'PY'
+          import re, pathlib, subprocess
+          log = pathlib.Path('/tmp/safe1-check.log').read_text(errors='replace')
+          changed = set(pathlib.Path('/tmp/safe1-files.txt').read_text().splitlines())
+          errs = set()
+          for line in log.splitlines():
+              m = re.match(r'(.+?\.(?:ts|tsx))\(\d+,\d+\):\s+error\s+TS\d+:', line)
+              if m:
+                  errs.add(m.group(1).replace('\\','/'))
+          revert = sorted(errs & changed)
+          print('SAFE1_ERROR_FILES=' + str(len(errs)))
+          print('SAFE1_REVERTING_CHANGED_ERROR_FILES=' + str(len(revert)))
+          for f in revert:
+              subprocess.run(['git','checkout','HEAD','--',f], check=True)
+          pathlib.Path('/tmp/safe1-files.txt').write_text('\n'.join(sorted(changed-set(revert))) + ('\n' if changed-set(revert) else ''))
+          if not revert:
+              pathlib.Path('/tmp/safe1-stuck').write_text('1')
+          PY
+            if [ -f /tmp/safe1-stuck ]; then
+              cat /tmp/safe1-check.log
+              exit 2
+            fi
+            if [ "$attempt" = 5 ]; then
+              cat /tmp/safe1-check.log
+              exit 2
+            fi
+          done
+          npm run check
+      - name: Measure retained reduction
+        shell: bash
+        run: |
+          set +e
+          npm run audit:type-escapes > /tmp/safe1-escapes.log 2>&1
+          rc=$?
+          set -e
+          tail -n 100 /tmp/safe1-escapes.log
+          echo "TYPE_ESCAPE_AUDIT_EXPECTED_NONZERO_EXIT=$rc"
+          echo "SAFE1_RETAINED_FILES=$(git diff --name-only | grep -E '\.(ts|tsx)$' | wc -l)"
+      - name: Commit and push green inference cleanup
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          revert_one() {
-            commit="$1"; parent="$2"; label="$3"
-            echo "=== reverting $label ==="
-            set +e
-            git revert --no-commit "$commit"
-            rc=$?
-            set -e
-            if [ $rc -ne 0 ]; then
-              mapfile -t conflicts < <(git diff --name-only --diff-filter=U)
-              printf '%s\n' "${conflicts[@]}"
-              for f in "${conflicts[@]}"; do
-                if git cat-file -e "$parent:$f" 2>/dev/null; then
-                  git show "$parent:$f" > "$f"
-                  git add -- "$f"
-                else
-                  git rm -f -- "$f" || true
-                fi
-              done
-            fi
-            git add -A
-            git commit -m "revert: remove unsafe $label mechanical typing pass [skip ci]" || true
-          }
-          revert_one a4ec34ab3b22cfd9dc6aae8e1be7f0c0e9fc42f2 567e8d9143f5496591f30390e7ec67ff90b98736 phase12-15
-          revert_one 2c7a00a96c72524e3a9c559664729e1de002e772 a04cb7a9d37cd6ef18687c5a38a0cf9a232ff0fc phase8-11
-          revert_one 55b1a292a7d0b7b44e3583d53656d182997b25c0 f9c8e96b325f870c0f2a624ef02a364467fca9a8 phase5-7
-      - name: Merge current main
-        shell: bash
-        run: |
-          set -euo pipefail
-          git fetch origin main
-          set +e
-          git merge --no-edit origin/main
-          rc=$?
-          set -e
-          if [ $rc -ne 0 ]; then
-            mapfile -t conflicts < <(git diff --name-only --diff-filter=U)
-            printf '%s\n' "${conflicts[@]}"
-            for f in "${conflicts[@]}"; do
-              case "$f" in
-                config/lint-warning-ratchet.json|config/type-escape-boundaries.json) git checkout --ours -- "$f" ;;
-                *) echo "Unhandled main conflict: $f"; exit 2 ;;
-              esac
-              git add -- "$f"
-            done
-            git commit --no-edit
+          git add -A
+          if git diff --cached --quiet; then
+            echo 'No safe inference edits retained.'
+            exit 0
           fi
-      - name: Repair recovered compiler edge cases
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          p=Path('client/src/pages/LocationSummary.tsx')
-          s=p.read_text().replace('}, [expandedGroups, hiddenRows, summaryData.stockGroups]);','}, [expandedGroups, hiddenRows, summaryData?.stockGroups]);')
-          p.write_text(s)
-
-          p=Path('server/routes/factory/suppliers/balance/with-balances.ts')
-          s=p.read_text().replace('let _fxNetUsd = 0;', 'let fxNetUsd = 0;').replace('_fxNetUsd +=', 'fxNetUsd +=')
-          p.write_text(s)
-
-          p=Path('server/routes/factory/suppliers/fx/transfers.ts')
-          s=p.read_text().replace('let _available: number;', 'let available: number;').replace('_available = commAvail;', 'available = commAvail;').replace('_available = supplierAvail + commAvail;', 'available = supplierAvail + commAvail;')
-          p.write_text(s)
-
-          p=Path('client/src/app/PropertiesRoutes.tsx')
-          s=p.read_text()
-          if 'sessionContracts' not in s:
-              s=s.replace('import PropertiesRentalsHub from "@/pages/properties/PropertiesRentalsHub";','import PropertiesRentalsHub from "@/pages/properties/PropertiesRentalsHub";\nimport type { AuthenticatedUser } from "@/contracts/sessionContracts";')
-          s=s.replace('user: any;', 'user: Pick<AuthenticatedUser, "role">;')
-          s=s.replace('user?.role === "Admin" || user?.role === "Developer"','user.role === "Admin" || user.role === "Developer"')
-          p.write_text(s)
-          PY
-          git add -A
-      - run: npm ci
-      - name: Require green TypeScript before writing recovery
-        run: npm run check
-      - name: Commit and push recovered baseline
-        shell: bash
-        run: |
-          set -euo pipefail
-          git add -A
-          git commit -m "repair: restore type-safe lint baseline and merge current main [phase18-recovery] [skip ci]" || true
+          git commit -m "refactor: compiler-gated inference cleanup [phase18-safe1-result] [skip ci]"
           git push origin HEAD:agent/lint-phase-4-fast
