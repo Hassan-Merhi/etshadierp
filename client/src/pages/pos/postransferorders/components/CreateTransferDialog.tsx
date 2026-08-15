@@ -50,7 +50,7 @@ export function CreateTransferDialog({
     enabled: !!sourceId && open,
   });
 
-  const addedIds = new Set(items.map((i) => i.stockItemId));
+  const addedIds = useMemo(() => new Set(items.map((i) => i.stockItemId)), [items]);
 
   const searchMatches = useMemo(() => {
     const s = itemSearch.toLowerCase().trim();

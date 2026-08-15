@@ -124,7 +124,10 @@ function EditableTransferDetail({
     quantity: i.quantity ?? "0",
   }));
 
-  const alreadyAddedIds = new Set([...extraItems.map((e) => e.stockItemId), ...myItems.map((i) => i.stockItemId)]);
+  const alreadyAddedIds = useMemo(
+    () => new Set([...extraItems.map((e) => e.stockItemId), ...myItems.map((i) => i.stockItemId)]),
+    [extraItems, myItems]
+  );
 
   const panelMatches = useMemo(
     () =>

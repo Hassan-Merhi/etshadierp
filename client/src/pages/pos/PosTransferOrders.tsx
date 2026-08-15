@@ -88,45 +88,212 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
 
   return (
     <section className="min-w-0 max-w-full space-y-4" data-pos-transfer-orders="true">
-      <PageHeader title="Transfer Orders" />
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[220px] flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search transfers..." className="pl-9" />
+      <PageHeader title="Orders" subtitle="Review and adjust quantities for your location" showBackButton={false}>
+        {myLocations.length > 1 && (
+          <Button className="w-full sm:w-auto" onClick={() => setCreateOpen(true)} data-testid="button-new-transfer">
+            <Plus className="mr-1.5 h-4 w-4" />
+            New Transfer
+          </Button>
+        )}
+      </PageHeader>
+
+      <div
+        role="search"
+        aria-label="Transfer order filters"
+        className="grid min-w-0 grid-cols-1 gap-3 rounded-xl border bg-muted/20 p-3 sm:grid-cols-2 lg:grid-cols-[10rem_9rem_minmax(12rem,1fr)_auto] lg:items-end"
+      >
+        <div className="min-w-0 space-y-1">
+          <label htmlFor="pos-transfer-date-filter" className="text-xs font-medium text-muted-foreground">
+            Date
+          </label>
+          <div className="relative min-w-0">
+            <CalendarIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              id="pos-transfer-date-filter"
+              type="date"
+              value={dateFilter}
+              onChange={(event) => setDateFilter(event.target.value)}
+              className="min-h-11 w-full min-w-0 rounded-lg border bg-background pl-10 pr-2 text-base outline-none focus:ring-2 focus:ring-ring lg:min-h-9 lg:text-sm"
+              data-testid="input-date-filter"
+            />
+          </div>
         </div>
-        <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as "all" | "applied" | "pending")}>
-          <SelectTrigger className="w-[150px]"><SelectValue placeholder="Status" /></SelectTrigger>
-          <SelectContent><SelectItem value="all">All</SelectItem><SelectItem value="applied">Applied</SelectItem><SelectItem value="pending">Pending</SelectItem></SelectContent>
-        </Select>
-        <div className="relative">
-          <CalendarIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input type="date" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} className="w-[170px] pl-9" />
+
+        <div className="min-w-0 space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">Status</label>
+          <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}>
+            <SelectTrigger className="min-h-11 w-full lg:min-h-9" data-testid="select-status-filter">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="applied">Applied</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        {hasFilters && <Button variant="ghost" size="sm" onClick={clearFilters}><X className="mr-1 h-4 w-4" />Clear</Button>}
-        <Button onClick={() => setCreateOpen(true)}><Plus className="mr-2 h-4 w-4" />New Transfer</Button>
+
+        <div className="min-w-0 space-y-1 sm:col-span-2 lg:col-span-1">
+          <label htmlFor="pos-transfer-list-search" className="text-xs font-medium text-muted-foreground">
+            Search
+          </label>
+          <div className="relative min-w-0">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="pos-transfer-list-search"
+              placeholder="Voucher number or item"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              className="min-h-11 pl-10 text-base lg:min-h-9 lg:text-sm"
+              data-testid="input-list-search"
+            />
+          </div>
+        </div>
+
+        {hasFilters ? (
+          <Button
+            variant="outline"
+            onClick={clearFilters}
+            className="min-h-11 w-full gap-1.5 sm:col-span-2 lg:col-span-1 lg:min-h-9 lg:w-auto"
+            data-testid="button-clear-filters"
+          >
+            <X className="h-4 w-4" />
+            Clear
+          </Button>
+        ) : (
+          <div className="hidden lg:block" aria-hidden="true" />
+        )}
+      </div>
+
+      <div className="flex items-center justify-between px-1">
+        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          {isLoading ? "Loading…" : `${transfers.length} ${transfers.length === 1 ? "order" : "orders"}`}
+        </span>
       </div>
 
       {isLoading ? (
-        <div className="space-y-2"><Skeleton className="h-16 w-full" /><Skeleton className="h-16 w-full" /><Skeleton className="h-16 w-full" /></div>
-      ) : transfers.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">No transfer orders found.</div>
-      ) : (
-        <div className="space-y-2">
-          {transfers.map((transfer) => (
-            <div key={transfer.id} className={cn("flex flex-wrap items-center gap-3 rounded-lg border p-3", transfer.inventoryApplied && "bg-muted/20")}>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2"><span className="font-medium">{transfer.voucherNumber}</span>{transfer.inventoryApplied ? <Badge variant="secondary"><CheckCircle2 className="mr-1 h-3 w-3" />Applied</Badge> : <Badge variant="outline"><Clock className="mr-1 h-3 w-3" />Pending</Badge>}</div>
-                <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground"><span>{formatDate(transfer.voucherDate)}</span><ArrowRight className="h-3 w-3" /><span>{transfer.destinationLocationName ?? `Location ${transfer.destinationLocationId}`}</span><span>•</span><span className="inline-flex items-center"><Package2 className="mr-1 h-3 w-3" />{transfer.stockItemNames?.join(", ") || "No items"}</span></div>
+        <div className="space-y-3">
+          {[1, 2, 3].map((item) => (
+            <div
+              key={item}
+              className="flex min-w-0 flex-col gap-3 rounded-xl border bg-card p-4 sm:flex-row sm:items-center"
+            >
+              <div className="flex min-w-0 flex-1 items-center gap-3">
+                <Skeleton className="h-3 w-3 shrink-0 rounded-full" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Skeleton className="h-4 w-36 max-w-full" />
+                  <Skeleton className="h-3 w-52 max-w-full" />
+                </div>
               </div>
-              <Button size="icon" variant="ghost" onClick={() => openView(transfer.id)} aria-label="View transfer"><Eye className="h-4 w-4" /></Button>
-              <Button size="icon" variant="ghost" onClick={() => setEditVoucherId(transfer.id)} aria-label="Edit transfer"><Pencil className="h-4 w-4" /></Button>
+              <Skeleton className="h-11 w-full sm:w-24" />
             </div>
+          ))}
+        </div>
+      ) : transfers.length === 0 ? (
+        <div
+          className="rounded-xl border border-dashed bg-card py-14 text-center text-muted-foreground"
+          data-testid="text-empty"
+        >
+          <Package2 className="mx-auto mb-3 h-10 w-10 opacity-20" />
+          <p className="text-sm font-medium">No transfer orders found</p>
+          {hasFilters && <p className="mt-1 text-xs opacity-70">Try clearing your filters.</p>}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {transfers.map((transfer) => (
+            <article
+              key={transfer.voucherId}
+              className="min-w-0 rounded-xl border bg-card p-3 shadow-sm transition-shadow hover:shadow-md sm:p-4"
+              data-testid={`row-transfer-${transfer.voucherId}`}
+            >
+              <div className="flex min-w-0 items-start gap-3">
+                <div
+                  className={cn(
+                    "mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full",
+                    transfer.inventoryApplied ? "bg-green-500 dark:bg-green-400" : "bg-amber-400"
+                  )}
+                  aria-hidden="true"
+                />
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <span
+                      className="break-all font-mono text-sm font-semibold"
+                      data-testid={`text-voucher-${transfer.voucherId}`}
+                    >
+                      {transfer.voucherNumber}
+                    </span>
+                    <span className="text-xs text-muted-foreground">{formatDate(transfer.voucherDate)}</span>
+                    {transfer.inventoryApplied ? (
+                      <Badge
+                        variant="secondary"
+                        className="gap-1 bg-green-100 text-xs text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                        data-testid={`badge-applied-${transfer.voucherId}`}
+                      >
+                        <CheckCircle2 className="h-3 w-3" />
+                        Applied
+                      </Badge>
+                    ) : (
+                      <Badge
+                        variant="secondary"
+                        className="gap-1 bg-amber-100 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                        data-testid={`badge-pending-${transfer.voucherId}`}
+                      >
+                        <Clock className="h-3 w-3" />
+                        Pending
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="mt-2 grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 text-sm">
+                    <span className="min-w-0 break-words text-muted-foreground">{transfer.sourceLocationName}</span>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                    <span className="min-w-0 break-words font-medium">{transfer.destinationLocationName}</span>
+                  </div>
+                </div>
+
+                <div className="shrink-0 rounded-lg bg-muted/50 px-2.5 py-2 text-center">
+                  <div className="font-mono text-lg font-bold leading-none tabular-nums">{transfer.itemCount}</div>
+                  <div className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">items</div>
+                </div>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2 border-t pt-3 sm:flex sm:justify-end">
+                <Button
+                  className="min-h-11 w-full gap-2 sm:w-auto"
+                  variant="outline"
+                  onClick={() => openView(transfer.voucherId)}
+                  data-testid={`button-view-${transfer.voucherId}`}
+                >
+                  <Eye className="h-4 w-4" />
+                  View
+                </Button>
+                {!transfer.inventoryApplied && (
+                  <Button
+                    className="min-h-11 w-full gap-2 sm:w-auto"
+                    onClick={() => setEditVoucherId(transfer.voucherId)}
+                    data-testid={`button-edit-${transfer.voucherId}`}
+                  >
+                    <Pencil className="h-4 w-4" />
+                    Adjust
+                  </Button>
+                )}
+              </div>
+            </article>
           ))}
         </div>
       )}
 
+      <ViewTransferDialog
+        voucherId={viewVoucherId}
+        open={viewDialogOpen}
+        onClose={() => {
+          setViewDialogOpen(false);
+          setViewVoucherId(null);
+        }}
+      />
+
       <CreateTransferDialog open={createOpen} onClose={() => setCreateOpen(false)} myLocations={myLocations} />
-      <ViewTransferDialog voucherId={viewVoucherId} open={viewDialogOpen} onClose={() => setViewDialogOpen(false)} />
     </section>
   );
 }

@@ -1,3 +1,5 @@
+const PAY_FROM_LEDGER_TYPES = new Set(["Cash", "Bank", "Loans"]);
+
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { stockItemKeys } from "@/lib/queryKeys";
@@ -155,7 +157,6 @@ export function useVoucherQueries({
   });
 
   // Pay From / Receive Into field: only Cash, Bank, and Loans ledger accounts + all bank accounts
-  const PAY_FROM_LEDGER_TYPES = new Set(["Cash", "Bank", "Loans"]);
   const payFromAccounts = useMemo<CombinedAccount[]>(
     () =>
       [
@@ -164,7 +165,7 @@ export function useVoucherQueries({
           .map((a) => ({ type: "ledger" as const, id: a.id, name: a.name, code: a.code })),
         ...bankAccounts.map((a) => ({ type: "bank" as const, id: a.id, name: a.bankName, code: a.accountNumber })),
       ].sort((a, b) => (a.name || "").localeCompare(b.name || "")),
-    [ledgerAccounts, bankAccounts, PAY_FROM_LEDGER_TYPES]
+    [ledgerAccounts, bankAccounts]
   );
 
   const allAccounts = useMemo<CombinedAccount[]>(() => {
