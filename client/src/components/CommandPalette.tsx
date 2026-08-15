@@ -35,6 +35,7 @@ import {
   HardHat,
   Sparkles,
   Bell,
+  ShieldCheck,
 } from "lucide-react";
 import { useErpVisibleSections } from "@/components/AppSidebar";
 import { useFactoryVisibleSections } from "@/components/FactorySidebar";
@@ -322,6 +323,12 @@ const adminPages: PageEntry[] = [
     icon: LinkIcon,
   },
   { label: "Inventory Repair", description: "Fix inventory discrepancies", path: "/inventory-repair", icon: Wrench },
+  {
+    label: "Convergence Reconciliation",
+    description: "Check documents against the evidence behind them",
+    path: "/convergence-reconciliation",
+    icon: ShieldCheck,
+  },
   {
     label: "Balance Repair",
     description: "Fix rent ledger drift, missing voucher entries, orphaned transfers, deposit flags",
