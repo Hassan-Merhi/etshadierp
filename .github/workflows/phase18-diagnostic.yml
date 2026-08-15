@@ -97,10 +97,6 @@ jobs:
           s=s.replace('user: any;', 'user: Pick<AuthenticatedUser, "role">;')
           s=s.replace('user?.role === "Admin" || user?.role === "Developer"','user.role === "Admin" || user.role === "Developer"')
           p.write_text(s)
-
-          p=Path('client/src/lib/lazyRetry.ts')
-          s=p.read_text().replace('ComponentType<any>', 'ComponentType<never>')
-          p.write_text(s)
           PY
           git add -A
       - run: npm ci
