@@ -200,9 +200,14 @@ jobs:
             fi
           fi
 
+          # Same paths and extensions as the CircleCI Parity job's formatting
+          # step. The two disagreed once — this job covered client/src, server
+          # and shared while parity also covered tests and scripts — and three
+          # unformatted test files reached the parity job because this one had
+          # never looked at them.
           mapfile -d '' changed_files < <(
-            git diff --name-only --diff-filter=ACMR -z "$base_sha" "$GITHUB_SHA" -- client/src server shared |
-              grep -zE '\.(ts|tsx|css)$' || true
+            git diff --name-only --diff-filter=ACMR -z "$base_sha" "$GITHUB_SHA" -- client/src server shared tests scripts |
+              grep -zE '\.(ts|tsx|css|mjs)$' || true
           )
 
           if [ "${#changed_files[@]}" -eq 0 ]; then

@@ -54,6 +54,7 @@
     "lint:fix": "node node_modules/eslint/bin/eslint.js \"client/src/**/*.{ts,tsx}\" \"server/**/*.ts\" \"shared/**/*.ts\" --fix",
     "format": "node node_modules/prettier/bin/prettier.cjs --write \"client/src/**/*.{ts,tsx,css}\" \"server/**/*.ts\" \"shared/**/*.ts\"",
     "format:check": "node node_modules/prettier/bin/prettier.cjs --check \"client/src/**/*.{ts,tsx,css}\" \"server/**/*.ts\" \"shared/**/*.ts\"",
+    "format:check:changed": "node scripts/check-changed-file-formatting.mjs",
     "test:backend": "node node_modules/vitest/vitest.mjs run",
     "test:smoke-sweep": "node node_modules/vitest/vitest.mjs run --config vitest.config.smoke-sweep.ts",
     "test:backend:coverage": "node node_modules/vitest/vitest.mjs run --coverage",
