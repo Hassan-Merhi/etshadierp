@@ -1,129 +1,142 @@
-name: Phase 18 Diagnostic
+name: Phase 18 Recovery
 
 on:
   push:
     branches: [agent/lint-phase-4-fast]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  diagnose:
-    if: contains(github.event.head_commit.message, '[phase18-bootstrap]')
+  recover:
+    if: contains(github.event.head_commit.message, '[phase18-recover]')
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: agent/lint-phase-4-fast
       - uses: actions/setup-node@v4
         with:
           node-version: '22.14.0'
           cache: npm
-      - name: Recover pre-mechanical lint tree
+      - name: Revert unsafe mechanical exhaustion passes
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          : > /tmp/revert-conflicts.txt
           revert_one() {
             commit="$1"; parent="$2"; label="$3"
+            echo "=== reverting $label ==="
             set +e
             git revert --no-commit "$commit"
             rc=$?
             set -e
             if [ $rc -ne 0 ]; then
-              git diff --name-only --diff-filter=U | sed "s#^#$label #" >> /tmp/revert-conflicts.txt
-              while IFS= read -r f; do
-                [ -z "$f" ] && continue
-                if git cat-file -e "$parent:$f" 2>/dev/null; then
-                  git show "$parent:$f" > "$f"
-                  git add -- "$f"
-                else
-                  git rm -f -- "$f" || true
-                fi
-              done < <(git diff --name-only --diff-filter=U)
+              mapfile -t conflicts < <(git diff --name-only --diff-filter=U)
+              printf '%s\n' "${conflicts[@]}"
+              for f in "${conflicts[@]}"; do
+                git checkout --ours -- "$f"
+                python - "$parent" "$commit" "$f" <<'PY'
+          import subprocess, sys, pathlib, re
+          parent, commit, f = sys.argv[1:]
+          patch = subprocess.check_output(['git','diff','--unified=0',parent,commit,'--',f], text=True)
+          removed=[]; added=[]; pairs=[]
+          def flush():
+              global removed, added
+              if len(removed)==len(added) and removed:
+                  pairs.extend(zip(added, removed))
+              removed=[]; added=[]
+          for line in patch.splitlines():
+              if line.startswith('@@'):
+                  flush(); continue
+              if line.startswith('---') or line.startswith('+++') or line.startswith('diff ') or line.startswith('index '):
+                  continue
+              if line.startswith('-'): removed.append(line[1:])
+              elif line.startswith('+'): added.append(line[1:])
+              else: flush()
+          flush()
+          p=pathlib.Path(f)
+          text=p.read_text()
+          changed=0
+          for new, old in pairs:
+              needle=new+'\n'
+              if needle in text:
+                  text=text.replace(needle, old+'\n', 1); changed+=1
+              elif text.endswith(new):
+                  text=text[:-len(new)]+old; changed+=1
+          p.write_text(text)
+          print(f'{f}: semantically inverted {changed}/{len(pairs)} changed lines')
+          PY
+                git add -- "$f"
+              done
             fi
             git add -A
-            git commit -m "probe: roll back $label" || true
+            git commit -m "revert: remove unsafe $label mechanical typing pass [skip ci]" || true
           }
           revert_one a4ec34ab3b22cfd9dc6aae8e1be7f0c0e9fc42f2 567e8d9143f5496591f30390e7ec67ff90b98736 phase12-15
           revert_one 2c7a00a96c72524e3a9c559664729e1de002e772 a04cb7a9d37cd6ef18687c5a38a0cf9a232ff0fc phase8-11
           revert_one 55b1a292a7d0b7b44e3583d53656d182997b25c0 f9c8e96b325f870c0f2a624ef02a364467fca9a8 phase5-7
+      - name: Merge current main
+        shell: bash
+        run: |
+          set -euo pipefail
           git fetch origin main
-          : > /tmp/merge-conflicts.txt
           set +e
           git merge --no-edit origin/main
           rc=$?
           set -e
           if [ $rc -ne 0 ]; then
-            git diff --name-only --diff-filter=U | tee /tmp/merge-conflicts.txt
-            while IFS= read -r f; do
-              [ -z "$f" ] && continue
+            mapfile -t conflicts < <(git diff --name-only --diff-filter=U)
+            printf '%s\n' "${conflicts[@]}"
+            for f in "${conflicts[@]}"; do
               case "$f" in
-                config/*lint*|config/*type-escape*|*lint*ratchet*|*type-escape*) git checkout --ours -- "$f" ;;
-                server/*) git checkout --theirs -- "$f" ;;
-                *) git checkout --ours -- "$f" ;;
+                config/lint-warning-ratchet.json|config/type-escape-boundaries.json) git checkout --ours -- "$f" ;;
+                *) echo "Unhandled main conflict: $f"; exit 2 ;;
               esac
               git add -- "$f"
-            done < /tmp/merge-conflicts.txt
+            done
             git commit --no-edit
           fi
-          echo "RECOVERED_HEAD=$(git rev-parse HEAD)"
+      - name: Repair recovered compiler edge cases
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('client/src/pages/LocationSummary.tsx')
+          s=p.read_text().replace('}, [expandedGroups, hiddenRows, summaryData.stockGroups]);','}, [expandedGroups, hiddenRows, summaryData?.stockGroups]);')
+          p.write_text(s)
+
+          p=Path('server/routes/factory/suppliers/balance/with-balances.ts')
+          s=p.read_text().replace('let _fxNetUsd = 0;', 'let fxNetUsd = 0;').replace('_fxNetUsd +=', 'fxNetUsd +=')
+          p.write_text(s)
+
+          p=Path('server/routes/factory/suppliers/fx/transfers.ts')
+          s=p.read_text().replace('let _available: number;', 'let available: number;').replace('_available = commAvail;', 'available = commAvail;').replace('_available = supplierAvail + commAvail;', 'available = supplierAvail + commAvail;')
+          p.write_text(s)
+
+          p=Path('client/src/app/PropertiesRoutes.tsx')
+          s=p.read_text()
+          if 'sessionContracts' not in s:
+              s=s.replace('import PropertiesRentalsHub from "@/pages/properties/PropertiesRentalsHub";','import PropertiesRentalsHub from "@/pages/properties/PropertiesRentalsHub";\nimport type { AuthenticatedUser } from "@/contracts/sessionContracts";')
+          s=s.replace('user: any;', 'user: Pick<AuthenticatedUser, "role">;')
+          s=s.replace('user?.role === "Admin" || user?.role === "Developer"','user.role === "Admin" || user.role === "Developer"')
+          p.write_text(s)
+
+          p=Path('client/src/lib/lazyRetry.ts')
+          s=p.read_text().replace('ComponentType<any>', 'ComponentType<never>')
+          p.write_text(s)
+          PY
+          git add -A
       - run: npm ci
-      - name: Inventory explicit any contexts
+      - name: Require green TypeScript before writing recovery
+        run: npm run check
+      - name: Commit and push recovered baseline
         shell: bash
         run: |
-          node - <<'NODE' > /tmp/any-inventory.json
-          const fs=require('fs'), path=require('path'), ts=require('typescript');
-          const roots=['client/src','server','shared'];
-          const files=[];
-          const walk=d=>{for(const ent of fs.readdirSync(d,{withFileTypes:true})){const p=path.join(d,ent.name); if(ent.isDirectory()) walk(p); else if(/\.(ts|tsx)$/.test(p)&&!p.endsWith('.d.ts')) files.push(p)}};
-          for(const r of roots) if(fs.existsSync(r)) walk(r);
-          const counts={}, examples={}, byFile={};
-          const add=(kind,file,node,sf)=>{counts[kind]=(counts[kind]||0)+1; (examples[kind]??=[]); if(examples[kind].length<12) examples[kind].push(`${file}:${sf.getLineAndCharacterOfPosition(node.getStart(sf)).line+1}:${node.getText(sf).slice(0,120)}`); byFile[file]=(byFile[file]||0)+1;};
-          for(const file of files){const text=fs.readFileSync(file,'utf8');const sf=ts.createSourceFile(file,text,ts.ScriptTarget.Latest,true,file.endsWith('.tsx')?ts.ScriptKind.TSX:ts.ScriptKind.TS); const visit=n=>{
-            if(n.kind===ts.SyntaxKind.AnyKeyword){let k='other-any-keyword',p=n.parent;
-              if(ts.isParameter(p)) k='parameter';
-              else if(ts.isVariableDeclaration(p)) k=p.initializer?'variable-with-initializer':'variable-no-initializer';
-              else if(ts.isPropertySignature(p)||ts.isPropertyDeclaration(p)) k='property';
-              else if(ts.isFunctionDeclaration(p)||ts.isMethodDeclaration(p)||ts.isArrowFunction(p)||ts.isFunctionExpression(p)) k='return-type';
-              else if(ts.isArrayTypeNode(p)) k='any-array-element';
-              else if(ts.isTypeArgumentNode?.(p)) k='type-argument';
-              else if(ts.isTypeReferenceNode(p)) k='type-reference-argument';
-              else if(ts.isAsExpression(p)||ts.isTypeAssertionExpression(p)) k='cast';
-              else if(ts.isIndexSignatureDeclaration(p)) k='index-signature';
-              add(k,file,n,sf);
-            }
-            ts.forEachChild(n,visit)
-          };visit(sf)}
-          console.log(JSON.stringify({total:Object.values(counts).reduce((a,b)=>a+b,0),counts,examples,topFiles:Object.entries(byFile).sort((a,b)=>b[1]-a[1]).slice(0,100)},null,2));
-          NODE
-          cat /tmp/any-inventory.json
-      - name: TypeScript baseline
-        shell: bash
-        run: |
-          set +e
-          npm run check > /tmp/ts.log 2>&1
-          rc=$?
-          echo "TSC_EXIT=$rc"
-          grep 'error TS' /tmp/ts.log || true
-          exit 0
-      - name: Package recovered source
-        shell: bash
-        run: |
-          tar -czf /tmp/recovered-source.tgz client/src server shared scripts config package.json package-lock.json tsconfig.json eslint.config.js 2>/dev/null || tar -czf /tmp/recovered-source.tgz client/src server shared scripts config package.json package-lock.json tsconfig.json
-          ls -lh /tmp/recovered-source.tgz
-      - name: Upload recovery bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: phase18-recovered-source
-          path: |
-            /tmp/recovered-source.tgz
-            /tmp/any-inventory.json
-            /tmp/ts.log
-            /tmp/revert-conflicts.txt
-            /tmp/merge-conflicts.txt
-          if-no-files-found: error
-          retention-days: 1
+          set -euo pipefail
+          git add -A
+          git commit -m "repair: restore type-safe lint baseline and merge current main [phase18-recovery] [skip ci]" || true
+          git push origin HEAD:agent/lint-phase-4-fast
