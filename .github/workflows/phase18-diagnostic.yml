@@ -51,10 +51,10 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'; git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           gate(){
-            mode="$1"; NODE_PATH="$PWD/node_modules" node /tmp/safe3.cjs "$mode"; list="/tmp/safe3-${mode}.files"
+            mode="$1"; NODE_PATH="$PWD/node_modules" node /tmp/safe3.cjs "$mode"; list="/tmp/safe3-${mode}.files"; green=0
             for attempt in 1 2 3 4; do
               set +e; npm run check >"/tmp/${mode}.log" 2>&1; rc=$?; set -e
-              [ $rc -eq 0 ] && { echo "${mode} GREEN attempt $attempt"; break; }
+              if [ $rc -eq 0 ]; then green=1; echo "${mode} GREEN attempt $attempt"; break; fi
               python - "$mode" "$list" <<'PY'
           import re,pathlib,subprocess,sys
           mode,lst=sys.argv[1:]; log=pathlib.Path('/tmp/'+mode+'.log').read_text(errors='replace'); changed=set(pathlib.Path(lst).read_text().splitlines()); errs=set()
@@ -64,12 +64,11 @@ jobs:
           rev=sorted(errs&changed); print(mode,'errors',len(errs),'reverting',len(rev))
           for f in rev: subprocess.run(['git','checkout','HEAD','--',f],check=True)
           pathlib.Path(lst).write_text('\n'.join(sorted(changed-set(rev)))+('\n' if changed-set(rev) else ''))
-          if not rev: pathlib.Path('/tmp/'+mode+'.stuck').write_text('1')
+          if not rev: pathlib.Path('/tmp/'+mode+'.crossfile').write_text('1')
           PY
-              [ -f "/tmp/${mode}.stuck" ] && { cat "/tmp/${mode}.log"; exit 2; }
-              [ "$attempt" = 4 ] && { cat "/tmp/${mode}.log"; exit 2; }
+              if [ -f "/tmp/${mode}.crossfile" ]; then echo "${mode}: abandoning category due cross-file fallout"; git reset --hard HEAD; rm -f "/tmp/${mode}.crossfile"; return 0; fi
             done
-            npm run check
+            if [ "$green" != 1 ]; then echo "${mode}: abandoning category after retries"; git reset --hard HEAD; return 0; fi
             git add -A; git diff --cached --quiet || git commit -m "refactor: compiler-gated ${mode} cleanup [phase18-safe3-${mode}] [skip ci]"
           }
           gate contextual-params
@@ -79,6 +78,7 @@ jobs:
           gate properties
           gate casts
           gate call-typeargs
+          npm run check
       - name: Measure and push
         shell: bash
         run: |
