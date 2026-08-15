@@ -11,35 +11,15 @@ import {
 } from "@/components/ui/dialog";
 import { PeriodFilter, type PeriodFilterValue } from "@/components/ui/period-filter";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { Location, StockItemData } from "../../stocktransferorder/types";
-
-type MonthlyMovement = {
-  month: number;
-  monthName: string;
-  openingQty: number;
-  openingRate: number;
-  openingValue: number;
-  inwardQty: number;
-  inwardRate: number;
-  inwardValue: number;
-  outwardQty: number;
-  outwardRate: number;
-  outwardValue: number;
-  closingQty: number;
-  closingRate: number;
-  closingValue: number;
-};
-
-type MovementTotals = Omit<MonthlyMovement, "month" | "monthName">;
-
-type StockMovementData = {
-  monthlyData?: MonthlyMovement[];
-  grandTotal?: MovementTotals;
-};
+import type {
+  Location,
+  StockItemData,
+  StockMovementSummaryData,
+} from "../../stocktransferorder/types";
 
 type StockMovementDialogProps = {
   formatAmount: (amount: number) => string;
-  historyData: StockMovementData | undefined;
+  historyData: unknown;
   historyDialogOpen: boolean;
   historyItem: StockItemData | null;
   historyLoading: boolean;
@@ -74,7 +54,8 @@ export function StockMovementDialog({
   setHistoryDialogOpen,
   setHistoryPeriod,
 }: StockMovementDialogProps) {
-  const monthlyData = historyData?.monthlyData ?? [];
+  const typedHistoryData = historyData as StockMovementSummaryData | undefined;
+  const monthlyData = typedHistoryData?.monthlyData ?? [];
   const hasMovement = monthlyData.some(
     (month) =>
       month.inwardQty > 0 ||
@@ -134,10 +115,16 @@ export function StockMovementDialog({
             <table className="w-full text-sm border-collapse" style={{ minWidth: "700px" }}>
               <thead className="sticky top-0 z-10">
                 <tr className="bg-muted border-b">
-                  <th rowSpan={2} className="text-left align-bottom px-3 py-2 border-r font-semibold w-28">
+                  <th
+                    rowSpan={2}
+                    className="text-left align-bottom px-3 py-2 border-r font-semibold w-28"
+                  >
                     Month
                   </th>
-                  <th colSpan={3} className="text-center px-2 py-1.5 border-r font-semibold text-muted-foreground">
+                  <th
+                    colSpan={3}
+                    className="text-center px-2 py-1.5 border-r font-semibold text-muted-foreground"
+                  >
                     Opening
                   </th>
                   <th
@@ -226,22 +213,22 @@ export function StockMovementDialog({
                   );
                 })}
               </tbody>
-              {historyData?.grandTotal && (
+              {typedHistoryData?.grandTotal && (
                 <tfoot className="sticky bottom-0 z-10">
                   <tr className="bg-muted font-bold border-t-2">
                     <td className="px-3 py-2 border-r">Total</td>
-                    <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">{formatQty(historyData.grandTotal.openingQty)}</td>
-                    <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">{formatRate(historyData.grandTotal.openingRate)}</td>
-                    <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">{formatValue(historyData.grandTotal.openingValue)}</td>
-                    <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">{formatQty(historyData.grandTotal.inwardQty)}</td>
-                    <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">{formatRate(historyData.grandTotal.inwardRate)}</td>
-                    <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">{formatValue(historyData.grandTotal.inwardValue)}</td>
-                    <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">{formatQty(historyData.grandTotal.outwardQty)}</td>
-                    <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">{formatRate(historyData.grandTotal.outwardRate)}</td>
-                    <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">{formatValue(historyData.grandTotal.outwardValue)}</td>
-                    <td className="text-right px-3 py-2 tabular-nums text-foreground">{formatQty(historyData.grandTotal.closingQty)}</td>
-                    <td className="text-right px-3 py-2 tabular-nums">{formatRate(historyData.grandTotal.closingRate)}</td>
-                    <td className="text-right px-3 py-2 tabular-nums">{formatValue(historyData.grandTotal.closingValue)}</td>
+                    <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">{formatQty(typedHistoryData.grandTotal.openingQty)}</td>
+                    <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">{formatRate(typedHistoryData.grandTotal.openingRate)}</td>
+                    <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">{formatValue(typedHistoryData.grandTotal.openingValue)}</td>
+                    <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">{formatQty(typedHistoryData.grandTotal.inwardQty)}</td>
+                    <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">{formatRate(typedHistoryData.grandTotal.inwardRate)}</td>
+                    <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">{formatValue(typedHistoryData.grandTotal.inwardValue)}</td>
+                    <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">{formatQty(typedHistoryData.grandTotal.outwardQty)}</td>
+                    <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">{formatRate(typedHistoryData.grandTotal.outwardRate)}</td>
+                    <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">{formatValue(typedHistoryData.grandTotal.outwardValue)}</td>
+                    <td className="text-right px-3 py-2 tabular-nums text-foreground">{formatQty(typedHistoryData.grandTotal.closingQty)}</td>
+                    <td className="text-right px-3 py-2 tabular-nums">{formatRate(typedHistoryData.grandTotal.closingRate)}</td>
+                    <td className="text-right px-3 py-2 tabular-nums">{formatValue(typedHistoryData.grandTotal.closingValue)}</td>
                   </tr>
                 </tfoot>
               )}
@@ -250,7 +237,11 @@ export function StockMovementDialog({
         </div>
 
         <DialogFooter className="flex-shrink-0 pt-2">
-          <Button variant="outline" onClick={() => setHistoryDialogOpen(false)} data-testid="button-history-close">
+          <Button
+            variant="outline"
+            onClick={() => setHistoryDialogOpen(false)}
+            data-testid="button-history-close"
+          >
             Close
           </Button>
           <Button
