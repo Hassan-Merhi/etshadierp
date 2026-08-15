@@ -70,3 +70,45 @@ export interface ImportPreviewRow {
   sourceLocationName: string;
   status: "ok" | "not_found" | "remove" | "new_item";
 }
+
+export interface StockItemOption {
+  id: number;
+  name: string;
+  code: string;
+  uom: string;
+}
+
+export interface ExistingStockTransferItem {
+  stockItemId: number;
+  sourceLocationId?: number | null;
+  quantity: string | number;
+  rate?: string | number | null;
+}
+
+export interface ExistingStockTransfer {
+  id: number;
+  destinationLocationId?: number | null;
+  items?: ExistingStockTransferItem[];
+}
+
+export interface ExistingVoucherHeader {
+  optional?: boolean;
+  voucherDate?: string | null;
+}
+
+export interface StockTransferRevisionItem {
+  stockItemName: string;
+  sourceLocationName?: string | null;
+  originalQuantity: string | number;
+  delta: string | number;
+  newQuantity: string | number;
+}
+
+export interface StockTransferRevision {
+  id: number;
+  revisionNumber: number;
+  optional: boolean;
+  revisionDate?: string | null;
+  note?: string | null;
+  items?: StockTransferRevisionItem[];
+}
