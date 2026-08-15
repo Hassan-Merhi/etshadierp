@@ -104,6 +104,14 @@ jobs:
         if: always() && steps.install.outcome == 'success'
         run: npm run audit:write-routes
 
+      # The ratchet above asks whether a sensitive write is tested. This asks
+      # whether it leaves the trail the rest of the system reconciles against:
+      # a canonical movement journal row for stock, an idempotency key for a
+      # voucher. Both backlogs pin their file set as well as their count.
+      - name: Write-evidence ratchet
+        if: always() && steps.install.outcome == 'success'
+        run: npm run audit:write-evidence
+
       # One Node version across .node-version, .nvmrc, .replit, package.json
       # engines, every workflow, CircleCI's image tag, and the README. Seven
       # sources used to disagree, and a fresh clone that followed the README
