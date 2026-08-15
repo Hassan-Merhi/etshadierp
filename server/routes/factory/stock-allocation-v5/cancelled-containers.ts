@@ -46,7 +46,7 @@ export function registerV5CancelledContainerRoutes(app: Express) {
             LIMIT 50`
       );
 
-      const orders = resultRows(raw).map((r: unknown) => ({
+      const orders = resultRows(raw).map((r: any) => ({
         id: Number(r.id),
         containerNumber: r.containerNumber ?? `Order #${r.id}`,
         status: r.status,
@@ -85,8 +85,8 @@ export function registerV5CancelledContainerRoutes(app: Express) {
             FROM customer_orders
             WHERE id = ${orderId} AND company_id = ${companyId}`
         )
-        .then((r: unknown) =>
-          (r.rows ?? (r as unknown[])).map((row: unknown) => ({
+        .then((r: any) =>
+          (r.rows ?? (r as unknown[])).map((row: any) => ({
             id: Number(row.id),
             status: row.status,
             proformaIdUsed: row.proforma_id_used,

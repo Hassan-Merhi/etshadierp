@@ -17,7 +17,7 @@ import {
 export async function executeContainerOffloadLifecycle(
   input: ContainerOffloadLifecycleInput
 ): Promise<ContainerOffloadLifecycleResult> {
-  return db.transaction(async (tx: unknown) => {
+  return db.transaction(async (tx: any) => {
     const [container] = await tx
       .select()
       .from(schema.containers)

@@ -65,7 +65,7 @@ export function registerPoImportRoutes(app: Express) {
       const allStockItems = await storage.getAllStockItems(req.session.currentCompanyId!);
 
       // Validate all items in the preview
-      const containerPreview = preview.find((p: unknown) => p.containerNumber === containerNumber);
+      const containerPreview = preview.find((p: any) => p.containerNumber === containerNumber);
       if (!containerPreview) {
         errors.push("Container data not found in preview");
       } else {
@@ -162,7 +162,7 @@ export function registerPoImportRoutes(app: Express) {
       const allStockItems = await storage.getAllStockItems(req.session.currentCompanyId!);
 
       // Validate all items in the preview
-      const containerPreview = preview.find((p: unknown) => p.containerNumber === containerNumber);
+      const containerPreview = preview.find((p: any) => p.containerNumber === containerNumber);
       if (!containerPreview) {
         validationErrors.push("Container data not found in preview");
       } else {
@@ -259,7 +259,7 @@ export function registerPoImportRoutes(app: Express) {
       }
 
       // Group items by PO
-      const poGroups = containerPreview.items.reduce((acc: unknown, item: unknown) => {
+      const poGroups = containerPreview.items.reduce((acc: unknown, item: any) => {
         if (!acc[item.poNumber]) {
           acc[item.poNumber] = [];
         }
@@ -337,7 +337,7 @@ export function registerPoImportRoutes(app: Express) {
         containerOtherCharges > 0;
 
       // Calculate total items value across all POs for pro-rating charges
-      const totalAllItemsValue = Object.values(poGroups).reduce((sum: number, items: unknown) => {
+      const totalAllItemsValue = Object.values(poGroups).reduce((sum: number, items: any) => {
         return sum + (items as unknown[]).reduce((s, item) => s + item.lineTotal, 0);
       }, 0);
 

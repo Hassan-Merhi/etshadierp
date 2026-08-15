@@ -33,7 +33,7 @@ export async function getAllLocationPrices(companyId: number): Promise<schema.St
 
 export async function getLocationPricesByStockItem(
   stockItemId: number,
-  _companyId: number
+  companyId: number
 ): Promise<schema.StockItemLocationPrice[]> {
   return await db
     .select()

@@ -351,7 +351,7 @@ async function runPhase1Report(ctx: DataQueryContext): Promise<DataQueryResult> 
           AND fa.attendance_date BETWEEN ${dateFrom} AND ${dateTo}
         GROUP BY fa.status ORDER BY fa.status
       `);
-      const totalRecords = (rows.rows as unknown[]).reduce((s: number, r: unknown) => s + parseInt(r.count || "0"), 0);
+      const totalRecords = (rows.rows as unknown[]).reduce((s: number, r: any) => s + parseInt(r.count || "0"), 0);
       const stats = (rows.rows as unknown[]).map((r) => ({
         label: r.status,
         value: `${r.count} records · ${r.workers} worker(s)`,
@@ -377,8 +377,8 @@ async function runPhase1Report(ctx: DataQueryContext): Promise<DataQueryResult> 
           AND fb.created_at::date BETWEEN ${dateFrom} AND ${dateTo}
         GROUP BY fb.status ORDER BY count DESC
       `);
-      const totalBales = (rows.rows as unknown[]).reduce((s: number, r: unknown) => s + parseInt(r.count || "0"), 0);
-      const totalWeight = (rows.rows as unknown[]).reduce((s: number, r: unknown) => s + parseFloat(r.total_weight || "0"), 0);
+      const totalBales = (rows.rows as unknown[]).reduce((s: number, r: any) => s + parseInt(r.count || "0"), 0);
+      const totalWeight = (rows.rows as unknown[]).reduce((s: number, r: any) => s + parseFloat(r.total_weight || "0"), 0);
       const tableRows = (rows.rows as unknown[]).map((r) => [
         String(r.status).replace(/_/g, " "),
         String(r.count),

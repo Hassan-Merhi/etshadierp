@@ -89,7 +89,7 @@ export async function fetchSpEditAccountingContext(
 export async function fetchSpEditDeductionPerQty(
   isSpCompanyEdit: boolean,
   targetLocationId: number,
-  connection: unknown = db
+  connection: any = db
 ): Promise<number> {
   if (!isSpCompanyEdit) return 0;
   const [editTargetLoc] = await connection

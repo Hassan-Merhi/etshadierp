@@ -102,7 +102,7 @@ export function registerFactoryCustomerStatementPdfRoutes(app: Express) {
 
       const openingBalance = parseFloat(customer.openingBalance || "0");
       const openingSide = customer.openingBalanceSide || "Dr";
-      const _runningBalance = openingSide === "Dr" ? openingBalance : -openingBalance;
+      let runningBalance = openingSide === "Dr" ? openingBalance : -openingBalance;
 
       // Read filter params (forwarded from the frontend export button)
       const dateFromParam = ((req.query.dateFrom as string) || "").trim();
@@ -172,8 +172,8 @@ export function registerFactoryCustomerStatementPdfRoutes(app: Express) {
         return true;
       });
 
-      const totalDr = rows.reduce((s: number, r: unknown) => s + r.debit, 0);
-      const totalCr = rows.reduce((s: number, r: unknown) => s + r.credit, 0);
+      const totalDr = rows.reduce((s: number, r: any) => s + r.debit, 0);
+      const totalCr = rows.reduce((s: number, r: any) => s + r.credit, 0);
       const closingRaw = bfRunning + (totalDr - totalCr);
       const closingBalance = Math.abs(closingRaw);
       const closingBalanceSide = closingRaw >= 0 ? "Dr" : "Cr";
@@ -230,7 +230,7 @@ export function registerFactoryCustomerStatementPdfRoutes(app: Express) {
           logoBuffer = await new Promise<Buffer>((resolve, reject) => {
             const proto = logoUrl.startsWith("https") ? require("https") : require("http");
             proto
-              .get(logoUrl, (r: unknown) => {
+              .get(logoUrl, (r: any) => {
                 const parts: Buffer[] = [];
                 r.on("data", (d: Buffer) => parts.push(d));
                 r.on("end", () => resolve(Buffer.concat(parts)));
@@ -266,7 +266,7 @@ export function registerFactoryCustomerStatementPdfRoutes(app: Express) {
       let custConvAr: ((t: string) => string) | null = null;
       let custBidi: {
         getEmbeddingLevels: (t: string, d: string) => unknown;
-        getReorderedString: (t: string, l: unknown) => string;
+        getReorderedString: (t: string, l: any) => string;
       } | null = null;
       try {
         custConvAr = require("arabic-reshaper").convertArabic;

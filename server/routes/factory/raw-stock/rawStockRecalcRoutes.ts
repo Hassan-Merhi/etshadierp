@@ -15,7 +15,7 @@ import { registerRawStockRecalcRoutes as registerPreservedRawStockRecalcRoutes }
  * the event loop can process any other work.
  */
 function registerLegacyRawStockRecalcRoutes(app: Express): void {
-  const mutablePool = pool as unknown;
+  const mutablePool = pool as any;
   const originalQuery = mutablePool.query;
   mutablePool.query = function guardedRegistrationQuery(...args: unknown[]) {
     const sqlText = typeof args[0] === "string" ? args[0] : args[0]?.text;

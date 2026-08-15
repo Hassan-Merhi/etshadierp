@@ -11,7 +11,7 @@ import { registerContainerLoadedItemImportRoutes } from "./import";
 import { registerContainerLoadedItemReportRoutes } from "./reports";
 import { registerContainerLoadedItemSummaryRoutes } from "./summary";
 
-export function registerContainerLoadedItemsRoutes(app: Express, requireAuth: unknown) {
+export function registerContainerLoadedItemsRoutes(app: Express, requireAuth: any) {
   registerContainerLoadedItemCrudRoutes(app, requireAuth);
   registerContainerLoadedItemImportRoutes(app, requireAuth);
   registerContainerLoadedItemReportRoutes(app, requireAuth);

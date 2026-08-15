@@ -22,7 +22,7 @@ import {
  * the Raw Materials API and used by the moving-average offload formula.
  */
 export async function getAuthoritativeSupplierRemainingKg(
-  tx: unknown,
+  tx: any,
   companyId: number,
   supplierId: number
 ): Promise<number> {
@@ -105,7 +105,7 @@ export async function getAuthoritativeSupplierRemainingKgWithExecutor(
  * the stable historical receipt cost and persisted; subsequent reads remain stable.
  */
 export async function getLockedSupplierRate(
-  tx: unknown,
+  tx: any,
   companyId: number,
   supplierId: number,
   opts: { forUpdate?: boolean } = {}
@@ -140,7 +140,7 @@ export async function getLockedSupplierRate(
 
 /** Pure read-only variant: never performs the legacy lazy-backfill write. */
 export async function getLockedSupplierRateReadOnly(
-  tx: unknown,
+  tx: any,
   companyId: number,
   supplierId: number
 ): Promise<{ rate: number; wasBackfilled: boolean }> {
@@ -213,7 +213,7 @@ export async function getLockedRateDiagnosticsForCompany(
     }
   }
 
-  return db.transaction(async (tx: unknown) => {
+  return db.transaction(async (tx: any) => {
     const rows: LockedRateDiagnosticRow[] = [];
     for (const supplier of suppliers) {
       const persistedRaw = supplier.currentRawMaterialCostPerKgUsd;
@@ -251,7 +251,7 @@ export async function getLockedRateDiagnosticsForCompany(
  * supplier receipt. Fully consumed historical stock never re-enters the average.
  */
 export async function applyOffloadMovingAverage(
-  tx: unknown,
+  tx: any,
   params: {
     companyId: number;
     supplierId: number;
@@ -287,7 +287,7 @@ export async function applyOffloadMovingAverage(
 
 /** Quantity-only manual ADDs require an already-established locked rate. */
 export async function requireExistingLockedRate(
-  tx: unknown,
+  tx: any,
   companyId: number,
   supplierId: number
 ): Promise<number | null> {

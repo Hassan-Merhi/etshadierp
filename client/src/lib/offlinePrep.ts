@@ -10,7 +10,7 @@ export interface DatasetSpec {
   /** Dexie table key on `db` to bulk-save CachedEntities into, or null = offlinePackages */
   tableKey: keyof typeof db | null;
   /** Extract array of items from API response (handles any response shape) */
-  extractItems: (data: unknown, companyId: number) => CachedEntity[];
+  extractItems: (data: any, companyId: number) => CachedEntity[];
 }
 
 export interface PrepPack {
@@ -51,7 +51,7 @@ export interface OfflineReadiness {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function toEntity(id: string | number, companyId: number, data: unknown): CachedEntity {
+function toEntity(id: string | number, companyId: number, data: any): CachedEntity {
   return {
     id,
     companyId,
@@ -61,7 +61,7 @@ function toEntity(id: string | number, companyId: number, data: unknown): Cached
   };
 }
 
-function extractArray(data: unknown): unknown[] {
+function extractArray(data: any): unknown[] {
   if (Array.isArray(data)) return data;
   // Common wrapper shapes
   for (const key of [
@@ -108,7 +108,7 @@ function buildPacks(): PrepPack[] {
           label: "Companies",
           endpoint: "/api/user/companies",
           tableKey: "companies",
-          extractItems: (data, _cid) => extractArray(data).map((c: unknown) => toEntity(c.id, c.id, c)),
+          extractItems: (data, _cid) => extractArray(data).map((c: any) => toEntity(c.id, c.id, c)),
         },
         {
           id: "companySettings",
@@ -130,7 +130,7 @@ function buildPacks(): PrepPack[] {
           endpoint: "/api/exchange-rates",
           tableKey: null,
           extractItems: (data, cid) =>
-            extractArray(data).map((r: unknown) => toEntity(`er_${r.id ?? Math.random()}`, cid, r)),
+            extractArray(data).map((r: any) => toEntity(`er_${r.id ?? Math.random()}`, cid, r)),
         },
       ],
     },
@@ -143,28 +143,28 @@ function buildPacks(): PrepPack[] {
           label: "Locations",
           endpoint: "/api/locations",
           tableKey: "locations",
-          extractItems: (data, cid) => extractArray(data).map((l: unknown) => toEntity(l.id, cid, l)),
+          extractItems: (data, cid) => extractArray(data).map((l: any) => toEntity(l.id, cid, l)),
         },
         {
           id: "ledgerAccounts",
           label: "Ledger accounts",
           endpoint: "/api/ledger-accounts",
           tableKey: "ledgerAccounts",
-          extractItems: (data, cid) => extractArray(data).map((a: unknown) => toEntity(a.id, cid, a)),
+          extractItems: (data, cid) => extractArray(data).map((a: any) => toEntity(a.id, cid, a)),
         },
         {
           id: "suppliers",
           label: "ERP suppliers",
           endpoint: "/api/suppliers",
           tableKey: "suppliers",
-          extractItems: (data, cid) => extractArray(data).map((s: unknown) => toEntity(s.id, cid, s)),
+          extractItems: (data, cid) => extractArray(data).map((s: any) => toEntity(s.id, cid, s)),
         },
         {
           id: "customers",
           label: "Customers",
           endpoint: "/api/customers",
           tableKey: "customers",
-          extractItems: (data, cid) => extractArray(data).map((c: unknown) => toEntity(c.id, cid, c)),
+          extractItems: (data, cid) => extractArray(data).map((c: any) => toEntity(c.id, cid, c)),
         },
         {
           id: "stockItems",
@@ -173,7 +173,7 @@ function buildPacks(): PrepPack[] {
           // for offline lookups.  The full 649 KB payload is not required here.
           endpoint: "/api/stock-items/light",
           tableKey: "stockItems",
-          extractItems: (data, cid) => extractArray(data).map((s: unknown) => toEntity(s.id, cid, s)),
+          extractItems: (data, cid) => extractArray(data).map((s: any) => toEntity(s.id, cid, s)),
         },
         {
           id: "inventory",
@@ -183,7 +183,7 @@ function buildPacks(): PrepPack[] {
           extractItems: (data, cid) =>
             // Backend returns paginated { data, ... } — handle both flat-array
             // and paginated-object formats for forward/backward compatibility.
-            (Array.isArray(data) ? data : (data?.data ?? [])).map((i: unknown) =>
+            (Array.isArray(data) ? data : (data?.data ?? [])).map((i: any) =>
               toEntity(`${i.stockItemId ?? i.stock_item_id}_${i.locationId ?? i.location_id}`, cid, i)
             ),
         },
@@ -198,21 +198,21 @@ function buildPacks(): PrepPack[] {
           label: "POS drafts",
           endpoint: "/api/pos/drafts",
           tableKey: null,
-          extractItems: (data, cid) => extractArray(data).map((d: unknown) => toEntity(`pos_draft_${d.id}`, cid, d)),
+          extractItems: (data, cid) => extractArray(data).map((d: any) => toEntity(`pos_draft_${d.id}`, cid, d)),
         },
         {
           id: "baleProducts",
           label: "Bale products (ERP)",
           endpoint: "/api/bale-products",
           tableKey: null,
-          extractItems: (data, cid) => extractArray(data).map((b: unknown) => toEntity(`bp_${b.id}`, cid, b)),
+          extractItems: (data, cid) => extractArray(data).map((b: any) => toEntity(`bp_${b.id}`, cid, b)),
         },
         {
           id: "employees",
           label: "Employees",
           endpoint: "/api/employees",
           tableKey: "employees",
-          extractItems: (data, cid) => extractArray(data).map((e: unknown) => toEntity(e.id, cid, e)),
+          extractItems: (data, cid) => extractArray(data).map((e: any) => toEntity(e.id, cid, e)),
         },
       ],
     },
@@ -225,56 +225,56 @@ function buildPacks(): PrepPack[] {
           label: "Factory suppliers",
           endpoint: "/api/factory/suppliers",
           tableKey: "factorySuppliers",
-          extractItems: (data, cid) => extractArray(data).map((s: unknown) => toEntity(s.id, cid, s)),
+          extractItems: (data, cid) => extractArray(data).map((s: any) => toEntity(s.id, cid, s)),
         },
         {
           id: "factoryCategories",
           label: "Factory categories",
           endpoint: "/api/factory/categories",
           tableKey: "factoryCategories",
-          extractItems: (data, cid) => extractArray(data).map((c: unknown) => toEntity(c.id, cid, c)),
+          extractItems: (data, cid) => extractArray(data).map((c: any) => toEntity(c.id, cid, c)),
         },
         {
           id: "factoryBaleProducts",
           label: "Factory bale products",
           endpoint: "/api/factory/bale-products",
           tableKey: "factoryBaleProducts",
-          extractItems: (data, cid) => extractArray(data).map((b: unknown) => toEntity(b.id, cid, b)),
+          extractItems: (data, cid) => extractArray(data).map((b: any) => toEntity(b.id, cid, b)),
         },
         {
           id: "factoryContainers",
           label: "Containers",
           endpoint: "/api/factory/containers",
           tableKey: "factoryContainers",
-          extractItems: (data, cid) => extractArray(data).map((c: unknown) => toEntity(c.id, cid, c)),
+          extractItems: (data, cid) => extractArray(data).map((c: any) => toEntity(c.id, cid, c)),
         },
         {
           id: "factoryRawStock",
           label: "Raw stock entries",
           endpoint: "/api/factory/raw-stock",
           tableKey: "factoryRawStock",
-          extractItems: (data, cid) => extractArray(data).map((r: unknown) => toEntity(r.id, cid, r)),
+          extractItems: (data, cid) => extractArray(data).map((r: any) => toEntity(r.id, cid, r)),
         },
         {
           id: "factorySuppliersWithBalances",
           label: "Supplier balances",
           endpoint: "/api/factory/suppliers/with-balances",
           tableKey: null,
-          extractItems: (data, cid) => extractArray(data).map((s: unknown) => toEntity(`fsb_${s.id}`, cid, s)),
+          extractItems: (data, cid) => extractArray(data).map((s: any) => toEntity(`fsb_${s.id}`, cid, s)),
         },
         {
           id: "factoryDaybook",
           label: "Factory daybook",
           endpoint: "/api/factory/daybook",
           tableKey: null,
-          extractItems: (data, cid) => extractArray(data).map((e: unknown) => toEntity(e.id ?? Math.random(), cid, e)),
+          extractItems: (data, cid) => extractArray(data).map((e: any) => toEntity(e.id ?? Math.random(), cid, e)),
         },
         {
           id: "factoryFxRates",
           label: "FX rates",
           endpoint: "/api/factory/fx-rates",
           tableKey: null,
-          extractItems: (data, cid) => extractArray(data).map((r: unknown) => toEntity(r.id ?? Math.random(), cid, r)),
+          extractItems: (data, cid) => extractArray(data).map((r: any) => toEntity(r.id ?? Math.random(), cid, r)),
         },
       ],
     },
@@ -393,7 +393,7 @@ export async function runOfflinePrep(companyId: number, onProgress: (p: PrepProg
         const items = dataset.extractItems(raw, companyId);
 
         if (dataset.tableKey && db[dataset.tableKey]) {
-          const _table = db[dataset.tableKey] as ReturnType<typeof db.users.toCollection>["db"]["table"];
+          const table = db[dataset.tableKey] as ReturnType<typeof db.users.toCollection>["db"]["table"];
           // Clear existing data for this company, then bulk-insert
           await (
             db as unknown as {
@@ -538,7 +538,7 @@ export async function runOfflinePrep(companyId: number, onProgress: (p: PrepProg
     if (supplierEntities.length > 0) {
       total += supplierEntities.length;
       for (const entity of supplierEntities) {
-        let supplier: unknown = {};
+        let supplier: any = {};
         try {
           supplier = JSON.parse(entity.data);
         } catch {

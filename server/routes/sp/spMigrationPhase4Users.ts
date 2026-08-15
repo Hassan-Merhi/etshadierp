@@ -5,7 +5,7 @@ import { resolveTargetLedgerAccount, resolveTargetLocation } from "./spMigration
 import { ensurePhase4CutoverSchema } from "./spMigrationPhase4Inventory";
 import { resultRows, firstRow } from "../../lib/queryResult";
 
-function roleSnapshot(row: unknown): unknown {
+function roleSnapshot(row: any): unknown {
   return {
     role: row.role,
     assignedLocationId: row.assigned_location_id ? pn(row.assigned_location_id) : (row.assignedLocationId ?? null),
@@ -20,7 +20,7 @@ function roleSnapshot(row: unknown): unknown {
 }
 
 async function switchUserSessions(
-  tx: unknown,
+  tx: any,
   params: {
     userId: string;
     fromCompanyId: number;
@@ -57,7 +57,7 @@ async function switchUserSessions(
   return resultRows(result).length;
 }
 
-async function loadUserLocations(tx: unknown, userId: string, companyId: number): Promise<unknown[]> {
+async function loadUserLocations(tx: any, userId: string, companyId: number): Promise<unknown[]> {
   const result = await tx.execute(sql`
     SELECT location_id
     FROM user_locations
@@ -67,7 +67,7 @@ async function loadUserLocations(tx: unknown, userId: string, companyId: number)
   return resultRows(result).map((row) => ({ locationId: pn(row.location_id) }));
 }
 
-async function loadCashMappings(tx: unknown, userId: string, companyId: number): Promise<unknown[]> {
+async function loadCashMappings(tx: any, userId: string, companyId: number): Promise<unknown[]> {
   const result = await tx.execute(sql`
     SELECT location_id, cash_account_id, pos_station
     FROM user_location_cash_accounts
@@ -81,7 +81,7 @@ async function loadCashMappings(tx: unknown, userId: string, companyId: number):
   }));
 }
 
-async function mapRole(sourceId: number, targetId: number, sourceRole: unknown): Promise<unknown> {
+async function mapRole(sourceId: number, targetId: number, sourceRole: any): Promise<unknown> {
   const location = sourceRole.assigned_location_id
     ? await resolveTargetLocation(sourceId, targetId, pn(sourceRole.assigned_location_id))
     : null;
@@ -133,7 +133,7 @@ async function mapAllCashMappings(sourceId: number, targetId: number, rows: unkn
   return mapped;
 }
 
-async function replaceLocations(tx: unknown, userId: string, companyId: number, rows: unknown[]): Promise<void> {
+async function replaceLocations(tx: any, userId: string, companyId: number, rows: unknown[]): Promise<void> {
   await tx.execute(sql`DELETE FROM user_locations WHERE user_id = ${userId} AND company_id = ${companyId}`);
   for (const row of rows) {
     await tx.execute(sql`
@@ -143,7 +143,7 @@ async function replaceLocations(tx: unknown, userId: string, companyId: number, 
   }
 }
 
-async function replaceCashMappings(tx: unknown, userId: string, companyId: number, rows: unknown[]): Promise<void> {
+async function replaceCashMappings(tx: any, userId: string, companyId: number, rows: unknown[]): Promise<void> {
   await tx.execute(
     sql`DELETE FROM user_location_cash_accounts WHERE user_id = ${userId} AND company_id = ${companyId}`
   );
@@ -156,10 +156,10 @@ async function replaceCashMappings(tx: unknown, userId: string, companyId: numbe
 }
 
 async function upsertRole(
-  tx: unknown,
+  tx: any,
   userId: string,
   companyId: number,
-  role: unknown
+  role: any
 ): Promise<{ id: number; created: boolean }> {
   const existing = await tx.execute(sql`
     SELECT id FROM user_company_roles
@@ -229,7 +229,7 @@ export async function moveUsersToTargetExact(
     const userId = String(sourceRole.user_id);
     const mappedRole = await mapRole(sourceId, targetId, sourceRole);
 
-    await db.transaction(async (tx: unknown) => {
+    await db.transaction(async (tx: any) => {
       const sourceLocations = await loadUserLocations(tx, userId, sourceId);
       const sourceCashMappings = await loadCashMappings(tx, userId, sourceId);
       const targetLocationsBefore = await loadUserLocations(tx, userId, targetId);
@@ -363,7 +363,7 @@ export async function restoreUsersToSourceExact(
       ? change.target_cash_mappings_snapshot_before
       : [];
 
-    await db.transaction(async (tx: unknown) => {
+    await db.transaction(async (tx: any) => {
       const restoredSourceRole = await upsertRole(tx, userId, sourceId, sourceRole);
       if (restoredSourceRole.created) summary.sourceRolesRestored++;
       await replaceLocations(tx, userId, sourceId, sourceLocations);

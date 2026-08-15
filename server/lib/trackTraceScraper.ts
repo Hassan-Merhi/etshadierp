@@ -118,7 +118,7 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
     return { success: false, shipment: null, blocked: false, error: "Puppeteer not available" };
   }
 
-  let browser: unknown = null;
+  let browser: any = null;
   const hardStop = setTimeout(() => {
     try {
       browser?.close();
@@ -224,7 +224,7 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
     // Set up new-tab listener BEFORE clicking — "Track direct" opens a popup/tab
     let newTabUrl: string | null = null;
     const newTabPromise = new Promise<string | null>((resolve) => {
-      const handler = (target: unknown) => {
+      const handler = (target: any) => {
         try {
           const url: string = target.url?.() ?? "";
           if (url && url.startsWith("http") && !url.includes("track-trace.com")) {
@@ -301,7 +301,7 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
     } else {
       // Fall back: click/submit via evaluate()
       const submitResult: string = await page
-        .evaluate((_cn: string): string => {
+        .evaluate((cn: string): string => {
           const allLinks = Array.from(
             document.querySelectorAll("a, button, input[type=submit], input[type=button]")
           ) as HTMLElement[];

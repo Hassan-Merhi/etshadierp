@@ -39,7 +39,7 @@ export function registerOrderFinalizeRoutes(app: Express) {
 
       if (orderId === null) return res.status(400).json({ message: "Invalid id" });
 
-      const result = await db.transaction(async (tx: unknown) => {
+      const result = await db.transaction(async (tx: any) => {
         const [order] = await tx
           .select()
           .from(customerOrders)
@@ -315,7 +315,7 @@ export function registerOrderFinalizeRoutes(app: Express) {
       const orderBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
       if (orderBales.length === 0) return res.json({ baleCount: 0, bales: [] });
 
-      const baleIds = orderBales.map((b: unknown) => b.baleId);
+      const baleIds = orderBales.map((b: any) => b.baleId);
       const baleRows = await db
         .select({
           id: factoryBales.id,
@@ -336,14 +336,14 @@ export function registerOrderFinalizeRoutes(app: Express) {
               .from(locations)
               .where(inArray(locations.id, locIds as number[]))
           : [];
-      const locationMap = new Map(locationRecords.map((l: unknown) => [l.id, l.name]));
+      const locationMap = new Map(locationRecords.map((l: any) => [l.id, l.name]));
 
-      const availableBales = baleRows.filter((b: unknown) => ["IN_STOCK", "RESERVED_FOR_ORDER"].includes(b.status));
+      const availableBales = baleRows.filter((b: any) => ["IN_STOCK", "RESERVED_FOR_ORDER"].includes(b.status));
 
       res.json({
         baleCount: availableBales.length,
         totalBalesInOrder: orderBales.length,
-        bales: availableBales.map((b: unknown) => ({
+        bales: availableBales.map((b: any) => ({
           id: b.id,
           baleReference: b.referenceNumber,
           productName: b.productName,

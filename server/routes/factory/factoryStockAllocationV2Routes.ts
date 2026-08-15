@@ -38,7 +38,7 @@ async function computeStockTruth(companyId: number) {
         WHERE company_id = ${companyId} AND status = 'IN_STOCK'
         GROUP BY article_code`
   );
-  const inStockMap = new Map<string, number>(resultRows(inStockRaw).map((r: unknown) => [r.articleCode, Number(r.count)]));
+  const inStockMap = new Map<string, number>(resultRows(inStockRaw).map((r: any) => [r.articleCode, Number(r.count)]));
 
   // RESERVED_FOR_ORDER = bales physically picked into an active loading order
   const inLoadingRaw = await db.execute(
@@ -51,7 +51,7 @@ async function computeStockTruth(companyId: number) {
         GROUP BY fb.article_code`
   );
   const inLoadingMap = new Map<string, number>(
-    resultRows(inLoadingRaw).map((r: unknown) => [r.articleCode, Number(r.count)])
+    resultRows(inLoadingRaw).map((r: any) => [r.articleCode, Number(r.count)])
   );
 
   // ── proformaStockReservations is the backend SOT for reservedNotYetLoaded ──
@@ -65,7 +65,7 @@ async function computeStockTruth(companyId: number) {
         GROUP BY article_code`
   );
   const reservedNotYetLoadedMap = new Map<string, number>(
-    resultRows(reservedRaw).map((r: unknown) => [r.articleCode, Number(r.reservedNotYetLoaded)])
+    resultRows(reservedRaw).map((r: any) => [r.articleCode, Number(r.reservedNotYetLoaded)])
   );
 
   // Union all known article codes from all three sources
@@ -104,7 +104,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
       const activeProformaIds = await db.execute(
         sql`SELECT id FROM customer_proformas WHERE company_id = ${companyId} AND is_active = true`
       );
-      const idsToSync: number[] = activeProformaIds.rows.map((r: unknown) => Number(r.id));
+      const idsToSync: number[] = activeProformaIds.rows.map((r: any) => Number(r.id));
       for (const pid of idsToSync) {
         await syncProformaReservations(db, companyId, pid);
       }
@@ -117,7 +117,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
             WHERE company_id = ${companyId} AND active = false`
       );
       const inactiveArticleCodes = new Set<string>(
-        resultRows(inactiveProductsRaw).flatMap((r: unknown) => {
+        resultRows(inactiveProductsRaw).flatMap((r: any) => {
           const vals: string[] = [];
           if (r.code) vals.push(r.code as string);
           if (r.article_code) vals.push(r.article_code as string);
@@ -173,7 +173,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
       type LoadedEntry = { proformaId: number; articleCode: string; loaded: number };
       const loadedByProforma: LoadedEntry[] = (
         loadedByProformaRaw.rows || (loadedByProformaRaw as unknown as unknown[])
-      ).map((r: unknown) => ({
+      ).map((r: any) => ({
         proformaId: Number(r.proformaId),
         articleCode: r.articleCode,
         loaded: Number(r.loaded),
@@ -187,7 +187,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
           .select({ id: customers.id, legalName: customers.legalName })
           .from(customers)
           .where(inArray(customers.id, customerIds));
-        rows.forEach((c: unknown) => customerMap.set(c.id, c.legalName));
+        rows.forEach((c: any) => customerMap.set(c.id, c.legalName));
       }
 
       // Filter proforma lines that reference inactive products
@@ -210,7 +210,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
               WHERE matched_code IS NOT NULL
               ORDER BY matched_code`
         );
-        (prodRaw.rows || (prodRaw as unknown as unknown[])).forEach((r: unknown) => {
+        (prodRaw.rows || (prodRaw as unknown as unknown[])).forEach((r: any) => {
           if (r.name) productNamesMap[r.articleCode] = r.name;
         });
       }
@@ -271,7 +271,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
       );
       const freeStockCounts: { articleCode: string; count: number }[] = (
         freeStockRaw.rows || (freeStockRaw as unknown as unknown[])
-      ).map((r: unknown) => ({
+      ).map((r: any) => ({
         articleCode: r.articleCode,
         count: Number(r.count),
       }));
@@ -284,7 +284,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
             WHERE company_id = ${companyId} AND status IN ('LOADING','PENDING_VERIFICATION')
             ORDER BY id`
       );
-      const loadings: unknown[] = (loadingsRaw.rows || (loadingsRaw as unknown as unknown[])).map((r: unknown) => ({
+      const loadings: unknown[] = (loadingsRaw.rows || (loadingsRaw as unknown as unknown[])).map((r: any) => ({
         id: r.id,
         customerId: r.customerId,
         containerNumber: r.containerNumber || null,
@@ -302,7 +302,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
               WHERE cob.order_id = ANY(${sqlArray(ids)})
               GROUP BY cob.order_id, fb.article_code`
         );
-        loadingBales = (balesRaw.rows || (balesRaw as unknown as unknown[])).map((r: unknown) => ({
+        loadingBales = (balesRaw.rows || (balesRaw as unknown as unknown[])).map((r: any) => ({
           orderId: r.orderId,
           articleCode: r.articleCode,
           count: Number(r.count),
@@ -320,7 +320,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
           })
           .from(customerProformaLines)
           .where(inArray(customerProformaLines.proformaId, proformaIds));
-        proformaLines = plRaw.map((r: unknown) => ({
+        proformaLines = plRaw.map((r: any) => ({
           proformaId: r.proformaId,
           articleCode: r.articleCode,
           quantity: Number(r.quantity),
@@ -334,7 +334,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
           .select({ id: customers.id, legalName: customers.legalName })
           .from(customers)
           .where(inArray(customers.id, customerIds));
-        rows.forEach((c: unknown) => customerMap.set(c.id, c.legalName));
+        rows.forEach((c: any) => customerMap.set(c.id, c.legalName));
       }
 
       const totalStockMap = new Map(freeStockMap);
@@ -348,7 +348,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
             WHERE company_id = ${companyId} AND active = false`
       );
       const inactiveCodes2 = new Set<string>(
-        inactiveRaw2.rows.flatMap((r: unknown) => {
+        inactiveRaw2.rows.flatMap((r: any) => {
           const vals: string[] = [];
           if (r.code) vals.push(r.code as string);
           if (r.article_code) vals.push(r.article_code as string);
@@ -377,7 +377,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
               WHERE matched_code IS NOT NULL
               ORDER BY matched_code`
         );
-        (prodRaw.rows || (prodRaw as unknown as unknown[])).forEach((r: unknown) => {
+        (prodRaw.rows || (prodRaw as unknown as unknown[])).forEach((r: any) => {
           if (r.name) productNameByCode.set(r.articleCode, r.name);
         });
       }

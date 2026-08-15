@@ -190,7 +190,7 @@ export function useVoucherQueries({
         code: f.code,
         openingBalance: f.openingBalance,
       })),
-      ...customers.map((c: unknown) => ({
+      ...customers.map((c: any) => ({
         type: "customer" as const,
         id: c.id,
         name: c.legalName,
@@ -198,8 +198,8 @@ export function useVoucherQueries({
         openingBalance: c.openingBalance,
       })),
       ...customerSearchResults
-        .filter((c: unknown) => !customers.find((p: unknown) => p.id === c.id))
-        .map((c: unknown) => ({
+        .filter((c: any) => !customers.find((p: any) => p.id === c.id))
+        .map((c: any) => ({
           type: "customer" as const,
           id: c.id,
           name: c.legalName,

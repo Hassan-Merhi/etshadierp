@@ -231,7 +231,7 @@ export function registerAdvanceRepaymentAuditRoutes(app: Express) {
         repaysByAdvId.set(r.advanceId, list);
       }
 
-      const result = await db.transaction(async (tx: unknown) => {
+      const result = await db.transaction(async (tx: any) => {
         // Resolve/create Factory Worker Advances ledger account once
         let [advancesAccount] = await tx
           .select({ id: ledgerAccounts.id })

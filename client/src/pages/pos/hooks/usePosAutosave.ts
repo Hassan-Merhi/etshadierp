@@ -80,5 +80,5 @@ export function usePosAutosave({
       }
     }, 3000);
     return () => clearInterval(interval);
-  }, [autoSaveInProgressRef, autoSaveStateRef, lastSavedFingerprintRef, setCurrentDraftId, setLastAutosaved]);
+  }, []);
 }

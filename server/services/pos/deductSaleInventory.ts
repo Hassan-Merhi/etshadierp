@@ -15,9 +15,9 @@ export interface LockedInventoryResult {
 }
 
 export async function lockAndDeductInventoryForSaleItem(
-  tx: unknown,
+  tx: any,
   parsedLocationId: number,
-  locationId: unknown,
+  locationId: any,
   validatedItem: ValidatedInventoryItem,
   canSellNegativeStock: boolean,
   companyId: number

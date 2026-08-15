@@ -105,7 +105,7 @@ export async function buildWeeklyReportExcelBuffer(companyId: number, period: st
     const isAdd = adj.type === "ADD";
     if (catBalMap.has(ck)) catBalMap.get(ck)!.currentBalance += isAdd ? kg : -kg;
     else catBalMap.set(ck, { name: getCN(adj.catId as number | null), currentBalance: isAdd ? kg : -kg });
-    const ds = typeof adj.date === "string" ? adj.date.slice(0, 10) : (adj.date as unknown).toISOString().slice(0, 10);
+    const ds = typeof adj.date === "string" ? adj.date.slice(0, 10) : (adj.date as any).toISOString().slice(0, 10);
     if (isAdd) {
       if (!stockInByDate.has(ds)) stockInByDate.set(ds, new Map());
       stockInByDate.get(ds)!.set(ck, (stockInByDate.get(ds)!.get(ck) || 0) + kg);
@@ -226,7 +226,7 @@ export async function buildWeeklyReportExcelBuffer(companyId: number, period: st
     LB = "FFE0EAFF",
     DG = "FF374151",
     TBG = "FFD1FAE5";
-  const BS: unknown = { style: "thin", color: { argb: "FFD1D5DB" } };
+  const BS: any = { style: "thin", color: { argb: "FFD1D5DB" } };
   const BA = { top: BS, left: BS, bottom: BS, right: BS };
   sh.getColumn(1).width = 24;
   sh.getColumn(2).width = 14;

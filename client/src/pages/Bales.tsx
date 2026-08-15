@@ -27,7 +27,7 @@ export default function Bales() {
   const [scanMode, setScanMode] = useState<"quick" | "review">("quick");
   const [barcodeInput, setBarcodeInput] = useState("");
   const [showBaleDialog, setShowBaleDialog] = useState(false);
-  const [_scannedBale, setScannedBale] = useState<Partial<InsertBale> | null>(null);
+  const [scannedBale, setScannedBale] = useState<Partial<InsertBale> | null>(null);
   const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [pendingBarcodeToMark, setPendingBarcodeToMark] = useState<number | null>(null);
@@ -176,7 +176,7 @@ export default function Bales() {
         setShowBaleDialog(true);
         setBarcodeInput("");
       }
-    } catch (_error) {
+    } catch (error) {
       toast({
         title: "Error checking barcode",
         description: "Please try again",

@@ -38,7 +38,7 @@ interface StockGroupData {
   items: StockItemData[];
 }
 
-interface _LocationSummaryResponse {
+interface LocationSummaryResponse {
   stockGroups: StockGroupData[];
   grandTotals: Record<number, LocationData>;
   asOfDate: string;
@@ -125,7 +125,7 @@ export default function LocationSummary() {
         }
       }, 100);
     }
-  }, [savedState]);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(selectedLocationIds));
@@ -309,7 +309,16 @@ export default function LocationSummary() {
     const handler = (e: KeyboardEvent) => handleTableKeyDown(e);
     window.addEventListener("keydown", handler, { capture: true });
     return () => window.removeEventListener("keydown", handler, { capture: true });
-  }, [selectedRowKey, summaryData, expandedGroups, locationDialogOpen, selectedLocationIndex, selectedLocations, hiddenRows, handleTableKeyDown]);
+  }, [
+    selectedRowKey,
+    summaryData,
+    expandedGroups,
+    locationDialogOpen,
+    selectedLocationIndex,
+    selectedLocations,
+    hiddenRows,
+    summaryData,
+  ]);
 
   useEffect(() => {
     if (!tableScrollContainer.current) return;
@@ -458,7 +467,7 @@ export default function LocationSummary() {
                   >
                     Particulars
                   </th>
-                  {selectedLocations.map((location, _locIndex) => (
+                  {selectedLocations.map((location, locIndex) => (
                     <th
                       key={location.id}
                       colSpan={3}
@@ -471,7 +480,7 @@ export default function LocationSummary() {
                   ))}
                 </tr>
                 <tr className="bg-muted/80">
-                  {selectedLocations.map((location, _locIndex) => (
+                  {selectedLocations.map((location, locIndex) => (
                     <Fragment key={`header-${location.id}`}>
                       <th
                         className="text-right py-1 px-2 font-medium border-b bg-muted/80"
@@ -678,7 +687,7 @@ export default function LocationSummary() {
                       <td className="py-1 px-2 border-r sticky left-0 bg-primary/10 text-primary z-10">
                         Grand Total (by Location)
                       </td>
-                      {selectedLocations.map((location, _locIndex) => {
+                      {selectedLocations.map((location, locIndex) => {
                         const data = summaryData.grandTotals[location.id] || { quantity: 0, rate: 0, value: 0 };
                         return (
                           <Fragment key={`grand-${location.id}`}>

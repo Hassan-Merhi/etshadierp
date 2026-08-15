@@ -77,7 +77,7 @@ export function registerInvoiceLoadingReportRoutes(app: Express) {
         ];
         let r = 3;
         meta.forEach((row) => {
-          [0, 2].forEach((ci, _idx) => {
+          [0, 2].forEach((ci, idx) => {
             const lc = ws1.getRow(r).getCell(ci + 1);
             lc.value = row[ci];
             lc.font = { bold: true, color: { argb: "FF6B7280" }, size: 10 };

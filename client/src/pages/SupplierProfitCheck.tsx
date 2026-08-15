@@ -127,7 +127,7 @@ export default function SupplierProfitCheck() {
     },
   });
   const selectedSupplier = suppliers.find((s: unknown) => String(s.id) === supplierId);
-  const _linkStockGroupMutation = useMutation({
+  const linkStockGroupMutation = useMutation({
     mutationFn: async (stockGroupId: number | null) => {
       const res = await apiRequest("PATCH", `/api/suppliers/${supplierId}/stock-group`, { stockGroupId });
       return res.json();
@@ -220,7 +220,7 @@ export default function SupplierProfitCheck() {
     if (sellPriceSource === "location_group" && locationGroups.length > 0 && !selectedLocationId) {
       setSelectedLocationId(String(locationGroups[0].id));
     }
-  }, [locationGroups, selectedLocationId, sellPriceSource]);
+  }, [locationGroups, sellPriceSource]);
   const saveOverrideMutation = useMutation({
     mutationFn: async (payload: { supplierId: number; stockItemId: number; poPrice?: number; avgPrice?: number }) => {
       const res = await apiRequest("PUT", "/api/supplier-profit-check/po-overrides", payload);

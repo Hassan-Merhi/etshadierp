@@ -69,7 +69,7 @@ export function StockItemDetailsDialog({
   });
 
   // Fetch grades (include inactive so currently-assigned inactive grades still show)
-  const { data: _stockGrades = [] } = useQuery<StockGrade[]>({
+  const { data: stockGrades = [] } = useQuery<StockGrade[]>({
     queryKey: ["/api/stock-grades", { includeInactive: true }],
     queryFn: async () => {
       const res = await fetch("/api/stock-grades?includeInactive=true", { credentials: "include" });
@@ -359,7 +359,7 @@ export function StockItemDetailsDialog({
       return;
     }
 
-    const updates: unknown = {};
+    const updates: any = {};
 
     if (editedStockItemId !== transaction.stockItemId) {
       updates.stockItemId = editedStockItemId;

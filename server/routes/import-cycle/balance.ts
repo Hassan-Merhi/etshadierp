@@ -517,7 +517,7 @@ export function registerImportCycleBalanceRoutes(app: Express) {
       const traceNetLiabilities = traceLiabilitiesRaw - openingBalanceEquity;
 
       // Verify: our trace matches the netImportCycleBalance exactly
-      const _traceNetBalance = traceAssetTotal + traceExpenseTotal - traceNetLiabilities;
+      const traceNetBalance = traceAssetTotal + traceExpenseTotal - traceNetLiabilities;
 
       // Create precision trace showing exact calculation
       const precisionTrace = {

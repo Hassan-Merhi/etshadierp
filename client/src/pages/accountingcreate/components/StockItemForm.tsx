@@ -39,7 +39,7 @@ function StockItemForm({
       const value = formatNumber(parseFloat(openingQty) * parseFloat(openingRate));
       form.setValue("openingValue", value);
     }
-  }, [form, openingQty, openingRate]);
+  }, [openingQty, openingRate]);
 
   return (
     <Card className="p-4 md:p-6">

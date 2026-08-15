@@ -133,7 +133,7 @@ export function registerSupplierBalanceSingleRoutes(app: Express) {
       // For brokers, their balance = only direct entries + FX-in (no child rollup).
       const computeBalance = (sid: number, openingBal: number) => {
         const supplierContainers = allContainers.filter((c) => c.supplierId === sid);
-        const containerValue = supplierContainers.reduce((sum: number, c: unknown) => {
+        const containerValue = supplierContainers.reduce((sum: number, c: any) => {
           // Use totalKg (declared/agreed weight) not actualReceivedKg — weight differences
           // at offload affect inventory only, not what is owed to the supplier.
           const kg = parseFloat(c.totalKg || "0");
@@ -154,7 +154,7 @@ export function registerSupplierBalanceSingleRoutes(app: Express) {
           return sum + (kg * rate + freightInContainerCurr) * fx + freightDirectUsd;
         }, 0);
         // Commission from supplier's OWN containers (not broker-earned from other suppliers' containers)
-        const ownCommission = supplierContainers.reduce((sum: number, c: unknown) => {
+        const ownCommission = supplierContainers.reduce((sum: number, c: any) => {
           const commAmt = parseFloat(c.commissionAmount || "0");
           if (commAmt <= 0) return sum;
           const commCurr = (c.commissionCurrencyCode || c.currencyCode || "USD").toUpperCase();
@@ -187,7 +187,7 @@ export function registerSupplierBalanceSingleRoutes(app: Express) {
           return sum + commAmt * commFx;
         }, 0);
         // Other charges from other suppliers' containers where this supplier is the charge recipient
-        const otherChargesValue = allContainers.reduce((sum: number, c: unknown) => {
+        const otherChargesValue = allContainers.reduce((sum: number, c: any) => {
           if (c.otherChargesSupplierId !== sid) return sum;
           const oc = parseFloat(c.otherCharges || "0");
           if (oc <= 0) return sum;
@@ -201,7 +201,7 @@ export function registerSupplierBalanceSingleRoutes(app: Express) {
           return sum + oc * fx;
         }, 0);
         // Post-offload additional charges explicitly assigned to this supplier (or children)
-        const offloadChargesValue = offloadAdditionalChargesForSupplier.reduce((sum: number, oc: unknown) => {
+        const offloadChargesValue = offloadAdditionalChargesForSupplier.reduce((sum: number, oc: any) => {
           if (oc.supplierId !== sid) return sum;
           const amt = parseFloat(oc.amount || "0");
           if (amt <= 0) return sum;
@@ -226,7 +226,7 @@ export function registerSupplierBalanceSingleRoutes(app: Express) {
           }
         }
         const supplierPayments = allPayments.filter((p) => p.supplierId === sid);
-        const totalPaid = supplierPayments.reduce((sum: number, p: unknown) => sum + parseFloat(p.amountUsd || "0"), 0);
+        const totalPaid = supplierPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0);
         const voucherPaid = voucherPaidBySupplier[sid] || 0;
         return (
           openingBal +

@@ -18,7 +18,7 @@ function getUserInfo(req: import("express").Request) {
   };
 }
 
-export function registerFactoryStockAllocationV3Routes(app: unknown) {
+export function registerFactoryStockAllocationV3Routes(app: any) {
   // ──────────────────────────────────────────────────────────────
   // GET /api/factory/v3/stock-overview
   // Per-article-code FTP: IN_STOCK - v3 expected_to_load - v3 loading
@@ -470,7 +470,7 @@ export function registerFactoryStockAllocationV3Routes(app: unknown) {
         SELECT bale_id FROM factory_v3_load_bales
         WHERE load_id = ${id} AND removed_at IS NULL
       `);
-      const baleIds: number[] = baleRows.rows.map((r: unknown) => r.bale_id ?? r.baleId);
+      const baleIds: number[] = baleRows.rows.map((r: any) => r.bale_id ?? r.baleId);
 
       // Mark each bale as SOLD in factory_bales (same end-state as existing finalization)
       if (baleIds.length > 0) {

@@ -2,7 +2,7 @@ import { eq, and, sql } from "drizzle-orm";
 import { db, pool } from "../../db";
 import * as schema from "@shared/schema";
 
-export async function getLastPurchaseOrderForItem(stockItemId: number, companyId: number): Promise<unknown | null> {
+export async function getLastPurchaseOrderForItem(stockItemId: number, companyId: number): Promise<any | null> {
   const result = await db
     .select({
       poNumber: schema.purchaseOrders.poNumber,
@@ -21,7 +21,7 @@ export async function getLastPurchaseOrderForItem(stockItemId: number, companyId
   return result.length > 0 ? result[0] : null;
 }
 
-export async function getLastSaleForItem(stockItemId: number, companyId: number): Promise<unknown | null> {
+export async function getLastSaleForItem(stockItemId: number, companyId: number): Promise<any | null> {
   const result = await db
     .select({
       voucherNumber: schema.vouchers.voucherNumber,

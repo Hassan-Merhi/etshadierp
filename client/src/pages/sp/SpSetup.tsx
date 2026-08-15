@@ -11,7 +11,7 @@ const ADMIN_TABS = ["setup", "migration"] as const;
 type AdminTab = (typeof ADMIN_TABS)[number];
 
 export default function SpSetup() {
-  const { data: user, isLoading } = useQuery<unknown>({
+  const { data: user, isLoading } = useQuery<any>({
     queryKey: ["/api/auth/me"],
     queryFn: getQueryFn({ on401: "returnNull" }),
     staleTime: 30 * 60 * 1000,

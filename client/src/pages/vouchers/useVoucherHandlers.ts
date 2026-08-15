@@ -51,7 +51,7 @@ export function useVoucherHandlers({
         }
       });
     } else {
-      const emptyEntryIndex = currentEntries.findIndex((e: unknown) => e.accountId === 0 || !e.accountName);
+      const emptyEntryIndex = currentEntries.findIndex((e: any) => e.accountId === 0 || !e.accountName);
       if (emptyEntryIndex >= 0) {
         targetRowIndex = emptyEntryIndex;
         form.setValue(`entries.${emptyEntryIndex}.accountType`, account.type);

@@ -132,7 +132,7 @@ export function registerOrderBaleSwapRoutes(app: Express) {
         .where(and(eq(customerOrders.id, orderBale.orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Associated order not found" });
 
-      await db.transaction(async (tx: unknown) => {
+      await db.transaction(async (tx: any) => {
         // 5. Update customerOrderBales to point to the replacement bale (keep priceUsed unchanged)
         await tx
           .update(customerOrderBales)

@@ -84,7 +84,7 @@ function money(value: unknown): string {
 export default function SpOverview() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [selectedSale, setSelectedSale] = useState<unknown | null>(null);
+  const [selectedSale, setSelectedSale] = useState<any | null>(null);
   const [reason, setReason] = useState("");
 
   const { data: currentUser } = useQuery<{ role?: string; currentRole?: string | null }>({

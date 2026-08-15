@@ -11,7 +11,7 @@ function transferReversalKeys(transferId: number): string[] {
 }
 
 export const transferRepository = {
-  transaction<T>(callback: (tx: unknown) => Promise<T>): Promise<T> {
+  transaction<T>(callback: (tx: any) => Promise<T>): Promise<T> {
     return db.transaction(callback);
   },
 
@@ -27,7 +27,7 @@ export const transferRepository = {
     return storage.getAllLedgerAccounts(companyId, includeHidden);
   },
 
-  createLedgerAccount(values: unknown) {
+  createLedgerAccount(values: any) {
     return storage.createLedgerAccount(values);
   },
 
@@ -35,12 +35,12 @@ export const transferRepository = {
     return storage.getAllInterCompanyTransfers(companyId);
   },
 
-  async createTransferTx(tx: unknown, values: unknown) {
+  async createTransferTx(tx: any, values: any) {
     const [transfer] = await tx.insert(interCompanyTransfers).values(values).returning();
     return transfer;
   },
 
-  async findTransferByVoucherIdsTx(tx: unknown, fromVoucherId: number, toVoucherId: number) {
+  async findTransferByVoucherIdsTx(tx: any, fromVoucherId: number, toVoucherId: number) {
     const [transfer] = await tx
       .select()
       .from(interCompanyTransfers)
@@ -68,7 +68,7 @@ export const transferRepository = {
     return new Set(rows.map((row) => row.key).filter(Boolean)).size === keys.length;
   },
 
-  async getSimpleTransferForUpdateTx(tx: unknown, transferId: number) {
+  async getSimpleTransferForUpdateTx(tx: any, transferId: number) {
     const [transfer] = await tx
       .select()
       .from(interCompanyTransfers)
@@ -78,7 +78,7 @@ export const transferRepository = {
     return transfer ?? null;
   },
 
-  async getVoucherSnapshotTx(tx: unknown, companyId: number, voucherId: number) {
+  async getVoucherSnapshotTx(tx: any, companyId: number, voucherId: number) {
     const [voucher] = await tx
       .select()
       .from(vouchers)
@@ -119,7 +119,7 @@ export const transferRepository = {
     }));
   },
 
-  async deleteSimpleTransferTx(tx: unknown, transferId: number): Promise<void> {
+  async deleteSimpleTransferTx(tx: any, transferId: number): Promise<void> {
     await tx.delete(interCompanyTransfers).where(eq(interCompanyTransfers.id, transferId));
   },
 };

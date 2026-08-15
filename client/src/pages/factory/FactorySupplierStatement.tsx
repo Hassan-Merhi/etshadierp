@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatNumber } from "@/lib/formatNumber";
 
-const _CURRENCIES = ["USD", "EUR", "GBP", "AUD", "LBP", "XOF", "XAF"];
+const CURRENCIES = ["USD", "EUR", "GBP", "AUD", "LBP", "XOF", "XAF"];
 
 // ─── Row-total helpers ───────────────────────────────────────────────────────
 
@@ -73,7 +73,7 @@ export default function FactorySupplierStatement() {
     queryKey: ["/api/user/companies"],
   });
 
-  const { data: me } = useQuery<unknown>({
+  const { data: me } = useQuery<any>({
     queryKey: ["/api/auth/me"],
   });
   const isAdmin = me?.role === "Admin" || me?.role === "Owner" || me?.role === "Developer";
@@ -88,7 +88,7 @@ export default function FactorySupplierStatement() {
     enabled: !!companyId,
   });
 
-  const { data: statement, isLoading: statementLoading } = useQuery<unknown>({
+  const { data: statement, isLoading: statementLoading } = useQuery<any>({
     queryKey: ["/api/factory/suppliers", supplierId, "statement"],
     queryFn: async () => {
       const res = await fetch(`/api/factory/suppliers/${supplierId}/statement`, { credentials: "include" });

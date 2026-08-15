@@ -4,13 +4,13 @@ import * as schema from "@shared/schema";
 
 import { amount, buildItemMap } from "./types";
 
-async function deleteVoucherWithEntries(tx: unknown, voucherId: number): Promise<void> {
+async function deleteVoucherWithEntries(tx: any, voucherId: number): Promise<void> {
   await tx.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, voucherId));
   await tx.delete(schema.vouchers).where(eq(schema.vouchers.id, voucherId));
 }
 
 export async function reverseExistingOffload(
-  tx: unknown,
+  tx: any,
   container: typeof schema.containers.$inferSelect,
   existingOffload: typeof schema.containerOffloads.$inferSelect,
   lineItems: Array<{ stockItemId: number; quantity: string; rate: string }>

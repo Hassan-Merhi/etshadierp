@@ -51,7 +51,7 @@ async function getLocationWhatsAppSettingsMap(companyId: number): Promise<Map<nu
   }
 }
 
-function withLocationWhatsAppSettings(location: unknown, settings?: LocationWhatsAppSettings) {
+function withLocationWhatsAppSettings(location: any, settings?: LocationWhatsAppSettings) {
   const legacyChatId = location.whatsappGroupChatId ?? null;
   return {
     ...location,

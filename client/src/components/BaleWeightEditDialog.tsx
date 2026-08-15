@@ -34,7 +34,7 @@ export function BaleWeightEditDialog({
   // Reset input whenever a different bale is opened
   useEffect(() => {
     if (bale) setNewWeight("");
-  }, [bale, bale.id]);
+  }, [bale?.id]);
 
   const handleOpenChange = (open: boolean) => {
     if (!open) {

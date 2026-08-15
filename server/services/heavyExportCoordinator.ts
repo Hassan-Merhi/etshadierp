@@ -25,12 +25,12 @@ interface SlotContext {
   label: string;
 }
 
-const state: CoordinatorState = ((globalThis as unknown)[STATE_KEY] ??= {
+const state: CoordinatorState = ((globalThis as any)[STATE_KEY] ??= {
   active: 0,
   queue: [],
 });
 
-const slotContext: AsyncLocalStorage<SlotContext> = ((globalThis as unknown)[CONTEXT_KEY] ??=
+const slotContext: AsyncLocalStorage<SlotContext> = ((globalThis as any)[CONTEXT_KEY] ??=
   new AsyncLocalStorage<SlotContext>());
 
 function readPositiveInt(name: string, fallback: number): number {

@@ -26,7 +26,7 @@ interface UserRolesCardProps {
 export function UserRolesCard({ userId, companies }: UserRolesCardProps) {
   const { toast } = useToast();
   const [activeEditorRoleId, setActiveEditorRoleId] = useState<number | "new" | null>(null);
-  const [roleToDelete, setRoleToDelete] = useState<unknown>(null);
+  const [roleToDelete, setRoleToDelete] = useState<any>(null);
 
   const { data: companyRoles = [] } = useQuery<unknown[]>({
     queryKey: [`/api/users/${userId}/company-roles`],

@@ -118,7 +118,7 @@ export function registerStockTransferImportRoutes(app: Express) {
 
       // Validate each item
       for (const item of items) {
-        const validatedItem: unknown = { ...item };
+        const validatedItem: any = { ...item };
 
         // Find stock item by barcode (code or alias)
         const stockItem = await storage.getStockItemByCodeOrAlias(item.barcode, req.session.currentCompanyId!);
@@ -514,7 +514,7 @@ export function registerStockTransferImportRoutes(app: Express) {
 
       // Validate each item
       for (const item of items) {
-        const validatedItem: unknown = { ...item };
+        const validatedItem: any = { ...item };
 
         // Find source location by name
         const sourceLocationName = item.sourceLocation?.toLowerCase().trim();

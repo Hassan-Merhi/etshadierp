@@ -33,7 +33,7 @@ export default function GcLshiMigration() {
 
   // Account plan / rename state (Step 3 — before staged migration)
   const [accountEdits, setAccountEdits] = useState<Record<string, { code: string; name: string }>>({});
-  const [_accountsCreated, setAccountsCreated] = useState(false);
+  const [accountsCreated, setAccountsCreated] = useState(false);
 
   // Opening balance
   const [obAmount, setObAmount] = useState("");

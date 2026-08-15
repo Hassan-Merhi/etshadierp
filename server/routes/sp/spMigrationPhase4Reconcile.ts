@@ -158,7 +158,7 @@ export async function reconcileHistoricalSalesCopy(params: {
         continue;
       }
       const candidates = targetItems.filter(
-        (targetItem: unknown) =>
+        (targetItem: any) =>
           !linkedTargetItemIds.has(pn(targetItem.id)) &&
           pn(targetItem.stock_item_id) === targetStockItemId &&
           numericEqual(targetItem.quantity, sourceItem.quantity) &&

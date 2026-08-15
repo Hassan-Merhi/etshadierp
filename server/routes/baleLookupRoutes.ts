@@ -181,7 +181,7 @@ export function registerBaleLookupRoutes(app: Express) {
         }
 
         // Build a minimal response from the bale row alone
-        let locationInfo: unknown = null;
+        let locationInfo: any = null;
         if (directBale.erpLocationId) {
           const [loc] = await db
             .select({ id: locations.id, name: locations.name, city: locations.city, state: locations.state })
@@ -215,7 +215,7 @@ export function registerBaleLookupRoutes(app: Express) {
           .from(customerOrderBales)
           .where(eq(customerOrderBales.baleReference, referenceNumber))
           .limit(1);
-        let directLoadedOnOrder: unknown = null;
+        let directLoadedOnOrder: any = null;
         let directIsInLoadingOrder = false;
         if (directOrderBale) {
           const [directOrder] = await db
@@ -301,10 +301,10 @@ export function registerBaleLookupRoutes(app: Express) {
       }
 
       // ── Enrich with factory_bales data (matched by referenceNumber) ──
-      let baleInfo: unknown = null;
-      let locationInfo: unknown = null;
-      let pressingBatch: unknown = null;
-      let mixBatch: unknown = null;
+      let baleInfo: any = null;
+      let locationInfo: any = null;
+      let pressingBatch: any = null;
+      let mixBatch: any = null;
       let containers_used: unknown[] = [];
 
       const [factoryBale] = await db
@@ -447,7 +447,7 @@ export function registerBaleLookupRoutes(app: Express) {
         DRAFT: 6,
         CANCELLED: 7,
       };
-      let loadedOnOrder: unknown = null;
+      let loadedOnOrder: any = null;
       const orderBaleRows = await db
         .select()
         .from(customerOrderBales)

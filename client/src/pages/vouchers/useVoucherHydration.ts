@@ -61,37 +61,37 @@ export function useVoucherHydration({
       // the idempotency ref then blocks re-hydration once the real lists load.
       if (!ledgerAccountsFetched || !bankAccountsFetched) return;
       // Per-type guards: only wait for a list when the voucher actually uses it.
-      const needsFactorySuppliers = voucherToEdit.entries.some((e: unknown) => e.factorySupplierId);
+      const needsFactorySuppliers = voucherToEdit.entries.some((e: any) => e.factorySupplierId);
       if (needsFactorySuppliers && factorySuppliersList.length === 0) return;
-      const needsSuppliers = voucherToEdit.entries.some((e: unknown) => e.supplierId);
+      const needsSuppliers = voucherToEdit.entries.some((e: any) => e.supplierId);
       if (needsSuppliers && !suppliersFetched) return;
-      const needsCustomers = voucherToEdit.entries.some((e: unknown) => e.customerId);
+      const needsCustomers = voucherToEdit.entries.some((e: any) => e.customerId);
       if (needsCustomers && !customersFetched) return;
 
       const allEntries = voucherToEdit.entries;
       let paymentEntry = null;
 
       if (voucherToEdit.voucherType === "Payment") {
-        paymentEntry = allEntries.find((entry: unknown) => {
+        paymentEntry = allEntries.find((entry: any) => {
           const cr = parseFloat(entry.creditAmount || "0");
           const isLiability = entry.supplierId || entry.employeeId || entry.factorySupplierId;
           return !isLiability && cr > 0;
         });
         if (!paymentEntry) {
-          paymentEntry = allEntries.find((entry: unknown) => {
+          paymentEntry = allEntries.find((entry: any) => {
             const dr = parseFloat(entry.debitAmount || "0");
             const isLiability = entry.supplierId || entry.employeeId || entry.factorySupplierId;
             return isLiability && dr > 0;
           });
         }
       } else if (voucherToEdit.voucherType === "Receipt") {
-        paymentEntry = allEntries.find((entry: unknown) => {
+        paymentEntry = allEntries.find((entry: any) => {
           const dr = parseFloat(entry.debitAmount || "0");
           const isLiability = entry.supplierId || entry.employeeId || entry.factorySupplierId;
           return !isLiability && dr > 0;
         });
         if (!paymentEntry) {
-          paymentEntry = allEntries.find((entry: unknown) => {
+          paymentEntry = allEntries.find((entry: any) => {
             const cr = parseFloat(entry.creditAmount || "0");
             const isLiability = entry.supplierId || entry.employeeId || entry.factorySupplierId;
             return isLiability && cr > 0;
@@ -155,7 +155,7 @@ export function useVoucherHydration({
       const payFromEmployeeId = paymentEntry.employeeId || null;
 
       const formEntries = voucherToEdit.entries
-        .filter((entry: unknown) => {
+        .filter((entry: any) => {
           if (entry === paymentEntry) return false;
           if (payFromLedgerId && entry.ledgerAccountId === payFromLedgerId) return false;
           if (payFromBankId && entry.bankAccountId === payFromBankId) return false;
@@ -165,7 +165,7 @@ export function useVoucherHydration({
           if (payFromCustomerId && entry.customerId === payFromCustomerId) return false;
           return true;
         })
-        .map((entry: unknown) => {
+        .map((entry: any) => {
           let accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" | "customer" | "factorySupplier" =
             "ledger";
           let accountId = 0;
@@ -222,7 +222,7 @@ export function useVoucherHydration({
 
           return { accountType, accountId, accountName, amount };
         })
-        .filter((entry: unknown) => parseFloat(entry.amount || "0") > 0);
+        .filter((entry: any) => parseFloat(entry.amount || "0") > 0);
 
       form.reset({
         paymentAccountType: paymentType as
@@ -259,7 +259,22 @@ export function useVoucherHydration({
       }
       setVoucherEffectiveDate(voucherToEdit.effectiveDate || "");
     }
-  }, [voucherToEdit, allAccounts, bankAccounts, bankAccountsFetched, ledgerAccounts, ledgerAccountsFetched, suppliers, suppliersFetched, employees, fixedAssets, customers, customersFetched, factorySuppliersList, form, setVoucherEffectiveDate, setTransactionRate]);
+  }, [
+    voucherToEdit,
+    allAccounts,
+    bankAccounts,
+    bankAccountsFetched,
+    ledgerAccounts,
+    ledgerAccountsFetched,
+    suppliers,
+    suppliersFetched,
+    employees,
+    fixedAssets,
+    customers,
+    customersFetched,
+    factorySuppliersList,
+    form,
+  ]);
 
   return { hydratedVoucherIdRef };
 }

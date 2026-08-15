@@ -9,7 +9,7 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { pool } from "../../db";
 
-export function registerSupplierProfitAddStockItemRoutes(app: Express, requireAuth: unknown) {
+export function registerSupplierProfitAddStockItemRoutes(app: Express, requireAuth: any) {
   app.post("/api/supplier-profit-check/add-stock-item", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;

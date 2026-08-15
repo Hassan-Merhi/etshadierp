@@ -62,7 +62,7 @@ export async function authorizeContainerDocumentDownload(
  * Serves container documents through the Program 3 protected-asset boundary.
  * Other legacy upload folders are delegated to the existing route.
  */
-export function createContainerDocumentDownloadHandler(db: unknown) {
+export function createContainerDocumentDownloadHandler(db: any) {
   return async (req: Request, res: Response, next: NextFunction) => {
     const folder = String(req.params.folder ?? "");
     if (folder !== "container-docs") return next();

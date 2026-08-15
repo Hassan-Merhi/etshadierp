@@ -19,7 +19,7 @@ interface PosCheckoutParams {
   setCurrentDraftId: React.Dispatch<React.SetStateAction<number | null>>;
   setShowDraftDialog: React.Dispatch<React.SetStateAction<boolean>>;
   setShowPrintDialog: React.Dispatch<React.SetStateAction<boolean>>;
-  setSavedSale: (sale: unknown) => void;
+  setSavedSale: (sale: any) => void;
   setSaleJustCompleted: React.Dispatch<React.SetStateAction<boolean>>;
   setLastAutosaved: React.Dispatch<React.SetStateAction<Date | null>>;
   setMobileTab: React.Dispatch<React.SetStateAction<"items" | "cart">>;
@@ -185,7 +185,7 @@ export function usePosCheckout({
       }
       setNotes(draft.notes || "");
 
-      const draftRows = (Array.isArray(draft.items) ? draft.items : []).map((item: unknown, index: number) => {
+      const draftRows = (Array.isArray(draft.items) ? draft.items : []).map((item: any, index: number) => {
         const rate = parseFloat(item.rate);
         const inventoryItem = inventory.find((i) => i.stockItemId === item.stockItemId);
         return {

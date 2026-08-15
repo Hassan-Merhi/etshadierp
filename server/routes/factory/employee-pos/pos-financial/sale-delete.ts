@@ -26,7 +26,7 @@ export function registerPosSaleDeleteRoutes(app: Express) {
       if (!sale) return res.status(404).json({ message: "Sale not found" });
       if (sale.status === "VOIDED") return res.status(400).json({ message: "Sale already voided" });
 
-      await db.transaction(async (tx: unknown) => {
+      await db.transaction(async (tx: any) => {
         // Restore bales to IN_STOCK by finding bales that were sold around the sale date/product
         const items = await tx.select().from(factoryPosSaleItems).where(eq(factoryPosSaleItems.saleId, saleId));
         for (const item of items) {
@@ -46,7 +46,7 @@ export function registerPosSaleDeleteRoutes(app: Express) {
               .orderBy(desc(factoryBales.id))
               .limit(item.quantity)
               .for("update");
-            const baleIds = soldBales.map((b: unknown) => b.id);
+            const baleIds = soldBales.map((b: any) => b.id);
             if (baleIds.length > 0) {
               await tx
                 .update(factoryBales)

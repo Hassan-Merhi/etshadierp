@@ -40,7 +40,7 @@ export function ContainerDrawerTracking({
   setTrackCarrierHint,
   trackingSettingsMutation,
   trackNowMutation,
-  _trackNowResult,
+  trackNowResult,
   trackProgress,
   trackingStatus,
   showEvents,
@@ -63,7 +63,7 @@ export function ContainerDrawerTracking({
   const Row = ({
     label,
     badge,
-    _badgeColor,
+    badgeColor,
     detail,
     detailNode,
     testId,

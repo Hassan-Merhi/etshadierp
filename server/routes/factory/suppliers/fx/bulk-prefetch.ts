@@ -116,7 +116,7 @@ export function registerSupplierBulkFxPrefetchRoutes(app: Express) {
       }> = [];
       for (const sup of linkedSuppliers) {
         const supContainers = allContainers.filter((c) => c.supplierId === sup.id);
-        const totalValue = supContainers.reduce((s: number, c: unknown) => {
+        const totalValue = supContainers.reduce((s: number, c: any) => {
           const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
           const rate = parseFloat(c.ratePerKg || "0");
           const freight = parseFloat(c.freight || "0");

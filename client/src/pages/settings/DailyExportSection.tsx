@@ -94,7 +94,7 @@ export function DailyExportSection() {
   const saveSettings = async () => {
     setSavingSettings(true);
     try {
-      const body: unknown = { scheduleEnabled: settings?.scheduleEnabled ?? false };
+      const body: any = { scheduleEnabled: settings?.scheduleEnabled ?? false };
       if (gmailUser) body.gmailUser = gmailUser;
       if (gmailPassword) body.gmailAppPassword = gmailPassword;
       await apiRequest("PUT", "/api/export/settings", body);
@@ -149,7 +149,7 @@ export function DailyExportSection() {
 
   const startExport = async (mode: "download" | "email") => {
     try {
-      const body: unknown = { mode };
+      const body: any = { mode };
       if (fromDate) body.fromDate = fromDate;
       if (toDate) body.toDate = toDate;
       const result = await (await apiRequest("POST", "/api/export/start", body)).json();
@@ -184,7 +184,7 @@ export function DailyExportSection() {
   const sendViaWhatsApp = async () => {
     setSendingWa(true);
     try {
-      const body: unknown = {};
+      const body: any = {};
       if (fromDate) body.fromDate = fromDate;
       if (toDate) body.toDate = toDate;
       const data = await (await apiRequest("POST", "/api/daily-export/trigger-whatsapp", body)).json();

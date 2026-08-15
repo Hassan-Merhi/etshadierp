@@ -99,7 +99,7 @@ export function registerFactoryContainerImportRoutes(app: Express) {
             }
           }
 
-          await db.transaction(async (tx: unknown) => {
+          await db.transaction(async (tx: any) => {
             let supplierId: number | null = null;
             if (row.supplierName && row.supplierName.trim()) {
               const key = row.supplierName.toLowerCase().trim();

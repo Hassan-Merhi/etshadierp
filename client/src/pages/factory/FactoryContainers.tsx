@@ -60,7 +60,7 @@ import {
 
 export default function FactoryContainers() {
   const [viewMode, setViewMode] = useState<"list" | "summary" | "tracking">("tracking");
-  const [_trackingNowId, _setTrackingNowId] = useState<number | null>(null);
+  const [trackingNowId, setTrackingNowId] = useState<number | null>(null);
   const [openOtwGroups, setOpenOtwGroups] = useState<Set<string>>(new Set());
   const [createOpen, setCreateOpen] = useState(false);
   const [editingContainer, setEditingContainer] = useState<ContainerWithSupplier | null>(null);
@@ -81,7 +81,7 @@ export default function FactoryContainers() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
-  const { data: currentUser } = useQuery<unknown>({ queryKey: ["/api/auth/me"] });
+  const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const { data: containers, isLoading } = useQuery<ContainerWithSupplier[]>({ queryKey: ["/api/factory/containers"] });
   const { data: suppliers } = useQuery<FactorySupplier[]>({ queryKey: ["/api/factory/suppliers"] });
   const { data: ledgerAccounts = [] } = useQuery<unknown[]>({

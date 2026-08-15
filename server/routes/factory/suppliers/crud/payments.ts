@@ -36,7 +36,7 @@ export function registerFactorySupplierPaymentRoutes(app: Express) {
           .select({ id: factorySuppliers.id })
           .from(factorySuppliers)
           .where(and(eq(factorySuppliers.companyId, companyId), eq(factorySuppliers.parentId, supplierId)));
-        children.forEach((c: unknown) => supplierIds.push(c.id));
+        children.forEach((c: any) => supplierIds.push(c.id));
       }
 
       const paymentConditions = [eq(factorySupplierPayments.companyId, companyId)];
@@ -76,7 +76,7 @@ export function registerFactorySupplierPaymentRoutes(app: Express) {
         }
       }
 
-      const created = await db.transaction(async (tx: unknown) => {
+      const created = await db.transaction(async (tx: any) => {
         const [payment] = await tx.insert(factorySupplierPayments).values(parsed).returning();
 
         // Double-entry Payment voucher: DR Supplier Payable / CR Bank or Cash
@@ -165,7 +165,7 @@ export function registerFactorySupplierPaymentRoutes(app: Express) {
             .where(eq(factorySuppliers.id, payment.supplierId))
         : [null];
 
-      await db.transaction(async (tx: unknown) => {
+      await db.transaction(async (tx: any) => {
         // Hard-delete the auto-generated Payment voucher and its entries for this payment
         const payVoucherPattern = `FACTORY-PAY-${id}-%`;
         const payVouchers = await tx
@@ -173,7 +173,7 @@ export function registerFactorySupplierPaymentRoutes(app: Express) {
           .from(vouchers)
           .where(and(eq(vouchers.companyId, companyId), sql`${vouchers.voucherNumber} LIKE ${payVoucherPattern}`));
         if (payVouchers.length > 0) {
-          const vIds = payVouchers.map((v: unknown) => v.id);
+          const vIds = payVouchers.map((v: any) => v.id);
           await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
           await tx.delete(vouchers).where(inArray(vouchers.id, vIds));
         }

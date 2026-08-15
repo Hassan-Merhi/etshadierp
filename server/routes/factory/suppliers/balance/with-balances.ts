@@ -55,7 +55,7 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
       // Voucher-based payments: debit entries on voucherEntries where factorySupplierId is set.
       // Exclude FACTORY-PAY-* vouchers — those are auto-generated from factorySupplierPayments
       // and are already counted in allPayments (would double-count otherwise).
-      const allSupplierIds = (suppliersList as unknown[]).map((s: unknown) => s.id);
+      const allSupplierIds = (suppliersList as unknown[]).map((s: any) => s.id);
       const voucherPaidBySupplier: Record<number, number> = {};
       const voucherFxUnresolvedSuppliers = new Set<number>();
       const voucherPaidBySupplierCurrency: Record<number, Record<string, number>> = {};
@@ -139,20 +139,20 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
           : [];
 
       // Helper to compute stats for a single supplier record
-      const computeStats = (s: unknown, includeOtw: boolean = false) => {
-        const supplierContainers = containers.filter((c: unknown) => c.supplierId === s.id);
+      const computeStats = (s: any, includeOtw: boolean = false) => {
+        const supplierContainers = containers.filter((c: any) => c.supplierId === s.id);
         const payableContainers = supplierContainers.filter(
-          (c: unknown) => isPayableContainer(c) || (includeOtw && (c.status === "PENDING" || c.status === "IN_TRANSIT"))
+          (c: any) => isPayableContainer(c) || (includeOtw && (c.status === "PENDING" || c.status === "IN_TRANSIT"))
         );
         const totalContainers = supplierContainers.length;
-        const totalKg = supplierContainers.reduce((sum: number, c: unknown) => {
+        const totalKg = supplierContainers.reduce((sum: number, c: any) => {
           return sum + parseFloat(c.actualReceivedKg || c.totalKg || "0");
         }, 0);
         // Sum container value including freight (agreed supplier charge) in USD.
         // Cross-currency freight (e.g. USD freight on AUD containers) is added directly in USD.
         // Always prefer the user-configured FX rate; fall back to the per-container rate only
         // when no configured rate exists for that currency.
-        const containerValue = payableContainers.reduce((sum: number, c: unknown) => {
+        const containerValue = payableContainers.reduce((sum: number, c: any) => {
           // Use totalKg (declared/agreed weight) not actualReceivedKg — weight differences
           // at offload affect inventory only, not what is owed to the supplier.
           const kg = parseFloat(c.totalKg || "0");
@@ -161,14 +161,14 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
           const containerCc = c.currencyCode || "USD";
           const fx = resolveDisplayFx(containerCc, configuredFxRates[containerCc], c.fxRateToUsd, c.fxRateConfirmed);
           const freightCc = c.freightCurrencyCode || containerCc;
-          const _freightFx = configuredFxRates[freightCc] ?? fx;
+          const freightFx = configuredFxRates[freightCc] ?? fx;
           const freightInContainerCurr = freightCc === containerCc ? freight : 0;
           const freightDirectUsd = freightCc === "USD" && freightCc !== containerCc ? freight : 0;
           return sum + (kg * rate + freightInContainerCurr) * fx + freightDirectUsd;
         }, 0);
         // Commission accumulates under the supplier, EXCEPT:
         // if this supplier is linked to a broker (has parentId), USD commission flows to the broker.
-        const commissionValue = payableContainers.reduce((sum: number, c: unknown) => {
+        const commissionValue = payableContainers.reduce((sum: number, c: any) => {
           const commAmt = parseFloat(c.commissionAmount || "0");
           if (commAmt <= 0) return sum;
           const commCurr = c.commissionCurrencyCode || c.currencyCode || "USD";
@@ -182,7 +182,7 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
           );
           return sum + (commCurr === "USD" ? commAmt : commAmt * commFx);
         }, 0);
-        const pendingConts = supplierContainers.filter((c: unknown) => c.status === "PENDING" || c.status === "IN_TRANSIT");
+        const pendingConts = supplierContainers.filter((c: any) => c.status === "PENDING" || c.status === "IN_TRANSIT");
         const pendingContainers = pendingConts.length;
         const otwByCurrency: Record<string, number> = {};
         for (const c of pendingConts) {
@@ -190,20 +190,20 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
           otwByCurrency[cc] = (otwByCurrency[cc] || 0) + 1;
         }
         const receivedContainers = supplierContainers.filter(
-          (c: unknown) => c.status === "RECEIVED" || c.status === "PARTIALLY_RECEIVED" || c.status === "OFFLOADED"
+          (c: any) => c.status === "RECEIVED" || c.status === "PARTIALLY_RECEIVED" || c.status === "OFFLOADED"
         ).length;
         const lastContainerDate =
           supplierContainers.length > 0
-            ? supplierContainers.reduce((latest: string | null, c: unknown) => {
+            ? supplierContainers.reduce((latest: string | null, c: any) => {
                 const d = c.arrivalDate || c.createdAt;
                 if (!latest) return d;
                 return new Date(d) > new Date(latest) ? d : latest;
               }, null)
             : null;
-        const supplierPayments = allPayments.filter((p: unknown) => p.supplierId === s.id);
-        const totalPaid = supplierPayments.reduce((sum: number, p: unknown) => sum + parseFloat(p.amountUsd || "0"), 0);
+        const supplierPayments = allPayments.filter((p: any) => p.supplierId === s.id);
+        const totalPaid = supplierPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0);
         // Include voucher-based payments (payment vouchers) in the balance
-        const _voucherPaidUsd = voucherPaidBySupplier[s.id] || 0;
+        const voucherPaidUsd = voucherPaidBySupplier[s.id] || 0;
         // FX net (USD): FX-in transfers received minus FX-out transfers sent (in USD equivalent)
         // This is critical for brokers that accumulate balance via explicit FX settlements from linked suppliers.
         // Always use toAmountUsd as the USD amount — it reflects the actual settled USD value.
@@ -213,12 +213,12 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
             _fxNetUsd += parseFloat(t.toAmountUsd || "0");
           }
           if (t.fromSupplierId === s.id) {
-            _fxNetUsd -= parseFloat(t.toAmountUsd || "0");
+            fxNetUsd -= parseFloat(t.toAmountUsd || "0");
           }
         }
         // Other charges from containers where this supplier is the charge recipient.
         // Linked suppliers: USD other charges flow to the parent broker — exclude from own balance.
-        const _otherChargesValue = containers.filter(isPayableContainer).reduce((sum: number, c: unknown) => {
+        const otherChargesValue = containers.filter(isPayableContainer).reduce((sum: number, c: any) => {
           if (c.otherChargesSupplierId !== s.id) return sum;
           const oc = parseFloat(c.otherCharges || "0");
           if (oc <= 0) return sum;
@@ -362,19 +362,19 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
             return { currencyCode, balance: native, fxRateToUsd: displayFx };
           })
           .filter(({ balance: bal }) => Math.abs(bal) > 0.001)
-          .sort((a, _b) => (a.currencyCode === "USD" ? 1 : -1)); // non-USD first
+          .sort((a, b) => (a.currencyCode === "USD" ? 1 : -1)); // non-USD first
 
         // Due containers: offloaded >30 days ago and supplier still has a positive balance
         const now = new Date();
         const dueContainers =
           balance > 0.01
             ? payableContainers
-                .filter((c: unknown) => {
+                .filter((c: any) => {
                   if (!c.offloadDate) return false;
                   const offloadMs = new Date(c.offloadDate).getTime();
                   return now.getTime() - offloadMs >= 30 * 24 * 60 * 60 * 1000;
                 })
-                .map((c: unknown) => ({
+                .map((c: any) => ({
                   id: c.id,
                   containerNumber: c.containerNumber,
                   offloadDate: c.offloadDate,
@@ -391,12 +391,12 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
         // Approx FX rate: weighted average rate across non-USD containers (for UI display).
         // Only include containers whose rate is actually confirmed/resolved — a numeric
         // fxRateToUsd of exactly 1 that isn't confirmed is not a "looks set" rate.
-        const fxContainers = payableContainers.filter((c: unknown) => {
+        const fxContainers = payableContainers.filter((c: any) => {
           if ((c.currencyCode || "USD") === "USD") return false;
           const { looksSet } = resolveStoredFxRate(c.currencyCode, c.fxRateToUsd, c.fxRateConfirmed);
           return looksSet;
         });
-        const fxWeightedSum = fxContainers.reduce((s: number, c: unknown) => {
+        const fxWeightedSum = fxContainers.reduce((s: number, c: any) => {
           const val =
             parseFloat(c.actualReceivedKg || c.totalKg || "0") * parseFloat(c.ratePerKg || "0") +
             (isSupplierPaidFreight(c) ? parseFloat(c.freight || "0") : 0);
@@ -406,7 +406,7 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
           const { fxRate } = resolveStoredFxRate(c.currencyCode, c.fxRateToUsd, c.fxRateConfirmed);
           return s + val * fxRate;
         }, 0);
-        const fxWeightBase = fxContainers.reduce((s: number, c: unknown) => {
+        const fxWeightBase = fxContainers.reduce((s: number, c: any) => {
           return (
             s +
             (parseFloat(c.actualReceivedKg || c.totalKg || "0") * parseFloat(c.ratePerKg || "0") +
@@ -420,7 +420,7 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
         // This amount is "auto-settled" from the supplier's perspective — the broker absorbs it.
         const autoSettledFreightUsd =
           s.parentId !== null && s.parentId !== undefined
-            ? payableContainers.reduce((sum: number, c: unknown) => {
+            ? payableContainers.reduce((sum: number, c: any) => {
                 if (!isSupplierPaidFreight(c)) return sum;
                 const freightCc = c.freightCurrencyCode || c.currencyCode || "USD";
                 const containerCc = c.currencyCode || "USD";
@@ -460,8 +460,8 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
       // balance matches the detail page exactly (same data source).
       const brokerParentIds = new Set<number>(
         (suppliersList as unknown[])
-          .filter((s: unknown) => (suppliersList as unknown[]).some((c: unknown) => c.parentId === s.id))
-          .map((s: unknown) => s.id as number)
+          .filter((s: any) => (suppliersList as unknown[]).some((c: any) => c.parentId === s.id))
+          .map((s: any) => s.id as number)
       );
       const brokerStmtMap: Record<number, unknown> = {};
       for (const s of suppliersList as unknown[]) {
@@ -472,9 +472,9 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
       }
 
       // Second pass: for parent suppliers, roll up children's stats
-      const suppliersWithBalances = (suppliersList as unknown[]).map((s: unknown) => {
+      const suppliersWithBalances = (suppliersList as unknown[]).map((s: any) => {
         const own = statsById[s.id];
-        const children = (suppliersList as unknown[]).filter((c: unknown) => c.parentId === s.id);
+        const children = (suppliersList as unknown[]).filter((c: any) => c.parentId === s.id);
 
         if (children.length === 0) {
           // Leaf supplier — use own stats
@@ -502,13 +502,13 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
         // The broker's own balance (totalValue / currencyBalances) reflects ONLY direct broker entries
         // and explicit FX-in transfers. Linked supplier balances are NOT merged into broker-owned totals.
         // They are returned separately as linkedSupplierExposure for informational display.
-        const childStats = children.map((c: unknown) => statsById[c.id]);
+        const childStats = children.map((c: any) => statsById[c.id]);
         // Informational aggregates that span all parties (container counts, kg, dates)
         const aggContainers =
-          own.totalContainers + childStats.reduce((n: number, cs: unknown) => n + cs.totalContainers, 0);
-        const aggKg = own.totalKg + childStats.reduce((n: number, cs: unknown) => n + cs.totalKg, 0);
+          own.totalContainers + childStats.reduce((n: number, cs: any) => n + cs.totalContainers, 0);
+        const aggKg = own.totalKg + childStats.reduce((n: number, cs: any) => n + cs.totalKg, 0);
         const aggPending =
-          own.pendingContainers + childStats.reduce((n: number, cs: unknown) => n + cs.pendingContainers, 0);
+          own.pendingContainers + childStats.reduce((n: number, cs: any) => n + cs.pendingContainers, 0);
         const aggOtwByCurrency: Record<string, number> = { ...own.otwByCurrency };
         for (const cs of childStats) {
           for (const [cc, n] of Object.entries(cs.otwByCurrency || {})) {
@@ -516,16 +516,16 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
           }
         }
         const aggReceived =
-          own.receivedContainers + childStats.reduce((n: number, cs: unknown) => n + cs.receivedContainers, 0);
-        const allDates = [own.lastContainerDate, ...childStats.map((cs: unknown) => cs.lastContainerDate)].filter(Boolean);
+          own.receivedContainers + childStats.reduce((n: number, cs: any) => n + cs.receivedContainers, 0);
+        const allDates = [own.lastContainerDate, ...childStats.map((cs: any) => cs.lastContainerDate)].filter(Boolean);
         const aggLastDate =
           allDates.length > 0
             ? allDates.reduce((latest: string, d: string) => (new Date(d) > new Date(latest) ? d : latest))
             : null;
-        const aggDueContainers = [...own.dueContainers, ...childStats.flatMap((cs: unknown) => cs.dueContainers)];
+        const aggDueContainers = [...own.dueContainers, ...childStats.flatMap((cs: any) => cs.dueContainers)];
 
         // Linked supplier exposure: per-child per-currency balances (informational, NOT counted in broker totals)
-        const linkedSupplierExposure = children.map((c: unknown, i: number) => ({
+        const linkedSupplierExposure = children.map((c: any, i: number) => ({
           supplierId: c.id,
           supplierName: c.name,
           currencyBalances: childStats[i].currencyBalances,
@@ -564,7 +564,7 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
                 : 1,
           }))
           .filter(({ balance: bal }) => bal > 0.001)
-          .sort((a, _b) => (a.currencyCode === "USD" ? 1 : -1));
+          .sort((a, b) => (a.currencyCode === "USD" ? 1 : -1));
 
         // Use broker-statement KPIs so the list card total matches the detail page.
         // Formula: USD_pool + EUR × configuredRate + AUD × configuredRate = totalValue
@@ -573,9 +573,9 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
         let finalExposureCurrencyBalances = exposureCurrencyBalances;
 
         if (stmt) {
-          const eurLedger = stmt.currencyLedgers.find((l: unknown) => l.currencyCode === "EUR");
-          const audLedger = stmt.currencyLedgers.find((l: unknown) => l.currencyCode === "AUD");
-          const usdLedger = stmt.currencyLedgers.find((l: unknown) => l.currencyCode === "USD");
+          const eurLedger = stmt.currencyLedgers.find((l: any) => l.currencyCode === "EUR");
+          const audLedger = stmt.currencyLedgers.find((l: any) => l.currencyCode === "AUD");
+          const usdLedger = stmt.currencyLedgers.find((l: any) => l.currencyCode === "USD");
 
           const eurBal = eurLedger ? parseFloat(eurLedger.netBalance) : 0;
           const audBal = audLedger ? parseFloat(audLedger.netBalance) : 0;
@@ -618,11 +618,11 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
           dueContainersCount: aggDueContainers.length,
           linkedSupplierExposure,
           exposureCurrencyBalances: finalExposureCurrencyBalances,
-          fxUnresolved: own.fxUnresolved || childStats.some((cs: unknown) => cs.fxUnresolved),
+          fxUnresolved: own.fxUnresolved || childStats.some((cs: any) => cs.fxUnresolved),
         };
       });
 
-      res.json(suppliersWithBalances.sort((a: unknown, b: unknown) => a.name.localeCompare(b.name)));
+      res.json(suppliersWithBalances.sort((a: any, b: any) => a.name.localeCompare(b.name)));
     } catch (error: unknown) {
       logger.error("Error fetching factory suppliers with balances:", { error: error });
       res.status(500).json({ message: getErrorMessage(error) });

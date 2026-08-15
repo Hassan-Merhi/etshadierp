@@ -52,17 +52,17 @@ async function invokeMigrationHandler(
   body: unknown
 ): Promise<unknown> {
   let statusCode = 200;
-  let payload: unknown = null;
-  const captureResponse: unknown = {
+  let payload: any = null;
+  const captureResponse: any = {
     status(code: number) {
       statusCode = code;
       return this;
     },
-    json(value: unknown) {
+    json(value: any) {
       payload = value;
       return this;
     },
-    send(value: unknown) {
+    send(value: any) {
       payload = value;
       return this;
     },
@@ -116,7 +116,7 @@ async function harmfulTargetActivity(targetId: number, activatedAt?: string | nu
 async function normalizedReadiness(sourceId: number, targetId: number): Promise<unknown> {
   const readiness = await buildCutoverReadiness(sourceId, targetId);
   const activity = await harmfulTargetActivity(targetId);
-  readiness.blockers = (readiness.blockers ?? []).filter((blocker: unknown) => blocker.code !== "TARGET_ALREADY_LIVE");
+  readiness.blockers = (readiness.blockers ?? []).filter((blocker: any) => blocker.code !== "TARGET_ALREADY_LIVE");
   readiness.counts.targetLiveActivity = activity.total;
   if (activity.total > 0) {
     readiness.blockers.push({
@@ -131,7 +131,7 @@ async function normalizedReadiness(sourceId: number, targetId: number): Promise<
   return readiness;
 }
 
-async function loadCutoverById(cutoverId: number): Promise<unknown | null> {
+async function loadCutoverById(cutoverId: number): Promise<any | null> {
   const result = await db.execute(sql`
     SELECT * FROM sp_migration_cutovers WHERE id = ${cutoverId} LIMIT 1
   `);

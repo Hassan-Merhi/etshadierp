@@ -9,7 +9,7 @@ import { eq, and, isNull } from "drizzle-orm";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-export function parseNum(v: unknown): number {
+export function parseNum(v: any): number {
   return parseFloat(v ?? "0") || 0;
 }
 

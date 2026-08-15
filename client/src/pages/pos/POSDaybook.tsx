@@ -76,7 +76,7 @@ export default function POSDaybook() {
 
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(initialPeriod);
 
-  const { data: currentUser, isLoading: isLoadingUser } = useQuery<unknown>({
+  const { data: currentUser, isLoading: isLoadingUser } = useQuery<any>({
     queryKey: ["/api/auth/me"],
   });
 

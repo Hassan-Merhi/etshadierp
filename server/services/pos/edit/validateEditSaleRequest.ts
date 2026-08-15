@@ -59,7 +59,7 @@ export async function loadAndValidateExistingVoucher(
  */
 export function applyPosRoleRestrictions(
   userRole: string | undefined,
-  newLocationId: unknown,
+  newLocationId: any,
   existingVoucherLocationId: number | null
 ): { error: HandlerErrorResult } | { ok: true } {
   if (userRole === "POS") {
@@ -73,7 +73,7 @@ export function applyPosRoleRestrictions(
 /** Determines the target/old location and whether the location changed. */
 export function resolveEditLocations(
   oldLocationId: number,
-  newLocationId: unknown
+  newLocationId: any
 ): { targetLocationId: number; oldLocationId: number; locationChanged: boolean } {
   const targetLocationId = newLocationId ? parseInt(newLocationId) : oldLocationId;
   const locationChanged = targetLocationId !== oldLocationId;
@@ -88,7 +88,7 @@ export async function validateNewLocationBelongsToCompany(
   targetLocationId: number,
   oldLocationId: number,
   companyId: number,
-  connection: unknown = db
+  connection: any = db
 ): Promise<{ ok: true } | { error: HandlerErrorResult }> {
   const [newLocation] = await connection
     .select()

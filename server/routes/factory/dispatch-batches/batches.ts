@@ -87,7 +87,7 @@ export function registerDispatchBatchCrudRoutes(app: Express) {
       if (!customerId) return res.status(400).json({ message: "customerId is required" });
       if (!batchDate) return res.status(400).json({ message: "batchDate is required" });
 
-      const result = await db.transaction(async (tx: unknown) => {
+      const result = await db.transaction(async (tx: any) => {
         // Validate customer
         const [customer] = await tx
           .select({ id: customers.id, legalName: customers.legalName })
@@ -96,7 +96,7 @@ export function registerDispatchBatchCrudRoutes(app: Express) {
         if (!customer) throw new Error("Customer not found");
 
         // Validate proforma if supplied
-        let proforma: unknown = null;
+        let proforma: any = null;
         let proformaLines: unknown[] = [];
         if (proformaId) {
           const [pf] = await tx
@@ -186,7 +186,7 @@ export function registerDispatchBatchCrudRoutes(app: Express) {
         .where(eq(customers.id, batch.customerId));
 
       // Proforma + lines
-      let proforma: unknown = null;
+      let proforma: any = null;
       let proformaLines: unknown[] = [];
       if (batch.proformaId) {
         const [pf] = await db.select().from(customerProformas).where(eq(customerProformas.id, batch.proformaId));
@@ -239,7 +239,7 @@ export function registerDispatchBatchCrudRoutes(app: Express) {
       `);
 
       // Final invoice link
-      let finalInvoice: unknown = null;
+      let finalInvoice: any = null;
       if (batch.finalOrderId) {
         const [inv] = await db
           .select({
@@ -284,7 +284,7 @@ export function registerDispatchBatchCrudRoutes(app: Express) {
       if (batch.status === "CANCELLED") return res.status(400).json({ message: "Cannot edit a cancelled batch" });
 
       const { notes, destination, batchDate } = req.body;
-      const updates: unknown = { updatedAt: new Date() };
+      const updates: any = { updatedAt: new Date() };
       if (notes !== undefined) updates.notes = notes;
       if (destination !== undefined) updates.destination = destination;
       if (batchDate !== undefined) updates.batchDate = batchDate;
@@ -309,7 +309,7 @@ export function registerDispatchBatchCrudRoutes(app: Express) {
       const batchId = parseId(req.params.id);
       if (batchId === null) return res.status(400).json({ message: "Invalid id" });
 
-      await db.transaction(async (tx: unknown) => {
+      await db.transaction(async (tx: any) => {
         const [batch] = await tx
           .select()
           .from(customerDispatchBatches)

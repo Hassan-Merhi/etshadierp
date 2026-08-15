@@ -109,7 +109,7 @@ export function ExportCenter() {
   // Handlers
   const startExport = async (mode: "download" | "email") => {
     try {
-      const body: unknown = { mode };
+      const body: any = { mode };
       if (fromDate) body.fromDate = fromDate;
       if (toDate) body.toDate = toDate;
       const result = await (await apiRequest("POST", "/api/export/start", body)).json();
@@ -123,7 +123,7 @@ export function ExportCenter() {
 
   const sendViaWaMutation = useMutation({
     mutationFn: async () => {
-      const body: unknown = {};
+      const body: any = {};
       if (fromDate) body.fromDate = fromDate;
       if (toDate) body.toDate = toDate;
       return (await apiRequest("POST", "/api/daily-export/trigger-whatsapp", body)).json();
@@ -147,7 +147,7 @@ export function ExportCenter() {
   const saveGmailSettings = async () => {
     setSavingGmail(true);
     try {
-      const body: unknown = { scheduleEnabled: exportSettings?.scheduleEnabled ?? false };
+      const body: any = { scheduleEnabled: exportSettings?.scheduleEnabled ?? false };
       if (gmailUser) body.gmailUser = gmailUser;
       if (gmailPassword) body.gmailAppPassword = gmailPassword;
       await apiRequest("PUT", "/api/export/settings", body);

@@ -70,7 +70,7 @@ export function registerContainerTrackingRoutes(app: Express) {
         blDocs,
       } = parseResult.data;
 
-      const updateData: unknown = {};
+      const updateData: any = {};
       if (shopName !== undefined) updateData.shopName = shopName;
       if (eta !== undefined) updateData.eta = eta || null;
       if (etaSource !== undefined) updateData.etaSource = etaSource;
@@ -209,7 +209,7 @@ export function registerContainerTrackingRoutes(app: Express) {
           }
 
           // Normalise any date string to YYYY-MM-DD; return null for invalid values
-          const normDate = (v: unknown): string | null => {
+          const normDate = (v: any): string | null => {
             if (!v) return null;
             if (v instanceof Date) {
               if (isNaN(v.getTime())) return null;
@@ -239,7 +239,7 @@ export function registerContainerTrackingRoutes(app: Express) {
           };
 
           // Sanitise numeric cell values — reject "[object Object]" strings that can come from ExcelJS
-          const normNum = (v: unknown): string | null => {
+          const normNum = (v: any): string | null => {
             if (v === null || v === undefined || v === "") return null;
             const s = String(v).trim();
             if (!s || s === "[object Object]") return null;
@@ -248,7 +248,7 @@ export function registerContainerTrackingRoutes(app: Express) {
           };
 
           // Build update object
-          const updateData: unknown = {};
+          const updateData: any = {};
           if (data.shopName && String(data.shopName) !== "[object Object]") updateData.shopName = String(data.shopName);
           const etaDate = normDate(data.eta);
           if (etaDate) updateData.eta = etaDate;
@@ -352,7 +352,7 @@ export function registerContainerTrackingRoutes(app: Express) {
 
   // POST /api/containers/refresh-etas — bulk JSONCargo ETA refresh, Admin/Developer/Owner only.
   app.post("/api/containers/refresh-etas", requireAuth, requireNonPOS, async (req, res) => {
-    const role = (req.user as unknown)?.role;
+    const role = (req.user as any)?.role;
     if (!JSONCARGO_ADMIN_ROLES.includes(role)) {
       return res.status(403).json({ message: "Insufficient permissions" });
     }
@@ -362,7 +362,7 @@ export function registerContainerTrackingRoutes(app: Express) {
 
     try {
       const containerIds = Array.isArray(req.body?.containerIds)
-        ? req.body.containerIds.filter((n: unknown) => Number.isInteger(n))
+        ? req.body.containerIds.filter((n: any) => Number.isInteger(n))
         : undefined;
 
       const summary = await refreshMultipleContainerEtas(containerIds, {

@@ -37,7 +37,7 @@ const LOG_COLS = `
 `;
 
 async function insertLog(
-  client: unknown,
+  client: any,
   companyId: number,
   itemId: number,
   itemName: string,

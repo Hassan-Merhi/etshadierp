@@ -25,7 +25,7 @@ export async function retryAsync<T>(options: {
   onAttempt?: (attempt: number) => void;
 }): Promise<RetryResult<T>> {
   let lastResult: T | undefined;
-  let lastError: unknown;
+  let lastError: any;
 
   for (let attempt = 1; attempt <= options.attempts; attempt++) {
     try {

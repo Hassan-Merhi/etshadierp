@@ -12,7 +12,7 @@ import { factoryDaybookEntries } from "@shared/schema";
  * Declared at module scope so those handlers can live in separate modules.
  */
 export async function writeDaybookEntry(
-  dbOrTx: unknown,
+  dbOrTx: any,
   opts: {
     companyId: number;
     txDate: string;

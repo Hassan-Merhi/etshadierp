@@ -134,7 +134,7 @@ export default function FactoryInvoiceLoadingScan() {
     if (openSession) {
       setActiveSessionId(openSession.id);
     }
-  }, [activeSessionId, summary, summary.sessions.length]);
+  }, [summary?.sessions.length]);
 
   // Auto-focus scan input when session is active
   useEffect(() => {

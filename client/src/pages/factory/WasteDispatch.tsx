@@ -32,7 +32,7 @@ import type { Bale, ProductGroup } from "./wastedispatch/types";
 import { fmt, fmtKg, today } from "./wastedispatch/utils";
 export default function WasteDispatch() {
   const { toast } = useToast();
-  const [, _navigate] = useLocation();
+  const [, navigate] = useLocation();
 
   // ── Dispatch tab state ─────────────────────────────────────────
   const [search, setSearch] = useState("");
@@ -45,7 +45,7 @@ export default function WasteDispatch() {
   const [expandedHistoryIds, setExpandedHistoryIds] = useState<Set<number>>(new Set());
   const [showAllHistory, setShowAllHistory] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const [printData, setPrintData] = useState<unknown | null>(null);
+  const [printData, setPrintData] = useState<any | null>(null);
   const [deleteDispatchId, setDeleteDispatchId] = useState<number | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
 

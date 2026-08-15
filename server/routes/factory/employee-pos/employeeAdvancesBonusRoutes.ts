@@ -74,7 +74,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
       const advResult = await db.execute(
         sql`SELECT * FROM employee_advances WHERE id = ${advId} AND company_id = ${companyId}`
       );
-      const adv = advResult.rows[0] as unknown;
+      const adv = advResult.rows[0] as any;
       if (!adv) return res.status(404).json({ message: "Advance not found" });
 
       const remaining = parseFloat(adv.remaining_balance) - amt;
@@ -242,7 +242,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
       const bonusResult = await db.execute(
         sql`SELECT * FROM employee_bonuses WHERE id = ${parseInt(req.params.id)} AND company_id = ${companyId}`
       );
-      const bonus = bonusResult.rows[0] as unknown;
+      const bonus = bonusResult.rows[0] as any;
       if (!bonus) return res.status(404).json({ message: "Bonus not found" });
 
       // Reversing a bonus touches four rows, and all four have to move or none
@@ -360,7 +360,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
         WHERE wb.id = ${parseInt(req.params.id)} AND wb.company_id = ${companyId} AND wb.status = 'pending'
       `);
       if (!bonusRows.rows.length) return res.status(404).json({ message: "Bonus not found or already paid" });
-      const wb = bonusRows.rows[0] as unknown;
+      const wb = bonusRows.rows[0] as any;
       const amt = parseFloat(wb.amount || "0");
 
       // Determine the city-split bonus expense account
@@ -378,7 +378,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
           SELECT MAX(CAST(code AS INTEGER)) as m FROM ledger_accounts
           WHERE company_id = ${companyId} AND code ~ '^[0-9]+$'
         `);
-        const nextCode = String(((maxCode.rows[0] as unknown)?.m || 0) + 1);
+        const nextCode = String(((maxCode.rows[0] as any)?.m || 0) + 1);
         [expAcc] = await db
           .insert(ledgerAccounts)
           .values({
@@ -393,7 +393,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
       }
 
       // Mark bonus as paid and create journal entry in a transaction
-      await db.transaction(async (tx: unknown) => {
+      await db.transaction(async (tx: any) => {
         await tx.execute(sql`
           UPDATE worker_bonuses SET status = 'paid', cash_account_id = ${cashId}, paid_date = ${payDate}
           WHERE id = ${parseInt(req.params.id)} AND company_id = ${companyId} AND status = 'pending'
@@ -448,10 +448,10 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
       const bonusRows = await db.execute(
         sql`SELECT * FROM worker_bonuses WHERE id = ${id} AND company_id = ${companyId}`
       );
-      const bonus = bonusRows.rows[0] as unknown;
+      const bonus = bonusRows.rows[0] as any;
       if (!bonus) return res.status(404).json({ message: "Bonus not found" });
 
-      await db.transaction(async (tx: unknown) => {
+      await db.transaction(async (tx: any) => {
         // Paid bonuses are posted with voucherNumber `WBONUS-{id}-{ts}` (see /pay above) —
         // there's no voucher_id FK column on worker_bonuses, so look the voucher up by that
         // naming convention and reverse it along with its entries before deleting the bonus.

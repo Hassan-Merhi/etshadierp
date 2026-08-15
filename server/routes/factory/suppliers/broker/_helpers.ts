@@ -20,7 +20,7 @@ import { eq, and, sql, inArray, isNull } from "drizzle-orm";
 
 export const PAYABLE_CONTAINER_STATUSES = new Set(["OFFLOADED", "RECEIVED", "PARTIALLY_RECEIVED"]);
 
-export const isPayableContainer = (c: unknown) => PAYABLE_CONTAINER_STATUSES.has(String(c.status || "").toUpperCase());
+export const isPayableContainer = (c: any) => PAYABLE_CONTAINER_STATUSES.has(String(c.status || "").toUpperCase());
 
 export async function buildBrokerStatement(brokerId: number, companyId: number, includeOtw = false) {
   // Fetch broker

@@ -85,7 +85,7 @@ export function useOfflineQueue() {
     if (isOnline && queue.some((q) => q.status === "pending" || q.status === "failed")) {
       syncQueue();
     }
-  }, [isOnline, queue, syncQueue]);
+  }, [isOnline]);
 
   // Generate unique client ID for idempotency
   const generateClientId = useCallback(() => {

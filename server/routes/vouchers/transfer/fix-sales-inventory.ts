@@ -43,7 +43,7 @@ export function registerSalesInventoryFixRoutes(app: Express) {
 
         for (const item of items) {
           const quantity = parseFloat(item.quantity);
-          const _costPrice = parseFloat(item.costPrice);
+          const costPrice = parseFloat(item.costPrice);
 
           // Check if inventory at this location has this deduction
           const [inv] = await db

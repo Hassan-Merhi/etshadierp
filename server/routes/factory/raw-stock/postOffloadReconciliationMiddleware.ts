@@ -83,7 +83,7 @@ export function postOffloadReconciliationMiddleware(req: Request, res: Response,
   const originalJson = res.json.bind(res);
   let responseHandled = false;
 
-  res.json = ((body: unknown) => {
+  res.json = ((body: any) => {
     if (responseHandled) return originalJson(body);
     responseHandled = true;
 

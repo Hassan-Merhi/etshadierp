@@ -123,5 +123,21 @@ export function useContainerFilters({
         if (sh !== 0) return sh;
         return a.containerNumber.localeCompare(b.containerNumber);
       });
-  }, [allContainers, companyFilter, containerFilters, supplierFilters, transporterFilters, agentFilters, truckFilters, locationFilters, docsFilter, delayedFilter, freightFilter, etaFilter, notesFilter, search, sortOrder]);
+  }, [
+    allContainers,
+    companyFilter,
+    containerFilters,
+    supplierFilters,
+    transporterFilters,
+    agentFilters,
+    truckFilters,
+    locationFilters,
+    docsFilter,
+    delayedFilter,
+    freightFilter,
+    JSON.stringify(etaFilter),
+    notesFilter,
+    sortOrder,
+    search,
+  ]);
 }

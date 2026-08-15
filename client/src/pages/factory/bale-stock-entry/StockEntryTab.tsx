@@ -94,12 +94,12 @@ export function StockEntryTab() {
         selectedLogoId,
       });
     }
-  }, [cart, productionPositionByProduct, selectedLocationId, entryDate, selectedCustomerId, selectedLogoId, scheduleCartSave]);
+  }, [cart, productionPositionByProduct, selectedLocationId, entryDate, selectedCustomerId, selectedLogoId]);
 
-  const { data: baleProducts, isLoading: _productsLoading } = useQuery<FactoryBaleProduct[]>({
+  const { data: baleProducts, isLoading: productsLoading } = useQuery<FactoryBaleProduct[]>({
     queryKey: ["/api/factory/bale-products"],
   });
-  const { data: _currentUser } = useQuery<unknown>({ queryKey: ["/api/auth/me"] });
+  const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const { data: locations } = useQuery<Location[]>({ queryKey: ["/api/locations"] });
   const { data: categories } = useQuery<FactoryCategory[]>({ queryKey: ["/api/factory/categories"] });
 
@@ -207,7 +207,7 @@ export function StockEntryTab() {
 
   const quickCreateMutation = useMutation({
     mutationFn: async () => {
-      const body: unknown = { name: quickCreateName };
+      const body: any = { name: quickCreateName };
       if (quickCreateCategoryId) body.categoryId = parseInt(quickCreateCategoryId);
       if (quickCreateWeight) body.weightPerBaleKg = quickCreateWeight;
       if (quickCreateGrade) body.grade = quickCreateGrade;

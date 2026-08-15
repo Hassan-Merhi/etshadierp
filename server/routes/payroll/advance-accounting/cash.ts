@@ -108,7 +108,7 @@ export function registerAdvanceCashRoutes(app: Express) {
         .where(and(eq(ledgerAccounts.id, cashAccountId), eq(ledgerAccounts.companyId, companyId)));
       if (!cashAcct) return res.status(400).json({ message: "Cash account not found" });
 
-      await db.transaction(async (tx: unknown) => {
+      await db.transaction(async (tx: any) => {
         // Resolve or auto-create the contra "Factory Advance Adjustments" account
         let [adjAccount] = await tx
           .select({ id: ledgerAccounts.id })

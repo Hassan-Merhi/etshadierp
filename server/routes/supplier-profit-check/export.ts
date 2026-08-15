@@ -10,7 +10,7 @@ import { logger } from "../../lib/logger";
 import { pool } from "../../db";
 import ExcelJS from "exceljs";
 
-export function registerSupplierProfitExportRoutes(app: Express, requireAuth: unknown) {
+export function registerSupplierProfitExportRoutes(app: Express, requireAuth: any) {
   app.get(
     "/api/supplier-profit-check/proforma/:proformaId/export-supplier",
     requireAuth,
@@ -319,19 +319,19 @@ export function registerSupplierProfitExportRoutes(app: Express, requireAuth: un
 
       // Summary totals
       const hasQty = rows.filter((r) => Number(r.qty) > 0);
-      const totalQtyOrdered = hasQty.reduce((s: number, r: unknown) => s + (Number(r.qty) || 0), 0);
+      const totalQtyOrdered = hasQty.reduce((s: number, r: any) => s + (Number(r.qty) || 0), 0);
       const totalAvgCostSum = hasQty.reduce(
-        (s: number, r: unknown) => s + (Number(r.qty) || 0) * (Number(r.offloadingCost) || 0),
+        (s: number, r: any) => s + (Number(r.qty) || 0) * (Number(r.offloadingCost) || 0),
         0
       );
-      const totalEstSales = hasQty.reduce((s: number, r: unknown) => {
+      const totalEstSales = hasQty.reduce((s: number, r: any) => {
         return r.avgSellingPrice != null ? s + (Number(r.qty) || 0) * Number(r.avgSellingPrice) : s;
       }, 0);
-      const totalEstHassansProfit = hasQty.reduce((s: number, r: unknown) => {
+      const totalEstHassansProfit = hasQty.reduce((s: number, r: any) => {
         const hp = (Number(r.configPrice) || 0) - (Number(r.offloadingCost) || 0);
         return s + (Number(r.qty) || 0) * hp;
       }, 0);
-      const totalEstCostProfit = hasQty.reduce((s: number, r: unknown) => {
+      const totalEstCostProfit = hasQty.reduce((s: number, r: any) => {
         const sell = r.avgSellingPrice != null ? Number(r.avgSellingPrice) : null;
         const p = sell != null ? sell - (Number(r.offloadingCost) || 0) : null;
         return p != null ? s + (Number(r.qty) || 0) * p : s;

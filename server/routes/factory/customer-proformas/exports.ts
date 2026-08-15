@@ -44,7 +44,7 @@ export function registerFactoryCustomerProformaExportRoutes(app: Express) {
 
       const [customer] = await db.select().from(customers).where(eq(customers.id, proforma.customerId));
       const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
-      const [_settings] = await db
+      const [settings] = await db
         .select()
         .from(companySettings)
         .where(eq(companySettings.companyId, companyId))
@@ -246,7 +246,7 @@ export function registerFactoryCustomerProformaExportRoutes(app: Express) {
 
       const [customer] = await db.select().from(customers).where(eq(customers.id, proforma.customerId));
       const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
-      const [_settings] = await db
+      const [settings] = await db
         .select()
         .from(companySettings)
         .where(eq(companySettings.companyId, companyId))

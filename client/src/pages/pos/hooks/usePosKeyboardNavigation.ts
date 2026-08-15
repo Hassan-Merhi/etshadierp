@@ -11,7 +11,7 @@ interface PosKeyboardNavigationParams {
   setRows: React.Dispatch<React.SetStateAction<SaleRow[]>>;
   toast: (opts: { title: string; description?: string; variant?: "destructive" | "default" }) => void;
   focusCell: (row: number, col: number) => void;
-  selectItem: (item: unknown, targetRowOverride?: number) => void;
+  selectItem: (item: any, targetRowOverride?: number) => void;
 }
 
 /**

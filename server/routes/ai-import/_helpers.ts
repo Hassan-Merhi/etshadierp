@@ -399,7 +399,7 @@ export async function postStockItemRows(
         reorderLevel: d.reorderLevel ?? "0",
         stockGroupId: d.stockGroupId ?? null,
         active: true,
-      } as unknown)
+      } as any)
       .returning({ id: stockItems.id });
 
     await logAudit({
@@ -438,7 +438,7 @@ export async function postCustomerRows(
         phone: d.phone ?? null,
         email: d.email ?? null,
         active: true,
-      } as unknown)
+      } as any)
       .returning({ id: customers.id });
 
     await logAudit({
@@ -477,7 +477,7 @@ export async function postSupplierRows(
         email: d.email ?? null,
         openingBalance: d.openingBalance ?? "0",
         active: true,
-      } as unknown)
+      } as any)
       .returning({ id: suppliers.id });
 
     await logAudit({

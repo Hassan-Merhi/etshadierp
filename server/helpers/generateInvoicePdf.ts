@@ -71,7 +71,7 @@ function formatDbDate(d: unknown): string {
 }
 
 // ── Manual text wrapper (prevents PDFKit mid-row page breaks) ─────────────────
-function wrapText(doc: unknown, text: string, maxWidth: number, maxLines: number): string[] {
+function wrapText(doc: any, text: string, maxWidth: number, maxLines: number): string[] {
   const words = text.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
   let current = "";
@@ -623,7 +623,7 @@ async function buildPdf(d: InvoiceData): Promise<{ buffer: Buffer; pageCount: nu
 
 // ── Vertically centred single-line text inside a cell ─────────────────────────
 function cellText(
-  doc: unknown,
+  doc: any,
   text: string,
   x: number,
   w: number,

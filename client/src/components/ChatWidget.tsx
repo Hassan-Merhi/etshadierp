@@ -66,14 +66,14 @@ export function ChatWidget() {
   const [stockItemSubmitting, setStockItemSubmitting] = useState(false);
   const [pendingPriceUpdate, setPendingPriceUpdate] = useState<PriceUpdateDraft | null>(null);
   const [priceUpdateSubmitting, setPriceUpdateSubmitting] = useState(false);
-  const [accountQueryResult, setAccountQueryResult] = useState<unknown>(null);
+  const [accountQueryResult, setAccountQueryResult] = useState<any>(null);
   const [poDraft, setPoDraft] = useState<POImportDraft | null>(null);
   const [poDraftUploading, setPoDraftUploading] = useState(false);
   const [poDraftSubmitting, setPoDraftSubmitting] = useState(false);
   const [poDraftResult, setPoDraftResult] = useState<POImportResult | null>(null);
   const [poDraftError, setPoDraftError] = useState<string | null>(null);
-  const [verifyContainerDraft, setVerifyContainerDraft] = useState<unknown>(null);
-  const [dataQueryResult, setDataQueryResult] = useState<unknown>(null);
+  const [verifyContainerDraft, setVerifyContainerDraft] = useState<any>(null);
+  const [dataQueryResult, setDataQueryResult] = useState<any>(null);
   const [pendingStockTransfer, setPendingStockTransfer] = useState<StockTransferDraft | null>(null);
   const [pendingStockTransferBatch, setPendingStockTransferBatch] = useState<StockTransferDraft[] | null>(null);
   const [stockTransferSubmitting, setStockTransferSubmitting] = useState(false);

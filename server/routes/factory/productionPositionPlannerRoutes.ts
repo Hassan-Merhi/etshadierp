@@ -31,7 +31,7 @@ interface PositionSnapshot {
   saved: boolean;
 }
 
-function rows(result: unknown): unknown[] {
+function rows(result: any): unknown[] {
   return Array.isArray(result) ? result : (result?.rows ?? []);
 }
 
@@ -305,7 +305,7 @@ export function registerProductionPositionPlannerRoutes(app: Express) {
         }
       }
 
-      await db.transaction(async (tx: unknown) => {
+      await db.transaction(async (tx: any) => {
         await tx.execute(sql`
           INSERT INTO factory_production_plans (company_id, plan_date, category_ids, notes)
           VALUES (${companyId}, ${date}::date, '[]', ${notes})

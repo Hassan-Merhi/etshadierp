@@ -26,7 +26,7 @@ export function FixPOCreditsDialog({ open, onOpenChange, companies }: FixPOCredi
   const { toast } = useToast();
   const [selectedSub, setSelectedSub] = useState("");
   const [selectedParent, setSelectedParent] = useState("");
-  const [result, setResult] = useState<unknown>(null);
+  const [result, setResult] = useState<any>(null);
 
   const fixMutation = useMutation({
     mutationFn: async (data: { companyId: number; parentCompanyId: number }) => {
@@ -152,7 +152,7 @@ interface ResetCompanyDataDialogProps {
 export function ResetCompanyDataDialog({ open, onOpenChange, companies }: ResetCompanyDataDialogProps) {
   const { toast } = useToast();
   const [selected, setSelected] = useState("");
-  const [result, setResult] = useState<unknown>(null);
+  const [result, setResult] = useState<any>(null);
 
   const mutation = useMutation({
     mutationFn: async (id: number) => {

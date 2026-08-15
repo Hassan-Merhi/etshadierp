@@ -42,7 +42,7 @@ export function registerFactoryCustomerProformaBulkPricingRoutes(app: Express) {
 
       const parsed = insertCustomerProformaSchema.parse({ companyId, customerId, name, isActive: isActive || false });
 
-      const result = await db.transaction(async (tx: unknown) => {
+      const result = await db.transaction(async (tx: any) => {
         const [proforma] = await tx.insert(customerProformas).values(parsed).returning();
 
         const lineValues = validLines.map((l) => ({
@@ -105,7 +105,7 @@ export function registerFactoryCustomerProformaBulkPricingRoutes(app: Express) {
           .json({ message: "At least one line must have articleCode, productName, and quantity > 0" });
       }
 
-      const result = await db.transaction(async (tx: unknown) => {
+      const result = await db.transaction(async (tx: any) => {
         await tx.delete(customerProformaLines).where(eq(customerProformaLines.proformaId, id));
         const lineValues = validLines.map((l) => ({
           proformaId: id,

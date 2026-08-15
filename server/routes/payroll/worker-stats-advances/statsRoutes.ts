@@ -31,7 +31,7 @@ export function registerWorkerStatsRoutes(app: Express) {
         .where(and(eq(factoryBales.finalizedBy, id), eq(factoryBales.companyId, companyId)));
 
       const totalBales = bales.length;
-      const totalKg = bales.reduce((sum: number, b: unknown) => sum + parseFloat(b.weightKg || "0"), 0);
+      const totalKg = bales.reduce((sum: number, b: any) => sum + parseFloat(b.weightKg || "0"), 0);
 
       let estimatedEarnings = 0;
       const salaryType = worker.salaryType || "Monthly";
@@ -50,7 +50,7 @@ export function registerWorkerStatsRoutes(app: Express) {
         .where(and(eq(factoryPayrolls.workerId, id), eq(factoryPayrolls.companyId, companyId)))
         .orderBy(desc(factoryPayrolls.periodEnd));
 
-      const totalPaid = payrolls.reduce((sum: number, p: unknown) => sum + parseFloat(p.netSalary || "0"), 0);
+      const totalPaid = payrolls.reduce((sum: number, p: any) => sum + parseFloat(p.netSalary || "0"), 0);
 
       res.json({
         workerId: id,

@@ -40,17 +40,17 @@ export default function ProductionRawStock() {
   const [editBatch, setEditBatch] = useState<FactoryMixBatch | null>(null);
 
   // Data States
-  const [adjustingRow, setAdjustingRow] = useState<unknown>(null);
+  const [adjustingRow, setAdjustingRow] = useState<any>(null);
   const [adjIsNewMaterial, setAdjIsNewMaterial] = useState(false);
-  const [deductingRow, setDeductingRow] = useState<unknown>(null);
-  const [addToBatchSource, setAddToBatchSource] = useState<unknown>(null);
+  const [deductingRow, setDeductingRow] = useState<any>(null);
+  const [addToBatchSource, setAddToBatchSource] = useState<any>(null);
   const [mixBatchDate, setMixBatchDate] = useState(() => new Date().toISOString().substring(0, 10));
 
   // Ref for WhatsApp printable card
   const mixBatchPrintRef = useRef<HTMLDivElement>(null);
 
   // Queries
-  const { data: rawStock, isLoading: _rawStockLoading } = useQuery<unknown[]>({
+  const { data: rawStock, isLoading: rawStockLoading } = useQuery<unknown[]>({
     queryKey: ["/api/factory/raw-stock"],
   });
 

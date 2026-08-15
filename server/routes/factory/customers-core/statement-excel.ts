@@ -31,7 +31,7 @@ export function registerFactoryCustomerStatementExcelRoutes(app: Express) {
         .where(and(eq(customers.id, customerId), eq(customers.companyId, companyId)));
       if (!customer) return res.status(404).json({ message: "Customer not found" });
 
-      const [_company] = await db.select().from(companies).where(eq(companies.id, companyId));
+      const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
 
       const balanceRows = await db
         .select()
@@ -111,7 +111,7 @@ export function registerFactoryCustomerStatementExcelRoutes(app: Express) {
 
       const openingBalance = parseFloat(customer.openingBalance || "0");
       const openingSide = customer.openingBalanceSide || "Dr";
-      const _runningBalance = openingSide === "Dr" ? openingBalance : -openingBalance;
+      let runningBalance = openingSide === "Dr" ? openingBalance : -openingBalance;
 
       // Read filter params (forwarded from frontend export button)
       const dateFromXlsx = ((req.query.dateFrom as string) || "").trim();
@@ -152,8 +152,8 @@ export function registerFactoryCustomerStatementExcelRoutes(app: Express) {
         return true;
       });
 
-      const totalDr = rows.reduce((s: number, r: unknown) => s + r.debit, 0);
-      const totalCr = rows.reduce((s: number, r: unknown) => s + r.credit, 0);
+      const totalDr = rows.reduce((s: number, r: any) => s + r.debit, 0);
+      const totalCr = rows.reduce((s: number, r: any) => s + r.credit, 0);
       const closingRawXlsx = bfRunningXlsx + (totalDr - totalCr);
       const closingBalance = Math.abs(closingRawXlsx);
       const closingBalanceSide = closingRawXlsx >= 0 ? "Dr" : "Cr";

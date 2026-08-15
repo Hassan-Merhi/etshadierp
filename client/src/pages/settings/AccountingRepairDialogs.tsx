@@ -162,7 +162,7 @@ interface InitializeBalancesDialogProps {
 
 export function InitializeBalancesDialog({ open, onOpenChange }: InitializeBalancesDialogProps) {
   const { toast } = useToast();
-  const [result, setResult] = useState<unknown>(null);
+  const [result, setResult] = useState<any>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
   const mutation = useMutation({

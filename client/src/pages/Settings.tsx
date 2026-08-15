@@ -50,9 +50,9 @@ export default function Settings() {
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   const [activeSection, setActiveSection] = useState("users-permissions");
-  const [userToDelete, setUserToDelete] = useState<unknown>(null);
+  const [userToDelete, setUserToDelete] = useState<any>(null);
 
-  const { data: companies = [], isLoading: _isLoadingCompanies } = useQuery<unknown[]>({
+  const { data: companies = [], isLoading: isLoadingCompanies } = useQuery<unknown[]>({
     queryKey: ["/api/companies"],
   });
 

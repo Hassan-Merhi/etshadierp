@@ -61,7 +61,7 @@ export default function BaleProducts() {
   const [importPreview, setImportPreview] = useState<ImportPreviewRow[]>([]);
   const [importError, setImportError] = useState("");
   const [importFile, setImportFile] = useState<File | null>(null);
-  const [condensedView, _setCondensedView] = useState(false);
+  const [condensedView, setCondensedView] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [showCategories, setShowCategories] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
@@ -79,7 +79,7 @@ export default function BaleProducts() {
     sellingPrice: "",
     labelDesignColor: "",
   });
-  const [_isGeneratingCode, setIsGeneratingCode] = useState(false);
+  const [isGeneratingCode, setIsGeneratingCode] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showHidden, setShowHidden] = useState(false);
@@ -115,7 +115,7 @@ export default function BaleProducts() {
     }
   }, [editingProduct]);
 
-  const { data: currentUser } = useQuery<unknown>({ queryKey: ["/api/auth/me"] });
+  const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const isAdmin = ["Admin", "Owner", "Developer"].includes(currentUser?.role || "");
 
   const { data: myAccess } = useQuery<{ hiddenCostFields: string[] }>({
@@ -399,7 +399,7 @@ export default function BaleProducts() {
     },
   });
 
-  const _handleGradeChange = async (grade: string) => {
+  const handleGradeChange = async (grade: string) => {
     setEditForm((f) => ({ ...f, grade }));
     if (!grade) return;
     setIsGeneratingCode(true);
@@ -594,7 +594,7 @@ export default function BaleProducts() {
       ]);
       totalRow.height = 22;
       const totalFill = { type: "pattern", pattern: "solid", fgColor: { argb: C_TOTAL } };
-      totalRow.eachCell((cell: unknown, _colNum: number) => {
+      totalRow.eachCell((cell: unknown, colNum: number) => {
         cell.fill = totalFill;
         cell.border = {
           top: { style: "medium", color: { argb: C_NAVY } },
@@ -823,7 +823,7 @@ export default function BaleProducts() {
       XLSX.utils.book_append_sheet(wb, ws, "Bale Products");
       await XLSX.writeFile(wb, "bale_products_template.xlsx");
       toast({ title: "Template downloaded" });
-    } catch (_err) {
+    } catch (err) {
       toast({ title: "Error", description: "Failed to generate template", variant: "destructive" });
     }
   };

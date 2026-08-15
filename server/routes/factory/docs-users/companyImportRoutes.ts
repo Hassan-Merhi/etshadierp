@@ -66,7 +66,7 @@ export function registerFactoryCompanyImportRoutes(app: Express) {
       const multer = (await import("multer")).default;
       const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
 
-      upload.single("file")(req, res, async (err: unknown) => {
+      upload.single("file")(req, res, async (err: any) => {
         if (err) return res.status(400).json({ message: "File upload error: " + err.message });
         if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
@@ -75,7 +75,7 @@ export function registerFactoryCompanyImportRoutes(app: Express) {
           if (!targetCompanyId) return res.status(400).json({ message: "No company selected" });
 
           const jsonStr = req.file.buffer.toString("utf-8");
-          let payload: unknown;
+          let payload: any;
           try {
             payload = JSON.parse(jsonStr);
           } catch {
@@ -135,7 +135,7 @@ export function registerFactoryCompanyImportRoutes(app: Express) {
             return mapped ?? null;
           };
 
-          async function makeUniqueCode(tx: unknown, table: unknown, field: PropertyKey, baseValue: string): Promise<string> {
+          async function makeUniqueCode(tx: any, table: any, field: PropertyKey, baseValue: string): Promise<string> {
             const [existing] = await tx.select({ id: table.id }).from(table).where(eq(field, baseValue)).limit(1);
             if (!existing) return baseValue;
             const attempt = baseValue + importSuffix;
@@ -221,7 +221,7 @@ export function registerFactoryCompanyImportRoutes(app: Express) {
             "loadingFinalizedAt",
             "lastUpdated",
           ]);
-          function fixDates(rec: unknown) {
+          function fixDates(rec: any) {
             for (const key of Object.keys(rec)) {
               if (rec[key] == null) continue;
               if (dateFieldNames.has(key) && typeof rec[key] === "string") {
@@ -231,10 +231,10 @@ export function registerFactoryCompanyImportRoutes(app: Express) {
             return rec;
           }
 
-          await db.transaction(async (tx: unknown) => {
+          await db.transaction(async (tx: any) => {
             async function insertAndMap(
               tableName: string,
-              drizzleTable: unknown,
+              drizzleTable: any,
               rows: unknown[],
               fkRemaps: Record<string, string>,
               opts?: { hasCompanyId?: boolean; nullifyFields?: string[] }
@@ -265,7 +265,7 @@ export function registerFactoryCompanyImportRoutes(app: Express) {
 
             async function insertSelfReferencing(
               tableName: string,
-              drizzleTable: unknown,
+              drizzleTable: any,
               rows: unknown[],
               parentField: string,
               fkRemaps: Record<string, string>,

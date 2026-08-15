@@ -40,8 +40,8 @@ export function registerChatbotTransactionRoutes(app: Express) {
         destinationLocationId,
         notes,
         items,
-        _sessionId,
-        _prompt,
+        sessionId,
+        prompt,
         optional,
         analysisSummary,
         analysisDateRange,
@@ -123,7 +123,7 @@ export function registerChatbotTransactionRoutes(app: Express) {
           notes: notes || "",
           voucherDate: date || new Date().toISOString().split("T")[0],
           optional: isOptional,
-          items: items.map((i: unknown) => ({
+          items: items.map((i: any) => ({
             stockItemId: Number(i.stockItemId),
             quantity: String(i.quantity),
             sourceLocationId: Number(sourceLocationId),
@@ -214,7 +214,7 @@ export function registerChatbotTransactionRoutes(app: Express) {
         .where(eq(voucherEntries.voucherId, v.id));
 
       res.json({ found: true, voucher: v, entries });
-    } catch (_error: unknown) {
+    } catch (error: unknown) {
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -336,7 +336,7 @@ export function registerChatbotTransactionRoutes(app: Express) {
       });
 
       res.json({ results });
-    } catch (_error: unknown) {
+    } catch (error: unknown) {
       res.status(500).json({ message: "Internal server error" });
     }
   });

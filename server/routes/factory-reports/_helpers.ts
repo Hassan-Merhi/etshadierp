@@ -18,7 +18,7 @@ import { factoryDaybookEntries } from "@shared/schema";
  * modules; they previously closed over the register function's body.
  */
 export async function writeDaybookEntry(
-  dbOrTx: unknown,
+  dbOrTx: any,
   opts: {
     companyId: number;
     txDate: string;
@@ -56,7 +56,7 @@ export async function writeDaybookEntry(
 }
 
 export const hmdLogo = path.join(process.cwd(), "server", "hmd-logo.png");
-export function addPdfBranding(doc: unknown) {
+export function addPdfBranding(doc: any) {
   if (fs.existsSync(hmdLogo)) {
     try {
       doc.image(hmdLogo, (doc.page.width - 220) / 2, doc.y, { width: 220 });
@@ -229,8 +229,8 @@ export async function generatePdf(
         y = 40;
       }
 
-      const materialsStr = bale.materials.map((m: unknown) => m.containerNumber).join(", ") || "N/A";
-      const kgEachStr = bale.materials.map((m: unknown) => m.weightKg.toFixed(3)).join(", ") || "N/A";
+      const materialsStr = bale.materials.map((m: any) => m.containerNumber).join(", ") || "N/A";
+      const kgEachStr = bale.materials.map((m: any) => m.weightKg.toFixed(3)).join(", ") || "N/A";
 
       x = startX;
       const baleRow = [

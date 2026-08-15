@@ -338,7 +338,7 @@ export async function computeNetPositionInventory(ctx: NetPositionInventoryConte
 `);
   const baleSumRow = resultRows(baleSumResult)[0] ?? {};
   const totalBaleKg = parseFloat(String(baleSumRow.total_kg ?? "0")) || 0;
-  const _totalWgKg = parseFloat(String(baleSumRow.wg_kg ?? "0")) || 0;
+  const totalWgKg = parseFloat(String(baleSumRow.wg_kg ?? "0")) || 0;
 
   const botWeightKg = totalMixKg - totalBaleKg;
   const balanceOnTableValue = ctx.round2(Math.max(botWeightKg, 0) * blendedCpk);

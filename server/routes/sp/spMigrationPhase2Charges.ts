@@ -78,7 +78,7 @@ function addPositiveCharge(candidates: ChargeCandidate[], candidate: ChargeCandi
   if (Math.abs(candidate.amountUsd) > 0.0001) candidates.push(candidate);
 }
 
-export async function getContainerChargeCandidates(container: unknown, po: unknown | null): Promise<ChargeCandidate[]> {
+export async function getContainerChargeCandidates(container: any, po: any | null): Promise<ChargeCandidate[]> {
   const candidates: ChargeCandidate[] = [];
 
   if (po) {
@@ -223,8 +223,8 @@ export async function getContainerChargeCandidates(container: unknown, po: unkno
 }
 
 export async function getSourceContainerLines(
-  container: unknown,
-  po: unknown | null
+  container: any,
+  po: any | null
 ): Promise<{ source: string; rows: unknown[] }> {
   if (po) {
     const poLines = await db.execute(sql`

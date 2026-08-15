@@ -221,16 +221,16 @@ export async function buildLoadingSummary(invoiceId: number, companyId: number, 
  * Declared at module scope so the four export handlers that share them can
  * live in separate modules.
  */
-export function cellFill(cell: unknown, argb: string) {
+export function cellFill(cell: any, argb: string) {
   cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb } };
 }
 /** Apply thin borders to all four sides of a cell */
-export function cellBorder(cell: unknown) {
+export function cellBorder(cell: any) {
   const s = { style: "thin", color: { argb: "FFD1D5DB" } };
   cell.border = { top: s, left: s, bottom: s, right: s };
 }
 /** Style a section-header row (dark navy bg, white bold) */
-export function sectionHeader(ws: unknown, rowNum: number, value: string, cols: number) {
+export function sectionHeader(ws: any, rowNum: number, value: string, cols: number) {
   const row = ws.getRow(rowNum);
   const cell = row.getCell(1);
   cell.value = value;
@@ -240,7 +240,7 @@ export function sectionHeader(ws: unknown, rowNum: number, value: string, cols: 
   row.height = 20;
 }
 /** Style a column-header row (light blue bg, dark blue bold) */
-export function colHeaders(ws: unknown, rowNum: number, headers: string[]) {
+export function colHeaders(ws: any, rowNum: number, headers: string[]) {
   const row = ws.getRow(rowNum);
   headers.forEach((h, i) => {
     const cell = row.getCell(i + 1);
@@ -254,8 +254,8 @@ export function colHeaders(ws: unknown, rowNum: number, headers: string[]) {
 }
 /** Style a data cell */
 export function dataCell(
-  cell: unknown,
-  value: unknown,
+  cell: any,
+  value: any,
   opts: { bold?: boolean; color?: string; align?: string; fill?: string } = {}
 ) {
   cell.value = value;

@@ -77,9 +77,9 @@ export function registerRawStockOpeningBalanceRoutes(app: Express) {
         }
       }
 
-      const result = await db.transaction(async (tx: unknown) => {
+      const result = await db.transaction(async (tx: any) => {
         // Use supplierId directly if provided, otherwise find-or-create by name
-        let existingSupplier: unknown;
+        let existingSupplier: any;
         if (reqSupplierId) {
           const [found] = await tx
             .select()
@@ -339,7 +339,7 @@ export function registerRawStockOpeningBalanceRoutes(app: Express) {
 
       if (!rawStockRow) return res.status(404).json({ message: "Opening balance record not found" });
 
-      await db.transaction(async (tx: unknown) => {
+      await db.transaction(async (tx: any) => {
         const rawUpdates: Record<string, unknown> = {};
         const containerUpdates: Record<string, unknown> = {};
 
@@ -499,7 +499,7 @@ export function registerRawStockOpeningBalanceRoutes(app: Express) {
           .json({ message: "This record is not an opening balance entry and cannot be deleted through this endpoint" });
       }
 
-      await db.transaction(async (tx: unknown) => {
+      await db.transaction(async (tx: any) => {
         // Safely detach: null out containerId on mix batch sources referencing this container
         await tx
           .update(factoryMixBatchSources)

@@ -160,7 +160,7 @@ export function registerLocationMonthlyDetailRoutes(app: Express) {
         else outTx.push({ ...entry, type: "Debit Note" });
       }
 
-      const byDate = (a: unknown, b: unknown) => new Date(a.date).getTime() - new Date(b.date).getTime();
+      const byDate = (a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime();
       res.json({ inTransactions: inTx.sort(byDate), outTransactions: outTx.sort(byDate) });
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });

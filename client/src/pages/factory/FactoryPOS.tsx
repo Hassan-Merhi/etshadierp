@@ -69,7 +69,7 @@ export default function FactoryPOS() {
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const searchRef = useRef<HTMLInputElement>(null);
   const itemListRef = useRef<HTMLDivElement>(null);
-  const [savedSale, setSavedSale] = useState<unknown>(null);
+  const [savedSale, setSavedSale] = useState<any>(null);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [voidId, setVoidId] = useState<number | null>(null);
   const [showHistory, setShowHistory] = useState(false);
@@ -105,11 +105,11 @@ export default function FactoryPOS() {
     queryKey: ["/api/factory/pos/sales"],
     enabled: showHistory,
   });
-  const { data: authUser } = useQuery<unknown>({ queryKey: ["/api/auth/me"] });
+  const { data: authUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const printUserName = authUser?.fullName || authUser?.name || authUser?.username || authUser?.email || "User";
 
   // Fetch existing sale when in edit mode
-  const { data: editSaleData } = useQuery<unknown>({
+  const { data: editSaleData } = useQuery<any>({
     queryKey: ["/api/factory/pos/sales", editSaleId],
     queryFn: async () => {
       if (!editSaleId) return null;

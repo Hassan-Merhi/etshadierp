@@ -46,7 +46,7 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       const t4 = totalsRow.rows[0] as unknown as { num_transactions: Parameters<typeof String>[0] } & {
         grand_total: string;
       };
-      const _grandRev = 0;
+      let grandRev = 0;
       const tableRows4 = (rows.rows as unknown[]).map((r) => {
         const rev = parseFloat(r.total_revenue || "0");
         grandRev += rev;
@@ -220,7 +220,7 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY total_items DESC
         LIMIT ${rowLimit}
       `);
-      const _grandItems = 0;
+      let grandItems = 0;
       const tableRows4 = (rows.rows as unknown[]).map((r) => {
         const items = parseFloat(r.total_items || "0");
         const charges = parseFloat(r.total_charges || "0");

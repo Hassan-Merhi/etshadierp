@@ -57,7 +57,7 @@ function formatSmartNumber(value: number): string {
   return formatNumber(value);
 }
 
-function _formatFullNumber(value: number): string {
+function formatFullNumber(value: number): string {
   const isWhole = Math.abs(value) % 1 === 0;
   return new Intl.NumberFormat("en-US", {
     minimumFractionDigits: isWhole ? 0 : 2,
@@ -69,7 +69,7 @@ export default function LedgerMonthlySummary() {
   const { formatAmountRaw: formatAmount } = useCurrencyContext();
   const { formatShortDate } = useDateFormat();
   const appMode = useAppMode();
-  const _modeApiRequest = getApiRequest(appMode);
+  const modeApiRequest = getApiRequest(appMode);
   const [, navigate] = useLocation();
   const handleBack = useBackToParent();
   const [, params] = useRoute("/ledger-monthly/:accountId");

@@ -17,7 +17,7 @@ export function isWipers(product: FactoryBaleProduct, categories: FactoryCategor
   );
 }
 
-export function isWipersBale(bale: unknown): boolean {
+export function isWipersBale(bale: any): boolean {
   const cat = (bale.bale?.category || bale.category || "").toLowerCase();
   const name = (bale.bale?.productName || bale.productName || "").toLowerCase();
   return cat.includes("wiper") || name.includes("wiper") || cat.includes("garbage") || name.includes("garbage");

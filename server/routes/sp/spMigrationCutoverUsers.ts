@@ -67,7 +67,7 @@ async function switchUserSessions(params: {
   return resultRows(result).length;
 }
 
-async function mapSourceRole(sourceId: number, targetId: number, sourceRole: unknown): Promise<unknown> {
+async function mapSourceRole(sourceId: number, targetId: number, sourceRole: any): Promise<unknown> {
   const location = sourceRole.assigned_location_id
     ? await resolveTargetLocation(sourceId, targetId, pn(sourceRole.assigned_location_id))
     : null;
@@ -128,7 +128,7 @@ export async function moveUsersToTarget(
     const existingTarget = firstRow(existingTargetResult) ?? null;
     let targetRoleId: number;
     let createdTargetRole = false;
-    let effectiveTargetRole: unknown;
+    let effectiveTargetRole: any;
 
     if (existingTarget) {
       targetRoleId = pn(existingTarget.id);

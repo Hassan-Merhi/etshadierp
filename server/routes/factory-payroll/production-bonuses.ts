@@ -13,7 +13,7 @@ import {
   updateProductionBonusRunStatuses,
 } from "../../services/payroll/productionBonusPayrollService";
 
-function rows(result: unknown): unknown[] {
+function rows(result: any): unknown[] {
   return Array.isArray(result) ? result : (result?.rows ?? []);
 }
 
@@ -44,7 +44,7 @@ const emptyTotals = () => ({
   rejectedCount: 0,
 });
 
-export function registerFactoryProductionBonusRoutes(app: Express, requireAuth: unknown, db: unknown) {
+export function registerFactoryProductionBonusRoutes(app: Express, requireAuth: any, db: any) {
   app.get("/api/factory/payroll/:id/production-bonuses", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = parseId(req.params.id);
@@ -83,7 +83,7 @@ export function registerFactoryProductionBonusRoutes(app: Express, requireAuth: 
       const note = typeof req.body?.note === "string" ? req.body.note.trim().slice(0, 1000) || null : null;
       const decidedBy = req.session?.userId ? String(req.session.userId) : null;
 
-      const result = await db.transaction(async (tx: unknown) => {
+      const result = await db.transaction(async (tx: any) => {
         const payrollResult = await tx.execute(sql`
           SELECT id, company_id AS "companyId", worker_id AS "workerId",
                  period_start::text AS "periodStart", period_end::text AS "periodEnd", status

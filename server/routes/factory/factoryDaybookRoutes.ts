@@ -265,7 +265,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
       // BALE_STOCK_ENTRY is always re-derived so old entries stored as selling price
       // are corrected to production price on the fly without a DB migration.
       const baleStockAndZeroRows = filteredDaybookRows.filter(
-        (r: unknown) =>
+        (r: any) =>
           r.txType === "BALE_STOCK_ENTRY" ||
           (parseFloat(r.amountCurrency || "0") === 0 && ["LOADING_SUBMITTED", "ORDER_VERIFIED"].includes(r.txType))
       );
@@ -357,7 +357,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
         // LOADING_SUBMITTED / ORDER_VERIFIED: derive from customerOrders.grandTotal
         // (grandTotal includes bales + all charges/surcharges, not just bale prices)
         const loadingRows = zeroRows.filter(
-          (r: unknown) => ["LOADING_SUBMITTED", "ORDER_VERIFIED"].includes(r.txType) && r.referenceId
+          (r: any) => ["LOADING_SUBMITTED", "ORDER_VERIFIED"].includes(r.txType) && r.referenceId
         );
         if (loadingRows.length > 0) {
           const orderIds = [...new Set(loadingRows.map((r) => r.referenceId as number))];
@@ -408,7 +408,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
       // ── 3. Merge + sort ────────────────────────────────────────────────────
       // If ownOnly, exclude synthetic rows (voucher-derived rows with no createdBy)
       const effectiveSyntheticRows = ownOnly ? [] : syntheticRows;
-      const merged = [...deduplicatedRows, ...effectiveSyntheticRows].sort((a: unknown, b: unknown) => {
+      const merged = [...deduplicatedRows, ...effectiveSyntheticRows].sort((a: any, b: any) => {
         if (b.txDate > a.txDate) return 1;
         if (b.txDate < a.txDate) return -1;
         return Math.abs(b.id) - Math.abs(a.id);

@@ -36,7 +36,7 @@ export function Stage2StepRunner({
   const { toast } = useToast();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmName, setConfirmName] = useState("");
-  const [result, setResult] = useState<unknown>(null);
+  const [result, setResult] = useState<any>(null);
   const [runError, setRunError] = useState<string | null>(null);
 
   const mutation = useMutation({

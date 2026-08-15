@@ -140,9 +140,9 @@ export default function FactoryEmployeeDetail() {
   const [withdrawCashAccountId, setWithdrawCashAccountId] = useState("");
 
   // Payroll (bulk) state
-  const [payrollDate, _setPayrollDate] = useState(new Date().toLocaleDateString("en-CA"));
+  const [payrollDate, setPayrollDate] = useState(new Date().toLocaleDateString("en-CA"));
   const [payrollNotes, setPayrollNotes] = useState("");
-  const [payrollEffectiveDate, _setPayrollEffectiveDate] = useState("");
+  const [payrollEffectiveDate, setPayrollEffectiveDate] = useState("");
 
   // All employees for payroll tab
   const [selectedEmployees, setSelectedEmployees] = useState<Set<number>>(new Set());
@@ -298,7 +298,7 @@ export default function FactoryEmployeeDetail() {
     },
   });
 
-  const _bulkPayrollMutation = useMutation({
+  const bulkPayrollMutation = useMutation({
     mutationFn: async () => {
       const deposits = Array.from(selectedEmployees)
         .map((empId) => ({
@@ -363,7 +363,7 @@ export default function FactoryEmployeeDetail() {
   const avatarColor = getAvatarColor(fullName);
   const balance = parseFloat(employee.currentBalance || "0");
 
-  const _infoRow = (label: string, value: string | number | null | undefined) => (
+  const infoRow = (label: string, value: string | number | null | undefined) => (
     <div className="flex justify-between py-1.5 border-b last:border-0 text-sm">
       <span className="text-muted-foreground shrink-0 mr-3">{label}</span>
       <span className="font-medium text-right">{value || "—"}</span>
@@ -371,8 +371,8 @@ export default function FactoryEmployeeDetail() {
   );
 
   // Deposits and withdrawals from statement
-  const _depositRows = (statement?.rows || []).filter((r) => r.credit > 0);
-  const _withdrawRows = (statement?.rows || []).filter((r) => r.debit > 0);
+  const depositRows = (statement?.rows || []).filter((r) => r.credit > 0);
+  const withdrawRows = (statement?.rows || []).filter((r) => r.debit > 0);
 
   return (
     <div className="space-y-4">

@@ -97,8 +97,8 @@ export function registerBalesCrudRoutes(app: Express) {
           : Promise.resolve(null as null),
       ]);
 
-      const productIds: number[] = Array.from(new Set(bales.map((b: unknown) => b.productId).filter(Boolean)));
-      const batchIds: number[] = Array.from(new Set(bales.map((b: unknown) => b.mixBatchId).filter(Boolean)));
+      const productIds: number[] = Array.from(new Set(bales.map((b: any) => b.productId).filter(Boolean)));
+      const batchIds: number[] = Array.from(new Set(bales.map((b: any) => b.mixBatchId).filter(Boolean)));
 
       const products =
         productIds.length > 0
@@ -127,10 +127,10 @@ export function registerBalesCrudRoutes(app: Express) {
             : await db.select().from(factoryMixBatches).where(inArray(factoryMixBatches.id, batchIds))
           : [];
 
-      const productMap = new Map(products.map((p: unknown) => [p.id, p]));
-      const batchMap = new Map(batches.map((b: unknown) => [b.id, b]));
+      const productMap = new Map(products.map((p: any) => [p.id, p]));
+      const batchMap = new Map(batches.map((b: any) => [b.id, b]));
 
-      const baleIds = bales.map((b: unknown) => b.id).filter(Boolean);
+      const baleIds = bales.map((b: any) => b.id).filter(Boolean);
       const lastPrintMap = new Map<number, string>();
       // In lite mode skip the print-history lookup; in full mode guard against huge IN-clauses.
       if (!lite && baleIds.length > 0 && baleIds.length <= 500) {
@@ -147,7 +147,7 @@ export function registerBalesCrudRoutes(app: Express) {
         }
       }
 
-      const results = bales.map((bale: unknown) => ({
+      const results = bales.map((bale: any) => ({
         bale,
         product: bale.productId ? productMap.get(bale.productId) || null : null,
         mixBatch: bale.mixBatchId ? batchMap.get(bale.mixBatchId) || null : null,
@@ -423,7 +423,7 @@ export function registerBalesCrudRoutes(app: Express) {
         .limit(1);
       if (!worker) return res.status(400).json({ message: "Worker is inactive or belongs to another company" });
 
-      const updated = await db.transaction(async (tx: unknown) => {
+      const updated = await db.transaction(async (tx: any) => {
         const [updatedBale] = await tx
           .update(factoryBales)
           .set({ finalizedBy: numericWorkerId, workerName: worker.fullName, updatedAt: new Date() })
@@ -482,13 +482,13 @@ export function registerBalesCrudRoutes(app: Express) {
         .limit(1);
       if (!worker) return res.status(400).json({ message: "Worker is inactive or belongs to another company" });
 
-      const updatedIds = await db.transaction(async (tx: unknown) => {
+      const updatedIds = await db.transaction(async (tx: any) => {
         const updatedBales = await tx
           .update(factoryBales)
           .set({ finalizedBy: numericWorkerId, workerName: worker.fullName, updatedAt: new Date() })
           .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, numericIds)))
           .returning({ id: factoryBales.id });
-        const ids = updatedBales.map((bale: unknown) => bale.id);
+        const ids = updatedBales.map((bale: any) => bale.id);
         if (ids.length > 0) {
           await tx
             .update(factoryBaleProductionAttributions)
@@ -525,7 +525,7 @@ export function registerBalesCrudRoutes(app: Express) {
       }
       const newWeightStr = rawWeight.toFixed(3);
 
-      const result = await db.transaction(async (tx: unknown) => {
+      const result = await db.transaction(async (tx: any) => {
         // Fetch bale and verify ownership
         const [bale] = await tx
           .select()
@@ -612,7 +612,7 @@ export function registerBalesCrudRoutes(app: Express) {
 
       if (id === null) return res.status(400).json({ message: "Invalid id" });
 
-      const result = await db.transaction(async (tx: unknown) => {
+      const result = await db.transaction(async (tx: any) => {
         const [originalBale] = await tx
           .select()
           .from(factoryBales)

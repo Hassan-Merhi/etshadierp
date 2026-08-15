@@ -343,7 +343,7 @@ export function registerFactoryStockAllocationV5PaginationRoutes(app: Express): 
 
       const aggregateResult = await pool.query(aggregateQuery, values);
       const aggregate = aggregateResult.rows[0] ?? {};
-      const pageRows: PageRow[] = (Array.isArray(aggregate.rows) ? aggregate.rows : []).map((row: unknown) => ({
+      const pageRows: PageRow[] = (Array.isArray(aggregate.rows) ? aggregate.rows : []).map((row: any) => ({
         articleCode: String(row.articleCode),
         productName: String(row.productName || row.articleCode),
         categoryName: String(row.categoryName || ""),

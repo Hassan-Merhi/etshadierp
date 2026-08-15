@@ -25,7 +25,7 @@ const POS_TAB_KEYS = POS_TABS.map((t) => t.key) as unknown as readonly ("daybook
 const ERP_TAB_KEYS = ERP_TABS.map((t) => t.key) as unknown as readonly ("transfers" | "pricelist")[];
 
 export default function SalesToolsHub() {
-  const { data: user } = useQuery<unknown>({
+  const { data: user } = useQuery<any>({
     queryKey: ["/api/auth/me"],
   });
 

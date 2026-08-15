@@ -15,9 +15,9 @@ import { Loader2, ArrowLeftRight } from "lucide-react";
 import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema } from "@shared/schema";
 import { useCompany } from "@/contexts/CompanyContext";
 
-const _userFormSchema = insertUserSchema;
-const _companyFormSchema = insertCompanySchema;
-const _roleAssignmentSchema = insertUserCompanyRoleSchema.refine(
+const userFormSchema = insertUserSchema;
+const companyFormSchema = insertCompanySchema;
+const roleAssignmentSchema = insertUserCompanyRoleSchema.refine(
   (data) => {
     // If role is POS, assignedLocationId must be present
     if (data.role === "POS" && !data.assignedLocationId) {
@@ -31,9 +31,9 @@ const _roleAssignmentSchema = insertUserCompanyRoleSchema.refine(
   }
 );
 
-type _UserFormData = z.infer<typeof userFormSchema>;
-type _CompanyFormData = z.infer<typeof companyFormSchema>;
-type _RoleAssignmentData = z.infer<typeof roleAssignmentSchema>;
+type UserFormData = z.infer<typeof userFormSchema>;
+type CompanyFormData = z.infer<typeof companyFormSchema>;
+type RoleAssignmentData = z.infer<typeof roleAssignmentSchema>;
 
 export function POSReceiptSettings() {
   return (
@@ -59,7 +59,7 @@ export function IntercompanyPosTab() {
   const { selectedCompany } = useCompany();
 
   // Current config
-  const { data: config, isLoading: configLoading } = useQuery<unknown>({
+  const { data: config, isLoading: configLoading } = useQuery<any>({
     queryKey: ["/api/intercompany-pos-config", selectedCompany?.id],
   });
 

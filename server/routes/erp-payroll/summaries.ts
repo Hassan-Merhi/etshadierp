@@ -45,7 +45,7 @@ export function registerPayrollSummaryRoutes(app: Express) {
 
       // Calculate total paid per worker by checking their employee liability account
       const workerPayments = await Promise.all(
-        workers.map(async (worker: unknown) => {
+        workers.map(async (worker: any) => {
           // Find employee's liability account (code: EMP-{worker.code})
           const employeeAccountCode = `EMP-${worker.code}`;
           const employeeAccount = allAccounts.find((a) => a.code === employeeAccountCode);
@@ -70,7 +70,7 @@ export function registerPayrollSummaryRoutes(app: Express) {
               );
 
             // Sum all credits (payments to worker)
-            totalPaid = entries.reduce((sum: number, entry: unknown) => sum + parseFloat(entry.creditAmount || "0"), 0);
+            totalPaid = entries.reduce((sum: number, entry: any) => sum + parseFloat(entry.creditAmount || "0"), 0);
           }
 
           return {
@@ -83,7 +83,7 @@ export function registerPayrollSummaryRoutes(app: Express) {
       );
 
       // Calculate grand total
-      const grandTotal = workerPayments.reduce((sum: number, wp: unknown) => sum + parseFloat(wp.totalPaid), 0);
+      const grandTotal = workerPayments.reduce((sum: number, wp: any) => sum + parseFloat(wp.totalPaid), 0);
 
       res.json({
         workerPayments,

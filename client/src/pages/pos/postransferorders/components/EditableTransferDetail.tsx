@@ -134,7 +134,7 @@ function EditableTransferDetail({
       locationInventory.filter(
         (i) => !alreadyAddedIds.has(i.stockItemId) && i.name.toLowerCase().includes(panelSearch.toLowerCase())
       ),
-    [locationInventory, alreadyAddedIds, panelSearch]
+    [locationInventory, panelSearch, extraItems, myItems]
   );
 
   useEffect(() => {

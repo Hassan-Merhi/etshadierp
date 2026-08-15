@@ -82,7 +82,7 @@ export function WorkerProfilesTab({
   if (selectedWorkerProfile) {
     return (
       <ERPWorkerDetail
-        worker={selectedWorkerProfile as unknown}
+        worker={selectedWorkerProfile as any}
         onBack={() => setSelectedWorkerProfileId(null)}
         onEdit={(w) => {
           setSelectedWorkerForEdit(

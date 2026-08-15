@@ -18,14 +18,14 @@ import { ProductionPositionsTab } from "./bale-stock-entry/ProductionPositionsTa
 
 export default function BaleStockEntry() {
   const todayStr = new Date().toLocaleDateString("en-CA");
-  const [summaryDate, _setSummaryDate] = useState<string>(todayStr);
+  const [summaryDate, setSummaryDate] = useState<string>(todayStr);
   const { toast } = useToast();
   // Track which tabs have ever been activated so we only mount heavy components on demand.
   const [mountedTabs, setMountedTabs] = useState<Set<string>>(() => new Set(["entry"]));
 
   const handleTabChange = (tab: string) => setMountedTabs((prev) => (prev.has(tab) ? prev : new Set([...prev, tab])));
 
-  const { data: settings } = useQuery<unknown>({
+  const { data: settings } = useQuery<any>({
     queryKey: ["/api/factory/settings"],
     queryFn: async () => {
       const r = await fetch("/api/factory/settings");
@@ -34,7 +34,7 @@ export default function BaleStockEntry() {
     staleTime: 60000,
   });
 
-  const { data: myAccess } = useQuery<unknown>({ queryKey: ["/api/factory/my-access"], staleTime: 5 * 60000 });
+  const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 5 * 60000 });
   const hiddenTabs = myAccess?.hiddenCostFields ?? [];
 
   const showEntry = settings?.stockEntryTabEntryEnabled !== false && !hiddenTabs.includes("hide_tab_stockentry_entry");
@@ -43,7 +43,7 @@ export default function BaleStockEntry() {
   const showGroundScan = !hiddenTabs.includes("hide_tab_stockentry_ground_scan");
   const showDailyScan = !hiddenTabs.includes("hide_tab_stockentry_daily_scan");
 
-  const { data: _productionSession, refetch: refetchSession } = useQuery<unknown>({
+  const { data: productionSession, refetch: refetchSession } = useQuery<any>({
     queryKey: ["/api/factory/stock-entry/production-session", todayStr],
     queryFn: async () => {
       const r = await fetch(`/api/factory/stock-entry/production-session?date=${todayStr}`);
@@ -52,7 +52,7 @@ export default function BaleStockEntry() {
     staleTime: 30000,
   });
 
-  const _endProductionMutation = useMutation({
+  const endProductionMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/factory/stock-entry/end-production", { date: todayStr });
       if (!res.ok) {

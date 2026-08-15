@@ -29,7 +29,7 @@ import {
   writeDaybookEntry,
 } from "./_helpers";
 
-export function registerFactoryPayrollGenerateRoutes(app: Express, requireAuth: unknown, db: unknown) {
+export function registerFactoryPayrollGenerateRoutes(app: Express, requireAuth: any, db: any) {
   app.post("/api/factory/payroll/generate", requireAuth, async (req: Request, res: Response) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;
@@ -47,7 +47,7 @@ export function registerFactoryPayrollGenerateRoutes(app: Express, requireAuth: 
         return res.status(400).json({ message: "No active workers found for this company" });
       }
 
-      const _workerIds = workers.map((w: unknown) => w.id);
+      const workerIds = workers.map((w: any) => w.id);
 
       const balesInRange = await db
         .select()
@@ -106,9 +106,9 @@ export function registerFactoryPayrollGenerateRoutes(app: Express, requireAuth: 
         advancesByWorker.set(adv.workerId, existing);
       }
 
-      const _periodDays = daysInPeriod(startDate, endDate);
+      const periodDays = daysInPeriod(startDate, endDate);
       const weekdays = countWeekdays(startDate, endDate);
-      const _monthDays = daysInMonth(startDate);
+      const monthDays = daysInMonth(startDate);
       const payrollRecords = [];
 
       for (const worker of workers) {
@@ -164,7 +164,7 @@ export function registerFactoryPayrollGenerateRoutes(app: Express, requireAuth: 
             baleEarnings = balesCount * workerPerBaleRate;
             break;
           case "Per KG":
-            kgProcessed = workerBales.reduce((sum: number, b: unknown) => sum + parseFloat(b.weightKg || "0"), 0);
+            kgProcessed = workerBales.reduce((sum: number, b: any) => sum + parseFloat(b.weightKg || "0"), 0);
             kgEarnings = kgProcessed * workerPerKgRate;
             break;
         }

@@ -443,7 +443,7 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
   ]);
 
   // Helper: enrich group row with name
-  function enrichGroupRow(row: unknown) {
+  function enrichGroupRow(row: any) {
     const grp = stockGroups.find((g) => g.id === row.stockGroupId);
     const rev = parseFloat(row.totalRevenue || "0");
     const prof = parseFloat(row.totalProfit || "0");

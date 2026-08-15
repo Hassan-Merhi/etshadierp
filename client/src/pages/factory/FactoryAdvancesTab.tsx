@@ -11,7 +11,7 @@ import {DeductionsView} from "./factoryadvancestab/components/DeductionsView";
 export default function FactoryAdvancesTab() {
   const [subTab, setSubTab] = useState("advances");
 
-  const { data: settings } = useQuery<unknown>({
+  const { data: settings } = useQuery<any>({
     queryKey: ["/api/factory/settings"],
     queryFn: async () => {
       const r = await fetch("/api/factory/settings");
@@ -20,7 +20,7 @@ export default function FactoryAdvancesTab() {
     staleTime: 60000,
   });
 
-  const { data: myAccess } = useQuery<unknown>({ queryKey: ["/api/factory/my-access"], staleTime: 5 * 60000 });
+  const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 5 * 60000 });
   const hiddenTabs = myAccess?.hiddenCostFields ?? [];
 
   const showRepayments =

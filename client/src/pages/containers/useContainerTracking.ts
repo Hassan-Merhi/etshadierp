@@ -64,7 +64,7 @@ export function useContainerTracking(filteredOtwContainers: Container[]) {
       });
       toast({ title: "Saved", description: "Tracking info updated" });
     },
-    onError: (error: unknown, { id }) => {
+    onError: (error: any, { id }) => {
       if (error?._handledGlobally) return;
       setSavingIds((prev) => {
         const next = new Set(prev);
@@ -82,23 +82,23 @@ export function useContainerTracking(filteredOtwContainers: Container[]) {
     return container[field];
   };
 
-  const setEditValue = async (containerId: number, field: keyof Container, value: unknown) => {
+  const setEditValue = async (containerId: number, field: keyof Container, value: any) => {
     setTrackingEdits((prev) => ({
       ...prev,
       [containerId]: { ...prev[containerId], [field]: value },
     }));
   };
 
-  const hasChanges = useCallback((containerId: number) => {
+  const hasChanges = (containerId: number) => {
     return trackingEdits[containerId] && Object.keys(trackingEdits[containerId]).length > 0;
-  }, [trackingEdits]);
+  };
 
-  const saveTracking = useCallback(async (containerId: number) => {
+  const saveTracking = async (containerId: number) => {
     const data = trackingEdits[containerId];
     if (!data) return;
     setSavingIds((prev) => new Set(prev).add(containerId));
     updateTrackingMutation.mutate({ id: containerId, data });
-  }, [trackingEdits, updateTrackingMutation]);
+  };
 
   const hasAnyChanges = Object.keys(trackingEdits).length > 0;
 
@@ -120,7 +120,7 @@ export function useContainerTracking(filteredOtwContainers: Container[]) {
           return (old as Container[]).map((c) => (c.id === id ? { ...c, ...updatedContainer } : c));
         });
         savedCount++;
-      } catch (_e) {
+      } catch (e) {
         errorCount++;
       }
     }

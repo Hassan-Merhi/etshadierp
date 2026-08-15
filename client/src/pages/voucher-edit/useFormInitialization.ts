@@ -99,7 +99,7 @@ export const useFormInitialization = (
             );
             eAccountName = fsAccount?.name || `Factory Supplier ${eAccountId}`;
           }
-          const _amount = isReceipt
+          const amount = isReceipt
             ? mainIsLiability
               ? e.creditAmount
               : e.creditAmount

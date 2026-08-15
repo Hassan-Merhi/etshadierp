@@ -81,7 +81,7 @@ export function useVoucherEntries({ form }: UseVoucherEntriesProps) {
     const hasEmpty = currentEntries.some((e: VoucherEntry) => !e.accountId || e.accountId === 0);
 
     if (!hasEmpty) {
-      const _newIndex = currentEntries.length;
+      const newIndex = currentEntries.length;
       form.setValue("entries", [
         ...currentEntries,
         {
@@ -96,7 +96,7 @@ export function useVoucherEntries({ form }: UseVoucherEntriesProps) {
 
   const removeEntry = (index: number) => {
     const currentEntries = form.getValues("entries");
-    const filtered = currentEntries.filter((_: unknown, i: number) => i !== index);
+    const filtered = currentEntries.filter((_: any, i: number) => i !== index);
 
     if (filtered.length === 0) {
       form.setValue("entries", [

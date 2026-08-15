@@ -33,10 +33,10 @@ function LedgerAccountForm({
   onCancel: () => void;
   isPending: boolean;
 }) {
-  const { _toast } = useToast();
+  const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const appMode = useAppMode();
-  const _modeApiRequest = getApiRequest(appMode);
+  const modeApiRequest = getApiRequest(appMode);
   const accountType = form.watch("accountType");
   const openingBalance = form.watch("openingBalance");
   // Get available subtypes based on account type

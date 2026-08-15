@@ -84,7 +84,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
   const companyId = selectedCompany?.id;
   // forceErp: when an SP company opens an ERP-sourced container, treat it as a regular ERP container
   const isSupplierPartner = forceErp ? false : selectedCompany?.companyType === "supplier_partner";
-  const _printRef = useRef<HTMLDivElement>(null);
+  const printRef = useRef<HTMLDivElement>(null);
 
   // Check for auto-print query parameter
   useEffect(() => {
@@ -108,7 +108,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
     enabled: !!containerId && !isSupplierPartner,
   });
 
-  const { data: spContainerData, isLoading: spDetailLoading } = useQuery<unknown>({
+  const { data: spContainerData, isLoading: spDetailLoading } = useQuery<any>({
     queryKey: [`/api/sp/containers/${containerId}`],
     queryFn: () => fetch(`/api/sp/containers/${containerId}`, { credentials: "include" }).then((r) => r.json()),
     enabled: !!containerId && isSupplierPartner,
@@ -140,7 +140,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
 
   const containerSale = containerSales.find((sale: ContainerSale) => sale.containerId === parseInt(containerId!));
 
-  const { data: docsData, isLoading: _docsLoading } = useQuery<{
+  const { data: docsData, isLoading: docsLoading } = useQuery<{
     documents: unknown[];
     docTypes: unknown[];
     completeness: { total: number; uploaded: number; complete: boolean };
@@ -154,7 +154,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
     enabled: !!containerId,
   });
 
-  const { data: _freightData = [], isLoading: _freightLoading } = useQuery<unknown[]>({
+  const { data: freightData = [], isLoading: freightLoading } = useQuery<unknown[]>({
     queryKey: ["/api/factory/containers", containerId, "freight"],
     queryFn: async () => {
       const res = await fetch(`/api/factory/containers/${containerId}/freight`);
@@ -312,7 +312,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
     onError: (e: import("react").SyntheticEvent) => toast({ title: "Upload failed", description: e.message, variant: "destructive" }),
   });
 
-  const _deleteDocMutation = useMutation({
+  const deleteDocMutation = useMutation({
     mutationFn: async (docId: number) => {
       await apiRequest("DELETE", `/api/factory/containers/${containerId}/documents/${docId}`);
     },
@@ -327,7 +327,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
     },
   });
 
-  async function _handleViewDoc(storageKey: string) {
+  async function handleViewDoc(storageKey: string) {
     try {
       const resp = await fetch(`/api/factory/uploads/${storageKey}`, { credentials: "include" });
       if (!resp.ok) {
@@ -373,7 +373,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
     },
   });
 
-  const _deleteFreightMutation = useMutation({
+  const deleteFreightMutation = useMutation({
     mutationFn: async (freightId: number) => {
       await apiRequest("DELETE", `/api/factory/containers/${containerId}/freight/${freightId}`);
     },
@@ -408,7 +408,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
     },
   });
 
-  const _deletePaymentMutation = useMutation({
+  const deletePaymentMutation = useMutation({
     mutationFn: async ({ freightId, paymentId }: { freightId: number; paymentId: number }) => {
       await apiRequest("DELETE", `/api/factory/freight/${freightId}/payments/${paymentId}`);
     },

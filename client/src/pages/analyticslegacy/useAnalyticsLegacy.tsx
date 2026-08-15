@@ -144,7 +144,7 @@ export function useAnalyticsLegacy() {
 
   // Fetch reference data — locations and stock groups are shared across sections.
   // staleTime avoids redundant refetches when the user navigates between sections.
-  const { data: _locations = [] } = useQuery<Location[]>({
+  const { data: locations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations", selectedCompany?.id],
     queryFn: async ({ queryKey }) => {
       const response = await fetch(queryKey[0] as string, { credentials: "include" });
@@ -154,7 +154,7 @@ export function useAnalyticsLegacy() {
     enabled: !!selectedCompany,
     staleTime: 5 * 60 * 1000,
   });
-  const { data: _stockGroups = [] } = useQuery<StockGroup[]>({
+  const { data: stockGroups = [] } = useQuery<StockGroup[]>({
     queryKey: ["/api/stock-groups", selectedCompany?.id],
     queryFn: async ({ queryKey }) => {
       const response = await fetch(queryKey[0] as string, { credentials: "include" });
@@ -165,7 +165,7 @@ export function useAnalyticsLegacy() {
     staleTime: 5 * 60 * 1000,
   });
   // Suppliers are only used in the Container Report filter — defer until that section opens.
-  const { data: _suppliers = [] } = useQuery<Supplier[]>({
+  const { data: suppliers = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers"],
     queryFn: async () => {
       const response = await fetch("/api/suppliers", { credentials: "include" });
@@ -271,9 +271,9 @@ export function useAnalyticsLegacy() {
   };
 
   const {
-    data: _stockMovementData,
-    refetch: _refetchStockMovement,
-    isLoading: _loadingStock,
+    data: stockMovementData,
+    refetch: refetchStockMovement,
+    isLoading: loadingStock,
   } = useQuery<StockMovementData>({
     queryKey: [buildStockMovementUrl(), selectedCompany?.id],
     queryFn: async ({ queryKey }) => {
@@ -312,7 +312,7 @@ export function useAnalyticsLegacy() {
 
   const {
     data: containerData,
-    refetch: _refetchContainers,
+    refetch: refetchContainers,
     isLoading: loadingContainers,
   } = useQuery<ContainerData>({
     queryKey: [buildContainerUrl(), selectedCompany?.id],
@@ -353,7 +353,7 @@ export function useAnalyticsLegacy() {
     enabled: !!selectedCompany && appMode === "factory",
   });
 
-  const { data: factoryPosSummary, isLoading: loadingFactoryPos } = useQuery<unknown>({
+  const { data: factoryPosSummary, isLoading: loadingFactoryPos } = useQuery<any>({
     queryKey: ["/api/factory/analytics/pos-summary", selectedCompany?.id, factorySalesStartDate, factorySalesEndDate],
     queryFn: async () => {
       const res = await fetch(buildFactorySalesUrl("/api/factory/analytics/pos-summary"), { credentials: "include" });
@@ -376,9 +376,9 @@ export function useAnalyticsLegacy() {
 
   const {
     data: factoryContainerSales,
-    refetch: _refetchFactoryContainerSales,
+    refetch: refetchFactoryContainerSales,
     isLoading: loadingFactoryContainerSales,
-  } = useQuery<unknown>({
+  } = useQuery<any>({
     queryKey: [buildFactoryContainerSalesUrl(), selectedCompany?.id],
     queryFn: async ({ queryKey }) => {
       const res = await fetch(queryKey[0] as string, { credentials: "include" });
@@ -549,7 +549,7 @@ export function useAnalyticsLegacy() {
 
   const netProfit = totalIncome - totalExpenses;
 
-  const goToStatement = (accountId: number, customerId?: number, _accountType?: string) => {
+  const goToStatement = (accountId: number, customerId?: number, accountType?: string) => {
     if (customerId && appMode === "factory") {
       window.open(`/factory/customers/${customerId}`, "_blank");
       return;

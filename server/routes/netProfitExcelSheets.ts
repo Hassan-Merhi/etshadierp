@@ -45,7 +45,7 @@ export function computeStats(
 ) {
   // Direct Incomes (non-sales income accounts)
   const directIncAccounts = ctx.companyAccounts.filter(
-    (acc: unknown) =>
+    (acc: any) =>
       acc.accountType === "Income" &&
       acc.subType === "Direct Income" &&
       !acc.code?.includes("SALES") &&
@@ -65,7 +65,7 @@ export function computeStats(
 
   // Purchases
   const purchaseAccounts = ctx.companyAccounts.filter(
-    (acc: unknown) => acc.code === "PURCHASES" || acc.code?.startsWith("PURCHASES-")
+    (acc: any) => acc.code === "PURCHASES" || acc.code?.startsWith("PURCHASES-")
   );
   let purchaseTotal = 0;
   const purchaseDetails = purchaseAccounts
@@ -79,7 +79,7 @@ export function computeStats(
 
   // Direct Expenses
   const directExpAccounts = ctx.companyAccounts.filter(
-    (acc: unknown) =>
+    (acc: any) =>
       acc.code !== "PURCHASES" &&
       !acc.code?.startsWith("PURCHASES") &&
       (acc.accountType === "Direct Expense" ||
@@ -98,7 +98,7 @@ export function computeStats(
 
   // Indirect Expenses
   const indirectExpAccounts = ctx.companyAccounts.filter(
-    (acc: unknown) =>
+    (acc: any) =>
       acc.accountType === "Indirect Expense" &&
       acc.code !== "PRODUCTION_ADJUSTMENT" &&
       acc.code !== "CONSUMPTION_EXPENSE" &&
@@ -149,15 +149,15 @@ export function computeStats(
 
 export function writeSheet(
   ctx: NetProfitSheetContext,
-  ws: unknown,
+  ws: any,
   stats: ReturnType<typeof computeStats>,
   sheetLabel: string,
-  _showNetPosition: boolean,
-  _npValue: number
+  showNetPosition: boolean,
+  npValue: number
 ) {
   const {
     salesTotal,
-    _directIncTotal,
+    directIncTotal,
     directIncDetails,
     totalIncome,
     purchaseTotal,
@@ -219,7 +219,7 @@ export function writeSheet(
     if (typeof value === "number" || !String(value).includes("%")) row.getCell(5).numFmt = "$#,##0.##";
     ws.mergeCells(`B${row.number}:D${row.number}`);
     if (isBold) {
-      row.eachCell((cell: unknown) => {
+      row.eachCell((cell: any) => {
         cell.fill = {
           type: "pattern",
           pattern: "solid",
@@ -235,7 +235,7 @@ export function writeSheet(
   // Helper: section header row
   const secHeader = (title: string, color: string) => {
     const hRow = ws.addRow([title, "Account", "Debit", "Credit", "Net"]);
-    hRow.eachCell((cell: unknown, col: number) => {
+    hRow.eachCell((cell: any, col: number) => {
       cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: color } };
       cell.alignment = { horizontal: col <= 2 ? "left" : "right" };
@@ -261,7 +261,7 @@ export function writeSheet(
   // Helper: subtotal row
   const subTot = (label: string, value: number) => {
     const r = ws.addRow(["", label, "", "", fmt(value)]);
-    r.eachCell((cell: unknown) => {
+    r.eachCell((cell: any) => {
       cell.font = { bold: true };
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEFF6FF" } };
     });
@@ -327,7 +327,7 @@ export function writeSheet(
 
   // COGS total
   const cogsRow = ws.addRow(["TOTAL COGS", "", "", "", fmt(totalCOGS)]);
-  cogsRow.eachCell((cell: unknown) => {
+  cogsRow.eachCell((cell: any) => {
     cell.font = { bold: true, size: 12, color: { argb: "FFFFFFFF" } };
     cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDC2626" } };
     cell.alignment = { horizontal: "center" };
@@ -339,7 +339,7 @@ export function writeSheet(
 
   // GROSS PROFIT
   const gpRow = ws.addRow(["GROSS PROFIT", "", "", "", fmt(grossProfit)]);
-  gpRow.eachCell((cell: unknown) => {
+  gpRow.eachCell((cell: any) => {
     cell.font = { bold: true, size: 13, color: { argb: "FFFFFFFF" } };
     cell.fill = {
       type: "pattern",
@@ -354,7 +354,7 @@ export function writeSheet(
 
   // NET PROFIT (= Gross Profit since all expenses are in COGS)
   const npRow = ws.addRow(["NET PROFIT", "", "", "", fmt(netProfit)]);
-  npRow.eachCell((cell: unknown) => {
+  npRow.eachCell((cell: any) => {
     cell.font = { bold: true, size: 13, color: { argb: "FFFFFFFF" } };
     cell.fill = {
       type: "pattern",
@@ -392,11 +392,11 @@ export function writeSheet(
 
 export function writeSummarySheet(
   ctx: NetProfitSheetContext,
-  ws: unknown,
+  ws: any,
   monthStatsList: ReturnType<typeof computeStats>[],
   totalStats: ReturnType<typeof computeStats>,
   monthLabels: string[],
-  _npValue: number
+  npValue: number
 ) {
   const numMonths = monthLabels.length;
   const totalCol = numMonths + 2; // col B = month1, ..., last month col = B+numMonths-1, total = B+numMonths
@@ -417,7 +417,7 @@ export function writeSummarySheet(
   for (const ml of monthLabels) hdrRowData.push(ml);
   hdrRowData.push("TOTAL");
   const hdrRow = ws.addRow(hdrRowData);
-  hdrRow.eachCell((cell: unknown, col: number) => {
+  hdrRow.eachCell((cell: any, col: number) => {
     if (col === 1) return;
     cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
     cell.fill = {
@@ -431,7 +431,7 @@ export function writeSummarySheet(
 
   // Helper: write a data row
   const numFmt = "$#,##0";
-  const _pctFmt = "0.00%";
+  const pctFmt = "0.00%";
 
   const writeRow = (
     label: string,
@@ -469,7 +469,7 @@ export function writeSummarySheet(
     const rowData: unknown[] = [label];
     for (let i = 0; i <= numMonths; i++) rowData.push("");
     const row = ws.addRow(rowData);
-    row.eachCell((cell: unknown) => {
+    row.eachCell((cell: any) => {
       cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: color } };
     });

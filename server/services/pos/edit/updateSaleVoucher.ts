@@ -14,7 +14,7 @@ import { eq } from "drizzle-orm";
 
 /** Updates voucher description, total amount, location, and optionally date. */
 export async function updateVoucherRecord(
-  tx: unknown,
+  tx: any,
   params: {
     voucherId: number;
     description: unknown;
@@ -27,7 +27,7 @@ export async function updateVoucherRecord(
 ): Promise<void> {
   const { voucherId, description, grandTotal, locationChanged, targetLocationId, oldLocationId, voucherDate } = params;
 
-  const voucherUpdate: unknown = {
+  const voucherUpdate: any = {
     description: description || null,
     totalAmount: grandTotal.toString(),
   };

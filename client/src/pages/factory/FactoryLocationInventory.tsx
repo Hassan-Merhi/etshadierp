@@ -539,7 +539,7 @@ export default function FactoryLocationInventory() {
       editModeInitialized
     )
       return;
-    const productByArticleCode = new Map<string, unknown>();
+    const productByArticleCode = new Map<string, any>();
     (inventoryData as unknown[]).forEach((prod: unknown) => {
       productByArticleCode.set((prod.articleCode || "").toLowerCase(), prod);
     });

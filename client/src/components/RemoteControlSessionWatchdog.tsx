@@ -39,7 +39,7 @@ export function RemoteControlSessionWatchdog() {
     conflictCountRef.current = 0;
     setState(target ? "waiting" : "idle");
     setMessage(null);
-  }, [target, target.userId]);
+  }, [target?.userId]);
 
   useEffect(() => {
     if (!target) return;
@@ -144,7 +144,7 @@ export function RemoteControlSessionWatchdog() {
       document.removeEventListener("visibilitychange", onVisibilityChange);
       runningRef.current = false;
     };
-  }, [adoptSession, refreshSession, session.id, session.status, session.targetUserId, t, target, target.userId, target.username]);
+  }, [adoptSession, refreshSession, session?.id, session?.status, t, target?.userId, target?.username]);
 
   if (!target || state === "idle" || state === "ready") return null;
 

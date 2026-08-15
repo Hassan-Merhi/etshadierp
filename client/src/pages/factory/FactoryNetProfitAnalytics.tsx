@@ -139,7 +139,7 @@ function AccountBreakdown({
   badgeClass: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [, _navigate] = useLocation();
+  const [, navigate] = useLocation();
   const active = (accounts || []).filter((a) => a.debit !== 0 || a.credit !== 0);
 
   return (
@@ -237,7 +237,7 @@ export default function FactoryNetProfitAnalytics() {
     return p.toString();
   }, [startDate, endDate]);
 
-  const { data, isLoading } = useQuery<unknown>({
+  const { data, isLoading } = useQuery<any>({
     queryKey: ["/api/reports/net-profit-statement", queryParams],
     queryFn: async ({ queryKey }) => {
       const params = queryKey[1] as string;

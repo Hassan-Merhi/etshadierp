@@ -27,7 +27,7 @@ import { ledgerAccounts } from "@shared/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { firstRow } from "../../lib/queryResult";
 
-export const pn = (v: unknown) => {
+export const pn = (v: any) => {
   const n = parseFloat(String(v ?? "0"));
   return isNaN(n) ? 0 : n;
 };
@@ -522,8 +522,8 @@ export async function buildGcMigrationPreview(sourceId: number, targetId: number
   ).rows as unknown[];
   const existingGcSubTypes = new Map(gcAcctRows.map((r) => [r.sub_type, r.name]));
 
-  const totalQty = stockItems.reduce((s: number, i: unknown) => s + i.quantity, 0);
-  const totalValue = stockItems.reduce((s: number, i: unknown) => s + i.totalValueUsd, 0);
+  const totalQty = stockItems.reduce((s: number, i: any) => s + i.quantity, 0);
+  const totalValue = stockItems.reduce((s: number, i: any) => s + i.totalValueUsd, 0);
   const alreadyMapped = mappedSourceIds.size;
 
   const warnings: string[] = [];

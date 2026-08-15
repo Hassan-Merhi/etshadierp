@@ -289,7 +289,7 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
       });
       document.body.removeChild(el);
       const imageBase64 = canvas.toDataURL("image/png");
-      const data: unknown = await apiRequest("POST", `/api/transporter-statement/${selectedAccountId}/send-whatsapp`, {
+      const data: any = await apiRequest("POST", `/api/transporter-statement/${selectedAccountId}/send-whatsapp`, {
         dateFrom,
         dateTo,
         imageBase64,
@@ -318,7 +318,7 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
   });
 
   // Print handler
-  function _handlePrint() {
+  function handlePrint() {
     window.print();
   }
 

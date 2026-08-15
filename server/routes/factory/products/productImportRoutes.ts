@@ -21,7 +21,7 @@ export function registerFactoryProductImportRoutes(app: Express) {
       const multer = (await import("multer")).default;
       const upload = multer({ storage: multer.memoryStorage() });
 
-      upload.single("file")(req, res, async (err: unknown) => {
+      upload.single("file")(req, res, async (err: any) => {
         try {
           if (err) return res.status(400).json({ message: getErrorMessage(err) });
 
@@ -226,7 +226,7 @@ export function registerFactoryProductImportRoutes(app: Express) {
       const multer = (await import("multer")).default;
       const upload = multer({ storage: multer.memoryStorage() });
 
-      upload.single("file")(req, res, async (err: unknown) => {
+      upload.single("file")(req, res, async (err: any) => {
         try {
           if (err) return res.status(400).json({ message: getErrorMessage(err) });
 
@@ -240,7 +240,7 @@ export function registerFactoryProductImportRoutes(app: Express) {
           const sheetName = workbook.SheetNames[0];
           const rows: unknown[] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
-          const getVal = (row: unknown, ...keys: string[]): unknown => {
+          const getVal = (row: any, ...keys: string[]): unknown => {
             const rowKeys = Object.keys(row);
             for (const k of keys) {
               const found = rowKeys.find((rk) => rk.trim().toLowerCase() === k.toLowerCase());
@@ -254,7 +254,7 @@ export function registerFactoryProductImportRoutes(app: Express) {
             .select()
             .from(factoryBaleProducts)
             .where(eq(factoryBaleProducts.companyId, companyId));
-          const productByArticle = new Map<string, unknown>();
+          const productByArticle = new Map<string, any>();
           for (const p of allProducts) {
             if (p.articleCode) productByArticle.set(p.articleCode.trim().toUpperCase(), p);
           }
@@ -367,7 +367,7 @@ export function registerFactoryProductImportRoutes(app: Express) {
       const multer = (await import("multer")).default;
       const upload = multer({ storage: multer.memoryStorage() });
 
-      upload.single("file")(req, res, async (err: unknown) => {
+      upload.single("file")(req, res, async (err: any) => {
         try {
           if (err) return res.status(400).json({ message: getErrorMessage(err) });
 
@@ -383,7 +383,7 @@ export function registerFactoryProductImportRoutes(app: Express) {
           const sheetName = workbook.SheetNames[0];
           const rows: unknown[] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
-          const getVal = (row: unknown, ...keys: string[]): unknown => {
+          const getVal = (row: any, ...keys: string[]): unknown => {
             const rowKeys = Object.keys(row);
             for (const k of keys) {
               const found = rowKeys.find((rk) => rk.trim().toLowerCase() === k.toLowerCase());
@@ -397,7 +397,7 @@ export function registerFactoryProductImportRoutes(app: Express) {
             .select()
             .from(factoryBaleProducts)
             .where(eq(factoryBaleProducts.companyId, companyId));
-          const productByArticle = new Map<string, unknown>();
+          const productByArticle = new Map<string, any>();
           for (const p of allProducts) {
             if (p.articleCode) productByArticle.set(p.articleCode.trim().toUpperCase(), p);
           }

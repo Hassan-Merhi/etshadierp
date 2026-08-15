@@ -45,7 +45,7 @@ export function registerFactoryMixBatchUpdateRoutes(app: Express) {
           .from(factoryMixBatches)
           .where(and(eq(factoryMixBatches.id, id), eq(factoryMixBatches.companyId, companyId)));
         if (!batch) return res.status(404).json({ message: "Mix batch not found" });
-        const updates: unknown = {};
+        const updates: any = {};
         if (name !== undefined) updates.name = name?.trim() || null;
         if (notes !== undefined) updates.notes = notes?.trim() || null;
         if (batchDate !== undefined) updates.batchDate = batchDate || null;
@@ -85,7 +85,7 @@ export function registerFactoryMixBatchUpdateRoutes(app: Express) {
       if (!batchBefore) return res.status(404).json({ message: "Mix batch not found" });
 
       // Full source edit: reverse old consumption, apply new
-      const result = await db.transaction(async (tx: unknown) => {
+      const result = await db.transaction(async (tx: any) => {
         const [batch] = await tx
           .select()
           .from(factoryMixBatches)
@@ -93,7 +93,7 @@ export function registerFactoryMixBatchUpdateRoutes(app: Express) {
           .for("update");
         if (!batch) throw new Error("Mix batch not found");
 
-        const _usedKg = parseFloat(batch.usedKg || "0");
+        const usedKg = parseFloat(batch.usedKg || "0");
 
         // ── 1. Reverse all existing sources ──
         const oldSources = await tx
@@ -263,7 +263,7 @@ export function registerFactoryMixBatchUpdateRoutes(app: Express) {
           : 0;
 
         // ── 5. Update batch totals ──
-        const batchUpdates: unknown = {
+        const batchUpdates: any = {
           totalWeightKg: dTotalWeightKg.toDecimalPlaces(6).toFixed(6),
           costPerKg: new Decimal(blendedCostPerKg).toFixed(6),
           totalCost: dTotalCost.toDecimalPlaces(6).toFixed(6),

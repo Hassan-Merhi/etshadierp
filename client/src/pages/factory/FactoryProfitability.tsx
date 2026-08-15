@@ -86,7 +86,7 @@ export default function FactoryProfitability() {
   const [from, setFrom] = useState(defaults.from);
   const [to, setTo] = useState(defaults.to);
 
-  const { data: settings } = useQuery<unknown>({
+  const { data: settings } = useQuery<any>({
     queryKey: ["/api/factory/settings"],
     queryFn: async () => {
       const r = await fetch("/api/factory/settings");
@@ -95,7 +95,7 @@ export default function FactoryProfitability() {
     staleTime: 60000,
   });
 
-  const { data: myAccess } = useQuery<unknown>({ queryKey: ["/api/factory/my-access"], staleTime: 5 * 60000 });
+  const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 5 * 60000 });
   const hiddenTabs = myAccess?.hiddenCostFields ?? [];
 
   const showContainers =

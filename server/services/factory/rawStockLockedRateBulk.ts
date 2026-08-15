@@ -13,7 +13,7 @@ import { getStableSupplierCost } from "./rawStockStableCost";
  * the normal backfill/offload paths establish the persisted rate.
  */
 export async function getLockedSupplierRatesReadOnlyBulk(
-  tx: unknown,
+  tx: any,
   companyId: number,
   supplierIds: readonly number[]
 ): Promise<Map<number, number>> {

@@ -10,7 +10,7 @@ function requestCompanyId(req: import("express").Request): number | null {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
-function rowsOf<T = unknown>(result: unknown): T[] {
+function rowsOf<T = any>(result: any): T[] {
   return Array.isArray(result?.rows) ? result.rows : [];
 }
 

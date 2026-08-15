@@ -150,7 +150,7 @@ export function registerVoucherPurchaseUpdateRoutes(app: Express) {
       }
 
       // Update the voucher
-      const voucherUpdates: unknown = {
+      const voucherUpdates: any = {
         totalAmount: totalAmount.toFixed(2),
       };
       if (voucherDate !== undefined) voucherUpdates.voucherDate = voucherDate;
@@ -338,7 +338,7 @@ export function registerVoucherPurchaseUpdateRoutes(app: Express) {
 
         for (const oldItem of oldAdjustmentItems) {
           const quantity = parseFloat(oldItem.quantity);
-          const _rate = parseFloat(oldItem.rate);
+          const rate = parseFloat(oldItem.rate);
 
           await adjustInventory(tx, oldLocationId, oldItem.stockItemId, -quantity, existingVoucher.companyId);
         }
@@ -367,7 +367,7 @@ export function registerVoucherPurchaseUpdateRoutes(app: Express) {
 
         // Update the main voucher
         const parsedLocationId = parseInt(locationId);
-        const voucherUpdates: unknown = {
+        const voucherUpdates: any = {
           totalAmount: totalAmount.toFixed(2),
           locationId: parsedLocationId,
         };

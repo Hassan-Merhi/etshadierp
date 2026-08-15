@@ -126,7 +126,7 @@ export default function FactoryEmployeePayrollTab() {
     return Math.max(0, sal - ded);
   }, [amounts, deductions]);
 
-  const totalNet = useMemo(() => employees.reduce((s, e) => s + getNet(e.id), 0), [employees, getNet]);
+  const totalNet = useMemo(() => employees.reduce((s, e) => s + getNet(e.id), 0), [amounts, deductions, employees]);
 
   const payrollMutation = useMutation({
     mutationFn: async () => {

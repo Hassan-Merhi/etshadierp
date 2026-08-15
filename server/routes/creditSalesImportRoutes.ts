@@ -120,7 +120,7 @@ export function registerCreditSalesImportRoutes(app: Express) {
       }
 
       for (const item of items) {
-        const validatedItem: unknown = { ...item };
+        const validatedItem: any = { ...item };
 
         const stockItem = await storage.getStockItemByCodeOrAlias(item.barcode, req.session.currentCompanyId!);
 
@@ -238,7 +238,7 @@ export function registerCreditSalesImportRoutes(app: Express) {
       }
 
       let totalSales = 0;
-      let createdVoucher: unknown = null;
+      let createdVoucher: any = null;
 
       await db.transaction(async (tx) => {
         const voucherNumber = `CREDIT-SALES-${Date.now()}`;
@@ -271,11 +271,11 @@ export function registerCreditSalesImportRoutes(app: Express) {
             .limit(1);
 
           let costPrice = 0;
-          const _currentQty = 0;
+          let currentQty = 0;
 
           if (inventoryRecord) {
             costPrice = parseFloat(inventoryRecord.averageRate || "0");
-            _currentQty = parseFloat(inventoryRecord.quantity);
+            currentQty = parseFloat(inventoryRecord.quantity);
           }
 
           const itemSales = item.quantity * item.rate;

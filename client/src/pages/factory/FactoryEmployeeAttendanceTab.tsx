@@ -61,11 +61,11 @@ function localDateStr(d: Date) {
 function todayStr() {
   return localDateStr(new Date());
 }
-function _currentMonthStart() {
+function currentMonthStart() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
 }
-function _currentMonthEnd() {
+function currentMonthEnd() {
   const d = new Date();
   return localDateStr(new Date(d.getFullYear(), d.getMonth() + 1, 0));
 }

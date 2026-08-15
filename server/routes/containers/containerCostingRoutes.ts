@@ -124,14 +124,14 @@ export function registerContainerCostingRoutes(app: Express) {
 
         // Recalculate itemsTotal for all affected POs, then the container
         const containerPOs = await storage.getPurchaseOrdersByContainer(containerId);
-        const _poIds = containerPOs.map((po) => po.id);
+        const poIds = containerPOs.map((po) => po.id);
 
         let containerItemsTotal = 0;
         let containerChargesTotal = 0;
 
         for (const po of containerPOs) {
           const lineItems = await tx.select().from(poLineItems).where(eq(poLineItems.poId, po.id));
-          const newItemsTotal = lineItems.reduce((sum: number, li: unknown) => sum + parseFloat(li.lineTotal || "0"), 0);
+          const newItemsTotal = lineItems.reduce((sum: number, li: any) => sum + parseFloat(li.lineTotal || "0"), 0);
           await tx
             .update(purchaseOrders)
             .set({ itemsTotal: newItemsTotal.toFixed(2) })

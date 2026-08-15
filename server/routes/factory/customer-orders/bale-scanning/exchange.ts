@@ -37,7 +37,7 @@ export function registerOrderBaleExchangeRoutes(app: Express) {
         return res.status(400).json({ message: "orderBaleId and newBaleReference are required" });
       }
 
-      await db.transaction(async (tx: unknown) => {
+      await db.transaction(async (tx: any) => {
         const [order] = await tx
           .select()
           .from(customerOrders)

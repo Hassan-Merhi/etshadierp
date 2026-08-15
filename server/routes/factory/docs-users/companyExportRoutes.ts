@@ -67,7 +67,7 @@ export function registerFactoryCompanyExportRoutes(app: Express) {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const byCompany = (table: unknown) => eq(table.companyId, companyId);
+      const byCompany = (table: any) => eq(table.companyId, companyId);
 
       const data: Record<string, unknown[]> = {};
 

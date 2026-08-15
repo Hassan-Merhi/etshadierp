@@ -36,7 +36,7 @@ export function usePosQueries({
     enabled: !posUser,
   });
 
-  const { data: companySettings } = useQuery<unknown>({
+  const { data: companySettings } = useQuery<any>({
     queryKey: ["/api/company-settings"],
     enabled: !!posUser,
   });
@@ -103,7 +103,7 @@ export function usePosQueries({
     enabled: !!activeLocation,
   });
 
-  const { data: currentShift } = useQuery<unknown>({
+  const { data: currentShift } = useQuery<any>({
     queryKey: posUser && activeLocation ? ["/api/pos/shifts/current", { locationId: activeLocation.id }] : [],
     queryFn: async () => {
       if (!activeLocation) return null;
@@ -115,7 +115,7 @@ export function usePosQueries({
     refetchInterval: 60_000,
   });
 
-  const { data: authUser } = useQuery<unknown>({ queryKey: ["/api/auth/me"] });
+  const { data: authUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
 
   const { data: lastSoldPrices = {} } = useQuery<Record<number, string>>({
     queryKey: activeLocation ? ["/api/pos/last-sold-prices", { locationId: activeLocation.id }] : [],
@@ -134,7 +134,7 @@ export function usePosQueries({
     enabled: isCreditSale && authUser?.canAccessCustomers === true,
   });
 
-  const { data: editVoucher, isLoading: editVoucherLoading } = useQuery<unknown>({
+  const { data: editVoucher, isLoading: editVoucherLoading } = useQuery<any>({
     queryKey: editVoucherId ? [`/api/vouchers/${editVoucherId}`] : [],
     enabled: !!editVoucherId,
   });

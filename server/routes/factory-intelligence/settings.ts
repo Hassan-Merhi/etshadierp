@@ -11,7 +11,7 @@ import { cache } from "../../lib/simpleCache";
 import { eq } from "drizzle-orm";
 import { factorySettings } from "@shared/schema";
 
-export function registerFactorySettingsRoutes(app: Express, requireAuth: unknown, db: unknown) {
+export function registerFactorySettingsRoutes(app: Express, requireAuth: any, db: any) {
   // ───────────────────────────────────────────────
   // 1. Settings CRUD
   // ───────────────────────────────────────────────
@@ -111,7 +111,7 @@ export function registerFactorySettingsRoutes(app: Express, requireAuth: unknown
         hideAvgCost,
       } = req.body;
 
-      const updateData: unknown = { updatedAt: new Date() };
+      const updateData: any = { updatedAt: new Date() };
       if (dashboardEnabled !== undefined) updateData.dashboardEnabled = dashboardEnabled;
       if (kpisEnabled !== undefined) updateData.kpisEnabled = kpisEnabled;
       if (profitabilityEnabled !== undefined) updateData.profitabilityEnabled = profitabilityEnabled;
@@ -142,8 +142,8 @@ export function registerFactorySettingsRoutes(app: Express, requireAuth: unknown
           .select({ extraSettings: factorySettings.extraSettings })
           .from(factorySettings)
           .where(eq(factorySettings.companyId, companyId));
-        const currentExtra: unknown = current?.extraSettings ?? {};
-        const newExtra: unknown = { ...currentExtra };
+        const currentExtra: any = current?.extraSettings ?? {};
+        const newExtra: any = { ...currentExtra };
         for (const key of extraKeys) {
           if (req.body[key] !== undefined) newExtra[key] = req.body[key];
         }

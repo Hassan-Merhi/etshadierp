@@ -242,7 +242,7 @@ export function registerFactoryProductWriteRoutes(app: Express) {
 
       // Try insert; if code/articleCode constraint fires (race condition),
       // keep incrementing the numeric suffix until we find a free slot.
-      let product: unknown;
+      let product: any;
       const knownPrefixesRetry = ["HMD10", "HMD11", "HMD12", "HMD13", "HMD14", "HMD16", "HMD00"];
       const retryPrefix = knownPrefixesRetry.find(
         (p) => articleCode.startsWith(p) && /^\d+$/.test(articleCode.slice(p.length))

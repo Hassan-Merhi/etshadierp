@@ -152,7 +152,7 @@ export function registerWorkerAdvancesRoutes(app: Express) {
 
       const repaymentType = req.body.repaymentType === "manual_repayment" ? "manual_repayment" : "salary_deduction";
 
-      const result = await db.transaction(async (tx: unknown) => {
+      const result = await db.transaction(async (tx: any) => {
         const [advance] = await tx
           .insert(factoryWorkerAdvances)
           .values({

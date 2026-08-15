@@ -73,7 +73,7 @@ const COMPLETED_BATCH_STATUSES = ["COMPLETED", "CLOSED"];
  * to every non-deleted bale still associated with the batch.
  */
 export async function recomputeBatchAndCascadeBales(
-  tx: unknown,
+  tx: any,
   companyId: number,
   batchId: number
 ): Promise<{
@@ -155,7 +155,7 @@ export async function recomputeBatchAndCascadeBales(
  * value that remains relevant to current inventory and eligible production.
  */
 export async function cascadeContainerCostChange(
-  tx: unknown,
+  tx: any,
   params: {
     companyId: number;
     containerId: number;
@@ -252,7 +252,7 @@ export async function cascadeContainerCostChange(
   const affectedBales: CascadeResult["affectedBales"] = [];
 
   if (mixSourcesWithStatus.length > 0) {
-    const allSources = mixSourcesWithStatus.map((row: unknown) => row.src);
+    const allSources = mixSourcesWithStatus.map((row: any) => row.src);
     const containerWeightByBatch = new Map<number, Decimal>();
     for (const source of allSources) {
       const previous = containerWeightByBatch.get(source.mixBatchId) || new Decimal(0);
@@ -283,8 +283,8 @@ export async function cascadeContainerCostChange(
     const cascadeEligibleBatchIds = [
       ...new Set(
         mixSourcesWithStatus
-          .filter((row: unknown) => cascadeStatuses.includes(row.batchStatus))
-          .map((row: unknown) => row.src.mixBatchId as number)
+          .filter((row: any) => cascadeStatuses.includes(row.batchStatus))
+          .map((row: any) => row.src.mixBatchId as number)
       ),
     ] as number[];
 
@@ -307,8 +307,8 @@ export async function cascadeContainerCostChange(
     const skippedCompletedBatchIds = [
       ...new Set(
         mixSourcesWithStatus
-          .filter((row: unknown) => !cascadeStatuses.includes(row.batchStatus))
-          .map((row: unknown) => row.src.mixBatchId as number)
+          .filter((row: any) => !cascadeStatuses.includes(row.batchStatus))
+          .map((row: any) => row.src.mixBatchId as number)
       ),
     ] as number[];
 

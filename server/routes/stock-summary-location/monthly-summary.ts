@@ -298,8 +298,8 @@ export function registerLocationMonthlySummaryRoutes(app: Express) {
       const totalYearInVal = Object.values(monthBuckets).reduce((s, b) => s + b.inVal, 0);
       const totalYearOutQty = Object.values(monthBuckets).reduce((s, b) => s + b.outQty, 0);
       const totalYearOutVal = Object.values(monthBuckets).reduce((s, b) => s + b.outVal, 0);
-      const _totalYearNetQty = totalYearInQty - totalYearOutQty;
-      const _totalYearNetVal = totalYearInVal - totalYearOutVal;
+      const totalYearNetQty = totalYearInQty - totalYearOutQty;
+      const totalYearNetVal = totalYearInVal - totalYearOutVal;
 
       const currentYear = new Date().getFullYear();
 

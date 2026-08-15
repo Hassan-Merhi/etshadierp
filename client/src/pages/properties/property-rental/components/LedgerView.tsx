@@ -43,7 +43,7 @@ function LedgerView({
   const [draftNote, setDraftNote] = useState(contract.statementNote ?? "");
   const noteChanged = draftNote !== (contract.statementNote ?? "");
 
-  const { data: me } = useQuery<unknown>({ queryKey: ["/api/auth/me"], staleTime: 30 * 60 * 1000 });
+  const { data: me } = useQuery<any>({ queryKey: ["/api/auth/me"], staleTime: 30 * 60 * 1000 });
   const isAdmin = me?.role === "Admin" || me?.role === "Developer";
 
   const saveNote = useMutation({

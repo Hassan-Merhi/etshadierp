@@ -7,7 +7,7 @@ import {
   factoryContainerOtherCharges,
 } from "../../../../shared/schema";
 
-export async function loadCostInputs(tx: unknown, companyId: number, containerId: number) {
+export async function loadCostInputs(tx: any, companyId: number, containerId: number) {
   const commissions = await tx
     .select()
     .from(factoryContainerCommissions)
@@ -17,7 +17,7 @@ export async function loadCostInputs(tx: unknown, companyId: number, containerId
         eq(factoryContainerCommissions.companyId, companyId)
       )
     );
-  const commissionRecord = commissions.sort((a: unknown, b: unknown) => b.id - a.id)[0] || null;
+  const commissionRecord = commissions.sort((a: any, b: any) => b.id - a.id)[0] || null;
 
   const otherChargeRows = await tx
     .select()
@@ -33,7 +33,7 @@ export async function loadCostInputs(tx: unknown, companyId: number, containerId
 }
 
 /** Load all active (non-deleted) additional-charge rows for this container. */
-export async function loadActiveCharges(tx: unknown, companyId: number, containerId: number) {
+export async function loadActiveCharges(tx: any, companyId: number, containerId: number) {
   return tx
     .select()
     .from(factoryOffloadAdditionalCharges)
@@ -47,7 +47,7 @@ export async function loadActiveCharges(tx: unknown, companyId: number, containe
 }
 
 /** Compute remaining-fraction from raw-stock rows. */
-export async function computeRemainingFraction(tx: unknown, companyId: number, containerId: number) {
+export async function computeRemainingFraction(tx: any, companyId: number, containerId: number) {
   const rows = await tx
     .select()
     .from(factoryRawStock)

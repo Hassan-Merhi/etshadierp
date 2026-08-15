@@ -68,7 +68,7 @@ export function DaybookTable({
   handleDelete,
   canEdit,
   canDelete,
-  _daybookRowLimit,
+  daybookRowLimit,
   setDaybookRowLimit,
   DAYBOOK_PAGE_SIZE,
   navigate,
@@ -76,7 +76,7 @@ export function DaybookTable({
   errorMessage = null,
   onRetry,
 }: DaybookTableProps) {
-  const _rowId = (row: DaybookRow): string => {
+  const rowId = (row: DaybookRow): string => {
     return row._type === "voucher" ? `voucher-${(row.data as Voucher).id}` : `offload-${row.data.id}`;
   };
 

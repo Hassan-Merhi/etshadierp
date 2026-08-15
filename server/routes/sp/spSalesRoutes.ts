@@ -142,7 +142,7 @@ export function registerSpSalesRoutes(app: Express) {
           }
 
           // ── FIFO lot selection (server-side) ──────────────────────────────
-          let lotsQuery: unknown;
+          let lotsQuery: any;
           if (stockItemId) {
             lotsQuery = await tx.execute(
               sql`SELECT * FROM sp_stock_movements
@@ -158,7 +158,7 @@ export function registerSpSalesRoutes(app: Express) {
           }
 
           const lots = resultRows(lotsQuery);
-          const totalAvail = lots.reduce((s: number, l: unknown) => s + parseNum(l.qty_remaining), 0);
+          const totalAvail = lots.reduce((s: number, l: any) => s + parseNum(l.qty_remaining), 0);
           if (qtySold > totalAvail + 0.0001) {
             throw new Error(
               `Insufficient stock for ${articleCode || `item #${stockItemId}`}: available ${totalAvail.toFixed(4)}, requested ${qtySold}`

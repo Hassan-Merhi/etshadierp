@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { fmt, gitContainersUrl, parseNum, COMPANY_COLORS } from "./helpers";
 import type { GitContainersResponse, EnrichedContainerApi, CompanyViewMode } from "./types";
 
-function _StatCard({
+function StatCard({
   label,
   value,
   sub,
@@ -136,9 +136,9 @@ export function TabSummary() {
     return [...map.values()];
   }, [allContainers]);
 
-  const byCompany = useMemo(() => makeBreakdown((r) => r.companyName), [makeBreakdown]);
-  const byTransport = useMemo(() => makeBreakdown((r) => r.transporter ?? "—"), [makeBreakdown]);
-  const byAgent = useMemo(() => makeBreakdown((r) => r.agent ?? "—"), [makeBreakdown]);
+  const byCompany = useMemo(() => makeBreakdown((r) => r.companyName), [allContainers]);
+  const byTransport = useMemo(() => makeBreakdown((r) => r.transporter ?? "—"), [allContainers]);
+  const byAgent = useMemo(() => makeBreakdown((r) => r.agent ?? "—"), [allContainers]);
 
   const modeSelector = (
     <div className="flex items-center gap-2 flex-wrap" data-testid="summary-mode-selector">

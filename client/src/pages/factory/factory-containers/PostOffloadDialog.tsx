@@ -217,7 +217,7 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
   const handleSaveEdit = () => {
     if (!container || !editingCharge) return;
     const isLegacy = editingCharge.supplierLockedRateBefore === null;
-    const body: unknown = {
+    const body: any = {
       description: editDesc || "Post-offload charge",
       amount: editAmount,
       currencyCode: editCcy,
@@ -267,7 +267,7 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
       });
       return;
     }
-    const body: unknown = {
+    const body: any = {
       undoDate,
       expectedVersion: undoCharge.version,
     };

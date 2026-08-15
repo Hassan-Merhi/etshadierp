@@ -600,7 +600,7 @@ export function generateRangePrintHtml(
     .join("");
 
   const htmlLang = lang === "ar" ? "ar" : "en";
-  const _colCount = 2 + dates.length + 2;
+  const colCount = 2 + dates.length + 2;
   const dateColWidth = Math.max(3, Math.floor(70 / dates.length));
 
   return `<!DOCTYPE html>

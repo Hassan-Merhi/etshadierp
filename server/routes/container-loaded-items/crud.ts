@@ -14,7 +14,7 @@ import { supplierContainerLoadedItems } from "@shared/schema";
 
 import { verifyContainerOwnership } from "./_helpers";
 
-export function registerContainerLoadedItemCrudRoutes(app: Express, requireAuth: unknown) {
+export function registerContainerLoadedItemCrudRoutes(app: Express, requireAuth: any) {
   app.get("/api/containers/:containerId/loaded-items", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;
@@ -76,7 +76,7 @@ export function registerContainerLoadedItemCrudRoutes(app: Express, requireAuth:
       if (!item) return res.status(404).json({ message: "Item not found" });
       if (!(await verifyContainerOwnership(item.containerId, companyId)))
         return res.status(403).json({ message: "Access denied" });
-      const updates: unknown = {};
+      const updates: any = {};
       if (req.body.barcode !== undefined) updates.barcode = req.body.barcode;
       if (req.body.itemName !== undefined) updates.itemName = req.body.itemName;
       if (req.body.qty !== undefined) updates.qty = parseInt(req.body.qty) || 0;

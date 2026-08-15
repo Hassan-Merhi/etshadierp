@@ -25,7 +25,7 @@ export function registerDispatchTruckRideDispatchRoutes(app: Express) {
       const rideId = parseId(req.params.id);
       if (rideId === null) return res.status(400).json({ message: "Invalid id" });
 
-      const result = await db.transaction(async (tx: unknown) => {
+      const result = await db.transaction(async (tx: any) => {
         const [ride] = await tx
           .select()
           .from(customerDispatchTruckRides)
@@ -73,7 +73,7 @@ export function registerDispatchTruckRideDispatchRoutes(app: Express) {
       if (!reason || !reason.trim())
         return res.status(400).json({ message: "reason is required to reopen a dispatched ride" });
 
-      const result = await db.transaction(async (tx: unknown) => {
+      const result = await db.transaction(async (tx: any) => {
         const [ride] = await tx
           .select()
           .from(customerDispatchTruckRides)

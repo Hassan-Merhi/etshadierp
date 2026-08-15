@@ -18,7 +18,7 @@ interface UsePosMutationsParams {
   currentDraftId: number | null;
   notes: string;
   lastSavedFingerprintRef: React.MutableRefObject<string>;
-  setSavedSale: (sale: unknown) => void;
+  setSavedSale: (sale: any) => void;
   setSaleJustCompleted: (v: boolean) => void;
   setShowPrintDialog: (v: boolean) => void;
   setCurrentDraftId: (id: number | null) => void;
@@ -55,7 +55,7 @@ export function usePosMutations({
   toast,
 }: UsePosMutationsParams) {
   const saveMutation = useMutation({
-    mutationFn: async (saleData: unknown) => {
+    mutationFn: async (saleData: any) => {
       if (editVoucherId) {
         const updateData = {
           description: saleData.notes,
@@ -65,7 +65,7 @@ export function usePosMutations({
           isCreditSale: saleData.isCreditSale,
           voucherDate: saleData.voucherDate,
           currency: saleData.currency,
-          items: saleData.items.map((item: unknown) => ({
+          items: saleData.items.map((item: any) => ({
             id: item.salesItemId,
             stockItemId: item.stockItemId,
             quantity: String(item.quantity),
@@ -83,7 +83,7 @@ export function usePosMutations({
           paymentAccountType: saleData.paymentAccountType,
           paymentAccountId: saleData.paymentAccountId,
           notes: saleData.notes || undefined,
-          saleLines: saleData.items.map((item: unknown) => ({
+          saleLines: saleData.items.map((item: any) => ({
             stockItemId: item.stockItemId,
             qtySold: String(item.quantity),
             salePricePerUnit: String(item.rate),
@@ -96,7 +96,7 @@ export function usePosMutations({
         return {
           voucher: { id: raw.voucherId, voucherNumber, customerId: undefined },
           location: activeLocation,
-          items: (raw.lines || []).map((l: unknown) => ({
+          items: (raw.lines || []).map((l: any) => ({
             stockItemId: l.stockItemId,
             stockItemName: l.description || l.articleCode,
             stockItemCode: l.articleCode,
@@ -118,7 +118,7 @@ export function usePosMutations({
       const res = await apiRequest("POST", "/api/pos/sales", saleData);
       return res.json();
     },
-    onSuccess: async (data: unknown) => {
+    onSuccess: async (data: any) => {
       clientSaleIdRef.current = crypto.randomUUID();
       setSavedSale(data);
       if (!editVoucherId) setSaleJustCompleted(true);
@@ -149,7 +149,7 @@ export function usePosMutations({
         }
       }
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       toast({
         title: "Error",
         description: error.message || `Failed to ${editVoucherId ? "update" : "save"} sale`,
@@ -197,7 +197,7 @@ export function usePosMutations({
       const res = await apiRequest("POST", "/api/pos/drafts", draftData);
       return res.json();
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       setCurrentDraftId(data.id);
       setLastAutosaved(new Date());
       const validItems = rows.filter((r) => r.stockItemId && r.quantity > 0 && r.rate > 0);
@@ -212,7 +212,7 @@ export function usePosMutations({
       });
       toast({ title: "Draft Saved", description: "Your transaction has been saved as a draft" });
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to save draft", variant: "destructive" });
     },

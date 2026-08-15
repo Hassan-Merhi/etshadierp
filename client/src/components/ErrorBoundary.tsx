@@ -26,7 +26,7 @@ function isChunkLoadError(error: unknown): boolean {
   if (typeof error === "string") {
     candidates.push(error);
   } else if (error && typeof error === "object") {
-    const e = error as unknown;
+    const e = error as any;
     if (e.message) candidates.push(String(e.message));
     if (e.name) candidates.push(String(e.name));
     try {
@@ -113,7 +113,7 @@ export class ErrorBoundary extends Component<Props, State> {
     if (error instanceof Error) {
       normalized = error;
     } else {
-      const msg = (error as unknown)?.message || (error as unknown)?.stack?.split?.("\n")?.[0] || String(error);
+      const msg = (error as any)?.message || (error as any)?.stack?.split?.("\n")?.[0] || String(error);
       normalized = new Error(msg || "Unknown error");
     }
     return { hasError: true, error: normalized, isChunkError: isChunk };

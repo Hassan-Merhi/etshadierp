@@ -28,7 +28,7 @@ const emptyTotals = () => ({
   rejectedCount: 0,
 });
 
-export function registerFactoryPayrollReadRoutes(app: Express, requireAuth: unknown, db: unknown) {
+export function registerFactoryPayrollReadRoutes(app: Express, requireAuth: any, db: any) {
   app.get("/api/factory/payroll", requireAuth, async (req: Request, res: Response) => {
     try {
       const { companyId, startDate, endDate, status } = req.query;
@@ -76,9 +76,9 @@ export function registerFactoryPayrollReadRoutes(app: Express, requireAuth: unkn
 
       const bonusTotals = await getProductionBonusTotalsForPayrollIds(
         db,
-        results.map((result: unknown) => result.payroll.id)
+        results.map((result: any) => result.payroll.id)
       );
-      const formatted = results.map((r: unknown) => {
+      const formatted = results.map((r: any) => {
         const production = bonusTotals.get(r.payroll.id) ?? emptyTotals();
         const totalBonuses = Number(r.payroll.bonuses ?? 0);
         return {

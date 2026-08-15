@@ -188,7 +188,7 @@ export async function generateStockPdf(
 
   // ── Page-bottom helper ───────────────────────────────────────────────────────
   function pageBottom(): number {
-    const page = doc.page as unknown;
+    const page = doc.page as any;
     if (typeof page.maxY === "function") return page.maxY() as number;
     if (typeof page.maxY === "number") return page.maxY;
     return page.height - (page.margins?.bottom ?? 40);

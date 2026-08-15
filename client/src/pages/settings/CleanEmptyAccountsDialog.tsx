@@ -31,7 +31,7 @@ export function CleanEmptyAccountsDialog({ open, onOpenChange, companyId }: Clea
   const {
     data: emptyAccounts = [],
     isLoading,
-    _refetch,
+    refetch,
   } = useQuery<unknown[]>({
     queryKey: ["/api/ledger-accounts/empty", companyId],
     enabled: open && !!companyId,

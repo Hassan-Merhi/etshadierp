@@ -5,7 +5,7 @@ import { findOrCreateImportChargeAccounts } from "./charge-accounts";
 import { ContainerOffloadLifecycleError, ContainerOffloadLifecycleInput, amount } from "./types";
 
 export async function postChargeVouchers(
-  tx: unknown,
+  tx: any,
   container: typeof schema.containers.$inferSelect,
   companyId: number,
   input: ContainerOffloadLifecycleInput

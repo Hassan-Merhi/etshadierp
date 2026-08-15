@@ -155,7 +155,7 @@ export default function Chat() {
     if (selectedUserId) {
       markReadMutation.mutate(selectedUserId);
     }
-  }, [selectedUserId, messages.length, markReadMutation]);
+  }, [selectedUserId, messages.length]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

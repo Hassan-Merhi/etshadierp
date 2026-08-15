@@ -82,7 +82,7 @@ function parseEvents(rawEvents: unknown): TrackingEvent[] {
     .filter((e) => e.date !== null || e.status !== null);
 }
 
-function pickEta(obj: unknown): string | null {
+function pickEta(obj: any): string | null {
   if (!obj) return null;
 
   // portCalls: destination is the last entry or explicitly flagged isDestination.
@@ -154,7 +154,7 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
     const raw: unknown = await res.json();
 
     // Response is usually an array; normalise to the first entry.
-    const entry: unknown = Array.isArray(raw) ? raw[0] : raw;
+    const entry: any = Array.isArray(raw) ? raw[0] : raw;
     if (!entry) throw new Error("Maersk returned empty response");
 
     // Events may be on entry.events or entry.containers[0].events

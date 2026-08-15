@@ -5,7 +5,7 @@ export function handlePaymentKeyDown(
   rowIndex: number,
   fieldName: "account" | "amount",
   fieldsLength: number,
-  append: (v: unknown) => void
+  append: (v: any) => void
 ): void {
   const isLastRow = rowIndex === fieldsLength - 1;
 

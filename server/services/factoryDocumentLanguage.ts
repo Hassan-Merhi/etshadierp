@@ -170,11 +170,11 @@ export function translateFactoryDocumentStatus(status: unknown, language: Factor
   return raw.replaceAll("_", " ");
 }
 
-export function configureFactoryArabicWorksheet(sheet: unknown, language: FactoryDocumentLanguage): void {
+export function configureFactoryArabicWorksheet(sheet: any, language: FactoryDocumentLanguage): void {
   if (language !== "ar") return;
   sheet.views = [{ rightToLeft: true, showGridLines: false }];
-  sheet.eachRow((row: unknown) => {
-    row.eachCell((cell: unknown) => {
+  sheet.eachRow((row: any) => {
+    row.eachCell((cell: any) => {
       cell.alignment = {
         ...(cell.alignment ?? {}),
         horizontal: "right",
@@ -195,7 +195,7 @@ export function findArabicPdfFont(): string | null {
   return candidates.find((candidate) => fs.existsSync(candidate)) ?? null;
 }
 
-export function applyFactoryPdfLanguage(doc: unknown, language: FactoryDocumentLanguage): void {
+export function applyFactoryPdfLanguage(doc: any, language: FactoryDocumentLanguage): void {
   if (language !== "ar") return;
   const font = findArabicPdfFont();
   if (font) doc.font(font);

@@ -56,8 +56,8 @@ export default function SpReports() {
   }`;
   const splitsUrl = "/api/sp/profit-splits";
 
-  const { data: payable, isLoading: payableLoading } = useQuery<unknown>({ queryKey: [payableUrl] });
-  const { data: profit, isLoading: profitLoading } = useQuery<unknown>({ queryKey: [profitUrl] });
+  const { data: payable, isLoading: payableLoading } = useQuery<any>({ queryKey: [payableUrl] });
+  const { data: profit, isLoading: profitLoading } = useQuery<any>({ queryKey: [profitUrl] });
   const { data: splits = [], isLoading: splitsLoading } = useQuery<unknown[]>({ queryKey: [splitsUrl] });
   const { data: locations = [] } = useQuery<unknown[]>({ queryKey: ["/api/locations"] });
   const { data: accounts = [] } = useQuery<unknown[]>({ queryKey: ["/api/accounts/all", selectedCompany?.id] });

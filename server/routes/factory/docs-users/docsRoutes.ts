@@ -150,7 +150,7 @@ export function registerFactoryDocsRoutes(app: Express) {
       // Use memory storage so file bytes are available for DB storage (avoids ephemeral-disk loss in production)
       const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
-      upload.single("file")(req, res, async (err: unknown) => {
+      upload.single("file")(req, res, async (err: any) => {
         try {
           if (err) return res.status(400).json({ message: err.message });
           if (!req.file) return res.status(400).json({ message: "No file uploaded" });

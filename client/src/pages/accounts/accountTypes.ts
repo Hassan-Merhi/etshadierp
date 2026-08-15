@@ -60,23 +60,23 @@ export interface WaChat {
 }
 
 export interface AccountDialogsProps {
-  bankToEdit: unknown | null;
-  setBankToEdit: (bank: unknown | null) => void;
+  bankToEdit: any | null;
+  setBankToEdit: (bank: any | null) => void;
   bankForm: unknown;
-  onBankSubmit: (data: unknown) => void;
+  onBankSubmit: (data: any) => void;
   updateBankMutation: unknown;
   deleteBankMutation: unknown;
   handleDeleteBankAccount: () => void;
-  accountToEdit: unknown | null;
-  setAccountToEdit: (acc: unknown | null) => void;
-  supplierToEdit: unknown | null;
-  setSupplierToEdit: (acc: unknown | null) => void;
-  customerToEdit: unknown | null;
-  setCustomerToEdit: (acc: unknown | null) => void;
-  employeeToEdit: unknown | null;
-  setEmployeeToEdit: (acc: unknown | null) => void;
+  accountToEdit: any | null;
+  setAccountToEdit: (acc: any | null) => void;
+  supplierToEdit: any | null;
+  setSupplierToEdit: (acc: any | null) => void;
+  customerToEdit: any | null;
+  setCustomerToEdit: (acc: any | null) => void;
+  employeeToEdit: any | null;
+  setEmployeeToEdit: (acc: any | null) => void;
   editForm: unknown;
-  onEditSubmit: (data: unknown) => void;
+  onEditSubmit: (data: any) => void;
   updateLedgerMutation: unknown;
   handleDeleteAccount: () => void;
   pendingDelete: (() => void) | null;
@@ -96,7 +96,7 @@ export interface AccountStatementViewProps {
   selectedAccount: Account;
   onClose: () => void;
   periodFilter: unknown;
-  setPeriodFilter: (filter: unknown) => void;
+  setPeriodFilter: (filter: any) => void;
   vouchersWithBalance: unknown[];
   closingBalance: number;
   openingBalance: number;
@@ -106,9 +106,9 @@ export interface AccountStatementViewProps {
   toggleSelectAll: () => void;
   setShowBulkDeleteConfirm: (show: boolean) => void;
   filterCurrency: string;
-  setFilterCurrency: (updater: unknown) => void;
+  setFilterCurrency: (updater: any) => void;
   showDeletedVouchers: boolean;
-  setShowDeletedVouchers: (updater: unknown) => void;
+  setShowDeletedVouchers: (updater: any) => void;
   currentUser: unknown;
   formatAmount: (amt: number) => string;
   hideBalances: boolean;
@@ -116,7 +116,7 @@ export interface AccountStatementViewProps {
   appMode: string;
   formatDisplayDate: (date: Date | string) => string;
   toggleVoucherSelection: (id: number) => void;
-  handleOpenVoucher: (v: unknown) => void;
+  handleOpenVoucher: (v: any) => void;
   waRule: WaRule | null;
   openWaRuleDialog: () => void;
   sendWaStatementMutation: unknown;
@@ -140,7 +140,7 @@ export interface AccountTableProps {
   handleAccountChange: (id: string) => void;
   hideBalances: boolean;
   formatAmount: (amt: number) => string;
-  onEdit?: (account: unknown) => void;
+  onEdit?: (account: any) => void;
 }
 
 export const exportLabels: Record<

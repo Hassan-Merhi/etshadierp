@@ -20,7 +20,7 @@ export function setPrinterName(name: string) {
   localStorage.setItem(PRINTER_NAME_KEY, name);
 }
 
-const _qzInstance = null;
+let qzInstance = null;
 
 async function loadQzTray(): Promise<unknown> {
   if ((window as unknown as (Window & typeof globalThis) & { qz: unknown }).qz)
@@ -30,7 +30,7 @@ async function loadQzTray(): Promise<unknown> {
     const script = document.createElement("script");
     script.src = "https://cdn.jsdelivr.net/npm/qz-tray@2/qz-tray.min.js";
     script.onload = () => {
-      const qz = (window as unknown).qz;
+      const qz = (window as any).qz;
       if (qz) {
         qz.security.setCertificatePromise(() => Promise.resolve(""));
         qz.security.setSignaturePromise(() => Promise.resolve(""));

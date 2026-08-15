@@ -63,7 +63,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   });
 
   // Fetch user preferences (includes preferredCurrency for logged-in users)
-  const { data: userPrefs } = useQuery<unknown>({
+  const { data: userPrefs } = useQuery<any>({
     queryKey: ["/api/user-preferences"],
     retry: false,
     staleTime: 5 * 60 * 1000,
@@ -91,7 +91,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   }, [userPrefs?.preferredCurrency]);
 
   // Fetch company details to get baseCurrency and displayCurrency
-  const { data: company, isLoading: isLoadingCompanyQuery } = useQuery<unknown>({
+  const { data: company, isLoading: isLoadingCompanyQuery } = useQuery<any>({
     queryKey: [`/api/companies/${selectedCompany?.id}`],
     enabled: !!selectedCompany?.id,
   });
@@ -104,7 +104,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   const isMultiCurrency = !!displayCurrency;
 
   // Fetch the latest exchange rate using company's currencies
-  const { data: rateData, isLoading: isLoadingRate } = useQuery<unknown>({
+  const { data: rateData, isLoading: isLoadingRate } = useQuery<any>({
     queryKey: ["/api/exchange-rates/latest", selectedCompany?.id, baseCurrency, displayCurrency],
     queryFn: async () => {
       if (!selectedCompany?.id || !displayCurrency || displayCurrency === "none") return null;

@@ -10,7 +10,7 @@ export default function SpSetupPanel() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: status, isLoading } = useQuery<unknown>({
+  const { data: status, isLoading } = useQuery<any>({
     queryKey: ["/api/sp/setup/status"],
   });
 

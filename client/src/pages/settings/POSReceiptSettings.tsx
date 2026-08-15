@@ -10,7 +10,7 @@ export function POSReceiptSettings() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
 
-  const { data: settings, isLoading } = useQuery<unknown>({
+  const { data: settings, isLoading } = useQuery<any>({
     queryKey: ["/api/settings/pos-receipt", selectedCompany?.id],
     enabled: !!selectedCompany?.id,
   });

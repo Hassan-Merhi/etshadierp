@@ -77,7 +77,7 @@ function fortuneToXlsx(sheets: FortuneSheet[]): unknown {
   const wb = XLSXS.utils.book_new();
 
   for (const sheet of sheets) {
-    const ws: unknown = {};
+    const ws: any = {};
     let maxR = 0;
     let maxC = 0;
 
@@ -88,7 +88,7 @@ function fortuneToXlsx(sheets: FortuneSheet[]): unknown {
 
       const addr = XLSX.utils.encode_cell({ r, c });
       const val = v.v ?? v.m;
-      const xlCell: unknown = {
+      const xlCell: any = {
         v: val,
         t: v.f ? "f" : typeof val === "number" ? "n" : typeof val === "boolean" ? "b" : "s",
         w: v.m !== undefined ? String(v.m) : val !== undefined ? String(val) : "",
@@ -102,7 +102,7 @@ function fortuneToXlsx(sheets: FortuneSheet[]): unknown {
       if (fa && fa !== "General" && fa !== "@") xlCell.z = fa;
 
       // Style object
-      const s: unknown = {};
+      const s: any = {};
 
       // Font
       if (v.bl || v.it || v.un || v.cl || v.fs || v.fc || v.ff) {
@@ -135,7 +135,7 @@ function fortuneToXlsx(sheets: FortuneSheet[]): unknown {
       // Borders
       if (v.b) {
         const sides: Record<string, string> = { l: "left", r: "right", t: "top", b: "bottom" };
-        const border: unknown = {};
+        const border: any = {};
         for (const [fs, xl] of Object.entries(sides)) {
           const bd = v.b[fs];
           if (bd?.style) {
@@ -318,7 +318,7 @@ export default function SpreadsheetEditor() {
   const hasInteractedRef = useRef<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
-  const workbookRef = useRef<unknown>(null);
+  const workbookRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   // Caches the base64 rawXlsx for Excel-mode sheets so autosave and download can use it
   const rawXlsxRef = useRef<string>("");
@@ -330,7 +330,7 @@ export default function SpreadsheetEditor() {
     queryKey: ["/api/spreadsheets"],
   });
 
-  const { data: openedSheet, isLoading: sheetLoading } = useQuery<unknown>({
+  const { data: openedSheet, isLoading: sheetLoading } = useQuery<any>({
     queryKey: ["/api/spreadsheets", openSheetId],
     queryFn: async () => {
       const res = await fetch(`/api/spreadsheets/${openSheetId}`, { credentials: "include" });
@@ -401,7 +401,7 @@ export default function SpreadsheetEditor() {
         }
       }, 1500);
     },
-    [openSheetId, updateMutation]
+    [openSheetId]
   );
 
   const handleChange = useCallback(

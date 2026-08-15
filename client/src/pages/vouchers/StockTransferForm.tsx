@@ -188,13 +188,13 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
   const [transferRevisionNote, setTransferRevisionNote] = useState("");
   const [isTransferSavingRevision, setIsTransferSavingRevision] = useState(false);
   const [transferRevisionsExpanded, setTransferRevisionsExpanded] = useState(false);
-  const [approveRevisionTarget, setApproveRevisionTarget] = useState<unknown | null>(null);
+  const [approveRevisionTarget, setApproveRevisionTarget] = useState<any | null>(null);
   const [transferQtyDraft, setTransferQtyDraft] = useState<Record<number | string, string>>({});
 
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
-  const [importPreview, setImportPreview] = useState<unknown>(null);
-  const [importValidationResult, setImportValidationResult] = useState<unknown>(null);
+  const [importPreview, setImportPreview] = useState<any>(null);
+  const [importValidationResult, setImportValidationResult] = useState<any>(null);
   const [importDestLocation, setImportDestLocation] = useState<string>("");
   const [importDate, setImportDate] = useState<string>(new Date().toLocaleDateString("en-CA"));
   const [importNotes, setImportNotes] = useState<string>("");
@@ -220,7 +220,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       });
       setTransferInventorySource(posSelectedSourceId);
     }
-  }, [isPOS, posSelectedSourceId, posSelectedSourceName]); 
+  }, [isPOS, posSelectedSourceId, posSelectedSourceName]); // eslint-disable-line
 
   const filteredTransferInventory = useFilteredTransferInventory(transferInventory, transferSearchTerm);
 
@@ -270,7 +270,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       });
       hydratedVoucherIdRef.current = voucherIdToEdit;
     }
-  }, [stockTransferToEdit, voucherToEdit, locations, stockItems, stockTransferForm]); 
+  }, [stockTransferToEdit, voucherToEdit, locations, stockItems, stockTransferForm]); // eslint-disable-line
 
   useEffect(() => {
     if (showItemSidebar && transferSidebarRef.current) {
@@ -686,9 +686,9 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       (e) => !(e.stockItemId > 0 && e.sourceLocationId > 0 && parseFloat(e.quantity) === 0)
     );
     const isEditMode = !!voucherIdToEdit;
-    const _originalItems = [];
+    let originalItems = [];
     if (isEditMode && voucherIdToEdit) {
-      let st = stockTransferToEdit as unknown | undefined;
+      let st = stockTransferToEdit as any | undefined;
       if (!st) {
         try {
           const res = await fetch(`/api/stock-transfers?voucherId=${voucherIdToEdit}`);
@@ -700,7 +700,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
           // Best-effort side request; the user-visible flow does not depend on it completing.
         }
       }
-      if (st?.items) _originalItems = st.items;
+      if (st?.items) originalItems = st.items;
     }
     await stockTransferMutation.mutateAsync(data);
   };

@@ -32,20 +32,20 @@ const C = {
 
 const currencyFmt = "#,##0.00";
 
-function hdr(cell: unknown, bgArgb = C.DARK_BLUE) {
+function hdr(cell: any, bgArgb = C.DARK_BLUE) {
   cell.font = { bold: true, color: { argb: C.WHITE }, size: 10 };
   cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: bgArgb } };
   cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
   cell.border = { bottom: { style: "thin", color: { argb: "FFAAAAAA" } } };
 }
 
-function subHdr(cell: unknown) {
+function subHdr(cell: any) {
   cell.font = { bold: true, color: { argb: C.WHITE }, size: 10 };
   cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.MID_BLUE } };
   cell.alignment = { horizontal: "center", vertical: "middle" };
 }
 
-function numCell(cell: unknown, value: number, _positive = true) {
+function numCell(cell: any, value: number, positive = true) {
   cell.value = value;
   cell.numFmt = currencyFmt;
   cell.alignment = { horizontal: "right" };
@@ -56,7 +56,7 @@ function numCell(cell: unknown, value: number, _positive = true) {
   cell.font = { color: { argb: fgArgb }, size: 10 };
 }
 
-function plainNum(cell: unknown, value: number) {
+function plainNum(cell: any, value: number) {
   cell.value = value;
   cell.numFmt = currencyFmt;
   cell.alignment = { horizontal: "right" };
@@ -112,7 +112,7 @@ export async function generateAllCompaniesNetPositionExcel(
   wb.creator = "ERP System";
   wb.created = new Date();
 
-  const _year = new Date(endDate).getUTCFullYear();
+  const year = new Date(endDate).getUTCFullYear();
 
   // ════════════════════════════════════════════════════════════
   //  SHEET 1: Net Position (balance-sheet snapshot)

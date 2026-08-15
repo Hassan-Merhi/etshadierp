@@ -22,11 +22,11 @@ export const supplierRepository = {
     return storage.getSupplierByCode(code, companyId);
   },
 
-  create(values: unknown) {
+  create(values: any) {
     return storage.createSupplier(values);
   },
 
-  update(supplierId: number, values: unknown, companyId: number) {
+  update(supplierId: number, values: any, companyId: number) {
     return storage.updateSupplier(supplierId, values, companyId);
   },
 

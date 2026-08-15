@@ -70,8 +70,8 @@ export default function FactorySuppliers() {
         : null
   );
 
-  const [showInactive, _setShowInactive] = useState(false);
-  const [_expandedSupplierIds, _setExpandedSupplierIds] = useState<Set<number>>(new Set());
+  const [showInactive, setShowInactive] = useState(false);
+  const [expandedSupplierIds, setExpandedSupplierIds] = useState<Set<number>>(new Set());
   const [createSubAccountParentId, setCreateSubAccountParentId] = useState<number | null>(null);
   type SupplierFilter =
     | "all"
@@ -143,7 +143,7 @@ export default function FactorySuppliers() {
 
   const [brokerIncludeOtw, setBrokerIncludeOtw] = useState(false);
 
-  const { data: brokerOverviewStatement, isLoading: brokerOverviewLoading } = useQuery<unknown>({
+  const { data: brokerOverviewStatement, isLoading: brokerOverviewLoading } = useQuery<any>({
     queryKey: ["/api/factory/suppliers", parentViewSupplierId, "broker-statement", brokerIncludeOtw],
     queryFn: async () => {
       const res = await factoryApiRequest(
@@ -483,7 +483,7 @@ export default function FactorySuppliers() {
     },
   });
 
-  const [dueDialogSupplier, setDueDialogSupplier] = useState<unknown | null>(null);
+  const [dueDialogSupplier, setDueDialogSupplier] = useState<any | null>(null);
 
   const formatNum = (v: string) =>
     parseFloat(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -493,7 +493,7 @@ export default function FactorySuppliers() {
 
   const allSuppliers = suppliers || [];
   const activeSuppliers = allSuppliers.filter((s) => s.isActive);
-  const _inactiveSuppliers = allSuppliers.filter((s) => !s.isActive);
+  const inactiveSuppliers = allSuppliers.filter((s) => !s.isActive);
   const subAccountsByParent = allSuppliers.reduce(
     (acc, s) => {
       if (s.parentId) {

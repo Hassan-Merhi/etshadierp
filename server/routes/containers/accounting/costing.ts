@@ -146,7 +146,7 @@ export function registerContainerCostingRoutes(app: Express) {
                   if (isSameCompanyPo) {
                     // Same-company: freight CR entry must exist at freightParentAccountId
                     const freightCrEntry = entries.find(
-                      (e: unknown) =>
+                      (e: any) =>
                         Number(e.ledgerAccountId) === poFreightParentAccountId &&
                         parseFloat(e.creditAmount || "0") > 0 &&
                         parseFloat(e.debitAmount || "0") === 0
@@ -156,12 +156,12 @@ export function registerContainerCostingRoutes(app: Express) {
                   } else {
                     // Interco: detect old single-DR structure or wrong DR sum → needs rebuild
                     const drEntries = entries.filter(
-                      (e: unknown) => parseFloat(e.debitAmount || "0") > 0 && parseFloat(e.creditAmount || "0") === 0
+                      (e: any) => parseFloat(e.debitAmount || "0") > 0 && parseFloat(e.creditAmount || "0") === 0
                     );
-                    const drSum = drEntries.reduce((s: number, e: unknown) => s + parseFloat(e.debitAmount || "0"), 0);
+                    const drSum = drEntries.reduce((s: number, e: any) => s + parseFloat(e.debitAmount || "0"), 0);
                     const strayFreightCr = poFreightParentAccountId
                       ? entries.some(
-                          (e: unknown) =>
+                          (e: any) =>
                             Number(e.ledgerAccountId) === poFreightParentAccountId &&
                             parseFloat(e.creditAmount || "0") > 0
                         )
@@ -172,7 +172,7 @@ export function registerContainerCostingRoutes(app: Express) {
                 } else if (hasOwnFreight) {
                   // Own-freight: freight CR to freightAccountId must exist in child's voucher
                   const freightCrEntry = entries.find(
-                    (e: unknown) => e.ledgerAccountId === freightAccountId && parseFloat(e.creditAmount || "0") > 0
+                    (e: any) => e.ledgerAccountId === freightAccountId && parseFloat(e.creditAmount || "0") > 0
                   );
                   freightEntryMissing = !freightCrEntry;
                 }

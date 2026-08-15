@@ -9,7 +9,7 @@ import BaleProducts from "../BaleProductsBilingual";
 export default function FactoryBalesHub() {
   const hash = typeof window !== "undefined" ? window.location.hash.replace("#", "") : "";
 
-  const { data: settings } = useQuery<unknown>({
+  const { data: settings } = useQuery<any>({
     queryKey: ["/api/factory/settings"],
     queryFn: async () => {
       const r = await fetch("/api/factory/settings");
@@ -18,7 +18,7 @@ export default function FactoryBalesHub() {
     staleTime: 60000,
   });
 
-  const { data: myAccess } = useQuery<unknown>({
+  const { data: myAccess } = useQuery<any>({
     queryKey: ["/api/factory/my-access"],
     staleTime: 5 * 60000,
   });

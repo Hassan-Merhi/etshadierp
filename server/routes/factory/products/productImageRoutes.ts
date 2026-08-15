@@ -22,12 +22,12 @@ export function registerFactoryProductImageRoutes(app: Express) {
 
   // ── Bale Product Images ──────────────────────────────────────────────────────
   const productImageStorage = multer.diskStorage({
-    destination: (_req: unknown, _file: unknown, cb: unknown) => {
+    destination: (_req: any, _file: any, cb: any) => {
       const dir = path.join(process.cwd(), "uploads", "product-images");
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       cb(null, dir);
     },
-    filename: (_req: unknown, file: unknown, cb: unknown) => {
+    filename: (_req: any, file: any, cb: any) => {
       const ext = path.extname(file.originalname).toLowerCase();
       cb(null, `prod-${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
     },
@@ -35,7 +35,7 @@ export function registerFactoryProductImageRoutes(app: Express) {
   const productImageUpload = multer({
     storage: productImageStorage,
     limits: { fileSize: 10 * 1024 * 1024 },
-    fileFilter: (_req: unknown, file: unknown, cb: unknown) => {
+    fileFilter: (_req: any, file: any, cb: any) => {
       if (file.mimetype.startsWith("image/")) cb(null, true);
       else cb(new Error("Only image files are allowed"));
     },
@@ -60,7 +60,7 @@ export function registerFactoryProductImageRoutes(app: Express) {
   });
 
   app.post("/api/factory/bale-product-images", requireAuth, (req: Request, res: Response) => {
-    productImageUpload.single("image")(req, res, async (err: unknown) => {
+    productImageUpload.single("image")(req, res, async (err: any) => {
       try {
         if (err) return res.status(400).json({ message: getErrorMessage(err) });
         const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;

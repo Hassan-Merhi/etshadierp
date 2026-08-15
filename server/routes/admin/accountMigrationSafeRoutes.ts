@@ -72,7 +72,7 @@ function uniqueDestinationCode(code: string, occupied: Set<string>): string {
   throw new AccountMigrationConflict(`Could not generate a unique destination code for ${code}.`);
 }
 
-async function lockCompanies(tx: unknown, sourceCompanyId: number, destinationCompanyId: number) {
+async function lockCompanies(tx: any, sourceCompanyId: number, destinationCompanyId: number) {
   const ids = [sourceCompanyId, destinationCompanyId].sort((a, b) => a - b);
   for (const companyId of ids) {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('account-migration'), ${companyId})`);
@@ -80,8 +80,8 @@ async function lockCompanies(tx: unknown, sourceCompanyId: number, destinationCo
 }
 
 function deepestError(error: unknown): unknown {
-  let current: unknown = error;
-  const seen = new Set<unknown>();
+  let current: any = error;
+  const seen = new Set<any>();
   while (current?.cause && !seen.has(current.cause)) {
     seen.add(current);
     current = current.cause;
@@ -156,7 +156,7 @@ export function registerAccountMigrationSafeRoutes(app: Express) {
             .select()
             .from(ledgerAccounts)
             .where(and(eq(ledgerAccounts.companyId, srcCompanyId), inArray(ledgerAccounts.id, accountIds)));
-          const sourceById = new Map(sourceAccounts.map((account: unknown) => [account.id, account]));
+          const sourceById = new Map(sourceAccounts.map((account: any) => [account.id, account]));
           const missingId = accountIds.find((id) => !sourceById.has(id));
           if (missingId) {
             throw new AccountMigrationConflict(
@@ -169,7 +169,7 @@ export function registerAccountMigrationSafeRoutes(app: Express) {
             .select({ code: ledgerAccounts.code })
             .from(ledgerAccounts)
             .where(eq(ledgerAccounts.companyId, destCompanyId));
-          const occupiedCodes = new Set(destinationAccounts.map((account: unknown) => account.code));
+          const occupiedCodes = new Set(destinationAccounts.map((account: any) => account.code));
 
           const selectedEntries = await tx
             .select({
@@ -189,7 +189,7 @@ export function registerAccountMigrationSafeRoutes(app: Express) {
           }
 
           const plans = accountIds.map((accountId) => {
-            const account: unknown = sourceById.get(accountId);
+            const account: any = sourceById.get(accountId);
             return {
               account,
               originalCode: account.code,
@@ -313,7 +313,7 @@ export function registerAccountMigrationSafeRoutes(app: Express) {
     requireRole("Admin", "Developer"),
     async (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => {
       const accountIds = idArray(
-        Array.isArray(req.body?.accounts) ? req.body.accounts.map((account: unknown) => account?.accountId) : null
+        Array.isArray(req.body?.accounts) ? req.body.accounts.map((account: any) => account?.accountId) : null
       );
       const movedVoucherIds = idArray(req.body?.movedVoucherIds, true);
       const srcCompanyId = positiveInt(req.body?.srcCompanyId);
@@ -329,7 +329,7 @@ export function registerAccountMigrationSafeRoutes(app: Express) {
           .where(and(eq(auditLog.action, EXECUTE_ACTION), eq(auditLog.companyId, srcCompanyId)))
           .orderBy(desc(auditLog.createdAt))
           .limit(100);
-        const audit = recentLogs.find((row: unknown) => {
+        const audit = recentLogs.find((row: any) => {
           const saved = savedMigration(row.changes);
           return (
             saved !== null &&
@@ -359,7 +359,7 @@ export function registerAccountMigrationSafeRoutes(app: Express) {
             .where(inArray(ledgerAccounts.id, accountIds));
           if (
             currentAccounts.length !== accountIds.length ||
-            currentAccounts.some((account: unknown) => account.companyId !== destCompanyId)
+            currentAccounts.some((account: any) => account.companyId !== destCompanyId)
           ) {
             throw new AccountMigrationConflict("One or more accounts are no longer in the destination company.");
           }
@@ -370,7 +370,7 @@ export function registerAccountMigrationSafeRoutes(app: Express) {
             .select({ id: ledgerAccounts.id, code: ledgerAccounts.code })
             .from(ledgerAccounts)
             .where(eq(ledgerAccounts.companyId, srcCompanyId));
-          const sourceCodeOwners = new Map(sourceCodes.map((account: unknown) => [account.code, account.id]));
+          const sourceCodeOwners = new Map(sourceCodes.map((account: any) => [account.code, account.id]));
           for (const account of saved.accounts) {
             const owner = sourceCodeOwners.get(account.originalCode);
             if (owner !== undefined && owner !== account.accountId) {

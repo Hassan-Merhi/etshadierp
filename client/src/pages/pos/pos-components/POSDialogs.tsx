@@ -63,7 +63,7 @@ export function POSDialogs({
   handleSendStockWhatsApp,
   sendingWhatsApp,
   handlePrint,
-  _isCreditSale,
+  isCreditSale,
   showStockPrompt,
   setShowStockPrompt,
   stockInventoryLoading,

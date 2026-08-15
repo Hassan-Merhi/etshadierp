@@ -24,7 +24,7 @@ import {
 } from "@shared/schema";
 import { writeDaybookEntry } from "./_helpers";
 
-export function registerFactoryPayrollUpdateRoutes(app: Express, requireAuth: unknown, db: unknown) {
+export function registerFactoryPayrollUpdateRoutes(app: Express, requireAuth: any, db: any) {
   app.patch("/api/factory/payroll/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = parseId(req.params.id);
@@ -126,7 +126,7 @@ export function registerFactoryPayrollUpdateRoutes(app: Express, requireAuth: un
         ).toFixed(2)
       );
 
-      const updateData: unknown = {
+      const updateData: any = {
         bonuses: updatedBonuses.toFixed(2),
         deductions: updatedDeductions.toFixed(2),
         advances: updatedAdvances.toFixed(2),
@@ -151,7 +151,7 @@ export function registerFactoryPayrollUpdateRoutes(app: Express, requireAuth: un
         advances !== undefined ||
         overtimePay !== undefined;
       if (financialChanged) {
-        await db.transaction(async (tx: unknown) => {
+        await db.transaction(async (tx: any) => {
           await rebuildPayrollGenVoucher(tx, current.companyId, current.periodStart, current.periodEnd);
         });
       }
@@ -245,7 +245,7 @@ export function registerFactoryPayrollUpdateRoutes(app: Express, requireAuth: un
         .where(and(eq(factoryPayrolls.id, id), eq(factoryPayrolls.companyId, companyId)));
       if (!existing) return res.status(404).json({ message: "Payroll record not found" });
 
-      await db.transaction(async (tx: unknown) => {
+      await db.transaction(async (tx: any) => {
         const advDeducted = parseFloat(existing.advances || "0");
         if (advDeducted > 0) {
           const repayments = await tx
@@ -291,7 +291,7 @@ export function registerFactoryPayrollUpdateRoutes(app: Express, requireAuth: un
             and(eq(vouchers.companyId, companyId), sql`${vouchers.voucherNumber} LIKE ${"PAYMENT-PAY-" + id + "-%"}`)
           );
         if (paymentVouchers.length > 0) {
-          const voucherIds = paymentVouchers.map((voucher: unknown) => voucher.id);
+          const voucherIds = paymentVouchers.map((voucher: any) => voucher.id);
           await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, voucherIds));
           await tx.delete(vouchers).where(inArray(vouchers.id, voucherIds));
         }

@@ -139,7 +139,7 @@ export const ensureChromiumAvailable = ensureChromiumInstalled;
 // One Chrome process is kept alive and reused across all scrape calls.
 // Replaced automatically if it crashes.
 
-let _sharedBrowser: unknown = null;
+let _sharedBrowser: any = null;
 let _stealthRegistered = false;
 
 async function getSharedBrowser(): Promise<unknown> {
@@ -233,7 +233,7 @@ export async function scrapeTracking(containerNumber: string): Promise<ScraperRe
   }
   logger.info(`[ParcelsAppScraper] ${containerNumber}: Puppeteer slot acquired`);
 
-  let page: unknown = null;
+  let page: any = null;
   const hardStop = setTimeout(() => {
     logger.warn(`[ParcelsAppScraper] ${containerNumber}: hard timeout — closing page`);
     try {
@@ -334,7 +334,7 @@ export async function scrapeTracking(containerNumber: string): Promise<ScraperRe
     const data = capturedData as unknown as { shipments: ParcelsAppShipment[] } & { parcels: ParcelsAppShipment[] };
     const all: ParcelsAppShipment[] = data.shipments ?? data.parcels ?? [];
     const shipment =
-      all.find((s: unknown) => s.trackingId === containerNumber || s.id === containerNumber) ?? all[0] ?? null;
+      all.find((s: any) => s.trackingId === containerNumber || s.id === containerNumber) ?? all[0] ?? null;
 
     return {
       success: !!shipment,

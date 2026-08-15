@@ -297,7 +297,7 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
   const isBalanced = Math.abs(totalDebits - totalCredits) < 0.01;
   const isOptional = form.watch("optional");
 
-  const _getAccountName = (entry: VoucherEntry) => {
+  const getAccountName = (entry: VoucherEntry) => {
     if (entry.ledgerAccountId) {
       const account = ledgerAccounts.find((a) => a.id === entry.ledgerAccountId);
       return account ? account.name : "";

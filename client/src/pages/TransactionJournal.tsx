@@ -135,7 +135,7 @@ export default function TransactionJournal() {
     enabled: !!detailId,
   });
 
-  const { data: viewEntriesRaw, isLoading: viewEntriesLoading } = useQuery<unknown>({
+  const { data: viewEntriesRaw, isLoading: viewEntriesLoading } = useQuery<any>({
     queryKey: ["/api/global/transactions", detailId, "view-entries"],
     queryFn: async () => {
       const res = await fetch(`/api/global/transactions/${detailId}/view-entries`);
@@ -147,7 +147,7 @@ export default function TransactionJournal() {
 
   // Normalise view-entries response (may be array or { entries, purchaseOrder, items })
   const viewEntries: unknown[] = Array.isArray(viewEntriesRaw) ? viewEntriesRaw : (viewEntriesRaw?.entries ?? []);
-  const viewPurchaseOrder: unknown | null = viewEntriesRaw?.purchaseOrder ?? null;
+  const viewPurchaseOrder: any | null = viewEntriesRaw?.purchaseOrder ?? null;
   const viewPurchaseItems: unknown[] = viewEntriesRaw?.items ?? [];
 
   const openDetail = (id: number) => {

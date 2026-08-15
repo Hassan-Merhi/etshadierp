@@ -193,7 +193,7 @@ export function registerSpMigrationPhase2Routes(app: Express): void {
           mapped: items.filter((item) => item.review_status === "mapped").length,
           review: items.filter((item) => item.review_status === "review").length,
           unmapped: items.filter((item) => item.review_status === "unmapped").length,
-          totalAmountUsd: items.reduce((sum: number, item: unknown) => sum + pn(item.amount_usd), 0),
+          totalAmountUsd: items.reduce((sum: number, item: any) => sum + pn(item.amount_usd), 0),
           items,
         });
       } catch (error) {

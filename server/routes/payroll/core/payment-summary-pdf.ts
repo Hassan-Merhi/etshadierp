@@ -58,7 +58,7 @@ export function registerPayrollPaymentSummaryPdfRoutes(app: Express) {
       let convertArabic: ((text: string) => string) | null = null;
       let bidi: {
         getEmbeddingLevels: (text: string, direction: string) => unknown;
-        getReorderedString: (text: string, levels: unknown) => string;
+        getReorderedString: (text: string, levels: any) => string;
       } | null = null;
       try {
         convertArabic = require("arabic-reshaper").convertArabic;

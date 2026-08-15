@@ -16,9 +16,9 @@ export function AccountCombobox({
   fixedAssets,
   rowIndex,
   testIdPrefix = "button-account",
-  _onArrowUp,
-  _onArrowDown,
-  _onArrowRight,
+  onArrowUp,
+  onArrowDown,
+  onArrowRight,
 }: {
   value: { type: string; id: number; name: string } | null;
   onChange: (type: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset", id: number, name: string) => void;

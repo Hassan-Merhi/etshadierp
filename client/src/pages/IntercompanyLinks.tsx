@@ -60,7 +60,7 @@ const EMPTY_FORM = {
 };
 
 export default function IntercompanyLinks() {
-  const [, _navigate] = useLocation();
+  const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -157,7 +157,7 @@ export default function IntercompanyLinks() {
     if (recipientsDialogLink && recipientsData.length >= 0) {
       setRecipientForm(recipientsData.map((r) => r.userId));
     }
-  }, [recipientsData, recipientsDialogLink, recipientsDialogLink.id]);
+  }, [recipientsData, recipientsDialogLink?.id]);
 
   // Mutations
   const createMutation = useMutation({

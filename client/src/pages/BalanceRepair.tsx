@@ -108,7 +108,7 @@ export default function BalanceRepair() {
   const { toast } = useToast();
   const [phase, setPhase] = useState<Phase>("idle");
   const [scan, setScan] = useState<ScanResult | null>(null);
-  const [snapshot, setSnapshot] = useState<unknown | null>(null);
+  const [snapshot, setSnapshot] = useState<any | null>(null);
   const [applied, setApplied] = useState<{
     ledger: number;
     vouchers: number;

@@ -108,7 +108,7 @@ export function registerOrderChargesRoutes(app: Express) {
             ? `${name} for offloaded container - ${order.containerNumber}`
             : `${name} - ${voucherRef}`;
           // Atomic: voucher + entries + FK stamp must all commit together
-          await db.transaction(async (tx: unknown) => {
+          await db.transaction(async (tx: any) => {
             const [chargeVoucher] = await tx
               .insert(vouchers)
               .values({
@@ -208,7 +208,7 @@ export function registerOrderChargesRoutes(app: Express) {
             : `${name} - Order #${orderId}`;
           // Phase 6: atomic — voucher + entries + FK stamp must all commit together
           // to avoid orphaned (unlinked) vouchers on mid-flight failure.
-          await db.transaction(async (tx: unknown) => {
+          await db.transaction(async (tx: any) => {
             const [chargeVoucher] = await tx
               .insert(vouchers)
               .values({
@@ -351,7 +351,7 @@ export function registerOrderChargesRoutes(app: Express) {
             ? `${charge.name} for offloaded container - ${order.containerNumber}`
             : `${charge.name} - ${voucherRef}`;
 
-          await db.transaction(async (tx: unknown) => {
+          await db.transaction(async (tx: any) => {
             const [chargeVoucher] = await tx
               .insert(vouchers)
               .values({
@@ -434,7 +434,7 @@ export function registerOrderChargesRoutes(app: Express) {
         .where(and(eq(customerOrderCharges.orderId, orderId), eq(customerOrderCharges.id, chargeId)));
       if (!chargeBeforeUpdate) return res.status(404).json({ message: "Charge not found" });
 
-      await db.transaction(async (tx: unknown) => {
+      await db.transaction(async (tx: any) => {
         await tx
           .update(customerOrderCharges)
           .set(updateData)

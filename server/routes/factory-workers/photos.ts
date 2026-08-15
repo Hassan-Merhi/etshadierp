@@ -16,7 +16,7 @@ import { factoryWorkers } from "@shared/schema";
 
 import { getFactoryCompanyId, workerUpload, writeDaybookEntry } from "./_helpers";
 
-export function registerFactoryWorkerPhotoRoutes(app: Express, requireAuth: unknown, db: unknown) {
+export function registerFactoryWorkerPhotoRoutes(app: Express, requireAuth: any, db: any) {
   // POST /api/factory/workers/:id/photo - Upload photo
   app.post(
     "/api/factory/workers/:id/photo",

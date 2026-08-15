@@ -79,7 +79,7 @@ export default function FactoryShippingContainers() {
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
 
   // ── Column visibility (per-user, persisted to localStorage) ───────────────────
-  const { data: me } = useQuery<unknown>({ queryKey: ["/api/auth/me"] });
+  const { data: me } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const [colVis, setColVis] = useState<Record<ShippingColId, boolean>>(DEFAULT_COL_VIS);
   useEffect(() => {
     if (!me?.id) return;
@@ -255,7 +255,7 @@ export default function FactoryShippingContainers() {
     },
   });
 
-  const _deleteShippingInvoiceMutation = useMutation({
+  const deleteShippingInvoiceMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `${LIST_KEY}/${id}/shipping-invoice`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [LIST_KEY] });

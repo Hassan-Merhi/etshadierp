@@ -68,7 +68,7 @@ export function AgentCard({
     newAmount: number;
     newContainerId: number;
   } | null>(null);
-  const [_replaceConfirmDiff, setReplaceConfirmDiff] = useState(false);
+  const [replaceConfirmDiff, setReplaceConfirmDiff] = useState(false);
   const [pendingGraduationIds, setPendingGraduationIds] = useState<number[]>([]);
 
   // ── Custom order (localStorage) ───────────────────────────────────────────
@@ -209,7 +209,7 @@ export function AgentCard({
     ledgerBalance,
     offloadedDutyTotal,
     clearedByPayments,
-    _openBalance,
+    openBalance,
     warnings,
     clearedRows,
     partialRows,
@@ -249,7 +249,7 @@ export function AgentCard({
         [newIds[idx], newIds[idx + 1]] = [newIds[idx + 1], newIds[idx]];
       saveOrder(newIds);
     },
-    [openAndPartial, saveOrder]
+    [openAndPartial]
   );
   const moveToTop = useCallback(
     (containerId: number) => {
@@ -257,7 +257,7 @@ export function AgentCard({
       if (ids.indexOf(containerId) <= 0) return;
       saveOrder([containerId, ...ids.filter((id) => id !== containerId)]);
     },
-    [openAndPartial, saveOrder]
+    [openAndPartial]
   );
 
   const openSum = openAndPartial.reduce((s, r) => s + r.remainingAmount, 0);

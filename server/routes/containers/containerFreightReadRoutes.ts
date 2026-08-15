@@ -24,7 +24,7 @@ import { calcPoAmounts, syncIntercoParentVoucher } from "./containerHelpers";
 export function registerContainerFreightReadRoutes(app: Express) {
   app.get("/api/purchase-orders/next-po-number", requireAuth, requireNonPOS, async (req, res) => {
     try {
-      const companyId = (req.user as unknown)?.companyId;
+      const companyId = (req.user as any)?.companyId;
       if (!companyId) return res.status(400).json({ message: "No company in session" });
 
       const year = new Date().getFullYear();

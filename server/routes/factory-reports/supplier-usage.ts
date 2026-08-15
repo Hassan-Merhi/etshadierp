@@ -22,7 +22,7 @@ import {
 import { getUserHideAllCosts } from "../factory/_helpers";
 import { generateEmptyExcel, generateEmptyPdf, generateExcel, generatePdf, writeDaybookEntry } from "./_helpers";
 
-export function registerFactorySupplierUsageReportRoutes(app: Express, requireAuth: unknown, db: unknown) {
+export function registerFactorySupplierUsageReportRoutes(app: Express, requireAuth: any, db: any) {
   app.post("/api/factory/reports/supplier-usage", requireAuth, async (req: Request, res: Response) => {
     try {
       const hideAllCosts = await getUserHideAllCosts(req);
@@ -51,7 +51,7 @@ export function registerFactorySupplierUsageReportRoutes(app: Express, requireAu
         .from(factoryContainers)
         .where(and(...containerConditions));
 
-      const containerIds = allContainers.map((c: unknown) => c.id);
+      const containerIds = allContainers.map((c: any) => c.id);
 
       if (containerIds.length === 0) {
         if (format === "pdf") {
@@ -76,7 +76,7 @@ export function registerFactorySupplierUsageReportRoutes(app: Express, requireAu
         .from(factoryRawStock)
         .where(eq(factoryRawStock.companyId, companyId));
 
-      const relevantRawStock = allRawStock.filter((rs: unknown) => containerIds.includes(rs.containerId));
+      const relevantRawStock = allRawStock.filter((rs: any) => containerIds.includes(rs.containerId));
 
       const allMixSources = await db
         .select({
@@ -93,7 +93,7 @@ export function registerFactorySupplierUsageReportRoutes(app: Express, requireAu
 
       const allMixBatches = await db.select().from(factoryMixBatches).where(eq(factoryMixBatches.companyId, companyId));
 
-      const mixBatchMap = new Map<number, unknown>();
+      const mixBatchMap = new Map<number, any>();
       for (const mb of allMixBatches) {
         mixBatchMap.set(mb.id, mb);
       }
@@ -106,12 +106,12 @@ export function registerFactorySupplierUsageReportRoutes(app: Express, requireAu
 
       const suppliers = await db.select().from(factorySuppliers).where(eq(factorySuppliers.companyId, companyId));
 
-      const supplierMap = new Map<number, unknown>();
+      const supplierMap = new Map<number, any>();
       for (const s of suppliers) {
         supplierMap.set(s.id, s);
       }
 
-      const containerMap = new Map<number, unknown>();
+      const containerMap = new Map<number, any>();
       for (const c of allContainers) {
         containerMap.set(c.id, c);
       }
@@ -140,9 +140,9 @@ export function registerFactorySupplierUsageReportRoutes(app: Express, requireAu
       for (const [sid, sContainers] of Array.from(supplierGroups.entries())) {
         const supplier = supplierMap.get(sid);
         const supplierName = supplier ? supplier.name : `Unknown (ID: ${sid})`;
-        const sContainerIds = sContainers.map((c: unknown) => c.id);
+        const sContainerIds = sContainers.map((c: any) => c.id);
 
-        const sRawStock = relevantRawStock.filter((rs: unknown) => sContainerIds.includes(rs.containerId));
+        const sRawStock = relevantRawStock.filter((rs: any) => sContainerIds.includes(rs.containerId));
 
         let openingReceivedKg = 0;
         let openingUsedKg = 0;
@@ -174,7 +174,7 @@ export function registerFactorySupplierUsageReportRoutes(app: Express, requireAu
           }
         }
 
-        const sMixSources = allMixSources.filter((ms: unknown) => sContainerIds.includes(ms.containerId));
+        const sMixSources = allMixSources.filter((ms: any) => sContainerIds.includes(ms.containerId));
 
         let periodUsedKg = 0;
         for (const ms of sMixSources) {
@@ -195,9 +195,9 @@ export function registerFactorySupplierUsageReportRoutes(app: Express, requireAu
           }
         }
 
-        const sBales = allBales.filter((b: unknown) => b.mixBatchId && sMixBatchIds.has(b.mixBatchId));
+        const sBales = allBales.filter((b: any) => b.mixBatchId && sMixBatchIds.has(b.mixBatchId));
 
-        const periodBales = sBales.filter((b: unknown) => {
+        const periodBales = sBales.filter((b: any) => {
           const bDate = b.finalizedAt
             ? new Date(b.finalizedAt).toISOString().split("T")[0]
             : b.createdAt
@@ -231,8 +231,8 @@ export function registerFactorySupplierUsageReportRoutes(app: Express, requireAu
       const baleBreakdown = [];
       for (const summary of supplierSummaries) {
         for (const bale of summary.bales) {
-          const mixSources = allMixSources.filter((ms: unknown) => ms.mixBatchId === bale.mixBatchId);
-          const materials = mixSources.map((ms: unknown) => {
+          const mixSources = allMixSources.filter((ms: any) => ms.mixBatchId === bale.mixBatchId);
+          const materials = mixSources.map((ms: any) => {
             const container = containerMap.get(ms.containerId);
             return {
               containerId: ms.containerId,

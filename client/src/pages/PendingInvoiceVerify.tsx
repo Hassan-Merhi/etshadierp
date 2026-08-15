@@ -45,7 +45,7 @@ import {
 import type { ComparisonItem, FinalizePreview, OrderDetail, VerificationSummary } from "./pendinginvoiceverify/types";
 export default function PendingInvoiceVerify() {
   const { toast } = useToast();
-  const { _selectedCompany } = useCompany();
+  const { selectedCompany } = useCompany();
   const [, navigate] = useLocation();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
@@ -103,7 +103,7 @@ export default function PendingInvoiceVerify() {
     queryKey: ["/api/auth/me"],
     retry: false,
   });
-  const _isAdminOrOwner =
+  const isAdminOrOwner =
     currentUser?.role === "Admin" || currentUser?.role === "Owner" || currentUser?.role === "Developer";
   const isDeveloper = currentUser?.role === "Developer";
 
@@ -279,7 +279,7 @@ export default function PendingInvoiceVerify() {
     });
   };
 
-  const _getComparisonRowClass = (status: ComparisonItem["status"]) => {
+  const getComparisonRowClass = (status: ComparisonItem["status"]) => {
     switch (status) {
       case "LOADED_NOT_IN_PROFORMA":
       case "MISSING_FROM_LOADED":

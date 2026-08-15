@@ -171,7 +171,7 @@ export default function FactoryDispatchBatches() {
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      const payload: unknown = {
+      const payload: any = {
         customerId: parseInt(form.customerId),
         batchDate: form.batchDate,
         currency: form.currency,

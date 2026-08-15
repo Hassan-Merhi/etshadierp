@@ -60,7 +60,7 @@ export async function createStockTransfer(
       transferItems.push(transferItem);
 
       if (!isOptional) {
-        const sourceInventoryRows = await (tx as unknown).execute(
+        const sourceInventoryRows = await (tx as any).execute(
           sql`SELECT * FROM inventory WHERE location_id = ${item.sourceLocationId} AND stock_item_id = ${item.stockItemId} FOR UPDATE`
         );
         const sourceInventory = sourceInventoryRows.rows?.[0] || sourceInventoryRows[0];
@@ -82,7 +82,7 @@ export async function createStockTransfer(
             .where(eq(schema.inventory.id, sourceInventory.id));
         }
 
-        const destInventoryRows = await (tx as unknown).execute(
+        const destInventoryRows = await (tx as any).execute(
           sql`SELECT * FROM inventory WHERE location_id = ${destinationLocationId} AND stock_item_id = ${item.stockItemId} FOR UPDATE`
         );
         const destInventory = destInventoryRows.rows?.[0] || destInventoryRows[0];
@@ -133,7 +133,7 @@ export async function createStockAdjustment(
   adjustmentType: "Production" | "Consumption" | "Mixed",
   notes: string,
   items: Array<{ stockItemId: number; quantity: string; rate: string }>,
-  _consumptionAccountOverride?: { code: string; name: string }
+  consumptionAccountOverride?: { code: string; name: string }
 ): Promise<unknown> {
   return await db.transaction(async (tx) => {
     const [voucher] = await tx.select().from(schema.vouchers).where(eq(schema.vouchers.id, voucherId));
@@ -210,7 +210,7 @@ export async function createStockAdjustment(
       let actualTotalAmount = multiplyInventoryValues(absoluteQuantity, rate);
 
       if (!isOptional) {
-        const currentInventoryRows = await (tx as unknown).execute(
+        const currentInventoryRows = await (tx as any).execute(
           sql`SELECT * FROM inventory WHERE location_id = ${locationId} AND stock_item_id = ${item.stockItemId} FOR UPDATE`
         );
         const currentInventory = currentInventoryRows.rows?.[0] || currentInventoryRows[0];

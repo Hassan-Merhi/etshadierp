@@ -430,9 +430,9 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
         const NUM_FMT = "#,##0.00";
         const INT_FMT = "#,##0";
 
-        const styleHeaderRow = (row: unknown, argbColor: string) => {
+        const styleHeaderRow = (row: any, argbColor: string) => {
           row.height = 20;
-          row.eachCell((cell: unknown) => {
+          row.eachCell((cell: any) => {
             cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: argbColor } };
             cell.alignment = { vertical: "middle", horizontal: "center", wrapText: false };
@@ -442,19 +442,19 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
           });
         };
 
-        const applyDataRow = (row: unknown, isAlt: boolean, altArgb: string) => {
+        const applyDataRow = (row: any, isAlt: boolean, altArgb: string) => {
           if (isAlt) {
-            row.eachCell({ includeEmpty: false }, (cell: unknown) => {
+            row.eachCell({ includeEmpty: false }, (cell: any) => {
               cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: altArgb } };
             });
           }
-          row.eachCell({ includeEmpty: false }, (cell: unknown) => {
+          row.eachCell({ includeEmpty: false }, (cell: any) => {
             cell.alignment = { vertical: "middle" };
           });
         };
 
         const buildSummarySheet = (
-          ws: unknown,
+          ws: any,
           rows: GroupedRow[],
           label: string,
           headerColor: string,
@@ -492,7 +492,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
             totalCost += tc;
             totalSell += ts;
 
-            const rd: unknown = {
+            const rd: any = {
               articleCode: row.articleCode,
               productName: row.productName,
               category: row.category,
@@ -525,7 +525,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
           });
 
           ws.addRow({});
-          const td: unknown = {
+          const td: any = {
             articleCode: "",
             productName: `TOTAL — ${rows.length} ${label}`,
             category: "",
@@ -543,7 +543,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
           }
           const tr = ws.addRow(td);
           tr.font = { bold: true };
-          tr.eachCell({ includeEmpty: false }, (cell: unknown) => {
+          tr.eachCell({ includeEmpty: false }, (cell: any) => {
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: TOTAL_BG } };
           });
           tr.getCell("baleCount").numFmt = INT_FMT;
@@ -588,7 +588,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
 
         mainBales.forEach((b, idx) => {
           const pid = b.productId ?? 0;
-          const rd: unknown = {
+          const rd: any = {
             referenceNumber: b.referenceNumber,
             articleCode: b.articleCode || "",
             productName: b.productName || "",
@@ -644,7 +644,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
           const pid = b.productId ?? 0;
           const w = parseFloat(String(b.weightKg || "0"));
           gbTotalKg += w;
-          const rd: unknown = {
+          const rd: any = {
             referenceNumber: b.referenceNumber,
             baleCode: b.baleCode || "",
             articleCode: b.articleCode || "",
@@ -669,7 +669,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
         // Totals row for garbage sheet
         if (garbageBales.length > 0) {
           garbageDetailSheet.addRow({});
-          const gtd: unknown = {
+          const gtd: any = {
             referenceNumber: "",
             baleCode: "",
             articleCode: "",
@@ -686,7 +686,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
           }
           const gtr = garbageDetailSheet.addRow(gtd);
           gtr.font = { bold: true };
-          gtr.eachCell({ includeEmpty: false }, (cell: unknown) => {
+          gtr.eachCell({ includeEmpty: false }, (cell: any) => {
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: TOTAL_BG } };
           });
           gtr.getCell("weightKg").numFmt = NUM_FMT;

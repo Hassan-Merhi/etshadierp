@@ -13,7 +13,7 @@ import { registerFactoryPayrollUpdateRoutes } from "./update";
 import { registerFactoryPayrollDeleteRoutes } from "./delete";
 import { registerFactoryPayrollExportRoutes } from "./exports";
 
-export function registerFactoryPayrollRoutes(app: Express, requireAuth: unknown, db: unknown) {
+export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db: any) {
   registerFactoryPayrollGenerateRoutes(app, requireAuth, db);
   registerFactoryPayrollReadRoutes(app, requireAuth, db);
   registerFactoryProductionBonusRoutes(app, requireAuth, db);

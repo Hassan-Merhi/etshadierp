@@ -59,7 +59,7 @@ export function CreateTransferDialog({
         (i) => !addedIds.has(i.stockItemId ?? i.id) && (i.stockItemName ?? i.name ?? "").toLowerCase().includes(s)
       )
       .slice(0, 40);
-  }, [itemSearch, sourceInventory, addedIds]);
+  }, [sourceInventory, itemSearch, items]);
 
   const addItem = (inv: unknown) => {
     const id = inv.stockItemId ?? inv.id;

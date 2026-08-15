@@ -55,7 +55,7 @@ export function registerRentalUnitsWriteRoutes(app: Express, ctx: RentalRoutesCo
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       const allowed = ["unitNumber", "size", "dimensions", "locationGroup", "notes", "sortOrder", "active"];
-      const updates: unknown = {};
+      const updates: any = {};
       for (const k of allowed) if (k in req.body) updates[k] = req.body[k];
 
       const [existing] = await db

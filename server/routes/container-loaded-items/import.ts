@@ -14,7 +14,7 @@ import { poLineItems, purchaseOrders, stockItems, supplierContainerLoadedItems }
 
 import { verifyContainerOwnership } from "./_helpers";
 
-export function registerContainerLoadedItemImportRoutes(app: Express, requireAuth: unknown) {
+export function registerContainerLoadedItemImportRoutes(app: Express, requireAuth: any) {
   app.post("/api/containers/:containerId/import-loaded-items", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;
@@ -30,7 +30,7 @@ export function registerContainerLoadedItemImportRoutes(app: Express, requireAut
       // Resolve alias codes → primary stock-item codes before saving so that
       // items imported with different (supplier) codes match the proforma.
       const { map: aliasMap } = await buildAliasMap(companyId);
-      const values = items.map((l: unknown) => ({
+      const values = items.map((l: any) => ({
         containerId,
         barcode: resolveBarcode(String(l.barcode || l.Barcode || "").trim(), aliasMap),
         itemName: String(l.itemName || l["Item Name"] || "").trim() || null,
@@ -95,7 +95,7 @@ export function registerContainerLoadedItemImportRoutes(app: Express, requireAut
         }
 
         const itemsWithBarcode = lineItems.filter(
-          (item: unknown) => item.stockItemCode && item.stockItemCode.trim() !== ""
+          (item: any) => item.stockItemCode && item.stockItemCode.trim() !== ""
         );
         const skippedCount = lineItems.length - itemsWithBarcode.length;
 
@@ -105,7 +105,7 @@ export function registerContainerLoadedItemImportRoutes(app: Express, requireAut
           });
         }
 
-        const values = itemsWithBarcode.map((item: unknown) => ({
+        const values = itemsWithBarcode.map((item: any) => ({
           containerId,
           barcode: item.stockItemCode.trim(),
           itemName: item.itemName || null,

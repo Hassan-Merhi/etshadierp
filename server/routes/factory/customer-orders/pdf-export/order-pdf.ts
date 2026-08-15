@@ -76,7 +76,7 @@ export function registerOrderPdfRoutes(app: Express) {
           if (p.articleCode) invNameMap.set(p.articleCode, p.name);
         }
       }
-      const sortedLines = lines.sort((a: unknown, b: unknown) => {
+      const sortedLines = lines.sort((a: any, b: any) => {
         const na = invNameMap.get(a.articleCode) || a.baleName || "";
         const nb = invNameMap.get(b.articleCode) || b.baleName || "";
         return na.localeCompare(nb);
@@ -99,12 +99,12 @@ export function registerOrderPdfRoutes(app: Express) {
         R = PAGE_W - 40; // left / right margin x
       const USABLE = R - L; // 515
 
-      const fmtN = (val: unknown) => {
+      const fmtN = (val: any) => {
         const n = parseFloat(val);
         if (isNaN(n)) return val ?? "";
         return n % 1 === 0 ? n.toLocaleString("en-US") : n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
       };
-      const fmtM = (val: unknown) => `$${fmtN(val)}`;
+      const fmtM = (val: any) => `$${fmtN(val)}`;
 
       // ── Logo (centred, fixed height so title lands below it) ─────────────────
       const logoPath = path.join(process.cwd(), "server", "hmd-logo.png");

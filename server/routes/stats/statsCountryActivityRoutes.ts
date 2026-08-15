@@ -47,7 +47,7 @@ export function registerStatsCountryActivityRoutes(app: Express) {
       }
 
       // Helper: normalize any date value from pg to a YYYY-MM-DD string
-      const toDateKey = (raw: unknown): string => {
+      const toDateKey = (raw: any): string => {
         if (!raw) return "";
         if (raw instanceof Date) return raw.toISOString().substring(0, 10);
         if (typeof raw === "string") return raw.substring(0, 10);
@@ -79,7 +79,7 @@ export function registerStatsCountryActivityRoutes(app: Express) {
       const companyDayMap = new Map<number, DayMap>();
       for (const c of companies) companyDayMap.set(Number(c.id), new Map<string, DayEntry>());
 
-      const ensureDay = (rawCompanyId: unknown, day: string): DayEntry | null => {
+      const ensureDay = (rawCompanyId: any, day: string): DayEntry | null => {
         const companyId = Number(rawCompanyId);
         const m = companyDayMap.get(companyId);
         if (!m) return null;

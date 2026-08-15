@@ -19,7 +19,7 @@ export async function getAllSuppliers(
     .select()
     .from(companyScopedSuppliers)
     .where(and(...conditions))
-    .orderBy(asc(companyScopedSuppliers.legalName)) as unknown;
+    .orderBy(asc(companyScopedSuppliers.legalName)) as any;
   if (limit) {
     query = query.limit(limit);
   }
@@ -49,7 +49,7 @@ export async function getSupplierById(id: number, companyId?: number): Promise<C
 export async function createSupplier(supplier: InsertCompanyScopedSupplier): Promise<CompanyScopedSupplier> {
   const [created] = await db
     .insert(companyScopedSuppliers)
-    .values(supplier as unknown)
+    .values(supplier as any)
     .returning();
   return created;
 }

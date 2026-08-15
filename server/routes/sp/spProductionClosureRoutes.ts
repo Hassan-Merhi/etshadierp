@@ -33,7 +33,7 @@ function username(req: Request): string | null {
   return String(req.user?.username ?? req.session.username ?? "") || null;
 }
 
-async function latestActiveCutover(companyId: number): Promise<unknown | null> {
+async function latestActiveCutover(companyId: number): Promise<any | null> {
   const result = await db.execute(sql`
     SELECT * FROM sp_migration_cutovers
     WHERE target_company_id = ${companyId} AND status = 'active'
@@ -61,7 +61,7 @@ export async function buildSpProductionClosureStatus(companyId: number): Promise
     ORDER BY evidence_type
   `);
   const evidence = resultRows(evidenceResult);
-  const evidenceMap = new Map<string, unknown>(evidence.map((row: unknown) => [row.evidence_type, row]));
+  const evidenceMap = new Map<string, any>(evidence.map((row: any) => [row.evidence_type, row]));
   const checks = REQUIRED_STABILIZATION_CHECKS.map((type) => ({
     type,
     ...(evidenceMap.get(type) ?? {
@@ -96,7 +96,7 @@ export async function buildSpProductionClosureStatus(companyId: number): Promise
   `);
   const migrationSuspenseEntryCount = Number(firstRow(suspense)?.count ?? 0);
 
-  const failures = checks.filter((check: unknown) => check.status !== "PASS");
+  const failures = checks.filter((check: any) => check.status !== "PASS");
   if (sourceWriteCount > 0) {
     failures.push({ type: "source_write_lock_database", status: "FAIL", sourceWriteCount });
   }

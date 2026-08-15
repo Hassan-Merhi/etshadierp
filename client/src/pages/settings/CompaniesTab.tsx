@@ -30,9 +30,9 @@ type CompanyFormValues = z.infer<typeof insertCompanySchema>;
 export function CompaniesTab() {
   const { toast } = useToast();
   const [isCompanyDialogOpen, setIsCompanyDialogOpen] = useState(false);
-  const [editingCompany, setEditingCompany] = useState<unknown>(null);
+  const [editingCompany, setEditingCompany] = useState<any>(null);
   const [companySearch, setCompanySearch] = useState("");
-  const [companyToDelete, setCompanyToDelete] = useState<unknown>(null);
+  const [companyToDelete, setCompanyToDelete] = useState<any>(null);
 
   const { data: companies = [], isLoading: isLoadingCompanies } = useQuery<unknown[]>({
     queryKey: ["/api/companies"],

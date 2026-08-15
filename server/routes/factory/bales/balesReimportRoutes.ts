@@ -28,7 +28,7 @@ export function registerBalesReimportRoutes(app: Express) {
   app.post("/api/factory/bales/reimport", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     const multer = (await import("multer")).default;
     const upload = multer({ storage: multer.memoryStorage() });
-    upload.single("file")(req, res, async (err: unknown) => {
+    upload.single("file")(req, res, async (err: any) => {
       if (err) return res.status(400).json({ message: "File upload error" });
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
@@ -112,12 +112,12 @@ export function registerBalesReimportRoutes(app: Express) {
           });
         }
 
-        const result = await db.transaction(async (tx: unknown) => {
+        const result = await db.transaction(async (tx: any) => {
           const existingBarcodes = await tx
             .select({ referenceNumber: factoryBales.referenceNumber })
             .from(factoryBales)
             .where(eq(factoryBales.companyId, companyId));
-          const existingRefSet = new Set(existingBarcodes.map((b: unknown) => b.referenceNumber));
+          const existingRefSet = new Set(existingBarcodes.map((b: any) => b.referenceNumber));
 
           const duplicates = rows.filter((r) => existingRefSet.has(r.referenceNumber));
           if (duplicates.length > 0) {
@@ -134,7 +134,7 @@ export function registerBalesReimportRoutes(app: Express) {
             .select({ id: locations.id })
             .from(locations)
             .where(eq(locations.companyId, companyId));
-          allLocs.forEach((l: unknown) => validLocIds.add(l.id));
+          allLocs.forEach((l: any) => validLocIds.add(l.id));
 
           const invalidLocRows = rows.filter((r) => r.erpLocationId && !validLocIds.has(r.erpLocationId));
           if (invalidLocRows.length > 0) {
@@ -407,7 +407,7 @@ export function registerBalesReimportRoutes(app: Express) {
   app.post("/api/factory/bales/bulk-update-names", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     const multer = (await import("multer")).default;
     const upload = multer({ storage: multer.memoryStorage() });
-    upload.single("file")(req, res, async (err: unknown) => {
+    upload.single("file")(req, res, async (err: any) => {
       if (err) return res.status(400).json({ message: "File upload error" });
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 

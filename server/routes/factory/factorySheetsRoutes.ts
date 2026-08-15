@@ -18,13 +18,13 @@ type SSheet = { id?: number; name: string; columns: unknown[]; rows: SRow[]; ord
 const STATUS_NAME = "STATUS";
 
 // Support both old format (string) and new format ({ id, label })
-function getColLabel(col: unknown): string {
+function getColLabel(col: any): string {
   if (typeof col === "string") return col;
   return col?.label ?? "";
 }
 
 // Support both old format (primitive) and new format ({ value, link? })
-function getCellRawValue(cell: unknown): CellVal {
+function getCellRawValue(cell: any): CellVal {
   if (cell === null || cell === undefined) return null;
   if (typeof cell === "number" || typeof cell === "string") return cell;
   if (typeof cell === "object" && "value" in cell) return cell.value ?? null;

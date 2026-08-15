@@ -58,7 +58,7 @@ export function ensurePhase2Schema(): Promise<void> {
   return phase2SchemaPromise;
 }
 
-async function getCompany(companyId: number): Promise<unknown | null> {
+async function getCompany(companyId: number): Promise<any | null> {
   const result = await db.execute(sql`
     SELECT id, code, name, company_type
     FROM companies
@@ -247,8 +247,8 @@ export async function loadTargetAccounts(targetId: number): Promise<{
     WHERE company_id = ${targetId} AND deleted_at IS NULL
   `);
   const rows = resultRows(result);
-  const bySubType = new Map<string, unknown>();
-  const byCode = new Map<string, unknown>();
+  const bySubType = new Map<string, any>();
+  const byCode = new Map<string, any>();
   const byType = new Map<string, unknown[]>();
   for (const row of rows) {
     if (row.sub_type) bySubType.set(String(row.sub_type), row);
@@ -271,7 +271,7 @@ export async function loadSourceAccounts(sourceId: number): Promise<Map<number, 
 }
 
 export function mapTargetAccount(
-  sourceAccount: unknown | null,
+  sourceAccount: any | null,
   targetAccounts: Awaited<ReturnType<typeof loadTargetAccounts>>
 ): {
   targetAccountId: number | null;

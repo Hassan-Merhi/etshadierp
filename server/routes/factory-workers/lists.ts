@@ -15,7 +15,7 @@ import { factoryWorkers, factoryPayrolls, factoryWorkerDocuments, factoryWorkerA
 import { getFactoryCompanyId } from "./_helpers";
 import { parseListPagination, setListPaginationHeaders } from "../../lib/listPagination";
 
-export function registerFactoryWorkerListRoutes(app: Express, requireAuth: unknown, db: unknown) {
+export function registerFactoryWorkerListRoutes(app: Express, requireAuth: any, db: any) {
   // GET /api/factory/workers/with-balances - List active workers with computed current balances
   // Balance = total advances (debit) minus total paid payroll net salary (credit), all-time
   app.get("/api/factory/workers/with-balances", requireAuth, async (req: Request, res: Response) => {
@@ -198,7 +198,7 @@ export function registerFactoryWorkerListRoutes(app: Express, requireAuth: unkno
           )
         )
         .orderBy(factoryWorkers.nationality);
-      const list = rows.map((r: unknown) => r.nationality as string).filter(Boolean);
+      const list = rows.map((r: any) => r.nationality as string).filter(Boolean);
       res.json(list);
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });

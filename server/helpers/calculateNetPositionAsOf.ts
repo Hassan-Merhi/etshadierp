@@ -116,7 +116,7 @@ export async function calculateNetPositionAsOf(
   // For non-SP companies, the generic exclusion of internal sp_stock / sp_cost_clearing applies.
   const accountsForClassify = isSupplierPartner
     ? companyAccounts.filter(
-        (a: unknown) => a.accountType === "Cash" || a.subType === "sp_payable" || a.subType === "sp_hadi_intercompany"
+        (a: any) => a.accountType === "Cash" || a.subType === "sp_payable" || a.subType === "sp_hadi_intercompany"
       )
     : companyAccounts.filter((a) => a.subType !== "sp_stock" && a.subType !== "sp_cost_clearing");
   const classified = classifyNetPositionAccounts(accountsForClassify, accountBalances, {

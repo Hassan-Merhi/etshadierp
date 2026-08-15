@@ -11,7 +11,7 @@ import { logger } from "../../lib/logger";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
 import { factoryWasteEntries, factoryWorkers, customerOrders } from "@shared/schema";
 
-export function registerFactoryDashboardWasteRoutes(app: Express, requireAuth: unknown, db: unknown) {
+export function registerFactoryDashboardWasteRoutes(app: Express, requireAuth: any, db: any) {
   app.get("/api/factory/dashboard", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;

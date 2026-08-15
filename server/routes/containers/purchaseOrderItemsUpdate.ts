@@ -386,7 +386,7 @@ export async function applyPurchaseOrderItemsUpdate(
       }
     }
     const _newIdSet = new Set(lineItems.filter((it) => it.id).map((it) => it.id));
-    for (const [oldId, _oldIt] of _oldItemMap) {
+    for (const [oldId, oldIt] of _oldItemMap) {
       if (!_newIdSet.has(oldId)) _removedItems.push(String(oldId));
     }
     if (_addedItems.length) _poItemChanges.itemsAdded = { new: _addedItems.join(", ") };

@@ -27,7 +27,7 @@ interface UserRoleDialogProps {
   onClose: () => void;
   userId: string;
   companies: unknown[];
-  editingRole?: unknown | null;
+  editingRole?: any | null;
 }
 
 export function UserRoleDialog({ open, onClose, userId, companies, editingRole }: UserRoleDialogProps) {
@@ -93,7 +93,7 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
         setLocationCashAccounts({});
       }
     }
-  }, [open, editingRole.id, editingRole, form, userId, companies]);
+  }, [open, editingRole?.id]);
 
   const { data: locations = [] } = useQuery<unknown[]>({
     queryKey: ["/api/locations", { companyId: selectedCompanyId }],

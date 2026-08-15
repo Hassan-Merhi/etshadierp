@@ -183,8 +183,8 @@ export default function StockItems() {
   }
 
   // Derived stats
-  const _activeCount = displayItems.filter((i) => i.active).length;
-  const _inactiveCount = displayItems.filter((i) => !i.active).length;
+  const activeCount = displayItems.filter((i) => i.active).length;
+  const inactiveCount = displayItems.filter((i) => !i.active).length;
 
   // ─── Mutations: stock items ───────────────────────────────────────────────
   const deleteMutation = useMutation({

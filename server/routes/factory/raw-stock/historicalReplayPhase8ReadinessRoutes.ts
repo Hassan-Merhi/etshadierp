@@ -180,7 +180,7 @@ export function registerHistoricalReplayPhase8ReadinessRoutes(app: Express): voi
 
       if (isPrepare) {
         const originalJson = res.json.bind(res);
-        res.json = (payload: unknown) => {
+        res.json = (payload: any) => {
           if (!payload?.dryRun || typeof payload.confirmationToken !== "string") {
             return originalJson(payload);
           }

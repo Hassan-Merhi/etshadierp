@@ -35,7 +35,7 @@ export interface StableSupplierCostResult {
  * so optional row locks remain inside the owning transaction.
  */
 export async function getStableSupplierCost(
-  tx: unknown,
+  tx: any,
   companyId: number,
   supplierId: number,
   opts: { forUpdate?: boolean } = {},
@@ -66,7 +66,7 @@ export async function getStableSupplierCost(
   if (opts.forUpdate) query = query.for("update");
 
   const rawRows = await query;
-  const rows: StableSupplierRawStockRow[] = rawRows.map((row: unknown) => {
+  const rows: StableSupplierRawStockRow[] = rawRows.map((row: any) => {
     const receivedKg = new Decimal(row.receivedKg || 0).toNumber();
     const rawUsdRate = new Decimal(row.costPerKgUsd || 0);
     const costPerKgUsd = rawUsdRate.gt(0)

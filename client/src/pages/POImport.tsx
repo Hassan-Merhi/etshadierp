@@ -107,13 +107,13 @@ export default function POImport() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<unknown>(null);
-  const [validationResult, setValidationResult] = useState<unknown>(null);
+  const [preview, setPreview] = useState<any>(null);
+  const [validationResult, setValidationResult] = useState<any>(null);
   const [selectedSupplier, setSelectedSupplier] = useState<string>("");
   const [containerNumber, setContainerNumber] = useState<string>("");
   const [importDate, setImportDate] = useState<string>(new Date().toLocaleDateString("en-CA"));
   const [showPrintDialog, setShowPrintDialog] = useState(false);
-  const [importResult, setImportResult] = useState<unknown>(null);
+  const [importResult, setImportResult] = useState<any>(null);
   const [freightPaidBy, setFreightPaidBy] = useState<"supplier" | "parent">("supplier");
   const [freightParentAccountId, setFreightParentAccountId] = useState<string>("");
 

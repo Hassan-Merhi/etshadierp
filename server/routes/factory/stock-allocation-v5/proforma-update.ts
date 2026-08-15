@@ -133,7 +133,7 @@ export function registerV5ProformaUpdateRoutes(app: Express) {
         // LOADING / PENDING / VERIFIED / FINALIZED / CANCELLED orders are not in eligibleIds,
         // so their expected lines are guaranteed to remain unchanged.
         let totalUpdated = 0;
-        await db.transaction(async (tx: unknown) => {
+        await db.transaction(async (tx: any) => {
           for (const update of updates) {
             const qty = Math.round(Number(update.expectedQty));
             for (const orderId of eligibleIds) {

@@ -130,7 +130,7 @@ export function useLocationInventoryQueries({
     enabled: !!closingInventoryUrl && !!companyId,
   });
 
-  const { data: allInventoryRaw, isLoading: allInventoryLoading } = useQuery<unknown>({
+  const { data: allInventoryRaw, isLoading: allInventoryLoading } = useQuery<any>({
     queryKey: companyId ? ["/api/inventory", companyId] : [],
     queryFn: async () => {
       // Fetch the first page at the maximum allowed page size.

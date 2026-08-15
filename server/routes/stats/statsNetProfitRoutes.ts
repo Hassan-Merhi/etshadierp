@@ -552,14 +552,14 @@ export function registerStatsNetProfitRoutes(app: Express) {
       // accounts like "Stock on Floor" (accountType: Asset) represent the same
       // physical stock and should appear as a single line in the breakdown.
       {
-        const isStockEntry = (a: unknown) => {
+        const isStockEntry = (a: any) => {
           const nl = (a.name || "").toLowerCase();
           const cat = (a.category || "").toLowerCase();
           return cat === "inventory" || nl.includes("stock in hand") || nl.includes("stock on floor");
         };
         const stockEntries = forUsAccounts.filter(isStockEntry);
         if (stockEntries.length > 1) {
-          const combined = round2(stockEntries.reduce((s: number, a: unknown) => s + (a.value || 0), 0));
+          const combined = round2(stockEntries.reduce((s: number, a: any) => s + (a.value || 0), 0));
           for (let i = forUsAccounts.length - 1; i >= 0; i--) {
             if (isStockEntry(forUsAccounts[i])) forUsAccounts.splice(i, 1);
           }

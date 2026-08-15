@@ -76,8 +76,8 @@ export function registerVoucherWithEntriesRoutes(app: Express) {
       }
 
       // Validate that debits equal credits (only for non-optional vouchers)
-      const totalDebits = entries.reduce((sum: number, entry: unknown) => sum + parseFloat(entry.debitAmount || "0"), 0);
-      const totalCredits = entries.reduce((sum: number, entry: unknown) => sum + parseFloat(entry.creditAmount || "0"), 0);
+      const totalDebits = entries.reduce((sum: number, entry: any) => sum + parseFloat(entry.debitAmount || "0"), 0);
+      const totalCredits = entries.reduce((sum: number, entry: any) => sum + parseFloat(entry.creditAmount || "0"), 0);
 
       // For active (non-optional) vouchers, enforce debit=credit balance
       if (!voucher.optional && Math.abs(totalDebits - totalCredits) >= 0.01) {
@@ -148,7 +148,7 @@ export function registerVoucherWithEntriesRoutes(app: Express) {
         oldEntries = await db.select().from(voucherEntries).where(eq(voucherEntries.voucherId, id));
 
         // Update voucher metadata
-        const voucherUpdates: unknown = {
+        const voucherUpdates: any = {
           voucherType: voucher.voucherType,
           voucherDate: voucher.voucherDate,
           description: voucher.description !== undefined ? voucher.description || null : existingVoucher.description,

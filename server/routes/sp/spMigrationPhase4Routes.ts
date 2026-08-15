@@ -78,7 +78,7 @@ async function loadLatestCutoversForCompanies(companyIds: number[]): Promise<Map
   if (holdCache && holdCache.expiresAt > Date.now() && companyIds.every((id) => holdCache!.byCompany.has(id))) {
     return holdCache.byCompany;
   }
-  const byCompany = holdCache?.byCompany ?? new Map<number, unknown>();
+  const byCompany = holdCache?.byCompany ?? new Map<number, any>();
   for (const companyId of companyIds) {
     const result = await db.execute(sql`
       SELECT *
@@ -195,7 +195,7 @@ function installPhase4WriteGuard(app: Express): void {
   const stack = app?._router?.stack as unknown[] | undefined;
   if (!stack?.length) return;
   const layer = stack.pop();
-  const firstRouteIndex = stack.findIndex((entry: unknown) => Boolean(entry.route));
+  const firstRouteIndex = stack.findIndex((entry: any) => Boolean(entry.route));
   if (!layer || firstRouteIndex < 0) {
     if (layer) stack.push(layer);
     return;
@@ -209,17 +209,17 @@ async function invokeMigrationHandler(
   body: unknown
 ): Promise<unknown> {
   let statusCode = 200;
-  let payload: unknown = null;
-  const response: unknown = {
+  let payload: any = null;
+  const response: any = {
     status(code: number) {
       statusCode = code;
       return this;
     },
-    json(value: unknown) {
+    json(value: any) {
       payload = value;
       return this;
     },
-    send(value: unknown) {
+    send(value: any) {
       payload = value;
       return this;
     },
@@ -300,7 +300,7 @@ async function targetLiveActivity(targetId: number, activatedAt?: string | null)
 
 async function normalizedVerification(sourceId: number, targetId: number, requireUnusedTarget = true): Promise<unknown> {
   const verification = await buildFinalMigrationVerification(sourceId, targetId);
-  verification.blockers = (verification.blockers ?? []).filter((issue: unknown) => issue.code !== "TARGET_ALREADY_LIVE");
+  verification.blockers = (verification.blockers ?? []).filter((issue: any) => issue.code !== "TARGET_ALREADY_LIVE");
   const activity = await targetLiveActivity(targetId);
   if (requireUnusedTarget && activity.total > 0) {
     verification.blockers.push({
@@ -317,7 +317,7 @@ async function normalizedVerification(sourceId: number, targetId: number, requir
   return verification;
 }
 
-async function loadCutover(cutoverId: number): Promise<unknown | null> {
+async function loadCutover(cutoverId: number): Promise<any | null> {
   const result = await db.execute(sql`SELECT * FROM sp_migration_cutovers WHERE id = ${cutoverId} LIMIT 1`);
   return firstRow(result) ?? null;
 }

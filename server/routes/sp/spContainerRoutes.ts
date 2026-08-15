@@ -130,7 +130,7 @@ export function registerSpContainerRoutes(app: Express) {
         // Insert lines
         if (lines && lines.length > 0) {
           await tx.insert(spContainerLines).values(
-            lines.map((l: unknown) => ({
+            lines.map((l: any) => ({
               containerId: container.id,
               companyId,
               articleCode: l.articleCode,

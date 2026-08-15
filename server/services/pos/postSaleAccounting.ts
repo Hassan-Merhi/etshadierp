@@ -59,7 +59,7 @@ export async function getOrCreateSalesRevenueAccount(
 export async function fetchSupplierPartnerAccountingContext(
   isSpCompany: boolean,
   companyId: number,
-  location: unknown,
+  location: any,
   inventoryValidation: ValidatedInventoryItem[]
 ): Promise<SupplierPartnerAccountingContext | { error: HandlerErrorResult }> {
   // Per-qty deduction that silently reduces Supplier Cash Payable (not income/expense)
@@ -204,7 +204,7 @@ function normalizePosEntry(
 
 /** Insert the Dr (payment) + Cr (Sales revenue, or SP-split) voucher entries for a POS sale. */
 export async function insertSaleAccountingEntries(
-  tx: unknown,
+  tx: any,
   params: {
     txVoucherId: number;
     voucherNumber: string;
@@ -266,7 +266,7 @@ export async function insertSaleAccountingEntries(
 
   // Debit entry (cash / bank / receivable account)
   const normDR = normalizePosEntry(toTxAmt(Math.abs(grandTotal)), 0, currency || "USD", exchangeRate);
-  const debitEntry: unknown = {
+  const debitEntry: any = {
     voucherId: txVoucherId,
     debitAmount: grandTotal >= 0 ? normDR.debitAmount : "0",
     creditAmount: grandTotal < 0 ? normDR.debitAmount : "0", // reversals have opposite sign

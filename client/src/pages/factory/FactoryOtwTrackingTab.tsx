@@ -50,7 +50,7 @@ import { TrackNowProgressLog } from "./factoryotwtrackingtab/components/TrackNow
 export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = {}) {
   const { toast } = useToast();
   const tqClient = useTQClient();
-  const { data: currentUser } = useQuery<unknown>({ queryKey: ["/api/auth/me"] });
+  const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const jsonCargoEta = useFactoryJsonCargoEta();
   const [trackingNowId, setTrackingNowId] = useState<number | null>(null);
   const [timelineId, setTimelineId] = useState<number | null>(null);
@@ -107,13 +107,13 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     return sa.localeCompare(sb);
   });
   // Summary stats
-  const _pending = otwContainers.filter((c) => c.status === "PENDING").length;
+  const pending = otwContainers.filter((c) => c.status === "PENDING").length;
   const inTransit = otwContainers.filter((c) => c.status === "IN_TRANSIT").length;
   const arrived = otwContainers.filter((c) => c.status === "ARRIVED").length;
   const delayed = otwContainers.filter((c) => calcDelayDays(c) > 0).length;
-  const _withErrors = otwContainers.filter((c) => !!c.trackingError).length;
+  const withErrors = otwContainers.filter((c) => !!c.trackingError).length;
   const today = new Date().toDateString();
-  const _checkedToday = otwContainers.filter((c) => {
+  const checkedToday = otwContainers.filter((c) => {
     const fc = c;
     return fc.trackingLastCheckedAt && new Date(fc.trackingLastCheckedAt).toDateString() === today;
   }).length;
@@ -171,7 +171,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
   const totalWeight = filtered.reduce((sum, c) => sum + num(c.totalKg), 0);
   const timelineContainer = otwContainers.find((c) => c.id === timelineId) ?? null;
   const trackingEnabledCount = otwContainers.filter((c) => c.trackingEnabled !== false).length;
-  const _hasActiveFilters =
+  const hasActiveFilters =
     search ||
     supplierFilter !== "all" ||
     freightFilter !== "all" ||

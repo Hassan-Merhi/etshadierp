@@ -67,7 +67,7 @@ export function registerRentalStatementExportRoutes(app: Express, ctx: RentalRou
       );
 
       const monthNames = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-      const fmtNum = (v: unknown) => Number(v || 0);
+      const fmtNum = (v: any) => Number(v || 0);
 
       const ExcelJS = (await import("exceljs")).default;
       const wb = new ExcelJS.Workbook();

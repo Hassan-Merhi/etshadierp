@@ -62,7 +62,7 @@ export function usePosWhatsApp({
       }
     };
     doSend();
-  }, [pendingAutoSend, setInvoiceWaStatus, setPendingAutoSend, setSendingInvoiceWhatsApp, toast]);
+  }, [pendingAutoSend]);
 
   // Deferred WhatsApp stock auto-send after sale saved
   useEffect(() => {
@@ -89,7 +89,7 @@ export function usePosWhatsApp({
       }
     };
     doSend();
-  }, [activeLocation.id, pendingStockSend, setPendingStockSend, setStockWaStatus, toast]);
+  }, [pendingStockSend]);
 
   // ISSUE 4: Real invoice WhatsApp send
   const handleSendInvoiceWhatsApp = async () => {

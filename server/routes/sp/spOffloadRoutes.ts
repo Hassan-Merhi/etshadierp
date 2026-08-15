@@ -116,7 +116,7 @@ export function registerSpOffloadRoutes(app: Express) {
 
       // Landed charges
       const charges: unknown[] = chargeLines || [];
-      const totalLandedCost = charges.reduce((s: number, c: unknown) => s + parseNum(c.amountUsd), 0);
+      const totalLandedCost = charges.reduce((s: number, c: any) => s + parseNum(c.amountUsd), 0);
       const landedPerUnit = totalQty > 0 ? totalLandedCost / totalQty : 0;
       const totalFinalCost = totalBaseCost + totalLandedCost;
       const invoiceTotal = parseNum(container.invoiceTotalUsd);
@@ -375,7 +375,7 @@ export function registerSpOffloadRoutes(app: Express) {
             );
           }
 
-          const totalAgentAmt = agentCharges.reduce((s: number, c: unknown) => s + parseNum(c.amountUsd), 0);
+          const totalAgentAmt = agentCharges.reduce((s: number, c: any) => s + parseNum(c.amountUsd), 0);
 
           // Create Voucher C in HADI L'SHI (company_id=1)
           const [voucherC] = await tx

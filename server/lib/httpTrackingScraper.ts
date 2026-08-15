@@ -104,7 +104,7 @@ async function tryMsc(containerNumber: string): Promise<HttpScraperResult> {
       signal: ctrl.signal,
     });
     if (!resp.ok) return { success: false, shipment: null, error: `MSC HTTP ${resp.status}` };
-    const data: unknown = await resp.json();
+    const data: any = await resp.json();
     const activities: unknown[] = data?.TrackingDetails?.TrackingActivities ?? data?.trackingActivities ?? [];
     if (!activities.length) return { success: false, shipment: null, error: "MSC: no activities" };
     const events = activities.map((a) => ({
@@ -153,7 +153,7 @@ async function tryHapag(containerNumber: string): Promise<HttpScraperResult> {
       }
     );
     if (!resp.ok) return { success: false, shipment: null, error: `Hapag HTTP ${resp.status}` };
-    const data: unknown = await resp.json();
+    const data: any = await resp.json();
     const moves: unknown[] = data?.containerJourneys?.[0]?.containerMoves ?? data?.moves ?? [];
     if (!moves.length) return { success: false, shipment: null, error: "Hapag: no moves" };
     const events = moves.map((m) => ({
@@ -183,7 +183,7 @@ async function tryCosco(containerNumber: string): Promise<HttpScraperResult> {
       }
     );
     if (!resp.ok) return { success: false, shipment: null, error: `COSCO HTTP ${resp.status}` };
-    const data: unknown = await resp.json();
+    const data: any = await resp.json();
     const detail = data?.data?.content?.[0];
     if (!detail) return { success: false, shipment: null, error: "COSCO: no data" };
     const moves: unknown[] = detail.movementActivities ?? detail.activities ?? [];
@@ -214,7 +214,7 @@ async function tryEvergreen(containerNumber: string): Promise<HttpScraperResult>
       }
     );
     if (!resp.ok) return { success: false, shipment: null, error: `Evergreen HTTP ${resp.status}` };
-    const data: unknown = await resp.json();
+    const data: any = await resp.json();
     const moves: unknown[] = data?.EventList ?? data?.events ?? [];
     if (!moves.length) return { success: false, shipment: null, error: "Evergreen: no events" };
     const events = moves.map((m) => ({
@@ -233,7 +233,7 @@ async function tryEvergreen(containerNumber: string): Promise<HttpScraperResult>
 
 // ── Maersk HTML page (Next.js embedded data) ──────────────────────────────────
 
-async function _tryMaerskHtml(containerNumber: string): Promise<HttpScraperResult> {
+async function tryMaerskHtml(containerNumber: string): Promise<HttpScraperResult> {
   try {
     const ctrl = abort(15_000);
     const resp = await fetch(`https://www.maersk.com/tracking/${encodeURIComponent(containerNumber)}`, {
@@ -316,7 +316,7 @@ async function _tryMaerskHtml(containerNumber: string): Promise<HttpScraperResul
 
 // ── ParcelsApp page HTML fallback (for unknown carriers) ──────────────────────
 
-async function _tryPageHtml(containerNumber: string): Promise<HttpScraperResult> {
+async function tryPageHtml(containerNumber: string): Promise<HttpScraperResult> {
   try {
     const ctrl = abort(TIMEOUT_MS);
     const resp = await fetch(`https://parcelsapp.com/en/tracking/${encodeURIComponent(containerNumber)}`, {
@@ -355,7 +355,7 @@ async function _tryPageHtml(containerNumber: string): Promise<HttpScraperResult>
   }
 }
 
-function extractFromNuxt(payload: unknown, containerNumber: string): ParcelsAppShipment | null {
+function extractFromNuxt(payload: any, containerNumber: string): ParcelsAppShipment | null {
   if (!payload || typeof payload !== "object") return null;
   const candidates: unknown[] =
     payload?.shipments ?? payload?.parcels ?? payload?.data?.shipments ?? payload?.data?.parcels ?? [];

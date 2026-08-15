@@ -127,7 +127,7 @@ export default function LocationVouchers({ posUser }: { posUser?: unknown } = {}
 
   const isLoading = showAllMonths ? rangeLoading : monthLoading;
   const data = showAllMonths ? rangeData : monthData;
-  const _totals = data?.totals;
+  const totals = data?.totals;
 
   const formatNumber = (num: number | null | undefined, decimals = 2) => {
     if (num == null || isNaN(num) || num === 0) return "";
@@ -256,7 +256,7 @@ export default function LocationVouchers({ posUser }: { posUser?: unknown } = {}
   useEffect(() => {
     window.addEventListener("keydown", handleTableKeyDown, { capture: true });
     return () => window.removeEventListener("keydown", handleTableKeyDown, { capture: true });
-  }, [selectedRowIndex, data, handleTableKeyDown]);
+  }, [selectedRowIndex, data]);
 
   useEffect(() => {
     if (selectedRowIndex < 0 || !tableScrollContainer.current) return;
@@ -278,7 +278,7 @@ export default function LocationVouchers({ posUser }: { posUser?: unknown } = {}
         }),
     });
     return () => clearCursorNav();
-  }, [selectedRowIndex, navigableRows, registerCursorNav, clearCursorNav]);
+  }, [selectedRowIndex, navigableRows]);
 
   const getVchTypeBadge = (vchType: string) => {
     const t = (vchType || "").toLowerCase();

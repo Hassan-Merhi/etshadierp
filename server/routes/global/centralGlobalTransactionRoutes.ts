@@ -22,7 +22,7 @@ function emptyResult(page: number) {
   return { vouchers: [], total: 0, page, totalPages: 0, summary: [], companies: [] };
 }
 
-export function registerCentralGlobalTransactionRoutes(app: Express, requireAuth: unknown) {
+export function registerCentralGlobalTransactionRoutes(app: Express, requireAuth: any) {
   app.get("/api/global/transactions", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const userId = req.session.userId!;

@@ -69,7 +69,7 @@ export async function buildLinkedSupplierGroups(
       // Only include freight in this currency's value when it shares the container's currency
       const value = kg * rate + (freightSameCcy ? freight : 0);
       const cComms = commissions.filter((cm) => cm.containerId === c.id);
-      const totalComm = cComms.reduce((s: number, cm: unknown) => s + parseFloat(cm.commissionTotal || "0"), 0);
+      const totalComm = cComms.reduce((s: number, cm: any) => s + parseFloat(cm.commissionTotal || "0"), 0);
       const commCc = c.commissionCurrencyCode || "USD";
       if (!linkedByCurrency[cc]) linkedByCurrency[cc] = { containers: [], totalValue: 0, totalCommission: 0 };
       linkedByCurrency[cc].containers.push({

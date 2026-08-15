@@ -85,10 +85,10 @@ export function registerSupplierStatementRoutes(app: Express) {
         )
         .orderBy(desc(factoryContainers.createdAt));
       const brokerContainers = (brokerContainerRows as unknown[]).filter(
-        (c: unknown) => parseFloat(c.commissionAmount || "0") > 0
+        (c: any) => parseFloat(c.commissionAmount || "0") > 0
       );
       const totalBrokerCommission = brokerContainers.reduce(
-        (sum: number, c: unknown) => sum + parseFloat(c.commissionAmount || "0"),
+        (sum: number, c: any) => sum + parseFloat(c.commissionAmount || "0"),
         0
       );
 
@@ -183,7 +183,7 @@ export function registerSupplierStatementRoutes(app: Express) {
         const value = kg * rate + (freightCc === containerCc ? freight : 0);
         const containerCommissions = commissions.filter((cm) => cm.containerId === c.id);
         const totalCommission = containerCommissions.reduce(
-          (sum: number, cm: unknown) => sum + parseFloat(cm.commissionTotal || "0"),
+          (sum: number, cm: any) => sum + parseFloat(cm.commissionTotal || "0"),
           0
         );
 
@@ -219,14 +219,14 @@ export function registerSupplierStatementRoutes(app: Express) {
         };
       });
 
-      const totalValue = statement.reduce((sum: number, s: unknown) => sum + parseFloat(s.value), 0);
+      const totalValue = statement.reduce((sum: number, s: any) => sum + parseFloat(s.value), 0);
       const totalKg = statement.reduce(
-        (sum: number, s: unknown) => sum + parseFloat(s.actualReceivedKg || s.totalKg || "0"),
+        (sum: number, s: any) => sum + parseFloat(s.actualReceivedKg || s.totalKg || "0"),
         0
       );
-      const totalCommissions = statement.reduce((sum: number, s: unknown) => sum + parseFloat(s.totalCommission), 0);
+      const totalCommissions = statement.reduce((sum: number, s: any) => sum + parseFloat(s.totalCommission), 0);
       const totalDirectCommissions = statement.reduce(
-        (sum: number, s: unknown) => sum + parseFloat(s.commissionAmount || "0"),
+        (sum: number, s: any) => sum + parseFloat(s.commissionAmount || "0"),
         0
       );
 
@@ -267,7 +267,7 @@ export function registerSupplierStatementRoutes(app: Express) {
         .orderBy(desc(vouchers.voucherDate));
 
       // Convert voucher payments to USD for total calculation (exclude optional payments)
-      const voucherPaymentsTotal = (voucherPaymentRows as unknown[]).reduce((sum: number, p: unknown) => {
+      const voucherPaymentsTotal = (voucherPaymentRows as unknown[]).reduce((sum: number, p: any) => {
         if (p.optional) return sum; // optional payments don't affect the balance
         const amt = parseFloat(p.debitAmount || "0");
         const currency = p.currency || "USD";
@@ -279,7 +279,7 @@ export function registerSupplierStatementRoutes(app: Express) {
       }, 0);
 
       const totalPayments =
-        payments.reduce((sum: number, p: unknown) => sum + parseFloat(p.amountUsd || "0"), 0) + voucherPaymentsTotal;
+        payments.reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0) + voucherPaymentsTotal;
 
       // Group by currency for multi-currency statement
       const byCurrency: Record<
@@ -583,7 +583,7 @@ export function registerSupplierStatementRoutes(app: Express) {
       // Compute the combined USD-equivalent net payable across all currency groups.
       // Correctly accounts for FX transfers (already deducted in paidByCurrency) and
       // converts non-USD remaining balances to USD using the containers' fxRateToUsd.
-      const totalNetPayableUsd = currencyGroups.reduce((sum: number, cg: unknown) => {
+      const totalNetPayableUsd = currencyGroups.reduce((sum: number, cg: any) => {
         const netPay = parseFloat(cg.netPayable);
         if (netPay <= 0) return sum;
         if (cg.currencyCode === "USD") return sum + netPay;
@@ -594,10 +594,10 @@ export function registerSupplierStatementRoutes(app: Express) {
           const { looksSet } = resolveStoredFxRate(cg.currencyCode, c.fxRateToUsd, c.fxRateConfirmed);
           return looksSet;
         });
-        const totalRawVal = resolvedCtrs.reduce((s: number, c: unknown) => s + parseFloat(c.value || "0"), 0);
+        const totalRawVal = resolvedCtrs.reduce((s: number, c: any) => s + parseFloat(c.value || "0"), 0);
         if (totalRawVal <= 0) return sum; // no resolved-rate containers → exclude rather than guess
         const weightedRate =
-          resolvedCtrs.reduce((s: number, c: unknown) => {
+          resolvedCtrs.reduce((s: number, c: any) => {
             const { fxRate } = resolveStoredFxRate(cg.currencyCode, c.fxRateToUsd, c.fxRateConfirmed);
             return s + parseFloat(c.value || "0") * fxRate;
           }, 0) / totalRawVal;
@@ -660,7 +660,7 @@ export function registerSupplierStatementRoutes(app: Express) {
           })(),
           amountUsd: r.commissionAmountUsd || r.commissionAmount,
         }));
-      const totalObCommissions = obCommissions.reduce((sum: number, c: unknown) => sum + parseFloat(c.amountUsd || "0"), 0);
+      const totalObCommissions = obCommissions.reduce((sum: number, c: any) => sum + parseFloat(c.amountUsd || "0"), 0);
 
       // Phase 2: Broker statement - per-linked-supplier rollups, built in
       // ./linkedSupplierGroups.

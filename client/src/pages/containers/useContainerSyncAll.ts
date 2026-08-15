@@ -9,7 +9,7 @@ export function useContainerSyncAll() {
 
   const syncAllMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/containers/sync-all-vouchers", {}),
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/containers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/containers/active"] });
       queryClient.invalidateQueries({ queryKey: ["/api/containers/sold"] });
@@ -39,7 +39,7 @@ export function useContainerSyncAll() {
         });
       }
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Sync Failed",

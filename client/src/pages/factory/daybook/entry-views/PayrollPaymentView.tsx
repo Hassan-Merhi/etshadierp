@@ -28,7 +28,7 @@ export function PayrollPaymentView({
   const grossEarnings = p
     ? n(p.baseSalary) + n(p.baleEarnings) + n(p.kgEarnings) + n(p.overtimePay) + n(p.bonuses) + n(p.transport)
     : 0;
-  const _totalDeductions = p ? n(p.deductions) + n(p.advances) : 0;
+  const totalDeductions = p ? n(p.deductions) + n(p.advances) : 0;
   const netPay = p ? n(p.netSalary) : 0;
 
   const periodLabel = p ? `${p.periodStart} – ${p.periodEnd}` : "—";

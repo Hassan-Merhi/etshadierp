@@ -81,7 +81,7 @@ function summarizeChanges(changes: unknown): string | null {
   return `${labels.join(", ")}${fields.length > labels.length ? ` and ${fields.length - labels.length} more` : ""}`;
 }
 
-function formatAuditRow(row: unknown) {
+function formatAuditRow(row: any) {
   const { storedUsername, resolvedUsername, displayName, companyName, companyCode, ...rest } = row;
   const actionLower = String(rest.action || "").toLowerCase();
   return {

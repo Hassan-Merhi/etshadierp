@@ -311,8 +311,8 @@ export function registerBalesReportRoutes(app: Express) {
       `);
 
       const groups: unknown[] = rows.rows;
-      const totalBales = groups.reduce((s: number, g: unknown) => s + (g.baleCount || 0), 0);
-      const totalWeight = groups.reduce((s: number, g: unknown) => s + parseFloat(g.totalWeight || "0"), 0);
+      const totalBales = groups.reduce((s: number, g: any) => s + (g.baleCount || 0), 0);
+      const totalWeight = groups.reduce((s: number, g: any) => s + parseFloat(g.totalWeight || "0"), 0);
 
       const PDFDocument = (await import("pdfkit")).default;
       const doc = new PDFDocument({ margin: 40, size: "A4" });
@@ -323,10 +323,10 @@ export function registerBalesReportRoutes(app: Express) {
       );
       doc.pipe(res);
 
-      const fmtN = (v: unknown, dec = 3) =>
+      const fmtN = (v: any, dec = 3) =>
         parseFloat(v || "0").toLocaleString("en-US", { minimumFractionDigits: dec, maximumFractionDigits: dec });
       const NAVY = "#1F3864";
-      const _LIGHT_BLUE = "#EFF3FB";
+      const LIGHT_BLUE = "#EFF3FB";
       const STRIPE = "#F8F8F8";
       const GROUP_BG = "#E8ECF4";
       const pageW = 515; // usable width with 40px margin each side
@@ -386,7 +386,7 @@ export function registerBalesReportRoutes(app: Express) {
       doc.fillColor("#000000");
       let y = tableTop + 16;
 
-      const _rowIdx = 0;
+      let rowIdx = 0;
       for (const g of groups) {
         // page break check — need room for group row + at least one bale row
         if (y > 780) {
@@ -439,7 +439,7 @@ export function registerBalesReportRoutes(app: Express) {
           y += 12;
         }
 
-        _rowIdx++;
+        rowIdx++;
       }
 
       // ── Totals footer ─────────────────────────────────────────────────────

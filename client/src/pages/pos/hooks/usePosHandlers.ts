@@ -28,7 +28,7 @@ interface PosHandlersParams {
   setCurrentDraftId: React.Dispatch<React.SetStateAction<number | null>>;
   setShowDraftDialog: React.Dispatch<React.SetStateAction<boolean>>;
   setShowPrintDialog: React.Dispatch<React.SetStateAction<boolean>>;
-  setSavedSale: (sale: unknown) => void;
+  setSavedSale: (sale: any) => void;
   setSaleJustCompleted: React.Dispatch<React.SetStateAction<boolean>>;
   setLastAutosaved: React.Dispatch<React.SetStateAction<Date | null>>;
   setMobileTab: React.Dispatch<React.SetStateAction<"items" | "cart">>;

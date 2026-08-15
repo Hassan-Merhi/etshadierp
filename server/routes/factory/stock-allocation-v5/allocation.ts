@@ -53,7 +53,7 @@ export function registerV5StockAllocationRoutes(app: Express) {
       );
       const excludedCodes = new Set<string>(
         resultRows(excludedCodesRaw)
-          .map((r: unknown) => r.articleCode)
+          .map((r: any) => r.articleCode)
           .filter(Boolean)
       );
 
@@ -65,7 +65,7 @@ export function registerV5StockAllocationRoutes(app: Express) {
             GROUP BY article_code`
       );
       const inStockMap = new Map<string, number>(
-        resultRows(inStockRaw).map((r: unknown) => [r.articleCode, Number(r.count)])
+        resultRows(inStockRaw).map((r: any) => [r.articleCode, Number(r.count)])
       );
 
       // 2. totalLoaded — bales physically scanned into LOADING orders ONLY.
@@ -83,7 +83,7 @@ export function registerV5StockAllocationRoutes(app: Express) {
             GROUP BY fb.article_code`
       );
       const inLoadingMap = new Map<string, number>(
-        resultRows(inLoadingRaw).map((r: unknown) => [r.articleCode, Number(r.count)])
+        resultRows(inLoadingRaw).map((r: any) => [r.articleCode, Number(r.count)])
       );
 
       // 3. Active proformas + lines (with optional date range filter on createdAt)
@@ -152,7 +152,7 @@ export function registerV5StockAllocationRoutes(app: Express) {
                 AND status = ANY(${sqlArray(ACTIVE_ORDER_STATUSES as unknown as string[])})
               ORDER BY id`
         );
-        ordersByProforma = resultRows(ordersRaw).map((r: unknown) => ({
+        ordersByProforma = resultRows(ordersRaw).map((r: any) => ({
           id: Number(r.id),
           proformaId: Number(r.proformaId),
           containerNumber: r.containerNumber ?? null,
@@ -173,7 +173,7 @@ export function registerV5StockAllocationRoutes(app: Express) {
               WHERE cob.order_id = ANY(${sqlArray(allOrderIds)})
               GROUP BY cob.order_id, fb.article_code`
         );
-        loadedBalesByOrder = resultRows(balesRaw).map((r: unknown) => ({
+        loadedBalesByOrder = resultRows(balesRaw).map((r: any) => ({
           orderId: Number(r.orderId),
           articleCode: r.articleCode,
           count: Number(r.count),
@@ -229,7 +229,7 @@ export function registerV5StockAllocationRoutes(app: Express) {
               FROM customer_order_expected_lines
               WHERE order_id = ANY(${sqlArray(allOrderIds)})`
         );
-        allExpectedLines = resultRows(expRaw).map((r: unknown) => ({
+        allExpectedLines = resultRows(expRaw).map((r: any) => ({
           orderId: Number(r.orderId),
           articleCode: r.articleCode,
           expectedQty: Number(r.expectedQty),
@@ -255,7 +255,7 @@ export function registerV5StockAllocationRoutes(app: Express) {
           .select({ id: customers.id, legalName: customers.legalName })
           .from(customers)
           .where(inArray(customers.id, customerIds));
-        rows.forEach((c: unknown) => customerMap.set(c.id, c.legalName));
+        rows.forEach((c: any) => customerMap.set(c.id, c.legalName));
       }
 
       // 7. ALL active factory_bale_products — so users can allocate to zero-stock items
@@ -272,7 +272,7 @@ export function registerV5StockAllocationRoutes(app: Express) {
       const allProductsMap = new Map<string, string>();
       const weightMap = new Map<string, number>();
       const categoryMap = new Map<string, string>();
-      resultRows(allProductsRaw).forEach((r: unknown) => {
+      resultRows(allProductsRaw).forEach((r: any) => {
         if (r.name && r.articleCode) {
           // Use only the canonical articleCode (COALESCE(article_code, code)) as the map key.
           // Adding the raw `code` separately would create phantom zero-stock rows for products
@@ -316,7 +316,7 @@ export function registerV5StockAllocationRoutes(app: Express) {
               WHERE matched_code IS NOT NULL
               ORDER BY matched_code`
         );
-        resultRows(prodRaw).forEach((r: unknown) => {
+        resultRows(prodRaw).forEach((r: any) => {
           if (r.name) productNamesMap[r.articleCode] = r.name;
         });
       }
@@ -342,7 +342,7 @@ export function registerV5StockAllocationRoutes(app: Express) {
                 AND product_name != ''
               ORDER BY article_code, created_at DESC`
         );
-        resultRows(baleNamesRaw).forEach((r: unknown) => {
+        resultRows(baleNamesRaw).forEach((r: any) => {
           if (r.articleCode && r.productName && !productNamesMap[r.articleCode]) {
             productNamesMap[r.articleCode] = r.productName;
           }

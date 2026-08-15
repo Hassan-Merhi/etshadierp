@@ -32,7 +32,7 @@ export interface RentalPaymentGroupOptions {
   contractCompanyId: number;
   module: RentalModule;
   contract: unknown;
-  unit: unknown | null;
+  unit: any | null;
   cashAccountId: number | null;
   amount: string;
   paymentDate: string;
@@ -64,12 +64,12 @@ function hashGroupId(groupId: string): bigint {
  * Returns the created voucherId (or null if no cashAccountId).
  */
 async function postGroupCore(
-  tx: unknown,
+  tx: any,
   opts: {
     companyId: number;
     module: RentalModule;
     contract: unknown;
-    unit: unknown | null;
+    unit: any | null;
     cashAccountId: number | null;
     allocs: Array<{
       forYear: number;
@@ -99,7 +99,7 @@ async function postGroupCore(
     allocs,
     totalAmountStr,
     paymentDate,
-    _asOfDate,
+    asOfDate,
     currency,
     exchangeRate,
     narration,
@@ -447,7 +447,7 @@ export async function createRentalPaymentGroup(
   } = opts;
 
   if (paymentDate > clientDate && !scheduleFuturePayment) {
-    const err: unknown = new Error("Future payment dates require Schedule future payment.");
+    const err: any = new Error("Future payment dates require Schedule future payment.");
     err.status = 400;
     throw err;
   }
@@ -640,8 +640,8 @@ async function postScheduledGroup(
   companyId: number,
   contractCompanyId: number,
   module: RentalModule,
-  contract: unknown,
-  unit: unknown | null,
+  contract: any,
+  unit: any | null,
   groupId: string,
   paymentDate: string,
   asOfDate: string,

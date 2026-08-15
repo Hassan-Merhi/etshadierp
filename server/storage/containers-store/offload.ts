@@ -88,7 +88,7 @@ export async function offloadContainer(
     for (const correction of inventoryCostCorrections) {
       const correctRate = toInventoryDecimal(correction.correctRate);
       if (!correctRate.isPositive() || !validCorrectionItemIds.has(correction.stockItemId)) continue;
-      const correctionRows = await (tx as unknown).execute(
+      const correctionRows = await (tx as any).execute(
         sql`SELECT * FROM inventory WHERE location_id = ${locationId} AND stock_item_id = ${correction.stockItemId} FOR UPDATE`
       );
       const correctionRow = correctionRows.rows?.[0] || correctionRows[0];
@@ -127,7 +127,7 @@ export async function offloadContainer(
 
       if (!newRate.isFinite()) throw new Error(`Calculated rate is infinite for stock item ${stockItemId}`);
 
-      const existingRows = await (tx as unknown).execute(
+      const existingRows = await (tx as any).execute(
         sql`SELECT * FROM inventory WHERE location_id = ${locationId} AND stock_item_id = ${stockItemId} FOR UPDATE`
       );
       const existing = existingRows.rows?.[0] || existingRows[0];

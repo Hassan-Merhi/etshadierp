@@ -59,8 +59,8 @@ export default function POSImport() {
   const { displayCurrency, exchangeRate, isLoadingCompany } = useCurrencyContext();
   const { selectedCompany } = useCompany();
   const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<unknown>(null);
-  const [validationResult, setValidationResult] = useState<unknown>(null);
+  const [preview, setPreview] = useState<any>(null);
+  const [validationResult, setValidationResult] = useState<any>(null);
   const [selectedLocation, setSelectedLocation] = useState<string>("");
   const [selectedCashAccount, setSelectedCashAccount] = useState<string>("");
   const [selectedCustomer, setSelectedCustomer] = useState<string>("");
@@ -69,8 +69,8 @@ export default function POSImport() {
   const [showWarningDialog, setShowWarningDialog] = useState(false);
   const [saleCurrency, setSaleCurrency] = useState<"USD" | "CFA">("USD");
   const [showPrintDialog, setShowPrintDialog] = useState(false);
-  const [importedSale, setImportedSale] = useState<unknown>(null);
-  const [_printTime, setPrintTime] = useState<string>("");
+  const [importedSale, setImportedSale] = useState<any>(null);
+  const [printTime, setPrintTime] = useState<string>("");
   const printRef = useRef<HTMLDivElement>(null);
   const errorsRef = useRef<HTMLDivElement>(null);
 
@@ -99,7 +99,7 @@ export default function POSImport() {
     enabled: isCreditSale,
   });
 
-  const { data: authUser } = useQuery<unknown>({
+  const { data: authUser } = useQuery<any>({
     queryKey: ["/api/auth/me"],
   });
   const printUserName = authUser?.fullName || authUser?.name || authUser?.username || authUser?.email || "Import";

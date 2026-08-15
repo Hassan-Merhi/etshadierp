@@ -60,7 +60,7 @@ import type { OrderDetail } from "./factoryinvoicedetail/types";
 export default function FactoryInvoiceDetail() {
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
-  const { _selectedCompany } = useCompany();
+  const { selectedCompany } = useCompany();
   const [, navigate] = useLocation();
   const [editingArticleCode, setEditingArticleCode] = useState<string | null>(null);
   const [editingChargeLedger, setEditingChargeLedger] = useState<number | null>(null);

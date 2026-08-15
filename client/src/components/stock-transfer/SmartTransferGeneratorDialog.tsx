@@ -397,7 +397,7 @@ export default function SmartTransferGeneratorDialog({
         description: `${result.achievedQuantity} of ${result.targetQuantity} bales suggested across ${result.lines.length} lines.`,
       });
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({ title: "Could not generate preview", description: error.message, variant: "destructive" });
     },

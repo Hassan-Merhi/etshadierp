@@ -51,7 +51,7 @@ export async function getSelectedAIProvider(): Promise<AIProvider> {
         return provider;
       }
     }
-  } catch (_error) {
+  } catch (error) {
     logger.info("[ChatService] Could not get AI provider setting, using default");
   }
   return "gemini"; // Default to Gemini

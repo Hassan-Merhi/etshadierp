@@ -31,7 +31,7 @@ export function StockAdjustmentDialog({
   const [adjType, setAdjType] = useState<"ADD" | "REMOVE" | "COST">("ADD");
   const [adjKg, setAdjKg] = useState("");
   const [adjCostPerKg, setAdjCostPerKg] = useState("");
-  const [adjCurrency, _setAdjCurrency] = useState("USD");
+  const [adjCurrency, setAdjCurrency] = useState("USD");
   const [adjNotes, setAdjNotes] = useState("");
   const [adjReference, setAdjReference] = useState("");
   const [adjDate, setAdjDate] = useState(() => new Date().toLocaleDateString("en-CA"));

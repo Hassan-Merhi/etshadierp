@@ -17,11 +17,11 @@ export function useFilteredTransferInventory(transferInventory: unknown[], trans
     const term = transferSearchTerm.trim().toLowerCase();
     const filtered = term
       ? transferInventory.filter(
-          (item: unknown) =>
+          (item: any) =>
             item.stockItemName?.toLowerCase().includes(term) || item.stockItemCode?.toLowerCase().includes(term)
         )
       : transferInventory.slice();
-    return filtered.sort((a: unknown, b: unknown) => (a.stockItemName || "").localeCompare(b.stockItemName || ""));
+    return filtered.sort((a: any, b: any) => (a.stockItemName || "").localeCompare(b.stockItemName || ""));
   }, [transferInventory, transferSearchTerm]);
 }
 

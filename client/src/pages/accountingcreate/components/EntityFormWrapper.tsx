@@ -39,7 +39,7 @@ function EntityFormWrapper({
 
   const form = useForm({
     resolver: zodResolver(config.schema),
-    defaultValues: defaultValues as unknown,
+    defaultValues: defaultValues as any,
   });
 
   const createMutation = useMutation({
@@ -76,7 +76,7 @@ function EntityFormWrapper({
         });
       }
 
-      form.reset(getDefaultValues(entityType) as unknown);
+      form.reset(getDefaultValues(entityType) as any);
       onCreated?.();
     },
     onError: (error: unknown) => {

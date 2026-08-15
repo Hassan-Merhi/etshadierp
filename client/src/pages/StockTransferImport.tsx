@@ -30,8 +30,8 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
   const isPOS = !!posUser;
 
   const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<unknown>(null);
-  const [validationResult, setValidationResult] = useState<unknown>(null);
+  const [preview, setPreview] = useState<any>(null);
+  const [validationResult, setValidationResult] = useState<any>(null);
   const [selectedSourceLocation, setSelectedSourceLocation] = useState<string>(
     isPOS && posUser?.assignedLocationId ? posUser.assignedLocationId.toString() : ""
   );

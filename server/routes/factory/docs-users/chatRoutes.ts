@@ -49,7 +49,7 @@ export function registerFactoryChatRoutes(app: Express) {
 
   app.post("/api/chat/typing", requireAuth, async (req: Request, res: Response) => {
     try {
-      const senderId = (req.session as unknown).userId;
+      const senderId = (req.session as any).userId;
       const { receiverId, isTyping } = req.body;
       if (!receiverId) return res.status(400).json({ message: "receiverId required" });
       if (isTyping) {
@@ -65,7 +65,7 @@ export function registerFactoryChatRoutes(app: Express) {
 
   app.get("/api/chat/typing/:userId", requireAuth, async (req: Request, res: Response) => {
     try {
-      const currentUserId = (req.session as unknown).userId;
+      const currentUserId = (req.session as any).userId;
       const otherUserId = req.params.userId;
       const record = typingStatus.get(otherUserId);
       const isTyping = !!record && record.receiverId === currentUserId && record.until > Date.now();
@@ -77,7 +77,7 @@ export function registerFactoryChatRoutes(app: Express) {
 
   app.get("/api/chat/users", requireAuth, async (req: Request, res: Response) => {
     try {
-      const currentUserId = (req.session as unknown).userId;
+      const currentUserId = (req.session as any).userId;
       const allUsers = await db
         .select({
           id: users.id,
@@ -94,7 +94,7 @@ export function registerFactoryChatRoutes(app: Express) {
       const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
 
       const usersWithUnread = await Promise.all(
-        filtered.map(async (u: unknown) => {
+        filtered.map(async (u: any) => {
           const [unreadResult] = await db
             .select({ count: sql<number>`count(*)::int` })
             .from(directMessages)
@@ -118,7 +118,7 @@ export function registerFactoryChatRoutes(app: Express) {
           // Find most recent presence record for this user
           const userPresenceRecords = presenceRecords.filter((p) => p.userId === u.id);
           const latestPresence = userPresenceRecords.sort(
-            (a: unknown, b: unknown) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime()
+            (a: any, b: any) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime()
           )[0];
           const isOnline = latestPresence ? new Date(latestPresence.lastSeen) > twoMinutesAgo : false;
           const lastSeen = latestPresence ? latestPresence.lastSeen : null;
@@ -141,7 +141,7 @@ export function registerFactoryChatRoutes(app: Express) {
 
   app.get("/api/chat/conversations/:userId", requireAuth, async (req: Request, res: Response) => {
     try {
-      const currentUserId = (req.session as unknown).userId;
+      const currentUserId = (req.session as any).userId;
       const otherUserId = req.params.userId;
 
       const messages = await db
@@ -163,7 +163,7 @@ export function registerFactoryChatRoutes(app: Express) {
 
   app.post("/api/chat/messages", requireAuth, async (req: Request, res: Response) => {
     try {
-      const currentUserId = (req.session as unknown).userId;
+      const currentUserId = (req.session as any).userId;
       const parsed = insertDirectMessageSchema.parse({
         ...req.body,
         senderId: currentUserId,
@@ -193,7 +193,7 @@ export function registerFactoryChatRoutes(app: Express) {
 
   app.post("/api/chat/mark-read/:userId", requireAuth, async (req: Request, res: Response) => {
     try {
-      const currentUserId = (req.session as unknown).userId;
+      const currentUserId = (req.session as any).userId;
       const senderId = req.params.userId;
 
       await db
@@ -215,7 +215,7 @@ export function registerFactoryChatRoutes(app: Express) {
 
   app.delete("/api/chat/messages/:userId", requireAuth, async (req: Request, res: Response) => {
     try {
-      const currentUserId = (req.session as unknown).userId;
+      const currentUserId = (req.session as any).userId;
       const otherUserId = req.params.userId;
 
       await db
@@ -235,7 +235,7 @@ export function registerFactoryChatRoutes(app: Express) {
 
   app.get("/api/chat/unread-count", requireAuth, async (req: Request, res: Response) => {
     try {
-      const currentUserId = (req.session as unknown).userId;
+      const currentUserId = (req.session as any).userId;
       const [result] = await db
         .select({ count: sql<number>`count(*)::int` })
         .from(directMessages)

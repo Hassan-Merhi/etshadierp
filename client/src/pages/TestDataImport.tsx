@@ -89,7 +89,7 @@ export default function TestDataImport() {
   });
 
   // Fetch all vouchers to find test data vouchers
-  const { data: allVouchers = [], refetch: _refetchVouchers } = useQuery<Voucher[]>({
+  const { data: allVouchers = [], refetch: refetchVouchers } = useQuery<Voucher[]>({
     queryKey: ["/api/vouchers"],
   });
 
@@ -237,7 +237,7 @@ export default function TestDataImport() {
     createMutation.mutate(data);
   };
 
-  const _getAccountName = (id: number | string) => {
+  const getAccountName = (id: number | string) => {
     const acc = accounts.find((a) => a.id === (typeof id === "string" ? parseInt(id) : id));
     return acc ? `${acc.name} (${acc.code})` : "Unknown";
   };

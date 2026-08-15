@@ -149,7 +149,7 @@ export function registerFactoryProductHistoryRoutes(app: Express) {
         );
 
       const realInStockCount = Number(inStockSnapshot?.balesNet ?? 0);
-      const _realLoadingCount = Number(inStockSnapshot?.balesLoading ?? 0);
+      const realLoadingCount = Number(inStockSnapshot?.balesLoading ?? 0);
       const realInStockWeightKg = Number(inStockSnapshot?.totalWeightNet ?? 0);
 
       const monthlyData = rows.map((r) => {
@@ -180,7 +180,7 @@ export function registerFactoryProductHistoryRoutes(app: Express) {
 
       // Sum per-month movements for the grand total row (except Net/KG-Net/Value which use snapshot)
       const grandTotalMovements = monthlyData.reduce(
-        (acc: unknown, m: unknown) => ({
+        (acc: unknown, m: any) => ({
           baleCount: acc.baleCount + m.balesIn,
           balesIn: acc.balesIn + m.balesIn,
           balesOut: acc.balesOut + m.balesOut,

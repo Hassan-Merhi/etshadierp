@@ -47,7 +47,7 @@ export function registerGitAgentRoutes(app: Express) {
     try {
       const companyId = parseInt(req.params.companyId, 10);
       const rows = await db.execute(sql`SELECT agent_name, note FROM git_agent_notes WHERE company_id = ${companyId}`);
-      res.json({ notes: rows.rows.map((r: unknown) => ({ agentName: r.agent_name, note: r.note ?? "" })) });
+      res.json({ notes: rows.rows.map((r: any) => ({ agentName: r.agent_name, note: r.note ?? "" })) });
     } catch (err: unknown) {
       res.status(500).json({ message: getErrorMessage(err) });
     }
@@ -92,7 +92,7 @@ export function registerGitAgentRoutes(app: Express) {
             ORDER BY created_at ASC`
       );
       res.json(
-        result.rows.map((r: unknown) => ({
+        result.rows.map((r: any) => ({
           id: r.id,
           description: r.description,
           amount: parseFloat(r.amount),

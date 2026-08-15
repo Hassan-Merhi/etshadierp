@@ -92,7 +92,7 @@ export default function SalesReport() {
   const [isMultiCompanyMode, setIsMultiCompanyMode] = useState(false);
   const [selectedCompanies, setSelectedCompanies] = useState<string[]>([]);
   const [selectedRowDate, setSelectedRowDate] = useState<string | null>(null);
-  const { _toast } = useToast();
+  const { toast } = useToast();
   const { formatDisplayDate } = useDateFormat();
   const { formatAmount } = useCurrencyContext();
 

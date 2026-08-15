@@ -56,8 +56,8 @@ function sessionCompanyResolver(sessionMiddleware: RequestHandler): SessionResol
       try {
         // The upgrade request carries the session cookie, and express-session
         // reads it from the same store the HTTP routes use.
-        sessionMiddleware(request as unknown, upgradeResponseStub() as unknown, () => {
-          const session = (request as unknown).session;
+        sessionMiddleware(request as any, upgradeResponseStub() as any, () => {
+          const session = (request as any).session;
           const companyId = Number(session?.currentCompanyId);
           finish(Number.isInteger(companyId) && companyId > 0 ? companyId : null);
         });

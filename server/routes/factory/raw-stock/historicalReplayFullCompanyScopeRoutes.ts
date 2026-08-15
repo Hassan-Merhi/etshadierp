@@ -91,7 +91,7 @@ export function registerHistoricalReplayFullCompanyScopeRoutes(app: Express): vo
         }
 
         const originalJson = res.json.bind(res);
-        res.json = (payload: unknown) => {
+        res.json = (payload: any) => {
           if (!payload?.dryRun) return originalJson(payload);
           return originalJson({
             ...payload,

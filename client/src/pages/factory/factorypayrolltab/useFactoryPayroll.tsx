@@ -171,7 +171,7 @@ export default function useFactoryPayroll() {
 
   const previewMutation = useMutation({
     mutationFn: async () => {
-      const body: unknown = {
+      const body: any = {
         periodStart: runForm.periodStart,
         periodEnd: runForm.periodEnd,
         bonusPerWorker: runForm.bonusPerWorker,
@@ -214,7 +214,7 @@ export default function useFactoryPayroll() {
       for (const [wid, amt] of Object.entries(transportOverrides)) {
         numericTransportOverrides[wid] = parseFloat(amt) || 0;
       }
-      const body: unknown = {
+      const body: any = {
         periodStart: runForm.periodStart,
         periodEnd: runForm.periodEnd,
         bonusPerWorker: runForm.bonusPerWorker,

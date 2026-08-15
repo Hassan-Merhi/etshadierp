@@ -33,7 +33,7 @@ export async function getAllDraftPosSales(userId: string, locationId?: number): 
   return rows;
 }
 
-export async function getDraftPosSaleById(id: number): Promise<unknown | undefined> {
+export async function getDraftPosSaleById(id: number): Promise<any | undefined> {
   const [draft] = await db.select().from(schema.draftPosSales).where(eq(schema.draftPosSales.id, id));
   if (!draft) return undefined;
 

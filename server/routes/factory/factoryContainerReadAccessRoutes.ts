@@ -59,7 +59,7 @@ export function registerFactoryContainerReadAccessRoutes(app: Express) {
         .where(and(eq(containerDocuments.containerId, containerId), eq(containerDocuments.companyId, companyId)));
       const docTypes = await db.select().from(containerDocumentTypes).orderBy(containerDocumentTypes.label);
       const requiredTypes = docTypes.filter(
-        (docType: unknown) => docType.isRequired && (docType.companyId == null || docType.companyId === companyId)
+        (docType: any) => docType.isRequired && (docType.companyId == null || docType.companyId === companyId)
       );
       const uploadedTypeIds = new Set(rawDocs.map((doc) => doc.docTypeId));
 
@@ -121,7 +121,7 @@ export function registerFactoryContainerReadAccessRoutes(app: Express) {
       return res.json(
         freightRows.map((freight) => {
           const freightPayments = paymentsByFreight.get(freight.id) ?? [];
-          const totalPaid = freightPayments.reduce((sum: number, payment: unknown) => sum + Number(payment.amount), 0);
+          const totalPaid = freightPayments.reduce((sum: number, payment: any) => sum + Number(payment.amount), 0);
           const freightAmount = Number(freight.freightAmount);
           const computedStatus = totalPaid >= freightAmount ? "PAID" : totalPaid > 0 ? "PARTIAL" : "UNPAID";
           return { ...freight, payments: freightPayments, totalPaid, computedStatus };

@@ -75,7 +75,7 @@ export default function BatchDetail({ batchId, onBack, onDeleted }: BatchDetailP
     queryKey: ["/api/factory/suppliers"],
   });
 
-  const _supplierMap = Object.fromEntries((suppliers || []).map((s) => [s.id, s.name]));
+  const supplierMap = Object.fromEntries((suppliers || []).map((s) => [s.id, s.name]));
 
   const editMutation = useMutation({
     mutationFn: async () => {

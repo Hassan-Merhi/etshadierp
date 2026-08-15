@@ -356,7 +356,7 @@ export function registerContainerOffloadCreateRoutes(app: Express) {
               .from(purchaseOrders)
               .where(eq(purchaseOrders.containerId, containerId));
 
-            const calculatePurchaseOrderTotal = (purchaseOrder: unknown) =>
+            const calculatePurchaseOrderTotal = (purchaseOrder: any) =>
               subtractInventoryValues(
                 addInventoryValues(
                   purchaseOrder.itemsTotal,

@@ -43,13 +43,13 @@ export function useAccountRenderers(deps: {
 }) {
   const {
     accountsLoading,
-    _appMode,
+    appMode,
     expandedAccounts,
-    _navigate,
+    navigate,
     goToStatement,
     toggleAccount,
-    _totalExpenses,
-    _totalIncome,
+    totalExpenses,
+    totalIncome,
   } = deps;
   const renderNetProfitAccountsList = (accts: NetProfitAccount[]) => {
     const nonZero = accts.filter((a) => Number(a.debit) !== 0 || Number(a.credit) !== 0);

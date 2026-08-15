@@ -40,7 +40,7 @@ export function ContainerSpView({
 }: ContainerSpViewProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [selectedContainer, setSelectedContainer] = useState<unknown | null>(null);
+  const [selectedContainer, setSelectedContainer] = useState<any | null>(null);
   const [reason, setReason] = useState("");
 
   const { data: currentUser } = useQuery<{ role?: string; currentRole?: string | null }>({

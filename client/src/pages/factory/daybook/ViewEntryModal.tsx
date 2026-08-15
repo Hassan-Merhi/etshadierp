@@ -62,22 +62,22 @@ export function ViewEntryModal({
     enabled: isVoucherBacked && !!entry.referenceId,
   });
 
-  const { data: containerDetail } = useQuery<unknown>({
+  const { data: containerDetail } = useQuery<any>({
     queryKey: [`/api/factory/containers/${entry.referenceId}`],
     enabled: isContainerImport,
   });
 
-  const { data: supplierBalance } = useQuery<unknown>({
+  const { data: supplierBalance } = useQuery<any>({
     queryKey: [`/api/factory/suppliers/${containerDetail?.supplierId}/balance`],
     enabled: isContainerImport && !!containerDetail?.supplierId,
   });
 
-  const { data: payrollSummary } = useQuery<unknown>({
+  const { data: payrollSummary } = useQuery<any>({
     queryKey: [`/api/factory/payroll/${entry.referenceId}/summary`],
     enabled: isPayrollPayment,
   });
 
-  const { data: mixBatchDetail } = useQuery<unknown>({
+  const { data: mixBatchDetail } = useQuery<any>({
     queryKey: [`/api/factory/mix-batches/${entry.referenceId}`],
     enabled: isMixBatchCreated,
   });
@@ -87,17 +87,17 @@ export function ViewEntryModal({
     enabled: isMixBatchCreated,
   });
 
-  const { data: loadingOrder } = useQuery<unknown>({
+  const { data: loadingOrder } = useQuery<any>({
     queryKey: [`/api/factory/customer-orders/${entry.referenceId}`],
     enabled: isLoadingCreated,
   });
 
-  const { data: metaContainerDetail } = useQuery<unknown>({
+  const { data: metaContainerDetail } = useQuery<any>({
     queryKey: [`/api/factory/containers/${metaContainerId}`],
     enabled: (isOffloadRawStock || isCommission) && !!metaContainerId,
   });
 
-  const { data: otherChargeContainerDetail } = useQuery<unknown>({
+  const { data: otherChargeContainerDetail } = useQuery<any>({
     queryKey: [`/api/factory/containers/${entry.referenceId}`],
     enabled: isOtherCharge && !!entry.referenceId,
   });

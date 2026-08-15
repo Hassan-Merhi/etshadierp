@@ -43,7 +43,7 @@ export function registerDispatchInvoiceRoutes(app: Express) {
       const [customer] = await db.select().from(customers).where(eq(customers.id, batch.customerId));
 
       // Proforma info
-      let proforma: unknown = null;
+      let proforma: any = null;
       let proformaLines: unknown[] = [];
       if (batch.proformaId) {
         const rows = await db.select().from(customerProformas).where(eq(customerProformas.id, batch.proformaId));
@@ -180,7 +180,7 @@ export function registerDispatchInvoiceRoutes(app: Express) {
 
       const { invoiceDate } = req.body;
 
-      const result = await db.transaction(async (tx: unknown) => {
+      const result = await db.transaction(async (tx: any) => {
         // 1. Lock and validate batch
         const batchRows = await tx.execute(sql`
           SELECT * FROM customer_dispatch_batches
@@ -192,7 +192,7 @@ export function registerDispatchInvoiceRoutes(app: Express) {
         if (batch.status === "CANCELLED") throw new Error("Batch is cancelled");
 
         // 2. Check proforma status
-        let proforma: unknown = null;
+        let proforma: any = null;
         let proformaLines: unknown[] = [];
         if (batch.proforma_id) {
           const pfRows = await tx.execute(

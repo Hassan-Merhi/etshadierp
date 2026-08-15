@@ -44,7 +44,7 @@ export function useAuthenticatedAppData({ selectedCompanyId, userPresent, isPOS 
     prevUnreadRef.current = count;
   }, [chatUnread?.count, isPOS, toast]);
 
-  const { data: companySettings } = useQuery<unknown>({
+  const { data: companySettings } = useQuery<any>({
     queryKey: companyQueryKey("/api/company-settings", selectedCompanyId),
     ...stableSettingsQueryPolicy,
     enabled: userPresent && !!selectedCompanyId,

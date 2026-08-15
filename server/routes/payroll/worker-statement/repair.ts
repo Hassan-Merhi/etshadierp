@@ -26,7 +26,7 @@ export function registerOrphanedVoucherRepairRoutes(app: Express) {
   // since been undone or deleted, leaving stale ledger entries (wrong cash balance etc).
   app.post("/api/factory/repair-orphaned-vouchers", requireAuth, async (req: Request, res: Response) => {
     try {
-      const currentRole = (req.session as unknown).currentRole;
+      const currentRole = (req.session as any).currentRole;
       if (!["Admin", "Owner", "Developer"].includes(currentRole)) {
         return res.status(403).json({ message: "Only Admin, Owner, or Developer can run ledger repair" });
       }
@@ -36,7 +36,7 @@ export function registerOrphanedVoucherRepairRoutes(app: Express) {
       let deletedPayrollVouchers = 0;
       let deletedAdvanceVouchers = 0;
 
-      await db.transaction(async (tx: unknown) => {
+      await db.transaction(async (tx: any) => {
         // ── PAYMENT-PAY-{payrollId}-{ts} ────────────────────────────────────────
         // Should exist only when the referenced payroll is in PAID status.
         // If the payroll is DRAFT, APPROVED, or deleted → the voucher is orphaned.
@@ -102,7 +102,7 @@ export function registerOrphanedVoucherRepairRoutes(app: Express) {
         // ── REPAY-SAL-{repaymentId}-{ts} and RECEIPT-REPAY-{repaymentId}-{ts} ──
         // Orphaned when the repayment record was deleted (e.g. via Reverse Advance)
         // but the voucher was not removed. Clean them up now.
-        const _deletedRepayVouchers = 0;
+        let deletedRepayVouchers = 0;
         const repayVouchers = await tx
           .select({ id: vouchers.id, voucherNumber: vouchers.voucherNumber })
           .from(vouchers)
@@ -133,7 +133,7 @@ export function registerOrphanedVoucherRepairRoutes(app: Express) {
         if (orphanedRepayVoucherIds.length > 0) {
           await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, orphanedRepayVoucherIds));
           await tx.delete(vouchers).where(inArray(vouchers.id, orphanedRepayVoucherIds));
-          _deletedRepayVouchers = orphanedRepayVoucherIds.length;
+          deletedRepayVouchers = orphanedRepayVoucherIds.length;
         }
 
         // ── PAYROLL-GEN-{ts} ────────────────────────────────────────────────
@@ -172,11 +172,11 @@ export function registerOrphanedVoucherRepairRoutes(app: Express) {
           }
         }
 
-        const _deletedGenVouchers = 0;
+        let deletedGenVouchers = 0;
         if (orphanedGenVoucherIds.length > 0) {
           await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, orphanedGenVoucherIds));
           await tx.delete(vouchers).where(inArray(vouchers.id, orphanedGenVoucherIds));
-          _deletedGenVouchers = orphanedGenVoucherIds.length;
+          deletedGenVouchers = orphanedGenVoucherIds.length;
         }
       });
 

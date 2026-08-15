@@ -63,7 +63,7 @@ export default function FactoryStockAllocationV3() {
       if (!r.ok) throw new Error(data.message);
       return data;
     },
-    onSuccess: (_, _id) => {
+    onSuccess: (_, id) => {
       toast({ title: "Loading started" });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/v3/loads"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/v3/stock-overview"] });

@@ -59,10 +59,10 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       inputRef.current?.focus();
       inputRef.current?.select();
     }
-  }, [editingItem.stockItemId, editingItem.locationId, editingItem]);
+  }, [editingItem?.stockItemId, editingItem?.locationId]);
   const lastSavedRef = useRef<{ stockItemId: number; locationId: number } | null>(null);
   const skipBlurSaveRef = useRef(false);
-  const { data: currentUser } = useQuery<unknown>({ queryKey: ["/api/auth/me"] });
+  const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const isPrivileged = ["Admin", "Owner", "Manager", "Developer"].includes(currentUser?.role || "");
   const { data: posAssignedLocations = [], isLoading: posLocationsLoading } = useQuery<Location[]>({
     queryKey: ["/api/my-locations"],
@@ -167,7 +167,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
 
   const unpricedCount = useMemo(
     () => locationPricedList.filter(isItemUnpriced).length,
-    [locationPricedList, isItemUnpriced]
+    [locationPricedList, isAllMode]
   );
 
   // Groups that have at least one unpriced item, with their counts — used for the chip picker
@@ -182,7 +182,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
     return Array.from(map.entries())
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [showUnpriced, locationPricedList, isItemUnpriced]);
+  }, [locationPricedList, showUnpriced, isAllMode]);
 
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -198,7 +198,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       const matchesUnpriced = !showUnpriced || isItemUnpriced(item);
       return matchesSearch && matchesGroup && matchesUnpriced;
     });
-  }, [search, locationPricedList, showUnpriced, hiddenUnpricedGroups, groupFilter, isItemUnpriced]);
+  }, [locationPricedList, search, groupFilter, showUnpriced, hiddenUnpricedGroups, isAllMode]);
 
   const selectedLocation = locations.find((l) => l.id === selectedLocationId);
 

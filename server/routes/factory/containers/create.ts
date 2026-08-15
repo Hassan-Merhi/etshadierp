@@ -333,7 +333,7 @@ export function registerFactoryContainerCreateRoutes(app: Express) {
         error,
       });
       logger.error("Error creating factory container:", { error: error });
-      const cause = (error as { cause: unknown })?.cause ?? (error as unknown);
+      const cause = (error as { cause: unknown })?.cause ?? (error as any);
       if (cause?.code === "23505" && cause?.detail?.includes("container_number")) {
         return res
           .status(409)

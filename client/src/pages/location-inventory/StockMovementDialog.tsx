@@ -49,7 +49,7 @@ export function StockMovementDialog({
     return n === 0 ? <span className="text-muted-foreground/30">—</span> : <>{formatAmount(n)}</>;
   };
 
-  const { data: stockMovementData, isLoading: stockMovementLoading } = useQuery<unknown>({
+  const { data: stockMovementData, isLoading: stockMovementLoading } = useQuery<any>({
     queryKey: stockMovementItem
       ? ["/api/inventory/movement", stockMovementItem.stockItemId, stockMovementItem.locationId, stockMovementPeriod]
       : [],
@@ -66,7 +66,7 @@ export function StockMovementDialog({
     },
   });
 
-  const { data: smDrillData, isLoading: smDrillLoading } = useQuery<unknown>({
+  const { data: smDrillData, isLoading: smDrillLoading } = useQuery<any>({
     queryKey:
       stockMovementItem && drillMonth
         ? [

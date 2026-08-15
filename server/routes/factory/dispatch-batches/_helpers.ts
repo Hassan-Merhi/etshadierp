@@ -34,7 +34,7 @@ export async function isAdmin(req: import("express").Request, companyId: number)
 
 // Recalculate and update the batch totals — not needed for batches themselves
 // but we do need to update batch status to LOADING when first ride is created
-export async function ensureBatchStatus(tx: unknown, batchId: number, companyId: number, status: string) {
+export async function ensureBatchStatus(tx: any, batchId: number, companyId: number, status: string) {
   await tx
     .update(customerDispatchBatches)
     .set({ status, updatedAt: new Date() })

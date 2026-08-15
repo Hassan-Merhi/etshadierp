@@ -5,7 +5,7 @@ import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { requireSpCompany } from "./spHelpers";
 
-function rows(result: unknown): unknown[] {
+function rows(result: any): unknown[] {
   return result?.rows ?? result ?? [];
 }
 

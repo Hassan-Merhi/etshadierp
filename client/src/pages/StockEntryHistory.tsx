@@ -52,7 +52,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   const { toast } = useToast();
   const qc = useQueryClient();
   const today = new Date().toLocaleDateString("en-CA");
-  const _thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString("en-CA");
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString("en-CA");
 
   // fromActive: send startDate; toActive: send endDate (activating To deactivates From)
   const [fromActive, setFromActive] = useState(true);
@@ -63,7 +63,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   useEffect(() => {
     if (!onActiveDateChange) return;
     onActiveDateChange(fromActive ? fromDate : null);
-  }, [fromActive, fromDate, onActiveDateChange]);
+  }, [fromActive, fromDate]);
 
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
   const [productCategoryFilter, setProductCategoryFilter] = useState<string[]>([]);
@@ -90,7 +90,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   const pageSize = 9999;
 
   // (no pagination state — all records load in a single request)
-  const _filtersKey = useMemo(
+  const filtersKey = useMemo(
     () =>
       [
         fromActive ? fromDate : "",
@@ -424,7 +424,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     setIncludeUnassigned(true);
   }
 
-  function _fmtTime(iso: string | null) {
+  function fmtTime(iso: string | null) {
     if (!iso) return "—";
     try {
       return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -500,7 +500,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     await XLSX.writeFile(wb, `stock-entry-history-${fromDate}-to-${toDate}.xlsx`);
   }
 
-  async function _handlePrintMatrix() {
+  async function handlePrintMatrix() {
     if (filteredGroups.length === 0) return;
     const groupsWithBales = await fetchGroupsWithBales();
     const matrix = buildWorkerMatrix(groupsWithBales);

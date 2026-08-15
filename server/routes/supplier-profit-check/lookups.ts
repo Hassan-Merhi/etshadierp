@@ -9,7 +9,7 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { pool } from "../../db";
 
-export function registerSupplierProfitLookupRoutes(app: Express, requireAuth: unknown) {
+export function registerSupplierProfitLookupRoutes(app: Express, requireAuth: any) {
   // ── GET location groups (master locations with configured price groups) ──
   app.get("/api/supplier-profit-check/location-groups", requireAuth, async (req: Request, res: Response) => {
     try {
