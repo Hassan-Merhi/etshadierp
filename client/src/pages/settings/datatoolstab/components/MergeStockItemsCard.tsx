@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { StockItemAutocomplete } from "@/components/StockItemAutocomplete";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useCompany } from "@/contexts/CompanyContext";
 import { Loader2, AlertTriangle, Eye, ArrowLeftRight } from "lucide-react";
 import { formatNumber } from "@/lib/formatNumber";
 
@@ -22,6 +23,7 @@ import type { MergePreviewResult } from "../types";
 
 export function MergeStockItemsCard({ embedded }: { embedded?: boolean } = {}) {
   const { toast } = useToast();
+  const { selectedCompany } = useCompany();
   const [keptItem, setKeptItem] = useState<{ id: number; name: string } | null>(null);
   const [dupItem, setDupItem] = useState<{ id: number; name: string } | null>(null);
   const [preview, setPreview] = useState<MergePreviewResult | null>(null);
@@ -32,6 +34,7 @@ export function MergeStockItemsCard({ embedded }: { embedded?: boolean } = {}) {
 
   const { data: allStockItems = [] } = useQuery<{ id: number; name: string; code: string }[]>({
     queryKey: ["/api/stock-items/light", selectedCompany?.id],
+    enabled: !!selectedCompany?.id,
     staleTime: 10 * 60 * 1000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
