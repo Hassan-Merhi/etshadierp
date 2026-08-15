@@ -77,6 +77,7 @@ Both describe work in progress and carry live figures bound to their sources.
 
 | Doc | What it covers |
 |---|---|
+| [erp-90-phases-3-6.md](erp-90-phases-3-6.md) | ERP 90/100 Phases 3–6: tenant isolation, accounting and inventory convergence |
 | [god-file-split-program.md](god-file-split-program.md) | Splitting oversized files, and the harness that makes a split provable |
 | [system-quality-program.md](system-quality-program.md) | Type safety, test breadth, documentation state, configuration coherence |
 

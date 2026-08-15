@@ -115,10 +115,10 @@ export async function assertCompaniesAccess(userId: string, companyIds: readonly
 }
 
 /**
- * Resolves a company-scoped request. A query/body override is accepted only for
- * privileged roles. Admin and Owner accounts must hold an explicit assignment
- * in the requested company; Developer accounts use the existing synthetic
- * all-company scope exposed by the company selector.
+ * Resolves an explicitly requested company after checking both privilege and
+ * canonical membership. This helper is for intentional cross-company tools;
+ * ordinary tenant routes should use the active company and the strict global
+ * tenant boundary instead of accepting an override.
  */
 export async function resolveAuthorizedCompanyId(req: Request, requestedCompanyId?: unknown): Promise<number> {
   const context = getCompanyAccessContext(req);
@@ -138,15 +138,11 @@ export async function resolveAuthorizedCompanyId(req: Request, requestedCompanyI
 export async function assertActiveCompanyAccess(req: Request): Promise<CompanyAccessContext> {
   const context = getCompanyAccessContext(req);
 
-  // The set-company route grants Developer (and Admin) users access to any company
-  // by creating a synthetic role object without writing it to user_company_roles.
-  // A subsequent DB lookup via assertCompanyAccess would therefore not find the
-  // Developer entry and would throw COMPANY_ACCESS_DENIED — causing routes like
-  // /api/vouchers and /api/offloads to silently return empty data.
-  //
-  // Mirror the set-company policy: if the session role is Developer or Admin, the
-  // user already passed the set-company gate; trust that and skip the DB check.
-  if (context.role === "Developer" || context.role === "Admin") {
+  // set-company fabricates an all-company role only for account-level Developer
+  // users. Admin/Owner/Manager sessions must always retain a real company-role
+  // assignment; a stale or forged active company must fail closed.
+  if (context.role === "Developer") {
+    await assertCompanyAccess(context.userId, context.activeCompanyId);
     return context;
   }
 

@@ -229,7 +229,11 @@ export async function createPosSale(
           locationId,
           validatedItem,
           canSellNegativeStock,
-          currentCompanyId
+          currentCompanyId,
+          {
+            sourceId: String(txVoucher.id),
+            idempotencyKey: `pos-sale:${txVoucher.id}:rev0:${item.stockItemId}`,
+          }
         );
 
         const [stockItem] = await tx.select().from(stockItems).where(eq(stockItems.id, item.stockItemId));

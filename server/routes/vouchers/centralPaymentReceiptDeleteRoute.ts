@@ -15,6 +15,7 @@ import { logger } from "../../lib/logger";
 import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../../lib/migratedVoucherGuard";
 import { storage } from "../../storage";
 import { applyEmployeeBalanceDeltasTx } from "../../services/accounting/employeeBalancePosting";
+import { removeFactoryDaybookMirrorTx } from "../../services/accounting/factoryDaybookMirrorRemoval";
 import {
   isPaymentReceiptVoucherType,
   shouldUseCentralPaymentReceiptDeletion,
@@ -151,6 +152,9 @@ async function deleteActivePaymentReceipt(req: Request, res: Response, next: Nex
         if (otherVoucherId && otherVoucherId !== voucherId) {
           await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, otherVoucherId));
           await tx.delete(vouchers).where(eq(vouchers.id, otherVoucherId));
+          // The counterpart voucher is gone entirely, so its mirror would
+          // reference nothing at all.
+          await removeFactoryDaybookMirrorTx({ tx, voucherId: otherVoucherId });
         }
       }
 
@@ -162,6 +166,11 @@ async function deleteActivePaymentReceipt(req: Request, res: Response, next: Nex
             eq(intercompanyPaymentRequests.status, "pending")
           )
         );
+
+      // The Daybook mirror is written inside the posting transaction; it is
+      // withdrawn inside the cancelling one, or the Daybook keeps reporting the
+      // cash movement of a voucher that no longer stands.
+      await removeFactoryDaybookMirrorTx({ tx, companyId, voucherId });
 
       await tx
         .update(vouchers)

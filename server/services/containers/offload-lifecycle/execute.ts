@@ -4,6 +4,9 @@ import * as schema from "@shared/schema";
 
 import { postChargeVouchers } from "./charge-vouchers";
 import { reverseExistingOffload } from "./reverse";
+import { nextCanonicalSourceRevision } from "../../inventory/canonicalSourceRevision";
+import { createDatabaseStockMovementAdapter } from "../../inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../../inventory/stockMovementIntegrityService";
 import { postSupplierPartnerJournals } from "./sp-journals";
 import {
   ContainerOffloadLifecycleError,
@@ -13,6 +16,8 @@ import {
   buildItemMap,
   positiveIds,
 } from "./types";
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 export async function executeContainerOffloadLifecycle(
   input: ContainerOffloadLifecycleInput
@@ -282,6 +287,13 @@ export async function executeContainerOffloadLifecycle(
       })
       .returning();
 
+    const canonicalRevision = await nextCanonicalSourceRevision(
+      tx,
+      input.companyId,
+      "container-offload",
+      String(offload.id)
+    );
+
     for (const item of storedItems) {
       await tx.insert(schema.containerOffloadItems).values({
         offloadId: offload.id,
@@ -290,6 +302,36 @@ export async function executeContainerOffloadLifecycle(
         rate: item.rate.toFixed(2),
         totalValue: item.totalValue.toFixed(2),
       });
+
+      // Canonical evidence for the stock this offload received, on the same
+      // transaction that applied it above. The rate is the container's
+      // weighted cost after charges — the value the offload actually stored —
+      // so the journal and the offload line agree by construction.
+      //
+      // A replace-only offload re-runs against the same container, so the
+      // batch takes the next revision index rather than colliding with the
+      // evidence the previous offload recorded.
+      if (item.quantity !== 0) {
+        await postStockMovementTx(
+          tx,
+          {
+            companyId: input.companyId,
+            stockItemId: item.stockItemId,
+            kind: "receipt",
+            quantity: item.quantity.toFixed(3),
+            unitCost: item.rate.toFixed(2),
+            toLocationId: input.locationId,
+            occurredAt: new Date().toISOString(),
+            source: {
+              sourceType: "container-offload",
+              sourceId: String(offload.id),
+              idempotencyKey: `container-offload:${offload.id}:rev${canonicalRevision}:${item.stockItemId}`,
+            },
+            allowNegativeStock: true,
+          },
+          canonicalStockMovementAdapter
+        );
+      }
     }
 
     await postSupplierPartnerJournals(tx, container, purchaseOrders, input);

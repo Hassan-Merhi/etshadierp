@@ -1,10 +1,7 @@
 const ACCOUNTING_REQUEST_TTL_MS = 30 * 60 * 1000;
 const MAX_PENDING_ACCOUNTING_IDENTITIES = 100;
 
-const pendingAccountingRequestIds = new Map<
-  string,
-  { requestId: string; createdAt: number }
->();
+const pendingAccountingRequestIds = new Map<string, { requestId: string; createdAt: number }>();
 
 type AccountingRequestPayload = Record<string, unknown>;
 
@@ -12,24 +9,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
-function isActiveManualJournal(
-  method: string,
-  pathname: string,
-  data: unknown
-): data is AccountingRequestPayload {
+function isActiveManualJournal(method: string, pathname: string, data: unknown): data is AccountingRequestPayload {
   return (
-    method.toUpperCase() === "POST" &&
-    pathname === "/api/vouchers/journal" &&
-    isRecord(data) &&
-    data.optional !== true
+    method.toUpperCase() === "POST" && pathname === "/api/vouchers/journal" && isRecord(data) && data.optional !== true
   );
 }
 
-function isActivePaymentReceipt(
-  method: string,
-  pathname: string,
-  data: unknown
-): data is AccountingRequestPayload {
+function isActivePaymentReceipt(method: string, pathname: string, data: unknown): data is AccountingRequestPayload {
   return (
     method.toUpperCase() === "POST" &&
     pathname === "/api/vouchers/payment-receipt" &&
@@ -39,11 +25,7 @@ function isActivePaymentReceipt(
   );
 }
 
-function isActiveGenericVoucher(
-  method: string,
-  pathname: string,
-  data: unknown
-): data is AccountingRequestPayload {
+function isActiveGenericVoucher(method: string, pathname: string, data: unknown): data is AccountingRequestPayload {
   if (
     method.toUpperCase() !== "POST" ||
     pathname !== "/api/vouchers/with-entries" ||
@@ -56,15 +38,23 @@ function isActiveGenericVoucher(
   return data.voucher.optional !== true;
 }
 
-function isCompanyTransfer(
-  method: string,
-  pathname: string,
-  data: unknown
-): data is AccountingRequestPayload {
+function isCompanyTransfer(method: string, pathname: string, data: unknown): data is AccountingRequestPayload {
   return (
     method.toUpperCase() === "POST" &&
     (pathname === "/api/simple-company-transfer" || pathname === "/api/inter-company-transfers") &&
     isRecord(data)
+  );
+}
+
+/**
+ * A stock transfer created from scratch moves inventory the moment it commits,
+ * so an uncertain network result is as dangerous here as it is for a payment.
+ * The branch that attaches items to an existing voucher is excluded: it is not
+ * the path that creates the movement.
+ */
+function isActiveStockTransfer(method: string, pathname: string, data: unknown): data is AccountingRequestPayload {
+  return (
+    method.toUpperCase() === "POST" && pathname === "/api/stock-transfers" && isRecord(data) && data.voucherId == null
   );
 }
 
@@ -78,7 +68,8 @@ export function isProtectedAccountingRequest(
     isActiveManualJournal(method, pathname, data) ||
     isActivePaymentReceipt(method, pathname, data) ||
     isActiveGenericVoucher(method, pathname, data) ||
-    isCompanyTransfer(method, pathname, data)
+    isCompanyTransfer(method, pathname, data) ||
+    isActiveStockTransfer(method, pathname, data)
   );
 }
 
@@ -89,11 +80,7 @@ function createClientRequestId(): string {
   return `accounting-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
-function accountingPayloadKey(
-  method: string,
-  url: string,
-  data: AccountingRequestPayload
-): string {
+function accountingPayloadKey(method: string, url: string, data: AccountingRequestPayload): string {
   const payload = { ...data };
   delete payload.clientRequestId;
   return `${method.toUpperCase()}:${url.split("?")[0]}:${JSON.stringify(payload)}`;
@@ -118,11 +105,7 @@ function prunePendingAccountingIdentities(): void {
  * A successful response or definite 4xx rejection releases the identity; queued
  * JSON retains its own request ID and server-side replay protection.
  */
-export function attachAccountingRequestIdentity(
-  method: string,
-  url: string,
-  data: unknown
-): unknown {
+export function attachAccountingRequestIdentity(method: string, url: string, data: unknown): unknown {
   if (!isProtectedAccountingRequest(method, url, data)) return data;
   if (typeof data.clientRequestId === "string" && data.clientRequestId.trim()) {
     return data;
@@ -139,11 +122,7 @@ export function attachAccountingRequestIdentity(
   return { ...data, clientRequestId: requestId };
 }
 
-export function releaseAccountingRequestIdentity(
-  method: string,
-  url: string,
-  data: unknown
-): void {
+export function releaseAccountingRequestIdentity(method: string, url: string, data: unknown): void {
   if (!isProtectedAccountingRequest(method, url, data)) return;
   pendingAccountingRequestIds.delete(accountingPayloadKey(method, url, data));
 }

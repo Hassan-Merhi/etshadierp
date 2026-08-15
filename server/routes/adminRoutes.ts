@@ -11,6 +11,7 @@ import { registerDeletedItemsRoutes } from "./admin/deleted-items";
 import { registerSecurityAnomalyRoutes } from "./admin/securityAnomalyRoutes";
 import { registerSecurityPermissionRoutes } from "./admin/securityPermissionRoutes";
 import { registerSchemaDiagnosticRoutes } from "./admin/schemaDiagnosticRoutes";
+import { registerConvergenceReconciliationRoutes } from "./admin/convergenceReconciliationRoutes";
 import { requirePrivilegedOperation } from "../services/security/privilegedOperationEnforcementAdapter";
 import {
   inventoryRebuildInputSchema,
@@ -62,4 +63,5 @@ export function registerAdminRoutes(app: Express) {
   registerSecurityAnomalyRoutes(app);
   registerSecurityPermissionRoutes(app);
   registerSchemaDiagnosticRoutes(app);
+  registerConvergenceReconciliationRoutes(app);
 }

@@ -46,6 +46,11 @@ function adapter(balance = "10"): StockMovementAdapter {
   };
 }
 
+/** A stub transaction that can run the transaction-local tenant-scope statement. */
+function stubTx() {
+  return { execute: vi.fn(async () => ({ rows: [] })) };
+}
+
 describe("validateStockMovementRequest", () => {
   it("creates equal and opposite transfer rows at one unit cost", () => {
     const result = validateStockMovementRequest(base);
@@ -83,8 +88,11 @@ describe("validateStockMovementRequest", () => {
 describe("postStockMovementTx", () => {
   it("locks balances before appending immutable movement rows", async () => {
     const mock = adapter();
-    const result = await postStockMovementTx({}, base, mock);
+    const tx = stubTx();
+    const result = await postStockMovementTx(tx, base, mock);
 
+    // The transaction-local company scope is asserted before any adapter read.
+    expect(tx.execute).toHaveBeenCalledTimes(1);
     expect(result.idempotent).toBe(false);
     expect(result.movements).toHaveLength(2);
     expect(mock.validateOwnership).toHaveBeenCalledOnce();
@@ -96,7 +104,7 @@ describe("postStockMovementTx", () => {
 
   it("rejects an issue that would create negative stock", async () => {
     const mock = adapter("4");
-    await expect(postStockMovementTx({}, base, mock)).rejects.toMatchObject<
+    await expect(postStockMovementTx(stubTx(), base, mock)).rejects.toMatchObject<
       Partial<StockMovementValidationError>
     >({ code: "STOCK_MOVEMENT_INSUFFICIENT_QUANTITY" });
     expect(mock.appendMovements).not.toHaveBeenCalled();
@@ -111,7 +119,7 @@ describe("postStockMovementTx", () => {
       idempotent: false,
     });
 
-    const result = await postStockMovementTx({}, base, mock);
+    const result = await postStockMovementTx(stubTx(), base, mock);
     expect(result.idempotent).toBe(true);
     expect(mock.validateOwnership).not.toHaveBeenCalled();
     expect(mock.appendMovements).not.toHaveBeenCalled();

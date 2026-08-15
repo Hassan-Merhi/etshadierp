@@ -171,7 +171,7 @@
       "client/src/pages/SalesReportLegacy.tsx": 1000,
       "client/src/pages/settings/DataToolsTab.tsx": 1825,
       "client/src/pages/sp/GcLshiMigration.tsx": 950,
-      "client/src/pages/StockEntryHistory.tsx": 1525,
+      "client/src/pages/StockEntryHistory.tsx": 1500,
       "client/src/pages/StockItems.tsx": 1375,
       "client/src/pages/StockTransferOrder.tsx": 2150,
       "client/src/pages/SupplierProfitCheck.tsx": 1975,

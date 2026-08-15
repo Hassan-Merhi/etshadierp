@@ -26,6 +26,10 @@ import {
   locations,
 } from "@shared/schema";
 import { eq, and, sql, inArray } from "drizzle-orm";
+import { createDatabaseStockMovementAdapter } from "../../../services/inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../../../services/inventory/stockMovementIntegrityService";
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 export function registerBalesFinalizeRoutes(app: Express) {
   // ───────────────────────────────────────────────
@@ -287,6 +291,30 @@ export function registerBalesFinalizeRoutes(app: Express) {
           const baleRate = weight * baleCostPerKg;
 
           await adjustInventory(tx, erpLocationId, erpStockItemId!, 1, companyId, baleRate);
+
+          // Canonical evidence for the bale this finalisation brought into ERP
+          // stock, on the same transaction that raised the inventory. A bale is
+          // one unit at its own cost, and its id is the natural document key —
+          // finalising the same bale twice is a replay, not a second unit.
+          await postStockMovementTx(
+            tx,
+            {
+              companyId,
+              stockItemId: erpStockItemId!,
+              kind: "receipt",
+              quantity: "1",
+              unitCost: baleRate.toFixed(6),
+              toLocationId: erpLocationId,
+              occurredAt: new Date().toISOString(),
+              source: {
+                sourceType: "factory-bale-finalize",
+                sourceId: String(bale.id),
+                idempotencyKey: `factory-bale-finalize:${bale.id}`,
+              },
+              allowNegativeStock: true,
+            },
+            canonicalStockMovementAdapter
+          );
         }
 
         return {

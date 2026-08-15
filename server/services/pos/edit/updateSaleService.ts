@@ -26,6 +26,7 @@ import {
 } from "./validateEditSaleRequest";
 import { reverseOriginalSaleInventory, clearOldSaleRecords } from "./reverseOriginalSaleInventory";
 import { rebuildSaleItems } from "./rebuildSaleItems";
+import { nextCanonicalSourceRevision } from "../../inventory/canonicalSourceRevision";
 import { updateVoucherRecord } from "./updateSaleVoucher";
 import { rebuildSaleAccountingEntries } from "./rebuildSaleAccounting";
 
@@ -130,7 +131,16 @@ export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ stat
 
     const oldItemsMap = new Map(oldSalesItems.map((item) => [item.id, item]));
 
-    await reverseOriginalSaleInventory(tx, lockedVoucher, oldSalesItems);
+    // Each edit appends its own reversal and reissue to the append-only
+    // journal, so it needs an idempotency key of its own.
+    const canonicalRevision = await nextCanonicalSourceRevision(
+      tx,
+      lockedVoucher.companyId,
+      "pos-sale",
+      String(voucherId)
+    );
+
+    await reverseOriginalSaleInventory(tx, lockedVoucher, oldSalesItems, canonicalRevision);
     await clearOldSaleRecords(tx, voucherId);
 
     const rebuildResult = await rebuildSaleItems(tx, {
@@ -140,6 +150,7 @@ export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ stat
       oldItemsMap,
       canSellNegativeStock,
       companyId: lockedVoucher.companyId,
+      canonicalRevision,
     });
 
     await updateVoucherRecord(tx, {

@@ -12,6 +12,42 @@ import {
 } from "../../lib/inventoryMath";
 import * as schema from "@shared/schema";
 import type { StockTransferItem, StockAdjustmentItem } from "@shared/schema";
+import { createDatabaseStockMovementAdapter } from "../../services/inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../../services/inventory/stockMovementIntegrityService";
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
+
+/**
+ * A second stock adjustment was created for a voucher that already had one.
+ *
+ * The route checks for this before it calls in, but a check made in one
+ * connection and an insert made in another are two separate moments: two
+ * submissions arriving together both find nothing and both apply their items to
+ * inventory. The check below is made under a lock on the voucher row inside the
+ * same transaction as the insert, so the second one loses.
+ */
+export class DuplicateStockAdjustmentError extends Error {
+  readonly code = "STOCK_ADJUSTMENT_ALREADY_EXISTS";
+
+  constructor(voucherId: number) {
+    super(`Voucher ${voucherId} already has a stock adjustment`);
+    this.name = "DuplicateStockAdjustmentError";
+  }
+}
+
+/**
+ * A second stock transfer document was created for a voucher that already had
+ * one. The endpoint that attaches items to an existing voucher had no guard at
+ * all: submitting it twice built a second transfer and moved the stock again.
+ */
+export class DuplicateStockTransferError extends Error {
+  readonly code = "STOCK_TRANSFER_ALREADY_EXISTS";
+
+  constructor(voucherId: number) {
+    super(`Voucher ${voucherId} already has a stock transfer`);
+    this.name = "DuplicateStockTransferError";
+  }
+}
 
 export async function createStockTransfer(
   voucherId: number,
@@ -20,9 +56,18 @@ export async function createStockTransfer(
   items: Array<{ sourceLocationId: number; stockItemId: number; quantity: string; rate: string }>
 ): Promise<any> {
   return await db.transaction(async (tx) => {
-    const [voucher] = await tx.select().from(schema.vouchers).where(eq(schema.vouchers.id, voucherId));
+    // The lock makes the duplicate check below decisive: two submissions for the
+    // same voucher are ordered, and the second one finds the first one's row.
+    const [voucher] = await tx.select().from(schema.vouchers).where(eq(schema.vouchers.id, voucherId)).for("update");
     if (!voucher) throw new Error(`Voucher ${voucherId} not found`);
     const isOptional = voucher.optional;
+
+    const [duplicate] = await tx
+      .select({ id: schema.stockTransferVouchers.id })
+      .from(schema.stockTransferVouchers)
+      .where(eq(schema.stockTransferVouchers.voucherId, voucherId))
+      .limit(1);
+    if (duplicate) throw new DuplicateStockTransferError(voucherId);
 
     if (!items || items.length === 0) throw new Error("No items provided for stock transfer");
 
@@ -120,6 +165,40 @@ export async function createStockTransfer(
             lastUpdated: new Date(),
           });
         }
+
+        // Canonical evidence for this leg, written inside the same transaction
+        // that applied the inventory above. Reconciliation compares the transfer
+        // document against these rows, so evidence and effect commit or roll
+        // back together — a transfer can never appear in one and not the other.
+        //
+        // A leg whose source and destination are the same location moves no
+        // stock between locations and has no balanced issue/receipt pair to
+        // record; reconciliation surfaces such a document as unevidenced rather
+        // than this path inventing a movement that did not happen.
+        if (item.sourceLocationId !== destinationLocationId) {
+          await postStockMovementTx(
+            tx,
+            {
+              companyId: voucher.companyId,
+              stockItemId: item.stockItemId,
+              kind: "transfer",
+              quantity: inventoryQuantity(quantity),
+              unitCost: inventoryUnitCost(rate),
+              fromLocationId: item.sourceLocationId,
+              toLocationId: destinationLocationId,
+              occurredAt: new Date().toISOString(),
+              source: {
+                sourceType: "stock-transfer",
+                sourceId: String(transfer.id),
+                idempotencyKey: `stock-transfer:${transfer.id}:${item.stockItemId}`,
+              },
+              // The journal records what the transfer did; it does not add a
+              // negative-stock rule the transfer itself does not enforce.
+              allowNegativeStock: true,
+            },
+            canonicalStockMovementAdapter
+          );
+        }
       }
     }
 
@@ -136,9 +215,18 @@ export async function createStockAdjustment(
   consumptionAccountOverride?: { code: string; name: string }
 ): Promise<any> {
   return await db.transaction(async (tx) => {
-    const [voucher] = await tx.select().from(schema.vouchers).where(eq(schema.vouchers.id, voucherId));
+    // Locking the voucher row serialises everyone who wants to adjust it, so the
+    // duplicate check below cannot be overtaken between reading and inserting.
+    const [voucher] = await tx.select().from(schema.vouchers).where(eq(schema.vouchers.id, voucherId)).for("update");
     if (!voucher) throw new Error(`Voucher ${voucherId} not found`);
     const isOptional = voucher.optional;
+
+    const [duplicate] = await tx
+      .select({ id: schema.stockAdjustmentVouchers.id })
+      .from(schema.stockAdjustmentVouchers)
+      .where(eq(schema.stockAdjustmentVouchers.voucherId, voucherId))
+      .limit(1);
+    if (duplicate) throw new DuplicateStockAdjustmentError(voucherId);
 
     const [adjustment] = await tx
       .insert(schema.stockAdjustmentVouchers)
@@ -277,6 +365,40 @@ export async function createStockAdjustment(
             lastUpdated: new Date(),
           });
         }
+      }
+
+      // Canonical evidence for the applied adjustment, on the same transaction
+      // that just moved the inventory above. The rate is the one the adjustment
+      // actually resolved — a consumption line takes the location's current
+      // average or the item's opening rate, not the rate the caller sent — so
+      // the journal records the cost that was really applied.
+      //
+      // A zero-quantity adjustment changes no stock and gets no movement row:
+      // the canonical boundary rejects a zero quantity precisely because it is
+      // not a movement.
+      if (!isOptional && !absoluteQuantity.isZero()) {
+        await postStockMovementTx(
+          tx,
+          {
+            companyId: voucher.companyId,
+            stockItemId: item.stockItemId,
+            kind: isProduction ? "receipt" : "issue",
+            quantity: inventoryQuantity(absoluteQuantity),
+            unitCost: inventoryUnitCost(actualRate),
+            fromLocationId: isProduction ? null : locationId,
+            toLocationId: isProduction ? locationId : null,
+            occurredAt: new Date().toISOString(),
+            source: {
+              sourceType: "stock-adjustment",
+              sourceId: String(adjustment.id),
+              idempotencyKey: `stock-adjustment:${adjustment.id}:${item.stockItemId}`,
+            },
+            // The journal records what the adjustment did; it does not add a
+            // negative-stock rule the adjustment does not itself enforce.
+            allowNegativeStock: true,
+          },
+          canonicalStockMovementAdapter
+        );
       }
 
       const [adjustmentItem] = await tx

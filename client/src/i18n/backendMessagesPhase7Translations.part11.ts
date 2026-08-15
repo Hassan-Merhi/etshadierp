@@ -112,4 +112,9 @@ export const backendMessagesPhase7TranslationsPart11: readonly Phase7BackendMess
     ar: "تم بلوغ الحصة الشهرية لـ Green API. حاول نظام ERP أيضًا مسار الإرسال الاحتياطي، لكن المزود ما زال يمنع الإرسال.",
     fr: "Le quota mensuel de Green API a été atteint. L’ERP a également essayé le mode d’envoi de secours, mais le fournisseur bloque toujours l’envoi.",
   },
+  {
+    en: "Invalid companyId in request path.",
+    ar: "معرّف الشركة غير صالح في مسار الطلب.",
+    fr: "Identifiant de société invalide dans le chemin de la requête.",
+  },
 ];
