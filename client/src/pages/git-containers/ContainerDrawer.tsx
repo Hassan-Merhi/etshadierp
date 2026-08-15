@@ -42,7 +42,7 @@ export function ContainerDrawer({
     }
   }, [open, container]);
 
-  const set = (field: keyof DrawerForm, val: unknown) => setForm((prev) => (prev ? { ...prev, [field]: val } : prev));
+  const set = (field: keyof DrawerForm, val: any) => setForm((prev) => (prev ? { ...prev, [field]: val } : prev));
 
   const canEdit = sessionCompanyId === null || !container || container.companyId === sessionCompanyId;
 
@@ -74,7 +74,7 @@ export function ContainerDrawer({
       toast({ title: "Saved", description: `\${container?.containerNumber} updated.` });
       onClose();
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({
         title: "Save failed",
         description: err?.message ?? "Unknown error",
@@ -90,7 +90,7 @@ export function ContainerDrawer({
       void invalidateApiFamily(queryClient, "/api/git/containers");
       toast({ title: "Tracking settings saved" });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Save failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -157,7 +157,7 @@ export function ContainerDrawer({
         setTimeout(() => toast({ title: "Quota low", description: result.quotaWarning, variant: "destructive" }), 400);
       }
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Track Now failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });

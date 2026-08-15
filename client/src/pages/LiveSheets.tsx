@@ -83,7 +83,7 @@ function SheetFormDialog({
       toast({ title: isEdit ? "Updated" : "Added", description: isEdit ? "Sheet link updated." : "Sheet link added." });
       onClose();
     },
-    onError: (e: import("react").SyntheticEvent) => {
+    onError: (e: any) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
@@ -202,7 +202,7 @@ export default function LiveSheets() {
       toast({ title: "Deleted", description: "Sheet link removed." });
       setDeleteTarget(null);
     },
-    onError: (e: import("react").SyntheticEvent) => {
+    onError: (e: any) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },

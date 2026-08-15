@@ -202,7 +202,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
 
   const importIsValidated = importValidationResult !== null;
   const importHasErrors = importValidationResult?.errors && importValidationResult.errors.length > 0;
-  const importValidItems = importValidationResult?.validatedItems?.filter((item: unknown) => !item.error) || [];
+  const importValidItems = importValidationResult?.validatedItems?.filter((item: any) => !item.error) || [];
   const importValidItemsCount = importValidItems.length;
   const importTotalItemsCount = importValidationResult?.validatedItems?.length || 0;
 
@@ -235,7 +235,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       stockItems.length > 0
     ) {
       if (hydratedVoucherIdRef.current === voucherIdToEdit) return;
-      const formEntries = stockTransferToEdit.items.map((item: unknown) => {
+      const formEntries = stockTransferToEdit.items.map((item: any) => {
         const sourceLocation = locations.find((l) => l.id === item.sourceLocationId);
         const stockItem = stockItems.find((s) => s.id === item.stockItemId);
         return {
@@ -299,7 +299,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", voucherIdToEdit] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers/list"] });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Approval failed", description: err.message, variant: "destructive" });
     },
   });
@@ -321,14 +321,14 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
         description: `Found ${data.items.length} item(s). Click Validate to check the data.`,
       });
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({ title: "Parse error", description: error.message, variant: "destructive" });
     },
   });
 
   const importValidateMutation = useMutation({
-    mutationFn: async (data: unknown) => {
+    mutationFn: async (data: any) => {
       const res = await modeApiRequest("POST", "/api/stock-transfer-import/validate-multi-source", data);
       return res.json();
     },
@@ -348,14 +348,14 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
         });
       }
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({ title: "Validation error", description: error.message, variant: "destructive" });
     },
   });
 
   const importMutation = useMutation({
-    mutationFn: async (data: unknown) => {
+    mutationFn: async (data: any) => {
       const res = await modeApiRequest("POST", "/api/stock-transfer-import/import-multi-source", data);
       return res.json();
     },
@@ -374,7 +374,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       setImportDestLocation("");
       setImportNotes("");
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({ title: "Import error", description: error.message, variant: "destructive" });
     },
@@ -495,7 +495,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
         });
       }
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       const isEditMode = !!voucherIdToEdit;
       toast({
@@ -515,8 +515,8 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
     >();
     for (const item of stockTransferToEdit.items) {
       const key: RevKey = `${item.stockItemId}-${item.sourceLocationId ?? "null"}`;
-      const si = stockItems.find((s: unknown) => s.id === item.stockItemId);
-      const sl = locations.find((l: unknown) => l.id === item.sourceLocationId);
+      const si = stockItems.find((s: any) => s.id === item.stockItemId);
+      const sl = locations.find((l: any) => l.id === item.sourceLocationId);
       originalMap.set(key, {
         qty: parseFloat(item.quantity) || 0,
         stockItemId: item.stockItemId,
@@ -660,7 +660,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
           const res = await fetch(`/api/locations/${entry.sourceLocationId}/inventory`);
           if (res.ok) {
             const inventory = await res.json();
-            const inv = inventory.find((item: unknown) => item.stockItemId === entry.stockItemId);
+            const inv = inventory.find((item: any) => item.stockItemId === entry.stockItemId);
             return {
               stockItemId: entry.stockItemId,
               sourceLocationId: entry.sourceLocationId,
@@ -710,7 +710,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
     const voucherDate = formData.voucherDate
       ? format(formData.voucherDate, "yyyy-MM-dd")
       : format(new Date(), "yyyy-MM-dd");
-    const validEntries = formData.entries.filter((e: import("react").SyntheticEvent) => e.stockItemId > 0 && parseFloat(e.quantity) > 0);
+    const validEntries = formData.entries.filter((e: any) => e.stockItemId > 0 && parseFloat(e.quantity) > 0);
     if (validEntries.length === 0) {
       toast({
         title: "No data to export",
@@ -719,10 +719,10 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       });
       return;
     }
-    const destLoc = locations?.find((l: unknown) => l.id === formData.destinationLocationId);
+    const destLoc = locations?.find((l: any) => l.id === formData.destinationLocationId);
     const destLocationName = destLoc?.name || "";
     if (detailed) {
-      const exportData = validEntries.map((entry: unknown) => ({
+      const exportData = validEntries.map((entry: any) => ({
         Date: voucherDate,
         "Source Location": entry.sourceLocationName || "",
         "Destination Location": destLocationName,
@@ -741,9 +741,9 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       await writeFile(workbook, fileName);
       toast({ title: "Export successful", description: `Downloaded ${fileName} with ${validEntries.length} items.` });
     } else {
-      const totalQty = validEntries.reduce((sum: number, e: import("react").SyntheticEvent) => sum + parseFloat(e.quantity), 0);
+      const totalQty = validEntries.reduce((sum: number, e: any) => sum + parseFloat(e.quantity), 0);
       const totalAmount = validEntries.reduce(
-        (sum: number, e: import("react").SyntheticEvent) => sum + parseFloat(e.quantity) * parseFloat(e.rate || "0"),
+        (sum: number, e: any) => sum + parseFloat(e.quantity) * parseFloat(e.rate || "0"),
         0
       );
       const exportData = [
@@ -812,7 +812,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       });
       return;
     }
-    const validItems = importValidationResult.validatedItems.filter((item: unknown) => !item.error);
+    const validItems = importValidationResult.validatedItems.filter((item: any) => !item.error);
     if (importValidationResult?.errors?.length > 0) {
       setImportConfirmDialogOpen(true);
       return;
@@ -825,7 +825,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
     });
   };
   const handleConfirmedImport = () => {
-    const validItems = importValidationResult?.validatedItems?.filter((item: unknown) => !item.error) || [];
+    const validItems = importValidationResult?.validatedItems?.filter((item: any) => !item.error) || [];
     setImportConfirmDialogOpen(false);
     if (validItems.length === 0) {
       setImportDialogOpen(false);
@@ -858,7 +858,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
               title: "Form Validation Error",
               description:
                 Object.values(errors)
-                  .map((e: import("react").SyntheticEvent) => e?.message || JSON.stringify(e))
+                  .map((e: any) => e?.message || JSON.stringify(e))
                   .join(", ") || "Please check all fields",
               variant: "destructive",
             });
@@ -1000,7 +1000,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                   const mobileFilteredItems =
                     activeTransferRow === index && activeFieldType === "item"
                       ? transferInventory
-                          .filter((item: unknown) => {
+                          .filter((item: any) => {
                             if (!transferSearchTerm.trim()) return true;
                             const term = transferSearchTerm.toLowerCase();
                             return (
@@ -1008,18 +1008,18 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                               item.stockItemCode?.toLowerCase().includes(term)
                             );
                           })
-                          .sort((a: unknown, b: unknown) => (a.stockItemName || "").localeCompare(b.stockItemName || ""))
+                          .sort((a: any, b: any) => (a.stockItemName || "").localeCompare(b.stockItemName || ""))
                           .slice(0, 10)
                       : [];
                   const mobileFilteredLocs =
                     activeTransferRow === index && activeFieldType === "source"
                       ? locations
-                          .filter((loc: unknown) => {
+                          .filter((loc: any) => {
                             if (!transferSourceSearchTerm.trim()) return true;
                             const term = transferSourceSearchTerm.toLowerCase();
                             return (loc.name || "").toLowerCase().includes(term);
                           })
-                          .sort((a: unknown, b: unknown) => (a.name || "").localeCompare(b.name || ""))
+                          .sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""))
                           .slice(0, 8)
                       : [];
                   return (
@@ -1079,7 +1079,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                           />
                           {mobileFilteredLocs.length > 0 && (
                             <div className="border rounded-md bg-popover shadow-md max-h-36 overflow-y-auto z-20 relative">
-                              {mobileFilteredLocs.map((loc: unknown) => (
+                              {mobileFilteredLocs.map((loc: any) => (
                                 <button
                                   key={loc.id}
                                   type="button"
@@ -1146,7 +1146,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                         />
                         {mobileFilteredItems.length > 0 && (
                           <div className="border rounded-md bg-popover shadow-md max-h-40 overflow-y-auto z-20 relative">
-                            {mobileFilteredItems.map((item: unknown) => (
+                            {mobileFilteredItems.map((item: any) => (
                               <button
                                 key={item.stockItemId}
                                 type="button"
@@ -1155,7 +1155,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                                   e.preventDefault();
                                   const sourceId = Number(transferInventorySource);
                                   if (!(sourceId > 0)) return;
-                                  const sourceLocation = locations.find((l: unknown) => l.id === sourceId);
+                                  const sourceLocation = locations.find((l: any) => l.id === sourceId);
                                   stockTransferForm.setValue(`entries.${index}.sourceLocationId`, sourceId, {
                                     shouldValidate: true,
                                   });
@@ -1916,7 +1916,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                         const filteredInventory = filteredTransferInventory;
                         if (filteredInventory.length === 0)
                           return <div className="text-center py-8 text-sm text-muted-foreground">No items found</div>;
-                        return filteredInventory.map((item: unknown, idx: number) => {
+                        return filteredInventory.map((item: any, idx: number) => {
                           const stock = parseFloat(item.quantity || "0");
                           const isHighlighted = idx === transferHighlightedIndex && activeTransferRow !== null;
                           return (
@@ -2218,7 +2218,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                   description='Use "Save as Revision" to record tracked changes to this transfer.'
                 />
               ) : (
-                transferRevisions.map((rev: unknown) => (
+                transferRevisions.map((rev: any) => (
                   <div key={rev.id} className="border rounded-md overflow-hidden">
                     {rev.optional && (
                       <div className="flex items-center justify-between gap-3 px-3 py-2 status-warning border-b">
@@ -2280,8 +2280,8 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                           </thead>
                           <tbody>
                             {rev.items
-                              .filter((item: unknown) => parseFloat(item.delta) !== 0)
-                              .map((item: unknown, idx: number) => {
+                              .filter((item: any) => parseFloat(item.delta) !== 0)
+                              .map((item: any, idx: number) => {
                                 const delta = parseFloat(item.delta);
                                 return (
                                   <tr key={idx} className="border-t">

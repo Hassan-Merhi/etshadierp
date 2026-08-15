@@ -24,7 +24,7 @@ import {
 import { eq, and } from "drizzle-orm";
 
 export function registerOrderBaleRemovalRoutes(app: Express) {
-  app.delete("/api/factory/customer-orders/:id/bales/:baleId", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.delete("/api/factory/customer-orders/:id/bales/:baleId", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -104,7 +104,7 @@ export function registerOrderBaleRemovalRoutes(app: Express) {
 
   // POST /api/factory/bales/:id/return-to-stock — remove a bale from its order and return it to stock
   // Works for any order status. For FINALIZED orders: updates customer_balances + daybook. Admin-gated.
-  app.post("/api/factory/bales/:id/return-to-stock", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.post("/api/factory/bales/:id/return-to-stock", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

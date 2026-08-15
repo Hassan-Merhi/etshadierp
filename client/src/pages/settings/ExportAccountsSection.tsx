@@ -75,7 +75,7 @@ export function ExportAccountsSection() {
 
   const filtered = allAccounts.filter((a) => a.name.toLowerCase().includes(search.toLowerCase()));
 
-  const grouped = filtered.reduce<Record<string, unknown[]>>((acc, account: unknown) => {
+  const grouped = filtered.reduce<Record<string, unknown[]>>((acc, account: any) => {
     const type = account.type || "ledger";
     if (!acc[type]) acc[type] = [];
     acc[type].push(account);
@@ -105,7 +105,7 @@ export function ExportAccountsSection() {
     );
   const clearAll = () => setSelectedIds(new Set());
 
-  const getTransactionUrl = (acc: unknown): string => {
+  const getTransactionUrl = (acc: any): string => {
     const params = new URLSearchParams();
     if (fromDate) params.append("startDate", fromDate);
     if (toDate) params.append("endDate", toDate);

@@ -26,9 +26,9 @@ export const chatMessageRateLimiter = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req: import("express").Request) => `${req.session?.userId ?? "anon"}_${req.session?.currentCompanyId ?? "0"}`,
-  handler: (_req: unknown, res: import("express").Response) => {
+  keyGenerator: (req: any) => `${req.session?.userId ?? "anon"}_${req.session?.currentCompanyId ?? "0"}`,
+  handler: (_req: any, res: any) => {
     res.status(429).json({ message: "Too many messages. Please wait a moment before sending again." });
   },
-  skip: (req: import("express").Request) => !req.session?.userId,
+  skip: (req: any) => !req.session?.userId,
 });

@@ -13,7 +13,7 @@ interface CurrencyPoolsProps {
   formatKg: (val: string) => string;
   formatNum: (val: string) => string;
   setFxSourceType: (val: "supplier" | "commission" | "both") => void;
-  setFxConversionForm: (val: unknown) => void;
+  setFxConversionForm: (val: any) => void;
   setFxConversionOpen: (val: boolean) => void;
   openFxConversionDialog: (
     fromSupplierId: number,

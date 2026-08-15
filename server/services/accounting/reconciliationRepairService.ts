@@ -143,7 +143,7 @@ function validateRun(request: ReconciliationRunRequest): void {
 
 /** Generates and persists an immutable, repeat-safe reconciliation report. */
 export async function generateReconciliationReportTx(
-  tx: unknown,
+  tx: any,
   request: ReconciliationRunRequest,
   adapter: ReconciliationRepairAdapter,
   now = new Date()
@@ -200,7 +200,7 @@ export async function generateReconciliationReportTx(
  * repair adapters must rebuild the operational projection from canonical ledger truth.
  */
 export async function executeApprovedRepairsTx(
-  tx: unknown,
+  tx: any,
   request: RepairExecutionRequest,
   adapter: ReconciliationRepairAdapter
 ): Promise<RepairExecutionResult> {

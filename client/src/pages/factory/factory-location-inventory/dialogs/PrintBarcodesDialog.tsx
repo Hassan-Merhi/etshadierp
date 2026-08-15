@@ -76,7 +76,7 @@ export function PrintBarcodesDialog({
                 </tr>
               </thead>
               <tbody>
-                {reprintBales.map((row: unknown) => (
+                {reprintBales.map((row: any) => (
                   <tr key={row.bale.id} className="border-t h-9" data-testid={`row-reprint-bale-${row.bale.id}`}>
                     <td className="px-3 font-mono text-xs text-muted-foreground">
                       {row.bale.referenceNumber || row.bale.baleCode}

@@ -160,7 +160,7 @@ export default function PurchaseOrderEdit() {
       });
       navigate("/daybook");
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Update Failed",
@@ -175,7 +175,7 @@ export default function PurchaseOrderEdit() {
       const res = await apiRequest("POST", `/api/purchase-orders/${poId}/sync-parent-voucher`, {});
       return res.json();
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: [`/api/purchase-orders/${poId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
@@ -191,7 +191,7 @@ export default function PurchaseOrderEdit() {
         variant: data?.found ? "default" : "destructive",
       });
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Sync Failed",

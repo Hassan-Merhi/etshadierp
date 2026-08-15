@@ -17,14 +17,14 @@ function StockGroupForm({
   isPending,
 }: {
   form: unknown;
-  onSubmit: (data: unknown, saveAndNew?: boolean) => void;
+  onSubmit: (data: any, saveAndNew?: boolean) => void;
   onCancel: () => void;
   isPending: boolean;
 }) {
   return (
     <Card className="p-4 md:p-6">
       <Form {...form}>
-        <form noValidate onSubmit={form.handleSubmit((data: unknown) => onSubmit(data, false))} className="space-y-6">
+        <form noValidate onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}

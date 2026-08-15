@@ -69,7 +69,7 @@ export function BulkAdvanceDialog({
               <Input
                 type="date"
                 value={bulkForm.advanceDate}
-                onChange={(e) => setBulkForm((p: unknown) => ({ ...p, advanceDate: e.target.value }))}
+                onChange={(e) => setBulkForm((p: any) => ({ ...p, advanceDate: e.target.value }))}
                 data-testid="input-bulk-advance-date"
               />
             </div>
@@ -77,13 +77,13 @@ export function BulkAdvanceDialog({
               <Label>Cash Account</Label>
               <Select
                 value={bulkForm.cashAccountId}
-                onValueChange={(v) => setBulkForm((p: unknown) => ({ ...p, cashAccountId: v }))}
+                onValueChange={(v) => setBulkForm((p: any) => ({ ...p, cashAccountId: v }))}
               >
                 <SelectTrigger data-testid="select-bulk-cash-account">
                   <SelectValue placeholder="Optional" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(cashAccounts || []).map((a: unknown) => (
+                  {(cashAccounts || []).map((a: any) => (
                     <SelectItem key={a.id} value={String(a.id)}>
                       {a.name}
                     </SelectItem>
@@ -97,7 +97,7 @@ export function BulkAdvanceDialog({
               <Label>Repayment Type</Label>
               <Select
                 value={bulkForm.repaymentType}
-                onValueChange={(v) => setBulkForm((p: unknown) => ({ ...p, repaymentType: v }))}
+                onValueChange={(v) => setBulkForm((p: any) => ({ ...p, repaymentType: v }))}
               >
                 <SelectTrigger data-testid="select-bulk-repayment-type">
                   <SelectValue />
@@ -113,7 +113,7 @@ export function BulkAdvanceDialog({
               <Input
                 placeholder="Optional notes for all"
                 value={bulkForm.notes}
-                onChange={(e) => setBulkForm((p: unknown) => ({ ...p, notes: e.target.value }))}
+                onChange={(e) => setBulkForm((p: any) => ({ ...p, notes: e.target.value }))}
                 data-testid="input-bulk-notes"
               />
             </div>
@@ -127,7 +127,7 @@ export function BulkAdvanceDialog({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setBulkSelected(new Set((workers || []).map((w: unknown) => w.id)))}
+                  onClick={() => setBulkSelected(new Set((workers || []).map((w: any) => w.id)))}
                   data-testid="button-bulk-select-all"
                 >
                   Select All
@@ -159,14 +159,14 @@ export function BulkAdvanceDialog({
                       </TableCell>
                     </TableRow>
                   ) : (
-                    (workers || []).map((w: unknown) => {
+                    (workers || []).map((w: any) => {
                       const selected = bulkSelected.has(w.id);
                       return (
                         <TableRow
                           key={w.id}
                           className={`cursor-pointer hover-elevate ${selected ? "bg-primary/5" : ""}`}
                           onClick={() =>
-                            setBulkSelected((prev: unknown) => {
+                            setBulkSelected((prev: any) => {
                               const next = new Set(prev);
                               if (next.has(w.id)) next.delete(w.id);
                               else next.add(w.id);
@@ -179,7 +179,7 @@ export function BulkAdvanceDialog({
                             <Checkbox
                               checked={selected}
                               onCheckedChange={() =>
-                                setBulkSelected((prev: unknown) => {
+                                setBulkSelected((prev: any) => {
                                   const next = new Set(prev);
                                   if (next.has(w.id)) next.delete(w.id);
                                   else next.add(w.id);
@@ -200,9 +200,9 @@ export function BulkAdvanceDialog({
                               value={bulkAmounts[w.id] || ""}
                               onChange={(e) => {
                                 const val = e.target.value;
-                                setBulkAmounts((prev: unknown) => ({ ...prev, [w.id]: val }));
+                                setBulkAmounts((prev: any) => ({ ...prev, [w.id]: val }));
                                 if (val && parseFloat(val) > 0) {
-                                  setBulkSelected((prev: unknown) => {
+                                  setBulkSelected((prev: any) => {
                                     const n = new Set(prev);
                                     n.add(w.id);
                                     return n;

@@ -145,7 +145,7 @@ export function PayrollDetailDialog({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {payrollDetail.attendance.map((att: unknown) => {
+                      {payrollDetail.attendance.map((att: any) => {
                         const d = new Date(att.attendanceDate + "T00:00:00");
                         const dayName = d.toLocaleDateString("en-US", { weekday: "short" });
                         const statusColors: Record<string, string> = {

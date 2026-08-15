@@ -149,7 +149,7 @@ export default function Accounts() {
         });
       }
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Delete failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -188,7 +188,7 @@ export default function Accounts() {
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Cannot delete", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -211,7 +211,7 @@ export default function Accounts() {
       toast({ title: "Account updated successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Update failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -233,7 +233,7 @@ export default function Accounts() {
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Update failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -254,7 +254,7 @@ export default function Accounts() {
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Delete failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -278,12 +278,12 @@ export default function Accounts() {
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Create failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
 
-  const onBankSubmit = (data: unknown) => {
+  const onBankSubmit = (data: any) => {
     if (bankToEdit) {
       updateBankMutation.mutate({ id: bankToEdit.id, ...data });
     } else {
@@ -305,14 +305,14 @@ export default function Accounts() {
         companyId: selectedCompany?.id,
         confirm: true,
       }),
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
       toast({
         title: "Payroll accounts fixed",
         description: `${data.vouchersUpdated ?? 0} voucher(s) updated · ${data.accountsDeleted ?? 0} old account(s) removed · ${(data.salaryAccountsReparented ?? 0) + (data.bonusAccountsReparented ?? 0)} account(s) grouped`,
       });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Fix failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -378,7 +378,7 @@ export default function Accounts() {
       setWaRuleDialogOpen(false);
       queryClient.invalidateQueries({ queryKey: [waRuleBase, selectedAccountId, "whatsapp-rule"] });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Save failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -396,7 +396,7 @@ export default function Accounts() {
     onSuccess: () => {
       toast({ title: "Statement sent to WhatsApp" });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "WhatsApp send failed", description: err?.message, variant: "destructive" });
     },
   });
@@ -581,7 +581,7 @@ export default function Accounts() {
     else setSelectedVoucherIds(new Set(vouchersWithBalance.map((v) => v.voucherId)));
   };
 
-  const handleOpenVoucher = (v: unknown) => {
+  const handleOpenVoucher = (v: any) => {
     const id = v.voucherId;
     const rawType = (v.voucherType || "").toLowerCase().replace(/\s+/g, "");
 

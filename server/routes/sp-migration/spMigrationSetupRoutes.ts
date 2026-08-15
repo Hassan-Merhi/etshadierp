@@ -90,7 +90,7 @@ export function registerSpMigrationSetupRoutes(app: Express) {
   // migration steps (stock master -> stock opening -> sales read-only ->
   // containers -> profit-share opening -> reconciliation). It is kept only as
   // a hard-disabled stub so any stale client cannot silently trigger it.
-  app.post("/api/sp/migration/gc-rehearsal", requireAuth, requireRole("Developer"), async (_req: unknown, res: import("express").Response) => {
+  app.post("/api/sp/migration/gc-rehearsal", requireAuth, requireRole("Developer"), async (_req: any, res: any) => {
     return res.status(410).json({
       message: "The old all-in-one GC migration flow is disabled. Use the staged migration steps instead.",
       code: "GC_REHEARSAL_DISABLED",

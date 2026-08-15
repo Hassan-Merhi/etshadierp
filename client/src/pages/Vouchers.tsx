@@ -336,7 +336,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         return await res.json();
       }
     },
-    onSuccess: async (data: unknown) => {
+    onSuccess: async (data: any) => {
       const isEditMode = !!voucherIdToEdit;
       toast({
         title: "Success",
@@ -369,7 +369,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         });
       }
     },
-    onError: (error: unknown, formData: VoucherFormData) => {
+    onError: (error: any, formData: VoucherFormData) => {
       if (error.name === "OfflineQueued") {
         const voucherType = activeTab === "payment" ? "Payment" : "Receipt";
         const syntheticVoucher = {
@@ -380,12 +380,12 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           description: formData.notes || `${voucherType} (pending sync)`,
           totalAmount: formData.entries
             .filter((e) => parseFloat(e.amount || "0") > 0)
-            .reduce((sum: number, e: import("react").SyntheticEvent) => sum + parseFloat(e.amount || "0"), 0)
+            .reduce((sum: number, e: any) => sum + parseFloat(e.amount || "0"), 0)
             .toFixed(2),
           optional: formData.optional || false,
           createdAt: new Date().toISOString(),
         };
-        queryClient.setQueriesData({ queryKey: ["/api/vouchers"] }, (old: unknown) =>
+        queryClient.setQueriesData({ queryKey: ["/api/vouchers"] }, (old: any) =>
           Array.isArray(old) ? [syntheticVoucher, ...old] : old
         );
         discardPaymentDraft();
@@ -424,7 +424,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       toast({ title: "Statement sent to WhatsApp" });
       setWaPendingPrompt(null);
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({ title: "WhatsApp send failed", description: error.message, variant: "destructive" });
       setWaPendingPrompt(null);

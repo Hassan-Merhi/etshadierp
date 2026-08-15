@@ -58,7 +58,7 @@ export function BaleWeightEditDialog({
       onClose();
       onSuccess();
     },
-    onError: (e: import("react").SyntheticEvent) => {
+    onError: (e: any) => {
       toast({ title: "Failed", description: e.message, variant: "destructive" });
     },
   });

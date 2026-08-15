@@ -38,7 +38,7 @@ async function ensureCutoverColumns(): Promise<void> {
   );
 }
 
-function exactConfirmation(req: import("express").Request, expected: string, sourceName: string): string | null {
+function exactConfirmation(req: any, expected: string, sourceName: string): string | null {
   if (req.body?.confirmation !== expected) return `Requires confirmation = "${expected}"`;
   if (!req.body?.companyNameConfirm || req.body.companyNameConfirm.trim() !== sourceName) {
     return `Company name confirmation must match exactly: "${sourceName}"`;
@@ -48,8 +48,8 @@ function exactConfirmation(req: import("express").Request, expected: string, sou
 
 async function invokeMigrationHandler(
   handler: (req: Request, res: Response) => Promise<unknown>,
-  req: import("express").Request,
-  body: unknown
+  req: any,
+  body: any
 ): Promise<unknown> {
   let statusCode = 200;
   let payload: any = null;

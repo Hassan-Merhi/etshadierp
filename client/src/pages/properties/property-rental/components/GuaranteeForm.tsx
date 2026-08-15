@@ -85,7 +85,7 @@ function GuaranteeForm({
       toast({ title: "Guarantee status reset" });
       invalidate();
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const post = useMutation({
@@ -100,7 +100,7 @@ function GuaranteeForm({
       toast({ title: "Guarantee posted to statement" });
       invalidate();
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const moveToCash = useMutation({
@@ -115,7 +115,7 @@ function GuaranteeForm({
       toast({ title: "Guarantee moved to cash successfully" });
       invalidate();
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const applyToRent = useMutation({
@@ -129,12 +129,12 @@ function GuaranteeForm({
       toast({ title: "Guarantee applied to rent", description: "Rent ledger updated. No cash moved." });
       invalidate();
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const undoGuaranteeAsRent = useMutation({
     mutationFn: () => apiRequest("POST", `${apiBase}/contracts/${contract.id}/undo-guarantee-as-rent`, {}),
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       setUndoConfirm(false);
       toast({
         title: "Guarantee reversed",
@@ -142,7 +142,7 @@ function GuaranteeForm({
       });
       invalidate();
     },
-    onError: (e: import("react").SyntheticEvent) => {
+    onError: (e: any) => {
       setUndoConfirm(false);
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },

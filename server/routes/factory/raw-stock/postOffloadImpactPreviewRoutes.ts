@@ -7,7 +7,7 @@ import { parseId } from "../../../lib/parseId";
 import { preparePostOffloadImpactPreview } from "../../../services/factory/postOffloadImpactPreview";
 
 export function registerPostOffloadImpactPreviewRoutes(app: Express): void {
-  app.post("/api/factory/containers/:id/post-offload-charges/preview", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.post("/api/factory/containers/:id/post-offload-charges/preview", requireAuth, async (req: any, res: any) => {
     const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
     const userId = String(req.session.userId || req.user?.id || "");
     const containerId = parseId(req.params.id);

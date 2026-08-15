@@ -75,12 +75,12 @@ export function BrokerOverviewPanel({
   const brokerOwnBalances: { currencyCode: string; balance: number; isBrokerPool: boolean }[] = (
     brokerOverviewStatement?.currencyLedgers || []
   )
-    .map((section: unknown) => ({
+    .map((section: any) => ({
       currencyCode: section.currencyCode,
       balance: parseFloat(section.netBalance || "0"),
       isBrokerPool: !!section.isBrokerPool,
     }))
-    .filter((b: unknown) => Math.abs(b.balance) > 0.001);
+    .filter((b: any) => Math.abs(b.balance) > 0.001);
 
   return (
     <div className="space-y-6">

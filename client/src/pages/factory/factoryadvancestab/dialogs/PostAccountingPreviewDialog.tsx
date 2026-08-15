@@ -69,7 +69,7 @@ export function PostAccountingPreviewDialog({
                 <SelectValue placeholder="Select cash account" />
               </SelectTrigger>
               <SelectContent>
-                {(cashAccounts || []).map((a: unknown) => (
+                {(cashAccounts || []).map((a: any) => (
                   <SelectItem key={a.id} value={String(a.id)}>
                     {a.name} ({a.code})
                   </SelectItem>
@@ -92,8 +92,8 @@ export function PostAccountingPreviewDialog({
             </div>
           ) : (
             (() => {
-              const selectedAcct = (cashAccounts || []).find((a: unknown) => String(a.id) === postCashAccountId);
-              const grandTotal = unvouchered.reduce((s: unknown, a: unknown) => s + parseFloat(a.amount || "0"), 0);
+              const selectedAcct = (cashAccounts || []).find((a: any) => String(a.id) === postCashAccountId);
+              const grandTotal = unvouchered.reduce((s: any, a: any) => s + parseFloat(a.amount || "0"), 0);
               const grouped: Record<string, typeof unvouchered> = {};
               for (const adv of unvouchered) {
                 const key = adv.workerName || `Worker #${adv.workerId}`;
@@ -137,10 +137,10 @@ export function PostAccountingPreviewDialog({
                           <div className="px-4 py-1.5 bg-muted/30 text-xs font-semibold text-muted-foreground flex justify-between">
                             <span>{workerName}</span>
                             <span className="font-mono">
-                              {fmt(advs.reduce((s: unknown, a: unknown) => s + parseFloat(a.amount || "0"), 0))}
+                              {fmt(advs.reduce((s: any, a: any) => s + parseFloat(a.amount || "0"), 0))}
                             </span>
                           </div>
-                          {advs.map((adv: unknown) => (
+                          {advs.map((adv: any) => (
                             <div
                               key={adv.id}
                               className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-4 py-2 text-sm items-center"
@@ -206,7 +206,7 @@ export function PostAccountingPreviewDialog({
                 Posting…
               </>
             ) : (
-              `Confirm — Post ${fmt(unvouchered?.reduce((s: unknown, a: unknown) => s + parseFloat(a.amount || "0"), 0) ?? 0)} (${unvouchered?.length ?? 0} entries)`
+              `Confirm — Post ${fmt(unvouchered?.reduce((s: any, a: any) => s + parseFloat(a.amount || "0"), 0) ?? 0)} (${unvouchered?.length ?? 0} entries)`
             )}
           </Button>
         </DialogFooter>

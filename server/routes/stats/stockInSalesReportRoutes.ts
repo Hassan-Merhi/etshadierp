@@ -97,13 +97,13 @@ function invalidRange(startDate: string | undefined, endDate: string | undefined
   return !!startDate && !!endDate && startDate > endDate;
 }
 
-function locationAccessResponse(error: unknown, res: import("express").Response): boolean {
+function locationAccessResponse(error: unknown, res: any): boolean {
   if (!(error instanceof StockInSalesLocationAccessError)) return false;
   res.status(error.statusCode).json({ message: error.message });
   return true;
 }
 
-async function resolveRequestLocationIds(req: import("express").Request, requestedLocationIds: number[]): Promise<number[]> {
+async function resolveRequestLocationIds(req: any, requestedLocationIds: number[]): Promise<number[]> {
   const companyId = req.session.currentCompanyId;
   const userId = req.session.userId;
   const role = req.session.currentRole;

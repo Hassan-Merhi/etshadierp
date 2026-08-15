@@ -76,7 +76,7 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
         queryKey: ["/api/transporter-statement", selectedAccountId, "statement"],
       });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Failed to save due date", description: err?.message, variant: "destructive" });
     },
   });
@@ -312,7 +312,7 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
         queryKey: ["/api/transporter-statement", selectedAccountId, "statement"],
       });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Reallocation failed", description: err?.message, variant: "destructive" });
     },
   });

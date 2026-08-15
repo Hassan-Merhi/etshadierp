@@ -12,7 +12,7 @@ import { agentAccounts, freightAccounts } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 
 export function registerAgentFreightAccountRoutes(app: Express) {
-  app.get("/api/agent-accounts", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.get("/api/agent-accounts", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -23,7 +23,7 @@ export function registerAgentFreightAccountRoutes(app: Express) {
     }
   });
 
-  app.post("/api/agent-accounts", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.post("/api/agent-accounts", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -44,7 +44,7 @@ export function registerAgentFreightAccountRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/agent-accounts/:accountId", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.delete("/api/agent-accounts/:accountId", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -59,7 +59,7 @@ export function registerAgentFreightAccountRoutes(app: Express) {
   });
 
   // ── FREIGHT ACCOUNTS (Financial Snapshot) ─────────────────────────────────
-  app.get("/api/freight-accounts", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.get("/api/freight-accounts", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -70,7 +70,7 @@ export function registerAgentFreightAccountRoutes(app: Express) {
     }
   });
 
-  app.post("/api/freight-accounts", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.post("/api/freight-accounts", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -91,7 +91,7 @@ export function registerAgentFreightAccountRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/freight-accounts/:accountId", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.delete("/api/freight-accounts/:accountId", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

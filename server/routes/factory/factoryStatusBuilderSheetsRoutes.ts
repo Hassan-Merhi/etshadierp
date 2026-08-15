@@ -152,7 +152,7 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
   });
 
   // ── Update a sheet ─────────────────────────────────────────────────────────
-  app.put("/api/factory/status-builder/sheets/:id", requireAuth, async (req: import("express").Request, res) => {
+  app.put("/api/factory/status-builder/sheets/:id", requireAuth, async (req: any, res) => {
     try {
       const companyId = req.session.currentCompanyId!;
       const id = parseId(req.params.id);
@@ -202,7 +202,7 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
   });
 
   // ── Change history log ─────────────────────────────────────────────────────
-  app.get("/api/factory/status-builder/log", requireAuth, async (req: import("express").Request, res) => {
+  app.get("/api/factory/status-builder/log", requireAuth, async (req: any, res) => {
     try {
       const companyId = req.session.currentCompanyId!;
       const sheetId = parseOptionalId(req.query.sheetId as string | undefined);

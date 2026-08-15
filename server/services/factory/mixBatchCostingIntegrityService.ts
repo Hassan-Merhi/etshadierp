@@ -197,7 +197,7 @@ export function validateMixBatchCostingRequest(request: MixBatchCostingRequest):
  * drifts because of consumption.
  */
 export async function createMixBatchCostTx(
-  tx: unknown,
+  tx: any,
   request: MixBatchCostingRequest,
   adapter: MixBatchCostingAdapter
 ): Promise<MixBatchCostingResult> {

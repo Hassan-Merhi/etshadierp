@@ -55,7 +55,7 @@ export function ContainerSpView({
       const response = await apiRequest("POST", `/api/sp/containers/${selectedContainer.id}/cancel`, { reason });
       return response.json();
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sp/containers"] });
       queryClient.invalidateQueries({ queryKey: [`/api/sp/containers/${selectedContainer?.id}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/sp/report/payable"] });
@@ -69,7 +69,7 @@ export function ContainerSpView({
       setSelectedContainer(null);
       setReason("");
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       toast({ title: "Cancellation failed", description: error.message, variant: "destructive" });
     },
   });

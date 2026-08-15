@@ -135,7 +135,7 @@ export function registerFactoryCompanyImportRoutes(app: Express) {
             return mapped ?? null;
           };
 
-          async function makeUniqueCode(tx: any, table: any, field: PropertyKey, baseValue: string): Promise<string> {
+          async function makeUniqueCode(tx: any, table: any, field: any, baseValue: string): Promise<string> {
             const [existing] = await tx.select({ id: table.id }).from(table).where(eq(field, baseValue)).limit(1);
             if (!existing) return baseValue;
             const attempt = baseValue + importSuffix;

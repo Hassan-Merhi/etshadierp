@@ -207,7 +207,7 @@ export default function BalesHistory() {
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     refetchOnMount: false,
-    placeholderData: (prev: unknown) => prev,
+    placeholderData: (prev: any) => prev,
   });
 
   // Extract flat items + pagination metadata from the paginated response.
@@ -230,7 +230,7 @@ export default function BalesHistory() {
       toast({ title: "Bale deleted" });
       setDeleteConfirm(null);
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error deleting bale", description: error.message, variant: "destructive" });
       setDeleteConfirm(null);
@@ -245,7 +245,7 @@ export default function BalesHistory() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
       toast({ title: "Status updated" });
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error updating status", description: error.message, variant: "destructive" });
     },
@@ -261,7 +261,7 @@ export default function BalesHistory() {
       setBulkStatus("");
       toast({ title: "Bulk status updated" });
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error updating status", description: error.message, variant: "destructive" });
     },
@@ -277,7 +277,7 @@ export default function BalesHistory() {
       setEditingNameId(null);
       toast({ title: "Product name updated" });
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error updating name", description: error.message, variant: "destructive" });
     },
@@ -314,7 +314,7 @@ export default function BalesHistory() {
         : "";
       toast({ title: "Bale returned to stock", description: `Bale removed from order.${invoiceMsg}` });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
@@ -324,7 +324,7 @@ export default function BalesHistory() {
     mutationFn: async (id: number) => {
       return await modeApiRequest("POST", `/api/factory/bales/${id}/repack`, {});
     },
-    onSuccess: async (response: unknown) => {
+    onSuccess: async (response: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
       setRepackConfirm(null);
       const data = await response.json();
@@ -339,7 +339,7 @@ export default function BalesHistory() {
       };
       openBrowserReprint([label]);
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error repacking bale", description: error.message, variant: "destructive" });
       setRepackConfirm(null);
@@ -479,7 +479,7 @@ export default function BalesHistory() {
     }
   };
 
-  const handleReprint = async (baleRow: unknown) => {
+  const handleReprint = async (baleRow: any) => {
     const label: LabelData = {
       referenceNumber: baleRow.bale.referenceNumber || baleRow.bale.baleCode,
       articleCode: baleRow.product?.articleCode || baleRow.bale.articleCode || baleRow.bale.category || "",
@@ -603,8 +603,8 @@ export default function BalesHistory() {
     return true;
   });
 
-  const totalWeight = filtered.reduce((sum: number, row: unknown) => sum + parseFloat(row.bale.weightKg || "0"), 0);
-  const totalBales = filtered.reduce((sum: number, row: unknown) => sum + (row.bale.quantity || 1), 0);
+  const totalWeight = filtered.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
+  const totalBales = filtered.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
 
   const groupedFiltered = useMemo(() => {
     const map = new Map<
@@ -667,7 +667,7 @@ export default function BalesHistory() {
 
   // Robust classification: check category → productName → product.name with includes() matching
   // so "Garbage Bales", "GARBAGE", " garbage " and "wiper"/"WIPERS" all classify correctly
-  const getBaleClassification = (row: unknown): "garbage" | "wipers" | "regular" => {
+  const getBaleClassification = (row: any): "garbage" | "wipers" | "regular" => {
     const candidates = [row.bale?.category, row.bale?.productName, row.product?.name]
       .filter((v) => v && typeof v === "string")
       .map((v: string) => v.toLowerCase().trim());
@@ -682,12 +682,12 @@ export default function BalesHistory() {
   const todayGarbage = todayInStock.filter((row) => getBaleClassification(row) === "garbage");
   const todayWipers = todayInStock.filter((row) => getBaleClassification(row) === "wipers");
   const todayRegular = todayInStock.filter((row) => getBaleClassification(row) === "regular");
-  const regularQty = todayRegular.reduce((sum: number, row: unknown) => sum + (row.bale.quantity || 1), 0);
-  const regularKg = todayRegular.reduce((sum: number, row: unknown) => sum + parseFloat(row.bale.weightKg || "0"), 0);
-  const garbageQty = todayGarbage.reduce((sum: number, row: unknown) => sum + (row.bale.quantity || 1), 0);
-  const garbageKg = todayGarbage.reduce((sum: number, row: unknown) => sum + parseFloat(row.bale.weightKg || "0"), 0);
-  const wipersQty = todayWipers.reduce((sum: number, row: unknown) => sum + (row.bale.quantity || 1), 0);
-  const wipersKg = todayWipers.reduce((sum: number, row: unknown) => sum + parseFloat(row.bale.weightKg || "0"), 0);
+  const regularQty = todayRegular.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
+  const regularKg = todayRegular.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
+  const garbageQty = todayGarbage.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
+  const garbageKg = todayGarbage.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
+  const wipersQty = todayWipers.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
+  const wipersKg = todayWipers.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
 
   if (isLoading) {
     return (

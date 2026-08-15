@@ -240,7 +240,7 @@ export function validateRawStockCostEvent(request: RawStockCostEventRequest): Va
  * and audit recorded inside the caller-owned transaction.
  */
 export async function applyRawStockCostEventTx(
-  tx: unknown,
+  tx: any,
   request: RawStockCostEventRequest,
   adapter: RawStockCostingAdapter
 ): Promise<RawStockCostResult> {

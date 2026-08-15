@@ -171,7 +171,7 @@ export function DailyRateModal({ companyId }: DailyRateModalProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/balance-sheet"] });
       setIsOpen(false);
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },

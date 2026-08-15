@@ -163,7 +163,7 @@ export default function FactoryPendingLoadings() {
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/v5/stock-allocation") });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Delete failed", description: err.message, variant: "destructive" });
     },
   });
@@ -176,7 +176,7 @@ export default function FactoryPendingLoadings() {
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/v5/stock-allocation") });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Restore failed", description: err.message, variant: "destructive" });
     },
   });
@@ -222,7 +222,7 @@ export default function FactoryPendingLoadings() {
       toast({ title: "Proforma updated", description: "The loading's proforma has been saved successfully." });
       closeLinkDialog();
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Link failed", description: err.message, variant: "destructive" });
     },
   });

@@ -13,7 +13,7 @@ interface SupplierFormDialogProps {
   editingSupplier: FactorySupplier | null;
   setEditingSupplier: (val: FactorySupplier | null) => void;
   formData: unknown;
-  setFormData: (val: unknown) => void;
+  setFormData: (val: any) => void;
   formRole: "broker" | "standalone" | "linked";
   setFormRole: (val: "broker" | "standalone" | "linked") => void;
   allSuppliers: SupplierWithBalance[];
@@ -81,7 +81,7 @@ export function SupplierFormDialog({
             <Label>Account Type</Label>
             <Select
               value={formRole}
-              onValueChange={(v: unknown) => {
+              onValueChange={(v: any) => {
                 setFormRole(v);
                 if (v !== "linked") setFormData({ ...formData, parentId: null });
               }}

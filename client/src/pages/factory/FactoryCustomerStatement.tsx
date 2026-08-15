@@ -157,7 +157,7 @@ export default function FactoryCustomerStatement() {
     mutationFn: async (lines: { articleCode: string; pricePerBale: string | number }[]) => {
       return await factoryApiRequest("PUT", `/api/factory/customer-price-lists/${customerId}`, lines);
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-price-lists", customerId] });
       setPriceEdits({});
       setNewCode("");

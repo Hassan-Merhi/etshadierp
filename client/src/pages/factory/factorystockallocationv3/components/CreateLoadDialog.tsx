@@ -51,7 +51,7 @@ export function CreateLoadDialog({
       setNotes("");
       onClose();
     },
-    onError: (err: unknown) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   return (

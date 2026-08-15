@@ -99,7 +99,7 @@ export default function RentalPaymentsLog({
       toast({ title: "Payment deleted", description: "The payment and its accounting entry have been removed." });
       setDeleteTarget(null);
     },
-    onError: (e: import("react").SyntheticEvent) => {
+    onError: (e: any) => {
       toast({ title: "Delete failed", description: e.message, variant: "destructive" });
       setDeleteTarget(null);
     },

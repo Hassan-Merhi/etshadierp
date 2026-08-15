@@ -98,7 +98,7 @@ export default function OrphanedRecordsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
@@ -112,7 +112,7 @@ export default function OrphanedRecordsPage() {
       toast({ title: "Success", description: "Archive deleted successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-group-archives"] });
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
@@ -122,7 +122,7 @@ export default function OrphanedRecordsPage() {
     mutationFn: async (data: { voucherIds: number[]; newLocationId: number }) => {
       return modeApiRequest("POST", "/api/orphaned-records/reassign", data);
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       toast({
         title: "Success",
         description: `${data.updated} records reassigned to ${data.newLocationName}`,
@@ -132,7 +132,7 @@ export default function OrphanedRecordsPage() {
       setSelectedVouchers([]);
       setSelectedLocation("");
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
@@ -143,7 +143,7 @@ export default function OrphanedRecordsPage() {
       const res = await modeApiRequest("DELETE", "/api/orphaned-records/delete-all");
       return res.json();
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       toast({
         title: "Deleted",
         description: `${data.deleted} orphaned vouchers permanently deleted`,
@@ -152,7 +152,7 @@ export default function OrphanedRecordsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/sales-report"] });
       setSelectedVouchers([]);
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },

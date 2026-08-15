@@ -241,7 +241,7 @@ export default function NotificationSettings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/notification-rules"] });
     },
-    onError: (err: unknown) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const addRecipient = (eventType: string, userId: string) => {

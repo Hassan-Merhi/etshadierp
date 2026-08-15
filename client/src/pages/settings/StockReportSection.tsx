@@ -117,7 +117,7 @@ export function StockReportSection() {
       queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/stock-settings"] });
       toast({ title: "Stock report settings saved" });
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const sendNow = useMutation({
@@ -126,10 +126,10 @@ export function StockReportSection() {
         companyId: rCompanyId,
         recipientId: rRecipientId,
       }),
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       toast({ title: "Reports sent", description: data?.message || "Done" });
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Send failed", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Send failed", description: e.message, variant: "destructive" }),
   });
 
   const canSend = !!(rCompanyId && rRecipientId);

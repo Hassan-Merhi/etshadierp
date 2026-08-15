@@ -174,7 +174,7 @@ export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
   const workerDeductionsWorkerBase = appMode === "factory" ? "/api/factory/workers" : "/api/payroll/workers";
 
   const addWorkerDeductionMutation = useMutation({
-    mutationFn: async (data: unknown) => {
+    mutationFn: async (data: any) => {
       return await modeApiRequest("POST", `${workerDeductionsWorkerBase}/${data.workerId}/deductions`, {
         amount: data.amount,
         reason: data.reason || null,
@@ -749,7 +749,7 @@ export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
           <Form {...addWorkerDeductionForm}>
             <form
               noValidate
-              onSubmit={addWorkerDeductionForm.handleSubmit((data: unknown) => addWorkerDeductionMutation.mutate(data))}
+              onSubmit={addWorkerDeductionForm.handleSubmit((data: any) => addWorkerDeductionMutation.mutate(data))}
               className="space-y-4"
             >
               <FormField

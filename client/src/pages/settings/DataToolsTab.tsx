@@ -144,7 +144,7 @@ export function DataToolsTab() {
     mutationFn: async () => {
       return apiRequest("POST", "/api/sales-report/recalculate-costs", {});
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       toast({
         title: "Cost Prices Updated",
         description: `Updated ${data.updatedCount} of ${data.totalChecked} sales items`,
@@ -192,7 +192,7 @@ export function DataToolsTab() {
         return;
       }
       const headerRow = utils.sheet_to_json<string[]>(worksheet, { header: 1 })[0] || [];
-      const columns = headerRow.map((h: unknown) => String(h || "").trim());
+      const columns = headerRow.map((h: any) => String(h || "").trim());
       const requiredCols = ["barcode", "costPrice"];
       const missingCols = requiredCols.filter((col) => !columns.includes(col));
       if (missingCols.length > 0) {
@@ -205,7 +205,7 @@ export function DataToolsTab() {
       }
       const errors: string[] = [];
       const rows: Array<{ barcode: string; costPrice: number }> = [];
-      jsonData.forEach((row: unknown, index: number) => {
+      jsonData.forEach((row: any, index: number) => {
         const rowNumber = index + 2;
         if (!row.barcode || String(row.barcode).trim() === "") {
           errors.push(`Row ${rowNumber}: Barcode is required`);
@@ -291,7 +291,7 @@ export function DataToolsTab() {
         return;
       }
       const headerRow = utils.sheet_to_json<string[]>(worksheet, { header: 1 })[0] || [];
-      const columns = headerRow.map((h: unknown) => String(h || "").trim());
+      const columns = headerRow.map((h: any) => String(h || "").trim());
       const requiredCols = ["Item_barcode", "quantity", "rate", "value"];
       const missingCols = requiredCols.filter((col) => !columns.includes(col));
       if (missingCols.length > 0) {
@@ -310,7 +310,7 @@ export function DataToolsTab() {
         rate: string;
         value: string;
       }> = [];
-      jsonData.forEach((row: unknown, index: number) => {
+      jsonData.forEach((row: any, index: number) => {
         const rowNumber = index + 2;
         if (!row.Item_barcode || String(row.Item_barcode).trim() === "") {
           errors.push(`Row ${rowNumber}: Item_barcode is required`);
@@ -401,7 +401,7 @@ export function DataToolsTab() {
   };
 
   const getCurrentQty = (stockItemId: number): number => {
-    const locRow = silentLocInventory.find((inv: unknown) => inv.stockItemId === stockItemId);
+    const locRow = silentLocInventory.find((inv: any) => inv.stockItemId === stockItemId);
     return locRow ? parseFloat(locRow.quantity || "0") : 0;
   };
 
@@ -432,10 +432,10 @@ export function DataToolsTab() {
           const rate = parseFloat(String(row.Rate ?? "0")) || 0;
 
           let matched: any = code
-            ? (allStockItems as unknown[]).find((s: unknown) => s.code?.toLowerCase() === code.toLowerCase())
+            ? (allStockItems as unknown[]).find((s: any) => s.code?.toLowerCase() === code.toLowerCase())
             : undefined;
           if (!matched && name)
-            matched = (allStockItems as unknown[]).find((s: unknown) => s.name.toLowerCase() === name.toLowerCase());
+            matched = (allStockItems as unknown[]).find((s: any) => s.name.toLowerCase() === name.toLowerCase());
 
           if (!matched) {
             return {
@@ -500,7 +500,7 @@ export function DataToolsTab() {
     doc.text("Silent Adjustment Preview", 14, 18);
     doc.setFontSize(10);
     doc.text(
-      `Location: ${(locations as unknown[]).find((l: unknown) => String(l.id) === silentProdLocId)?.name || ""}   Date: ${new Date().toLocaleDateString()}`,
+      `Location: ${(locations as unknown[]).find((l: any) => String(l.id) === silentProdLocId)?.name || ""}   Date: ${new Date().toLocaleDateString()}`,
       14,
       25
     );
@@ -627,7 +627,7 @@ export function DataToolsTab() {
                   <SelectValue placeholder="Choose location..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {locations.map((loc: unknown) => (
+                  {locations.map((loc: any) => (
                     <SelectItem key={loc.id} value={String(loc.id)}>
                       {loc.name}
                     </SelectItem>
@@ -869,7 +869,7 @@ export function DataToolsTab() {
                       <SelectValue placeholder="Select location..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {(locations as unknown[]).map((loc: unknown) => (
+                      {(locations as unknown[]).map((loc: any) => (
                         <SelectItem key={loc.id} value={String(loc.id)}>
                           {loc.name}
                         </SelectItem>
@@ -932,7 +932,7 @@ export function DataToolsTab() {
                                 );
                               }
                               const filtered = (allStockItems as unknown[]).filter(
-                                (si: unknown) =>
+                                (si: any) =>
                                   si.name.toLowerCase().includes(term) ||
                                   (si.code && si.code.toLowerCase().includes(term))
                               );
@@ -940,8 +940,8 @@ export function DataToolsTab() {
                                 return (
                                   <div className="text-center text-sm text-muted-foreground py-4">No items found</div>
                                 );
-                              return filtered.map((si: unknown) => {
-                                const locRow = silentLocInventory.find((inv: unknown) => inv.stockItemId === si.id);
+                              return filtered.map((si: any) => {
+                                const locRow = silentLocInventory.find((inv: any) => inv.stockItemId === si.id);
                                 const currentQty = locRow ? parseFloat(locRow.quantity || "0") : 0;
                                 return (
                                   <button
@@ -1382,7 +1382,7 @@ export function DataToolsTab() {
                       <SelectValue placeholder="From location..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {(locations as unknown[]).map((loc: unknown) => (
+                      {(locations as unknown[]).map((loc: any) => (
                         <SelectItem key={loc.id} value={String(loc.id)}>
                           {loc.name}
                         </SelectItem>
@@ -1398,8 +1398,8 @@ export function DataToolsTab() {
                     </SelectTrigger>
                     <SelectContent>
                       {(locations as unknown[])
-                        .filter((l: unknown) => String(l.id) !== silentSrcId)
-                        .map((loc: unknown) => (
+                        .filter((l: any) => String(l.id) !== silentSrcId)
+                        .map((loc: any) => (
                           <SelectItem key={loc.id} value={String(loc.id)}>
                             {loc.name}
                           </SelectItem>
@@ -1533,7 +1533,7 @@ export function DataToolsTab() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {silentErrorLines.map((e: import("react").SyntheticEvent, i: number) => (
+                              {silentErrorLines.map((e: any, i: number) => (
                                 <TableRow key={i} className="bg-red-50/60 dark:bg-red-950/20">
                                   <TableCell className="text-xs py-1.5 text-muted-foreground">{e.rowNum}</TableCell>
                                   <TableCell className="text-xs py-1.5 font-mono">{e.barcode || "—"}</TableCell>
@@ -1577,7 +1577,7 @@ export function DataToolsTab() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {silentWarnItems.map((item: unknown, i: number) => (
+                              {silentWarnItems.map((item: any, i: number) => (
                                 <TableRow
                                   key={i}
                                   className={silentIncludeWarnings ? "bg-yellow-50/60 dark:bg-yellow-950/20" : ""}
@@ -1621,7 +1621,7 @@ export function DataToolsTab() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {silentValidItems.map((item: unknown, i: number) => (
+                              {silentValidItems.map((item: any, i: number) => (
                                 <TableRow key={i} className="bg-green-50/40 dark:bg-green-950/10">
                                   <TableCell className="py-1.5">
                                     <div className="text-xs font-medium">{item.stockItemName}</div>

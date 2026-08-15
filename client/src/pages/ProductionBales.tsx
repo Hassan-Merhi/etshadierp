@@ -124,10 +124,10 @@ function BatchDetailView({ batch, onBack }: { batch: unknown; onBack: () => void
   const activeLocations = locations?.filter((l) => l.active);
   const activeMixBatches = mixBatches?.filter((b) => b.status === "ACTIVE");
 
-  const pendingBales = batch.bales?.filter((b: unknown) => b.status === "PENDING_PRESSING") || [];
+  const pendingBales = batch.bales?.filter((b: any) => b.status === "PENDING_PRESSING") || [];
   const scannedCount = scannedBaleIds.size;
   const expectedCount = pendingBales.length;
-  const missingBales = pendingBales.filter((b: unknown) => !scannedBaleIds.has(b.id));
+  const missingBales = pendingBales.filter((b: any) => !scannedBaleIds.has(b.id));
   const countsMatch = scannedCount === expectedCount && expectedCount > 0;
   const hasScanned = scannedCount > 0;
 
@@ -137,8 +137,8 @@ function BatchDetailView({ batch, onBack }: { batch: unknown; onBack: () => void
     : 0;
 
   const totalScannedWeight = pendingBales
-    .filter((b: unknown) => scannedBaleIds.has(b.id))
-    .reduce((sum: number, b: unknown) => sum + parseFloat(b.weightKg || "0"), 0);
+    .filter((b: any) => scannedBaleIds.has(b.id))
+    .reduce((sum: number, b: any) => sum + parseFloat(b.weightKg || "0"), 0);
 
   const selectedLocationName = activeLocations?.find((l) => l.id.toString() === selectedLocationId);
 
@@ -253,10 +253,10 @@ function BatchDetailView({ batch, onBack }: { batch: unknown; onBack: () => void
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
 
       const locName = selectedLocationName ? `${selectedLocationName.code} - ${selectedLocationName.name}` : "";
-      const finalizedBales = pendingBales.filter((b: unknown) => scannedBaleIds.has(b.id));
+      const finalizedBales = pendingBales.filter((b: any) => scannedBaleIds.has(b.id));
 
       try {
-        const labelData = finalizedBales.map((bale: unknown) => ({
+        const labelData = finalizedBales.map((bale: any) => ({
           productionBaleId: bale.id,
           productId: bale.productId,
           articleCode: bale.articleCode || "",
@@ -269,8 +269,8 @@ function BatchDetailView({ batch, onBack }: { batch: unknown; onBack: () => void
         if (labelResponse.ok) {
           const { labelPrints } = await labelResponse.json();
 
-          const baleMap = new Map(finalizedBales.map((b: unknown) => [b.id, b]));
-          const labels = labelPrints.map((lp: unknown) => {
+          const baleMap = new Map(finalizedBales.map((b: any) => [b.id, b]));
+          const labels = labelPrints.map((lp: any) => {
             const bale = baleMap.get(lp.productionBaleId) || {};
             return {
               referenceNumber: lp.referenceNumber,
@@ -327,11 +327,11 @@ function BatchDetailView({ batch, onBack }: { batch: unknown; onBack: () => void
   });
 
   const productGroups = new Map<string, number>();
-  pendingBales.forEach((b: unknown) => {
+  pendingBales.forEach((b: any) => {
     const name = b.productName || "Unknown";
     productGroups.set(name, (productGroups.get(name) || 0) + 1);
   });
-  const totalWeight = pendingBales.reduce((sum: number, b: unknown) => sum + parseFloat(b.weightKg || "0"), 0);
+  const totalWeight = pendingBales.reduce((sum: number, b: any) => sum + parseFloat(b.weightKg || "0"), 0);
 
   return (
     <div className="space-y-4">
@@ -408,7 +408,7 @@ function BatchDetailView({ batch, onBack }: { batch: unknown; onBack: () => void
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {pendingBales.map((bale: unknown) => {
+                {pendingBales.map((bale: any) => {
                   const isScanned = scannedBaleIds.has(bale.id);
                   return (
                     <TableRow
@@ -586,7 +586,7 @@ function BatchDetailView({ batch, onBack }: { batch: unknown; onBack: () => void
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {missingBales.map((bale: unknown) => (
+                    {missingBales.map((bale: any) => (
                       <TableRow key={bale.id}>
                         <TableCell className="font-mono text-sm">{bale.referenceNumber}</TableCell>
                         <TableCell className="text-sm">{bale.productName || "-"}</TableCell>
@@ -665,8 +665,8 @@ export default function ProductionBales() {
     queryKey: ["/api/factory/pressing-batches"],
   });
 
-  const pendingBatches = pressingBatches?.filter((b: unknown) => b.pendingCount > 0) || [];
-  const selectedBatch = pressingBatches?.find((b: unknown) => b.id === selectedBatchId);
+  const pendingBatches = pressingBatches?.filter((b: any) => b.pendingCount > 0) || [];
+  const selectedBatch = pressingBatches?.find((b: any) => b.id === selectedBatchId);
 
   if (batchesLoading) {
     return (
@@ -707,14 +707,14 @@ export default function ProductionBales() {
 
       {pendingBatches.length > 0 && (
         <div className="grid gap-3">
-          {pendingBatches.map((batch: unknown) => {
-            const batchBales = batch.bales?.filter((b: unknown) => b.status === "PENDING_PRESSING") || [];
+          {pendingBatches.map((batch: any) => {
+            const batchBales = batch.bales?.filter((b: any) => b.status === "PENDING_PRESSING") || [];
             const productGroups = new Map<string, number>();
-            batchBales.forEach((b: unknown) => {
+            batchBales.forEach((b: any) => {
               const name = b.productName || "Unknown";
               productGroups.set(name, (productGroups.get(name) || 0) + 1);
             });
-            const totalWeight = batchBales.reduce((sum: number, b: unknown) => sum + parseFloat(b.weightKg || "0"), 0);
+            const totalWeight = batchBales.reduce((sum: number, b: any) => sum + parseFloat(b.weightKg || "0"), 0);
             const productList = Array.from(productGroups.entries());
 
             return (

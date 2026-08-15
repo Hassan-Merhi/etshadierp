@@ -41,7 +41,7 @@ function ModifyRentForm({
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units", unitId, "detail"] });
       setNewAmount("");
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   return (

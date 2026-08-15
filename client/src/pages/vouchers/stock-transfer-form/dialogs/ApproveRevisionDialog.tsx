@@ -54,7 +54,7 @@ export function ApproveRevisionDialog({
               : "The following quantity changes will be applied to the transfer. This action cannot be undone."}
           </DialogDescription>
         </DialogHeader>
-        {revisionsToApply.map((revision: unknown) => (
+        {revisionsToApply.map((revision: any) => (
           <div key={revision.id} className="space-y-1">
             {multiple && (
               <p className="text-xs font-medium text-muted-foreground">
@@ -74,8 +74,8 @@ export function ApproveRevisionDialog({
                 </thead>
                 <tbody>
                   {(revision.items ?? [])
-                    .filter((item: unknown) => parseFloat(item.delta) !== 0)
-                    .map((item: unknown, idx: number) => {
+                    .filter((item: any) => parseFloat(item.delta) !== 0)
+                    .map((item: any, idx: number) => {
                       const delta = parseFloat(item.delta);
                       return (
                         <tr key={idx} className="border-t">

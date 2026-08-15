@@ -257,7 +257,7 @@ export async function scrapeTracking(containerNumber: string): Promise<ScraperRe
     let isBlocked = false;
 
     // Intercept ParcelsApp API responses (v2 and v3, all known endpoints)
-    page.on("response", async (response: import("express").Response) => {
+    page.on("response", async (response: any) => {
       const url: string = response.url();
       if (
         url.includes("parcelsapp.com") &&

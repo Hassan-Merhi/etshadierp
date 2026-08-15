@@ -10,15 +10,15 @@ import { firstRow } from "../../../lib/queryResult";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-export function getCompanyId(req: import("express").Request): number | null {
+export function getCompanyId(req: any): number | null {
   return req.session.factoryCompanyId || req.session.currentCompanyId || null;
 }
 
-export function getUsername(req: import("express").Request): string {
+export function getUsername(req: any): string {
   return req.session.username || req.session.user?.username || "unknown";
 }
 
-export async function isAdmin(req: import("express").Request, companyId: number): Promise<boolean> {
+export async function isAdmin(req: any, companyId: number): Promise<boolean> {
   try {
     const userId = req.session.userId;
     if (!userId) return false;

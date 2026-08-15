@@ -98,7 +98,7 @@ export function ContainerReportPanel({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {factoryContainerSales.rows.map((row: unknown) => (
+                  {factoryContainerSales.rows.map((row: any) => (
                     <TableRow key={row.id}>
                       <TableCell className="font-mono">{row.containerNumber || "-"}</TableCell>
                       <TableCell className="font-medium">{row.customerName || `#${row.customerId}`}</TableCell>
@@ -133,7 +133,7 @@ export function ContainerReportPanel({
               </Table>
             </div>
             <div className="md:hidden space-y-3">
-              {factoryContainerSales.rows.map((row: unknown) => (
+              {factoryContainerSales.rows.map((row: any) => (
                 <Card key={row.id}>
                   <CardContent className="p-4 space-y-2">
                     <div className="flex items-center justify-between gap-2">
@@ -237,7 +237,7 @@ export function ContainerReportPanel({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Companies</SelectItem>
-              {userCompanies.map((c: unknown) => (
+              {userCompanies.map((c: any) => (
                 <SelectItem key={c.companyId} value={String(c.companyId)}>
                   {c.companyName}
                 </SelectItem>

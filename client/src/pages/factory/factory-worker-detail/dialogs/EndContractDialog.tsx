@@ -167,7 +167,7 @@ export function EndContractDialog({
                     <SelectValue placeholder="Select account..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {cashAccounts?.map((a: unknown) => (
+                    {cashAccounts?.map((a: any) => (
                       <SelectItem key={a.id} value={String(a.id)}>
                         {a.name} ({a.code})
                       </SelectItem>

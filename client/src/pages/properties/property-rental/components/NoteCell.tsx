@@ -33,7 +33,7 @@ function NoteCell({ contractId, note, testId }: { contractId: number; note: stri
       setEditing(false);
       toast({ title: "Note saved" });
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   if (editing) {

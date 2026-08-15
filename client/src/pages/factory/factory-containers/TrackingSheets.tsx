@@ -199,7 +199,7 @@ export function TrackingSettingsSheet({
       toast({ title: "Tracking settings saved" });
       onClose();
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Failed to save settings", description: err?.message, variant: "destructive" });
     },
   });

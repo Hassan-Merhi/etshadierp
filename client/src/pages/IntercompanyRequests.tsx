@@ -97,7 +97,7 @@ export default function IntercompanyRequests() {
         description: description || undefined,
       });
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       toast({ title: "Approved", description: `Mirror voucher ${data.voucherNumber} created in destination company.` });
       queryClient.invalidateQueries({ queryKey: ["/api/intercompany-requests"] });
       queryClient.invalidateQueries({ queryKey: ["/api/intercompany-requests/pending-count"] });
@@ -105,7 +105,7 @@ export default function IntercompanyRequests() {
       setSelectedAccountId("");
       setApproveDescription("");
     },
-    onError: (err: unknown) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const dismissMutation = useMutation({
@@ -119,7 +119,7 @@ export default function IntercompanyRequests() {
       setDismissDialogRequest(null);
       setDismissNote("");
     },
-    onError: (err: unknown) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   function handleApprove() {

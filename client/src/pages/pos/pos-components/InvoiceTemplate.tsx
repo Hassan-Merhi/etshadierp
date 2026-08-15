@@ -6,8 +6,8 @@ export interface InvoiceTemplateProps {
   printUserName: string;
   selectedCompany: unknown;
   exchangeRate: number | null;
-  fmtPrint: (val: unknown, prefix?: string) => string;
-  fmtPrintCurrency: (val: unknown) => string;
+  fmtPrint: (val: any, prefix?: string) => string;
+  fmtPrintCurrency: (val: any) => string;
 }
 
 export function InvoiceTemplate({
@@ -209,7 +209,7 @@ export function InvoiceTemplate({
             </tr>
           </thead>
           <tbody>
-            {(savedSale?.items ?? []).map((item: unknown, idx: number) => {
+            {(savedSale?.items ?? []).map((item: any, idx: number) => {
               const itemRateUSD = parseFloat(item.rateUSD || item.rate);
               const itemAmountUSD = parseFloat(item.quantity) * itemRateUSD;
               const configuredPrice = parseFloat(item.configuredPrice || "0");
@@ -317,7 +317,7 @@ export function InvoiceTemplate({
                 }}
               >
                 {fmtPrint(
-                  (savedSale?.items ?? []).reduce((sum: number, item: unknown) => sum + parseFloat(item.quantity || 0), 0)
+                  (savedSale?.items ?? []).reduce((sum: number, item: any) => sum + parseFloat(item.quantity || 0), 0)
                 )}
               </td>
               <td style={{ border: "1px solid #999" }}></td>
@@ -332,7 +332,7 @@ export function InvoiceTemplate({
               >
                 {fmtPrintCurrency(
                   (savedSale?.items ?? []).reduce(
-                    (sum: number, item: unknown) => sum + parseFloat(item.quantity) * parseFloat(item.rateUSD || item.rate),
+                    (sum: number, item: any) => sum + parseFloat(item.quantity) * parseFloat(item.rateUSD || item.rate),
                     0
                   )
                 )}
@@ -348,7 +348,7 @@ export function InvoiceTemplate({
                   verticalAlign: "middle",
                   color: (() => {
                     const t = (savedSale?.items ?? []).reduce(
-                      (s: number, i: unknown) =>
+                      (s: number, i: any) =>
                         s +
                         (parseFloat(i.rateUSD || i.rate) - parseFloat(i.configuredPrice || "0")) *
                           parseFloat(i.quantity),
@@ -360,7 +360,7 @@ export function InvoiceTemplate({
               >
                 {(() => {
                   const t = (savedSale?.items ?? []).reduce(
-                    (s: number, i: unknown) =>
+                    (s: number, i: any) =>
                       s +
                       (parseFloat(i.rateUSD || i.rate) - parseFloat(i.configuredPrice || "0")) * parseFloat(i.quantity),
                     0
@@ -387,7 +387,7 @@ export function InvoiceTemplate({
           <span>TOTAL PAID:</span>
           <span>
             {fmtPrintCurrency(
-              (savedSale?.items ?? []).reduce((sum: number, item: unknown) => {
+              (savedSale?.items ?? []).reduce((sum: number, item: any) => {
                 const rateUSD = parseFloat(item.rateUSD || item.rate);
                 return sum + parseFloat(item.quantity) * rateUSD;
               }, 0)

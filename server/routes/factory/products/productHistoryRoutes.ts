@@ -17,8 +17,8 @@ export function registerFactoryProductHistoryRoutes(app: Express) {
   // Shared implementation for the monthly-overview query (year-level view).
   // Called by both the 2-segment route (year from ?year=) and the 3-segment route (year from path).
   async function baleProductHistoryByYear(
-    req: import("express").Request,
-    res: import("express").Response,
+    req: any,
+    res: any,
     companyId: number,
     productId: number,
     locationId: number,
@@ -180,7 +180,7 @@ export function registerFactoryProductHistoryRoutes(app: Express) {
 
       // Sum per-month movements for the grand total row (except Net/KG-Net/Value which use snapshot)
       const grandTotalMovements = monthlyData.reduce(
-        (acc: unknown, m: any) => ({
+        (acc: any, m: any) => ({
           baleCount: acc.baleCount + m.balesIn,
           balesIn: acc.balesIn + m.balesIn,
           balesOut: acc.balesOut + m.balesOut,

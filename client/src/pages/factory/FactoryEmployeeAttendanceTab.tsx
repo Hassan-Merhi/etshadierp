@@ -155,7 +155,7 @@ export default function FactoryEmployeeAttendanceTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employee-attendance", selectedDate] });
       toast({ title: "Attendance saved", description: `Saved for ${selectedDate}` });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       if (err?._handledGlobally) return;
       toast({ title: "Save failed", description: err.message, variant: "destructive" });
     },
@@ -507,7 +507,7 @@ function PerEmployeeView() {
       });
       toast({ title: "Attendance saved", description: `${dates.length} days saved.` });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       if (err?._handledGlobally) return;
       toast({ title: "Save failed", description: err.message, variant: "destructive" });
     },

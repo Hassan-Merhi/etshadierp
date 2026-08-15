@@ -12,7 +12,7 @@ import {} from "@shared/schema";
 
 export function registerFactoryMixBatchesByDateRoutes(app: Express, requireAuth: any, db: any) {
   // ── Mix batches by date ───────────────────────────────────────────────────
-  app.get("/api/factory/mix-batches-by-date", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.get("/api/factory/mix-batches-by-date", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.session?.factoryCompanyId || req.session?.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

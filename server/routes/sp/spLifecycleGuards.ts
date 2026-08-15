@@ -13,7 +13,7 @@ function requireSpContainerPatchAuth(req: Request, res: Response, next: NextFunc
 }
 
 export function registerSpLifecycleGuards(app: Express) {
-  app.use("/api/sp/containers/:id", requireSpContainerPatchAuth, async (req: import("express").Request, res: import("express").Response, next: NextFunction) => {
+  app.use("/api/sp/containers/:id", requireSpContainerPatchAuth, async (req: any, res: any, next: NextFunction) => {
     if (req.method !== "PATCH") return next();
 
     try {

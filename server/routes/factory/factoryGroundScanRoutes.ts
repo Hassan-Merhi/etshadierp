@@ -4,7 +4,7 @@ import { pool } from "../../db";
 import { requireAuth } from "../../auth";
 
 export function registerFactoryGroundScanRoutes(app: Express) {
-  app.get("/api/factory/ground-scan-items", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.get("/api/factory/ground-scan-items", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -46,7 +46,7 @@ export function registerFactoryGroundScanRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/ground-scan-items", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.post("/api/factory/ground-scan-items", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -90,7 +90,7 @@ export function registerFactoryGroundScanRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/ground-scan-items/bulk", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.post("/api/factory/ground-scan-items/bulk", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -140,7 +140,7 @@ export function registerFactoryGroundScanRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/factory/ground-scan-items/:id", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.delete("/api/factory/ground-scan-items/:id", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -153,7 +153,7 @@ export function registerFactoryGroundScanRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/factory/ground-scan-items", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.delete("/api/factory/ground-scan-items", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

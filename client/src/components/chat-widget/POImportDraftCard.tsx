@@ -16,7 +16,7 @@ export function POImportDraftCard({
   importError,
 }: {
   draft: POImportDraft;
-  onConfirm: (resolved: unknown) => void;
+  onConfirm: (resolved: any) => void;
   onDismiss: () => void;
   isSubmitting: boolean;
   result: POImportResult | null;

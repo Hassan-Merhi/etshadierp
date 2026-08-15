@@ -228,7 +228,7 @@ export function validateCentralPostingRequest(
  * effects when the same idempotency key is submitted more than once.
  */
 export async function postBalancedVoucherTx(
-  tx: unknown,
+  tx: any,
   request: CentralPostingRequest,
   dependencies: CentralPostingDependencies
 ): Promise<CentralPostingResult> {

@@ -20,7 +20,7 @@ interface Phase6RequestContext {
   username: string | null;
 }
 
-function requestContext(req: import("express").Request): Phase6RequestContext | null {
+function requestContext(req: any): Phase6RequestContext | null {
   const companyId = Number(req.session?.factoryCompanyId || req.session?.currentCompanyId || 0);
   const userId = String(req.session?.userId || req.user?.id || "");
   if (!Number.isInteger(companyId) || companyId <= 0 || !userId) return null;

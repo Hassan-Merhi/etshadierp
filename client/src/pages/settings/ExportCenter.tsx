@@ -128,11 +128,11 @@ export function ExportCenter() {
       if (toDate) body.toDate = toDate;
       return (await apiRequest("POST", "/api/daily-export/trigger-whatsapp", body)).json();
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       toast({ title: "WhatsApp export started", description: data.message });
       [5, 20, 45, 75, 120].forEach((s) => setTimeout(() => refetchBackup(), s * 1000));
     },
-    onError: (e: import("react").SyntheticEvent) => {
+    onError: (e: any) => {
       toast({ variant: "destructive", title: "WhatsApp send failed", description: e.message });
     },
   });

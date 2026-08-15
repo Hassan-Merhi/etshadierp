@@ -36,7 +36,7 @@ function MemberFormDialog({
   const [notes, setNotes] = useState(existing?.notes ?? "");
 
   const saveMutation = useMutation({
-    mutationFn: async (data: unknown) => {
+    mutationFn: async (data: any) => {
       if (existing) {
         return apiRequest("PATCH", `/api/insurance/members/${existing.id}`, data);
       } else {
@@ -48,7 +48,7 @@ function MemberFormDialog({
       toast({ title: existing ? "Member updated" : "Member added" });
       onClose();
     },
-    onError: (e: import("react").SyntheticEvent) => {
+    onError: (e: any) => {
       toast({ title: "Save failed", description: e.message, variant: "destructive" });
     },
   });

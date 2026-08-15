@@ -67,7 +67,7 @@ export function GroupsTab() {
       setNewWorkerGroupDescription("");
       setCreateWorkerGroupDialogOpen(false);
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to create group", variant: "destructive" });
     },
   });
@@ -80,7 +80,7 @@ export function GroupsTab() {
       toast({ title: "Success", description: "Group deleted successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/worker-groups/with-members", selectedCompany?.id] });
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to delete group", variant: "destructive" });
     },
   });
@@ -93,7 +93,7 @@ export function GroupsTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/worker-groups/with-members", selectedCompany?.id] });
       toast({ title: "Success", description: "Member added to group" });
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to add member to group", variant: "destructive" });
     },
   });
@@ -106,7 +106,7 @@ export function GroupsTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/worker-groups/with-members", selectedCompany?.id] });
       toast({ title: "Success", description: "Member removed from group" });
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       toast({
         title: "Error",
         description: error.message || "Failed to remove member from group",

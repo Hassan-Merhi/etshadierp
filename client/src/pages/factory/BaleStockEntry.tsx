@@ -65,7 +65,7 @@ export default function BaleStockEntry() {
       toast({ title: "Production ended", description: "Worker Matrix PDF sent to WhatsApp group." });
       refetchSession();
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "End Production failed", description: err.message, variant: "destructive" });
     },
   });

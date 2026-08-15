@@ -101,7 +101,7 @@ export type AuditChangePair = { old?: unknown; new?: unknown };
  *  2. security events:     { field: value }
  * Normalize both so every screen can render actual values instead of blank rows.
  */
-export function normalizeAuditChanges(source: unknown): Record<string, AuditChangePair> {
+export function normalizeAuditChanges(source: any): Record<string, AuditChangePair> {
   const raw = source?.changes ?? source?.diff ?? source;
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
 
@@ -127,7 +127,7 @@ function changeValue(changes: Record<string, AuditChangePair>, key: string): unk
   return pair.new !== undefined ? pair.new : pair.old;
 }
 
-function securityParts(logOrAction: unknown): {
+function securityParts(logOrAction: any): {
   category: string;
   check: string;
   outcome: string;
@@ -146,7 +146,7 @@ function securityParts(logOrAction: unknown): {
   };
 }
 
-export function securityActionSummary(logOrAction: unknown): string {
+export function securityActionSummary(logOrAction: any): string {
   const parsed = securityParts(logOrAction);
   if (!parsed) return "Security event recorded";
 
@@ -170,13 +170,13 @@ export function securityActionSummary(logOrAction: unknown): string {
   return `${subject} ${outcomeWord}`;
 }
 
-function formatPlainNumber(value: unknown, maximumFractionDigits = 6): string | null {
+function formatPlainNumber(value: any, maximumFractionDigits = 6): string | null {
   const n = typeof value === "number" ? value : Number(String(value));
   if (!Number.isFinite(n)) return null;
   return n.toLocaleString(undefined, { maximumFractionDigits });
 }
 
-export function fmtBusinessValue(field: string, value: unknown): string {
+export function fmtBusinessValue(field: string, value: any): string {
   if (value === null || value === undefined || value === "") return "—";
   if (field === "optional") return value ? "Optional" : "Active";
   if (typeof value === "boolean") return value ? "Yes" : "No";
@@ -390,7 +390,7 @@ export function isItemDiffKey(field: string): boolean {
   return /^item_(added|removed|changed)_/.test(field);
 }
 
-export function getRecordLabel(log: unknown): string {
+export function getRecordLabel(log: any): string {
   if (
     log?.tableName === "security_events" ||
     String(log?.action || "")
@@ -443,7 +443,7 @@ function fallbackDetails(action: string): string {
   return messages[key] || `${actionLabel(action)} activity recorded`;
 }
 
-export function getDetailsSentence(log: unknown): string {
+export function getDetailsSentence(log: any): string {
   if (
     log?.tableName === "security_events" ||
     String(log?.action || "")

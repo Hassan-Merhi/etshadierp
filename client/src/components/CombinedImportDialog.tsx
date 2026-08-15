@@ -66,7 +66,7 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
     ) => {
       return await apiRequest("POST", "/api/stock-items/import-opening-balances", { openingBalances: data });
     },
-    onSuccess: (result: unknown) => {
+    onSuccess: (result: any) => {
       toast({
         title: "Success",
         description: result.message || "Opening balances imported successfully",

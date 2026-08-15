@@ -55,7 +55,7 @@ const FS_VT: Record<string, string> = { "0": "center", "1": "top", "2": "bottom"
 // Fortune Sheet's onChange delivers sheets in dense `data` format.
 // When re-opening a saved sheet, convert back to sparse `celldata` so
 // Fortune Sheet's initSheetData() correctly populates the grid.
-function ensureCelldata(sheet: unknown): unknown {
+function ensureCelldata(sheet: any): unknown {
   if (sheet.celldata !== undefined) return sheet; // already sparse
   if (!Array.isArray(sheet.data)) return sheet;
   const celldata: unknown[] = [];
@@ -81,7 +81,7 @@ function fortuneToXlsx(sheets: FortuneSheet[]): unknown {
     let maxR = 0;
     let maxC = 0;
 
-    const writeCell = (r: number, c: number, v: unknown) => {
+    const writeCell = (r: number, c: number, v: any) => {
       if (!v) return;
       const hasValue = v.v !== undefined || v.m !== undefined || v.f;
       if (!hasValue) return;
@@ -171,7 +171,7 @@ function fortuneToXlsx(sheets: FortuneSheet[]): unknown {
 
     // Merged cells
     if (cfg.merge) {
-      ws["!merges"] = Object.values(cfg.merge).map((m: unknown) => ({
+      ws["!merges"] = Object.values(cfg.merge).map((m: any) => ({
         s: { r: m.r, c: m.c },
         e: { r: m.r + m.rs - 1, c: m.c + m.cs - 1 },
       }));
@@ -352,7 +352,7 @@ export default function SpreadsheetEditor() {
       setSheetName(sheet.name);
       setSaveStatus("saved");
     },
-    onError: (e: import("react").SyntheticEvent) => {
+    onError: (e: any) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error creating spreadsheet", variant: "destructive" });
     },
@@ -367,7 +367,7 @@ export default function SpreadsheetEditor() {
       setSaveStatus("saved");
       queryClient.invalidateQueries({ queryKey: ["/api/spreadsheets"], exact: true });
     },
-    onError: (e: import("react").SyntheticEvent) => {
+    onError: (e: any) => {
       if (e?._handledGlobally) return;
       setSaveStatus("unsaved");
     },
@@ -382,7 +382,7 @@ export default function SpreadsheetEditor() {
       if (openSheetId === deleteTarget) setOpenSheetId(null);
       setDeleteTarget(null);
     },
-    onError: (e: import("react").SyntheticEvent) => {
+    onError: (e: any) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error deleting spreadsheet", variant: "destructive" });
     },

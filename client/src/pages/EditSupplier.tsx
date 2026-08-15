@@ -80,11 +80,11 @@ export default function EditSupplier() {
   }, [supplier]);
 
   const updateMutation = useMutation({
-    mutationFn: async (data: unknown) => {
+    mutationFn: async (data: any) => {
       const res = await apiRequest("PATCH", `/api/suppliers/${supplierId}`, data);
       return await res.json();
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       toast({
         title: "Success",
         description: `Supplier "${data.legalName}" updated successfully`,
@@ -94,7 +94,7 @@ export default function EditSupplier() {
       queryClient.invalidateQueries({ queryKey: [`/api/suppliers/${supplierId}`] });
       navigate("/suppliers");
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Error",
@@ -104,7 +104,7 @@ export default function EditSupplier() {
     },
   });
 
-  const onSubmit = (data: unknown) => {
+  const onSubmit = (data: any) => {
     updateMutation.mutate(data);
   };
 

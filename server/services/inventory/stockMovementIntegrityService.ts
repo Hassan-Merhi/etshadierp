@@ -212,7 +212,7 @@ export function validateStockMovementRequest(request: StockMovementRequest): Val
  * explicitly linked reversal movements.
  */
 export async function postStockMovementTx(
-  tx: unknown,
+  tx: any,
   request: StockMovementRequest,
   adapter: StockMovementAdapter
 ): Promise<StockMovementResult> {

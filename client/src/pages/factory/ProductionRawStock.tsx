@@ -80,7 +80,7 @@ export default function ProductionRawStock() {
 
   // Mutations
   const offloadMutation = useMutation({
-    mutationFn: async (data: unknown) => {
+    mutationFn: async (data: any) => {
       const res = await modeApiRequest("POST", "/api/factory/raw-stock/offload", data);
       if (!res.ok) throw new Error((await res.json()).message || "Failed to offload");
       return res.json();
@@ -91,7 +91,7 @@ export default function ProductionRawStock() {
       setOffloadDialogOpen(false);
       toast({ title: "Success", description: "Container offloaded successfully." });
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Offload Failed",
@@ -102,7 +102,7 @@ export default function ProductionRawStock() {
   });
 
   const openingBalanceMutation = useMutation({
-    mutationFn: async (data: unknown) => {
+    mutationFn: async (data: any) => {
       const res = await modeApiRequest("POST", "/api/factory/raw-stock/opening-balance", data);
       if (!res.ok) throw new Error((await res.json()).message || "Failed to add OB");
       return res.json();
@@ -115,7 +115,7 @@ export default function ProductionRawStock() {
   });
 
   const createAdjustmentMutation = useMutation({
-    mutationFn: async (payload: unknown) => {
+    mutationFn: async (payload: any) => {
       const res = await modeApiRequest("POST", "/api/factory/raw-stock/adjustment", payload);
       if (!res.ok) throw new Error((await res.json()).message || "Failed to save adjustment");
       return res.json();
@@ -128,7 +128,7 @@ export default function ProductionRawStock() {
   });
 
   const deductReceivedMutation = useMutation({
-    mutationFn: async (payload: unknown) => {
+    mutationFn: async (payload: any) => {
       const res = await modeApiRequest("POST", "/api/factory/raw-stock/deduct-received", payload);
       if (!res.ok) throw new Error((await res.json()).message || "Failed to deduct");
       return res.json();
@@ -141,7 +141,7 @@ export default function ProductionRawStock() {
   });
 
   const updateCostMutation = useMutation({
-    mutationFn: async (payload: unknown) => {
+    mutationFn: async (payload: any) => {
       const res = await modeApiRequest("POST", "/api/factory/raw-stock/update-cost", payload);
       if (!res.ok) throw new Error((await res.json()).message || "Failed to update cost");
       return res.json();
@@ -154,7 +154,7 @@ export default function ProductionRawStock() {
   });
 
   const addToBatchMutation = useMutation({
-    mutationFn: async (data: unknown) => {
+    mutationFn: async (data: any) => {
       // Never send costPerKg for a supplier source — the server always applies the
       // supplier's locked rate and ignores any client-supplied cost.
       const res = await modeApiRequest("POST", `/api/factory/mix-batches/${data.batchId}/top-up`, {
@@ -182,7 +182,7 @@ export default function ProductionRawStock() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
       toast({ title: "Deleted", description: "Mix batch deleted." });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -204,7 +204,7 @@ export default function ProductionRawStock() {
     onSuccess: () => {
       toast({ title: "Sent", description: "Mix batch details sent to WhatsApp group." });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });

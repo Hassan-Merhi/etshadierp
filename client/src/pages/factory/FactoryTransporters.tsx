@@ -110,7 +110,7 @@ function ChargeDialog({ transporterId, open, onClose }: { transporterId: number;
       setDescription("");
       onClose();
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   return (
@@ -221,7 +221,7 @@ function PaymentDialog({
       setDescription("");
       onClose();
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   return (
@@ -315,7 +315,7 @@ function TransporterStatement({ transporterId, onBack }: { transporterId: number
       queryClient.invalidateQueries({ queryKey: [API] });
       queryClient.invalidateQueries({ queryKey: [API, transporterId] });
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const handlePrint = useReactToPrint({ contentRef: printRef });
@@ -512,7 +512,7 @@ function AddTransporterDialog({ open, onClose }: { open: boolean; onClose: () =>
       setNotes("");
       onClose();
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   return (

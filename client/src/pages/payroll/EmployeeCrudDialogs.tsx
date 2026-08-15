@@ -24,7 +24,7 @@ interface EmployeeCrudDialogsProps {
   createEmployeeMutation: unknown;
   employeeGroups: unknown[];
   deleteConflict: unknown;
-  setDeleteConflict: (v: unknown) => void;
+  setDeleteConflict: (v: any) => void;
   handleForceDeleteEmployee: () => void;
   createGroupDialogOpen: boolean;
   setCreateGroupDialogOpen: (open: boolean) => void;
@@ -81,7 +81,7 @@ export function EmployeeCrudDialogs({
           <Form {...createEmployeeForm}>
             <form
               noValidate
-              onSubmit={createEmployeeForm.handleSubmit((data: unknown) => createEmployeeMutation.mutate(data))}
+              onSubmit={createEmployeeForm.handleSubmit((data: any) => createEmployeeMutation.mutate(data))}
               className="space-y-4"
             >
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

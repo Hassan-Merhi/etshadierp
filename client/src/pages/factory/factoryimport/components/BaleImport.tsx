@@ -51,7 +51,7 @@ export function BaleImport() {
       setResult(data);
       toast({ title: "Import complete", description: `${data.imported} bales imported` });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       if (err?._handledGlobally) return;
       toast({ title: "Import failed", description: err.message, variant: "destructive" });
     },
@@ -69,7 +69,7 @@ export function BaleImport() {
         skipEmptyLines: true,
         complete: (results) => {
           const parsed: BaleRow[] = results.data
-            .map((row: unknown) => ({
+            .map((row: any) => ({
               baleCode: (row.baleCode || row.bale_code || "").trim(),
               articleCode: (row.articleCode || row.article_code || "").trim(),
               productName: (row.productName || row.product_name || "").trim(),

@@ -27,7 +27,7 @@ interface Account {
 interface VoucherSidebarPanelProps {
   sidebarAccounts: Account[];
   activeTab: string;
-  onTabChange: (tab: unknown) => void;
+  onTabChange: (tab: any) => void;
   isFactoryMode: boolean;
   onAccountSelect: (account: Account) => void;
   getAccountBalance: (type: string, id: number) => number;

@@ -13,7 +13,7 @@ import { eq, and } from "drizzle-orm";
 
 export function registerWorkerCategoryRoutes(app: Express) {
   // ── Worker Categories ──────────────────────────────────────────────────────
-  app.get("/api/factory/worker-categories", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.get("/api/factory/worker-categories", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -28,7 +28,7 @@ export function registerWorkerCategoryRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/worker-categories", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.post("/api/factory/worker-categories", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -40,7 +40,7 @@ export function registerWorkerCategoryRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/factory/worker-categories/:id", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.patch("/api/factory/worker-categories/:id", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -58,7 +58,7 @@ export function registerWorkerCategoryRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/factory/worker-categories/:id", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.delete("/api/factory/worker-categories/:id", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

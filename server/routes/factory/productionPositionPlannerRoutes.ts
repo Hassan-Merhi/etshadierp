@@ -35,7 +35,7 @@ function rows(result: any): unknown[] {
   return Array.isArray(result) ? result : (result?.rows ?? []);
 }
 
-function companyIdFor(req: import("express").Request): number | null {
+function companyIdFor(req: any): number | null {
   return req.session?.factoryCompanyId || req.session?.currentCompanyId || null;
 }
 

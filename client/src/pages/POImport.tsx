@@ -147,17 +147,17 @@ export default function POImport() {
       if (data.preview.length > 0) setContainerNumber(data.preview[0].containerNumber || "");
       toast({
         title: "File parsed successfully",
-        description: `Found ${data.preview.length} container(s) with ${data.preview.reduce((sum: number, p: unknown) => sum + p.itemsCount, 0)} items. Click Validate to check the data.`,
+        description: `Found ${data.preview.length} container(s) with ${data.preview.reduce((sum: number, p: any) => sum + p.itemsCount, 0)} items. Click Validate to check the data.`,
       });
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({ title: "Parse error", description: error.message, variant: "destructive" });
     },
   });
 
   const validateMutation = useMutation({
-    mutationFn: async (data: unknown) => {
+    mutationFn: async (data: any) => {
       const res = await apiRequest("POST", "/api/po-import/validate", data);
       return await res.json();
     },
@@ -173,14 +173,14 @@ export default function POImport() {
         variant: errorCount === 0 ? "default" : "destructive",
       });
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({ title: "Validation error", description: error.message, variant: "destructive" });
     },
   });
 
   const importMutation = useMutation({
-    mutationFn: async (data: unknown) => {
+    mutationFn: async (data: any) => {
       const res = await apiRequest("POST", "/api/po-import/import", data);
       return await res.json();
     },
@@ -193,7 +193,7 @@ export default function POImport() {
       setImportResult(data);
       setShowPrintDialog(true);
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({ title: "Import error", description: error.message, variant: "destructive" });
     },
@@ -222,7 +222,7 @@ export default function POImport() {
     parseMutation.mutate(formData);
   };
 
-  const selectedContainer = preview?.preview?.find((c: unknown) => c.containerNumber === containerNumber);
+  const selectedContainer = preview?.preview?.find((c: any) => c.containerNumber === containerNumber);
   const hasValidationErrors = Boolean(validationResult?.errors?.length);
   const isValidated = validationResult !== null;
 
@@ -415,7 +415,7 @@ export default function POImport() {
                   <div>
                     <h3 className="font-semibold text-destructive">Validation Errors Found</h3>
                     <ul className="mt-2 space-y-1 text-sm text-destructive">
-                      {validationResult.errors.map((error: unknown, idx: number) => <li key={idx}>• {error}</li>)}
+                      {validationResult.errors.map((error: any, idx: number) => <li key={idx}>• {error}</li>)}
                     </ul>
                   </div>
                 </div>
@@ -434,7 +434,7 @@ export default function POImport() {
               </div>
             )}
 
-            {preview.preview.map((container: unknown, idx: number) => (
+            {preview.preview.map((container: any, idx: number) => (
               <div key={idx} className="space-y-4 mb-6">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold">Container: {container.containerNumber}</h3>
@@ -455,7 +455,7 @@ export default function POImport() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {container.items.map((item: unknown, itemIdx: number) => (
+                      {container.items.map((item: any, itemIdx: number) => (
                         <TableRow key={itemIdx}>
                           <TableCell>{item.poNumber}</TableCell>
                           <TableCell>{item.itemName}</TableCell>

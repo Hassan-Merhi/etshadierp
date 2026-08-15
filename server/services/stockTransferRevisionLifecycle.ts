@@ -17,7 +17,7 @@ import {
  * shapes: a node-postgres `QueryResult` (`{ rows: [...] }`) and a bare row
  * array. Keeps the both-shapes runtime behaviour while remaining type-safe.
  */
-function firstRow<T = Record<string, unknown>>(res: import("express").Response): T | undefined {
+function firstRow<T = Record<string, unknown>>(res: any): T | undefined {
   return (res?.rows ?? res)?.[0];
 }
 

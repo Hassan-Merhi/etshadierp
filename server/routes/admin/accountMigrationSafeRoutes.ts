@@ -89,7 +89,7 @@ function deepestError(error: unknown): unknown {
   return current ?? error;
 }
 
-function respondWithError(res: import("express").Response, error: unknown) {
+function respondWithError(res: any, error: unknown) {
   if (error instanceof AccountMigrationConflict) {
     return res.status(error.status).json({ message: error.message });
   }
@@ -311,7 +311,7 @@ export function registerAccountMigrationSafeRoutes(app: Express) {
     "/api/admin/account-migration/undo",
     requireAuth,
     requireRole("Admin", "Developer"),
-    async (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => {
+    async (req: any, res: any, next: any) => {
       const accountIds = idArray(
         Array.isArray(req.body?.accounts) ? req.body.accounts.map((account: any) => account?.accountId) : null
       );

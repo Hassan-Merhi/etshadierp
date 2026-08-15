@@ -30,7 +30,7 @@ export async function getFreightContainerId(freightId: number, companyId: number
 }
 
 // Safe file-serving: normalise the path and reject traversal attempts.
-export function safeSendFile(res: import("express").Response, folder: string, filename: string) {
+export function safeSendFile(res: any, folder: string, filename: string) {
   const safeFolder = path.basename(folder);
   const safeFile = path.basename(filename);
   if (!safeFolder || !safeFile || safeFolder !== folder || safeFile !== filename) {

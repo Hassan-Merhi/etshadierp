@@ -492,7 +492,7 @@ export default function BaleProducts() {
       }
 
       // ── Header rows 1-4 ─────────────────────────────────────────────
-      const addHeaderRow = (text: string, height: number, font: unknown) => {
+      const addHeaderRow = (text: string, height: number, font: any) => {
         const r = ws.addRow(["", "", text, "", "", "", "", ""]);
         r.height = height;
         const cell = r.getCell(3);
@@ -525,7 +525,7 @@ export default function BaleProducts() {
         "Total",
       ]);
       hdrRow.height = 22;
-      hdrRow.eachCell((cell: unknown) => {
+      hdrRow.eachCell((cell: any) => {
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C_BLUE } };
         cell.font = { bold: true, color: { argb: C_WHITE }, size: 11 };
         cell.alignment = { horizontal: "center", vertical: "middle" };
@@ -561,7 +561,7 @@ export default function BaleProducts() {
         const isAlt = i % 2 === 1;
         const rowFill = isAlt ? { type: "pattern", pattern: "solid", fgColor: { argb: C_ALT_ROW } } : undefined;
 
-        row.eachCell((cell: unknown, colNum: number) => {
+        row.eachCell((cell: any, colNum: number) => {
           if (rowFill) cell.fill = rowFill;
           cell.font = { size: 10 };
           cell.border = { bottom: { style: "hair", color: { argb: C_BORDER } } };
@@ -594,7 +594,7 @@ export default function BaleProducts() {
       ]);
       totalRow.height = 22;
       const totalFill = { type: "pattern", pattern: "solid", fgColor: { argb: C_TOTAL } };
-      totalRow.eachCell((cell: unknown, colNum: number) => {
+      totalRow.eachCell((cell: any, colNum: number) => {
         cell.fill = totalFill;
         cell.border = {
           top: { style: "medium", color: { argb: C_NAVY } },
@@ -683,7 +683,7 @@ export default function BaleProducts() {
         /* logo fetch failed — skip */
       }
 
-      const addHeaderRow = (text: string, height: number, font: unknown) => {
+      const addHeaderRow = (text: string, height: number, font: any) => {
         const r = ws.addRow(["", "", text, "", "", ""]);
         r.height = height;
         const cell = r.getCell(3);
@@ -705,7 +705,7 @@ export default function BaleProducts() {
 
       const hdrRow = ws.addRow(["#", "Article Code", "Name of Item", "Category", "Weight (kg)", "Bales"]);
       hdrRow.height = 22;
-      hdrRow.eachCell((cell: unknown) => {
+      hdrRow.eachCell((cell: any) => {
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C_BLUE } };
         cell.font = { bold: true, color: { argb: C_WHITE }, size: 11 };
         cell.alignment = { horizontal: "center", vertical: "middle" };
@@ -735,7 +735,7 @@ export default function BaleProducts() {
         const isAlt = i % 2 === 1;
         const rowFill = isAlt ? { type: "pattern", pattern: "solid", fgColor: { argb: C_ALT_ROW } } : undefined;
 
-        row.eachCell((cell: unknown, colNum: number) => {
+        row.eachCell((cell: any, colNum: number) => {
           if (rowFill) cell.fill = rowFill;
           cell.font = { size: 10 };
           cell.border = { bottom: { style: "hair", color: { argb: C_BORDER } } };
@@ -758,7 +758,7 @@ export default function BaleProducts() {
       ]);
       totalRow.height = 22;
       const totalFill = { type: "pattern", pattern: "solid", fgColor: { argb: C_TOTAL } };
-      totalRow.eachCell((cell: unknown) => {
+      totalRow.eachCell((cell: any) => {
         cell.fill = totalFill;
         cell.border = {
           top: { style: "medium", color: { argb: C_NAVY } },

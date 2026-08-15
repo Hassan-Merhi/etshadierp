@@ -62,7 +62,7 @@ export interface PaymentReceiptTabProps {
   handleAmountCommit: (rowIndex: number) => void;
   handlePrint: () => void;
   handleExportVoucher?: (detailed: boolean) => void;
-  onSubmit: (values: unknown) => void;
+  onSubmit: (values: any) => void;
   activeTab: "payment" | "receipt";
   activeRowIndex: number | null;
   setActiveRowIndex: (index: number | null) => void;

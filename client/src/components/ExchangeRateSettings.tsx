@@ -90,7 +90,7 @@ export function ExchangeRateSettings() {
       form.reset({ rate: "", effectiveDate: format(new Date(), "yyyy-MM-dd") });
       setShowForm(false);
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },

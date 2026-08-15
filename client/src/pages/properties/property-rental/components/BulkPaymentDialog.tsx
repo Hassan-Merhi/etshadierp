@@ -71,7 +71,7 @@ function BulkPaymentDialog({
       if (items.length === 0) throw new Error("No valid amounts entered");
       return apiRequest("POST", apiBase + "/payments/bulk", items);
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       const isScheduled = paymentDate > new Date().toISOString().slice(0, 10);
       toast({
         title: isScheduled ? "Payments scheduled" : "Bulk payment recorded",
@@ -84,7 +84,7 @@ function BulkPaymentDialog({
       onSuccess();
       onClose();
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const canSubmit = Object.values(amounts).some((v) => parseFloat(v) > 0) && !bulkPay.isPending;

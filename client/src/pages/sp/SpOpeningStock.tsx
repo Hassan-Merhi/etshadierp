@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Loader2, ArrowRight } from "lucide-react";
 
-function fmt(v: unknown, dec = 2) {
+function fmt(v: any, dec = 2) {
   const n = parseFloat(String(v ?? "0"));
   return isNaN(n)
     ? `$0.${"0".repeat(dec)}`
@@ -40,7 +40,7 @@ export default function SpOpeningStock() {
   });
 
   const mutation = useMutation({
-    mutationFn: (body: unknown) => apiRequest("POST", "/api/sp/opening-stock", body),
+    mutationFn: (body: any) => apiRequest("POST", "/api/sp/opening-stock", body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sp/opening-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sp/report/stock"] });
@@ -52,7 +52,7 @@ export default function SpOpeningStock() {
       setFinalUC("");
       setNotes("");
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const qtyN = num(qty);

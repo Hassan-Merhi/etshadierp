@@ -166,7 +166,7 @@ export default function PressingBales() {
 
   const printBaleLabels = async (bales: unknown[], products: FactoryBaleProduct[], weights: string[]) => {
     try {
-      const labelData = bales.map((bale: unknown, idx: number) => ({
+      const labelData = bales.map((bale: any, idx: number) => ({
         productionBaleId: bale.id,
         productId: products[idx].id,
         articleCode: products[idx].articleCode || products[idx].code,
@@ -185,7 +185,7 @@ export default function PressingBales() {
 
       const { labelPrints } = await labelPrintResponse.json();
 
-      const labels = labelPrints.map((lp: unknown, idx: number) => ({
+      const labels = labelPrints.map((lp: any, idx: number) => ({
         referenceNumber: lp.referenceNumber,
         articleCode: lp.articleCode,
         pieces: lp.pieces,
@@ -258,7 +258,7 @@ export default function PressingBales() {
 
       setCart([]);
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },

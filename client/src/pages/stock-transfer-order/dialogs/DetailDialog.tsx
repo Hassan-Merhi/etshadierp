@@ -91,8 +91,8 @@ export function DetailDialog({
                 );
               }
 
-              const totalQty = rows.reduce((s: number, r: unknown) => s + (r.qty || 0), 0);
-              const totalValue = rows.reduce((s: number, r: unknown) => s + (r.value || 0), 0);
+              const totalQty = rows.reduce((s: number, r: any) => s + (r.qty || 0), 0);
+              const totalValue = rows.reduce((s: number, r: any) => s + (r.value || 0), 0);
               const avgRate = totalQty > 0 ? totalValue / totalQty : 0;
 
               return (
@@ -108,7 +108,7 @@ export function DetailDialog({
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((tx: unknown, i: number) => (
+                    {rows.map((tx: any, i: number) => (
                       <tr key={i} className="border-b hover:bg-muted/30 transition-colors">
                         <td className="px-3 py-2">
                           <span

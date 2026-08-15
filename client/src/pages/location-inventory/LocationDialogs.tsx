@@ -71,11 +71,11 @@ interface LocationDialogsProps {
   stockMovementOpen: boolean;
   setStockMovementOpen: (o: boolean) => void;
   stockMovementItem: unknown;
-  setStockMovementItem: (item: unknown) => void;
+  setStockMovementItem: (item: any) => void;
   stockMovementPeriod: unknown;
-  setStockMovementPeriod: (p: unknown) => void;
+  setStockMovementPeriod: (p: any) => void;
   drillMonth: unknown;
-  setDrillMonth: (m: unknown) => void;
+  setDrillMonth: (m: any) => void;
   formatAmount: (amt: number) => string;
   navigate: (path: string) => void;
 }

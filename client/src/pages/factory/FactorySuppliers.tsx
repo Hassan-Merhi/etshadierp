@@ -270,7 +270,7 @@ export default function FactorySuppliers() {
   });
 
   const fxConversionMutation = useMutation({
-    mutationFn: async (data: unknown) => {
+    mutationFn: async (data: any) => {
       const displayRate = parseFloat(data.fxRateToUsd) || 0;
       const amt = parseFloat(data.amount) || 0;
       const toAmountUsd = amt * displayRate;
@@ -299,7 +299,7 @@ export default function FactorySuppliers() {
   });
 
   const paymentMutation = useMutation({
-    mutationFn: async (data: unknown) => {
+    mutationFn: async (data: any) => {
       const fxRate = parseFloat(data.fxRateToUsd) || 1;
       const amt = parseFloat(data.amount) || 0;
       const amountUsd = data.currencyCode === "USD" ? amt : amt / fxRate;
@@ -341,7 +341,7 @@ export default function FactorySuppliers() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: unknown) => factoryApiRequest("POST", "/api/factory/suppliers", data),
+    mutationFn: async (data: any) => factoryApiRequest("POST", "/api/factory/suppliers", data),
     onSuccess: () => {
       setCreateOpen(false);
       resetForm();
@@ -353,7 +353,7 @@ export default function FactorySuppliers() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: unknown) => factoryApiRequest("PATCH", `/api/factory/suppliers/${data.id}`, data),
+    mutationFn: async (data: any) => factoryApiRequest("PATCH", `/api/factory/suppliers/${data.id}`, data),
     onSuccess: () => {
       setEditingSupplier(null);
       queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] });
@@ -361,7 +361,7 @@ export default function FactorySuppliers() {
   });
 
   const obEditMutation = useMutation({
-    mutationFn: async (data: unknown) =>
+    mutationFn: async (data: any) =>
       factoryApiRequest("PATCH", `/api/factory/suppliers/${data.id}/opening-balance`, {
         openingBalance: data.openingBalance,
       }),
@@ -475,7 +475,7 @@ export default function FactorySuppliers() {
     notes: string;
   }>(null);
   const updateObCommissionMutation = useMutation({
-    mutationFn: async (data: unknown) =>
+    mutationFn: async (data: any) =>
       factoryApiRequest("PATCH", `/api/factory/raw-stock/opening-balance/${data.rawStockId}`, data),
     onSuccess: () => {
       setEditObComm(null);
@@ -648,7 +648,7 @@ export default function FactorySuppliers() {
         onDelete: () => wrapAdminAction(() => deletePaymentMutation.mutate(p.id), "Delete Payment"),
       })
     );
-    voucherPmts.forEach((p: unknown) => {
+    voucherPmts.forEach((p: any) => {
       const currency = p.currency || "USD";
       const debitAmt = parseFloat(p.debitAmount || "0");
       const fx = parseFloat(p.exchangeRate || "1") || 1;

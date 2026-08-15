@@ -36,7 +36,7 @@ export function RawStockImport() {
       setResult(data);
       toast({ title: "Import complete", description: `${data.imported} raw stock records imported` });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       if (err?._handledGlobally) return;
       toast({ title: "Import failed", description: err.message, variant: "destructive" });
     },
@@ -53,7 +53,7 @@ export function RawStockImport() {
         skipEmptyLines: true,
         complete: (results) => {
           const parsed: RawStockRow[] = results.data
-            .map((row: unknown) => ({
+            .map((row: any) => ({
               containerNumber: (row.containerNumber || row.container_number || "").trim(),
               supplierName: (row.supplierName || row.supplier_name || "").trim(),
               receivedKg: (row.receivedKg || row.received_kg || "").trim(),

@@ -168,7 +168,7 @@ export default function FactoryDispatchBatchScan() {
       }
       setTimeout(() => scanRef.current?.focus(), 40);
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       setScanInput("");
       flashFeedback("error", err.message);
       setTimeout(() => scanRef.current?.focus(), 40);
@@ -188,7 +188,7 @@ export default function FactoryDispatchBatchScan() {
       setRemoveScanId(null);
       setTimeout(() => scanRef.current?.focus(), 40);
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
       setRemoveScanId(null);
     },
@@ -207,7 +207,7 @@ export default function FactoryDispatchBatchScan() {
       setDispatchOpen(false);
       navigate(`/factory/dispatch-batches/${batchId}`);
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
       setDispatchOpen(false);
     },

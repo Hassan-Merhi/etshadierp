@@ -19,7 +19,7 @@ export default function SpSetupPanel() {
       const response = await apiRequest("POST", "/api/sp/setup");
       return response.json();
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sp/setup/status"] });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
 
@@ -38,7 +38,7 @@ export default function SpSetupPanel() {
         description: messages.join(" ") || "Accounts, warehouse, and supplier ledger links are already configured.",
       });
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   if (isLoading) {
@@ -77,7 +77,7 @@ export default function SpSetupPanel() {
         <CardContent className="space-y-4">
           {status?.spAccounts && status.spAccounts.length > 0 && (
             <div className="grid gap-1.5">
-              {status.spAccounts.map((acct: unknown) => (
+              {status.spAccounts.map((acct: any) => (
                 <div key={acct.id} className="flex items-center justify-between text-sm py-1 border-b border-border/40 last:border-0">
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-xs text-muted-foreground w-24">{acct.code}</span>

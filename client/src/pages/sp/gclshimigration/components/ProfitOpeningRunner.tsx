@@ -32,13 +32,13 @@ export function ProfitOpeningRunner({ targetCompanyId, onDone }: { targetCompany
         accumulatedProfit,
         ...(useManualSplit ? { ourShareAmount, supplierShareAmount } : { ourSplitPct }),
       }),
-    onSuccess: async (data: unknown) => {
+    onSuccess: async (data: any) => {
       const r = await data.json();
       setResult(r);
       toast({ title: "Profit-share opening balance posted", description: `Voucher ${r.voucherNumber}` });
       onDone();
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
   });
 
   return (

@@ -25,7 +25,7 @@ export function PaymentReceiptEditForm({
 }: {
   form: UseFormReturn<unknown>;
   voucherType: string;
-  onSubmit: (data: unknown) => void;
+  onSubmit: (data: any) => void;
   onCancel: () => void;
   isPending: boolean;
   allAccountsWithBalances: CombinedAccount[];

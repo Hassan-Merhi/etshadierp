@@ -56,13 +56,13 @@ export function CashAccountAdjustmentDialog({
             </Label>
             <Select
               value={cashAdjForm.cashAccountId}
-              onValueChange={(v) => setCashAdjForm((p: unknown) => ({ ...p, cashAccountId: v }))}
+              onValueChange={(v) => setCashAdjForm((p: any) => ({ ...p, cashAccountId: v }))}
             >
               <SelectTrigger data-testid="select-cadj-account">
                 <SelectValue placeholder="Select cash account" />
               </SelectTrigger>
               <SelectContent>
-                {(cashAccounts || []).map((a: unknown) => (
+                {(cashAccounts || []).map((a: any) => (
                   <SelectItem key={a.id} value={String(a.id)}>
                     {a.name} ({a.code})
                   </SelectItem>
@@ -82,7 +82,7 @@ export function CashAccountAdjustmentDialog({
                 step="0.01"
                 placeholder="0.00"
                 value={cashAdjForm.amount}
-                onChange={(e) => setCashAdjForm((p: unknown) => ({ ...p, amount: e.target.value }))}
+                onChange={(e) => setCashAdjForm((p: any) => ({ ...p, amount: e.target.value }))}
                 data-testid="input-cadj-amount"
               />
             </div>
@@ -90,7 +90,7 @@ export function CashAccountAdjustmentDialog({
               <Label>Direction</Label>
               <Select
                 value={cashAdjForm.direction}
-                onValueChange={(v) => setCashAdjForm((p: unknown) => ({ ...p, direction: v }))}
+                onValueChange={(v) => setCashAdjForm((p: any) => ({ ...p, direction: v }))}
               >
                 <SelectTrigger data-testid="select-cadj-direction">
                   <SelectValue />
@@ -110,7 +110,7 @@ export function CashAccountAdjustmentDialog({
             <Input
               type="date"
               value={cashAdjForm.date}
-              onChange={(e) => setCashAdjForm((p: unknown) => ({ ...p, date: e.target.value }))}
+              onChange={(e) => setCashAdjForm((p: any) => ({ ...p, date: e.target.value }))}
               data-testid="input-cadj-date"
             />
           </div>
@@ -119,7 +119,7 @@ export function CashAccountAdjustmentDialog({
             <Label>Narration</Label>
             <Input
               value={cashAdjForm.narration}
-              onChange={(e) => setCashAdjForm((p: unknown) => ({ ...p, narration: e.target.value }))}
+              onChange={(e) => setCashAdjForm((p: any) => ({ ...p, narration: e.target.value }))}
               data-testid="input-cadj-narration"
             />
           </div>
@@ -129,7 +129,7 @@ export function CashAccountAdjustmentDialog({
             cashAdjForm.amount &&
             parseFloat(cashAdjForm.amount) > 0 &&
             (() => {
-              const acct = (cashAccounts || []).find((a: unknown) => String(a.id) === cashAdjForm.cashAccountId);
+              const acct = (cashAccounts || []).find((a: any) => String(a.id) === cashAdjForm.cashAccountId);
               const isCredit = cashAdjForm.direction === "credit";
               return (
                 <div className="rounded-md border overflow-hidden text-sm">

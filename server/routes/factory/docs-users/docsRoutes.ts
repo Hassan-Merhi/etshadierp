@@ -26,7 +26,7 @@ export function registerFactoryDocsRoutes(app: Express) {
   // Validates admin credentials and grants a 10-minute session override token
   // that allows non-admin users to perform admin-only actions after approval.
   // ─────────────────────────────────────────────────────────────────────────────
-  app.post("/api/factory/admin-verify", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.post("/api/factory/admin-verify", requireAuth, async (req: any, res: any) => {
     try {
       const { username, password } = req.body as { username?: string; password?: string };
       if (!username || !password) {
@@ -93,7 +93,7 @@ export function registerFactoryDocsRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/container-doc-types", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.get("/api/factory/container-doc-types", requireAuth, async (req: any, res: any) => {
     try {
       const rows = await db.select().from(containerDocumentTypes).orderBy(containerDocumentTypes.label);
       res.json(rows);
@@ -102,7 +102,7 @@ export function registerFactoryDocsRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/container-doc-types", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.post("/api/factory/container-doc-types", requireAuth, async (req: any, res: any) => {
     try {
       const [row] = await db.insert(containerDocumentTypes).values(req.body).returning();
       res.json(row);
@@ -113,7 +113,7 @@ export function registerFactoryDocsRoutes(app: Express) {
 
   // ─────── CONTAINER DOCUMENTS (upload / list / delete) ───────
 
-  app.get("/api/factory/containers/:containerId/documents", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.get("/api/factory/containers/:containerId/documents", requireAuth, async (req: any, res: any) => {
     try {
       const containerId = Number(req.params.containerId);
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
@@ -142,7 +142,7 @@ export function registerFactoryDocsRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/containers/:containerId/documents", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.post("/api/factory/containers/:containerId/documents", requireAuth, async (req: any, res: any) => {
     try {
       const multer = (await import("multer")).default;
       const pathLib = await import("path");
@@ -230,7 +230,7 @@ export function registerFactoryDocsRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/factory/containers/:containerId/documents/:docId", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.delete("/api/factory/containers/:containerId/documents/:docId", requireAuth, async (req: any, res: any) => {
     try {
       const containerId = Number(req.params.containerId);
       const docId = Number(req.params.docId);
@@ -277,7 +277,7 @@ export function registerFactoryDocsRoutes(app: Express) {
 
   // Authenticated, path-traversal-safe file serving.
   // Only the document's owner company can download a container-doc file.
-  app.get("/api/factory/uploads/:folder/:filename", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.get("/api/factory/uploads/:folder/:filename", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(403).json({ message: "Access denied" });

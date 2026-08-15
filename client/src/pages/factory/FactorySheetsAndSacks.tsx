@@ -49,7 +49,7 @@ export default function FactorySheetsAndSacks() {
       toast({ title: "Item deleted" });
       setDeleteItem(null);
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Delete failed", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Delete failed", description: e.message, variant: "destructive" }),
   });
 
   const filtered = useMemo(() => {

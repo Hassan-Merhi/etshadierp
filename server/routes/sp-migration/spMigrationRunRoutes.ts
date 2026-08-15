@@ -35,7 +35,7 @@ export function registerSpMigrationRunRoutes(app: Express) {
   });
 
   // ── GET /api/sp/migration/runs ──────────────────────────────────────────
-  app.get("/api/sp/migration/runs", requireAuth, requireRole("Developer"), async (_req: unknown, res: import("express").Response) => {
+  app.get("/api/sp/migration/runs", requireAuth, requireRole("Developer"), async (_req: any, res: any) => {
     try {
       const runs = (
         await db.execute(sql`
@@ -62,7 +62,7 @@ export function registerSpMigrationRunRoutes(app: Express) {
   // source_type='opening_stock' + "recreate containers manually") is permanently retired.
   // Use the staged endpoints instead: gc-account-plan, gc-stock-master, gc-stock-opening,
   // gc-sales-readonly, gc-containers, gc-profit-opening, gc-reconciliation.
-  app.post("/api/sp/migration/rehearsal", requireAuth, requireRole("Developer"), async (_req: unknown, res: import("express").Response) => {
+  app.post("/api/sp/migration/rehearsal", requireAuth, requireRole("Developer"), async (_req: any, res: any) => {
     return res.status(410).json({
       message: "The old all-in-one GC migration flow is disabled. Use the staged migration steps instead.",
       code: "OLD_GC_REHEARSAL_DISABLED",

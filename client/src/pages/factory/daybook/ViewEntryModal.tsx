@@ -135,7 +135,7 @@ export function ViewEntryModal({
           ? viewEntries.filter((e) => parseFloat(e.creditAmount || "0") > 0)
           : viewEntries;
 
-    const resolveUrl = (e: import("react").SyntheticEvent): string | null => {
+    const resolveUrl = (e: any): string | null => {
       if (e.ledgerAccountId) return `/api/accounts/ledger/${e.ledgerAccountId}/balance`;
       if (e.bankAccountId) return `/api/accounts/ledger/${e.bankAccountId}/balance`;
       if (e.customerId) return `/api/customers/${e.customerId}/balance`;
@@ -164,7 +164,7 @@ export function ViewEntryModal({
       // Per-entry balances
       const results: Record<number, string> = {};
       await Promise.all(
-        display.map(async (e: import("react").SyntheticEvent) => {
+        display.map(async (e: any) => {
           const url = resolveUrl(e);
           if (!url) return;
           try {
@@ -218,9 +218,9 @@ export function ViewEntryModal({
 
     // Total = opposite side of source for Payment/Receipt
     const totalAmount = isPayment
-      ? viewEntries.reduce((s: number, e: import("react").SyntheticEvent) => s + parseFloat(e.debitAmount || "0"), 0)
+      ? viewEntries.reduce((s: number, e: any) => s + parseFloat(e.debitAmount || "0"), 0)
       : isReceipt
-        ? viewEntries.reduce((s: number, e: import("react").SyntheticEvent) => s + parseFloat(e.creditAmount || "0"), 0)
+        ? viewEntries.reduce((s: number, e: any) => s + parseFloat(e.creditAmount || "0"), 0)
         : Math.max(totalDebit, totalCredit);
 
     // Display entries: Payment = debit side only, Receipt = credit side only, Journal = all
@@ -437,7 +437,7 @@ export function ViewEntryModal({
   if (isBaleStockEntry && bales.length > 0) {
     const totalAmt = amt;
     const amtPerBale = bales.length > 0 ? totalAmt / bales.length : 0;
-    const groups = bales.reduce((acc: Record<string, { count: number; totalAmount: number }>, b: unknown) => {
+    const groups = bales.reduce((acc: Record<string, { count: number; totalAmount: number }>, b: any) => {
       const key = b.productName || b.ref || "Unknown";
       if (!acc[key]) acc[key] = { count: 0, totalAmount: 0 };
       acc[key].count += 1;

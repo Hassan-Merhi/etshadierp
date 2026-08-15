@@ -487,7 +487,7 @@ export async function recalculateContainerCosts(
  * Use in POST handlers that aren't covered by the global PUT/PATCH/DELETE guard:
  *   if (!checkFactoryAdmin(req, res)) return;
  */
-export function checkFactoryAdmin(req: import("express").Request, res: import("express").Response): boolean {
+export function checkFactoryAdmin(req: any, res: any): boolean {
   const role = req.session?.currentRole as string | undefined;
   if (["Admin", "Owner", "Developer"].includes(role || "")) return true;
   const overrideUntil = req.session?.factoryAdminOverrideUntil as number | undefined;
@@ -503,7 +503,7 @@ export function checkFactoryAdmin(req: import("express").Request, res: import("e
  * Returns true if the logged-in user has "hideAllCosts" enabled.
  * Admins and owners always return false (they always see costs).
  */
-export async function getUserHideAllCosts(req: import("express").Request): Promise<boolean> {
+export async function getUserHideAllCosts(req: any): Promise<boolean> {
   try {
     const userId = req.session?.userId;
     if (!userId) return false;

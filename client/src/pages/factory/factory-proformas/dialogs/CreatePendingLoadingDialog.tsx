@@ -51,7 +51,7 @@ export function CreatePendingLoadingDialog({
                 <SelectValue placeholder="Select a location..." />
               </SelectTrigger>
               <SelectContent>
-                {locations.map((loc: unknown) => (
+                {locations.map((loc: any) => (
                   <SelectItem key={loc.id} value={loc.id.toString()} data-testid={`select-location-option-${loc.id}`}>
                     {loc.name} {loc.code ? `(${loc.code})` : ""}
                   </SelectItem>

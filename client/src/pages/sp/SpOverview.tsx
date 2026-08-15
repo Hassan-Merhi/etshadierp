@@ -103,7 +103,7 @@ export default function SpOverview() {
       const response = await apiRequest("POST", `/api/sp/sales/${selectedSale.id}/reverse`, { reason });
       return response.json();
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({
         predicate: (query) => {
           const key = String(query.queryKey[0] ?? "");
@@ -119,7 +119,7 @@ export default function SpOverview() {
       setSelectedSale(null);
       setReason("");
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       toast({ title: releaseDebtEnglish("Reversal failed"), description: error.message, variant: "destructive" });
     },
   });

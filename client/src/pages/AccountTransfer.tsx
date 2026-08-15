@@ -208,13 +208,13 @@ export default function AccountTransfer() {
         entryIds: Array.from(selectedIds),
         toAccountId,
       }),
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       setDone({ moved: data.moved, toAccount: data.toAccount });
       setSelectedIds(new Set());
       queryClient.invalidateQueries({ queryKey: ["/api/voucher-entries/by-account", fromAccountId] });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Transfer failed", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Transfer failed", description: e.message, variant: "destructive" }),
   });
 
   function resetAll() {

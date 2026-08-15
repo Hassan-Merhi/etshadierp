@@ -145,7 +145,7 @@ export function registerHistoricalReplayPhase8VerificationRoutes(app: Express): 
     VERIFICATION_PATH,
     requireAuth,
     requireRole(...ADMIN_ROLES),
-    async (req: import("express").Request, res: import("express").Response) => {
+    async (req: any, res: any) => {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const requestedId = req.query?.undoLogId == null

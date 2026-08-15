@@ -25,7 +25,7 @@ import {
 import { eq, and } from "drizzle-orm";
 
 export function registerBalesReimportRoutes(app: Express) {
-  app.post("/api/factory/bales/reimport", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.post("/api/factory/bales/reimport", requireAuth, async (req: any, res: any) => {
     const multer = (await import("multer")).default;
     const upload = multer({ storage: multer.memoryStorage() });
     upload.single("file")(req, res, async (err: any) => {
@@ -344,7 +344,7 @@ export function registerBalesReimportRoutes(app: Express) {
   });
 
   // GET /api/factory/bales/export-names.xlsx — Export all bales for bulk product-name editing
-  app.get("/api/factory/bales/export-names.xlsx", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.get("/api/factory/bales/export-names.xlsx", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -404,7 +404,7 @@ export function registerBalesReimportRoutes(app: Express) {
   });
 
   // POST /api/factory/bales/bulk-update-names — Upload Excel and update product_name in bulk
-  app.post("/api/factory/bales/bulk-update-names", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.post("/api/factory/bales/bulk-update-names", requireAuth, async (req: any, res: any) => {
     const multer = (await import("multer")).default;
     const upload = multer({ storage: multer.memoryStorage() });
     upload.single("file")(req, res, async (err: any) => {

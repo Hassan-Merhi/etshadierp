@@ -38,7 +38,7 @@ function requireRepairRole(req: Request, res: Response): boolean {
   return true;
 }
 
-function actorFromRequest(req: import("express").Request): { userId: string; username: string } {
+function actorFromRequest(req: any): { userId: string; username: string } {
   const userId = String(req.session?.userId ?? req.user?.id ?? "unknown");
   const username = String(req.session?.username ?? req.user?.username ?? userId);
   return { userId, username };

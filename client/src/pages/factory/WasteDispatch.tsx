@@ -185,13 +185,13 @@ export default function WasteDispatch() {
     });
   };
 
-  const handleHistoryPrint = (d: unknown) => {
+  const handleHistoryPrint = (d: any) => {
     const dispatchBales = d.bales || [];
-    const totalW = dispatchBales.reduce((s: number, b: unknown) => s + parseFloat(b.weightKg || 0), 0);
-    const totalC = dispatchBales.reduce((s: number, b: unknown) => s + parseFloat(b.totalCost || 0), 0);
+    const totalW = dispatchBales.reduce((s: number, b: any) => s + parseFloat(b.weightKg || 0), 0);
+    const totalC = dispatchBales.reduce((s: number, b: any) => s + parseFloat(b.totalCost || 0), 0);
     const baleRows = dispatchBales
       .map(
-        (b: unknown) =>
+        (b: any) =>
           `<tr>
           <td style="border:1px solid #ccc;padding:5px 8px;font-family:monospace">${b.referenceNumber}</td>
           <td style="border:1px solid #ccc;padding:5px 8px">${b.productName || ""}</td>
@@ -252,7 +252,7 @@ export default function WasteDispatch() {
         description: `${result.totalBales} bale(s) marked as disposed (${result.dispatch.dispatchNumber})`,
       });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
       setConfirming(false);
@@ -274,7 +274,7 @@ export default function WasteDispatch() {
         description: `${result.restoredBales} bale(s) restored to stock.`,
       });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
       setDeleteDispatchId(null);
@@ -634,7 +634,7 @@ export default function WasteDispatch() {
               <p className="text-sm text-muted-foreground p-4">No dispatches yet.</p>
             ) : (
               <div className="divide-y">
-                {(showAllHistory ? history : history.slice(0, 10)).map((d: unknown) => {
+                {(showAllHistory ? history : history.slice(0, 10)).map((d: any) => {
                   const isOpen = expandedHistoryIds.has(d.id);
                   const dispatchBales = d.bales || [];
                   return (
@@ -708,7 +708,7 @@ export default function WasteDispatch() {
                                 </tr>
                               </thead>
                               <tbody>
-                                {dispatchBales.map((b: unknown) => (
+                                {dispatchBales.map((b: any) => (
                                   <tr key={b.id} className="border-b border-border/40 last:border-0">
                                     <td className="py-1 font-mono text-primary">{b.referenceNumber}</td>
                                     <td className="py-1">{b.productName}</td>
@@ -724,12 +724,12 @@ export default function WasteDispatch() {
                                   </td>
                                   <td className="pt-1.5 text-right">
                                     {fmtKg(
-                                      dispatchBales.reduce((s: number, b: unknown) => s + parseFloat(b.weightKg || 0), 0)
+                                      dispatchBales.reduce((s: number, b: any) => s + parseFloat(b.weightKg || 0), 0)
                                     )}
                                   </td>
                                   <td className="pt-1.5 text-right text-destructive">
                                     {fmt(
-                                      dispatchBales.reduce((s: number, b: unknown) => s + parseFloat(b.totalCost || 0), 0)
+                                      dispatchBales.reduce((s: number, b: any) => s + parseFloat(b.totalCost || 0), 0)
                                     )}
                                   </td>
                                 </tr>
@@ -923,7 +923,7 @@ export default function WasteDispatch() {
                   </tr>
                 </thead>
                 <tbody>
-                  {printData.bales.map((b: unknown) => (
+                  {printData.bales.map((b: any) => (
                     <tr key={b.id}>
                       <td style={{ border: "1px solid #ccc", padding: "5px 8px", fontFamily: "monospace" }}>
                         {b.referenceNumber}

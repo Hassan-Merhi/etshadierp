@@ -111,7 +111,7 @@ export function registerHistoricalReplayPhase8ReadinessRoutes(app: Express): voi
     READINESS_PATH,
     requireAuth,
     requireRole(...ADMIN_ROLES),
-    async (req: import("express").Request, res: import("express").Response) => {
+    async (req: any, res: any) => {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
@@ -161,7 +161,7 @@ export function registerHistoricalReplayPhase8ReadinessRoutes(app: Express): voi
   app.post(
     APPLY_PATH,
     requireAuth,
-    async (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => {
+    async (req: any, res: any, next: any) => {
       const confirmationToken = typeof req.body?.confirmationToken === "string"
         ? req.body.confirmationToken
         : "";

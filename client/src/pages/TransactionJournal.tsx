@@ -959,12 +959,12 @@ export default function TransactionJournal() {
               ) : (
                 (() => {
                   const vtype = detailData.voucher.voucherType;
-                  const fmt = (v: unknown) => {
+                  const fmt = (v: any) => {
                     const n = typeof v === "number" ? v : parseFloat(v || "0");
                     if (isNaN(n)) return "—";
                     return formatCashAmount(n);
                   };
-                  const fmtNum = (v: unknown) => {
+                  const fmtNum = (v: any) => {
                     const n = typeof v === "number" ? v : parseFloat(v || "0");
                     if (isNaN(n)) return "0";
                     return Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: 3 });

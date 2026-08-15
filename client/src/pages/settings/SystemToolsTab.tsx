@@ -79,7 +79,7 @@ export function SystemToolsTab({ appMode, currentUser, selectedCompany, companie
       const res = await apiRequest("POST", "/api/fix-parent-po-supplier-entries", {});
       return res.json();
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       toast({ title: "Done", description: data?.message || "Supplier entries fixed." });
     },
     onError: () => {

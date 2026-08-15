@@ -231,7 +231,7 @@ export function registerStockItemImportRoutes(app: Express) {
     requireAuth,
     requireNonPOS,
     upload.single("file"),
-    async (req: import("express").Request, res) => {
+    async (req: any, res) => {
       try {
         const companyId = req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });

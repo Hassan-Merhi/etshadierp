@@ -18,7 +18,7 @@ interface BulkDialogsProps {
   setBulkDepositNotes: (v: string) => void;
   employeeStaff: unknown[];
   bulkDepositSelections: Record<number, boolean>;
-  handleSelectAllEmployees: (checked: unknown) => void;
+  handleSelectAllEmployees: (checked: any) => void;
   handleToggleEmployeeDeposit: (id: number) => void;
   bulkDepositTotal: number;
   validSelectedEmployees: unknown[];
@@ -28,7 +28,7 @@ interface BulkDialogsProps {
   bulkWithdrawalDate: string;
   setBulkWithdrawalDate: (v: string) => void;
   bulkWithdrawalAccountType: string;
-  setBulkWithdrawalAccountType: (v: unknown) => void;
+  setBulkWithdrawalAccountType: (v: any) => void;
   bulkWithdrawalAccountId: string;
   setBulkWithdrawalAccountId: (v: string) => void;
   bulkWithdrawalNotes: string;
@@ -276,7 +276,7 @@ export function BulkDialogs({
                 <Label>Account Type</Label>
                 <Select
                   value={bulkWithdrawalAccountType}
-                  onValueChange={(val: unknown) => {
+                  onValueChange={(val: any) => {
                     setBulkWithdrawalAccountType(val);
                     setBulkWithdrawalAccountId("");
                   }}

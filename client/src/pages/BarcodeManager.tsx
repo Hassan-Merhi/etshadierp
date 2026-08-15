@@ -45,11 +45,11 @@ export default function BarcodeManager() {
         barcodes: barcodeList.map((b) => ({ barcode: b })),
       });
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/pending-barcodes", selectedCompany?.id] });
       toast({ title: `Imported ${data.count} barcodes` });
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Import failed", description: error.message, variant: "destructive" });
     },
@@ -64,7 +64,7 @@ export default function BarcodeManager() {
       toast({ title: "Barcode added" });
       setManualBarcode("");
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error adding barcode", description: error.message, variant: "destructive" });
     },

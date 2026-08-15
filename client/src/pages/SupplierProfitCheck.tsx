@@ -126,7 +126,7 @@ export default function SupplierProfitCheck() {
       return res.ok ? res.json() : [];
     },
   });
-  const selectedSupplier = suppliers.find((s: unknown) => String(s.id) === supplierId);
+  const selectedSupplier = suppliers.find((s: any) => String(s.id) === supplierId);
   const linkStockGroupMutation = useMutation({
     mutationFn: async (stockGroupId: number | null) => {
       const res = await apiRequest("PATCH", `/api/suppliers/${supplierId}/stock-group`, { stockGroupId });
@@ -136,7 +136,7 @@ export default function SupplierProfitCheck() {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers", companyId] });
       toast({ title: "Supplier stock group updated" });
     },
-    onError: (err: unknown) => toast({ title: "Failed to update", description: err.message, variant: "destructive" }),
+    onError: (err: any) => toast({ title: "Failed to update", description: err.message, variant: "destructive" }),
   });
   const { data: proformas = [] } = useQuery<unknown[]>({
     queryKey: ["/api/suppliers", supplierId, "proformas"],
@@ -241,7 +241,7 @@ export default function SupplierProfitCheck() {
           return;
         }
         // Detect header row — first row is headers (case-insensitive)
-        const headers = (raw[0] as unknown[]).map((h: unknown) => String(h).toLowerCase().trim());
+        const headers = (raw[0] as unknown[]).map((h: any) => String(h).toLowerCase().trim());
         const colCode = headers.findIndex((h) => h.includes("code") || h === "item" || h === "barcode");
         const colCost = headers.findIndex((h) => h.includes("cost") || h.includes("dubai") || h.includes("po"));
         const colSell = headers.findIndex((h) => h.includes("sell") || h.includes("price") || h.includes("avg"));
@@ -363,7 +363,7 @@ export default function SupplierProfitCheck() {
       setNewItemAvgSell("");
       toast({ title: "Item added", description: "The item is now included in the analysis." });
     },
-    onError: (err: unknown) => toast({ title: "Failed to add item", description: err.message, variant: "destructive" }),
+    onError: (err: any) => toast({ title: "Failed to add item", description: err.message, variant: "destructive" }),
   });
   const handleManualPoChange = useCallback(
     (stockItemId: number, value: string) => {
@@ -806,7 +806,7 @@ export default function SupplierProfitCheck() {
                     <SelectValue placeholder="Select supplier…" />
                   </SelectTrigger>
                   <SelectContent>
-                    {suppliers.map((s: unknown) => (
+                    {suppliers.map((s: any) => (
                       <SelectItem key={s.id} value={String(s.id)}>
                         {s.legalName || s.legal_name || s.code}
                       </SelectItem>
@@ -860,7 +860,7 @@ export default function SupplierProfitCheck() {
                       <SelectValue placeholder="Select proforma…" />
                     </SelectTrigger>
                     <SelectContent>
-                      {proformas.map((p: unknown) => (
+                      {proformas.map((p: any) => (
                         <SelectItem key={p.id} value={String(p.id)}>
                           {p.reference}
                         </SelectItem>
@@ -1658,7 +1658,7 @@ export default function SupplierProfitCheck() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No group</SelectItem>
-                  {(stockGroups as unknown[]).map((g: unknown) => (
+                  {(stockGroups as unknown[]).map((g: any) => (
                     <SelectItem key={g.id} value={String(g.id)}>
                       {g.name}
                     </SelectItem>

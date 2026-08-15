@@ -77,7 +77,7 @@ export function UserManagementDrawer({ user, open, onClose, companies, onUserDel
   }, [erpHiddenCostData]);
 
   const updateMutation = useMutation({
-    mutationFn: async (data: unknown) => {
+    mutationFn: async (data: any) => {
       const res = await factoryApiRequest("PUT", `/api/factory/users/${user.id}`, data);
       if (!res.ok) {
         const err = await res.json();

@@ -58,7 +58,7 @@ export function ScanningPanel({ load, onClose }: { load: V3Load; onClose: () => 
       queryClient.invalidateQueries({ queryKey: ["/api/factory/v3/stock-overview"] });
       scannerRef.current?.focus();
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       if (err.code === "RESERVED_WARNING" || err.code === "OTHER_V3_LOAD_WARNING") {
         setPendingBypass({ code: scanCode, message: err.message });
         setScanCode("");
@@ -85,7 +85,7 @@ export function ScanningPanel({ load, onClose }: { load: V3Load; onClose: () => 
       queryClient.invalidateQueries({ queryKey: ["/api/factory/v3/loads"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/v3/stock-overview"] });
     },
-    onError: (err: unknown) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const finalizeMutation = useMutation({
@@ -104,7 +104,7 @@ export function ScanningPanel({ load, onClose }: { load: V3Load; onClose: () => 
       queryClient.invalidateQueries({ queryKey: ["/api/factory/v3/stock-overview"] });
       onClose();
     },
-    onError: (err: unknown) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const handleScan = useCallback(() => {

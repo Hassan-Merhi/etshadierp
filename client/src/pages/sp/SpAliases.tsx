@@ -20,7 +20,7 @@ export default function SpAliases() {
   });
 
   const addMutation = useMutation({
-    mutationFn: (body: unknown) => apiRequest("POST", "/api/sp/aliases", body),
+    mutationFn: (body: any) => apiRequest("POST", "/api/sp/aliases", body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sp/aliases"] });
       toast({ title: "Alias added" });
@@ -28,7 +28,7 @@ export default function SpAliases() {
       setStockItemId("");
       setDescription("");
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -37,7 +37,7 @@ export default function SpAliases() {
       queryClient.invalidateQueries({ queryKey: ["/api/sp/aliases"] });
       toast({ title: "Alias removed" });
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const handleAdd = () => {

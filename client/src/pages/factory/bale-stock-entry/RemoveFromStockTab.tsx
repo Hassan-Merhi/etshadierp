@@ -189,7 +189,7 @@ export function RemoveFromStockTab() {
     }
   };
 
-  const printSingleBale = async (bale: unknown) => {
+  const printSingleBale = async (bale: any) => {
     try {
       const labelResponse = await modeApiRequest("POST", "/api/bale-label-prints", {
         bales: [
@@ -204,7 +204,7 @@ export function RemoveFromStockTab() {
       });
       if (!labelResponse.ok) throw new Error("Failed to create label");
       const { labelPrints } = await labelResponse.json();
-      const labels: LabelData[] = labelPrints.map((lp: unknown) => ({
+      const labels: LabelData[] = labelPrints.map((lp: any) => ({
         referenceNumber: lp.referenceNumber,
         articleCode: lp.articleCode || bale.articleCode || "",
         pieces: lp.pieces || 1,
@@ -265,7 +265,7 @@ export function RemoveFromStockTab() {
     enabled: true,
   });
 
-  const filteredBales = inStockBales?.filter((bale: unknown) => {
+  const filteredBales = inStockBales?.filter((bale: any) => {
     if (!dateFilter) return true;
     const baleDate = bale.finalizedAt ? new Date(bale.finalizedAt).toLocaleDateString("en-CA") : null;
     return baleDate === dateFilter;
@@ -304,7 +304,7 @@ export function RemoveFromStockTab() {
   })();
 
   const totalQty = filteredBales?.length || 0;
-  const totalWeight = filteredBales?.reduce((sum: number, b: unknown) => sum + parseFloat(b.weightKg || "0"), 0) || 0;
+  const totalWeight = filteredBales?.reduce((sum: number, b: any) => sum + parseFloat(b.weightKg || "0"), 0) || 0;
 
   const toggleBale = (baleId: number) => {
     setSelectedBaleIds((prev) => {
@@ -330,7 +330,7 @@ export function RemoveFromStockTab() {
 
   const selectAll = () => {
     if (!filteredBales) return;
-    const allIds = new Set(filteredBales.map((b: unknown) => b.id));
+    const allIds = new Set(filteredBales.map((b: any) => b.id));
     setSelectedBaleIds(allIds);
   };
 

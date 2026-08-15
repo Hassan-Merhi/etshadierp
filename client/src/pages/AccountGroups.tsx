@@ -136,7 +136,7 @@ export default function AccountGroups() {
         companyId: selectedCompany.id,
       });
     },
-    onSuccess: async (data: unknown) => {
+    onSuccess: async (data: any) => {
       await queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
       setCreateOpen(false);
       setNewGroupName("");
@@ -144,7 +144,7 @@ export default function AccountGroups() {
       setSelectedGroupId(data.id);
       toast({ title: "Group created", description: `"${data.name}" is ready — add accounts to it.` });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Failed to create group", description: err.message, variant: "destructive" });
     },
   });
@@ -165,7 +165,7 @@ export default function AccountGroups() {
       setRenameOpen(false);
       toast({ title: "Group renamed" });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Failed to rename", description: err.message, variant: "destructive" });
     },
   });
@@ -180,7 +180,7 @@ export default function AccountGroups() {
       setAccountSearch("");
       toast({ title: "Accounts added to group" });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Failed to assign accounts", description: err.message, variant: "destructive" });
     },
   });
@@ -192,7 +192,7 @@ export default function AccountGroups() {
       await queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
       toast({ title: "Account removed from group" });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Failed to remove account", description: err.message, variant: "destructive" });
     },
   });
@@ -223,7 +223,7 @@ export default function AccountGroups() {
       setSelectedGroupId(null);
       toast({ title: "Group dissolved", description: "All accounts have been unlinked." });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Failed to dissolve group", description: err.message, variant: "destructive" });
     },
   });

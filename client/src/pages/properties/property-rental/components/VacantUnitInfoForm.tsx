@@ -30,7 +30,7 @@ function VacantUnitInfoForm({ unit, testIdPrefix }: { unit: Unit; testIdPrefix: 
       toast({ title: "Unit info updated" });
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const changed = unitNumber !== unit.unitNumber || dimensions !== (unit.dimensions ?? "");

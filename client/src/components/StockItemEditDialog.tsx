@@ -96,7 +96,7 @@ export function StockItemEditDialog({ open, onOpenChange, stockItemId }: StockIt
       });
       onOpenChange(false);
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Update Failed",
@@ -121,7 +121,7 @@ export function StockItemEditDialog({ open, onOpenChange, stockItemId }: StockIt
       setShowDeleteDialog(false);
       onOpenChange(false);
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Delete Failed",

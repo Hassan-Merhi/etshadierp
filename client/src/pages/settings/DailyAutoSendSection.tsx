@@ -45,15 +45,15 @@ export function DailyAutoSendSection() {
     mutationFn: (patch: Partial<{ dailyAutoSend: boolean; dailyRecipientId: number | null }>) =>
       apiRequest("PUT", "/api/whatsapp/settings", patch),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/settings"] }),
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const sendNow = useMutation({
     mutationFn: () => apiRequest("POST", "/api/daily-export/trigger-whatsapp"),
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       toast({ title: "Daily export sent", description: data?.message || "ZIP sent to WhatsApp group" });
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Send failed", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Send failed", description: e.message, variant: "destructive" }),
   });
 
   const isActive = !!(settings?.enabled && settings?.dailyAutoSend && settings?.dailyRecipientId);

@@ -259,7 +259,7 @@ export function registerPoImportRoutes(app: Express) {
       }
 
       // Group items by PO
-      const poGroups = containerPreview.items.reduce((acc: unknown, item: any) => {
+      const poGroups = containerPreview.items.reduce((acc: any, item: any) => {
         if (!acc[item.poNumber]) {
           acc[item.poNumber] = [];
         }

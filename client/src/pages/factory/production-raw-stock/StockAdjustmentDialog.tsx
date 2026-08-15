@@ -78,7 +78,7 @@ export function StockAdjustmentDialog({
           {!isNewMaterial && (
             <div className="space-y-1">
               <Label>Adjustment Type</Label>
-              <Select value={adjType} onValueChange={(v: unknown) => setAdjType(v)}>
+              <Select value={adjType} onValueChange={(v: any) => setAdjType(v)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

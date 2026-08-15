@@ -81,7 +81,7 @@ export default function FactoryPendingInvoices() {
       toast({ title: "Deleted", description: "Invoice deleted successfully." });
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },

@@ -48,7 +48,7 @@ export function StockOverloadWarningDialog({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {overloadWarning.items.map((item: unknown) => (
+              {overloadWarning.items.map((item: any) => (
                 <TableRow key={item.articleCode} data-testid={`row-overload-${item.articleCode}`}>
                   <TableCell className="font-mono text-xs">{item.articleCode}</TableCell>
                   <TableCell className="text-sm">{item.productName}</TableCell>

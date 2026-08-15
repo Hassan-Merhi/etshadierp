@@ -7,7 +7,7 @@ import { StockItem, StockItemCombobox } from "./VoucherEditHelpers";
 
 interface PurchaseEditFormTableProps {
   fields: unknown[];
-  append: (item: unknown) => void;
+  append: (item: any) => void;
   remove: (index: number) => void;
   stockItems: StockItem[];
   formatAmount: (amount: number) => string;

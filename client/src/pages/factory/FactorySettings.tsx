@@ -225,7 +225,7 @@ export default function FactorySettings() {
       }
       return res.json();
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       setBaleValidationResult(data);
       setBaleImportResult(null);
       if (data.validRows.length === 0) {
@@ -345,7 +345,7 @@ export default function FactorySettings() {
       setWeeklyWaPickerOpen(false);
       toast({ title: "Saved", description: "Weekly report WhatsApp group updated." });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
@@ -371,7 +371,7 @@ export default function FactorySettings() {
       setProdWaPickerOpen(false);
       toast({ title: "Saved", description: "Production WhatsApp group updated." });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },

@@ -7,11 +7,11 @@ import { db } from "../../db";
 import { factoryV3Loads, factoryV3LoadBales } from "@shared/schema";
 import { requireAuth } from "../../auth";
 
-function getCompanyId(req: import("express").Request): number | null {
+function getCompanyId(req: any): number | null {
   return req.session?.factoryCompanyId || req.session?.currentCompanyId || null;
 }
 
-function getUserInfo(req: import("express").Request) {
+function getUserInfo(req: any) {
   return {
     id: req.user?.id ?? null,
     name: req.user?.username ?? null,

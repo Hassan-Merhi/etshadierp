@@ -63,7 +63,7 @@ export default function BaleProductImages() {
       if (imagesQueryKey) queryClient.invalidateQueries({ queryKey: [imagesQueryKey] });
       toast({ title: "Image uploaded" });
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Upload failed", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Upload failed", description: e.message, variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -82,7 +82,7 @@ export default function BaleProductImages() {
       if (imagesQueryKey) queryClient.invalidateQueries({ queryKey: [imagesQueryKey] });
       toast({ title: "Image deleted" });
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Delete failed", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Delete failed", description: e.message, variant: "destructive" }),
   });
 
   const handleFiles = useCallback(

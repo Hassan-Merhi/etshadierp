@@ -128,7 +128,7 @@ export function NetProfitPanel({
                   </div>
 
                   {(netProfitData.rightPane?.directIncomes?.accounts?.filter(
-                    (a: unknown) => Number(a.debit) !== 0 || Number(a.credit) !== 0
+                    (a: any) => Number(a.debit) !== 0 || Number(a.credit) !== 0
                   ).length ?? 0) > 0 && (
                     <div>
                       <div
@@ -147,7 +147,7 @@ export function NetProfitPanel({
                             (
                             {
                               netProfitData.rightPane!.directIncomes.accounts.filter(
-                                (a: unknown) => Number(a.debit) !== 0 || Number(a.credit) !== 0
+                                (a: any) => Number(a.debit) !== 0 || Number(a.credit) !== 0
                               ).length
                             }
                             )
@@ -159,7 +159,7 @@ export function NetProfitPanel({
                         <div className="bg-muted/30 divide-y">
                           {netProfitData
                             .rightPane!.directIncomes.accounts.filter(
-                              (a: unknown) => Number(a.debit) !== 0 || Number(a.credit) !== 0
+                              (a: any) => Number(a.debit) !== 0 || Number(a.credit) !== 0
                             )
                             .map((acc) => (
                               <div
@@ -326,7 +326,7 @@ export function NetProfitPanel({
                   <div>
                     {(() => {
                       const nonZeroIndirectInc = (netProfitData.rightPane?.indirectIncomes?.accounts || []).filter(
-                        (a: unknown) => Number(a.debit) !== 0 || Number(a.credit) !== 0
+                        (a: any) => Number(a.debit) !== 0 || Number(a.credit) !== 0
                       );
                       return (
                         <>

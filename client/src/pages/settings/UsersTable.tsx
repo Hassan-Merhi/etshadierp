@@ -5,9 +5,9 @@ import { Edit, Trash2, Key } from "lucide-react";
 
 interface UsersTableProps {
   users: unknown[];
-  onEdit: (user: unknown) => void;
-  onDelete: (user: unknown) => void;
-  onResetPassword: (user: unknown) => void;
+  onEdit: (user: any) => void;
+  onDelete: (user: any) => void;
+  onResetPassword: (user: any) => void;
 }
 
 export function UsersTable({ users, onEdit, onDelete, onResetPassword }: UsersTableProps) {

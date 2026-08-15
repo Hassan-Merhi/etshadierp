@@ -8,7 +8,7 @@ import { useDateFormat } from "@/contexts/DateFormatContext";
 
 interface EmployeeStatementDialogProps {
   statementEmployee: unknown;
-  setStatementEmployee: (v: unknown) => void;
+  setStatementEmployee: (v: any) => void;
   transactionsLoading: boolean;
   employeeTransactions: unknown[];
   statementExpanded: boolean;
@@ -59,7 +59,7 @@ export function EmployeeStatementDialog({
                 {formatAmount(
                   employeeTransactions
                     .filter((t) => !t.isDebit)
-                    .reduce((s: number, t: unknown) => s + parseFloat(t.amount || "0"), 0)
+                    .reduce((s: number, t: any) => s + parseFloat(t.amount || "0"), 0)
                 )}
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">Credits</p>
@@ -70,7 +70,7 @@ export function EmployeeStatementDialog({
                 {formatAmount(
                   employeeTransactions
                     .filter((t) => t.isDebit)
-                    .reduce((s: number, t: unknown) => s + parseFloat(t.amount || "0"), 0)
+                    .reduce((s: number, t: any) => s + parseFloat(t.amount || "0"), 0)
                 )}
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">Debits</p>
@@ -97,14 +97,14 @@ export function EmployeeStatementDialog({
           ) : (
             (() => {
               const sorted = [...employeeTransactions].sort(
-                (a: unknown, b: unknown) => new Date(a.date).getTime() - new Date(b.date).getTime()
+                (a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime()
               );
               const totalDebit = sorted.reduce(
-                (s: number, t: unknown) => s + (t.isDebit ? parseFloat(t.amount || "0") : 0),
+                (s: number, t: any) => s + (t.isDebit ? parseFloat(t.amount || "0") : 0),
                 0
               );
               const totalCredit = sorted.reduce(
-                (s: number, t: unknown) => s + (!t.isDebit ? parseFloat(t.amount || "0") : 0),
+                (s: number, t: any) => s + (!t.isDebit ? parseFloat(t.amount || "0") : 0),
                 0
               );
               const currentBalance = parseFloat(statementEmployee?.calculatedBalance || "0");

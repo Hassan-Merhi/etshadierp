@@ -182,10 +182,10 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       const res = await apiRequest("POST", `/api/containers/${containerId}/price-import/preview`, { rows });
       return res.json();
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       setPriceImportPreview(data.preview || []);
     },
-    onError: (e: import("react").SyntheticEvent) => {
+    onError: (e: any) => {
       toast({ title: "Preview failed", description: e.message, variant: "destructive" });
     },
   });
@@ -195,14 +195,14 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       const res = await apiRequest("POST", `/api/containers/${containerId}/price-import/apply`, { rows });
       return res.json();
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       toast({ title: "Prices updated", description: `${data.updated} line item(s) updated successfully.` });
       setShowPriceImportDialog(false);
       setPriceImportPreview(null);
       setPriceImportError(null);
       queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
     },
-    onError: (e: import("react").SyntheticEvent) => {
+    onError: (e: any) => {
       toast({ title: "Apply failed", description: e.message, variant: "destructive" });
     },
   });
@@ -220,10 +220,10 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       let priceCol = -1;
       let headerRow = -1;
 
-      sheet.eachRow((row: unknown, rowNumber: number) => {
+      sheet.eachRow((row: any, rowNumber: number) => {
         const vals = row.values as unknown[];
         if (headerRow === -1) {
-          vals.forEach((cell: unknown, colIdx: number) => {
+          vals.forEach((cell: any, colIdx: number) => {
             const v = String(cell || "")
               .toLowerCase()
               .trim();
@@ -253,7 +253,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
           "unit_price",
           "unit price",
         ];
-        sheet.eachRow((row: unknown) => {
+        sheet.eachRow((row: any) => {
           const vals = row.values as unknown[];
           const firstCell = String(vals[1] ?? "")
             .toLowerCase()
@@ -309,7 +309,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       setUploadFile(null);
       toast({ title: "Document uploaded" });
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Upload failed", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Upload failed", description: e.message, variant: "destructive" }),
   });
 
   const deleteDocMutation = useMutation({
@@ -321,7 +321,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
       toast({ title: "Document deleted" });
     },
-    onError: (e: import("react").SyntheticEvent) => {
+    onError: (e: any) => {
       if (e?._handledGlobally) return;
       toast({ title: "Delete failed", description: e.message, variant: "destructive" });
     },
@@ -357,7 +357,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
   });
 
   const addFreightMutation = useMutation({
-    mutationFn: async (data: unknown) => {
+    mutationFn: async (data: any) => {
       const res = await apiRequest("POST", `/api/factory/containers/${containerId}/freight`, data);
       return res.json();
     },
@@ -367,7 +367,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       freightForm.reset();
       toast({ title: "Freight charge added" });
     },
-    onError: (e: import("react").SyntheticEvent) => {
+    onError: (e: any) => {
       if (e?._handledGlobally) return;
       toast({ title: "Failed", description: e.message, variant: "destructive" });
     },
@@ -381,7 +381,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       queryClient.invalidateQueries({ queryKey: ["/api/factory/containers", containerId, "freight"] });
       toast({ title: "Freight charge removed" });
     },
-    onError: (e: import("react").SyntheticEvent) => {
+    onError: (e: any) => {
       if (e?._handledGlobally) return;
       toast({ title: "Failed", description: e.message, variant: "destructive" });
     },
@@ -402,7 +402,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       paymentForm.reset({ paymentDate: new Date().toLocaleDateString("en-CA"), amount: "", method: "", reference: "" });
       toast({ title: "Payment recorded" });
     },
-    onError: (e: import("react").SyntheticEvent) => {
+    onError: (e: any) => {
       if (e?._handledGlobally) return;
       toast({ title: "Failed", description: e.message, variant: "destructive" });
     },
@@ -416,7 +416,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       queryClient.invalidateQueries({ queryKey: ["/api/factory/containers", containerId, "freight"] });
       toast({ title: "Payment deleted" });
     },
-    onError: (e: import("react").SyntheticEvent) => {
+    onError: (e: any) => {
       if (e?._handledGlobally) return;
       toast({ title: "Failed", description: e.message, variant: "destructive" });
     },
@@ -618,7 +618,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
         description: "The purchase order and associated data have been removed",
       });
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Deletion Failed",
@@ -641,7 +641,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       });
       setLocation("/containers");
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Deletion Failed",
@@ -657,14 +657,14 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       const res = await apiRequest("POST", `/api/containers/${containerId}/sync-voucher`);
       return res.json();
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
       toast({
         title: "Voucher Synced",
         description: data.message || "Purchase voucher amounts updated successfully",
       });
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Sync Failed",
@@ -687,7 +687,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
         description: "Container status restored to IN_TRANSIT",
       });
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Reverse Failed",
@@ -726,7 +726,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       setShowSellDialog(false);
       form.reset();
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Sale Failed",
@@ -781,7 +781,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
 
   // ── SP early return — all hooks already called above ─────────────────────
   if (isSupplierPartner) {
-    const spFmt = (v: unknown) => {
+    const spFmt = (v: any) => {
       const n = parseFloat(String(v ?? "0"));
       const isWhole = Math.abs(n) % 1 === 0;
       return isNaN(n)
@@ -816,7 +816,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
     const spc = spContainerData;
     const discFactor = 1 - parseFloat(spc.discountPct || "0") / 100;
     const baseCost = (spc.lines || []).reduce(
-      (s: number, l: unknown) => s + parseFloat(l.qty || "0") * parseFloat(l.unitRateUsd || "0") * discFactor,
+      (s: number, l: any) => s + parseFloat(l.qty || "0") * parseFloat(l.unitRateUsd || "0") * discFactor,
       0
     );
 
@@ -907,7 +907,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
                     </TableCell>
                   </TableRow>
                 ) : (
-                  (spc.lines || []).map((line: unknown) => {
+                  (spc.lines || []).map((line: any) => {
                     const discRate = parseFloat(line.unitRateUsd || "0") * discFactor;
                     const lineCost = parseFloat(line.qty || "0") * discRate;
                     return (
@@ -948,7 +948,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(spc.prepaid || []).map((p: unknown) => (
+                  {(spc.prepaid || []).map((p: any) => (
                     <TableRow key={p.id}>
                       <TableCell className="text-sm capitalize">{p.chargeType}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{p.description || "—"}</TableCell>
@@ -983,7 +983,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(spc.offloadCharges || []).map((c: unknown) => (
+                    {(spc.offloadCharges || []).map((c: any) => (
                       <TableRow key={c.id}>
                         <TableCell className="text-sm capitalize">{c.chargeType}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">{c.description || "—"}</TableCell>
@@ -1023,19 +1023,19 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
   if (!containerData) return null;
 
   const { container, pos, charges } = containerData;
-  const supplier = suppliers.find((s: unknown) => s.id === container.supplierId);
+  const supplier = suppliers.find((s: any) => s.id === container.supplierId);
 
   // Compute totals live from the actual PO and charges data so they are
   // always accurate, even when the stored container totals are stale.
-  const itemsTotal = pos.reduce((sum: number, po: unknown) => sum + parseFloat(po.itemsTotal || "0"), 0);
-  const chargesTotal = charges.reduce((sum: number, c: unknown) => sum + parseFloat(c.amount || "0"), 0);
+  const itemsTotal = pos.reduce((sum: number, po: any) => sum + parseFloat(po.itemsTotal || "0"), 0);
+  const chargesTotal = charges.reduce((sum: number, c: any) => sum + parseFloat(c.amount || "0"), 0);
   const grandTotal = itemsTotal + chargesTotal;
 
   // Calculate total bales from all line items
-  const totalBales = pos.reduce((total: number, po: unknown) => {
+  const totalBales = pos.reduce((total: number, po: any) => {
     return (
       total +
-      po.items.reduce((sum: number, item: unknown) => {
+      po.items.reduce((sum: number, item: any) => {
         return sum + parseFloat(item.quantity || "0");
       }, 0)
     );
@@ -1272,7 +1272,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
             {formatAmount(itemsTotal)}
           </p>
           <p className="text-xs text-muted-foreground">
-            {pos.reduce((sum: number, po: unknown) => sum + po.items.length, 0)} items in {pos.length} PO(s)
+            {pos.reduce((sum: number, po: any) => sum + po.items.length, 0)} items in {pos.length} PO(s)
           </p>
         </div>
 
@@ -1296,7 +1296,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
         </div>
       ) : (
         <div className="space-y-4">
-          {pos.map((po: unknown) => (
+          {pos.map((po: any) => (
             <div key={po.id} className="rounded-lg border bg-card overflow-hidden">
               {/* PO header bar */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-3 bg-muted/40 border-b">
@@ -1348,7 +1348,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {po.items.map((item: unknown) => (
+                    {po.items.map((item: any) => (
                       <TableRow key={item.id} data-testid={`row-item-${item.id}`} className="text-sm">
                         <TableCell className="font-medium py-2">{item.itemName}</TableCell>
                         <TableCell className="text-right tabular-nums py-2 text-muted-foreground">
@@ -1368,7 +1368,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
 
               {/* Items — mobile */}
               <div className="md:hidden divide-y">
-                {po.items.map((item: unknown) => (
+                {po.items.map((item: any) => (
                   <div key={item.id} className="px-4 py-3 text-sm" data-testid={`row-item-${item.id}`}>
                     <p className="font-medium mb-1.5">{item.itemName}</p>
                     <div className="grid grid-cols-3 gap-2 text-muted-foreground text-xs">
@@ -1410,7 +1410,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
               </tr>
             </thead>
             <tbody>
-              {charges.map((c: unknown, i: number) => (
+              {charges.map((c: any, i: number) => (
                 <tr key={i} className="border-t first:border-t-0">
                   <td className="px-4 py-2.5 text-muted-foreground">{c.chargeType}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums font-medium">
@@ -1592,7 +1592,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
                   <SelectValue placeholder="Select document type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(docsData?.docTypes || []).map((dt: unknown) => (
+                  {(docsData?.docTypes || []).map((dt: any) => (
                     <SelectItem key={dt.id} value={String(dt.id)}>
                       {dt.label}
                       {dt.isRequired ? " *" : ""}
@@ -1862,7 +1862,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {priceImportPreview.map((row: unknown, i: number) => (
+                    {priceImportPreview.map((row: any, i: number) => (
                       <TableRow key={i} data-testid={`row-price-preview-${i}`}>
                         <TableCell className="font-mono text-xs">{row.barcode}</TableCell>
                         <TableCell className="text-sm">{row.itemName || "—"}</TableCell>
@@ -1916,20 +1916,20 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
             )}
           </div>
 
-          {priceImportPreview && priceImportPreview.some((r: unknown) => r.status === "will_update") && (
+          {priceImportPreview && priceImportPreview.some((r: any) => r.status === "will_update") && (
             <div className="flex justify-between items-center pt-2 border-t gap-2 flex-wrap">
               <p className="text-sm text-muted-foreground">
-                {priceImportPreview.filter((r: unknown) => r.status === "will_update").length} item(s) will be updated
-                {priceImportPreview.some((r: unknown) => r.status === "not_found") &&
-                  ` · ${priceImportPreview.filter((r: unknown) => r.status === "not_found").length} not found`}
-                {priceImportPreview.some((r: unknown) => r.status === "not_in_container") &&
-                  ` · ${priceImportPreview.filter((r: unknown) => r.status === "not_in_container").length} not in this container`}
+                {priceImportPreview.filter((r: any) => r.status === "will_update").length} item(s) will be updated
+                {priceImportPreview.some((r: any) => r.status === "not_found") &&
+                  ` · ${priceImportPreview.filter((r: any) => r.status === "not_found").length} not found`}
+                {priceImportPreview.some((r: any) => r.status === "not_in_container") &&
+                  ` · ${priceImportPreview.filter((r: any) => r.status === "not_in_container").length} not in this container`}
               </p>
               <Button
                 onClick={() => {
                   const rows = priceImportPreview
-                    .filter((r: unknown) => r.status === "will_update" && r.lineItemIds?.length)
-                    .map((r: unknown) => ({ lineItemIds: r.lineItemIds, newRate: r.newRate }));
+                    .filter((r: any) => r.status === "will_update" && r.lineItemIds?.length)
+                    .map((r: any) => ({ lineItemIds: r.lineItemIds, newRate: r.newRate }));
                   priceApplyMutation.mutate(rows);
                 }}
                 disabled={priceApplyMutation.isPending}

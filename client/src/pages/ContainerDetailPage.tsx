@@ -20,12 +20,12 @@ import { ArrowLeft, Truck, Edit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ContainerDetailERP from "./ContainerDetail";
 
-function fmt2(v: unknown) {
+function fmt2(v: any) {
   const n = parseFloat(String(v ?? "0"));
   return isNaN(n) ? "$0.00" : `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function fmt4(v: unknown) {
+function fmt4(v: any) {
   const n = parseFloat(String(v ?? "0"));
   return isNaN(n) ? "$0.0000" : `$${n.toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 4 })}`;
 }
@@ -151,7 +151,7 @@ function SpContainerDetailView() {
   }
 
   const discountFactor = 1 - parseFloat(spc.discountPct ?? "0") / 100;
-  const baseCostAfterDiscount = (spc.lines ?? []).reduce((sum: number, l: unknown) => {
+  const baseCostAfterDiscount = (spc.lines ?? []).reduce((sum: number, l: any) => {
     return sum + parseFloat(l.qty ?? "0") * parseFloat(l.unitRateUsd ?? "0") * discountFactor;
   }, 0);
 
@@ -264,7 +264,7 @@ function SpContainerDetailView() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(spc.lines ?? []).map((line: unknown) => {
+                {(spc.lines ?? []).map((line: any) => {
                   const qty = parseFloat(line.qty ?? "0");
                   const unitRate = parseFloat(line.unitRateUsd ?? "0");
                   const discRate = unitRate * discountFactor;
@@ -309,7 +309,7 @@ function SpContainerDetailView() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(spc.prepaid ?? []).map((charge: unknown) => (
+                  {(spc.prepaid ?? []).map((charge: any) => (
                     <TableRow key={charge.id}>
                       <TableCell className="text-sm capitalize">
                         {charge.chargeType?.replace(/_/g, " ") ?? "—"}
@@ -349,7 +349,7 @@ function SpContainerDetailView() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(spc.offloadCharges ?? []).map((charge: unknown) => (
+                    {(spc.offloadCharges ?? []).map((charge: any) => (
                       <TableRow key={charge.id}>
                         <TableCell className="text-sm capitalize">
                           {charge.chargeType?.replace(/_/g, " ") ?? "—"}

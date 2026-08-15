@@ -70,7 +70,7 @@ export default function Settings() {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       setUserToDelete(null);
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to delete user", variant: "destructive" });
     },
   });

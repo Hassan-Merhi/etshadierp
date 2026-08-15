@@ -286,7 +286,7 @@ export function VoucherDetailsDialog({
                           purchaseOrderData &&
                           (() => {
                             const totalQty = purchaseItems.reduce(
-                              (sum: number, e: import("react").SyntheticEvent) => sum + parseFloat(e.quantity || "0"),
+                              (sum: number, e: any) => sum + parseFloat(e.quantity || "0"),
                               0
                             );
                             const charges = [
@@ -921,8 +921,8 @@ export function VoucherDetailsDialog({
                               </TableHeader>
                               <TableBody>
                                 {rev.items
-                                  .filter((item: unknown) => parseFloat(item.delta ?? "0") !== 0)
-                                  .map((item: unknown, idx: number) => {
+                                  .filter((item: any) => parseFloat(item.delta ?? "0") !== 0)
+                                  .map((item: any, idx: number) => {
                                     const delta = parseFloat(item.delta ?? "0");
                                     return (
                                       <TableRow key={idx}>

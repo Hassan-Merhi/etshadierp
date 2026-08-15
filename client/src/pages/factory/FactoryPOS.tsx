@@ -100,7 +100,7 @@ export default function FactoryPOS() {
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   });
-  const cashAccounts = (ledgerAccounts || []).filter((a: unknown) => a.accountType === "Cash");
+  const cashAccounts = (ledgerAccounts || []).filter((a: any) => a.accountType === "Cash");
   const { data: sales, isLoading: salesLoading } = useQuery<unknown[]>({
     queryKey: ["/api/factory/pos/sales"],
     enabled: showHistory,
@@ -133,7 +133,7 @@ export default function FactoryPOS() {
     setCashAccountId(editSaleData.cashAccountId ? String(editSaleData.cashAccountId) : "");
     if (editSaleData.items && editSaleData.items.length > 0) {
       setRows(
-        editSaleData.items.map((it: unknown) => ({
+        editSaleData.items.map((it: any) => ({
           id: String(it.id),
           productId: it.productId || null,
           productName: it.productName,
@@ -149,7 +149,7 @@ export default function FactoryPOS() {
       try {
         const expArr = JSON.parse(editSaleData.expensesJson);
         setExpenseRows(
-          expArr.map((e: import("react").SyntheticEvent) => ({
+          expArr.map((e: any) => ({
             id: String(Date.now() + Math.random()),
             accountId: String(e.accountId),
             description: e.description || "",
@@ -349,7 +349,7 @@ export default function FactoryPOS() {
 
   // ---- Mutations ----
   const saleMutation = useMutation({
-    mutationFn: (data: unknown) => apiRequest("POST", "/api/factory/pos/sale", data),
+    mutationFn: (data: any) => apiRequest("POST", "/api/factory/pos/sale", data),
     onSuccess: async (res) => {
       const data = await res.json();
       queryClient.invalidateQueries({ queryKey: ["/api/factory/pos/sales"] });
@@ -357,7 +357,7 @@ export default function FactoryPOS() {
       const snapshotExpenses = expenseRows
         .map((e) => ({
           ...e,
-          accountName: (ledgerAccounts || []).find((a: unknown) => String(a.id) === e.accountId)?.name || e.accountId,
+          accountName: (ledgerAccounts || []).find((a: any) => String(a.id) === e.accountId)?.name || e.accountId,
         }))
         .filter((e) => parseFloat(e.amount) > 0 && e.accountId);
       setSavedSale({
@@ -385,13 +385,13 @@ export default function FactoryPOS() {
       toast({ title: "Sale recorded", description: `${data.saleNumber} – ${ccPrefix}${formatNum(total)}` });
       setShowPrintDialog(true);
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Error", description: err.message || "Failed to create sale", variant: "destructive" });
     },
   });
 
   const editMutation = useMutation({
-    mutationFn: (data: unknown) => apiRequest("PUT", `/api/factory/pos/sales/${editSaleId}`, data),
+    mutationFn: (data: any) => apiRequest("PUT", `/api/factory/pos/sales/${editSaleId}`, data),
     onSuccess: async (res) => {
       const data = await res.json();
       queryClient.invalidateQueries({ queryKey: ["/api/factory/pos/sales"] });
@@ -401,7 +401,7 @@ export default function FactoryPOS() {
       toast({ title: "Sale updated", description: `${data.saleNumber || editSaleData?.saleNumber} saved` });
       navigate("/factory/daybook");
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Error", description: err.message || "Failed to update sale", variant: "destructive" });
     },
   });
@@ -414,7 +414,7 @@ export default function FactoryPOS() {
       setVoidId(null);
       toast({ title: "Sale voided" });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -514,7 +514,7 @@ export default function FactoryPOS() {
               <SelectValue placeholder="Select location" />
             </SelectTrigger>
             <SelectContent>
-              {(locations || []).map((l: unknown) => (
+              {(locations || []).map((l: any) => (
                 <SelectItem key={l.id} value={String(l.id)}>
                   {l.name}
                 </SelectItem>
@@ -557,7 +557,7 @@ export default function FactoryPOS() {
               <SelectValue placeholder="Cash account" />
             </SelectTrigger>
             <SelectContent>
-              {cashAccounts.map((a: unknown) => (
+              {cashAccounts.map((a: any) => (
                 <SelectItem key={a.id} value={String(a.id)}>
                   {a.name}
                 </SelectItem>
@@ -613,7 +613,7 @@ export default function FactoryPOS() {
                 <SelectValue placeholder="Select customer *" />
               </SelectTrigger>
               <SelectContent>
-                {(allCustomers || []).map((c: unknown) => (
+                {(allCustomers || []).map((c: any) => (
                   <SelectItem key={c.id} value={String(c.id)}>
                     {c.legalName || c.name || `Customer #${c.id}`}
                   </SelectItem>
@@ -846,7 +846,7 @@ export default function FactoryPOS() {
                       <SelectValue placeholder="Expense account" />
                     </SelectTrigger>
                     <SelectContent>
-                      {(ledgerAccounts || []).map((a: unknown) => (
+                      {(ledgerAccounts || []).map((a: any) => (
                         <SelectItem key={a.id} value={String(a.id)}>
                           {a.name}
                         </SelectItem>
@@ -910,7 +910,7 @@ export default function FactoryPOS() {
                 )}
                 {paymentType === "CREDIT" &&
                   (() => {
-                    const custObj = (allCustomers || []).find((c: unknown) => String(c.id) === selectedCustomerId);
+                    const custObj = (allCustomers || []).find((c: any) => String(c.id) === selectedCustomerId);
                     const prevBal = custObj ? parseFloat(custObj.balance || "0") : 0;
                     const prevBalSide = custObj?.balanceSide || "Dr";
                     const prevNet = prevBalSide === "Dr" ? prevBal : -prevBal;
@@ -1073,7 +1073,7 @@ export default function FactoryPOS() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sales.map((sale: unknown) => {
+                  {sales.map((sale: any) => {
                     const pfx = sale.currencyCode !== "USD" ? `${sale.currencyCode} ` : "$";
                     return (
                       <TableRow key={sale.id} data-testid={`row-sale-${sale.id}`}>
@@ -1596,7 +1596,7 @@ export default function FactoryPOS() {
                         }}
                       >
                         <tbody>
-                          {printExpenses.map((exp: unknown, idx: number) => (
+                          {printExpenses.map((exp: any, idx: number) => (
                             <tr key={idx}>
                               <td style={{ padding: "2px 5px", fontSize: "7pt", fontWeight: "600", color: "#333" }}>
                                 {exp.description || exp.accountName || "Deduction"}

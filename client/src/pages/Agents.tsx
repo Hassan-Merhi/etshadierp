@@ -77,7 +77,7 @@ interface AgentAccount {
   accountName: string;
 }
 
-function parseBalance(value: unknown): number {
+function parseBalance(value: any): number {
   if (value === null || value === undefined || value === "") return 0;
   const parsed = typeof value === "string" ? parseFloat(value) : value;
   return isNaN(parsed) ? 0 : parsed;

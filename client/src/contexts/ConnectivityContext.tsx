@@ -98,7 +98,7 @@ function FullConnectivityProvider({ children }: Props) {
     isMountedRef.current = true;
     import("@/lib/db").then(({ getGlobalSyncState }) =>
       getGlobalSyncState()
-        .then((state: unknown) => {
+        .then((state: any) => {
           if (isMountedRef.current && state?.lastSyncedAt) {
             setLastSyncedAt(state.lastSyncedAt);
           }

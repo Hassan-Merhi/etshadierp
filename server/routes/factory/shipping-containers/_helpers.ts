@@ -6,7 +6,7 @@
 import multer from "multer";
 import http from "http";
 
-export function getCompanyId(req: import("express").Request): number | null {
+export function getCompanyId(req: any): number | null {
   return req.session.factoryCompanyId || req.session.currentCompanyId || null;
 }
 
@@ -34,7 +34,7 @@ export const scrUploadBase = multer({
   },
 });
 
-export function scrUpload(req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) {
+export function scrUpload(req: any, res: any, next: any) {
   scrUploadBase.single("file")(req, res, (err: any) => {
     if (err) return res.status(400).json({ message: err.message });
     next();
@@ -56,7 +56,7 @@ export function safeDownloadName(name: string | null | undefined): string {
  *  Uses process.env.PORT (reliable in production) rather than req.socket.localPort
  *  which is unreliable behind reverse proxies.
  */
-export function fetchInternalBuffer(req: import("express").Request, urlPath: string): Promise<Buffer | null> {
+export function fetchInternalBuffer(req: any, urlPath: string): Promise<Buffer | null> {
   return new Promise((resolve) => {
     try {
       // Always use the app's own bind port. process.env.PORT is set by Replit/production.

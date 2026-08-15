@@ -127,7 +127,7 @@ export function ReportsSectionPanel({ analytics }: { analytics: AnalyticsLegacyS
 
                       {/* Direct Incomes - Moved to Right Pane (Credit side) */}
                       {(netProfitData.rightPane?.directIncomes?.accounts?.filter(
-                        (a: unknown) => Number(a.debit) !== 0 || Number(a.credit) !== 0
+                        (a: any) => Number(a.debit) !== 0 || Number(a.credit) !== 0
                       ).length ?? 0) > 0 && (
                         <div>
                           <div
@@ -146,7 +146,7 @@ export function ReportsSectionPanel({ analytics }: { analytics: AnalyticsLegacyS
                                 (
                                 {
                                   netProfitData.rightPane!.directIncomes.accounts.filter(
-                                    (a: unknown) => Number(a.debit) !== 0 || Number(a.credit) !== 0
+                                    (a: any) => Number(a.debit) !== 0 || Number(a.credit) !== 0
                                   ).length
                                 }
                                 )
@@ -160,7 +160,7 @@ export function ReportsSectionPanel({ analytics }: { analytics: AnalyticsLegacyS
                             <div className="bg-muted/30 divide-y">
                               {netProfitData
                                 .rightPane!.directIncomes.accounts.filter(
-                                  (a: unknown) => Number(a.debit) !== 0 || Number(a.credit) !== 0
+                                  (a: any) => Number(a.debit) !== 0 || Number(a.credit) !== 0
                                 )
                                 .map((acc) => (
                                   <div
@@ -341,7 +341,7 @@ export function ReportsSectionPanel({ analytics }: { analytics: AnalyticsLegacyS
                       <div>
                         {(() => {
                           const nonZeroIndirectInc = (netProfitData.rightPane?.indirectIncomes?.accounts || []).filter(
-                            (a: unknown) => Number(a.debit) !== 0 || Number(a.credit) !== 0
+                            (a: any) => Number(a.debit) !== 0 || Number(a.credit) !== 0
                           );
                           return (
                             <>
@@ -367,7 +367,7 @@ export function ReportsSectionPanel({ analytics }: { analytics: AnalyticsLegacyS
                               </div>
                               {expandedNetProfitSections.has("indirectIncomes") && nonZeroIndirectInc.length > 0 && (
                                 <div className="bg-muted/30 divide-y">
-                                  {nonZeroIndirectInc.map((acc: unknown) => (
+                                  {nonZeroIndirectInc.map((acc: any) => (
                                     <div
                                       key={acc.id}
                                       className="flex justify-between items-center px-6 py-2 text-sm text-muted-foreground cursor-pointer hover-elevate"

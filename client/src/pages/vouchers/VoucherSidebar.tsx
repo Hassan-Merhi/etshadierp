@@ -24,7 +24,7 @@ interface SidebarGroup {
 
 interface VoucherSidebarProps {
   activeTab: string;
-  onTabChange: (tab: unknown) => void;
+  onTabChange: (tab: any) => void;
   isFactoryMode: boolean;
 }
 

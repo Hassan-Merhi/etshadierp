@@ -17,7 +17,7 @@ function isFrenchRequest(req: Request): boolean {
   return req.query.lang === "fr" || header === "fr" || /(?:^|;\s*)factory_catalog_language=fr(?:;|$)/.test(cookie);
 }
 
-function accessError(res: import("express").Response) {
+function accessError(res: any) {
   return res.status(403).json({
     message: "You do not have access to the selected Factory company.",
     code: "FACTORY_COMPANY_ACCESS_REQUIRED",

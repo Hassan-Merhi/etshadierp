@@ -50,7 +50,7 @@ export function RecordAdvanceDialog({
                 <SelectValue placeholder="Select worker" />
               </SelectTrigger>
               <SelectContent>
-                {(workers || []).map((w: unknown) => (
+                {(workers || []).map((w: any) => (
                   <SelectItem key={w.id} value={String(w.id)}>
                     {w.fullName}
                   </SelectItem>
@@ -88,7 +88,7 @@ export function RecordAdvanceDialog({
                 <SelectValue placeholder="Select cash account (optional)" />
               </SelectTrigger>
               <SelectContent>
-                {(cashAccounts || []).map((a: unknown) => (
+                {(cashAccounts || []).map((a: any) => (
                   <SelectItem key={a.id} value={String(a.id)}>
                     {a.name}
                   </SelectItem>

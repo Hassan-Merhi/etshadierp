@@ -339,7 +339,7 @@ export default function FactoryPendingInvoiceVerify() {
       });
       return res.json();
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       const repriced = data?.repriced ?? 0;
       toast({ title: "Proforma prices applied", description: `${repriced} bale${repriced !== 1 ? "s" : ""} updated` });
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
@@ -357,7 +357,7 @@ export default function FactoryPendingInvoiceVerify() {
       const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/reprice-production`, {});
       return res.json();
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       const updated = data?.updated ?? data?.repriced ?? 0;
       toast({ title: "Production Prices Applied", description: `${updated} bale(s) updated` });
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
@@ -373,7 +373,7 @@ export default function FactoryPendingInvoiceVerify() {
       const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/reprice`, {});
       return res.json();
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       const updated = data?.updated ?? data?.repriced ?? 0;
       toast({ title: "Selling Prices Applied", description: `${updated} bale(s) updated` });
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });

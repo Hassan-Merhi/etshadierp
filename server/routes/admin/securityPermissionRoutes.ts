@@ -12,7 +12,7 @@ import {
   replaceNamedPermissions,
 } from "../../services/security/namedPermissionService";
 
-function activeCompany(req: import("express").Request): number | null {
+function activeCompany(req: any): number | null {
   const value = req.session?.currentCompanyId;
   return Number.isSafeInteger(value) && value > 0 ? value : null;
 }

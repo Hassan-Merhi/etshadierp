@@ -38,7 +38,7 @@ function CreateUnitDialog({
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
       onClose();
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   return (

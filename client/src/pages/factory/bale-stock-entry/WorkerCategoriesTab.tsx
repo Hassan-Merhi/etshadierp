@@ -74,7 +74,7 @@ export function WorkerCategoriesTab() {
     setCatWorkerIds([]);
     setCatDialogOpen(true);
   };
-  const openEditCat = (cat: unknown) => {
+  const openEditCat = (cat: any) => {
     setEditingCat(cat);
     setCatName(cat.name);
     setCatWorkerIds(Array.isArray(cat.workerIds) ? cat.workerIds : []);

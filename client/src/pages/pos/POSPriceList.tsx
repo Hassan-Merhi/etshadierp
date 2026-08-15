@@ -1,5 +1,5 @@
 import { getErrorDetails } from "@shared/errorUtils";
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -124,8 +124,8 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
     enabled: isAllMode,
   });
 
-  const masters = useMemo(() => (mastersData?.masters ?? []), [mastersData?.masters]);
-  const masterItems = useMemo(() => (mastersData?.items ?? []), [mastersData?.items]);
+  const masters = mastersData?.masters ?? [];
+  const masterItems = mastersData?.items ?? [];
 
   // ── Merged state ────────────────────────────────────────────────────────────
   const isLoading = isAllMode ? mastersLoading : priceListLoading;
@@ -153,17 +153,17 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
     return Array.from(groups).sort();
   }, [locationPricedList]);
 
-  const isItemUnpriced = useCallback((item: unknown): boolean => {
+  const isItemUnpriced = (item: any): boolean => {
     if (isAllMode) {
       const hasBase = item.baseSellingPrice && parseFloat(item.baseSellingPrice) > 0;
       if (hasBase) return false; // base price covers all locations
       const allMasterPrices = item.masterPrices ? Object.values(item.masterPrices) : [];
       if (allMasterPrices.length === 0) return true;
-      const allHavePrice = allMasterPrices.every((p: unknown) => p && parseFloat(p) > 0);
+      const allHavePrice = allMasterPrices.every((p: any) => p && parseFloat(p) > 0);
       return !allHavePrice; // unpriced until every location has a price
     }
     return !item.sellingPrice || parseFloat(item.sellingPrice) === 0;
-  }, [isAllMode]);
+  };
 
   const unpricedCount = useMemo(
     () => locationPricedList.filter(isItemUnpriced).length,
@@ -186,7 +186,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
 
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return locationPricedList.filter((item: unknown) => {
+    return locationPricedList.filter((item: any) => {
       const matchesSearch =
         !q ||
         item.name.toLowerCase().includes(q) ||
@@ -257,7 +257,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
     const current = editingItemRef.current;
     if (!current) return;
     const items = filteredItems;
-    const idx = items.findIndex((i: unknown) => i.stockItemId === current.stockItemId);
+    const idx = items.findIndex((i: any) => i.stockItemId === current.stockItemId);
     if (idx === -1) return;
     const nextIdx = direction === "up" ? idx - 1 : idx + 1;
     if (nextIdx < 0 || nextIdx >= items.length) return;
@@ -282,7 +282,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       return;
     }
     const items = filteredItems;
-    const idx = items.findIndex((i: unknown) => i.stockItemId === current.stockItemId);
+    const idx = items.findIndex((i: any) => i.stockItemId === current.stockItemId);
     if (idx === -1) return;
     const masterIdx = visibleMasters.findIndex((m) => m.id === current.locationId);
     if (masterIdx === -1) return;
@@ -534,7 +534,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
     try {
       const XLSX = await import("@/lib/excelHelper");
 
-      const rows = filteredItems.map((item: unknown) => {
+      const rows = filteredItems.map((item: any) => {
         const row: Record<string, unknown> = {
           Code: item.code || "",
           "Item Name": item.name,
@@ -1091,7 +1091,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredItems.map((item: unknown) => (
+                        {filteredItems.map((item: any) => (
                           <TableRow
                             key={item.stockItemId}
                             data-testid={`row-price-${item.stockItemId}`}

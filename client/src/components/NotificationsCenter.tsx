@@ -208,13 +208,13 @@ export function NotificationsCenter() {
   const approveMutation = useMutation({
     mutationFn: ({ id, destLedgerAccountId }: { id: number; destLedgerAccountId: number }) =>
       apiRequest("POST", `/api/intercompany-requests/${id}/approve`, { destLedgerAccountId }),
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       toast({ title: "Approved", description: `Mirror voucher ${data.voucherNumber} created.` });
       invalidateIC();
       setApproveReq(null);
       setSelectedAccountId("");
     },
-    onError: (err: unknown) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const dismissMutation = useMutation({
@@ -226,7 +226,7 @@ export function NotificationsCenter() {
       setDismissReq(null);
       setDismissNote("");
     },
-    onError: (err: unknown) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   // ── Notification item click ───────────────────────────────────────────────────

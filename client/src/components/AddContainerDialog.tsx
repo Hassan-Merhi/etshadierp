@@ -56,7 +56,7 @@ const spFormSchema = z.object({
 type ErpForm = z.infer<typeof erpFormSchema>;
 type SpForm = z.infer<typeof spFormSchema>;
 
-function fmt2(v: unknown) {
+function fmt2(v: any) {
   const n = parseFloat(String(v ?? "0"));
   return isNaN(n) ? "$0.00" : `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }

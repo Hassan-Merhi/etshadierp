@@ -14,7 +14,7 @@ import { db } from "../../db";
  * high-frequency voucher and lookup callers that only need id/code/name/uom.
  */
 export function registerStockLightRoutes(app: Express) {
-  app.get("/api/stock-items/light", requireAuth, async (req: import("express").Request, res) => {
+  app.get("/api/stock-items/light", requireAuth, async (req: any, res) => {
     try {
       const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
       if (!companyId) {

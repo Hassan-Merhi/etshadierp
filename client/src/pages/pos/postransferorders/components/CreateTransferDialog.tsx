@@ -61,7 +61,7 @@ export function CreateTransferDialog({
       .slice(0, 40);
   }, [sourceInventory, itemSearch, items]);
 
-  const addItem = (inv: unknown) => {
+  const addItem = (inv: any) => {
     const id = inv.stockItemId ?? inv.id;
     const name = inv.stockItemName ?? inv.name ?? "";
     setItems((p) => [...p, { stockItemId: id, stockItemName: name, quantity: "" }]);
@@ -118,7 +118,7 @@ export function CreateTransferDialog({
       queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers/list"] });
       handleClose();
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });

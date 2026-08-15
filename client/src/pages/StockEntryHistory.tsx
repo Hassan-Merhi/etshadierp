@@ -222,12 +222,12 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
         ids.add(Number(id));
       }
     }
-    return workers.filter((w: unknown) => w.active && ids.has(w.id)).map((w: unknown) => w.id);
+    return workers.filter((w: any) => w.active && ids.has(w.id)).map((w: any) => w.id);
   }, [categoryFilter, categories, workers]);
 
   const filteredWorkers = useMemo(() => {
     if (!selectedCategoryWorkerIds) return workers;
-    return workers.filter((w: unknown) => selectedCategoryWorkerIds.includes(w.id));
+    return workers.filter((w: any) => selectedCategoryWorkerIds.includes(w.id));
   }, [workers, selectedCategoryWorkerIds]);
 
   // Every history filter is applied by the API, so the screen, totals, and exports share one dataset.
@@ -270,7 +270,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     // Add zero-bale entries for workers in the production plan who haven't made any bales yet
     if (Object.keys(workerTargets).length > 0) {
       const workerNameById = new Map<number, string>(
-        (workers as unknown[]).map((w: unknown) => [w.id, w.fullName ?? w.full_name ?? ""])
+        (workers as unknown[]).map((w: any) => [w.id, w.fullName ?? w.full_name ?? ""])
       );
       const selectedWorkerIds = new Set(workerIdFilter.map(Number));
       const categoryWorkerIds = selectedCategoryWorkerIds ? new Set(selectedCategoryWorkerIds) : null;
@@ -301,7 +301,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
       setEditingDateKey(null);
       qc.invalidateQueries({ queryKey: ["/api/factory/bales/stock-entry-history"] });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Update failed", description: err.message, variant: "destructive" });
     },
   });
@@ -315,7 +315,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
       toast({ title: "Worker assigned", description: `Worker updated for ${vars.baleIds.length} bale(s).` });
       qc.invalidateQueries({ queryKey: ["/api/factory/bales/stock-entry-history"] });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Assignment failed", description: err.message, variant: "destructive" });
     },
   });
@@ -334,7 +334,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     onSuccess: () => {
       toast({ title: "Sent", description: "Worker PDF sent to production WhatsApp group." });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       if (err?._handledGlobally) return;
       toast({ title: "Send failed", description: err.message, variant: "destructive" });
     },
@@ -965,7 +965,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
               Bale Category
             </div>
             <MultiSelectFilter
-              options={productCategories.map((c: unknown) => ({ value: String(c.id), label: c.name }))}
+              options={productCategories.map((c: any) => ({ value: String(c.id), label: c.name }))}
               selected={productCategoryFilter}
               onChange={setProductCategoryFilter}
               placeholder="Bale categories"
@@ -980,7 +980,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
               Worker Group
             </div>
             <MultiSelectFilter
-              options={categories.map((c: unknown) => ({ value: String(c.id), label: c.name }))}
+              options={categories.map((c: any) => ({ value: String(c.id), label: c.name }))}
               selected={categoryFilter}
               onChange={(next) => {
                 setCategoryFilter(next);
@@ -1007,7 +1007,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
               Worker
             </div>
             <MultiSelectFilter
-              options={filteredWorkers.map((w: unknown) => ({
+              options={filteredWorkers.map((w: any) => ({
                 value: String(w.id),
                 label: w.fullName || w.full_name || w.name || String(w.id),
               }))}
@@ -1025,7 +1025,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
               Product
             </div>
             <MultiSelectFilter
-              options={products.map((p: unknown) => ({ value: String(p.id), label: p.name }))}
+              options={products.map((p: any) => ({ value: String(p.id), label: p.name }))}
               selected={productIdFilter}
               onChange={setProductIdFilter}
               placeholder="Products"
@@ -1040,7 +1040,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
               Location
             </div>
             <MultiSelectFilter
-              options={locations.map((l: unknown) => ({ value: String(l.id), label: l.name }))}
+              options={locations.map((l: any) => ({ value: String(l.id), label: l.name }))}
               selected={locationIdFilter}
               onChange={setLocationIdFilter}
               placeholder="Locations"
@@ -1330,8 +1330,8 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                                       </SelectTrigger>
                                       <SelectContent>
                                         {workers
-                                          .filter((w: unknown) => w.active)
-                                          .map((w: unknown) => (
+                                          .filter((w: any) => w.active)
+                                          .map((w: any) => (
                                             <SelectItem key={w.id} value={String(w.id)}>
                                               {w.fullName || w.full_name || w.name}
                                             </SelectItem>

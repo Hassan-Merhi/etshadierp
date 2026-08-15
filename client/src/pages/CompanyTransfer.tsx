@@ -131,7 +131,7 @@ export default function CompanyTransfer() {
       toast({ title: "Transfer reversed", description: "Both company balances were restored." });
       setUndoTarget(null);
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       toast({ title: "Undo failed", description: error.message, variant: "destructive" });
       setUndoTarget(null);
     },
@@ -151,7 +151,7 @@ export default function CompanyTransfer() {
       setRuleCashAccountIds([]);
       setRuleEnabled(true);
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       toast({ title: "Save failed", description: error.message, variant: "destructive" });
     },
   });
@@ -166,7 +166,7 @@ export default function CompanyTransfer() {
       toast({ title: "Rule removed", description: "Auto-transfer rule deleted." });
       setDeleteConfirmRuleId(null);
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       toast({ title: "Delete failed", description: error.message, variant: "destructive" });
       setDeleteConfirmRuleId(null);
     },

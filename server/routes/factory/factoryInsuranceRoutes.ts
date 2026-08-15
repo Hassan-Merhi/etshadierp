@@ -18,7 +18,7 @@ function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
 }
 
-function sendRouteError(res: import("express").Response, error: unknown, fallback: string): void {
+function sendRouteError(res: any, error: unknown, fallback: string): void {
   if (isCompanyIsolationError(error)) {
     res.status(403).json({ message: "Forbidden" });
     return;

@@ -180,7 +180,7 @@ export default function OffloadDetail() {
       queryClient.invalidateQueries({ queryKey: [`/api/offloads/${id}`] });
       toast({ title: data.optional ? "Offload suspended" : "Offload restored", description: data.message });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });

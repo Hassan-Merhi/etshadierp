@@ -184,7 +184,7 @@ export function BusinessAlertsPage({ currentUser }: Props) {
       toast({ title: "Alert dismissed" });
       queryClient.invalidateQueries({ queryKey: ["/api/business-alerts"] });
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const resolveMutation = useMutation({
@@ -194,7 +194,7 @@ export function BusinessAlertsPage({ currentUser }: Props) {
       queryClient.invalidateQueries({ queryKey: ["/api/business-alerts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/business-alerts/summary"] });
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const reopenMutation = useMutation({
@@ -204,7 +204,7 @@ export function BusinessAlertsPage({ currentUser }: Props) {
       queryClient.invalidateQueries({ queryKey: ["/api/business-alerts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/business-alerts/summary"] });
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const runChecksMutation = useMutation({
@@ -214,7 +214,7 @@ export function BusinessAlertsPage({ currentUser }: Props) {
       queryClient.invalidateQueries({ queryKey: ["/api/business-alerts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/business-alerts/summary"] });
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const alerts = Array.isArray(alertsQuery.data) ? alertsQuery.data : [];

@@ -104,7 +104,7 @@ export default function FactoryEmployeeBonusesTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employee-bonuses"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employees"] });
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -121,7 +121,7 @@ export default function FactoryEmployeeBonusesTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employee-bonuses"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employees"] });
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   return (

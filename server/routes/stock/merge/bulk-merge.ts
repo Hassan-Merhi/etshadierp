@@ -26,7 +26,7 @@ import {
 import { eq, and, sql, isNull } from "drizzle-orm";
 
 export function registerStockItemBulkMergeRoutes(app: Express) {
-  app.post("/api/stock-items/bulk-merge", requireAuth, requireNonPOS, async (req: import("express").Request, res: import("express").Response) => {
+  app.post("/api/stock-items/bulk-merge", requireAuth, requireNonPOS, async (req: any, res: any) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

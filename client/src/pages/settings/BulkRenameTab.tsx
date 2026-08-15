@@ -88,15 +88,15 @@ export function BulkRenameTab() {
       const regex = buildRegex();
       if (!regex) return;
       const matches = allItems
-        .filter((item: unknown) => regex.test(item.name))
-        .map((item: unknown) => ({
+        .filter((item: any) => regex.test(item.name))
+        .map((item: any) => ({
           id: item.id,
           code: item.code || "",
           name: item.name,
         }));
       regex.lastIndex = 0;
       setMatchingItems(matches);
-      setSelectedIds(new Set(matches.map((m: unknown) => m.id)));
+      setSelectedIds(new Set(matches.map((m: any) => m.id)));
       if (matches.length === 0) {
         toast({ title: "No matches", description: "No stock items matched the search text" });
       }
@@ -161,7 +161,7 @@ export function BulkRenameTab() {
       if (data.failures && data.failures.length > 0) {
         toast({
           title: "Some items failed",
-          description: data.failures.map((f: unknown) => `${f.name}: ${f.reason}`).join(", "),
+          description: data.failures.map((f: any) => `${f.name}: ${f.reason}`).join(", "),
           variant: "destructive",
         });
       }

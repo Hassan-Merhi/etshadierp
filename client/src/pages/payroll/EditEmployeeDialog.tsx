@@ -9,7 +9,7 @@ import { Plus, X } from "lucide-react";
 interface EditEmployeeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  setEditingEmployee: (v: unknown) => void;
+  setEditingEmployee: (v: any) => void;
   editEmployeeForm: unknown;
   editEmployeeMutation: unknown;
   employeeGroups: unknown[];
@@ -58,7 +58,7 @@ export function EditEmployeeDialog({
         <Form {...editEmployeeForm}>
           <form
             noValidate
-            onSubmit={editEmployeeForm.handleSubmit((data: unknown) => editEmployeeMutation.mutate(data))}
+            onSubmit={editEmployeeForm.handleSubmit((data: any) => editEmployeeMutation.mutate(data))}
             className="space-y-4"
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

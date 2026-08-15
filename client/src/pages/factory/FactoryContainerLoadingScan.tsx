@@ -208,7 +208,7 @@ export default function FactoryContainerLoadingScan() {
       const res = await modeApiRequest("POST", "/api/factory/customer-orders-loading", data);
       return await res.json();
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       setOrderId(data.id);
       toast({
         title: "Loading order created",
@@ -237,7 +237,7 @@ export default function FactoryContainerLoadingScan() {
       return await res.json();
     },
     onSuccess: (
-      data: unknown,
+      data: any,
       variables: { scanCode: string; locationId: number; allowBypassProforma?: boolean; allowBypassOverload?: boolean }
     ) => {
       setPendingBypassBaleRef(null);
@@ -273,7 +273,7 @@ export default function FactoryContainerLoadingScan() {
       }, 500);
       if (orderId) {
         const scanned = variables.scanCode;
-        const newestForRef = [...(data?.bales || [])].sort((a: unknown, b: unknown) => b.id - a.id)[0];
+        const newestForRef = [...(data?.bales || [])].sort((a: any, b: any) => b.id - a.id)[0];
         const lastScanned = {
           baleReference: newestForRef?.baleReference || scanned,
           baleName: newestForRef?.baleName || "",
@@ -282,7 +282,7 @@ export default function FactoryContainerLoadingScan() {
         localStorage.setItem(`lastScannedBale_${orderId}`, JSON.stringify(lastScanned));
         setLastScannedRef(lastScanned);
       }
-      const newest = [...(data?.bales || [])].sort((a: unknown, b: unknown) => b.id - a.id)[0];
+      const newest = [...(data?.bales || [])].sort((a: any, b: any) => b.id - a.id)[0];
       if (newest?.articleCode) {
         setExpandedGroups((prev) => {
           const next = new Set(prev);
@@ -293,7 +293,7 @@ export default function FactoryContainerLoadingScan() {
       queryClient.setQueryData<OrderDetail>(["/api/factory/customer-orders", orderId], data);
       setScanCode("");
     },
-    onError: (error: Error, variables: unknown) => {
+    onError: (error: Error, variables: any) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       if ((error as unknown as Error & { overloaded: unknown }).overloaded) {
         setPendingBypassOverloadRef(variables.scanCode);
@@ -451,7 +451,7 @@ export default function FactoryContainerLoadingScan() {
       const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/bales/bulk-import`, body);
       return await res.json();
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries(
         { queryKey: ["/api/factory/customer-orders", orderId], exact: true, refetchType: "active" },
         { cancelRefetch: false }
@@ -460,7 +460,7 @@ export default function FactoryContainerLoadingScan() {
       setImportPreview([]);
       setImportRefNumbers([]);
       const notFoundMsgs = (data.notFound || []).map(
-        (n: unknown) => `${n.articleCode}: requested ${n.requestedQty}, found ${n.foundQty}`
+        (n: any) => `${n.articleCode}: requested ${n.requestedQty}, found ${n.foundQty}`
       );
       const notFoundRefMsgs =
         (data.notFoundRefs || []).length > 0 ? `Not found: ${(data.notFoundRefs as string[]).join(", ")}` : undefined;

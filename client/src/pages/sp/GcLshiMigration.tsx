@@ -137,7 +137,7 @@ export default function GcLshiMigration() {
   const createCompanyMutation = useMutation({
     mutationFn: (body: { name: string; code: string }) =>
       apiRequest("POST", "/api/sp/migration/create-sp-company", body),
-    onSuccess: async (data: unknown) => {
+    onSuccess: async (data: any) => {
       const result = await data.json();
       toast({
         title: "Company created",
@@ -147,22 +147,22 @@ export default function GcLshiMigration() {
       qc.invalidateQueries({ queryKey: ["/api/companies"] });
       setTargetCompanyId(result.company.id);
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const openingBalanceMutation = useMutation({
     mutationFn: (body: object) => apiRequest("POST", "/api/sp/migration/opening-balance", body),
-    onSuccess: async (data: unknown) => {
+    onSuccess: async (data: any) => {
       const result = await data.json();
       toast({ title: "Opening balance created", description: `Voucher ${result.voucherNumber} for $${result.amount}` });
       setObAmount("");
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const createAccountsMutation = useMutation({
     mutationFn: (body: object) => apiRequest("POST", "/api/sp/migration/gc-create-accounts", body),
-    onSuccess: async (data: unknown) => {
+    onSuccess: async (data: any) => {
       const result = await data.json();
       toast({
         title: "Accounts created",
@@ -171,7 +171,7 @@ export default function GcLshiMigration() {
       setAccountsCreated(true);
       refetchAccountPlan();
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const rollbackMutation = useMutation({
@@ -182,7 +182,7 @@ export default function GcLshiMigration() {
       refetchRuns();
       refetchPreview();
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Rollback failed", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Rollback failed", description: e.message, variant: "destructive" }),
   });
 
   // ── Helpers ─────────────────────────────────────────────────────────────

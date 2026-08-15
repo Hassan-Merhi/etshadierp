@@ -121,7 +121,7 @@ export default function FactoryInsurance() {
       setEcDate(new Date().toISOString().slice(0, 10));
       toast({ title: "Extra charge posted", description: "Voucher created and visible in Daybook & Accounts." });
     },
-    onError: (e: import("react").SyntheticEvent) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
   });
 
   // Close account dropdowns on outside click
@@ -162,7 +162,7 @@ export default function FactoryInsurance() {
       queryClient.invalidateQueries({ queryKey: ["/api/insurance/members"] });
       toast({ title: "Status updated" });
     },
-    onError: (e: import("react").SyntheticEvent) => {
+    onError: (e: any) => {
       toast({ title: "Failed", description: e.message, variant: "destructive" });
     },
   });
@@ -176,7 +176,7 @@ export default function FactoryInsurance() {
       toast({ title: "Member deleted" });
       setDeleteMember(null);
     },
-    onError: (e: import("react").SyntheticEvent) => {
+    onError: (e: any) => {
       toast({ title: "Failed to delete", description: e.message, variant: "destructive" });
     },
   });
@@ -203,7 +203,7 @@ export default function FactoryInsurance() {
         ),
       });
     },
-    onError: (e: import("react").SyntheticEvent) => {
+    onError: (e: any) => {
       toast({ title: "Generation failed", description: e.message, variant: "destructive" });
     },
   });

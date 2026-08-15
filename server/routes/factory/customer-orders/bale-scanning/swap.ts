@@ -24,7 +24,7 @@ import { eq, and, sql, ilike } from "drizzle-orm";
 
 export function registerOrderBaleSwapRoutes(app: Express) {
   // GET /api/factory/bales/:id/order-info — get the order a bale is allocated to (for the confirmation dialog)
-  app.get("/api/factory/bales/:id/order-info", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.get("/api/factory/bales/:id/order-info", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -68,7 +68,7 @@ export function registerOrderBaleSwapRoutes(app: Express) {
 
   // POST /api/factory/bales/swap — swap a loaded bale (SOLD/RESERVED) with an IN_STOCK bale by reference number
   // The current bale is returned to stock; the replacement bale takes its place in the order.
-  app.post("/api/factory/bales/swap", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.post("/api/factory/bales/swap", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

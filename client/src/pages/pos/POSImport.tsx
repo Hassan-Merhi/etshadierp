@@ -134,7 +134,7 @@ export default function POSImport() {
         description: `Found ${data.items.length} item(s) totaling ${formatNumber(data.totalValue)}. Click Validate to check the data.`,
       });
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Parse error",
@@ -145,7 +145,7 @@ export default function POSImport() {
   });
 
   const validateMutation = useMutation({
-    mutationFn: async (data: unknown) => {
+    mutationFn: async (data: any) => {
       const res = await apiRequest("POST", "/api/pos-import/validate", data);
       return await res.json();
     },
@@ -169,7 +169,7 @@ export default function POSImport() {
         }, 100);
       }
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Validation error",
@@ -189,7 +189,7 @@ export default function POSImport() {
   });
 
   const importMutation = useMutation({
-    mutationFn: async (data: unknown) => {
+    mutationFn: async (data: any) => {
       const res = await apiRequest("POST", "/api/pos-import/import", data);
       return await res.json();
     },
@@ -203,7 +203,7 @@ export default function POSImport() {
       const location = locations.find((l) => l.id === parseInt(selectedLocation));
       const itemsForPrint =
         saleCurrency === "CFA" && exchangeRate
-          ? (validationResult?.validatedItems || []).map((item: unknown) => ({
+          ? (validationResult?.validatedItems || []).map((item: any) => ({
               ...item,
               rate: (parseFloat(item.rate) / exchangeRate).toFixed(2),
             }))
@@ -219,7 +219,7 @@ export default function POSImport() {
       setPrintTime(new Date().toLocaleTimeString());
       setShowPrintDialog(true);
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Import error",
@@ -230,7 +230,7 @@ export default function POSImport() {
   });
 
   const creditImportMutation = useMutation({
-    mutationFn: async (data: unknown) => {
+    mutationFn: async (data: any) => {
       const res = await apiRequest("POST", "/api/credit-sales-import/import", data);
       return await res.json();
     },
@@ -247,7 +247,7 @@ export default function POSImport() {
       const customer = customers.find((c) => c.id === parseInt(selectedCustomer));
       const itemsForPrint =
         saleCurrency === "CFA" && exchangeRate
-          ? (validationResult?.validatedItems || []).map((item: unknown) => ({
+          ? (validationResult?.validatedItems || []).map((item: any) => ({
               ...item,
               rate: (parseFloat(item.rate) / exchangeRate).toFixed(2),
             }))
@@ -264,7 +264,7 @@ export default function POSImport() {
       setPrintTime(new Date().toLocaleTimeString());
       setShowPrintDialog(true);
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Credit Import error",
@@ -354,7 +354,7 @@ export default function POSImport() {
     let itemsToImport = validationResult.validatedItems;
     if (saleCurrency === "CFA" && exchangeRate) {
       // Convert CFA to USD: CFA_amount / rate = USD_amount
-      itemsToImport = validationResult.validatedItems.map((item: unknown) => ({
+      itemsToImport = validationResult.validatedItems.map((item: any) => ({
         ...item,
         rate: (parseFloat(item.rate) / exchangeRate).toFixed(2),
       }));
@@ -725,7 +725,7 @@ export default function POSImport() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {preview.items.map((item: unknown, index: number) => {
+                  {preview.items.map((item: any, index: number) => {
                     const validation = validationResult?.validatedItems?.[index];
                     const hasError = validation?.error;
 
@@ -939,7 +939,7 @@ export default function POSImport() {
                   </tr>
                 </thead>
                 <tbody>
-                  {(importedSale?.items ?? []).map((item: unknown, idx: number) => {
+                  {(importedSale?.items ?? []).map((item: any, idx: number) => {
                     const rate = parseFloat(item.rate || 0);
                     const qty = parseFloat(item.quantity || 0);
                     return (
@@ -987,7 +987,7 @@ export default function POSImport() {
                     <td style={{ textAlign: "center", padding: "5px 3px" }}>
                       {fmtPrint(
                         (importedSale?.items ?? []).reduce(
-                          (sum: number, item: unknown) => sum + parseFloat(item.quantity || 0),
+                          (sum: number, item: any) => sum + parseFloat(item.quantity || 0),
                           0
                         )
                       )}
@@ -996,7 +996,7 @@ export default function POSImport() {
                     <td style={{ textAlign: "center", padding: "5px 3px", fontWeight: "900" }}>
                       {fmtPrint(
                         (importedSale?.items ?? []).reduce(
-                          (sum: number, item: unknown) => sum + parseFloat(item.quantity || 0) * parseFloat(item.rate || 0),
+                          (sum: number, item: any) => sum + parseFloat(item.quantity || 0) * parseFloat(item.rate || 0),
                           0
                         ),
                         printCurrPrefix
@@ -1022,7 +1022,7 @@ export default function POSImport() {
                 <span>
                   {fmtPrint(
                     (importedSale?.items ?? []).reduce(
-                      (sum: number, item: unknown) => sum + parseFloat(item.quantity || 0) * parseFloat(item.rate || 0),
+                      (sum: number, item: any) => sum + parseFloat(item.quantity || 0) * parseFloat(item.rate || 0),
                       0
                     ),
                     printCurrPrefix

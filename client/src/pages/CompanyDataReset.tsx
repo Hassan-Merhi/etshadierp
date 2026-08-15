@@ -53,7 +53,7 @@ export default function CompanyDataReset() {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Reset Failed", description: error.message, variant: "destructive" });
     },
@@ -65,7 +65,7 @@ export default function CompanyDataReset() {
         companyId: parseInt(selectedCompanyId),
       });
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       toast({
         title: "Undo Complete",
         description: `Restored ${data.vouchersRestored || 0} vouchers successfully`,
@@ -74,7 +74,7 @@ export default function CompanyDataReset() {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Undo Failed", description: error.message, variant: "destructive" });
     },

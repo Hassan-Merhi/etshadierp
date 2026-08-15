@@ -97,7 +97,7 @@ export default function ContainerVerification() {
   });
 
   const addItemMutation = useMutation({
-    mutationFn: async (data: unknown) => {
+    mutationFn: async (data: any) => {
       const res = await apiRequest("POST", `/api/containers/${containerId}/loaded-items`, data);
       return res.json();
     },
@@ -107,7 +107,7 @@ export default function ContainerVerification() {
       setNewItem({ barcode: "", itemName: "", qty: "0", weightPerBale: "0", pricePerBale: "0" });
       if (verificationResult) generateComparison();
     },
-    onError: (e: import("react").SyntheticEvent) => {
+    onError: (e: any) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
@@ -123,7 +123,7 @@ export default function ContainerVerification() {
       setEditingItemId(null);
       if (verificationResult) generateComparison();
     },
-    onError: (e: import("react").SyntheticEvent) => {
+    onError: (e: any) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
@@ -137,7 +137,7 @@ export default function ContainerVerification() {
       queryClient.invalidateQueries({ queryKey: ["/api/containers", containerId, "loaded-items"] });
       if (verificationResult) generateComparison();
     },
-    onError: (e: import("react").SyntheticEvent) => {
+    onError: (e: any) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
@@ -148,7 +148,7 @@ export default function ContainerVerification() {
       const res = await apiRequest("POST", `/api/containers/${containerId}/auto-populate-loaded-items`);
       return res.json();
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/containers", containerId, "loaded-items"] });
       const skippedMsg = data.skipped > 0 ? ` (${data.skipped} skipped - missing barcodes)` : "";
       toast({
@@ -157,7 +157,7 @@ export default function ContainerVerification() {
       });
       if (verificationResult) generateComparison();
     },
-    onError: (e: import("react").SyntheticEvent) => {
+    onError: (e: any) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
@@ -168,12 +168,12 @@ export default function ContainerVerification() {
       const res = await apiRequest("POST", `/api/containers/${containerId}/import-loaded-items`, { items });
       return res.json();
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/containers", containerId, "loaded-items"] });
       toast({ title: "Import complete", description: `${data.imported} items imported` });
       if (verificationResult) generateComparison();
     },
-    onError: (e: import("react").SyntheticEvent) => {
+    onError: (e: any) => {
       if (e?._handledGlobally) return;
       toast({ title: "Import error", description: e.message, variant: "destructive" });
     },

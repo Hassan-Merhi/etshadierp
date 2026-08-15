@@ -78,7 +78,7 @@ export default function Bales() {
         barcodeInputRef.current.focus();
       }
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Error creating bale",
@@ -97,7 +97,7 @@ export default function Bales() {
       queryClient.invalidateQueries({ queryKey: ["/api/bales", selectedCompany?.id] });
       toast({ title: "Bale deleted successfully" });
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Error deleting bale",

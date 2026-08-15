@@ -8,7 +8,7 @@ export interface ExportPriceVisibility {
   hideProformaPrice: boolean;
 }
 
-export async function getExportPriceVisibility(req: import("express").Request): Promise<ExportPriceVisibility> {
+export async function getExportPriceVisibility(req: any): Promise<ExportPriceVisibility> {
   try {
     const userId = req.user?.id ? String(req.user.id) : null;
     if (!userId) return { hideSelling: true, hideCost: true, hideProformaPrice: true };
@@ -48,7 +48,7 @@ export interface ErpExportVisibility {
  * Developer and Admin always see everything.
  * Everyone else respects their individual field restriction settings.
  */
-export async function getErpExportVisibility(req: import("express").Request): Promise<ErpExportVisibility> {
+export async function getErpExportVisibility(req: any): Promise<ErpExportVisibility> {
   try {
     const userId = req.user?.id ? String(req.user.id) : null;
     if (!userId) return { hideSelling: false, hideCost: false, hideSalesProfitCost: false };

@@ -141,7 +141,7 @@ export default function FactoryInvoiceDetail() {
       if (!res.ok) throw new Error((await res.json()).message || "Failed to add charge");
       return res.json();
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
       setShowAddCharge(false);
       setNewChargeName("");
@@ -163,7 +163,7 @@ export default function FactoryInvoiceDetail() {
       if (!res.ok) throw new Error((await res.json()).message || "Failed to relink");
       return res.json();
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
       toast({ title: data.linked > 0 ? "Ledger entries created" : "Nothing to relink", description: data.message });
     },
@@ -293,7 +293,7 @@ export default function FactoryInvoiceDetail() {
       invalidateCustomerBalances(order?.customerId ?? undefined);
       navigate("/factory/invoicing?tab=invoices");
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
@@ -308,7 +308,7 @@ export default function FactoryInvoiceDetail() {
       }
       return res.json();
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       if (data.repriced === 0) {
         toast({
           title: "Prices already current",
@@ -322,7 +322,7 @@ export default function FactoryInvoiceDetail() {
       }
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
@@ -348,7 +348,7 @@ export default function FactoryInvoiceDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
       setEditingArticleCode(null);
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
       setEditingArticleCode(null);
@@ -369,7 +369,7 @@ export default function FactoryInvoiceDetail() {
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
       invalidateCustomerBalances(order?.customerId ?? undefined);
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({ title: "Cannot revert", description: error.message, variant: "destructive" });
     },
@@ -384,7 +384,7 @@ export default function FactoryInvoiceDetail() {
       }
       return res.json();
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       if (data.repriced === 0) {
         toast({
           title: "Already at production prices",
@@ -398,7 +398,7 @@ export default function FactoryInvoiceDetail() {
       }
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
@@ -415,7 +415,7 @@ export default function FactoryInvoiceDetail() {
       }
       return res.json();
     },
-    onSuccess: (data: unknown) => {
+    onSuccess: (data: any) => {
       const repriced = data?.repriced ?? 0;
       if (repriced === 0) {
         toast({
@@ -429,7 +429,7 @@ export default function FactoryInvoiceDetail() {
       setShowProformaDialog(false);
       setSelectedProformaId("");
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
@@ -453,7 +453,7 @@ export default function FactoryInvoiceDetail() {
       setExchangeBale(null);
       setNewRefInput("");
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
@@ -473,7 +473,7 @@ export default function FactoryInvoiceDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
       setRemoveBaleState(null);
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },

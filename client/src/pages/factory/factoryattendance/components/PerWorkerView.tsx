@@ -97,7 +97,7 @@ export function PerWorkerView() {
       });
       toast({ title: "Attendance saved", description: `${dates.length} days saved for this worker.` });
     },
-    onError: (err: unknown) => {
+    onError: (err: any) => {
       if (err?._handledGlobally) return;
       toast({ title: "Save failed", description: err.message, variant: "destructive" });
     },

@@ -26,7 +26,7 @@ function getRoleBadgeClass(role: string): string {
   }
 }
 
-function accessSummary(user: unknown): { label: string; variant: "default" | "secondary" | "outline" } {
+function accessSummary(user: any): { label: string; variant: "default" | "secondary" | "outline" } {
   const privileged = ["admin", "owner", "developer"].includes(user.role?.toLowerCase());
   const hasERP = privileged || (user.hasErpAccess ?? true);
   const hasFactory = privileged || (user.hasFactoryAccess ?? true);
@@ -36,7 +36,7 @@ function accessSummary(user: unknown): { label: string; variant: "default" | "se
   return { label: "No access", variant: "outline" };
 }
 
-function pagesSummary(user: unknown): string {
+function pagesSummary(user: any): string {
   const privileged = ["admin", "owner", "developer"].includes(user.role?.toLowerCase());
   if (privileged || !user.pageAccess || user.pageAccess.length === 0) return "Full access";
   const factoryKeys = new Set(FACTORY_NAV_PAGES.map((p) => p.key));
@@ -53,7 +53,7 @@ interface UserListTableProps {
   users: unknown[];
   isLoading: boolean;
   selectedUserId?: string | null;
-  onSelectUser: (user: unknown) => void;
+  onSelectUser: (user: any) => void;
 }
 
 export function UserListTable({ users, isLoading, selectedUserId, onSelectUser }: UserListTableProps) {

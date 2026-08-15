@@ -10,7 +10,7 @@ const ALLOWED_ROLES = ["Developer", "Admin"];
 
 export function registerNotificationRoutes(app: Express) {
   // GET /api/notifications — current user's notifications for the active company, enriched with triggered-by username
-  app.get("/api/notifications", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.get("/api/notifications", requireAuth, async (req: any, res: any) => {
     try {
       const userId = req.session?.userId;
       const companyId = req.session?.currentCompanyId;
@@ -76,7 +76,7 @@ export function registerNotificationRoutes(app: Express) {
   });
 
   // GET /api/notifications/unread-count
-  app.get("/api/notifications/unread-count", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.get("/api/notifications/unread-count", requireAuth, async (req: any, res: any) => {
     try {
       const userId = req.session?.userId;
       const companyId = req.session?.currentCompanyId;
@@ -94,7 +94,7 @@ export function registerNotificationRoutes(app: Express) {
   });
 
   // POST /api/notifications/:id/read
-  app.post("/api/notifications/:id/read", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.post("/api/notifications/:id/read", requireAuth, async (req: any, res: any) => {
     try {
       const userId = req.session?.userId;
       const id = parseInt(req.params.id);
@@ -110,7 +110,7 @@ export function registerNotificationRoutes(app: Express) {
   });
 
   // POST /api/notifications/read-all
-  app.post("/api/notifications/read-all", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.post("/api/notifications/read-all", requireAuth, async (req: any, res: any) => {
     try {
       const userId = req.session?.userId;
       const companyId = req.session?.currentCompanyId;
@@ -128,7 +128,7 @@ export function registerNotificationRoutes(app: Express) {
   });
 
   // GET /api/notification-rules — admin/dev only
-  app.get("/api/notification-rules", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.get("/api/notification-rules", requireAuth, async (req: any, res: any) => {
     try {
       const role = req.session?.currentRole;
       if (!ALLOWED_ROLES.includes(role)) {
@@ -142,7 +142,7 @@ export function registerNotificationRoutes(app: Express) {
   });
 
   // PUT /api/notification-rules — admin/dev only; replaces all rules for given eventType
-  app.put("/api/notification-rules", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.put("/api/notification-rules", requireAuth, async (req: any, res: any) => {
     try {
       const role = req.session?.currentRole;
       if (!ALLOWED_ROLES.includes(role)) {
@@ -175,7 +175,7 @@ export function registerNotificationRoutes(app: Express) {
   });
 
   // GET /api/notification-users — users list for recipient picker (admin/dev only)
-  app.get("/api/notification-users", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
+  app.get("/api/notification-users", requireAuth, async (req: any, res: any) => {
     try {
       const role = req.session?.currentRole;
       if (!ALLOWED_ROLES.includes(role)) {

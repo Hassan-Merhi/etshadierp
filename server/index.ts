@@ -422,7 +422,7 @@ let migrationsDone = false;
     logger.info("[Schedulers] Disabled via ENABLE_SCHEDULERS=false");
   }
 
-  app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     // DB unavailable errors — return 503 immediately instead of a generic 500.
     const isPoolTimeout =
       err?.cause?.message?.includes("timeout exceeded when trying to connect") ||

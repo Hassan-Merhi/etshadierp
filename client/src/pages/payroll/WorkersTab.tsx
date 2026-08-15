@@ -18,13 +18,13 @@ interface WorkersTabProps {
   workerStaff: Employee[];
   workerGroups: unknown[];
   workerGroupsExpanded: Record<number, boolean>;
-  setWorkerGroupsExpanded: (val: unknown) => void;
+  setWorkerGroupsExpanded: (val: any) => void;
   workerPayments: Record<number, unknown>;
-  setWorkerOverrides: (val: unknown) => void;
+  setWorkerOverrides: (val: any) => void;
   setCreateWorkerGroupDialogOpen: (val: boolean) => void;
-  setSelectedWorkerGroupForMembers: (val: unknown) => void;
+  setSelectedWorkerGroupForMembers: (val: any) => void;
   setWorkerGroupMembersDialogOpen: (val: boolean) => void;
-  setWorkerGroupMemberSelections: (val: unknown) => void;
+  setWorkerGroupMemberSelections: (val: any) => void;
   deleteWorkerGroupMutation: unknown;
   handleToggleWorker: (id: number) => void;
   handleUpdateAmount: (id: number, val: string) => void;
@@ -69,7 +69,7 @@ export function WorkersTab({
 
   const handleSelectAll = () => {
     const shouldSelectAll = !allSelected;
-    setWorkerOverrides((prev: unknown) => {
+    setWorkerOverrides((prev: any) => {
       const next = { ...prev };
       workerStaff.forEach((w) => {
         next[w.id] = { ...next[w.id], selected: shouldSelectAll };
@@ -149,7 +149,7 @@ export function WorkersTab({
                 key={group.id}
                 open={isExpanded}
                 onOpenChange={(open) =>
-                  setWorkerGroupsExpanded((prev: unknown) => ({ ...prev, [group.id]: open }))
+                  setWorkerGroupsExpanded((prev: any) => ({ ...prev, [group.id]: open }))
                 }
               >
                 <Card>

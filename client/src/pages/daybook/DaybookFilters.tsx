@@ -15,7 +15,7 @@ interface DaybookFiltersProps {
     minAmount: string;
     maxAmount: string;
   };
-  setFilters: (v: unknown) => void;
+  setFilters: (v: any) => void;
   onPrevDay?: () => void;
   onNextDay?: () => void;
 }

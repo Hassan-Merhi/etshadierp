@@ -68,7 +68,7 @@ export function FiscalPeriodTab({ currentCompanyId, userRole }: FiscalPeriodTabP
       const response = await fetch(`/api/ledger-accounts?accountType=Equity`);
       if (!response.ok) throw new Error("Failed to fetch equity accounts");
       const allAccounts = await response.json();
-      return allAccounts.filter((acc: unknown) => acc.companyId === currentCompanyId);
+      return allAccounts.filter((acc: any) => acc.companyId === currentCompanyId);
     },
     enabled: !!currentCompanyId,
   });
@@ -111,7 +111,7 @@ export function FiscalPeriodTab({ currentCompanyId, userRole }: FiscalPeriodTabP
       setIsConfirmDialogOpen(false);
       setPendingFormData(null);
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         variant: "destructive",
@@ -240,7 +240,7 @@ export function FiscalPeriodTab({ currentCompanyId, userRole }: FiscalPeriodTabP
                           No equity accounts found
                         </SelectItem>
                       ) : (
-                        equityAccounts.map((account: unknown) => (
+                        equityAccounts.map((account: any) => (
                           <SelectItem key={account.id} value={account.id.toString()}>
                             {account.name} ({account.code})
                           </SelectItem>
@@ -307,7 +307,7 @@ export function FiscalPeriodTab({ currentCompanyId, userRole }: FiscalPeriodTabP
               </TableRow>
             </TableHeader>
             <TableBody>
-              {closures.map((closure: unknown) => {
+              {closures.map((closure: any) => {
                 const netIncome = parseFloat(closure.netIncome || "0");
                 const isProfit = netIncome > 0;
 

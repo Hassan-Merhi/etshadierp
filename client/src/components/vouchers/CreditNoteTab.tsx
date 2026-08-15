@@ -264,7 +264,7 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/locations", selectedLocationId, "inventory"] });
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Error",
@@ -302,7 +302,7 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
       queryClient.invalidateQueries({ queryKey: ["/api/locations", selectedLocationId, "inventory"] });
       queryClient.invalidateQueries({ queryKey: ["/api/credit-notes", editingVoucherId] });
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Error",

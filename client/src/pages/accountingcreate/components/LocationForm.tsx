@@ -19,7 +19,7 @@ function LocationForm({
   isPending,
 }: {
   form: unknown;
-  onSubmit: (data: unknown, saveAndNew?: boolean) => void;
+  onSubmit: (data: any, saveAndNew?: boolean) => void;
   onCancel: () => void;
   isPending: boolean;
 }) {
