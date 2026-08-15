@@ -1,4 +1,4 @@
-name: Phase 18 Client Error Typing
+name: Phase 18 Isolated Inference Cleanup
 
 on:
   push:
@@ -8,8 +8,8 @@ permissions:
   contents: write
 
 jobs:
-  client-errors:
-    if: contains(github.event.head_commit.message, '[phase18-safe2]')
+  isolated-inference:
+    if: contains(github.event.head_commit.message, '[phase18-safe3]')
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -24,134 +24,180 @@ jobs:
       - run: npm ci
       - name: Confirm type-green baseline
         run: npm run check
-      - name: Replace mutation/query onError any parameters with a real error contract
+      - name: Install isolated transformation driver
         shell: bash
         run: |
-          set -euo pipefail
-          cat > client/src/lib/clientError.ts <<'EOF'
-          /** Shared client-side error surface used by query/mutation callbacks. */
-          export interface ClientErrorLike {
-            message?: string;
-            name?: string;
-            _handledGlobally?: boolean;
-            description?: string;
-            code?: string | number;
-          }
-          EOF
-          node <<'NODE'
+          cat > /tmp/safe3-transform.cjs <<'NODE'
           const ts = require('typescript');
           const fs = require('fs');
           const path = require('path');
-          const root = path.join(process.cwd(), 'client/src');
+          const mode = process.argv[2];
+          const configPath = ts.findConfigFile(process.cwd(), ts.sys.fileExists, 'tsconfig.json');
+          const configFile = ts.readConfigFile(configPath, ts.sys.readFile);
+          const parsed = ts.parseJsonConfigFileContent(configFile.config, ts.sys, path.dirname(configPath));
+          const program = ts.createProgram(parsed.fileNames, parsed.options);
+          const checker = program.getTypeChecker();
+          let total = 0;
           const changed = [];
-          let editsCount = 0;
 
-          function files(dir) {
-            let out = [];
-            for (const e of fs.readdirSync(dir, {withFileTypes:true})) {
-              const p = path.join(dir, e.name);
-              if (e.isDirectory()) out = out.concat(files(p));
-              else if (/\.tsx?$/.test(e.name) && !e.name.endsWith('.d.ts')) out.push(p);
-            }
-            return out;
-          }
-          function hasAny(n) {
+          function containsAnyNode(n) {
+            if (!n) return false;
             let found = false;
             function walk(x) {
               if (x.kind === ts.SyntaxKind.AnyKeyword) found = true;
               if (!found) ts.forEachChild(x, walk);
             }
-            walk(n);
-            return found;
+            walk(n); return found;
           }
-          function typeRange(param, sf) {
-            const typeStart = param.type.getStart(sf);
-            const anchor = param.questionToken ? param.questionToken.end : param.name.end;
-            const between = sf.text.slice(anchor, typeStart);
-            const colon = between.lastIndexOf(':');
-            if (colon < 0) return null;
-            return {start: anchor + colon + 1, end: param.type.end};
+          function typeContainsAny(t, seen = new Set()) {
+            if (!t || seen.has(t.id)) return false;
+            if (t.flags & ts.TypeFlags.Any) return true;
+            seen.add(t.id);
+            if (t.isUnionOrIntersection?.() && t.types.some(x => typeContainsAny(x, seen))) return true;
+            if (t.aliasTypeArguments?.some(x => typeContainsAny(x, seen))) return true;
+            if (t.typeArguments?.some(x => typeContainsAny(x, seen))) return true;
+            return /(^|[^A-Za-z0-9_])any([^A-Za-z0-9_]|$)/.test(checker.typeToString(t));
           }
+          function annotationRemoval(node, sf, anchor) {
+            if (!node.type) return null;
+            const typeStart = node.type.getStart(sf);
+            const colon = sf.text.lastIndexOf(':', typeStart);
+            if (colon < anchor) return null;
+            return {start: colon, end: node.type.end, replacement: ''};
+          }
+          function add(edits, edit) { if (edit) { edits.push(edit); total++; } }
 
-          for (const f of files(root)) {
-            if (f.endsWith('/clientError.ts')) continue;
-            const text = fs.readFileSync(f,'utf8');
-            const sf = ts.createSourceFile(f, text, ts.ScriptTarget.Latest, true, f.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+          for (const sf of program.getSourceFiles()) {
+            const fn = path.relative(process.cwd(), sf.fileName).replaceAll('\\','/');
+            if (sf.isDeclarationFile || fn.startsWith('node_modules/') || fn.startsWith('.github/') || !/\.(ts|tsx)$/.test(fn)) continue;
             const edits = [];
             function visit(n) {
-              if (ts.isPropertyAssignment(n) && n.name.getText(sf) === 'onError' && (ts.isArrowFunction(n.initializer) || ts.isFunctionExpression(n.initializer))) {
-                const p = n.initializer.parameters[0];
-                if (p && p.type && hasAny(p.type)) {
-                  const r = typeRange(p, sf);
-                  if (r) { edits.push({...r, replacement:' ClientErrorLike'}); editsCount++; }
+              if (mode === 'contextual-params' && ts.isParameter(n) && n.type && containsAnyNode(n.type)) {
+                const p = n.parent;
+                if (ts.isArrowFunction(p) || ts.isFunctionExpression(p)) {
+                  const contextual = checker.getContextualType(p);
+                  const sig = contextual?.getCallSignatures()?.[0];
+                  const idx = p.parameters.indexOf(n);
+                  const sym = sig?.getParameters()?.[Math.min(idx, (sig?.getParameters()?.length || 1)-1)];
+                  const ct = sym && checker.getTypeOfSymbolAtLocation(sym, n);
+                  const bad = ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Never;
+                  if (ct && !(ct.flags & bad) && !typeContainsAny(ct)) {
+                    const anchor = n.questionToken ? n.questionToken.end : n.name.end;
+                    add(edits, annotationRemoval(n, sf, anchor));
+                  }
                 }
+              }
+              if (mode === 'default-params' && ts.isParameter(n) && n.type && n.initializer && containsAnyNode(n.type)) {
+                const it = checker.getTypeAtLocation(n.initializer);
+                const bad = ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Never | ts.TypeFlags.Null | ts.TypeFlags.Undefined;
+                if (it && !(it.flags & bad) && !typeContainsAny(it)) {
+                  const anchor = n.questionToken ? n.questionToken.end : n.name.end;
+                  add(edits, annotationRemoval(n, sf, anchor));
+                }
+              }
+              if (mode === 'variables' && ts.isVariableDeclaration(n) && n.type && n.initializer && containsAnyNode(n.type)) {
+                const it = checker.getTypeAtLocation(n.initializer);
+                const bad = ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Never | ts.TypeFlags.Null | ts.TypeFlags.Undefined;
+                if (it && !(it.flags & bad) && !typeContainsAny(it)) {
+                  const init = n.initializer;
+                  if ((!ts.isArrayLiteralExpression(init) || init.elements.length) && (!ts.isObjectLiteralExpression(init) || init.properties.length)) {
+                    add(edits, annotationRemoval(n, sf, n.name.end));
+                  }
+                }
+              }
+              if (mode === 'returns' && n.type && containsAnyNode(n.type) && n.body && (ts.isFunctionDeclaration(n) || ts.isFunctionExpression(n) || ts.isArrowFunction(n) || ts.isMethodDeclaration(n))) {
+                const anchor = n.parameters?.end ?? n.name?.end ?? n.getStart(sf);
+                add(edits, annotationRemoval(n, sf, anchor));
+              }
+              if (mode === 'properties' && ts.isPropertyDeclaration(n) && n.type && n.initializer && containsAnyNode(n.type)) {
+                const it = checker.getTypeAtLocation(n.initializer);
+                const bad = ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Never | ts.TypeFlags.Null | ts.TypeFlags.Undefined;
+                if (it && !(it.flags & bad) && !typeContainsAny(it)) add(edits, annotationRemoval(n, sf, n.name.end));
+              }
+              if (mode === 'casts' && ts.isAsExpression(n) && containsAnyNode(n.type)) {
+                const et = checker.getTypeAtLocation(n.expression);
+                if (et && !(et.flags & ts.TypeFlags.Any) && !typeContainsAny(et)) {
+                  edits.push({start:n.getStart(sf), end:n.end, replacement:`(${n.expression.getText(sf)})`}); total++;
+                  return;
+                }
+              }
+              if (mode === 'call-typeargs' && ts.isCallExpression(n) && n.typeArguments?.length && n.typeArguments.some(containsAnyNode)) {
+                const first=n.typeArguments[0].getStart(sf), last=n.typeArguments[n.typeArguments.length-1].end;
+                const lt=sf.text.lastIndexOf('<', first), gt=sf.text.indexOf('>', last);
+                if (lt>=n.expression.end && gt>=last) { edits.push({start:lt,end:gt+1,replacement:''}); total++; }
               }
               ts.forEachChild(n, visit);
             }
             visit(sf);
-            if (!edits.length) continue;
-            edits.sort((a,b)=>b.start-a.start);
-            let next = text;
-            for (const e of edits) next = next.slice(0,e.start) + e.replacement + next.slice(e.end);
-            if (!/from ["']@\/lib\/clientError["']/.test(next)) {
-              next = 'import type { ClientErrorLike } from "@/lib/clientError";\n' + next;
+            if (edits.length) {
+              edits.sort((a,b)=>b.start-a.start);
+              let text=sf.text;
+              for(const e of edits) text=text.slice(0,e.start)+e.replacement+text.slice(e.end);
+              fs.writeFileSync(sf.fileName,text); changed.push(fn);
             }
-            fs.writeFileSync(f,next);
-            changed.push(path.relative(process.cwd(),f).replaceAll('\\','/'));
           }
-          fs.writeFileSync('/tmp/safe2-files.txt', changed.join('\n') + (changed.length?'\n':''));
-          console.log(`SAFE2_CALLBACKS_TYPED=${editsCount}`);
-          console.log(`SAFE2_CHANGED_FILES=${changed.length}`);
+          fs.writeFileSync(`/tmp/safe3-${mode}-files.txt`, changed.join('\n')+(changed.length?'\n':''));
+          console.log(`SAFE3_MODE=${mode} EDITS=${total} FILES=${changed.length}`);
           NODE
-          git diff --stat
-      - name: Compiler-gate and retain only compatible callback files
-        shell: bash
-        run: |
-          set -euo pipefail
-          for attempt in 1 2 3 4; do
-            set +e
-            npm run check > /tmp/safe2-check.log 2>&1
-            rc=$?
-            set -e
-            if [ $rc -eq 0 ]; then
-              echo "SAFE2_TYPESCRIPT_GREEN_AT_ATTEMPT=$attempt"
-              break
-            fi
-            python - <<'PY'
-          import re, pathlib, subprocess
-          log=pathlib.Path('/tmp/safe2-check.log').read_text(errors='replace')
-          changed=set(pathlib.Path('/tmp/safe2-files.txt').read_text().splitlines())
-          errs=set()
-          for line in log.splitlines():
-              m=re.match(r'(.+?\.(?:ts|tsx))\(\d+,\d+\):\s+error\s+TS\d+:', line)
-              if m: errs.add(m.group(1).replace('\\','/'))
-          revert=sorted(errs & changed)
-          print('SAFE2_ERROR_FILES='+str(len(errs)))
-          print('SAFE2_REVERTING_FILES='+str(len(revert)))
-          for f in revert: subprocess.run(['git','checkout','HEAD','--',f],check=True)
-          pathlib.Path('/tmp/safe2-files.txt').write_text('\n'.join(sorted(changed-set(revert))) + ('\n' if changed-set(revert) else ''))
-          if not revert: pathlib.Path('/tmp/safe2-stuck').write_text('1')
-          PY
-            if [ -f /tmp/safe2-stuck ]; then cat /tmp/safe2-check.log; exit 2; fi
-            if [ "$attempt" = 4 ]; then cat /tmp/safe2-check.log; exit 2; fi
-          done
-          npm run check
-      - name: Measure type-escape reduction
-        shell: bash
-        run: |
-          set +e
-          npm run audit:type-escapes > /tmp/safe2-escapes.log 2>&1
-          rc=$?
-          set -e
-          tail -n 40 /tmp/safe2-escapes.log
-          echo "TYPE_ESCAPE_AUDIT_EXPECTED_NONZERO_EXIT=$rc"
-          echo "SAFE2_RETAINED_FILES=$(git diff --name-only | grep -E '\.(ts|tsx)$' | wc -l)"
-      - name: Commit and push green client-error typing
+      - name: Apply and gate isolated categories
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "refactor: type client query and mutation errors [phase18-safe2-result] [skip ci]" || true
-          git push origin HEAD:agent/lint-phase-4-fast
+          gate_mode() {
+            mode="$1"
+            node /tmp/safe3-transform.cjs "$mode"
+            filelist="/tmp/safe3-${mode}-files.txt"
+            for attempt in 1 2 3 4; do
+              set +e
+              npm run check > "/tmp/safe3-${mode}.log" 2>&1
+              rc=$?
+              set -e
+              if [ $rc -eq 0 ]; then
+                echo "SAFE3_${mode}_GREEN_ATTEMPT=$attempt"
+                break
+              fi
+              python - "$mode" "$filelist" <<'PY'
+          import re, pathlib, subprocess, sys
+          mode, filelist=sys.argv[1:]
+          log=pathlib.Path(f'/tmp/safe3-{mode}.log').read_text(errors='replace')
+          changed=set(pathlib.Path(filelist).read_text().splitlines())
+          errs=set()
+          for line in log.splitlines():
+              m=re.match(r'(.+?\.(?:ts|tsx))\(\d+,\d+\):\s+error\s+TS\d+:', line)
+              if m: errs.add(m.group(1).replace('\\','/'))
+          revert=sorted(errs & changed)
+          print(f'SAFE3_{mode}_ERROR_FILES={len(errs)} REVERTING={len(revert)}')
+          for f in revert: subprocess.run(['git','checkout','HEAD','--',f],check=True)
+          pathlib.Path(filelist).write_text('\n'.join(sorted(changed-set(revert)))+('\n' if changed-set(revert) else ''))
+          if not revert: pathlib.Path(f'/tmp/safe3-{mode}-stuck').write_text('1')
+          PY
+              if [ -f "/tmp/safe3-${mode}-stuck" ]; then cat "/tmp/safe3-${mode}.log"; exit 2; fi
+              if [ "$attempt" = 4 ]; then cat "/tmp/safe3-${mode}.log"; exit 2; fi
+            done
+            npm run check
+            git add -A
+            if ! git diff --cached --quiet; then
+              git commit -m "refactor: compiler-gated ${mode} inference cleanup [phase18-safe3-${mode}] [skip ci]"
+            fi
+          }
+          gate_mode contextual-params
+          gate_mode default-params
+          gate_mode variables
+          gate_mode returns
+          gate_mode properties
+          gate_mode casts
+          gate_mode call-typeargs
+      - name: Measure isolated cleanup
+        shell: bash
+        run: |
+          set +e
+          npm run audit:type-escapes > /tmp/safe3-escapes.log 2>&1
+          rc=$?
+          set -e
+          tail -n 50 /tmp/safe3-escapes.log
+          echo "TYPE_ESCAPE_AUDIT_EXPECTED_NONZERO_EXIT=$rc"
+          git log --oneline --max-count=10
+      - name: Push type-green isolated cleanup
+        run: git push origin HEAD:agent/lint-phase-4-fast
