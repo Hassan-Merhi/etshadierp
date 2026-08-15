@@ -1,15 +1,38 @@
-/**
- * RevisionDialog — extracted from StockTransferOrder.tsx during the Phase 4 split.
- *
- * Props are the parent-scope bindings the block referenced; they were
- * discovered from compiler errors rather than guessed.
- */
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import type { Dispatch, SetStateAction } from "react";
 import { GitBranch } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatNumber } from "@/lib/formatNumber";
+import type { StockTransferRevision } from "../../stocktransferorder/types";
+
+type ComputedRevisionItem = {
+  stockItemId: number;
+  stockItemName: string;
+  sourceLocationId: number | null;
+  sourceLocationName: string;
+  originalQuantity: number;
+  delta: number;
+  newQuantity: number;
+};
+
+type RevisionDialogProps = {
+  computeRevisionItems: () => ComputedRevisionItem[];
+  confirmSaveAsRevision: () => void | Promise<void>;
+  isSavingRevision: boolean;
+  revisionDialogOpen: boolean;
+  revisionNote: string;
+  revisions: StockTransferRevision[];
+  setRevisionDialogOpen: Dispatch<SetStateAction<boolean>>;
+  setRevisionNote: Dispatch<SetStateAction<string>>;
+};
 
 export function RevisionDialog({
   computeRevisionItems,
@@ -20,16 +43,7 @@ export function RevisionDialog({
   revisions,
   setRevisionDialogOpen,
   setRevisionNote,
-}: {
-  computeRevisionItems: any;
-  confirmSaveAsRevision: any;
-  isSavingRevision: any;
-  revisionDialogOpen: any;
-  revisionNote: any;
-  revisions: any;
-  setRevisionDialogOpen: any;
-  setRevisionNote: any;
-}) {
+}: RevisionDialogProps) {
   return (
     <Dialog open={revisionDialogOpen} onOpenChange={setRevisionDialogOpen}>
       <DialogContent className="sm:max-w-[420px]">
@@ -62,19 +76,27 @@ export function RevisionDialog({
                     </tr>
                   </thead>
                   <tbody>
-                    {items.map((item: any, idx: any) => (
-                      <tr key={idx} className="border-t">
-                        <td className="p-2 font-medium truncate max-w-[120px]">{item.stockItemName}</td>
+                    {items.map((item, index) => (
+                      <tr key={index} className="border-t">
+                        <td className="p-2 font-medium truncate max-w-[120px]">
+                          {item.stockItemName}
+                        </td>
                         <td className="p-2 text-right font-mono text-muted-foreground">
                           {formatNumber(item.originalQuantity, 0)}
                         </td>
                         <td
-                          className={`p-2 text-right font-mono font-semibold ${item.delta > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}
+                          className={`p-2 text-right font-mono font-semibold ${
+                            item.delta > 0
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : "text-destructive"
+                          }`}
                         >
                           {item.delta > 0 ? "+" : ""}
                           {formatNumber(item.delta, 0)}
                         </td>
-                        <td className="p-2 text-right font-mono">{formatNumber(item.newQuantity, 0)}</td>
+                        <td className="p-2 text-right font-mono">
+                          {formatNumber(item.newQuantity, 0)}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -88,14 +110,18 @@ export function RevisionDialog({
               id="revision-note"
               placeholder="Why was this revised? e.g. Shop sold 10 bales of fabric"
               value={revisionNote}
-              onChange={(e) => setRevisionNote(e.target.value)}
+              onChange={(event) => setRevisionNote(event.target.value)}
               rows={2}
               data-testid="input-revision-note"
             />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setRevisionDialogOpen(false)} disabled={isSavingRevision}>
+          <Button
+            variant="outline"
+            onClick={() => setRevisionDialogOpen(false)}
+            disabled={isSavingRevision}
+          >
             Cancel
           </Button>
           <Button
