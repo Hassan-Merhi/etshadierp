@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { format, parseISO } from "date-fns";
+import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import {
   ArrowLeft,
   ChevronDown,
@@ -87,6 +87,29 @@ interface StockInSalesResponse {
   summary: StockInSalesMetrics;
   rows: StockInSalesRow[];
   rowCount: number;
+}
+
+type ReportGrouping = "daily" | "monthly" | "yearly";
+
+function resolveGrouping(period: PeriodFilterValue): ReportGrouping {
+  if (["today", "yesterday", "this_week", "this_month", "last_1_month"].includes(period.preset)) {
+    return "daily";
+  }
+  if (period.preset === "this_year" || period.preset === "last_6_months") return "monthly";
+  if (period.preset === "all_time") return "yearly";
+
+  if (period.fromDate && period.toDate) {
+    try {
+      const days = Math.abs(differenceInCalendarDays(parseISO(period.toDate), parseISO(period.fromDate))) + 1;
+      if (days <= 45) return "daily";
+      if (days <= 730) return "monthly";
+      return "yearly";
+    } catch {
+      return "monthly";
+    }
+  }
+
+  return "monthly";
 }
 
 function MultiSelectFilter<T extends { id: number; name: string }>({
@@ -199,8 +222,6 @@ const EMPTY_METRICS: StockInSalesMetrics = {
   avgProfitPerBale: 0,
 };
 
-const GROUPING = "monthly" as const;
-
 export default function StockInSalesReport() {
   const view = new URLSearchParams(window.location.search).get("view");
   if (view === "detail") return <StockInSalesReportDetail />;
@@ -243,18 +264,20 @@ function StockInSalesReportSummary() {
 
   const sortedLocations = useMemo(() => [...locations].sort((a, b) => a.name.localeCompare(b.name)), [locations]);
   const sortedStockGroups = useMemo(() => [...stockGroups].sort((a, b) => a.name.localeCompare(b.name)), [stockGroups]);
+  const grouping = useMemo(() => resolveGrouping(periodFilter), [periodFilter]);
+  const periodColumnLabel = grouping === "daily" ? "Day" : grouping === "yearly" ? "Year" : "Month";
 
   const queryUrl = useMemo(() => {
     const params = new URLSearchParams();
     if (periodFilter.fromDate) params.set("startDate", periodFilter.fromDate);
     if (periodFilter.toDate) params.set("endDate", periodFilter.toDate);
-    params.set("grouping", GROUPING);
+    params.set("grouping", grouping);
     params.set("profitFilter", "all");
     if (selectedLocations.length > 0) params.set("locationIds", selectedLocations.join(","));
     if (selectedStockGroups.length > 0) params.set("stockGroupIds", selectedStockGroups.join(","));
     if (debouncedSearch) params.set("search", debouncedSearch);
     return `/api/reports/stock-in-sales?${params.toString()}`;
-  }, [periodFilter, selectedLocations, selectedStockGroups, debouncedSearch]);
+  }, [periodFilter, grouping, selectedLocations, selectedStockGroups, debouncedSearch]);
 
   const { data, isLoading, isFetching, isError, error, refetch } = useQuery<StockInSalesResponse, Error>({
     queryKey: [queryUrl, selectedCompany?.id],
@@ -270,6 +293,8 @@ function StockInSalesReportSummary() {
     value < 0 ? `-${formatAmount(Math.round(Math.abs(value)))}` : formatAmount(Math.round(value));
   const formatPeriodLabel = (row: StockInSalesRow) => {
     try {
+      if (grouping === "daily") return format(parseISO(row.periodKey), "EEE, MMM d, yyyy");
+      if (grouping === "yearly") return row.periodKey;
       return format(parseISO(`${row.periodKey}-01`), "MMMM yyyy");
     } catch {
       return row.periodKey;
@@ -298,7 +323,7 @@ function StockInSalesReportSummary() {
   };
 
   const openComparison = () => {
-    const params = new URLSearchParams({ view: "comparison", grouping: GROUPING });
+    const params = new URLSearchParams({ view: "comparison", grouping });
     if (periodFilter.fromDate) params.set("startDate", periodFilter.fromDate);
     if (periodFilter.toDate) params.set("endDate", periodFilter.toDate);
     if (debouncedSearch) params.set("search", debouncedSearch);
@@ -318,7 +343,7 @@ function StockInSalesReportSummary() {
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet("Stock In & Sales");
       sheet.columns = [
-        { header: "Month", key: "period", width: 22 },
+        { header: periodColumnLabel, key: "period", width: 22 },
         { header: "Opening Qty", key: "openingStockQty", width: 16 },
         { header: "Stock In", key: "stockInQty", width: 16 },
         { header: "Stock Out", key: "stockOutQty", width: 16 },
@@ -344,7 +369,7 @@ function StockInSalesReportSummary() {
   const exportCsv = () => {
     if (rows.length === 0) return;
     const headers = [
-      "Month",
+      periodColumnLabel,
       "Opening Qty",
       "Stock In",
       "Stock Out",
@@ -393,7 +418,7 @@ function StockInSalesReportSummary() {
           <div>
             <PageHeader title="Stock In & Sales Report" />
             <p className="text-sm text-muted-foreground">
-              Simple monthly stock and sales overview{selectedCompany?.name ? ` · ${selectedCompany.name}` : ""}
+              Stock and sales overview{selectedCompany?.name ? ` · ${selectedCompany.name}` : ""}
             </p>
           </div>
         </div>
@@ -508,14 +533,18 @@ function StockInSalesReportSummary() {
 
       <div>
         <p className="mb-3 text-xs text-muted-foreground">
-          Monthly stock movement and profitability · Click a month for full details
+          {grouping === "daily"
+            ? "Daily stock movement and profitability · Click a day for that day's full details"
+            : grouping === "yearly"
+              ? "Yearly stock movement and profitability · Click a year for full details"
+              : "Monthly stock movement and profitability · Click a month for full details"}
         </p>
         <div className="overflow-hidden rounded-xl border">
           <div className="overflow-x-auto">
             <Table className="min-w-[900px]">
               <TableHeader>
                 <TableRow className="bg-muted/40 hover:bg-muted/40">
-                  <TableHead>Month</TableHead>
+                  <TableHead>{periodColumnLabel}</TableHead>
                   <TableHead className="text-right">Opening</TableHead>
                   <TableHead className="text-right">Stock In</TableHead>
                   <TableHead className="text-right">Stock Out</TableHead>

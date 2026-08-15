@@ -26,6 +26,7 @@
  */
 import React from "react";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { stubFetch } from "./helpers";
@@ -95,6 +96,34 @@ describe("StockInSalesReport view dispatch", () => {
     expect(await screen.findByTestId("period-filter-stock-in-sales-report")).toBeInTheDocument();
     expect(screen.queryByTestId("stub-detail-view")).not.toBeInTheDocument();
     expect(screen.queryByTestId("stub-comparison-view")).not.toBeInTheDocument();
+  });
+
+  it("changes the report grouping with the selected period", async () => {
+    const user = userEvent.setup();
+    setView(null);
+    const { default: StockInSalesReport } = await import("@/pages/StockInSalesReport");
+    renderReport(<StockInSalesReport />);
+
+    expect(
+      await screen.findByText("Monthly stock movement and profitability · Click a month for full details")
+    ).toBeInTheDocument();
+    expect(screen.getByText("Month", { selector: "th" })).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("period-filter-stock-in-sales-report"));
+    await user.click(await screen.findByTestId("period-preset-all-time"));
+
+    expect(
+      await screen.findByText("Yearly stock movement and profitability · Click a year for full details")
+    ).toBeInTheDocument();
+    expect(screen.getByText("Year", { selector: "th" })).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("period-filter-stock-in-sales-report"));
+    await user.click(await screen.findByTestId("period-preset-today"));
+
+    expect(
+      await screen.findByText("Daily stock movement and profitability · Click a day for that day's full details")
+    ).toBeInTheDocument();
+    expect(screen.getByText("Day", { selector: "th" })).toBeInTheDocument();
   });
 
   it("renders the detail view for ?view=detail", async () => {
