@@ -207,10 +207,10 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
         // FX net (USD): FX-in transfers received minus FX-out transfers sent (in USD equivalent)
         // This is critical for brokers that accumulate balance via explicit FX settlements from linked suppliers.
         // Always use toAmountUsd as the USD amount — it reflects the actual settled USD value.
-        let _fxNetUsd = 0;
+        let fxNetUsd = 0;
         for (const t of allFxTransfers) {
           if (t.toSupplierId === s.id) {
-            _fxNetUsd += parseFloat(t.toAmountUsd || "0");
+            fxNetUsd += parseFloat(t.toAmountUsd || "0");
           }
           if (t.fromSupplierId === s.id) {
             fxNetUsd -= parseFloat(t.toAmountUsd || "0");

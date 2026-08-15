@@ -202,7 +202,7 @@ export default function LocationSummary() {
     });
 
     return rows;
-  }, [expandedGroups, hiddenRows, summaryData.stockGroups]);
+  }, [expandedGroups, hiddenRows, summaryData?.stockGroups]);
 
   // Immediate scroll function - called directly from keydown handler for faster response
   const scrollToRowImmediate = (rowKey: string) => {
