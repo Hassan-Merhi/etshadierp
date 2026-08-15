@@ -93,7 +93,7 @@ export const BUSINESS_FIELD_LABELS: Record<string, string> = {
   metadata: "Additional Details",
 };
 
-export type AuditChangePair = { old?: any; new?: any };
+export type AuditChangePair = { old?: unknown; new?: unknown };
 
 /**
  * Audit rows come from two historical formats:
@@ -121,7 +121,7 @@ export function normalizeAuditChanges(source: any): Record<string, AuditChangePa
   return normalized;
 }
 
-function changeValue(changes: Record<string, AuditChangePair>, key: string): any {
+function changeValue(changes: Record<string, AuditChangePair>, key: string): unknown {
   const pair = changes[key];
   if (!pair) return undefined;
   return pair.new !== undefined ? pair.new : pair.old;

@@ -64,12 +64,12 @@ export function IntercompanyPosTab() {
   });
 
   // All companies (for dest company dropdown)
-  const { data: allCompanies = [] } = useQuery<any[]>({
+  const { data: allCompanies = [] } = useQuery<unknown[]>({
     queryKey: ["/api/companies"],
   });
 
   // Current company accounts (source interco account)
-  const { data: srcAccounts = [] } = useQuery<any[]>({
+  const { data: srcAccounts = [] } = useQuery<unknown[]>({
     queryKey: ["/api/ledger-accounts", selectedCompany?.id],
   });
 
@@ -81,7 +81,7 @@ export function IntercompanyPosTab() {
   const [initialized, setInitialized] = useState(false);
 
   // Dest company accounts
-  const { data: destAccounts = [], isLoading: destAccountsLoading } = useQuery<any[]>({
+  const { data: destAccounts = [], isLoading: destAccountsLoading } = useQuery<unknown[]>({
     queryKey: ["/api/intercompany-pos-config/dest-accounts", destCompanyId],
     queryFn: async () => {
       if (!destCompanyId) return [];

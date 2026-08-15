@@ -23,7 +23,7 @@ export function getTodayLabel(): string {
 /**
  * Build a ZIP containing per-company net position Excel files.
  */
-export async function buildNetPositionZip(companies: any[], startDate: string, endDate: string): Promise<Buffer> {
+export async function buildNetPositionZip(companies: unknown[], startDate: string, endDate: string): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     const arc = archiver("zip", { zlib: { level: 6 } });

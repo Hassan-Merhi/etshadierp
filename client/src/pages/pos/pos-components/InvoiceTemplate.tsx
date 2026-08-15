@@ -2,9 +2,9 @@ import { formatNumber } from "@/lib/formatNumber";
 
 export interface InvoiceTemplateProps {
   printRef: React.RefObject<HTMLDivElement>;
-  savedSale: any;
+  savedSale: unknown;
   printUserName: string;
-  selectedCompany: any;
+  selectedCompany: unknown;
   exchangeRate: number | null;
   fmtPrint: (val: any, prefix?: string) => string;
   fmtPrintCurrency: (val: any) => string;

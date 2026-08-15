@@ -142,7 +142,7 @@ export function registerBalesReportRoutes(app: Express) {
           ${groupByClause}
         ) AS grp`;
 
-      function buildPaginatedResponse(items: any[], total: number, totalBales = 0, totalWeight = 0) {
+      function buildPaginatedResponse(items: unknown[], total: number, totalBales = 0, totalWeight = 0) {
         const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
         return {
           items,
@@ -310,7 +310,7 @@ export function registerBalesReportRoutes(app: Express) {
         ORDER BY fb.stock_entry_date DESC, l.name NULLS LAST, fw.full_name NULLS LAST, fbp.name NULLS LAST
       `);
 
-      const groups: any[] = rows.rows;
+      const groups: unknown[] = rows.rows;
       const totalBales = groups.reduce((s: number, g: any) => s + (g.baleCount || 0), 0);
       const totalWeight = groups.reduce((s: number, g: any) => s + parseFloat(g.totalWeight || "0"), 0);
 
@@ -408,7 +408,7 @@ export function registerBalesReportRoutes(app: Express) {
         y += 14;
 
         // bale detail rows
-        const bales: any[] = g.bales || [];
+        const bales: unknown[] = g.bales || [];
         for (let bi = 0; bi < bales.length; bi++) {
           if (y > 790) {
             doc.addPage();
@@ -478,9 +478,9 @@ export function registerBalesReportRoutes(app: Express) {
             .filter((n) => !isNaN(n))
         : [];
 
-      let results: any[] = [];
+      let results: unknown[] = [];
 
-      const baseConditions: any[] = [
+      const baseConditions: unknown[] = [
         eq(factoryBales.companyId, companyId),
         or(
           eq(factoryBales.referenceNumber, barcode),

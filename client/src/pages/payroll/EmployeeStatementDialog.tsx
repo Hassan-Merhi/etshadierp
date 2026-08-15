@@ -7,10 +7,10 @@ import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 
 interface EmployeeStatementDialogProps {
-  statementEmployee: any;
+  statementEmployee: unknown;
   setStatementEmployee: (v: any) => void;
   transactionsLoading: boolean;
-  employeeTransactions: any[];
+  employeeTransactions: unknown[];
   statementExpanded: boolean;
   setStatementExpanded: (fn: (prev: boolean) => boolean) => void;
   cleanTxnDesc: (desc: string) => string;

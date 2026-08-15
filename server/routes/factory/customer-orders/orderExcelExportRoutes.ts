@@ -272,7 +272,7 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
           ? tot / safeNum(g.totalWt)
           : safeNum(g.pricePerKg)
         : safeNum(g.pricePerBale);
-    const rowCells: any[] = [
+    const rowCells: unknown[] = [
       idx + 1,
       safeStr(g.articleCode),
       safeStr(g.productName),
@@ -308,7 +308,7 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
   });
 
   // ── Totals row ──
-  const totRowCells: any[] = ["", "", "Totals", totalQty, "", fmtNum(totalWtAll)];
+  const totRowCells: unknown[] = ["", "", "Totals", totalQty, "", fmtNum(totalWtAll)];
   if (!hideSelling) {
     totRowCells.push("");
     totRowCells.push(fmtMoney(totalAll));
@@ -448,7 +448,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
 
       const baleLinks = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
       const baleIds = baleLinks.map((b: any) => b.baleId).filter(Boolean);
-      const baleRows: any[] =
+      const baleRows: unknown[] =
         baleIds.length > 0 ? await db.select().from(factoryBales).where(inArray(factoryBales.id, baleIds)) : [];
       const orderCharges = await db
         .select()
@@ -456,7 +456,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
         .where(eq(customerOrderCharges.orderId, orderId));
 
       const productIds = [...new Set(baleRows.map((b: any) => b.productId).filter((id: any) => id != null))];
-      const productRecords: any[] =
+      const productRecords: unknown[] =
         productIds.length > 0
           ? await db
               .select()

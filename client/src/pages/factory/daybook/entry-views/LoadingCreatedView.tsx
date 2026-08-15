@@ -19,17 +19,17 @@ export function LoadingCreatedView({
   badgeClass,
   onNavigate,
 }: {
-  entry: any;
-  onClose: any;
-  formatDisplayDate: any;
-  loadingOrder: any;
-  badgeVariant: any;
-  badgeClass: any;
-  onNavigate: any;
+  entry: unknown;
+  onClose: unknown;
+  formatDisplayDate: unknown;
+  loadingOrder: unknown;
+  badgeVariant: unknown;
+  badgeClass: unknown;
+  onNavigate: unknown;
 }) {
   const lo = loadingOrder;
-  const lines: any[] = lo?.lines ?? [];
-  const balesList: any[] = lo?.bales ?? [];
+  const lines: unknown[] = lo?.lines ?? [];
+  const balesList: unknown[] = lo?.bales ?? [];
   const n = (v: any) => parseFloat(v || "0");
 
   const expectedBalesTotal = lines.reduce((s: number, l: any) => s + (parseInt(l.quantity || "0") || 0), 0);

@@ -50,9 +50,9 @@ export interface BatchDetail {
 }
 
 export interface InvoicePreview {
-  batch: any;
-  customer: any;
-  proforma: any;
+  batch: unknown;
+  customer: unknown;
+  proforma: unknown;
   proformaProgress: {
     articleCode: string;
     productName: string;

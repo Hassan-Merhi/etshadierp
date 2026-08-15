@@ -15,7 +15,7 @@ type UserFormData = z.infer<typeof userFormSchema>;
 interface UserDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  editingUser: any;
+  editingUser: unknown;
   onSubmit: (data: UserFormData) => void;
   isPending: boolean;
 }

@@ -14,7 +14,7 @@ function rowsOf<T = any>(result: any): T[] {
   return Array.isArray(result?.rows) ? result.rows : [];
 }
 
-function ledgerTotals(rows: any[]) {
+function ledgerTotals(rows: unknown[]) {
   return rows.reduce(
     (total, row) => ({
       baleCount: total.baleCount + Number(row.baleCount || 0),
@@ -112,7 +112,7 @@ async function sendLedgerSummary(companyId: number, res: any): Promise<void> {
     [companyId]
   );
 
-  const buckets: Record<string, any[]> = {
+  const buckets: Record<string, unknown[]> = {
     currentStock: [],
     wasteStock: [],
     sold: [],

@@ -18,14 +18,14 @@ interface ContainerDrawerTrackingProps {
   setTrackAutoUpdate: (v: boolean) => void;
   trackCarrierHint: string;
   setTrackCarrierHint: (v: string) => void;
-  trackingSettingsMutation: any;
-  trackNowMutation: any;
-  trackNowResult: any; // Result from trackNowMutation.data (started or TrackNowResult)
-  trackProgress: any[];
-  trackingStatus: any;
+  trackingSettingsMutation: unknown;
+  trackNowMutation: unknown;
+  trackNowResult: unknown; // Result from trackNowMutation.data (started or TrackNowResult)
+  trackProgress: unknown[];
+  trackingStatus: unknown;
   showEvents: boolean;
   setShowEvents: (v: boolean) => void;
-  events: any[] | undefined;
+  events: unknown[] | undefined;
   eventsLoading: boolean;
   canEdit: boolean;
 }

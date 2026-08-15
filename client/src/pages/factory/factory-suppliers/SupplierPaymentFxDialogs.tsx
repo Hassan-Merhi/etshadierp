@@ -17,11 +17,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 interface SupplierPaymentFxDialogsProps {
   paymentDialogSupplier: SupplierWithBalance | null;
   setPaymentDialogSupplier: (val: SupplierWithBalance | null) => void;
-  paymentForm: any;
+  paymentForm: unknown;
   setPaymentForm: (val: any) => void;
   allSuppliers: SupplierWithBalance[];
-  ledgerAccounts: any[] | undefined;
-  paymentMutation: UseMutationResult<any, any, any>;
+  ledgerAccounts: unknown[] | undefined;
+  paymentMutation: UseMutationResult<unknown, unknown, unknown>;
   paymentAmtUsd: number;
   paymentBalanceUsd: number;
   isOverpayment: boolean;
@@ -30,11 +30,11 @@ interface SupplierPaymentFxDialogsProps {
 
   fxConversionOpen: boolean;
   setFxConversionOpen: (val: boolean) => void;
-  fxConversionForm: any;
+  fxConversionForm: unknown;
   setFxConversionForm: (val: any) => void;
   fxSourceType: "supplier" | "commission" | "both";
   setFxSourceType: (val: "supplier" | "commission" | "both") => void;
-  fxConversionMutation: UseMutationResult<any, any, any>;
+  fxConversionMutation: UseMutationResult<unknown, unknown, unknown>;
   wrapAdminAction: (fn: () => void, title: string) => void;
 }
 

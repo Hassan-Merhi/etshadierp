@@ -121,7 +121,7 @@ export async function fetchGreenApiChats(instanceId: string, apiToken: string): 
     const body = await response.text();
     throw new Error(`Green API getChats error ${response.status}: ${body}`);
   }
-  const data = (await response.json()) as any[];
+  const data = (await response.json()) as unknown[];
   return data
     .filter((c) => c && c.id)
     .map((c) => ({

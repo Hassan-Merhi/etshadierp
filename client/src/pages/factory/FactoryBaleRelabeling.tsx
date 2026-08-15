@@ -77,7 +77,7 @@ export default function FactoryBaleRelabeling() {
   const validRows = validationResults.filter((r) => r.valid);
   const invalidRows = validationResults.filter((r) => !r.valid);
 
-  const { data: sessions = [] } = useQuery<any[]>({
+  const { data: sessions = [] } = useQuery<unknown[]>({
     queryKey: ["/api/factory/bales/relabel/sessions"],
     queryFn: async () => {
       const res = await factoryApiRequest("GET", "/api/factory/bales/relabel/sessions");

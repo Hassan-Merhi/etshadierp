@@ -17,7 +17,7 @@ import {
 } from "./UserManagementConstants";
 
 interface AdvancedRestrictionsProps {
-  user: any;
+  user: unknown;
   isPrivileged: boolean;
   hasFactoryAccess: boolean;
   hasErpAccess: boolean;

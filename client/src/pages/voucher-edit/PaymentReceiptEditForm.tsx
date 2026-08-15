@@ -23,7 +23,7 @@ export function PaymentReceiptEditForm({
   total,
   focusByTestId,
 }: {
-  form: UseFormReturn<any>;
+  form: UseFormReturn<unknown>;
   voucherType: string;
   onSubmit: (data: any) => void;
   onCancel: () => void;

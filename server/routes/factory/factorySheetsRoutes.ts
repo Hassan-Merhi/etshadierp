@@ -12,8 +12,8 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 // ── STATUS sheet helpers ───────────────────────────────────────────────────────
 type CellVal = number | string | null;
-type SRow = { id?: string; label: string; cells: any[] };
-type SSheet = { id?: number; name: string; columns: any[]; rows: SRow[]; orderIndex?: number };
+type SRow = { id?: string; label: string; cells: unknown[] };
+type SSheet = { id?: number; name: string; columns: unknown[]; rows: SRow[]; orderIndex?: number };
 
 const STATUS_NAME = "STATUS";
 
@@ -285,7 +285,7 @@ export function registerFactorySheetsRoutes(app: Express) {
       for (let sheetIdx = 0; sheetIdx < wb.SheetNames.length; sheetIdx++) {
         const sheetName = wb.SheetNames[sheetIdx];
         const ws = wb.Sheets[sheetName];
-        const rawData: any[][] = xlsxUtils.sheet_to_json(ws, { header: 1, defval: null });
+        const rawData: unknown[][] = xlsxUtils.sheet_to_json(ws, { header: 1, defval: null });
 
         if (!rawData || rawData.length === 0) {
           // Empty sheet — just create blank
@@ -396,7 +396,7 @@ export function registerFactorySheetsRoutes(app: Express) {
       const wb = xlsxUtils.book_new();
 
       // Sheet 1 — Production Tracking example
-      const sheet1: any[][] = [
+      const sheet1: unknown[][] = [
         ["Label", "Week 1", "Week 2", "Week 3", "Week 4"],
         ["Target", 150, 150, 150, 150],
         ["Actual", 120, 135, 140, 155],
@@ -407,7 +407,7 @@ export function registerFactorySheetsRoutes(app: Express) {
       xlsxUtils.book_append_sheet(wb, ws1, "Production Tracking");
 
       // Sheet 2 — Inventory example
-      const sheet2: any[][] = [
+      const sheet2: unknown[][] = [
         ["Label", "Mon", "Tue", "Wed", "Thu", "Fri"],
         ["Opening Stock", 500, 470, 490, 460, 480],
         ["Received", 100, 150, 80, 120, 90],
@@ -440,7 +440,7 @@ export function registerFactorySheetsRoutes(app: Express) {
       const wb = xlsxUtils.book_new();
 
       for (const sheet of sheets) {
-        const rawColumns = (sheet.columns as any[]) ?? [];
+        const rawColumns = (sheet.columns as unknown[]) ?? [];
         const rows = (sheet.rows as SRow[]) ?? [];
         const colLabels = rawColumns.map(getColLabel);
 

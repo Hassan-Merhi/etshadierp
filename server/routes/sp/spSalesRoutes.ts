@@ -118,7 +118,7 @@ export function registerSpSalesRoutes(app: Express) {
         let totalSalePrice = 0;
         let totalBaseCost = 0;
         let totalFinalCost = 0;
-        const postedLines: any[] = [];
+        const postedLines: unknown[] = [];
 
         for (const sl of saleLines) {
           const qtySold = parseNum(sl.qtySold);

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 
 interface PosLocationManagerProps {
-  locations: any[];
+  locations: unknown[];
   selectedLocationIds: number[];
   setSelectedLocationIds: (v: number[] | ((prev: number[]) => number[])) => void;
   setAssignedLocationId: (v: number | undefined) => void;
@@ -16,7 +16,7 @@ interface PosLocationManagerProps {
       | ((prev: Record<number, number | undefined>) => Record<number, number | undefined>)
   ) => void;
   posViewOnly: boolean;
-  cashAccounts: any[];
+  cashAccounts: unknown[];
 }
 
 export function PosLocationManager({
@@ -82,7 +82,7 @@ export function PosLocationManager({
         <p className="text-xs text-muted-foreground">No locations for this company.</p>
       ) : (
         <div className="space-y-1 max-h-56 overflow-y-auto rounded-md border p-2" data-testid="select-locations">
-          {(locations as any[]).map((loc) => {
+          {(locations as unknown[]).map((loc) => {
             const checked = selectedLocationIds.includes(loc.id);
             return (
               <div key={loc.id} className="space-y-1">

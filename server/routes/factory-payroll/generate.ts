@@ -61,7 +61,7 @@ export function registerFactoryPayrollGenerateRoutes(app: Express, requireAuth: 
           )
         );
 
-      const balesByWorker = new Map<number, any[]>();
+      const balesByWorker = new Map<number, unknown[]>();
       for (const bale of balesInRange) {
         if (bale.finalizedBy) {
           const existing = balesByWorker.get(bale.finalizedBy) || [];
@@ -81,7 +81,7 @@ export function registerFactoryPayrollGenerateRoutes(app: Express, requireAuth: 
             lte(factoryAttendance.attendanceDate, endDate)
           )
         );
-      const attendanceByWorker = new Map<number, any[]>();
+      const attendanceByWorker = new Map<number, unknown[]>();
       for (const att of attendanceInRange) {
         const existing = attendanceByWorker.get(att.workerId) || [];
         existing.push(att);
@@ -99,7 +99,7 @@ export function registerFactoryPayrollGenerateRoutes(app: Express, requireAuth: 
             eq(factoryWorkerAdvances.repaymentType, "salary_deduction")
           )
         );
-      const advancesByWorker = new Map<number, any[]>();
+      const advancesByWorker = new Map<number, unknown[]>();
       for (const adv of outstandingAdvances) {
         const existing = advancesByWorker.get(adv.workerId) || [];
         existing.push(adv);

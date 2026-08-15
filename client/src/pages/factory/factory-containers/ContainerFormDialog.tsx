@@ -90,7 +90,7 @@ interface ContainerFormDialogProps {
   open: boolean;
   editingContainer: ContainerWithSupplier | null;
   suppliers: FactorySupplier[] | undefined;
-  ledgerAccounts: any[];
+  ledgerAccounts: unknown[];
   onClose: () => void;
 }
 
@@ -179,7 +179,7 @@ export function ContainerFormDialog({
     const containerCcy = (editingContainer as { currencyCode: unknown }).currencyCode || "USD";
     factoryApiRequest("GET", `/api/factory/containers/${editingContainer.id}/other-charges`)
       .then((res) => (res.ok ? res.json() : []))
-      .then((charges: any[]) => {
+      .then((charges: unknown[]) => {
         setOtherChargeLines(
           charges.map((c) => ({
             amount: stripTrailingZeros(c.amount),

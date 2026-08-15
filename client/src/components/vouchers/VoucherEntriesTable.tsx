@@ -27,8 +27,8 @@ export interface VoucherEntry {
 }
 
 interface VoucherEntriesTableProps {
-  form: UseFormReturn<any>;
-  fieldArray: UseFieldArrayReturn<any, "entries", "id">;
+  form: UseFormReturn<unknown>;
+  fieldArray: UseFieldArrayReturn<unknown, "entries", "id">;
   entries: VoucherEntry[];
   total: number;
   mode: "payment" | "receipt";

@@ -17,7 +17,7 @@ function EmployeeForm({
   onCancel,
   isPending,
 }: {
-  form: any;
+  form: unknown;
   onSubmit: (data: any, saveAndNew?: boolean) => void;
   onCancel: () => void;
   isPending: boolean;

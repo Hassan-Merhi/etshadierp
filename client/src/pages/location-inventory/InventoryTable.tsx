@@ -28,10 +28,10 @@ interface InventoryTableProps {
   setSelectedRowIndex: (idx: number) => void;
   navigate: (path: string) => void;
   formatAmount: (amt: number) => string;
-  posUser?: any;
+  posUser?: unknown;
   itemSearchTerm: string;
   inventory: InventoryItem[];
-  selectedGroup: any;
+  selectedGroup: unknown;
 }
 
 export function InventoryTable({

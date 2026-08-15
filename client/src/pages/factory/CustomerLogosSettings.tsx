@@ -16,12 +16,12 @@ export default function CustomerLogosSettings() {
   const [renamingId, setRenamingId] = useState<number | null>(null);
   const [renameValue, setRenameValue] = useState("");
 
-  const { data: allCustomers = [] } = useQuery<any[]>({
+  const { data: allCustomers = [] } = useQuery<unknown[]>({
     queryKey: ["/api/factory/customers"],
     queryFn: () => fetch("/api/factory/customers", { credentials: "include" }).then((r) => r.json()),
   });
 
-  const { data: logos = [], isLoading } = useQuery<any[]>({
+  const { data: logos = [], isLoading } = useQuery<unknown[]>({
     queryKey: ["/api/factory/customers", selectedCustomerId, "logos"],
     queryFn: () =>
       fetch(`/api/factory/customers/${selectedCustomerId}/logos`, { credentials: "include" }).then((r) => r.json()),

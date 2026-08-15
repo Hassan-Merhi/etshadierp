@@ -21,7 +21,7 @@ interface LocationInventoryDialogsProps {
   setShowNegativeStock: (v: boolean) => void;
   selectedLocationLocal: Location | null;
   negativeStockLoading: boolean;
-  allNegativeStock: any[];
+  allNegativeStock: unknown[];
   negativeSearchTerm: string;
   setNegativeSearchTerm: (s: string) => void;
 }

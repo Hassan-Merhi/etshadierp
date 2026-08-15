@@ -20,12 +20,12 @@ function fmtEntryAmount(v: string | number | null | undefined): string {
   return isNaN(n) ? "—" : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function compareEntries(oldArr: any[], newArr: any[]) {
+function compareEntries(oldArr: unknown[], newArr: unknown[]) {
   const oldMap = new Map<string, any>(oldArr.map((entry) => [String(entry.account || "Unknown account"), entry]));
   const newMap = new Map<string, any>(newArr.map((entry) => [String(entry.account || "Unknown account"), entry]));
   const added = [];
   const removed = [];
-  const changed: Array<{ account: string; old: any; new: any }> = [];
+  const changed: Array<{ account: string; old: unknown; new: unknown }> = [];
 
   for (const [account, entry] of newMap) {
     if (!oldMap.has(account)) {
@@ -115,7 +115,7 @@ function valuesEqual(a: any, b: any): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
-function StructuredValue({ field, value, depth = 0 }: { field: string; value: any; depth?: number }): ReactNode {
+function StructuredValue({ field, value, depth = 0 }: { field: string; value: unknown; depth?: number }): ReactNode {
   if (value === null || value === undefined || value === "") {
     return <span className="text-muted-foreground">—</span>;
   }
@@ -166,7 +166,7 @@ function StructuredValue({ field, value, depth = 0 }: { field: string; value: an
   return <span className="break-words whitespace-pre-wrap">{fmtBusinessValue(field, value)}</span>;
 }
 
-function EntryTable({ entries, label }: { entries: any[]; label?: string }) {
+function EntryTable({ entries, label }: { entries: unknown[]; label?: string }) {
   if (entries.length === 0) return null;
   return (
     <div className="space-y-1.5">
@@ -194,7 +194,7 @@ function EntryTable({ entries, label }: { entries: any[]; label?: string }) {
   );
 }
 
-export function AuditLogDialog({ log, onClose }: { log: any; onClose: () => void }) {
+export function AuditLogDialog({ log, onClose }: { log: unknown; onClose: () => void }) {
   const changes = normalizeAuditChanges(log);
   const actionKey = String(log.action || "").toLowerCase();
   const isDelete = actionKey === "delete";

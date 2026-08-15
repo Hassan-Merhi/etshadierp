@@ -105,7 +105,7 @@ export default function FactoryUsers() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ userId, data }: { userId: string; data: any }) => {
+    mutationFn: async ({ userId, data }: { userId: string; data: unknown }) => {
       const res = await factoryApiRequest("PUT", `/api/factory/users/${userId}`, data);
       if (!res.ok) {
         const err = await res.json();

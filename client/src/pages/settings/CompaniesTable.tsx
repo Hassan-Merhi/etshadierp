@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Edit, Trash2, Search } from "lucide-react";
 
 interface CompaniesTableProps {
-  companies: any[];
+  companies: unknown[];
   onEdit: (company: any) => void;
   onDelete: (company: any) => void;
 }

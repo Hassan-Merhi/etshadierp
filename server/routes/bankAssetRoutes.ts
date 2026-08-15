@@ -125,7 +125,7 @@ export function registerBankAssetRoutes(app: Express) {
       const account = await storage.updateBankAccount(id, parsed, req.session.currentCompanyId);
       try {
         if (existingBankAcc) {
-          const _bankChanges: Record<string, { old?: any; new?: any }> = {};
+          const _bankChanges: Record<string, { old?: unknown; new?: unknown }> = {};
           for (const _f of ["name", "code", "openingBalance", "openingBalanceSide"] as const) {
             if (String(existingBankAcc[_f] ?? "") !== String(account[_f] ?? "")) {
               _bankChanges[_f] = { old: existingBankAcc[_f], new: account[_f] };
@@ -557,10 +557,10 @@ export function registerBankAssetRoutes(app: Express) {
       }
 
       // Parse and structure the data
-      const rows = rawData as any[];
+      const rows = rawData as unknown[];
       const errors: string[] = [];
-      const itemRows: any[] = [];
-      const chargeRows: any[] = [];
+      const itemRows: unknown[] = [];
+      const chargeRows: unknown[] = [];
 
       // Get all stock items for barcode/name lookup
       const allStockItems = await storage.getAllStockItems(req.session.currentCompanyId!);
@@ -673,7 +673,7 @@ export function registerBankAssetRoutes(app: Express) {
 
           return acc;
         },
-        {} as Record<string, any>
+        {} as Record<string, unknown>
       );
 
       // Calculate container totals

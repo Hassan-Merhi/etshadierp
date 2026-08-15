@@ -33,11 +33,11 @@ interface PosCheckoutParams {
   dailyExchangeRate: number | null;
   activeLocation: Location | null;
   editVoucherId?: string;
-  editVoucher: any;
+  editVoucher: unknown;
   inventory: InventoryItem[];
-  currentShift: any;
-  posUser: any;
-  saveMutation: any;
+  currentShift: unknown;
+  posUser: unknown;
+  saveMutation: unknown;
   toast: (opts: { title: string; description?: string; variant?: "destructive" | "default" }) => void;
   focusCell: (row: number, col: number) => void;
 }

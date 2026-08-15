@@ -6,7 +6,7 @@ interface VoucherEntry {
   accountId?: number;
   accountName: string;
   amount: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export const PrintTemplate = ({
@@ -186,7 +186,7 @@ export const PrintTemplate = ({
 };
 
 interface VouchersProps {
-  posUser?: any;
+  posUser?: unknown;
 }
 
 export function parseDateLocal(dateStr: string): Date {

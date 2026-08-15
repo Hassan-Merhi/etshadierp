@@ -117,14 +117,14 @@ export function registerRawStockRecalculateUsedRoutes(app: Express) {
       }
 
       // 4. Build the change list with full per-row detail.
-      const changes: any[] = [];
+      const changes: unknown[] = [];
       let totalOldUsed = new Decimal(0);
       let totalNewUsed = new Decimal(0);
       let totalReceived = new Decimal(0);
       let totalValidSourceWeight = new Decimal(0);
       let totalExcludedWeight = new Decimal(0);
 
-      for (const rs of allRawStock as any[]) {
+      for (const rs of allRawStock as unknown[]) {
         const valid = validByContainer.get(rs.containerId) || { used: 0, count: 0 };
         const excluded = excludedByContainer.get(rs.containerId) || { weight: 0, count: 0 };
         const oldUsedKg = new Decimal(rs.usedKg || "0").toDecimalPlaces(3);
@@ -176,7 +176,7 @@ export function registerRawStockRecalculateUsedRoutes(app: Express) {
 
       // 5. Apply inside a single transaction — lock each row FOR UPDATE, compare with Decimal.js.
       let updated = 0;
-      const appliedChanges: any[] = [];
+      const appliedChanges: unknown[] = [];
       const now = new Date();
 
       await db.transaction(async (tx) => {

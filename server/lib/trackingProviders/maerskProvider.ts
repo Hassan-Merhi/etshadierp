@@ -87,7 +87,7 @@ function pickEta(obj: any): string | null {
 
   // portCalls: destination is the last entry or explicitly flagged isDestination.
   // NEVER use portCalls[0] — that is the origin.
-  const portCalls: any[] = Array.isArray(obj.portCalls) ? obj.portCalls : [];
+  const portCalls: unknown[] = Array.isArray(obj.portCalls) ? obj.portCalls : [];
   const destPortCall =
     portCalls.find((p) => p.isDestination === true || p.isDestination === "true") ??
     (portCalls.length > 0 ? portCalls[portCalls.length - 1] : null);

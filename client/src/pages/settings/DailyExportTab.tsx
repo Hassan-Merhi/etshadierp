@@ -33,7 +33,7 @@ interface DailyExportTabProps {
   setShowHistory: (v: boolean | ((v: boolean) => boolean)) => void;
   historyFilter: string;
   setHistoryFilter: (f: string) => void;
-  filteredRuns: any[];
+  filteredRuns: unknown[];
 }
 
 import { Badge } from "@/components/ui/badge";

@@ -52,7 +52,7 @@ export function registerFactoryContainerUpdateRoutes(app: Express) {
       const str = (v: any) => (v === "" || v === undefined ? null : String(v));
 
       // Build a strict whitelist — only valid factoryContainers columns
-      const updateData: Record<string, any> = {
+      const updateData: Record<string, unknown> = {
         updatedAt: new Date(),
       };
 
@@ -454,7 +454,7 @@ export function registerFactoryContainerUpdateRoutes(app: Express) {
         const syncDesc = syncDescParts.join(" · ");
         const syncAmount = rateForSync * kgForSync;
         const syncFxRate = parseFloat(updated.fxRateToUsd || "1") || 1;
-        const daybookUpdateSet: Record<string, any> = { description: syncDesc };
+        const daybookUpdateSet: Record<string, unknown> = { description: syncDesc };
         if (syncAmount > 0) {
           daybookUpdateSet.amountCurrency = String(syncAmount);
           daybookUpdateSet.amountUsd = String(syncAmount * syncFxRate);

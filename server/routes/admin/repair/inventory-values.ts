@@ -43,7 +43,7 @@ export function registerAdminInventoryValueRepairRoutes(app: Express) {
       }
 
       const previewRows = [];
-      for (const row of corruptedRows as any[]) {
+      for (const row of corruptedRows as unknown[]) {
         const qty = parseFloat(row.quantity || "0");
         const oldRate = parseFloat(row.average_rate || "0");
         const oldValue = parseFloat(row.total_value || "0");
@@ -115,7 +115,7 @@ export function registerAdminInventoryValueRepairRoutes(app: Express) {
       }
 
       const correctedRows = [];
-      for (const row of corruptedRows as any[]) {
+      for (const row of corruptedRows as unknown[]) {
         const qty = parseFloat(row.quantity || "0");
         const oldRate = parseFloat(row.average_rate || "0");
         const oldValue = parseFloat(row.total_value || "0");

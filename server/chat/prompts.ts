@@ -644,7 +644,7 @@ function extractSearchTerm(message: string): string {
 }
 
 // Load only the data relevant to the classified intent
-async function loadToolData(intent: ChatIntent, companyId: number, userMessage: string): Promise<Record<string, any>> {
+async function loadToolData(intent: ChatIntent, companyId: number, userMessage: string): Promise<Record<string, unknown>> {
   const term = extractSearchTerm(userMessage) || userMessage.slice(0, 60);
 
   switch (intent) {
@@ -654,11 +654,11 @@ async function loadToolData(intent: ChatIntent, companyId: number, userMessage: 
         searchStockItems(companyId, term, 20),
         getOrBuildAISnapshot(companyId, "low_stock"),
       ]);
-      let locationBreakdown: any[] = [];
+      let locationBreakdown: unknown[] = [];
       if (items.length === 1) {
         locationBreakdown = await getStockByLocation(companyId, items[0].id);
       }
-      return { items, lowStock: (lowStockSnap.items as any[]).slice(0, 10), locationBreakdown };
+      return { items, lowStock: (lowStockSnap.items as unknown[]).slice(0, 10), locationBreakdown };
     }
 
     case "supplier_query": {
@@ -681,7 +681,7 @@ async function loadToolData(intent: ChatIntent, companyId: number, userMessage: 
         getOrBuildAISnapshot(companyId, "business_summary"),
         searchStockItems(companyId, term, 5),
       ]);
-      let salesHistory: any[] = [];
+      let salesHistory: unknown[] = [];
       if (items.length > 0) {
         salesHistory = await getSalesForItem(companyId, items[0].id, 20);
       }
@@ -697,8 +697,8 @@ async function loadToolData(intent: ChatIntent, companyId: number, userMessage: 
       ]);
       return {
         summary,
-        lowStock: (lowStockSnap.items as any[]).slice(0, 5),
-        pricingHealth: (pricingSnap.items as any[]).slice(0, 5),
+        lowStock: (lowStockSnap.items as unknown[]).slice(0, 5),
+        pricingHealth: (pricingSnap.items as unknown[]).slice(0, 5),
       };
     }
 
@@ -710,7 +710,7 @@ async function loadToolData(intent: ChatIntent, companyId: number, userMessage: 
 // Build a focused system prompt from tool data (much smaller than full ERP context)
 function buildToolSystemPrompt(
   intent: ChatIntent,
-  data: Record<string, any>,
+  data: Record<string, unknown>,
   pageContext?: { currentRoute?: string; entityType?: string; entityId?: number; entityName?: string }
 ): string {
   const today = new Date().toISOString().slice(0, 10);
@@ -769,7 +769,7 @@ function buildToolSystemPrompt(
       if (supplierBalances && supplierBalances.length > 0) {
         prompt += `\n## SUPPLIER BALANCES (${supplierBalances.length} with non-zero balance):\n`;
         prompt +=
-          (supplierBalances as any[])
+          (supplierBalances as unknown[])
             .slice(0, 15)
             .map((s: any) => `- ${s.supplierName} (${s.supplierCode}): balance=${s.balance} [${s.status}]`)
             .join("\n") + "\n";

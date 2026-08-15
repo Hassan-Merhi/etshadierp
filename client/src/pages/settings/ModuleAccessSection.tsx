@@ -13,7 +13,7 @@ export function ModuleAccessSection() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
 
-  const { data: rolePermissions = [], isLoading } = useQuery<any[]>({
+  const { data: rolePermissions = [], isLoading } = useQuery<unknown[]>({
     queryKey: ["/api/settings/role-permissions", selectedCompany?.id],
     enabled: !!selectedCompany?.id,
   });

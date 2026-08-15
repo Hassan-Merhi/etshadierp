@@ -27,7 +27,7 @@ export function buildPosSaleAdvisoryLockKey(companyId: number, clientSaleId: str
  * on commit or rollback and requires no schema migration.
  */
 export async function lockAndFindExistingPosSaleTx(input: {
-  tx: any;
+  tx: unknown;
   companyId: number;
   clientSaleId: unknown;
 }): Promise<ExistingPosSale | null> {

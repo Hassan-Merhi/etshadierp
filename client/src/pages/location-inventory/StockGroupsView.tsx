@@ -34,12 +34,12 @@ interface StockGroupSummary {
   totalValue: number;
   averageRate: number;
   itemCount: number;
-  items: any[];
+  items: unknown[];
 }
 
 interface StockGroupsViewProps {
   selectedLocationLocal: Location;
-  posUser?: any;
+  posUser?: unknown;
   canManageWhatsapp: boolean;
   openRenameDialog: (loc: Location, e?: any) => void;
   openWaGroupDialog: (loc: Location, e?: any) => void;

@@ -44,7 +44,7 @@ export function registerFactoryFinancialSnapshotRoutes(app: Express) {
         .where(eq(factoryRawStock.companyId, companyId));
 
       let rawMaterialValue = 0;
-      for (const r of rawStockRows as any[]) {
+      for (const r of rawStockRows as unknown[]) {
         const remaining = parseFloat(r.receivedKg || "0") - parseFloat(r.usedKg || "0");
         const cost = parseFloat(r.costPerKgUsd || "0") || parseFloat(r.costPerKg || "0");
         rawMaterialValue += remaining * cost;
@@ -68,7 +68,7 @@ export function registerFactoryFinancialSnapshotRoutes(app: Express) {
         );
 
       let mixBatchValue = 0;
-      for (const b of mixBatchRows as any[]) {
+      for (const b of mixBatchRows as unknown[]) {
         const remaining = parseFloat(b.totalWeightKg || "0") - parseFloat(b.usedKg || "0");
         const cost = parseFloat(b.costPerKg || "0");
         if (remaining > 0) mixBatchValue += remaining * cost;
@@ -136,8 +136,8 @@ export function registerFactoryFinancialSnapshotRoutes(app: Express) {
 
       // Get voucher entries for equity accounts
       let capitalTotal = 0;
-      if ((equityAccounts as any[]).length > 0) {
-        const equityIds = (equityAccounts as any[]).map((a) => a.id);
+      if ((equityAccounts as unknown[]).length > 0) {
+        const equityIds = (equityAccounts as unknown[]).map((a) => a.id);
         const equityEntries = await db
           .select({
             ledgerAccountId: voucherEntries.ledgerAccountId,
@@ -158,11 +158,11 @@ export function registerFactoryFinancialSnapshotRoutes(app: Express) {
           .groupBy(voucherEntries.ledgerAccountId);
 
         const balMap = new Map<number, { debit: number; credit: number }>();
-        for (const e of equityEntries as any[]) {
+        for (const e of equityEntries as unknown[]) {
           balMap.set(e.ledgerAccountId, { debit: parseFloat(e.debit || "0"), credit: parseFloat(e.credit || "0") });
         }
 
-        for (const acc of equityAccounts as any[]) {
+        for (const acc of equityAccounts as unknown[]) {
           const opening = parseFloat(acc.openingBalance || "0");
           const openingSide = acc.openingBalanceSide === "Dr" ? 1 : acc.openingBalanceSide === "Cr" ? -1 : -1;
           const signedOpening = opening * openingSide;
@@ -182,7 +182,7 @@ export function registerFactoryFinancialSnapshotRoutes(app: Express) {
         advanceCount,
         activeWorkerCount,
         capitalTotal: round2(capitalTotal),
-        equityAccounts: (equityAccounts as any[]).map((a) => ({
+        equityAccounts: (equityAccounts as unknown[]).map((a) => ({
           id: a.id,
           name: a.name,
           code: a.code,

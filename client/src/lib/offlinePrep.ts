@@ -61,7 +61,7 @@ function toEntity(id: string | number, companyId: number, data: any): CachedEnti
   };
 }
 
-function extractArray(data: any): any[] {
+function extractArray(data: any): unknown[] {
   if (Array.isArray(data)) return data;
   // Common wrapper shapes
   for (const key of [
@@ -450,7 +450,7 @@ export async function runOfflinePrep(companyId: number, onProgress: (p: PrepProg
   // Step 2b: Pre-warm lazy-loaded factory page JS chunks so they work offline
   // without needing a prior visit. Dynamic import() fetches the chunk; the
   // service worker caches it automatically via stale-while-revalidate.
-  const pageChunks: Array<{ label: string; loader: () => Promise<any> }> = [
+  const pageChunks: Array<{ label: string; loader: () => Promise<unknown> }> = [
     // ── Core factory pages ───────────────────────────────────────────────
     { label: "Dashboard", loader: () => import("@/pages/factory/FactoryDashboard") },
     { label: "Daybook", loader: () => import("@/pages/factory/FactoryDaybook") },

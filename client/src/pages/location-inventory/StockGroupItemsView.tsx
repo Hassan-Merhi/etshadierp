@@ -7,14 +7,14 @@ import type { InventoryItem, StockGroupSummary } from "./locationInventoryTypes"
 
 interface StockGroupItemsViewProps {
   selectedGroup: StockGroupSummary;
-  posUser?: any;
+  posUser?: unknown;
   formatAmount: (v: number) => string;
   setArchiveDialogOpen: (v: boolean) => void;
   itemSearchTerm: string;
   setItemSearchTerm: (v: string) => void;
   itemCategoryFilter: string[];
   setItemCategoryFilter: (v: string[]) => void;
-  categoriesList: any[];
+  categoriesList: unknown[];
   filteredStockItems: InventoryItem[];
   showMovement: boolean;
   openingInventoryMap: Map<number, number>;

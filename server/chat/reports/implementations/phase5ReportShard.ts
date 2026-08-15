@@ -39,7 +39,7 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       `);
       let grandDr = 0,
         grandCr = 0;
-      const tableRows5 = (rows.rows as any[]).map((r) => {
+      const tableRows5 = (rows.rows as unknown[]).map((r) => {
         const dr = parseFloat(r.total_dr || "0");
         const cr = parseFloat(r.total_cr || "0");
         const net = dr - cr;
@@ -139,7 +139,7 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY pli.id
       `);
       let lineTotal = 0;
-      const tableRows5 = (lineRows.rows as any[]).map((r) => {
+      const tableRows5 = (lineRows.rows as unknown[]).map((r) => {
         const lt = parseFloat(r.line_total || "0");
         lineTotal += lt;
         return [r.item_name, r.code, `${fmtDec(parseFloat(r.qty))} ${r.uom}`, fmtDec(parseFloat(r.rate)), fmt(lt)];
@@ -253,7 +253,7 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         breakdownRows.push(["Transport Fee", cc.currency, fmt(parseFloat(cc.transport_fee))]);
       if (parseFloat(cc.duty_fee || "0") > 0)
         breakdownRows.push(["Duty Fee", cc.currency, fmt(parseFloat(cc.duty_fee))]);
-      for (const po of poRows5.rows as any[]) {
+      for (const po of poRows5.rows as unknown[]) {
         if (parseFloat(po.freight || "0") > 0)
           breakdownRows.push([`Freight (${po.po_number})`, po.currency, fmt(parseFloat(po.freight))]);
         if (parseFloat(po.fumigation || "0") > 0)
@@ -300,7 +300,7 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       `);
       const expired: string[] = [],
         expiringSoon: string[] = [];
-      const tableRows5 = (rows.rows as any[]).map((r) => {
+      const tableRows5 = (rows.rows as unknown[]).map((r) => {
         const visaExp = r.visa_expiry ? String(r.visa_expiry).slice(0, 10) : "—";
         const wpExp = r.work_permit_expiry ? String(r.work_permit_expiry).slice(0, 10) : "—";
         const rpExp = r.residential_permit_expiry ? String(r.residential_permit_expiry).slice(0, 10) : "—";
@@ -355,7 +355,7 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         LIMIT ${rowLimit}
       `);
       let totalTransferred = 0;
-      const tableRows5 = (rows.rows as any[]).map((r) => {
+      const tableRows5 = (rows.rows as unknown[]).map((r) => {
         const amt = parseFloat(r.total_amount || "0");
         totalTransferred += amt;
         return [
@@ -396,7 +396,7 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       `);
       let grandIn = 0,
         grandOut = 0;
-      const tableRows5 = (rows.rows as any[]).map((r) => {
+      const tableRows5 = (rows.rows as unknown[]).map((r) => {
         const inflow = parseFloat(r.total_in || "0");
         const outflow = parseFloat(r.total_out || "0");
         const net = inflow - outflow;
@@ -487,7 +487,7 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       let runningBal = ob;
       let totalDr = 0,
         totalCr = 0;
-      const tableRows5 = (txRows5.rows as any[]).map((r) => {
+      const tableRows5 = (txRows5.rows as unknown[]).map((r) => {
         const dr = parseFloat(r.dr || "0");
         const cr = parseFloat(r.cr || "0");
         runningBal += dr - cr;
@@ -545,7 +545,7 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       `);
       const typeMap5: Record<string, number> = {};
       let grandAmt = 0;
-      const tableRows5 = (rows.rows as any[]).map((r) => {
+      const tableRows5 = (rows.rows as unknown[]).map((r) => {
         const amt = parseFloat(r.amount || "0");
         typeMap5[r.voucher_type] = (typeMap5[r.voucher_type] || 0) + amt;
         grandAmt += amt;
@@ -597,7 +597,7 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       let grandRev = 0,
         grandCost = 0,
         grandProfit = 0;
-      const tableRows5 = (rows.rows as any[]).map((r) => {
+      const tableRows5 = (rows.rows as unknown[]).map((r) => {
         const rev = parseFloat(r.total_revenue || "0");
         const cost = parseFloat(r.total_cost || "0");
         const profit5 = parseFloat(r.total_profit || "0");
@@ -642,7 +642,7 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         LIMIT ${rowLimit}
       `);
       let totalDN = 0;
-      const tableRows5 = (rows.rows as any[]).map((r) => {
+      const tableRows5 = (rows.rows as unknown[]).map((r) => {
         const amt = parseFloat(r.amount || "0");
         totalDN += amt;
         return [

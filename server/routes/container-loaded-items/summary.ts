@@ -188,7 +188,7 @@ export function registerContainerLoadedItemSummaryRoutes(app: Express, requireAu
           title: string,
           sectionColor: string,
           columns: ColDef[],
-          data: any[],
+          data: unknown[],
           statusColorFn?: (row: any) => string | null,
           includeAutoFilter = false
         ) => {

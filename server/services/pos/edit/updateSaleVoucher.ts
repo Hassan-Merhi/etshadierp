@@ -17,12 +17,12 @@ export async function updateVoucherRecord(
   tx: any,
   params: {
     voucherId: number;
-    description: any;
+    description: unknown;
     grandTotal: number;
     locationChanged: boolean;
     targetLocationId: number;
     oldLocationId: number;
-    voucherDate: any;
+    voucherDate: unknown;
   }
 ): Promise<void> {
   const { voucherId, description, grandTotal, locationChanged, targetLocationId, oldLocationId, voucherDate } = params;

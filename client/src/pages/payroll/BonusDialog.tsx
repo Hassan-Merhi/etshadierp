@@ -23,10 +23,10 @@ import { getThisMonthRange } from "./payrollSchemas";
 interface BonusDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  selectedEmployee: any;
+  selectedEmployee: unknown;
   bonusTab: "sales" | "bales";
   setBonusTab: (v: "sales" | "bales") => void;
-  bonusSalesPreview: any;
+  bonusSalesPreview: unknown;
   setBonusSalesPreview: (v: any) => void;
   bonusSalesCustomPct: string;
   setBonusSalesCustomPct: (v: string) => void;
@@ -40,8 +40,8 @@ interface BonusDialogProps {
   setBonusSalesEnd: (v: string) => void;
   bonusSalesLoading: boolean;
   fetchSalesPreview: () => void;
-  balesRows: any[];
-  setBalesRows: (fn: (prev: any[]) => any[]) => void;
+  balesRows: unknown[];
+  setBalesRows: (fn: (prev: unknown[]) => unknown[]) => void;
   balesPeriod: "thisMonth" | "custom";
   setBalesPeriod: (v: "thisMonth" | "custom") => void;
   balesStart: string;
@@ -55,8 +55,8 @@ interface BonusDialogProps {
   setBonusNotes: (v: string) => void;
   saveBonusToPending: () => void;
   submitSmartBonus: () => void;
-  locations: any[];
-  allCompanyLocations: any[];
+  locations: unknown[];
+  allCompanyLocations: unknown[];
 }
 
 export function BonusDialog({

@@ -29,7 +29,7 @@ import {
 } from "@/lazyPages";
 
 interface PropertiesRoutesProps {
-  user: any;
+  user: unknown;
   currentLocation: string;
 }
 

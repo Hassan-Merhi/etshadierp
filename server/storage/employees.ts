@@ -248,7 +248,7 @@ export async function deleteEmployee(
 
 // Employee Groups
 
-export async function getAllEmployeeGroups(companyId: number): Promise<any[]> {
+export async function getAllEmployeeGroups(companyId: number): Promise<unknown[]> {
   const results = await db
     .select()
     .from(schema.employeeGroups)
@@ -287,7 +287,7 @@ export async function deleteEmployeeGroup(id: number): Promise<void> {
   await db.delete(schema.employeeGroups).where(eq(schema.employeeGroups.id, id));
 }
 
-export async function getEmployeeGroupMembers(groupId: number): Promise<any[]> {
+export async function getEmployeeGroupMembers(groupId: number): Promise<unknown[]> {
   const results = await db
     .select({
       id: schema.employeeGroupMembers.id,
@@ -336,7 +336,7 @@ export async function removeEmployeeFromGroup(groupId: number, employeeId: numbe
 
 // Salary Advances
 
-export async function getAllSalaryAdvances(companyId: number): Promise<any[]> {
+export async function getAllSalaryAdvances(companyId: number): Promise<unknown[]> {
   const rows = await db
     .select({
       id: schema.salaryAdvances.id,

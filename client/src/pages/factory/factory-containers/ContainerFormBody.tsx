@@ -48,7 +48,7 @@ interface ContainerFormBodyProps {
   filteredSupplierList: FactorySupplier[];
   selectedSupplier: FactorySupplier | null;
   brokerMismatch: boolean | null | undefined;
-  ledgerAccounts: any[];
+  ledgerAccounts: unknown[];
 }
 
 export function ContainerFormBody({

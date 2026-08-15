@@ -7,7 +7,7 @@ interface AllItemsViewProps {
   totalItems: number;
   totalQty: number;
   totalValue: number;
-  posUser?: any;
+  posUser?: unknown;
   formatAmount: (v: number) => string;
   itemSearchTerm: string;
   setItemSearchTerm: (v: string) => void;

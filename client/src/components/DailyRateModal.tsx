@@ -81,7 +81,7 @@ export function DailyRateModal({ companyId }: DailyRateModalProps) {
 
   const { data: todayRateCheck, isLoading: isCheckingRate } = useQuery<{
     hasRate: boolean;
-    latestRate?: any;
+    latestRate?: unknown;
     today: string;
   }>({
     queryKey: ["/api/exchange-rates/check-today", companyId],

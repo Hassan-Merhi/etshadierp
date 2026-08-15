@@ -24,7 +24,7 @@ export function JournalEditForm({
   crTotal,
   focusByTestId,
 }: {
-  form: UseFormReturn<any>;
+  form: UseFormReturn<unknown>;
   onSubmit: (data: any) => void;
   onCancel: () => void;
   isPending: boolean;

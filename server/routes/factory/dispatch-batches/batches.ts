@@ -97,7 +97,7 @@ export function registerDispatchBatchCrudRoutes(app: Express) {
 
         // Validate proforma if supplied
         let proforma: any = null;
-        let proformaLines: any[] = [];
+        let proformaLines: unknown[] = [];
         if (proformaId) {
           const [pf] = await tx
             .select()
@@ -187,7 +187,7 @@ export function registerDispatchBatchCrudRoutes(app: Express) {
 
       // Proforma + lines
       let proforma: any = null;
-      let proformaLines: any[] = [];
+      let proformaLines: unknown[] = [];
       if (batch.proformaId) {
         const [pf] = await db.select().from(customerProformas).where(eq(customerProformas.id, batch.proformaId));
         if (pf) {

@@ -10,7 +10,7 @@ import { UserRolesCard } from "./UserRolesCard";
 import { AdvancedRestrictions } from "./AdvancedRestrictions";
 
 interface UserManagementFormProps {
-  user: any;
+  user: unknown;
   username: string;
   setUsername: (v: string) => void;
   displayName: string;
@@ -24,7 +24,7 @@ interface UserManagementFormProps {
   isPrivileged: boolean;
   isViewOnly: boolean;
   accessLabel: string;
-  companies: any[];
+  companies: unknown[];
   setConfirmDelete: (v: boolean) => void;
   pageAccess: Set<string>;
   hiddenCostFields: string[];

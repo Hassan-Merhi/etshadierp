@@ -458,7 +458,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
         const voucherRows = await tx.execute(
           sql`SELECT id FROM vouchers WHERE company_id = ${companyId} AND voucher_number LIKE ${"WBONUS-" + id + "-%"}`
         );
-        for (const v of voucherRows.rows as any[]) {
+        for (const v of voucherRows.rows as unknown[]) {
           await tx.execute(sql`DELETE FROM voucher_entries WHERE voucher_id = ${v.id}`);
           await tx.execute(sql`DELETE FROM vouchers WHERE id = ${v.id}`);
         }

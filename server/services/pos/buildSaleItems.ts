@@ -12,7 +12,7 @@ import { eq, and } from "drizzle-orm";
 import type { HandlerErrorResult, ValidatedInventoryItem } from "./posSaleTypes";
 
 /** Input validation assertions for inventory safety. */
-export function validateItemsBasic(locationId: any, items: any[]): { error: HandlerErrorResult } | null {
+export function validateItemsBasic(locationId: any, items: unknown[]): { error: HandlerErrorResult } | null {
   const parsedLocationId = Number(locationId);
   if (!locationId || isNaN(parsedLocationId)) {
     return { error: { status: 400, body: { message: `Invalid locationId: ${locationId}` } } };
@@ -32,7 +32,7 @@ export function validateItemsBasic(locationId: any, items: any[]): { error: Hand
 }
 
 /** Validate and calculate total. */
-export function calculateGrandTotal(items: any[]): { grandTotal: number } | { error: HandlerErrorResult } {
+export function calculateGrandTotal(items: unknown[]): { grandTotal: number } | { error: HandlerErrorResult } {
   let grandTotal = 0;
   for (const item of items) {
     if (!item.stockItemId) {
@@ -56,7 +56,7 @@ export function calculateGrandTotal(items: any[]): { grandTotal: number } | { er
  */
 export async function validateInventoryAvailability(
   locationId: any,
-  items: any[],
+  items: unknown[],
   canSellNegativeStock: boolean
 ): Promise<ValidatedInventoryItem[]> {
   const inventoryValidation: ValidatedInventoryItem[] = [];

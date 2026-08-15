@@ -30,7 +30,7 @@ export function registerFactoryMixBatchConsumeRoutes(app: Express) {
       }
       if (!usedDate) return res.status(400).json({ message: "usedDate is required" });
 
-      const results: any[] = [];
+      const results: unknown[] = [];
       await db.transaction(async (tx: any) => {
         for (const u of usages) {
           const { batchId, kgUsed, notes } = u;

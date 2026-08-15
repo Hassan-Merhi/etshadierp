@@ -145,7 +145,7 @@ function KpiCard({
 }: {
   title: string;
   value: number;
-  icon: any;
+  icon: unknown;
   color: string;
   isProfit?: boolean;
 }) {
@@ -177,7 +177,7 @@ function AccountSection({
   badgeColor,
 }: {
   title: string;
-  accounts: any[];
+  accounts: unknown[];
   total: number;
   type: "income" | "expense";
   badgeColor: string;
@@ -273,7 +273,7 @@ export default function NetProfitReport() {
     return PERIODS.find((p) => p.value === period)?.label || "This Month";
   }, [period, specificMonth, specificYear, customFromDate, customToDate]);
 
-  const { data: companies = [] } = useQuery<any[]>({
+  const { data: companies = [] } = useQuery<unknown[]>({
     queryKey: ["/api/companies"],
     enabled: isAdminOrDev,
   });

@@ -763,7 +763,7 @@ export function registerContainerFreightWriteRoutes(app: Express) {
       // INTERCO-FREIGHT sync removed — freight is now inside the purchase voucher itself.
 
       try {
-        const _poChanges: Record<string, any> = {};
+        const _poChanges: Record<string, unknown> = {};
         for (const _f of [
           "poNumber",
           "currency",

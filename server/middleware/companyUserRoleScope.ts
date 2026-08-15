@@ -29,7 +29,7 @@ async function loadRoleRows(userId?: string): Promise<CompanyUserRoleRow[]> {
   return userId ? await query.where(eq(userCompanyRoles.userId, userId)) : await query;
 }
 
-function installJsonArrayFilter(res: Response, filter: (rows: any[]) => any[]): void {
+function installJsonArrayFilter(res: Response, filter: (rows: unknown[]) => unknown[]): void {
   const originalJson = res.json.bind(res);
   res.json = (body: unknown) => originalJson(Array.isArray(body) ? filter(body) : body);
 }

@@ -21,7 +21,7 @@ import { buildVoucherChangesForCreate, logAudit, snapshotVoucherEntries } from "
 import { checkAccountWhatsAppRule } from "../factoryWhatsappRoutes";
 
 const postingDependencies = createDatabasePostingDependencies();
-type PersistedPostingResult = CentralPostingResult<any, any>;
+type PersistedPostingResult = CentralPostingResult<unknown, unknown>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -40,7 +40,7 @@ function postingStatus(error: PostingValidationError): number {
 }
 
 async function resolvePaymentReceiptTargetTx(input: {
-  tx: any;
+  tx: unknown;
   companyId: number;
   accountType: string;
   accountId: number;
@@ -105,7 +105,7 @@ async function resolvePaymentReceiptTargetTx(input: {
   return { [field]: accountId } as VoucherEntryInsertFields;
 }
 
-async function writeFactoryDaybookCompatibility(input: { companyId: number; voucher: any }): Promise<void> {
+async function writeFactoryDaybookCompatibility(input: { companyId: number; voucher: unknown }): Promise<void> {
   const [settings] = await db
     .select({ id: factorySettings.id })
     .from(factorySettings)
@@ -149,7 +149,7 @@ async function createCentralPaymentReceipt(req: Request, res: Response, next: Ne
       return;
     }
 
-    const body = req.body as Record<string, any>;
+    const body = req.body as Record<string, unknown>;
     const result = await db.transaction(async (tx) => {
       const built = await buildPaymentReceiptPostingRequest({
         companyId,

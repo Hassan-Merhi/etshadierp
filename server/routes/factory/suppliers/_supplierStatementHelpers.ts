@@ -79,7 +79,7 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
           .orderBy(factoryContainers.arrivalDate, factoryContainers.createdAt)
       : [];
   // Build a Set of the filtered container IDs so charge queries can be scoped to the same set.
-  const filteredContainerIdSet = new Set((allContainers as any[]).map((c) => c.id as number));
+  const filteredContainerIdSet = new Set((allContainers as unknown[]).map((c) => c.id as number));
 
   // Payments (direct)
   const allPayments =
@@ -209,7 +209,7 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
   // Container rows
   // Always use totalKg (declared/agreed weight) — weight differences at offload affect inventory
   // only, not what is owed to the supplier. This matches computeBalance and computeStats.
-  for (const c of allContainers as any[]) {
+  for (const c of allContainers as unknown[]) {
     const supplierName = supplierNameMap[c.supplierId] || "Unknown";
     const cc = c.currencyCode || "USD";
     const kg = parseFloat(c.totalKg || "0");
@@ -283,7 +283,7 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
   }
 
   // Payment rows
-  for (const p of allPayments as any[]) {
+  for (const p of allPayments as unknown[]) {
     const supplierName = supplierNameMap[p.supplierId] || "Unknown";
     const cc = p.currencyCode || "USD";
     addRow(cc, {
@@ -299,7 +299,7 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
 
   // Voucher-based payment rows (general accounting payments linked to factory suppliers)
   // Skip optional vouchers — they are informational only and don't affect the balance.
-  for (const p of allVoucherPayments as any[]) {
+  for (const p of allVoucherPayments as unknown[]) {
     if (p.optional) continue;
     const cc = p.currency || "USD";
     const suppId = p.supplierId;
@@ -322,7 +322,7 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
   // For USD→USD transfers FROM a linked supplier TO the broker, adding both fx_out and fx_in
   // to the USD section used to cancel them to zero — now we only add the correct directional row.
   const seenFxIds = new Set<number>();
-  for (const t of allFx as any[]) {
+  for (const t of allFx as unknown[]) {
     if (seenFxIds.has(t.id)) continue;
     seenFxIds.add(t.id);
     const fromCc = t.fromCurrencyCode || "USD";
@@ -380,7 +380,7 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
   // to a supplier via supplierId (already filtered at query level), so they belong on that
   // supplier's statement regardless of which supplier owns the container.
   // Post-offload charges can only be added to OFFLOADED containers, so OTW-toggle is irrelevant.
-  for (const oc of allOffloadCharges as any[]) {
+  for (const oc of allOffloadCharges as unknown[]) {
     const cc = oc.currencyCode || "USD";
     const amt = parseFloat(oc.amount || "0");
     const supplierName = supplierNameMap[oc.supplierId] || "Unknown";
@@ -397,7 +397,7 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
   }
 
   // Container-level other charge rows (linked via container → supplier)
-  for (const oc of allContainerOtherCharges as any[]) {
+  for (const oc of allContainerOtherCharges as unknown[]) {
     // Skip charges tied to OTW containers when toggle is off
     if (oc.containerId != null && !filteredContainerIdSet.has(oc.containerId)) continue;
     const cc = oc.chargeCurrencyCode || oc.containerCurrencyCode || "USD";
@@ -441,7 +441,7 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
           )
       : [];
 
-  for (const c of containerColOtherCharges as any[]) {
+  for (const c of containerColOtherCharges as unknown[]) {
     // Skip charges tied to OTW containers when toggle is off
     if (!filteredContainerIdSet.has(c.id)) continue;
     const cc = c.otherChargesCurrencyCode || "USD";
@@ -465,7 +465,7 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
   }
 
   // Inject opening balance rows (always USD) for broker and all linked suppliers
-  for (const s of allSuppliers as any[]) {
+  for (const s of allSuppliers as unknown[]) {
     const ob = parseFloat(s.openingBalance || "0");
     if (ob !== 0) {
       if (!ledgerByCurrency["USD"]) ledgerByCurrency["USD"] = [];

@@ -73,7 +73,7 @@ export type MutationResult = {
 
 export interface PostOffloadDialogProps {
   container: ContainerWithSupplier | null;
-  ledgerAccounts: any[];
+  ledgerAccounts: unknown[];
   onClose: () => void;
 }
 

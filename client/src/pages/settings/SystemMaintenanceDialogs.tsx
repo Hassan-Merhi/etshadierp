@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label";
 interface FixPOCreditsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  companies: any[];
+  companies: unknown[];
 }
 
 export function FixPOCreditsDialog({ open, onOpenChange, companies }: FixPOCreditsDialogProps) {
@@ -146,7 +146,7 @@ export function FixPOCreditsDialog({ open, onOpenChange, companies }: FixPOCredi
 interface ResetCompanyDataDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  companies: any[];
+  companies: unknown[];
 }
 
 export function ResetCompanyDataDialog({ open, onOpenChange, companies }: ResetCompanyDataDialogProps) {

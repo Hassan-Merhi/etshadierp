@@ -79,7 +79,7 @@ async function lockCompanies(tx: any, sourceCompanyId: number, destinationCompan
   }
 }
 
-function deepestError(error: unknown): any {
+function deepestError(error: unknown): unknown {
   let current: any = error;
   const seen = new Set<any>();
   while (current?.cause && !seen.has(current.cause)) {

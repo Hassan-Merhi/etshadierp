@@ -536,7 +536,7 @@ export default function FactoryContainerLoadingScan() {
           { credentials: "include" }
         );
         if (res.ok) {
-          const allOrders: any[] = await res.json();
+          const allOrders: unknown[] = await res.json();
           const pending = allOrders.filter((o) => ["LOADING", "DRAFT", "PENDING_VERIFICATION"].includes(o.status));
           if (pending.length > 0) {
             setPendingOrders(pending);
@@ -619,7 +619,7 @@ export default function FactoryContainerLoadingScan() {
           const data = new Uint8Array(evt.target?.result as ArrayBuffer);
           const wb = await XLSX.read(data, { type: "array" });
           const ws = wb.Sheets[wb.SheetNames[0]];
-          const rows: any[] = XLSX.utils.sheet_to_json(ws);
+          const rows: unknown[] = XLSX.utils.sheet_to_json(ws);
 
           // Detect mode: if any row has a "Ref" / "Reference" / "Ref Number" / "Ref Code" column, use ref mode
           const firstRow = rows[0] || {};

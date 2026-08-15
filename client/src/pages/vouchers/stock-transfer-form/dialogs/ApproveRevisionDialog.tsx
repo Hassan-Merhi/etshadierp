@@ -22,14 +22,14 @@ export function ApproveRevisionDialog({
   setApproveRevisionTarget,
   pendingRevisions = [],
 }: {
-  approveRevisionMutation: any;
-  approveRevisionTarget: any;
-  setApproveRevisionTarget: any;
+  approveRevisionMutation: unknown;
+  approveRevisionTarget: unknown;
+  setApproveRevisionTarget: unknown;
   /**
    * Every revision still awaiting review. Approving one applies all of them,
    * so the dialog previews the whole set rather than just the clicked row.
    */
-  pendingRevisions?: any[];
+  pendingRevisions?: unknown[];
 }) {
   const revisionsToApply = approveRevisionTarget
     ? pendingRevisions.some((rev) => rev.id === approveRevisionTarget.id)

@@ -160,7 +160,7 @@ export function registerFactoryEmployeeBulkPayrollRoutes(app: Express) {
               ORDER BY advance_date ASC, id ASC
             `);
             let remaining = deduction;
-            for (const adv of outstanding.rows as any[]) {
+            for (const adv of outstanding.rows as unknown[]) {
               if (remaining <= 0.001) break;
               const bal = parseFloat(adv.remaining_balance || "0");
               if (bal <= 0) continue;

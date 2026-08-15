@@ -156,7 +156,7 @@ export function registerBalesCrudRoutes(app: Express) {
 
       // Paginated response when ?page= is given; legacy array shape for backward-compat callers.
       if (page !== null && countResult) {
-        const total = Number((countResult as any[])[0]?.count ?? 0);
+        const total = Number((countResult as unknown[])[0]?.count ?? 0);
         const totalPages = Math.max(1, Math.ceil(total / rowLimit));
         res.set("Cache-Control", "private, max-age=60");
         res.json({ items: results, total, page, limit: rowLimit, totalPages });

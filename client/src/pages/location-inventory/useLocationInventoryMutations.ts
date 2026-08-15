@@ -31,7 +31,7 @@ export function useLocationInventoryMutations({
       name: string;
       supplierPartnerPayableDeductionPerQty?: number;
     }) => {
-      const payload: Record<string, any> = { name };
+      const payload: Record<string, unknown> = { name };
       if (supplierPartnerPayableDeductionPerQty !== undefined)
         payload.supplierPartnerPayableDeductionPerQty = supplierPartnerPayableDeductionPerQty;
       const res = await apiRequest("PATCH", `/api/locations/${id}`, payload);

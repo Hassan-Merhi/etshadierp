@@ -39,9 +39,9 @@ import { VoucherSourceCard } from "@/components/vouchers/VoucherSourceCard";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
 export interface PaymentReceiptTabProps {
-  form: UseFormReturn<any>;
-  fieldArray: UseFieldArrayReturn<any, "entries", "id">;
-  entries: any[];
+  form: UseFormReturn<unknown>;
+  fieldArray: UseFieldArrayReturn<unknown, "entries", "id">;
+  entries: unknown[];
   total: number;
   paymentAccountId: number;
   paymentAccountType: string;

@@ -40,34 +40,34 @@ export function FinalizeProformaDialog({
   updateFinalizePrice,
   updateFinalizeQty,
 }: {
-  bulkCreateMutation: any;
-  createCustomerMutation: any;
-  customerSearch: any;
-  editingProformaId: any;
-  filteredCustomers: any;
-  finalizeOpen: any;
-  formatAmount: any;
-  grandTotal: any;
-  handleCloseFinalizeDialog: any;
-  handleExportExcel: any;
-  handleExportPdf: any;
-  handleSaveProforma: any;
-  newCustomerName: any;
-  proformaName: any;
-  removeFromFinalize: any;
-  replaceLinesMutation: any;
-  savedProformaId: any;
-  selectedCustomerId: any;
-  selectedItems: any;
-  setCustomerSearch: any;
-  setNewCustomerName: any;
-  setProformaName: any;
-  setSelectedCustomerId: any;
-  setShowCreateCustomer: any;
-  showCreateCustomer: any;
-  totalSelectedBales: any;
-  updateFinalizePrice: any;
-  updateFinalizeQty: any;
+  bulkCreateMutation: unknown;
+  createCustomerMutation: unknown;
+  customerSearch: unknown;
+  editingProformaId: unknown;
+  filteredCustomers: unknown;
+  finalizeOpen: unknown;
+  formatAmount: unknown;
+  grandTotal: unknown;
+  handleCloseFinalizeDialog: unknown;
+  handleExportExcel: unknown;
+  handleExportPdf: unknown;
+  handleSaveProforma: unknown;
+  newCustomerName: unknown;
+  proformaName: unknown;
+  removeFromFinalize: unknown;
+  replaceLinesMutation: unknown;
+  savedProformaId: unknown;
+  selectedCustomerId: unknown;
+  selectedItems: unknown;
+  setCustomerSearch: unknown;
+  setNewCustomerName: unknown;
+  setProformaName: unknown;
+  setSelectedCustomerId: unknown;
+  setShowCreateCustomer: unknown;
+  showCreateCustomer: unknown;
+  totalSelectedBales: unknown;
+  updateFinalizePrice: unknown;
+  updateFinalizeQty: unknown;
 }) {
   return (
     <Dialog

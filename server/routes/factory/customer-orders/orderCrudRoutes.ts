@@ -28,7 +28,7 @@ export function registerOrderCrudRoutes(app: Express) {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const conditions: any[] = [eq(customerOrders.companyId, companyId), isNull(customerOrders.deletedAt)];
+      const conditions: unknown[] = [eq(customerOrders.companyId, companyId), isNull(customerOrders.deletedAt)];
       const queryCustomerId = parseOptionalId(req.query.customerId);
       if (queryCustomerId !== null) conditions.push(eq(customerOrders.customerId, queryCustomerId));
       if (req.query.status) conditions.push(eq(customerOrders.status, req.query.status));
@@ -133,7 +133,7 @@ export function registerOrderCrudRoutes(app: Express) {
             WHERE co.id = ${id} AND co.company_id = ${companyId}
             LIMIT 1`
       );
-      const rawOrderRows: any[] = resultRows(rawOrderRes);
+      const rawOrderRows: unknown[] = resultRows(rawOrderRes);
       if (!rawOrderRows.length) return res.status(404).json({ message: "Order not found" });
       const r = rawOrderRows[0];
       const order = {
@@ -781,7 +781,7 @@ export function registerOrderCrudRoutes(app: Express) {
       const locationId = req.query.locationId ? parseOptionalId(req.query.locationId) : null;
       if (!code) return res.status(400).json({ message: "code is required" });
 
-      const conditions: any[] = [
+      const conditions: unknown[] = [
         eq(factoryBales.companyId, companyId),
         eq(factoryBales.status, "IN_STOCK"),
         or(eq(factoryBales.referenceNumber, code), eq(factoryBales.baleCode, code), eq(factoryBales.articleCode, code)),

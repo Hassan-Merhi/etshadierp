@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 export function BaleStatusBadge({ status }: { status: string }) {
   const map: Record<
     string,
-    { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: any }
+    { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: unknown }
   > = {
     IN_STOCK: { label: "In Stock", variant: "default", icon: CheckCircle2 },
     SOLD: { label: "Sold", variant: "secondary", icon: ArchiveX },

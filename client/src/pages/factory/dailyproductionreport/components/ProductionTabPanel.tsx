@@ -521,7 +521,7 @@ export function ProductionTabPanel({ report }: { report: DailyProductionReportSt
             }
           }
           const mergedCategories = [...(data?.production.byCategory ?? []), ...wgCats];
-          const mergedProducts = [...((data?.production.byProduct ?? []) as any[]), ...wgProds];
+          const mergedProducts = [...((data?.production.byProduct ?? []) as unknown[]), ...wgProds];
           const mergedTotalBales = (data?.production.totalBales ?? 0) + wgCats.reduce((s, c) => s + c.qty, 0);
           const mergedTotalWeightKg =
             (data?.production.totalWeightKg ?? 0) + wgCats.reduce((s, c) => s + c.totalWeightKg, 0);

@@ -24,12 +24,12 @@ export function ReconcileBalancesDialog({
   reconcilePreviewLoading,
   setReconcileOpen,
 }: {
-  formatDate: any;
-  reconcileMutation: any;
-  reconcileOpen: any;
-  reconcilePreview: any;
-  reconcilePreviewLoading: any;
-  setReconcileOpen: any;
+  formatDate: unknown;
+  reconcileMutation: unknown;
+  reconcileOpen: unknown;
+  reconcilePreview: unknown;
+  reconcilePreviewLoading: unknown;
+  setReconcileOpen: unknown;
 }) {
   return (
     <Dialog open={reconcileOpen} onOpenChange={setReconcileOpen}>

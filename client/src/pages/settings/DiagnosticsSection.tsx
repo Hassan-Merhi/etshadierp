@@ -9,7 +9,7 @@ export function DiagnosticsSection({
   toast,
 }: {
   setOrphanedChargesDiagnostic: (v: any) => void;
-  toast: any;
+  toast: unknown;
 }) {
   const [, navigate] = useLocation();
 

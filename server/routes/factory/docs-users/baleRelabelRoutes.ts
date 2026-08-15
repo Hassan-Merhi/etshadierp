@@ -156,7 +156,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
         }
 
         // 3. Update factory_bales referenceNumber
-        const recodeMap: { oldRef: string; newRef: string; bale: any }[] = refCodes.map((oldRef, i) => ({
+        const recodeMap: { oldRef: string; newRef: string; bale: unknown }[] = refCodes.map((oldRef, i) => ({
           oldRef,
           newRef: newRefs[i],
           bale: baleMap.get(oldRef),
@@ -238,7 +238,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
 
       // attach items counts
       const sessionIds = sessions.map((s: any) => s.id);
-      const itemsBySession: Record<number, any[]> = {};
+      const itemsBySession: Record<number, unknown[]> = {};
       if (sessionIds.length > 0) {
         const items = await db.select().from(baleRecodeItems).where(inArray(baleRecodeItems.sessionId, sessionIds));
         for (const item of items) {

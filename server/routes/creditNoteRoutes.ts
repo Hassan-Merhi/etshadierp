@@ -593,7 +593,7 @@ export function registerCreditNoteRoutes(app: Express) {
       });
 
       try {
-        const changes: Record<string, any> = {};
+        const changes: Record<string, unknown> = {};
         if (voucherDate && voucher.voucherDate !== voucherDate)
           changes.date = { old: voucher.voucherDate, new: voucherDate };
         if (cashAccountId !== undefined)
@@ -607,7 +607,7 @@ export function registerCreditNoteRoutes(app: Express) {
                 rate: it.rate,
                 totalValue: it.totalValue,
               })),
-              (items as any[]).map((it) => ({
+              (items as unknown[]).map((it) => ({
                 stockItemId: Number(it.stockItemId),
                 quantity: String(it.quantity ?? ""),
                 rate: String(it.refundRate ?? it.rate ?? ""),

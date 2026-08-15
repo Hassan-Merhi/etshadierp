@@ -89,7 +89,7 @@ export function registerVoucherWithEntriesRoutes(app: Express) {
       // Update voucher with error handling
       let updatedVoucher;
       const createdEntries = [];
-      let oldEntries: any[] = [];
+      let oldEntries: unknown[] = [];
 
       // SALES VOUCHER INVENTORY HANDLING
       // If this is a Sales voucher and location is changing, we need to reverse inventory at old location
@@ -198,7 +198,7 @@ export function registerVoucherWithEntriesRoutes(app: Express) {
           //     → derive base amounts from debitAmount/creditAmount + rate.
           //  C) Legacy call (no transactionCurrency at all)
           //     → derive from the voucher's stored currency/rate.
-          let dualCurrencyFields: Record<string, any> = {};
+          let dualCurrencyFields: Record<string, unknown> = {};
           if (entry.transactionCurrency) {
             // Case A/B: caller-supplied transaction currency
             try {

@@ -68,7 +68,7 @@ export function validateCustomerLedgerPairs(
 }
 
 export async function assertCustomerLinkedLedgerPairs(input: {
-  tx: any;
+  tx: unknown;
   companyId: number;
   entries: VoucherEntryInsertFields[];
 }): Promise<void> {

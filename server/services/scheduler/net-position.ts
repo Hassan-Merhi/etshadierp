@@ -40,7 +40,7 @@ export async function runMonthlyWhatsAppNetPosition() {
       return d.toISOString().split("T")[0];
     })();
 
-    for (const company of companies as any[]) {
+    for (const company of companies as unknown[]) {
       try {
         logger.info(`[WhatsApp] Generating net-position Excel for ${company.name}…`);
         const buffer = await generateNetPositionExcel(company.id, company.name, startDate, endDate);

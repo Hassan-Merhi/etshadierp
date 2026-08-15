@@ -18,12 +18,12 @@ import { AccountCombobox } from "./ProductionRawStockHelpers";
 interface OffloadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  availableContainers: any[];
-  factorySuppliers: any[];
-  ledgerAccounts: any[];
-  offloadMutation: any;
+  availableContainers: unknown[];
+  factorySuppliers: unknown[];
+  ledgerAccounts: unknown[];
+  offloadMutation: unknown;
   wrapAdminAction: (action: () => void, title: string) => void;
-  mixBatches: any[];
+  mixBatches: unknown[];
 }
 
 export function OffloadDialog({
@@ -78,8 +78,8 @@ export function OffloadDialog({
   const [dutyAccountId, setDutyAccountId] = useState("");
   const [dutyPending, setDutyPending] = useState(false);
   const [dutyNotes, setDutyNotes] = useState("");
-  const [additionalCharges, setAdditionalCharges] = useState<any[]>([]);
-  const [mixBatchAllocations, setMixBatchAllocations] = useState<any[]>([]);
+  const [additionalCharges, setAdditionalCharges] = useState<unknown[]>([]);
+  const [mixBatchAllocations, setMixBatchAllocations] = useState<unknown[]>([]);
 
   // ── Additional charge helpers ──────────────────────────────────────────────
   const handleAddAdditionalCharge = () => {

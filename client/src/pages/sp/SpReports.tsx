@@ -58,9 +58,9 @@ export default function SpReports() {
 
   const { data: payable, isLoading: payableLoading } = useQuery<any>({ queryKey: [payableUrl] });
   const { data: profit, isLoading: profitLoading } = useQuery<any>({ queryKey: [profitUrl] });
-  const { data: splits = [], isLoading: splitsLoading } = useQuery<any[]>({ queryKey: [splitsUrl] });
-  const { data: locations = [] } = useQuery<any[]>({ queryKey: ["/api/locations"] });
-  const { data: accounts = [] } = useQuery<any[]>({ queryKey: ["/api/accounts/all", selectedCompany?.id] });
+  const { data: splits = [], isLoading: splitsLoading } = useQuery<unknown[]>({ queryKey: [splitsUrl] });
+  const { data: locations = [] } = useQuery<unknown[]>({ queryKey: ["/api/locations"] });
+  const { data: accounts = [] } = useQuery<unknown[]>({ queryKey: ["/api/accounts/all", selectedCompany?.id] });
 
   const finalizeMutation = useMutation({
     mutationFn: (body: any) => apiRequest("POST", "/api/sp/profit-splits", body),

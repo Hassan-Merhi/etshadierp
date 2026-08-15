@@ -190,7 +190,7 @@ function parseResponse(containerNumber: string, data: unknown, base: CarrierTrac
     return { ...base, noData: true, error: "empty_response" };
   }
 
-  const d = data as Record<string, any>;
+  const d = data as Record<string, unknown>;
 
   // Maersk may wrap in various shapes
   const entry: any = (Array.isArray(d) ? d[0] : null) ?? d.containers?.[0] ?? d.shipment ?? d.trackingData ?? d;
@@ -224,7 +224,7 @@ function parseResponse(containerNumber: string, data: unknown, base: CarrierTrac
 
   // For portCalls, the destination is the last entry or the one flagged isDestination.
   // portCalls[0] is the ORIGIN — never use index 0 for ETA.
-  const portCalls: any[] = Array.isArray(entry.portCalls) ? entry.portCalls : [];
+  const portCalls: unknown[] = Array.isArray(entry.portCalls) ? entry.portCalls : [];
   const destPortCall =
     portCalls.find((p) => p.isDestination === true || p.isDestination === "true") ??
     (portCalls.length > 0 ? portCalls[portCalls.length - 1] : null);

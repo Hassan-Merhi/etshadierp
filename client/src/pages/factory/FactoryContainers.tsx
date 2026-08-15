@@ -73,7 +73,7 @@ export default function FactoryContainers() {
   const { toast } = useToast();
 
   const [importOpen, setImportOpen] = useState(false);
-  const [importPreview, setImportPreview] = useState<any[]>([]);
+  const [importPreview, setImportPreview] = useState<unknown[]>([]);
   const [importResult, setImportResult] = useState<{ imported: number; errors: string[]; total: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [reversingContainer, setReversingContainer] = useState<ContainerWithSupplier | null>(null);
@@ -84,7 +84,7 @@ export default function FactoryContainers() {
   const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const { data: containers, isLoading } = useQuery<ContainerWithSupplier[]>({ queryKey: ["/api/factory/containers"] });
   const { data: suppliers } = useQuery<FactorySupplier[]>({ queryKey: ["/api/factory/suppliers"] });
-  const { data: ledgerAccounts = [] } = useQuery<any[]>({
+  const { data: ledgerAccounts = [] } = useQuery<unknown[]>({
     queryKey: ["/api/ledger-accounts?includeHidden=true"],
     staleTime: 60_000,
     refetchOnWindowFocus: false,
@@ -147,7 +147,7 @@ export default function FactoryContainers() {
 
   // ── Import ────────────────────────────────────────────────────────────────
   const importMutation = useMutation({
-    mutationFn: async (rows: any[]) => {
+    mutationFn: async (rows: unknown[]) => {
       const res = await factoryApiRequest("POST", "/api/factory/containers/import-excel", { rows });
       if (!res.ok) {
         const err = await res.json();

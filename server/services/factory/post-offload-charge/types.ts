@@ -51,7 +51,7 @@ export interface PostOffloadMutationResult {
   supplierInventoryValueDeltaUsd: string;
   supplierValueBeforeUsd: string | null;
   supplierValueAfterUsd: string | null;
-  cascadeResult: any;
+  cascadeResult: unknown;
   reversalDaybookEntryId?: number | null;
 }
 

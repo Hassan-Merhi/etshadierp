@@ -15,7 +15,7 @@ export function useBales() {
     enabled: !!selectedCompany,
   });
 
-  const { data: containers = [] } = useQuery<any[]>({
+  const { data: containers = [] } = useQuery<unknown[]>({
     queryKey: ["/api/containers", selectedCompany?.id],
     enabled: !!selectedCompany,
   });

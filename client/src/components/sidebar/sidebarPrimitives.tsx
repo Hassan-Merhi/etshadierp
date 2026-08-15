@@ -10,8 +10,8 @@ import { useConnectivity } from "@/contexts/ConnectivityContext";
 export interface NavItem {
   title: string;
   url: string;
-  icon: any;
-  [key: string]: any;
+  icon: unknown;
+  [key: string]: unknown;
 }
 
 export interface NavSection {
@@ -21,7 +21,7 @@ export interface NavSection {
   items: NavItem[];
   /** When true, section is only shown to Developer-role users. */
   devOnly?: boolean;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 const baseLinkClasses = "relative flex items-center gap-2.5 rounded-md py-1.5 pl-3 pr-2.5 text-sm transition-colors";
@@ -79,7 +79,7 @@ export function SidebarNavLink({ item, color, testId, trailing, draggable }: Sid
 
 interface SidebarFlatLinkProps {
   href: string;
-  icon: any;
+  icon: unknown;
   label: string;
   color?: string;
   badge?: number;
@@ -330,7 +330,7 @@ export function PinnedNavList({ items, color, onReorder, isVisible, testIdFor, t
 }
 
 interface ModuleHeaderProps {
-  icon: any;
+  icon: unknown;
   label: string;
   tagline: string;
   /** CSS color used for the brand icon tile background. */

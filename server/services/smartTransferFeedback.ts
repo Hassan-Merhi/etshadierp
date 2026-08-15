@@ -163,15 +163,15 @@ function compareLines(suggested: CompactFeedbackLine[], finalLines: CompactFeedb
   };
 }
 
-function jsonObject(value: unknown): Record<string, any> {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, any>) : {};
+function jsonObject(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
 export async function createSmartTransferPreviewFeedback(params: {
   companyId: number;
   userId: string;
   requestInput: unknown;
-  preview: Record<string, any>;
+  preview: Record<string, unknown>;
 }): Promise<string | null> {
   try {
     const sessionId = `stf_${randomUUID()}`;

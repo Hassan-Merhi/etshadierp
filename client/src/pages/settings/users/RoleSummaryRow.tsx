@@ -6,7 +6,7 @@ import { Edit, Trash2, MapPin, Monitor, Calendar, PackageMinus, ShieldCheck, Use
 import { AdvancedRestrictionsPanel } from "@/components/AdvancedRestrictionsPanel";
 
 interface RoleSummaryRowProps {
-  role: any;
+  role: unknown;
   companyName: string;
   locationNames: string[];
   isEditing: boolean;
@@ -16,7 +16,7 @@ interface RoleSummaryRowProps {
 
 const NON_RESTRICTABLE_ROLES = ["Developer", "Admin"];
 
-function countActivePermissions(role: string, permissions: any[]): number {
+function countActivePermissions(role: string, permissions: unknown[]): number {
   const isNormal = role === "Normal User";
   return permissions.filter((p) => {
     if (p.role !== role) return false;
@@ -47,7 +47,7 @@ export function RoleSummaryRow({ role, companyName, locationNames, isEditing, on
   const isPrivileged = ["Admin", "Owner", "Developer"].includes(role.role);
   const canShowRestrictions = !NON_RESTRICTABLE_ROLES.includes(role.role) && !!role.companyId;
 
-  const { data: allPermissions = [] } = useQuery<any[]>({
+  const { data: allPermissions = [] } = useQuery<unknown[]>({
     queryKey: ["/api/settings/role-permissions", role.companyId],
     queryFn: async () => {
       const res = await fetch(`/api/settings/role-permissions?companyId=${role.companyId}`, { credentials: "include" });

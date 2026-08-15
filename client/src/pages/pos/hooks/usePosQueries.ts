@@ -5,7 +5,7 @@ import type { APIInventoryItem, Location } from "../pos-components/posTypes";
 import { buildPosInventory, type SpMovement } from "./posInventory";
 
 interface PosQueriesParams {
-  posUser: any;
+  posUser: unknown;
   activeLocation: Location | null;
   isCreditSale: boolean;
   editVoucherId?: string;
@@ -79,12 +79,12 @@ export function usePosQueries({
     [apiInventory, spStock, isSpCompany, activeLocation]
   );
 
-  const { data: bankAccounts = [] } = useQuery<any[]>({
+  const { data: bankAccounts = [] } = useQuery<unknown[]>({
     queryKey: ["/api/bank-accounts"],
     enabled: !!activeLocation,
   });
 
-  const { data: allLedgerAccounts = [] } = useQuery<any[]>({
+  const { data: allLedgerAccounts = [] } = useQuery<unknown[]>({
     queryKey: ["/api/ledger-accounts"],
     enabled: !!activeLocation,
   });
@@ -98,7 +98,7 @@ export function usePosQueries({
     [allLedgerAccounts]
   );
 
-  const { data: drafts = [], refetch: refetchDrafts } = useQuery<any[]>({
+  const { data: drafts = [], refetch: refetchDrafts } = useQuery<unknown[]>({
     queryKey: activeLocation ? [`/api/pos/drafts?locationId=${activeLocation.id}`] : [],
     enabled: !!activeLocation,
   });
@@ -129,7 +129,7 @@ export function usePosQueries({
     staleTime: 60_000,
   });
 
-  const { data: posCustomers = [] } = useQuery<any[]>({
+  const { data: posCustomers = [] } = useQuery<unknown[]>({
     queryKey: ["/api/pos/customers"],
     enabled: isCreditSale && authUser?.canAccessCustomers === true,
   });
@@ -143,7 +143,7 @@ export function usePosQueries({
   // fetch from view-entries which always includes stock items for Sales type.
   const editVoucherHasSalesItems =
     editVoucher && Array.isArray(editVoucher.salesItems) && editVoucher.salesItems.length > 0;
-  const { data: editVoucherViewEntries = [] } = useQuery<any[]>({
+  const { data: editVoucherViewEntries = [] } = useQuery<unknown[]>({
     queryKey:
       editVoucherId && editVoucher && !editVoucherHasSalesItems ? [`/api/vouchers/${editVoucherId}/view-entries`] : [],
     enabled: !!editVoucherId && !!editVoucher && !editVoucherHasSalesItems,

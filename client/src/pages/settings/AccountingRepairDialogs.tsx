@@ -30,7 +30,7 @@ export function ZeroBalancesDialog({ open, onOpenChange, companyId }: ZeroBalanc
   const { toast } = useToast();
   const [selected, setSelected] = useState<number[]>([]);
 
-  const { data: accounts = [] } = useQuery<any[]>({
+  const { data: accounts = [] } = useQuery<unknown[]>({
     queryKey: ["/api/ledger-accounts", companyId],
     enabled: !!companyId && open,
   });

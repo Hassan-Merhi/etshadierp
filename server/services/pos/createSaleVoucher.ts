@@ -10,18 +10,18 @@ export async function insertSaleVoucher(
   tx: any,
   params: {
     companyId: number;
-    locationId: any;
+    locationId: unknown;
     locationName: string;
     voucherNumber: string;
     voucherDate: string;
-    notes: any;
-    isCreditSale: any;
+    notes: unknown;
+    isCreditSale: unknown;
     customerAccountName: string | undefined;
     grandTotal: number;
     effectiveShiftId: number | null;
-    clientSaleId: any;
-    currency: any;
-    exchangeRate: any;
+    clientSaleId: unknown;
+    currency: unknown;
+    exchangeRate: unknown;
   }
 ) {
   const {

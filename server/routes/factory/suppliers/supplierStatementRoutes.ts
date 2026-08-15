@@ -84,7 +84,7 @@ export function registerSupplierStatementRoutes(app: Express) {
           )
         )
         .orderBy(desc(factoryContainers.createdAt));
-      const brokerContainers = (brokerContainerRows as any[]).filter(
+      const brokerContainers = (brokerContainerRows as unknown[]).filter(
         (c: any) => parseFloat(c.commissionAmount || "0") > 0
       );
       const totalBrokerCommission = brokerContainers.reduce(
@@ -158,8 +158,8 @@ export function registerSupplierStatementRoutes(app: Express) {
       // Merge into supplierOffloadCharges list for unified processing below
       // Use otherChargesCurrencyCode when set, otherwise default to USD
       const allSupplierCharges = [
-        ...(supplierOffloadCharges as any[]),
-        ...(containerColCharges as any[]).map((c) => ({
+        ...(supplierOffloadCharges as unknown[]),
+        ...(containerColCharges as unknown[]).map((c) => ({
           ...c,
           amount: c.amount,
           currencyCode: c.otherChargesCurrencyCode || "USD",
@@ -267,7 +267,7 @@ export function registerSupplierStatementRoutes(app: Express) {
         .orderBy(desc(vouchers.voucherDate));
 
       // Convert voucher payments to USD for total calculation (exclude optional payments)
-      const voucherPaymentsTotal = (voucherPaymentRows as any[]).reduce((sum: number, p: any) => {
+      const voucherPaymentsTotal = (voucherPaymentRows as unknown[]).reduce((sum: number, p: any) => {
         if (p.optional) return sum; // optional payments don't affect the balance
         const amt = parseFloat(p.debitAmount || "0");
         const currency = p.currency || "USD";
@@ -285,7 +285,7 @@ export function registerSupplierStatementRoutes(app: Express) {
       const byCurrency: Record<
         string,
         {
-          containers: any[];
+          containers: unknown[];
           totalKg: number;
           totalValue: number;
           totalCommission: number;
@@ -361,7 +361,7 @@ export function registerSupplierStatementRoutes(app: Express) {
         }
       }
       // Add offload other charges (supplier-linked + container col other_charges) into their currency bucket
-      for (const oc of allSupplierCharges as any[]) {
+      for (const oc of allSupplierCharges as unknown[]) {
         const ocCc = oc.currencyCode || "USD";
         if (!byCurrency[ocCc])
           byCurrency[ocCc] = {
@@ -407,7 +407,7 @@ export function registerSupplierStatementRoutes(app: Express) {
 
       // Phase 3: Enrich FX transfers with counterparty supplier names for bilateral visibility
       const fxSupplierIds = [
-        ...new Set((fxTransfers as any[]).flatMap((t) => [t.fromSupplierId, t.toSupplierId]).filter(Boolean)),
+        ...new Set((fxTransfers as unknown[]).flatMap((t) => [t.fromSupplierId, t.toSupplierId]).filter(Boolean)),
       ];
       const fxSupplierNames: Record<number, string> = {};
       if (fxSupplierIds.length > 0) {
@@ -418,7 +418,7 @@ export function registerSupplierStatementRoutes(app: Express) {
         for (const s of fxSups) fxSupplierNames[s.id] = s.name;
       }
       // Enrich incoming FX transfers with the container numbers they cover (cross-reference)
-      const incomingFxIds = (fxTransfers as any[]).filter((t) => t.toSupplierId === supplierId).map((t) => t.id);
+      const incomingFxIds = (fxTransfers as unknown[]).filter((t) => t.toSupplierId === supplierId).map((t) => t.id);
       const fxContainerRefsMap: Record<number, Array<{ containerNumber: string; allocatedAmount: string }>> = {};
       if (incomingFxIds.length > 0) {
         const fxAllocs = await db
@@ -440,7 +440,7 @@ export function registerSupplierStatementRoutes(app: Express) {
         }
       }
 
-      const enrichedFxTransfers = (fxTransfers as any[]).map((t) => ({
+      const enrichedFxTransfers = (fxTransfers as unknown[]).map((t) => ({
         ...t,
         fromSupplierName: fxSupplierNames[t.fromSupplierId] || "",
         toSupplierName: fxSupplierNames[t.toSupplierId] || "",
@@ -452,12 +452,12 @@ export function registerSupplierStatementRoutes(app: Express) {
       // Phase 2: Track commission reductions from FX settlements (source = commission or both)
       const fxCommOut: Record<string, number> = {};
       const fxBothOut: Record<string, number> = {};
-      for (const p of payments as any[]) {
+      for (const p of payments as unknown[]) {
         const cc = p.currencyCode || "USD";
         paidByCurrency[cc] = (paidByCurrency[cc] || 0) + parseFloat(p.amount || "0");
       }
       // Voucher-based payments also reduce the per-currency balance
-      for (const p of voucherPaymentRows as any[]) {
+      for (const p of voucherPaymentRows as unknown[]) {
         if (p.optional) continue;
         const cc = p.currency || "USD";
         paidByCurrency[cc] = (paidByCurrency[cc] || 0) + parseFloat(p.debitAmount || "0");
@@ -589,7 +589,7 @@ export function registerSupplierStatementRoutes(app: Express) {
         if (cg.currencyCode === "USD") return sum + netPay;
         // Weighted-average fxRateToUsd across this currency's containers whose rate actually
         // looks resolved (confirmed non-USD rate, or legacy heuristic where no flag exists yet).
-        const ctrs: any[] = cg.containers;
+        const ctrs: unknown[] = cg.containers;
         const resolvedCtrs = ctrs.filter((c) => {
           const { looksSet } = resolveStoredFxRate(cg.currencyCode, c.fxRateToUsd, c.fxRateConfirmed);
           return looksSet;
@@ -605,7 +605,7 @@ export function registerSupplierStatementRoutes(app: Express) {
       }, 0);
 
       // Build OB commissions list
-      const containerMap: Record<number, any> = {};
+      const containerMap: Record<number, unknown> = {};
       for (const c of containers) containerMap[c.id] = c;
 
       // Offload charges may reference containers belonging to child suppliers (broker receives a charge
@@ -631,7 +631,7 @@ export function registerSupplierStatementRoutes(app: Express) {
       }
 
       // Fetch commission supplier names for the statement
-      const commSupplierIds = (obRawStockWithCommission as any[]).map((r) => r.commissionSupplierId).filter(Boolean);
+      const commSupplierIds = (obRawStockWithCommission as unknown[]).map((r) => r.commissionSupplierId).filter(Boolean);
       const commSupplierMap: Record<number, string> = {};
       if (commSupplierIds.length > 0) {
         const commSuppliers = await db
@@ -640,7 +640,7 @@ export function registerSupplierStatementRoutes(app: Express) {
           .where(sql`${factorySuppliers.id} = ANY(${sqlArray(commSupplierIds)})`);
         for (const s of commSuppliers) commSupplierMap[s.id] = s.name;
       }
-      const obCommissions = (obRawStockWithCommission as any[])
+      const obCommissions = (obRawStockWithCommission as unknown[])
         .filter((r) => r.commissionAmount && parseFloat(r.commissionAmount) > 0)
         .map((r) => ({
           rawStockId: r.id,
@@ -702,7 +702,7 @@ export function registerSupplierStatementRoutes(app: Express) {
         const sign = neg ? "-" : "+";
         return `${sign}${prefix}${parseFloat(amt || "0").toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       };
-      const ledger: any[] = [
+      const ledger: unknown[] = [
         ...enrichedStatement.map((s) => ({
           key: `c-${s.id}`,
           date: s.date,
@@ -715,7 +715,7 @@ export function registerSupplierStatementRoutes(app: Express) {
           allocatedAmount: s.allocatedAmount,
           remainingAmount: s.remainingAmount,
         })),
-        ...(payments as any[]).map((p) => ({
+        ...(payments as unknown[]).map((p) => ({
           key: `p-${p.id}`,
           date: p.date,
           type: "payment",
@@ -725,7 +725,7 @@ export function registerSupplierStatementRoutes(app: Express) {
           amountIsNeg: true,
           notes: p.notes,
         })),
-        ...(voucherPaymentRows as any[]).map((p) => ({
+        ...(voucherPaymentRows as unknown[]).map((p) => ({
           key: `vp-${p.id}`,
           date: p.voucherDate,
           type: "payment",

@@ -24,7 +24,7 @@ export interface PosNavItem {
 }
 
 interface UsePosNavigationItemsParams {
-  user: any;
+  user: unknown;
   posImportEnabled: boolean;
   chatUnread: { count: number } | undefined;
 }

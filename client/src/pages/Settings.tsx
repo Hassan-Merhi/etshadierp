@@ -52,7 +52,7 @@ export default function Settings() {
   const [activeSection, setActiveSection] = useState("users-permissions");
   const [userToDelete, setUserToDelete] = useState<any>(null);
 
-  const { data: companies = [], isLoading: isLoadingCompanies } = useQuery<any[]>({
+  const { data: companies = [], isLoading: isLoadingCompanies } = useQuery<unknown[]>({
     queryKey: ["/api/companies"],
   });
 
@@ -113,7 +113,7 @@ export default function Settings() {
     },
   ];
 
-  const allowedItems = (items: any[]) => items.filter((item) => !item.devOnly || currentUser?.role === "Developer");
+  const allowedItems = (items: unknown[]) => items.filter((item) => !item.devOnly || currentUser?.role === "Developer");
 
   return (
     <div className="flex flex-col sm:flex-row sm:h-full">

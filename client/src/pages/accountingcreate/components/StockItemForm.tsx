@@ -21,12 +21,12 @@ function StockItemForm({
   onCancel,
   isPending,
 }: {
-  form: any;
+  form: unknown;
   onSubmit: (data: any, saveAndNew?: boolean) => void;
   onCancel: () => void;
   isPending: boolean;
 }) {
-  const { data: stockGroups = [] } = useQuery<any[]>({
+  const { data: stockGroups = [] } = useQuery<unknown[]>({
     queryKey: ["/api/stock-groups"],
   });
 

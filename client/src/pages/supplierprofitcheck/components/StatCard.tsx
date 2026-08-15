@@ -13,7 +13,7 @@ function StatCard({
   sub,
   valueColor,
 }: {
-  icon: any;
+  icon: unknown;
   iconBg: string;
   label: string;
   value: string;

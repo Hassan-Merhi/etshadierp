@@ -60,8 +60,8 @@ async function tryBuildEarlyMultiSourceTargetTransfer(
   response: string;
   suggestions: string[];
   provider?: string;
-  stockTransferDraft?: any;
-  stockTransferDrafts?: any[];
+  stockTransferDraft?: unknown;
+  stockTransferDrafts?: unknown[];
 } | null> {
   const hasMultiSourceQtySignal =
     RE_MULTI_SOURCE_LOCATIONS.test(userMessage) ||
@@ -255,17 +255,17 @@ export async function chat(
   response: string;
   suggestions: string[];
   provider?: string;
-  voucherDraft?: any;
-  stockAdjustmentDraft?: any;
-  stockTransferDraft?: any;
-  stockTransferDrafts?: any[];
-  voucherSearchResults?: any[];
-  stockItemDraft?: any;
-  priceUpdateDraft?: any;
-  accountQueryResult?: any;
-  verifyContainerDraft?: any;
-  dataQueryResult?: any;
-  filePatchDrafts?: any[];
+  voucherDraft?: unknown;
+  stockAdjustmentDraft?: unknown;
+  stockTransferDraft?: unknown;
+  stockTransferDrafts?: unknown[];
+  voucherSearchResults?: unknown[];
+  stockItemDraft?: unknown;
+  priceUpdateDraft?: unknown;
+  accountQueryResult?: unknown;
+  verifyContainerDraft?: unknown;
+  dataQueryResult?: unknown;
+  filePatchDrafts?: unknown[];
   readFiles?: string[];
 }> {
   const available = getAvailableProviders();
@@ -537,7 +537,7 @@ Rules:
     logger.info(`[ChatService] AI call (${usedProvider}) took ${Date.now() - aiStart}ms`);
 
     // ── Code Edit: parse filePatchDrafts (single or multi-file) from AI JSON ──
-    let filePatchDrafts: any[] | undefined = undefined;
+    let filePatchDrafts: unknown[] | undefined = undefined;
     let finalResponse = response;
 
     if (intent === "code_edit") {
@@ -774,7 +774,7 @@ If intent is unclear, respond with exactly: null`;
     }
 
     // ── Voucher search by description ─────────────────────────────────
-    let voucherSearchResults: any[] | undefined = undefined;
+    let voucherSearchResults: unknown[] | undefined = undefined;
 
     if (RE_VOUCHER_SEARCH.test(userMessage)) {
       try {
@@ -1073,7 +1073,7 @@ If intent is not about an account query, respond with exactly: null`;
               };
             } else if (parsed.queryType === "transactions") {
               // Search transactions by description and/or amount
-              const conditions: any[] = [
+              const conditions: unknown[] = [
                 eq(schema.voucherEntries.ledgerAccountId, parsed.accountId),
                 eq(schema.vouchers.optional, false),
                 isNull(schema.vouchers.deletedAt),
@@ -1153,7 +1153,7 @@ If intent is not about an account query, respond with exactly: null`;
               const target = parseFloat(parsed.targetBalance);
               const tolerance = Math.max(Math.abs(target) * 0.01, 1); // 1% or ±1
 
-              const matches: any[] = [];
+              const matches: unknown[] = [];
               for (const row of allRows) {
                 running += parseFloat(row.debitAmount || "0") - parseFloat(row.creditAmount || "0");
                 if (Math.abs(running - target) <= tolerance) {
@@ -1178,7 +1178,7 @@ If intent is not about an account query, respond with exactly: null`;
 
     // ── Stock transfer detection ───────────────────────────────────────
     let stockTransferDraft: any = undefined;
-    let stockTransferDrafts: any[] | undefined = undefined;
+    let stockTransferDrafts: unknown[] | undefined = undefined;
     // When set, this is used verbatim as the assistant's text response for the
     // stock-transfer flow, bypassing the generic "prepared a draft" acknowledgement
     // prompt — guarantees we never claim a draft exists when it doesn't.

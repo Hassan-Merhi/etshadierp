@@ -4,7 +4,7 @@ import type { CompanyExportData } from "../export-data";
 import { ALT_FILL, HDR_FILL, HDR_FONT } from "./sheet-helpers";
 
 export function addSummarySheet(wb: ExcelJS.Workbook, data: CompanyExportData) {
-  const sl = (arr: any[] | undefined | null): number => (Array.isArray(arr) ? arr.length : 0);
+  const sl = (arr: unknown[] | undefined | null): number => (Array.isArray(arr) ? arr.length : 0);
   const ws = wb.addWorksheet("SUMMARY");
   ws.getColumn(1).width = 38;
   ws.getColumn(2).width = 18;

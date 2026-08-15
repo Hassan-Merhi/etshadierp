@@ -27,13 +27,13 @@ export function RecordAdvanceDialog({
   setForm,
   workers,
 }: {
-  addOpen: any;
-  cashAccounts: any;
-  createMutation: any;
-  form: any;
-  setAddOpen: any;
-  setForm: any;
-  workers: any;
+  addOpen: unknown;
+  cashAccounts: unknown;
+  createMutation: unknown;
+  form: unknown;
+  setAddOpen: unknown;
+  setForm: unknown;
+  workers: unknown;
 }) {
   return (
     <Dialog open={addOpen} onOpenChange={setAddOpen}>

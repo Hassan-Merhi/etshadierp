@@ -121,8 +121,8 @@ export async function generatePdf(
   companyName: string,
   startDate: string,
   endDate: string,
-  supplierSummaries: any[],
-  baleBreakdown: any[],
+  supplierSummaries: unknown[],
+  baleBreakdown: unknown[],
   hideAllCosts: boolean
 ) {
   const doc = new PDFDocument({ margin: 40, size: "A4", layout: "landscape" });
@@ -257,11 +257,11 @@ export async function generateExcel(
   companyName: string,
   startDate: string,
   endDate: string,
-  supplierSummaries: any[],
-  baleBreakdown: any[],
-  allMixSources: any[],
-  containerMap: Map<number, any>,
-  supplierMap: Map<number, any>,
+  supplierSummaries: unknown[],
+  baleBreakdown: unknown[],
+  allMixSources: unknown[],
+  containerMap: Map<number, unknown>,
+  supplierMap: Map<number, unknown>,
   hideAllCosts: boolean
 ) {
   const workbook = new ExcelJS.Workbook();

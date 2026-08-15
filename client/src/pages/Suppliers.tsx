@@ -122,7 +122,7 @@ export default function Suppliers() {
     queryKey: ["/api/suppliers/stats"],
   });
 
-  const { data: companies = [] } = useQuery<any[]>({
+  const { data: companies = [] } = useQuery<unknown[]>({
     queryKey: ["/api/companies"],
   });
 
@@ -131,7 +131,7 @@ export default function Suppliers() {
       ? `/api/suppliers/${selectedSupplier?.id}/unified-ledger?companyId=${companyFilter}`
       : `/api/suppliers/${selectedSupplier?.id}/unified-ledger`;
 
-  const { data: unifiedLedger = [], isLoading: ledgerLoading } = useQuery<any[]>({
+  const { data: unifiedLedger = [], isLoading: ledgerLoading } = useQuery<unknown[]>({
     queryKey: [unifiedLedgerUrl],
     enabled: !!selectedSupplier,
   });
@@ -141,7 +141,7 @@ export default function Suppliers() {
       ? `/api/suppliers/${selectedSupplier?.id}/purchase-orders?companyId=${companyFilter}`
       : `/api/suppliers/${selectedSupplier?.id}/purchase-orders`;
 
-  const { data: purchaseOrders = [], isLoading: posLoading } = useQuery<any[]>({
+  const { data: purchaseOrders = [], isLoading: posLoading } = useQuery<unknown[]>({
     queryKey: [purchaseOrdersUrl],
     enabled: !!selectedSupplier,
   });

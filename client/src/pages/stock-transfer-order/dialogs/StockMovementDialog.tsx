@@ -35,22 +35,22 @@ export function StockMovementDialog({
   setHistoryDialogOpen,
   setHistoryPeriod,
 }: {
-  formatAmount: any;
-  historyData: any;
-  historyDialogOpen: any;
-  historyItem: any;
-  historyLoading: any;
-  historyLocation: any;
-  historyPeriod: any;
-  matrixRef: any;
-  navigate: any;
-  setDetailDirection: any;
-  setDetailMonth: any;
-  setDetailMonthName: any;
-  setDetailOpen: any;
-  setDetailYear: any;
-  setHistoryDialogOpen: any;
-  setHistoryPeriod: any;
+  formatAmount: unknown;
+  historyData: unknown;
+  historyDialogOpen: unknown;
+  historyItem: unknown;
+  historyLoading: unknown;
+  historyLocation: unknown;
+  historyPeriod: unknown;
+  matrixRef: unknown;
+  navigate: unknown;
+  setDetailDirection: unknown;
+  setDetailMonth: unknown;
+  setDetailMonthName: unknown;
+  setDetailOpen: unknown;
+  setDetailYear: unknown;
+  setHistoryDialogOpen: unknown;
+  setHistoryPeriod: unknown;
 }) {
   return (
     <Dialog

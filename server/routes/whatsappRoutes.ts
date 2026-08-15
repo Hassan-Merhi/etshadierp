@@ -68,7 +68,7 @@ export function registerWhatsAppRoutes(app: Express) {
 
   app.put("/api/whatsapp/settings", requireAuth, async (req, res) => {
     try {
-      const body = req.body as Record<string, any>;
+      const body = req.body as Record<string, unknown>;
 
       // Fetch existing row so we can preserve fields not sent by the caller
       const existing = await getWaSettings();
@@ -228,7 +228,7 @@ export function registerWhatsAppRoutes(app: Express) {
 
   app.put("/api/whatsapp/settings/pos", requireAuth, async (req, res) => {
     try {
-      const body = req.body as Record<string, any>;
+      const body = req.body as Record<string, unknown>;
       const existing = await getWaSettingsById(2);
 
       const instanceId = body.instanceId ?? existing?.instanceId ?? "";
@@ -407,7 +407,7 @@ export function registerWhatsAppRoutes(app: Express) {
     try {
       const { companyId, recipientId, autoSend, enabled, frequency, sendHour, sendDayOfWeek } = req.body as Record<
         string,
-        any
+        unknown
       >;
       await pool.query(
         `INSERT INTO whatsapp_stock_settings (id, company_id, recipient_id, auto_send, enabled, frequency, send_hour, send_day_of_week)
@@ -478,7 +478,7 @@ export function registerWhatsAppRoutes(app: Express) {
 
   app.put("/api/whatsapp/np-settings", requireAuth, async (req, res) => {
     try {
-      const { recipientId, frequency, sendHour, sendDayOfWeek, enabled, autoSend } = req.body as Record<string, any>;
+      const { recipientId, frequency, sendHour, sendDayOfWeek, enabled, autoSend } = req.body as Record<string, unknown>;
       await pool.query(
         `INSERT INTO net_position_export_settings
            (id, recipient_id, frequency, send_hour, send_day_of_week, enabled, auto_send)
@@ -532,9 +532,9 @@ export function registerWhatsAppRoutes(app: Express) {
         userId: _uid,
         companyId: _cid,
       });
-      const { recipientId: reqRecipientId } = req.body as Record<string, any>;
+      const { recipientId: reqRecipientId } = req.body as Record<string, unknown>;
 
-      const allCompanies = (await storage.getAllCompanies()) as any[];
+      const allCompanies = (await storage.getAllCompanies()) as unknown[];
       if (!allCompanies.length) return res.status(400).json({ message: "No companies found" });
 
       const today = getClientDate(req);
@@ -641,7 +641,7 @@ export function registerWhatsAppRoutes(app: Express) {
         userId: _uid,
         companyId: _cid,
       });
-      const { companyId: reqCompanyId, recipientId: reqRecipientId } = req.body as Record<string, any>;
+      const { companyId: reqCompanyId, recipientId: reqRecipientId } = req.body as Record<string, unknown>;
 
       // Resolve company
       const companyId = reqCompanyId ? parseInt(reqCompanyId) : null;

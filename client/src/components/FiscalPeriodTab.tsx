@@ -61,7 +61,7 @@ export function FiscalPeriodTab({ currentCompanyId, userRole }: FiscalPeriodTabP
   const isAuthorized = userRole === "Admin" || userRole === "Owner" || userRole === "Developer";
 
   // Fetch Equity ledger accounts for the current company
-  const { data: equityAccounts = [], isLoading: isLoadingAccounts } = useQuery<any[]>({
+  const { data: equityAccounts = [], isLoading: isLoadingAccounts } = useQuery<unknown[]>({
     queryKey: ["/api/ledger-accounts", { companyId: currentCompanyId, accountType: "Equity" }],
     queryFn: async () => {
       if (!currentCompanyId) return [];
@@ -74,7 +74,7 @@ export function FiscalPeriodTab({ currentCompanyId, userRole }: FiscalPeriodTabP
   });
 
   // Fetch fiscal period closures for the current company
-  const { data: closures = [], isLoading: isLoadingClosures } = useQuery<any[]>({
+  const { data: closures = [], isLoading: isLoadingClosures } = useQuery<unknown[]>({
     queryKey: ["/api/fiscal-period/closures", { companyId: currentCompanyId }],
     enabled: !!currentCompanyId,
   });

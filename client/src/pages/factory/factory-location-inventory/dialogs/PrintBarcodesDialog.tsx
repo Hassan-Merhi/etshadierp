@@ -27,15 +27,15 @@ export function PrintBarcodesDialog({
   setReprintDialogOpen,
   setReprintProduct,
 }: {
-  handleDoPrint: any;
-  reprintBales: any;
-  reprintDialogOpen: any;
-  reprintLoading: any;
-  reprintProduct: any;
-  selectedLocation: any;
-  setReprintBales: any;
-  setReprintDialogOpen: any;
-  setReprintProduct: any;
+  handleDoPrint: unknown;
+  reprintBales: unknown;
+  reprintDialogOpen: unknown;
+  reprintLoading: unknown;
+  reprintProduct: unknown;
+  selectedLocation: unknown;
+  setReprintBales: unknown;
+  setReprintDialogOpen: unknown;
+  setReprintProduct: unknown;
 }) {
   return (
     <Dialog

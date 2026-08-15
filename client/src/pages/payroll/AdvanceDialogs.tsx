@@ -26,20 +26,20 @@ import { useDateFormat } from "@/contexts/DateFormatContext";
 interface AdvanceDialogsProps {
   advanceDialogOpen: boolean;
   setAdvanceDialogOpen: (open: boolean) => void;
-  advanceForm: any;
-  advanceMutation: any;
+  advanceForm: unknown;
+  advanceMutation: unknown;
   advanceWorkerComboOpen: boolean;
   setAdvanceWorkerComboOpen: (open: boolean) => void;
-  workerStaff: any[];
-  cashAccounts: any[];
+  workerStaff: unknown[];
+  cashAccounts: unknown[];
   deductionDialogOpen: boolean;
   setDeductionDialogOpen: (open: boolean) => void;
-  selectedAdvance: any;
-  deductionForm: any;
-  deductionMutation: any;
+  selectedAdvance: unknown;
+  deductionForm: unknown;
+  deductionMutation: unknown;
   advanceToDelete: number | null;
   setAdvanceToDelete: (v: number | null) => void;
-  deleteAdvanceMutation: any;
+  deleteAdvanceMutation: unknown;
 }
 
 export function AdvanceDialogs({

@@ -17,7 +17,7 @@ function numericEqual(left: unknown, right: unknown, tolerance = 0.0001): boolea
 }
 
 function buildSalesAccountMap(
-  sourceAccounts: Map<number, any>,
+  sourceAccounts: Map<number, unknown>,
   targetAccounts: Awaited<ReturnType<typeof loadTargetAccounts>>
 ) {
   const suspense = targetAccounts.bySubType.get("gc_mig_suspense");
@@ -66,7 +66,7 @@ export async function reconcileHistoricalSalesCopy(params: {
   runId: string;
   sourceId: number;
   targetId: number;
-}): Promise<any> {
+}): Promise<unknown> {
   const { runId, sourceId, targetId } = params;
   const stockMap = await loadStockItemMap(sourceId, targetId);
   const sourceAccounts = await loadSourceAccounts(sourceId);
@@ -285,7 +285,7 @@ export async function reconcileMigrationOwnedContainers(params: {
   sourceId: number;
   targetId: number;
   sourceCompanyName: string;
-}): Promise<any> {
+}): Promise<unknown> {
   const { runId, sourceId, targetId, sourceCompanyName } = params;
   const stockMap = await loadStockItemMap(sourceId, targetId);
   const linkedResult = await db.execute(sql`

@@ -103,11 +103,11 @@ export function StockEntryTab() {
   const { data: locations } = useQuery<Location[]>({ queryKey: ["/api/locations"] });
   const { data: categories } = useQuery<FactoryCategory[]>({ queryKey: ["/api/factory/categories"] });
 
-  const { data: workers = [] } = useQuery<any[]>({
+  const { data: workers = [] } = useQuery<unknown[]>({
     queryKey: ["/api/factory/workers"],
     enabled: cart.length > 0,
   });
-  const { data: workerCategoryGroups = [] } = useQuery<any[]>({
+  const { data: workerCategoryGroups = [] } = useQuery<unknown[]>({
     queryKey: ["/api/factory/worker-categories"],
     queryFn: () => fetch("/api/factory/worker-categories", { credentials: "include" }).then((r) => r.json()),
     enabled: cart.length > 0,
@@ -127,7 +127,7 @@ export function StockEntryTab() {
     enabled: cart.length > 0,
     staleTime: 30000,
   });
-  const { data: allCustomers = [] } = useQuery<any[]>({
+  const { data: allCustomers = [] } = useQuery<unknown[]>({
     queryKey: ["/api/factory/customers"],
     queryFn: () => fetch("/api/factory/customers", { credentials: "include" }).then((r) => r.json()),
   });
@@ -146,12 +146,12 @@ export function StockEntryTab() {
 
   const filteredWorkers =
     workerCategoryFilter === "all"
-      ? (workers as any[]).filter((w) => w.active !== false)
+      ? (workers as unknown[]).filter((w) => w.active !== false)
       : (() => {
           const cat = workerCategoryGroups.find((c) => String(c.id) === workerCategoryFilter);
-          if (!cat) return (workers as any[]).filter((w) => w.active !== false);
+          if (!cat) return (workers as unknown[]).filter((w) => w.active !== false);
           const ids = Array.isArray(cat.workerIds) ? (cat.workerIds as number[]) : [];
-          return (workers as any[]).filter((w) => w.active !== false && ids.includes(w.id));
+          return (workers as unknown[]).filter((w) => w.active !== false && ids.includes(w.id));
         })();
 
   // Keep attribution valid when the entry date, membership configuration, cart,
@@ -514,7 +514,7 @@ export function StockEntryTab() {
                     onRestore={() => {
                       const draftData = cartDraft?.data as
                         | {
-                            cart?: any[];
+                            cart?: unknown[];
                             productionPositionByProduct?: Record<number, number | null>;
                             selectedLocationId?: string;
                             entryDate?: string;

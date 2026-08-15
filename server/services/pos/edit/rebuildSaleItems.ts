@@ -27,8 +27,8 @@ export async function rebuildSaleItems(
   params: {
     voucherId: number;
     targetLocationId: number;
-    items: any[];
-    oldItemsMap: Map<number, any>;
+    items: unknown[];
+    oldItemsMap: Map<number, unknown>;
     canSellNegativeStock: boolean;
     companyId: number;
   }

@@ -9,7 +9,7 @@ import {} from "@shared/schema";
 // Lightweight in-process TTL cache — same 30s pattern as statsRoutes.ts.
 // Keyed by companyId. Multiple dashboard users share one DB round-trip.
 // ---------------------------------------------------------------------------
-export const _icCache = new Map<string, { data: any; expiresAt: number }>();
+export const _icCache = new Map<string, { data: unknown; expiresAt: number }>();
 export function _getCached(key: string): any | null {
   const e = _icCache.get(key);
   if (!e) return null;

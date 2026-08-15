@@ -27,7 +27,7 @@ import { normalizeVoucherEntryAmounts } from "../../services/accounting/currency
  */
 export async function getOrCreateSalesRevenueAccount(
   companyId: number
-): Promise<{ salesAccount: any } | { error: HandlerErrorResult }> {
+): Promise<{ salesAccount: unknown } | { error: HandlerErrorResult }> {
   const salesAccount = await storage.getOrCreateLedgerAccount({
     companyId,
     code: "SALES",
@@ -209,14 +209,14 @@ export async function insertSaleAccountingEntries(
     txVoucherId: number;
     voucherNumber: string;
     grandTotal: number;
-    isCreditSale: any;
+    isCreditSale: unknown;
     accountType: "cash" | "bank" | "credit";
     accountId: number;
-    location: any;
-    customerAccount: any;
+    location: unknown;
+    customerAccount: unknown;
     companyId: number;
     isSpCompany: boolean;
-    salesAccount: any;
+    salesAccount: unknown;
     spCtx: SupplierPartnerAccountingContext;
     /** Voucher transaction currency (e.g. "CFA", "USD"). Defaults to "USD". */
     currency?: string | null;

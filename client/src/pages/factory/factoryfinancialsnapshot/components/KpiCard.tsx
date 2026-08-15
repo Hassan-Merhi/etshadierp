@@ -14,7 +14,7 @@ export function KpiCard({
   color = "default",
   loading = false,
 }: {
-  icon: any;
+  icon: unknown;
   title: string;
   value: string;
   sub?: string;

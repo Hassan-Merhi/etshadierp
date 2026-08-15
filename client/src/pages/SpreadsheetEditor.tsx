@@ -55,10 +55,10 @@ const FS_VT: Record<string, string> = { "0": "center", "1": "top", "2": "bottom"
 // Fortune Sheet's onChange delivers sheets in dense `data` format.
 // When re-opening a saved sheet, convert back to sparse `celldata` so
 // Fortune Sheet's initSheetData() correctly populates the grid.
-function ensureCelldata(sheet: any): any {
+function ensureCelldata(sheet: any): unknown {
   if (sheet.celldata !== undefined) return sheet; // already sparse
   if (!Array.isArray(sheet.data)) return sheet;
-  const celldata: any[] = [];
+  const celldata: unknown[] = [];
   for (let r = 0; r < sheet.data.length; r++) {
     const row = sheet.data[r];
     if (!Array.isArray(row)) continue;
@@ -73,7 +73,7 @@ function ensureCelldata(sheet: any): any {
   return { ...rest, celldata };
 }
 
-function fortuneToXlsx(sheets: FortuneSheet[]): any {
+function fortuneToXlsx(sheets: FortuneSheet[]): unknown {
   const wb = XLSXS.utils.book_new();
 
   for (const sheet of sheets) {
@@ -155,14 +155,14 @@ function fortuneToXlsx(sheets: FortuneSheet[]): any {
       maxC = Math.max(maxC, c);
     };
 
-    const sheetData = sheet.data as any[][] | undefined;
+    const sheetData = sheet.data as unknown[][] | undefined;
     if (sheetData && Array.isArray(sheetData) && sheetData.length > 0) {
       for (let r = 0; r < sheetData.length; r++) {
         if (!sheetData[r]) continue;
         for (let c = 0; c < sheetData[r].length; c++) writeCell(r, c, sheetData[r][c]);
       }
     } else {
-      for (const cell of (sheet.celldata || []) as any[]) writeCell(cell.r, cell.c, cell.v);
+      for (const cell of (sheet.celldata || []) as unknown[]) writeCell(cell.r, cell.c, cell.v);
     }
 
     ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: maxR, c: maxC } });
@@ -184,7 +184,7 @@ function fortuneToXlsx(sheets: FortuneSheet[]): any {
         ...Object.keys(cfg.colhidden || {}).map(Number),
         maxC
       );
-      const xlCols: any[] = Array.from({ length: cMax + 1 }, () => ({}));
+      const xlCols: unknown[] = Array.from({ length: cMax + 1 }, () => ({}));
       for (const [ci, w] of Object.entries(cfg.columnlen || {})) {
         xlCols[Number(ci)].wpx = w;
         xlCols[Number(ci)].wch = Math.round(((w as number) / 7) * 100) / 100;
@@ -200,7 +200,7 @@ function fortuneToXlsx(sheets: FortuneSheet[]): any {
         ...Object.keys(cfg.rowhidden || {}).map(Number),
         maxR
       );
-      const xlRows: any[] = Array.from({ length: rMax + 1 }, () => ({}));
+      const xlRows: unknown[] = Array.from({ length: rMax + 1 }, () => ({}));
       for (const [ri, h] of Object.entries(cfg.rowlen || {})) {
         xlRows[Number(ri)].hpx = h;
         xlRows[Number(ri)].hpt = Math.round(((h as number) / 1.333) * 100) / 100;
@@ -326,7 +326,7 @@ export default function SpreadsheetEditor() {
   const seqRef = useRef<string>("");
   const seqTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { data: library = [], isLoading: libraryLoading } = useQuery<any[]>({
+  const { data: library = [], isLoading: libraryLoading } = useQuery<unknown[]>({
     queryKey: ["/api/spreadsheets"],
   });
 
@@ -341,7 +341,7 @@ export default function SpreadsheetEditor() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (payload: { name: string; data: any }) => {
+    mutationFn: async (payload: { name: string; data: unknown }) => {
       const res = await apiRequest("POST", "/api/spreadsheets", payload);
       return res.json();
     },
@@ -359,7 +359,7 @@ export default function SpreadsheetEditor() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, fields }: { id: number; fields: { name?: string; data?: any } }) => {
+    mutationFn: async ({ id, fields }: { id: number; fields: { name?: string; data?: unknown } }) => {
       const res = await apiRequest("PATCH", `/api/spreadsheets/${id}`, fields);
       return res.json();
     },
@@ -810,7 +810,7 @@ export default function SpreadsheetEditor() {
           <Loader2 className="h-5 w-5 animate-spin mr-2" />
           Loading…
         </div>
-      ) : (library as any[]).length === 0 ? (
+      ) : (library as unknown[]).length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <FileSpreadsheet className="h-12 w-12 text-muted-foreground/40 mb-4" />
           <p className="text-sm font-medium text-muted-foreground">No spreadsheets yet</p>
@@ -830,7 +830,7 @@ export default function SpreadsheetEditor() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {(library as any[]).map((sheet) => (
+          {(library as unknown[]).map((sheet) => (
             <Card
               key={sheet.id}
               className="hover-elevate cursor-pointer group"

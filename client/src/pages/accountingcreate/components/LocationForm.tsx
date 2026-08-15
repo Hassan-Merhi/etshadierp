@@ -18,12 +18,12 @@ function LocationForm({
   onCancel,
   isPending,
 }: {
-  form: any;
+  form: unknown;
   onSubmit: (data: any, saveAndNew?: boolean) => void;
   onCancel: () => void;
   isPending: boolean;
 }) {
-  const { data: companies = [] } = useQuery<any[]>({
+  const { data: companies = [] } = useQuery<unknown[]>({
     queryKey: ["/api/companies"],
   });
 

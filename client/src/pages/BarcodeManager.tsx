@@ -102,7 +102,7 @@ export default function BarcodeManager() {
         const workbook = await read(data);
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
-        const jsonData = utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+        const jsonData = utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
 
         const barcodeList: string[] = [];
         jsonData.forEach((row, index) => {

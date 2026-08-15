@@ -63,7 +63,7 @@ export default function Customers() {
     (Customer & { balance: number; balanceSide: string }) | null
   >(null);
 
-  const { data: ledgerTxns = [], isLoading: txnsLoading } = useQuery<any[]>({
+  const { data: ledgerTxns = [], isLoading: txnsLoading } = useQuery<unknown[]>({
     queryKey: ["/api/customers", statementCustomer?.id, "transactions"],
     queryFn: () => fetch(`/api/customers/${statementCustomer!.id}/transactions`).then((r) => r.json()),
     enabled: !!statementCustomer?.id,

@@ -49,7 +49,7 @@ export default function BatchDetail({ batchId, onBack, onDeleted }: BatchDetailP
     queryKey: ["/api/factory/mix-batches", batchId],
   });
 
-  const { data: balesData, isLoading: balesLoading } = useQuery<any[]>({
+  const { data: balesData, isLoading: balesLoading } = useQuery<unknown[]>({
     queryKey: ["/api/factory/bales", { mixBatchId: batchId }],
     queryFn: async () => {
       const res = await fetch(`/api/factory/bales?mixBatchId=${batchId}`, {
@@ -71,7 +71,7 @@ export default function BatchDetail({ batchId, onBack, onDeleted }: BatchDetailP
     },
   });
 
-  const { data: suppliers } = useQuery<any[]>({
+  const { data: suppliers } = useQuery<unknown[]>({
     queryKey: ["/api/factory/suppliers"],
   });
 

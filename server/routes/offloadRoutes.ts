@@ -37,7 +37,7 @@ export function registerOffloadRoutes(app: Express) {
       const companyId = access.activeCompanyId;
 
       const { startDate, endDate } = req.query;
-      const conditions: any[] = [eq(containers.companyId, companyId)];
+      const conditions: unknown[] = [eq(containers.companyId, companyId)];
 
       if (startDate) {
         conditions.push(gte(containerOffloads.offloadedAt, new Date((startDate as string) + "T00:00:00")));
@@ -587,7 +587,7 @@ export function registerOffloadRoutes(app: Express) {
         WHERE c.ledger_account_id IS NOT NULL
         ORDER BY c.id
       `);
-        const rows: any[] = resultRows(chargesRes);
+        const rows: unknown[] = resultRows(chargesRes);
 
         for (const row of rows) {
           scanned++;
@@ -634,7 +634,7 @@ export function registerOffloadRoutes(app: Express) {
               AND ve.credit_amount::numeric > 0
             LIMIT 1
           `);
-            const existingRows: any[] = resultRows(existingCheck);
+            const existingRows: unknown[] = resultRows(existingCheck);
             if (existingRows.length > 0) {
               skippedExisting++;
               continue;

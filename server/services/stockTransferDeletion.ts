@@ -58,7 +58,7 @@ export function sortStockTransferDeletionItems<T extends {
 }
 
 async function assertPersistedTransferScope(input: {
-  tx: any;
+  tx: unknown;
   companyId: number;
   destinationLocationId: number;
   items: Array<{ sourceLocationId: number; stockItemId: number }>;

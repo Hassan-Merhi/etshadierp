@@ -34,26 +34,26 @@ export function EndContractDialog({
   setEndStep,
   worker,
 }: {
-  cashAccounts: any;
-  endCalculating: any;
-  endCashAccountId: any;
-  endEnd: any;
-  endOpen: any;
-  endResult: any;
-  endStart: any;
-  endStep: any;
-  endSubmitting: any;
-  handleCalculate: any;
-  handleEndContract: any;
-  handleSkipAndEnd: any;
-  payrollBalance: any;
-  setEndCashAccountId: any;
-  setEndEnd: any;
-  setEndOpen: any;
-  setEndResult: any;
-  setEndStart: any;
-  setEndStep: any;
-  worker: any;
+  cashAccounts: unknown;
+  endCalculating: unknown;
+  endCashAccountId: unknown;
+  endEnd: unknown;
+  endOpen: unknown;
+  endResult: unknown;
+  endStart: unknown;
+  endStep: unknown;
+  endSubmitting: unknown;
+  handleCalculate: unknown;
+  handleEndContract: unknown;
+  handleSkipAndEnd: unknown;
+  payrollBalance: unknown;
+  setEndCashAccountId: unknown;
+  setEndEnd: unknown;
+  setEndOpen: unknown;
+  setEndResult: unknown;
+  setEndStart: unknown;
+  setEndStep: unknown;
+  worker: unknown;
 }) {
   return (
     <Dialog

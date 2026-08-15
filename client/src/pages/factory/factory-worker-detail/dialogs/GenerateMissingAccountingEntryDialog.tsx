@@ -28,15 +28,15 @@ export function GenerateMissingAccountingEntryDialog({
   setFixAcctTargetId,
   wrapAdminAction,
 }: {
-  cashAccounts: any;
-  fixAcctCashId: any;
-  fixAcctMutation: any;
-  fixAcctOpen: any;
-  fixAcctTargetId: any;
-  setFixAcctCashId: any;
-  setFixAcctOpen: any;
-  setFixAcctTargetId: any;
-  wrapAdminAction: any;
+  cashAccounts: unknown;
+  fixAcctCashId: unknown;
+  fixAcctMutation: unknown;
+  fixAcctOpen: unknown;
+  fixAcctTargetId: unknown;
+  setFixAcctCashId: unknown;
+  setFixAcctOpen: unknown;
+  setFixAcctTargetId: unknown;
+  wrapAdminAction: unknown;
 }) {
   return (
     <Dialog

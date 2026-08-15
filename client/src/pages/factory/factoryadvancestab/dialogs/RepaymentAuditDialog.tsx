@@ -35,17 +35,17 @@ export function RepaymentAuditDialog({
   setRepayAuditForm,
   setRepayAuditOpen,
 }: {
-  auditCashBalance: any;
-  auditData: any;
-  auditLoading: any;
-  cashAccounts: any;
-  formatDate: any;
-  refetchAudit: any;
-  repayAuditForm: any;
-  repayAuditMutation: any;
-  repayAuditOpen: any;
-  setRepayAuditForm: any;
-  setRepayAuditOpen: any;
+  auditCashBalance: unknown;
+  auditData: unknown;
+  auditLoading: unknown;
+  cashAccounts: unknown;
+  formatDate: unknown;
+  refetchAudit: unknown;
+  repayAuditForm: unknown;
+  repayAuditMutation: unknown;
+  repayAuditOpen: unknown;
+  setRepayAuditForm: unknown;
+  setRepayAuditOpen: unknown;
 }) {
   return (
     <Dialog

@@ -7,7 +7,7 @@ import { UseFormReturn } from "react-hook-form";
 import { Loader2 } from "lucide-react";
 
 interface VoucherFormProps {
-  form: UseFormReturn<any>;
+  form: UseFormReturn<unknown>;
   onSubmit: (data: any) => void;
   isPending: boolean;
   voucherNumber?: string;

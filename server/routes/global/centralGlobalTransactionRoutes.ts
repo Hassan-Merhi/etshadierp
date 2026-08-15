@@ -76,7 +76,7 @@ export function registerCentralGlobalTransactionRoutes(app: Express, requireAuth
         if (targetCompanyIds.length === 0) return res.json(emptyResult(page));
       }
 
-      const conditions: any[] = [
+      const conditions: unknown[] = [
         inArray(vouchers.companyId, targetCompanyIds),
         isNull(vouchers.deletedAt),
       ];

@@ -15,29 +15,29 @@ export interface POSDialogsProps {
   zeroStockItem: string;
   showDraftDialog: boolean;
   setShowDraftDialog: (open: boolean) => void;
-  drafts: any[];
+  drafts: unknown[];
   handleLoadDraft: (id: number) => void;
-  deleteDraftMutation: any;
+  deleteDraftMutation: unknown;
   showPrintDialog: boolean;
   setShowPrintDialog: (open: boolean) => void;
   editVoucherId?: string;
   handleNewSale: () => void;
   navigate: (path: string) => void;
-  activeLocation: any;
+  activeLocation: unknown;
   invoiceWaStatus: string;
   handleSendInvoiceWhatsApp: () => void;
   sendingInvoiceWhatsApp: boolean;
   stockWaStatus: string;
   handleSendStockWhatsApp: () => void;
   sendingWhatsApp: boolean;
-  handlePrint: any;
+  handlePrint: unknown;
   isCreditSale: boolean;
   showStockPrompt: boolean;
   setShowStockPrompt: (open: boolean) => void;
   stockInventoryLoading: boolean;
   handleStockPrint: () => void;
   handleSendWhatsAppReport: () => void;
-  stockInventory: any[];
+  stockInventory: unknown[];
   stockPrintRef: React.RefObject<HTMLDivElement>;
 }
 

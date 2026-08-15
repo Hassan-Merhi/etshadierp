@@ -11,14 +11,14 @@ export function UsersSection() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
 
-  const { data: rawUsers = [], isLoading } = useQuery<any[]>({
+  const { data: rawUsers = [], isLoading } = useQuery<unknown[]>({
     queryKey: ["/api/users"],
   });
   const users = [...rawUsers].sort((a, b) =>
     (a.displayName || a.username || "").localeCompare(b.displayName || b.username || "")
   );
 
-  const { data: companies = [] } = useQuery<any[]>({
+  const { data: companies = [] } = useQuery<unknown[]>({
     queryKey: ["/api/companies"],
   });
 

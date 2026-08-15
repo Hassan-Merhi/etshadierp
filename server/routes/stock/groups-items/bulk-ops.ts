@@ -46,8 +46,8 @@ export function registerStockItemBulkRoutes(app: Express) {
           sql`, `
         )}]) GROUP BY stock_item_id`
       );
-      if ((inventoryCheck.rows as any[]).length > 0) {
-        const blockedIds = new Set((inventoryCheck.rows as any[]).map((r) => parseInt(r.stock_item_id)));
+      if ((inventoryCheck.rows as unknown[]).length > 0) {
+        const blockedIds = new Set((inventoryCheck.rows as unknown[]).map((r) => parseInt(r.stock_item_id)));
         const blockedCodes = validItems.filter((item) => blockedIds.has(item.id)).map((item) => item.code);
         return res.status(400).json({
           message: `Cannot delete ${blockedCodes.length} item(s) — they have existing inventory records: ${blockedCodes.join(", ")}. Please clear all inventory first.`,

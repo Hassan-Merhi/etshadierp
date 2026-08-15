@@ -12,15 +12,15 @@ interface SupplierFormDialogProps {
   setCreateOpen: (val: boolean) => void;
   editingSupplier: FactorySupplier | null;
   setEditingSupplier: (val: FactorySupplier | null) => void;
-  formData: any;
+  formData: unknown;
   setFormData: (val: any) => void;
   formRole: "broker" | "standalone" | "linked";
   setFormRole: (val: "broker" | "standalone" | "linked") => void;
   allSuppliers: SupplierWithBalance[];
   createSubAccountParentId: number | null;
   setCreateSubAccountParentId: (val: number | null) => void;
-  createMutation: UseMutationResult<any, any, any>;
-  updateMutation: UseMutationResult<any, any, any>;
+  createMutation: UseMutationResult<unknown, unknown, unknown>;
+  updateMutation: UseMutationResult<unknown, unknown, unknown>;
   resetForm: () => void;
   wrapAdminAction: (fn: () => void, title: string) => void;
 }

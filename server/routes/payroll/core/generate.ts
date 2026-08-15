@@ -86,7 +86,7 @@ export function registerPayrollGenerateRoutes(app: Express) {
               )
             )
         : [];
-      const attendanceByWorker = new Map<number, any[]>();
+      const attendanceByWorker = new Map<number, unknown[]>();
       for (const att of attendanceRecords) {
         const list = attendanceByWorker.get(att.workerId) || [];
         list.push(att);

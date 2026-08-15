@@ -7,7 +7,7 @@ import type { SaleRow, Location } from "../pos-components/posTypes";
 interface UsePosMutationsParams {
   activeLocation: Location | null;
   editVoucherId?: string;
-  editVoucher: any;
+  editVoucher: unknown;
   isSpCompany?: boolean;
   clientSaleIdRef: React.MutableRefObject<string>;
   rows: SaleRow[];

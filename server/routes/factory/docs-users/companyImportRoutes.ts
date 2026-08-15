@@ -235,7 +235,7 @@ export function registerFactoryCompanyImportRoutes(app: Express) {
             async function insertAndMap(
               tableName: string,
               drizzleTable: any,
-              rows: any[],
+              rows: unknown[],
               fkRemaps: Record<string, string>,
               opts?: { hasCompanyId?: boolean; nullifyFields?: string[] }
             ) {
@@ -266,7 +266,7 @@ export function registerFactoryCompanyImportRoutes(app: Express) {
             async function insertSelfReferencing(
               tableName: string,
               drizzleTable: any,
-              rows: any[],
+              rows: unknown[],
               parentField: string,
               fkRemaps: Record<string, string>,
               opts?: { hasCompanyId?: boolean }

@@ -2,15 +2,15 @@ import { getErrorDetails } from "@shared/errorUtils";
 import type { Account } from "@/components/AccountSidebar";
 
 interface UseVoucherHandlersProps {
-  form: any;
-  append: any;
+  form: unknown;
+  append: unknown;
   activeRowIndex: number | null;
   setActiveRowIndex: (i: number | null) => void;
   sidebarAccounts: Account[];
   selectedCompany: { id: number } | null;
   setIsAutoCreating: (v: boolean) => void;
-  queryClient: any;
-  toast: any;
+  queryClient: unknown;
+  toast: unknown;
   setSelectedAccountId: (v: number | null) => void;
   setSelectedAccountType: (v: string | null) => void;
   setSidebarSearchValue: (v: string) => void;

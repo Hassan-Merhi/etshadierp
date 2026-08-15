@@ -17,7 +17,7 @@ export interface ScheduledExportArtifact {
 
 export async function createScheduledExportArtifact(
   label: string,
-  companies: any[],
+  companies: unknown[],
   fromDate?: string,
   toDate?: string,
   onProgress?: (msg: string, level?: "info" | "success" | "warning" | "error") => void
@@ -51,7 +51,7 @@ export async function createScheduledExportArtifact(
 
 export async function withScheduledExportArtifact<T>(
   label: string,
-  companies: any[],
+  companies: unknown[],
   fromDate: string | undefined,
   toDate: string | undefined,
   work: (artifact: ScheduledExportArtifact) => Promise<T>,

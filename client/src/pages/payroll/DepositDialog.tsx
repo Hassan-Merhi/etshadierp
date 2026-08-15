@@ -8,8 +8,8 @@ interface DepositDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedEmployee: { firstName?: string; lastName?: string } | null;
-  form: any;
-  mutation: any;
+  form: unknown;
+  mutation: unknown;
 }
 
 export function DepositDialog({ open, onOpenChange, selectedEmployee, form, mutation }: DepositDialogProps) {

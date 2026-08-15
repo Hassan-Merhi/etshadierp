@@ -43,7 +43,7 @@ function attachArchiveLogging(arc: archiver.Archiver): void {
 
 async function appendCompanyWorkbooks(
   arc: archiver.Archiver,
-  companies: any[],
+  companies: unknown[],
   fromDate: string | undefined,
   toDate: string | undefined,
   log: ExportProgress
@@ -93,7 +93,7 @@ async function appendCompanyWorkbooks(
 
 async function streamFullExportZipUnsafe(
   destination: Writable,
-  companies: any[],
+  companies: unknown[],
   fromDate?: string,
   toDate?: string,
   onProgress?: ExportProgress
@@ -145,7 +145,7 @@ async function streamFullExportZipUnsafe(
  */
 export async function streamFullExportZip(
   destination: Writable,
-  companies: any[],
+  companies: unknown[],
   fromDate?: string,
   toDate?: string,
   onProgress?: ExportProgress
@@ -156,7 +156,7 @@ export async function streamFullExportZip(
 }
 
 async function buildFullExportZipUnsafe(
-  companies: any[],
+  companies: unknown[],
   fromDate?: string,
   toDate?: string,
   onProgress?: ExportProgress
@@ -200,7 +200,7 @@ async function buildFullExportZipUnsafe(
  * require final bytes. It is still serialized through the heavy-export slot.
  */
 export async function buildFullExportZip(
-  companies: any[],
+  companies: unknown[],
   fromDate?: string,
   toDate?: string,
   onProgress?: ExportProgress

@@ -208,7 +208,7 @@ export function useErpVisibleSections(user?: any): {
   };
 }
 
-export function AppSidebar({ user }: { user?: any }) {
+export function AppSidebar({ user }: { user?: unknown }) {
   const { toast } = useToast();
   const { conflictCount } = useConnectivity();
   const { selectedCompany } = useCompany();

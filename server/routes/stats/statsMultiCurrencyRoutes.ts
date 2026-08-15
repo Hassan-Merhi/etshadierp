@@ -13,7 +13,7 @@ function round2(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
-function rebuildBreakdown(accounts: any[]): Array<{ name: string; value: number }> {
+function rebuildBreakdown(accounts: unknown[]): Array<{ name: string; value: number }> {
   const totals = new Map<string, number>();
   for (const account of accounts) {
     const category = account.category || "Other";

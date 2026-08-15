@@ -31,7 +31,7 @@ export function registerCommonInventoryPerformanceRoutes(app: Express): void {
       const page = parsePage(req.query.page);
       const pageSize = parsePageSize(req.query.pageSize);
       const offset = (page - 1) * pageSize;
-      const conditions: any[] = [eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)];
+      const conditions: unknown[] = [eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)];
 
       const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
       if (search) {
@@ -79,7 +79,7 @@ export function registerCommonInventoryPerformanceRoutes(app: Express): void {
       const page = parsePage(req.query.page);
       const pageSize = parseInventoryPageSize(req.query.pageSize);
       const offset = (page - 1) * pageSize;
-      const conditions: any[] = [
+      const conditions: unknown[] = [
         eq(inventory.companyId, companyId),
         isNull(locations.deletedAt),
         isNull(stockItems.deletedAt),

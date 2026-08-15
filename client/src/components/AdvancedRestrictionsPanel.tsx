@@ -89,7 +89,7 @@ export function AdvancedRestrictionsPanel({ role, companyId, companyName }: Adva
   const isPrivileged = role === "Developer" || role === "Admin";
 
   // ── Load current permissions ─────────────────────────────────────────────
-  const { data: allPermissions = [], isLoading } = useQuery<any[]>({
+  const { data: allPermissions = [], isLoading } = useQuery<unknown[]>({
     queryKey: ["/api/settings/role-permissions", companyId],
     queryFn: async () => {
       const res = await fetch(`/api/settings/role-permissions?companyId=${companyId}`, { credentials: "include" });

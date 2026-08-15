@@ -44,7 +44,7 @@ export function registerDispatchInvoiceRoutes(app: Express) {
 
       // Proforma info
       let proforma: any = null;
-      let proformaLines: any[] = [];
+      let proformaLines: unknown[] = [];
       if (batch.proformaId) {
         const rows = await db.select().from(customerProformas).where(eq(customerProformas.id, batch.proformaId));
         proforma = rows[0] || null;
@@ -193,7 +193,7 @@ export function registerDispatchInvoiceRoutes(app: Express) {
 
         // 2. Check proforma status
         let proforma: any = null;
-        let proformaLines: any[] = [];
+        let proformaLines: unknown[] = [];
         if (batch.proforma_id) {
           const pfRows = await tx.execute(
             sql`SELECT * FROM customer_proformas WHERE id = ${batch.proforma_id} FOR UPDATE`

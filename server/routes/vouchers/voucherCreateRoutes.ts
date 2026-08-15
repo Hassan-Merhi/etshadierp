@@ -146,7 +146,7 @@ export function registerVoucherCreateRoutes(app: Express) {
           // Normalize dual-currency fields.
           // If the caller already provides transactionCurrency (new multi-currency frontend),
           // use those fields as-is. Otherwise derive from the voucher's currency/rate.
-          let dualCurrencyFields: Record<string, any> = {};
+          let dualCurrencyFields: Record<string, unknown> = {};
           if (!entry.transactionCurrency) {
             try {
               const debitAmt = String(entry.debitAmount || "0");

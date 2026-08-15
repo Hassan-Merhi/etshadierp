@@ -116,7 +116,7 @@ export default function FactoryContainerCreate() {
     queryKey: ["/api/factory/suppliers"],
   });
 
-  const { data: ledgerAccounts = [] } = useQuery<any[]>({
+  const { data: ledgerAccounts = [] } = useQuery<unknown[]>({
     queryKey: ["/api/ledger-accounts?includeHidden=true"],
     staleTime: 60_000,
     refetchOnWindowFocus: false,

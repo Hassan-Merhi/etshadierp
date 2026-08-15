@@ -26,8 +26,8 @@ import { resolveStoredFxRate } from "../../../services/factory/currencyConversio
 export async function buildLinkedSupplierGroups(
   supplierId: number,
   companyId: number,
-  commissions: any[]
-): Promise<any[]> {
+  commissions: unknown[]
+): Promise<unknown[]> {
   // Phase 2: Broker statement — aggregate linked suppliers if this is a broker
   const linkedSuppliers = await db
     .select({ id: factorySuppliers.id, name: factorySuppliers.name })
@@ -57,7 +57,7 @@ export async function buildLinkedSupplierGroups(
         )
       );
 
-    const linkedByCurrency: Record<string, { containers: any[]; totalValue: number; totalCommission: number }> = {};
+    const linkedByCurrency: Record<string, { containers: unknown[]; totalValue: number; totalCommission: number }> = {};
     for (const c of linkedContainers) {
       const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
       const rate = parseFloat(c.ratePerKg || "0");
@@ -104,11 +104,11 @@ export async function buildLinkedSupplierGroups(
     }
 
     const linkedPaidByCurrency: Record<string, number> = {};
-    for (const p of linkedPayments as any[]) {
+    for (const p of linkedPayments as unknown[]) {
       const cc = p.currencyCode || "USD";
       linkedPaidByCurrency[cc] = (linkedPaidByCurrency[cc] || 0) + parseFloat(p.amount || "0");
     }
-    for (const t of linkedFxTransfers as any[]) {
+    for (const t of linkedFxTransfers as unknown[]) {
       if (t.fromSupplierId === linked.id) {
         // Linked supplier sent funds out (FX Out) — counts as settled against their balance
         const cc = t.fromCurrencyCode || "USD";

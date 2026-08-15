@@ -15,11 +15,11 @@ export function RenameProformaDialog({
   setRenameValue,
   setRenamingProforma,
 }: {
-  renameProformaMutation: any;
-  renameValue: any;
-  renamingProforma: any;
-  setRenameValue: any;
-  setRenamingProforma: any;
+  renameProformaMutation: unknown;
+  renameValue: unknown;
+  renamingProforma: unknown;
+  setRenameValue: unknown;
+  setRenamingProforma: unknown;
 }) {
   return (
     <Dialog

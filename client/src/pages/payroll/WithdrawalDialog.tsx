@@ -9,10 +9,10 @@ interface WithdrawalDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedEmployee: { firstName?: string; lastName?: string; currentBalance?: string } | null;
-  form: any;
-  mutation: any;
-  cashAccounts: any[];
-  bankAccounts: any[] | undefined;
+  form: unknown;
+  mutation: unknown;
+  cashAccounts: unknown[];
+  bankAccounts: unknown[] | undefined;
   bankAccountsLoading: boolean;
 }
 

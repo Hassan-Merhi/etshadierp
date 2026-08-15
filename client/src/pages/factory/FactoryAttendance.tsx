@@ -98,7 +98,7 @@ export default function FactoryAttendance() {
   }, [data]);
 
   const saveMutation = useMutation({
-    mutationFn: (records: any[]) => apiRequest("POST", "/api/factory/attendance/bulk", { records }),
+    mutationFn: (records: unknown[]) => apiRequest("POST", "/api/factory/attendance/bulk", { records }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/attendance", selectedDate] });
       toast({ title: "Attendance saved", description: `Saved for ${selectedDate}` });

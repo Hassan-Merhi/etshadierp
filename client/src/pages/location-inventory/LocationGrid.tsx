@@ -9,7 +9,7 @@ interface LocationGridProps {
   setSelectedLocationLocal: (loc: Location | null) => void;
   locationSearchTerm: string;
   setLocationSearchTerm: (s: string) => void;
-  posUser?: any;
+  posUser?: unknown;
   canManageWhatsapp?: boolean;
   openRenameDialog?: (loc: Location, e?: any) => void;
   openWaGroupDialog?: (loc: Location, e?: any) => void;

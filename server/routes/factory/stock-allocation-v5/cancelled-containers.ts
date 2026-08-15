@@ -86,7 +86,7 @@ export function registerV5CancelledContainerRoutes(app: Express) {
             WHERE id = ${orderId} AND company_id = ${companyId}`
         )
         .then((r: any) =>
-          (r.rows ?? (r as any[])).map((row: any) => ({
+          (r.rows ?? (r as unknown[])).map((row: any) => ({
             id: Number(row.id),
             status: row.status,
             proformaIdUsed: row.proforma_id_used,

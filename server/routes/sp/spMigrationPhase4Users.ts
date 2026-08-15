@@ -5,7 +5,7 @@ import { resolveTargetLedgerAccount, resolveTargetLocation } from "./spMigration
 import { ensurePhase4CutoverSchema } from "./spMigrationPhase4Inventory";
 import { resultRows, firstRow } from "../../lib/queryResult";
 
-function roleSnapshot(row: any): any {
+function roleSnapshot(row: any): unknown {
   return {
     role: row.role,
     assignedLocationId: row.assigned_location_id ? pn(row.assigned_location_id) : (row.assignedLocationId ?? null),
@@ -25,7 +25,7 @@ async function switchUserSessions(
     userId: string;
     fromCompanyId: number;
     toCompanyId: number;
-    role: any;
+    role: unknown;
     companyName: string;
   }
 ): Promise<number> {
@@ -57,7 +57,7 @@ async function switchUserSessions(
   return resultRows(result).length;
 }
 
-async function loadUserLocations(tx: any, userId: string, companyId: number): Promise<any[]> {
+async function loadUserLocations(tx: any, userId: string, companyId: number): Promise<unknown[]> {
   const result = await tx.execute(sql`
     SELECT location_id
     FROM user_locations
@@ -67,7 +67,7 @@ async function loadUserLocations(tx: any, userId: string, companyId: number): Pr
   return resultRows(result).map((row) => ({ locationId: pn(row.location_id) }));
 }
 
-async function loadCashMappings(tx: any, userId: string, companyId: number): Promise<any[]> {
+async function loadCashMappings(tx: any, userId: string, companyId: number): Promise<unknown[]> {
   const result = await tx.execute(sql`
     SELECT location_id, cash_account_id, pos_station
     FROM user_location_cash_accounts
@@ -81,7 +81,7 @@ async function loadCashMappings(tx: any, userId: string, companyId: number): Pro
   }));
 }
 
-async function mapRole(sourceId: number, targetId: number, sourceRole: any): Promise<any> {
+async function mapRole(sourceId: number, targetId: number, sourceRole: any): Promise<unknown> {
   const location = sourceRole.assigned_location_id
     ? await resolveTargetLocation(sourceId, targetId, pn(sourceRole.assigned_location_id))
     : null;
@@ -104,7 +104,7 @@ async function mapRole(sourceId: number, targetId: number, sourceRole: any): Pro
   };
 }
 
-async function mapAllLocations(sourceId: number, targetId: number, rows: any[]): Promise<any[]> {
+async function mapAllLocations(sourceId: number, targetId: number, rows: unknown[]): Promise<unknown[]> {
   const mapped = [];
   for (const row of rows) {
     const location = await resolveTargetLocation(sourceId, targetId, pn(row.locationId));
@@ -114,7 +114,7 @@ async function mapAllLocations(sourceId: number, targetId: number, rows: any[]):
   return mapped;
 }
 
-async function mapAllCashMappings(sourceId: number, targetId: number, rows: any[]): Promise<any[]> {
+async function mapAllCashMappings(sourceId: number, targetId: number, rows: unknown[]): Promise<unknown[]> {
   const mapped = [];
   for (const row of rows) {
     const location = await resolveTargetLocation(sourceId, targetId, pn(row.locationId));
@@ -133,7 +133,7 @@ async function mapAllCashMappings(sourceId: number, targetId: number, rows: any[
   return mapped;
 }
 
-async function replaceLocations(tx: any, userId: string, companyId: number, rows: any[]): Promise<void> {
+async function replaceLocations(tx: any, userId: string, companyId: number, rows: unknown[]): Promise<void> {
   await tx.execute(sql`DELETE FROM user_locations WHERE user_id = ${userId} AND company_id = ${companyId}`);
   for (const row of rows) {
     await tx.execute(sql`
@@ -143,7 +143,7 @@ async function replaceLocations(tx: any, userId: string, companyId: number, rows
   }
 }
 
-async function replaceCashMappings(tx: any, userId: string, companyId: number, rows: any[]): Promise<void> {
+async function replaceCashMappings(tx: any, userId: string, companyId: number, rows: unknown[]): Promise<void> {
   await tx.execute(
     sql`DELETE FROM user_location_cash_accounts WHERE user_id = ${userId} AND company_id = ${companyId}`
   );
@@ -202,7 +202,7 @@ export async function moveUsersToTargetExact(
   sourceId: number,
   targetId: number,
   targetCompanyName: string
-): Promise<any> {
+): Promise<unknown> {
   await ensurePhase4CutoverSchema();
   const sourceRolesResult = await db.execute(sql`
     SELECT * FROM user_company_roles
@@ -325,7 +325,7 @@ export async function restoreUsersToSourceExact(
   targetId: number,
   sourceCompanyName: string,
   clearSnapshots = false
-): Promise<any> {
+): Promise<unknown> {
   await ensurePhase4CutoverSchema();
   const changesResult = await db.execute(sql`
     SELECT * FROM sp_migration_cutover_role_changes

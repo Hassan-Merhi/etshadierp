@@ -63,7 +63,7 @@ export const useAccountsWithBalances = (
       });
     });
 
-    (allAccountsData as any[])
+    (allAccountsData as unknown[])
       .filter((a) => a.type === "factorySupplier")
       .forEach((fs) => {
         const adjustment = balanceAdjustments[`factorySupplier-${fs.id}`] || 0;

@@ -81,7 +81,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
       `);
 
       let vouchersUpdated = 0;
-      for (const row of genVouchers.rows as any[]) {
+      for (const row of genVouchers.rows as unknown[]) {
         const voucherDate = row.voucher_date as string;
         // Parse period end from description: "Payroll expense: N workers (YYYY-MM-DD – YYYY-MM-DD)"
         const periodMatch = (row.description as string).match(/\((\d{4}-\d{2}-\d{2})\s*[–-]\s*(\d{4}-\d{2}-\d{2})\)/);
@@ -105,7 +105,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
         // Aggregate by city
         const salByCity = new Map<string, number>();
         const bonByCity = new Map<string, number>();
-        for (const pr of payrollData.rows as any[]) {
+        for (const pr of payrollData.rows as unknown[]) {
           const city = (pr.city as string | null)?.trim() || "";
           const sal =
             parseFloat(pr.base_salary || "0") + parseFloat(pr.transport || "0") - parseFloat(pr.deductions || "0");
@@ -179,7 +179,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
       `);
 
       let bonusesRecorded = 0;
-      for (const wb of paidBonuses.rows as any[]) {
+      for (const wb of paidBonuses.rows as unknown[]) {
         const amt = parseFloat(wb.amount || "0");
         if (amt <= 0) continue;
         const city = (wb.city as string | null)?.trim() || "";
@@ -252,7 +252,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
 
       let vouchersUpdated = 0;
 
-      for (const row of genVouchers.rows as any[]) {
+      for (const row of genVouchers.rows as unknown[]) {
         // Parse period dates from description: "Payroll expense: N workers (YYYY-MM-DD – YYYY-MM-DD)"
         const periodMatch = (row.description as string | null)?.match(
           /\((\d{4}-\d{2}-\d{2})\s*[–-]\s*(\d{4}-\d{2}-\d{2})\)/
@@ -272,7 +272,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
             AND fp.period_end = ${periodEnd}
         `);
 
-        if ((payrollData.rows as any[]).length === 0) continue;
+        if ((payrollData.rows as unknown[]).length === 0) continue;
 
         // Resolve per-worker ledger accounts (sequential to avoid nextCode collisions)
         // Ensure group headers exist so worker accounts nest under them in the chart of accounts
@@ -283,7 +283,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
           sql`UPDATE ledger_accounts SET sub_type='Group' WHERE id IN (${salGrp.id}, ${bonGrp.id}) AND (sub_type IS NULL OR sub_type <> 'Group')`
         );
         const workerAccMap = new Map<number, { salaryId: number; bonusId: number }>();
-        for (const p of payrollData.rows as any[]) {
+        for (const p of payrollData.rows as unknown[]) {
           if (workerAccMap.has(p.worker_id)) continue;
           const workerName = (p.full_name as string) || `Worker #${p.worker_id}`;
           const sa = await findOrCreateLedger(companyId, `Salary Expense - ${workerName}`, "Expense", {
@@ -311,7 +311,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
 
         // Insert new per-worker DR entries
         const newEntries = [];
-        for (const p of payrollData.rows as any[]) {
+        for (const p of payrollData.rows as unknown[]) {
           const workerName = (p.full_name as string) || `Worker #${p.worker_id}`;
           const accs = workerAccMap.get(p.worker_id)!;
           const salAmt =
@@ -355,7 +355,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
           )
       `);
       let accountsDeleted = 0;
-      const orphanRows = orphanedAccounts.rows as any[];
+      const orphanRows = orphanedAccounts.rows as unknown[];
       if (orphanRows.length > 0) {
         // Use inArray (drizzle) instead of raw ANY() to avoid parameterization issues
         const orphanIds = orphanRows.map((r) => r.id as number);

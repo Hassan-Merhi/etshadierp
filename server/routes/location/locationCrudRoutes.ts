@@ -264,7 +264,7 @@ export function registerLocationCrudRoutes(app: Express) {
         return res.status(400).json({ message: "name is required" });
       }
 
-      const updatePayload: Record<string, any> = { name: name.trim() };
+      const updatePayload: Record<string, unknown> = { name: name.trim() };
       if (transferWaGroupChatId !== undefined) {
         updatePayload.transferWaGroupChatId = transferWaGroupChatId || null;
       }
@@ -279,7 +279,7 @@ export function registerLocationCrudRoutes(app: Express) {
       const [updated] = await db.update(locations).set(updatePayload).where(eq(locations.id, locationId)).returning();
 
       try {
-        const _locChanges: Record<string, { old?: any; new?: any }> = {};
+        const _locChanges: Record<string, { old?: unknown; new?: unknown }> = {};
         if (location.name !== updated.name) _locChanges.name = { old: location.name, new: updated.name };
         await logAudit({
           userId: req.session.userId!,

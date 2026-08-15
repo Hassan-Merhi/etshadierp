@@ -35,7 +35,7 @@ export default function SpOpeningStock() {
     if (b > 0 || l > 0) setFinalUC(String((b + l).toFixed(6)));
   }, [baseUC, landedUC]);
 
-  const { data: past = [], isLoading: pastLoading } = useQuery<any[]>({
+  const { data: past = [], isLoading: pastLoading } = useQuery<unknown[]>({
     queryKey: ["/api/sp/opening-stock"],
   });
 
@@ -219,7 +219,7 @@ export default function SpOpeningStock() {
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading...
           </div>
-        ) : (past as any[]).length === 0 ? (
+        ) : (past as unknown[]).length === 0 ? (
           <p className="text-sm text-muted-foreground">No opening stock entries yet.</p>
         ) : (
           <Card>
@@ -233,7 +233,7 @@ export default function SpOpeningStock() {
                     <span className="text-right">Base/u</span>
                     <span className="text-right">Final/u</span>
                   </div>
-                  {(past as any[]).map((p, i: number) => (
+                  {(past as unknown[]).map((p, i: number) => (
                     <div
                       key={p.id}
                       className="grid grid-cols-6 text-xs py-1.5 border-b border-border/30 last:border-0"

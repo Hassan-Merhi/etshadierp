@@ -72,12 +72,12 @@ export function collectPostingTargetIds(entries: VoucherEntryInsertFields[]): Po
 }
 
 async function assertCompanyOwnedIds(input: {
-  tx: any;
+  tx: unknown;
   companyId: number;
   ids: number[];
-  table: any;
-  idColumn: any;
-  companyColumn: any;
+  table: unknown;
+  idColumn: unknown;
+  companyColumn: unknown;
   label: string;
 }) {
   const { tx, companyId, ids, table, idColumn, companyColumn, label } = input;

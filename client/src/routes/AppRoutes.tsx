@@ -4,7 +4,7 @@ import { PosRoutes } from "./PosRoutes";
 import { ErpRoutes } from "./ErpRoutes";
 
 interface RouterProps {
-  user: any;
+  user: unknown;
   posImportEnabled?: boolean;
 }
 

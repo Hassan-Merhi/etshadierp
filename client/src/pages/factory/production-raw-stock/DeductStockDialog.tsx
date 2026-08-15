@@ -9,8 +9,8 @@ import { AlertTriangle } from "lucide-react";
 interface DeductStockDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  deductingRow: any;
-  deductReceivedMutation: any;
+  deductingRow: unknown;
+  deductReceivedMutation: unknown;
   wrapAdminAction: (action: () => void, title: string) => void;
 }
 

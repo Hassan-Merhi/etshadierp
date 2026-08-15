@@ -112,7 +112,7 @@ export async function getMixBatchSourceCostMismatchPreview(
       ])
     : [[], [], []];
 
-  const chargesByContainer = new Map<number, any[]>();
+  const chargesByContainer = new Map<number, unknown[]>();
   for (const c of allAdditionalCharges) {
     if (!chargesByContainer.has(c.containerId)) chargesByContainer.set(c.containerId, []);
     chargesByContainer.get(c.containerId)!.push(c);
@@ -122,7 +122,7 @@ export async function getMixBatchSourceCostMismatchPreview(
     const ex = commissionByContainer.get(c.containerId);
     if (!ex || c.id > ex.id) commissionByContainer.set(c.containerId, c);
   }
-  const otherChargesByContainer = new Map<number, any[]>();
+  const otherChargesByContainer = new Map<number, unknown[]>();
   for (const oc of allOtherCharges) {
     if (!otherChargesByContainer.has(oc.containerId)) otherChargesByContainer.set(oc.containerId, []);
     otherChargesByContainer.get(oc.containerId)!.push(oc);

@@ -166,7 +166,7 @@ export function registerAccountMigrationRoutes(app: Express) {
 
         // Build per-account plan (code conflict resolution + entry counts)
         const accountPlans: Array<{
-          account: any;
+          account: unknown;
           originalCode: string;
           finalCode: string;
           entryCount: number;

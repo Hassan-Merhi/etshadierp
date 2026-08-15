@@ -31,7 +31,7 @@ export interface RentalPaymentGroupOptions {
   companyId: number;
   contractCompanyId: number;
   module: RentalModule;
-  contract: any;
+  contract: unknown;
   unit: any | null;
   cashAccountId: number | null;
   amount: string;
@@ -68,7 +68,7 @@ async function postGroupCore(
   opts: {
     companyId: number;
     module: RentalModule;
-    contract: any;
+    contract: unknown;
     unit: any | null;
     cashAccountId: number | null;
     allocs: Array<{
@@ -195,7 +195,7 @@ async function postGroupCore(
       })
       .returning();
 
-    const payEntries: any[] = [
+    const payEntries: unknown[] = [
       { voucherId: v.id, ledgerAccountId: cashAccountId, ...normEntry("0", totalAmountStr), narration },
     ];
 
@@ -378,7 +378,7 @@ async function postGroupCore(
       })
       .returning();
 
-    const lEntries: any[] = [
+    const lEntries: unknown[] = [
       {
         voucherId: v.id,
         ledgerAccountId: cashAccountId,
@@ -426,7 +426,7 @@ async function postGroupCore(
 
 export async function createRentalPaymentGroup(
   opts: RentalPaymentGroupOptions
-): Promise<{ paymentGroupId: string; scheduled: boolean; payments: any[] }> {
+): Promise<{ paymentGroupId: string; scheduled: boolean; payments: unknown[] }> {
   const {
     companyId,
     contractCompanyId,

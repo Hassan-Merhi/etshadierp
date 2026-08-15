@@ -178,7 +178,7 @@ export default function BalesHistory() {
   });
   const hiddenCost = myAccess?.hiddenCostFields ?? [];
 
-  type BalesPage = { items: any[]; total: number; page: number; limit: number; totalPages: number };
+  type BalesPage = { items: unknown[]; total: number; page: number; limit: number; totalPages: number };
   const { data: balesResponse, isLoading } = useQuery<BalesPage>({
     queryKey: [
       "/api/factory/bales",
@@ -469,7 +469,7 @@ export default function BalesHistory() {
     });
   };
 
-  const toggleSelectAll = (filteredItems: any[]) => {
+  const toggleSelectAll = (filteredItems: unknown[]) => {
     const filteredIds = filteredItems.map((r) => r.bale.id);
     const allSelected = filteredIds.every((id: number) => selectedIds.has(id));
     if (allSelected) {
@@ -616,7 +616,7 @@ export default function BalesHistory() {
         sellingPrice: string | null;
         totalQty: number;
         totalWeightKg: number;
-        rows: any[];
+        rows: unknown[];
       }
     >();
     for (const row of filtered) {

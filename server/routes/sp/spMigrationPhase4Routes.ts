@@ -26,7 +26,7 @@ import { repairSpSupplierVoucherLinks } from "./spSupplierVoucherSync";
 import { resultRows, firstRow } from "../../lib/queryResult";
 
 const installedApps = new WeakSet<object>();
-let holdCache: { expiresAt: number; byCompany: Map<number, any> } | null = null;
+let holdCache: { expiresAt: number; byCompany: Map<number, unknown> } | null = null;
 let phase4RouteSchemaPromise: Promise<void> | null = null;
 
 function invalidatePhase4HoldCache(): void {
@@ -73,7 +73,7 @@ function collectCompanyIds(req: Request): number[] {
   );
 }
 
-async function loadLatestCutoversForCompanies(companyIds: number[]): Promise<Map<number, any>> {
+async function loadLatestCutoversForCompanies(companyIds: number[]): Promise<Map<number, unknown>> {
   await ensurePhase4Schema();
   if (holdCache && holdCache.expiresAt > Date.now() && companyIds.every((id) => holdCache!.byCompany.has(id))) {
     return holdCache.byCompany;
@@ -192,7 +192,7 @@ function installPhase4WriteGuard(app: Express): void {
   if (installedApps.has(app)) return;
   installedApps.add(app);
   app.use(phase4WriteGuard);
-  const stack = app?._router?.stack as any[] | undefined;
+  const stack = app?._router?.stack as unknown[] | undefined;
   if (!stack?.length) return;
   const layer = stack.pop();
   const firstRouteIndex = stack.findIndex((entry: any) => Boolean(entry.route));
@@ -204,10 +204,10 @@ function installPhase4WriteGuard(app: Express): void {
 }
 
 async function invokeMigrationHandler(
-  handler: (req: Request, res: Response) => Promise<any>,
+  handler: (req: Request, res: Response) => Promise<unknown>,
   req: any,
   body: any
-): Promise<any> {
+): Promise<unknown> {
   let statusCode = 200;
   let payload: any = null;
   const response: any = {
@@ -229,7 +229,7 @@ async function invokeMigrationHandler(
   return payload;
 }
 
-async function targetLiveActivity(targetId: number, activatedAt?: string | null): Promise<any> {
+async function targetLiveActivity(targetId: number, activatedAt?: string | null): Promise<unknown> {
   const vouchers = await db.execute(
     activatedAt
       ? sql`
@@ -298,7 +298,7 @@ async function targetLiveActivity(targetId: number, activatedAt?: string | null)
   return { ...counts, total: Object.values(counts).reduce((sum, value) => sum + value, 0) };
 }
 
-async function normalizedVerification(sourceId: number, targetId: number, requireUnusedTarget = true): Promise<any> {
+async function normalizedVerification(sourceId: number, targetId: number, requireUnusedTarget = true): Promise<unknown> {
   const verification = await buildFinalMigrationVerification(sourceId, targetId);
   verification.blockers = (verification.blockers ?? []).filter((issue: any) => issue.code !== "TARGET_ALREADY_LIVE");
   const activity = await targetLiveActivity(targetId);
@@ -322,7 +322,7 @@ async function loadCutover(cutoverId: number): Promise<any | null> {
   return firstRow(result) ?? null;
 }
 
-async function prepareCutover(req: Request, res: Response): Promise<any> {
+async function prepareCutover(req: Request, res: Response): Promise<unknown> {
   const pair = await validateMigrationPair(req, res, false);
   if (!pair) return;
   const error = exactCutoverConfirmation(
@@ -365,7 +365,7 @@ async function prepareCutover(req: Request, res: Response): Promise<any> {
   });
 }
 
-async function finalizeCutover(req: Request, res: Response): Promise<any> {
+async function finalizeCutover(req: Request, res: Response): Promise<unknown> {
   const pair = await validateMigrationPair(req, res, false);
   if (!pair) return;
   const error = exactCutoverConfirmation(
@@ -391,7 +391,7 @@ async function finalizeCutover(req: Request, res: Response): Promise<any> {
     return res.status(409).json({ message: "Cutover finalization is already running or awaiting recovery." });
   }
 
-  const partialDeltaSummary: Record<string, any> = {};
+  const partialDeltaSummary: Record<string, unknown> = {};
   try {
     const migrationBody = {
       sourceCompanyId: pair.sourceId,
@@ -473,7 +473,7 @@ async function finalizeCutover(req: Request, res: Response): Promise<any> {
     });
   } catch (caught) {
     const message = caught instanceof Error ? caught.message : String(caught);
-    const recovery: Record<string, any> = {};
+    const recovery: Record<string, unknown> = {};
     try {
       recovery.users = await restoreUsersToSourceExact(
         cutoverId,
@@ -515,7 +515,7 @@ async function finalizeCutover(req: Request, res: Response): Promise<any> {
   }
 }
 
-async function rollbackCutover(req: Request, res: Response): Promise<any> {
+async function rollbackCutover(req: Request, res: Response): Promise<unknown> {
   const cutoverId = pn(req.body?.cutoverId);
   if (!cutoverId) return res.status(400).json({ message: "cutoverId is required" });
   await ensurePhase4Schema();
@@ -565,7 +565,7 @@ async function rollbackCutover(req: Request, res: Response): Promise<any> {
   });
 }
 
-async function cancelPreparedCutover(req: Request, res: Response): Promise<any> {
+async function cancelPreparedCutover(req: Request, res: Response): Promise<unknown> {
   const cutoverId = pn(req.body?.cutoverId);
   if (!cutoverId) return res.status(400).json({ message: "cutoverId is required" });
   await ensurePhase4Schema();
@@ -618,7 +618,7 @@ async function cancelPreparedCutover(req: Request, res: Response): Promise<any> 
   });
 }
 
-async function releaseTargetHold(req: Request, res: Response): Promise<any> {
+async function releaseTargetHold(req: Request, res: Response): Promise<unknown> {
   const cutoverId = pn(req.body?.cutoverId);
   if (!cutoverId) return res.status(400).json({ message: "cutoverId is required" });
   await ensurePhase4Schema();
@@ -660,7 +660,7 @@ async function releaseTargetHold(req: Request, res: Response): Promise<any> {
   return res.json({ success: true, cutover: resultRows(released)[0] });
 }
 
-async function statusCutover(req: Request, res: Response): Promise<any> {
+async function statusCutover(req: Request, res: Response): Promise<unknown> {
   const pair = await validateMigrationPair(req, res, false);
   if (!pair) return;
   await ensurePhase4Schema();
@@ -677,7 +677,7 @@ async function statusCutover(req: Request, res: Response): Promise<any> {
   });
 }
 
-async function finalVerification(req: Request, res: Response): Promise<any> {
+async function finalVerification(req: Request, res: Response): Promise<unknown> {
   const pair = await validateMigrationPair(req, res, false);
   if (!pair) return;
   const live = await getLiveCutover(pair.sourceId, pair.targetId);

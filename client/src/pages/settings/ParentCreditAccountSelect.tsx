@@ -33,7 +33,7 @@ type UserFormData = z.infer<typeof userFormSchema>;
 type CompanyFormData = z.infer<typeof companyFormSchema>;
 type RoleAssignmentData = z.infer<typeof roleAssignmentSchema>;
 
-export function ParentCreditAccountSelect({ company }: { company: any }) {
+export function ParentCreditAccountSelect({ company }: { company: unknown }) {
   const { toast } = useToast();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
@@ -54,7 +54,7 @@ export function ParentCreditAccountSelect({ company }: { company: any }) {
     },
   });
 
-  const { data: ledgerAccounts = [] } = useQuery<any[]>({
+  const { data: ledgerAccounts = [] } = useQuery<unknown[]>({
     queryKey: ["/api/ledger-accounts", company.id],
     queryFn: async () => {
       try {

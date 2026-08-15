@@ -146,9 +146,9 @@ export default function TransactionJournal() {
   });
 
   // Normalise view-entries response (may be array or { entries, purchaseOrder, items })
-  const viewEntries: any[] = Array.isArray(viewEntriesRaw) ? viewEntriesRaw : (viewEntriesRaw?.entries ?? []);
+  const viewEntries: unknown[] = Array.isArray(viewEntriesRaw) ? viewEntriesRaw : (viewEntriesRaw?.entries ?? []);
   const viewPurchaseOrder: any | null = viewEntriesRaw?.purchaseOrder ?? null;
-  const viewPurchaseItems: any[] = viewEntriesRaw?.items ?? [];
+  const viewPurchaseItems: unknown[] = viewEntriesRaw?.items ?? [];
 
   const openDetail = (id: number) => {
     setEntryBalances({});

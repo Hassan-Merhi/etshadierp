@@ -2,7 +2,7 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "../../db";
 import * as schema from "@shared/schema";
 
-export async function getAllDraftPosSales(userId: string, locationId?: number): Promise<any[]> {
+export async function getAllDraftPosSales(userId: string, locationId?: number): Promise<unknown[]> {
   const { pool } = await import("../../db");
   const locationFilter = locationId ? "AND d.location_id = $2" : "";
   const params = locationId ? [userId, locationId] : [userId];

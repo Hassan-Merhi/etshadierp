@@ -40,7 +40,7 @@ export function registerFactoryCustomerStatementExcelRoutes(app: Express) {
         .orderBy(customerBalances.transactionDate, customerBalances.id);
 
       // Pull voucher entries (same logic as statement endpoint)
-      const voucherRowsXlsx: any[] = [];
+      const voucherRowsXlsx: unknown[] = [];
       const ledgerAccountIdXlsx = customer.ledgerAccountId;
       const voucherCondXlsx = ledgerAccountIdXlsx
         ? sql`(${voucherEntries.ledgerAccountId} = ${ledgerAccountIdXlsx} OR ${voucherEntries.customerId} = ${customerId})`

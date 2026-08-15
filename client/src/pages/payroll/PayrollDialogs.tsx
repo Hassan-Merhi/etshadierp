@@ -14,7 +14,7 @@ interface WorkerDeductionDialogProps {
   setReason: (val: string) => void;
   date: string;
   setDate: (val: string) => void;
-  mutation: any;
+  mutation: unknown;
 }
 
 export function WorkerDeductionDialog({

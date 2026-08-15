@@ -21,11 +21,11 @@ import { triggerIntercompanyNotifications } from "../intercompanyNotificationRou
 import { buildVoucherChangesForCreate, getCurrentExchangeRate, logAudit, snapshotVoucherEntries } from "../_helpers";
 
 const postingDependencies = createDatabasePostingDependencies();
-type PersistedPostingResult = CentralPostingResult<any, any>;
+type PersistedPostingResult = CentralPostingResult<unknown, unknown>;
 type CustomerLinkedLedgerRow = { id: number; ledgerAccountId: number | null };
 
 async function resolveCustomerLinkedLedgersTx(input: {
-  tx: any;
+  tx: unknown;
   companyId: number;
   entries: Array<Record<string, unknown>>;
 }): Promise<Array<Record<string, unknown>>> {

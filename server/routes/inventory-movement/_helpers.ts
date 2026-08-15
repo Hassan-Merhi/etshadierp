@@ -83,7 +83,7 @@ export async function fetchStockMovements(
 ): Promise<StockMovementTx[]> {
   const results: StockMovementTx[] = [];
 
-  const dateConds = (dateCol: any): any[] => {
+  const dateConds = (dateCol: any): unknown[] => {
     const parts = [];
     if (fromDate) parts.push(gte(dateCol, fromDate));
     if (toDate) parts.push(toDateExclusive ? lt(dateCol, toDate) : lte(dateCol, toDate));

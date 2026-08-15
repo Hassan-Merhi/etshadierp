@@ -34,7 +34,7 @@ function sanitizeDecimal(v: any): string {
  * Insert proforma lines in chunks inside a single transaction so partial imports
  * never leave orphan rows when a later chunk fails.
  */
-async function batchInsertProformaLines(rows: any[]) {
+async function batchInsertProformaLines(rows: unknown[]) {
   // Each row has 6 columns → 6 params; PostgreSQL limit is 65535.
   // 200 rows × 6 = 1200 params — well within limits.
   const CHUNK = 200;

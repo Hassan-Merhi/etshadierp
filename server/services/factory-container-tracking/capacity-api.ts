@@ -196,7 +196,7 @@ export async function updateFactoryContainerTrackingSettings(
   containerId: number,
   settings: { trackingEnabled?: boolean; trackingAutoUpdate?: boolean; trackingCarrierHint?: string | null }
 ): Promise<void> {
-  const updatePayload: Record<string, any> = {};
+  const updatePayload: Record<string, unknown> = {};
   if (settings.trackingEnabled !== undefined) updatePayload.trackingEnabled = settings.trackingEnabled;
   if (settings.trackingAutoUpdate !== undefined) updatePayload.trackingAutoUpdate = settings.trackingAutoUpdate;
   if ("trackingCarrierHint" in settings) updatePayload.trackingCarrierHint = settings.trackingCarrierHint;

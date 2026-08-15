@@ -174,7 +174,7 @@ export default function FactoryProformas() {
   // Phase 4: opening/expanding a proforma no longer downloads the ERP stock
   // catalog. The add-item dialog is the only consumer, and it only needs the
   // identity profile (id/code/name/uom).
-  const { data: allStockItems = [] } = useQuery<any[]>({
+  const { data: allStockItems = [] } = useQuery<unknown[]>({
     queryKey: ["/api/stock-items/light?profile=identity", selectedCompany?.id],
     enabled: isAddLineOpen && !!selectedCompany?.id,
     staleTime: 30 * 60 * 1000,
@@ -418,7 +418,7 @@ export default function FactoryProformas() {
   };
 
   const bulkImportMutation = useMutation({
-    mutationFn: async (data: { customerId: number; name: string; isActive: boolean; lines: any[] }) => {
+    mutationFn: async (data: { customerId: number; name: string; isActive: boolean; lines: unknown[] }) => {
       const res = await modeApiRequest("POST", "/api/factory/customer-proformas/bulk", data);
       if (!res.ok) {
         const e = await res.json();
@@ -463,7 +463,7 @@ export default function FactoryProformas() {
         setExcelImportErrors(["No sheets found in this file"]);
         return;
       }
-      const rows = excelUtils.sheet_to_json<Record<string, any>>(firstSheet);
+      const rows = excelUtils.sheet_to_json<Record<string, unknown>>(firstSheet);
       if (rows.length === 0) {
         setExcelImportErrors(["The sheet appears to be empty"]);
         return;
@@ -474,7 +474,7 @@ export default function FactoryProformas() {
         String(s ?? "")
           .toLowerCase()
           .replace(/[\s_-]/g, "");
-      const findCol = (row: Record<string, any>, aliases: string[]): string => {
+      const findCol = (row: Record<string, unknown>, aliases: string[]): string => {
         const keys = Object.keys(row);
         for (const alias of aliases) {
           const found = keys.find((k) => normalize(k) === alias);

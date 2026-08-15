@@ -256,7 +256,7 @@ export function registerFactoryFreightRoutes(app: Express) {
       if (!companyId) return res.json({});
       const allFreight = await db.select().from(containerFreight).where(eq(containerFreight.companyId, companyId));
       const freightIds = allFreight.map((f) => f.id);
-      let allPayments: any[] = [];
+      let allPayments: unknown[] = [];
       if (freightIds.length > 0) {
         allPayments = await db
           .select()

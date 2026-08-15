@@ -36,7 +36,7 @@ export function registerOrderVerificationSummaryRoutes(app: Express) {
       const rawOrderResult = await db.execute(
         sql`SELECT * FROM customer_orders WHERE id = ${orderId} AND company_id = ${companyId} LIMIT 1`
       );
-      const rawOrderRows: any[] = resultRows(rawOrderResult);
+      const rawOrderRows: unknown[] = resultRows(rawOrderResult);
       if (!rawOrderRows.length) return res.status(404).json({ message: "Order not found" });
       const orderRow = rawOrderRows[0];
       // Normalise the raw row into a typed object with JS-side defaults.
@@ -68,7 +68,7 @@ export function registerOrderVerificationSummaryRoutes(app: Express) {
       };
 
       const rawBalesResult = await db.execute(sql`SELECT * FROM customer_order_bales WHERE order_id = ${orderId}`);
-      const rawBaleRows: any[] = resultRows(rawBalesResult);
+      const rawBaleRows: unknown[] = resultRows(rawBalesResult);
       const orderBales = rawBaleRows.map((r) => ({
         id: r.id,
         order_id: r.order_id,
@@ -101,7 +101,7 @@ export function registerOrderVerificationSummaryRoutes(app: Express) {
 
       if (orderBales.length === 0 && order.totalQtyBales > 0) {
         const rawLinesResult = await db.execute(sql`SELECT * FROM customer_order_lines WHERE order_id = ${orderId}`);
-        const linesRows: any[] = resultRows(rawLinesResult);
+        const linesRows: unknown[] = resultRows(rawLinesResult);
         const hasLines = linesRows.some((r) => (r.qty ?? 0) > 0);
 
         if (hasLines) {
@@ -177,7 +177,7 @@ export function registerOrderVerificationSummaryRoutes(app: Express) {
         loadedByArticle[code].totalPrice += parseFloat(priceUsed) || 0;
       }
 
-      let proformaLines: any[] = [];
+      let proformaLines: unknown[] = [];
       const proformaByArticle: Record<
         string,
         {
@@ -317,7 +317,7 @@ export function registerOrderVerificationSummaryRoutes(app: Express) {
       }
 
       const allArticles = new Set([...Object.keys(loadedByArticle), ...Object.keys(proformaByArticle)]);
-      const comparison: any[] = [];
+      const comparison: unknown[] = [];
 
       for (const code of allArticles) {
         const loaded = loadedByArticle[code] || null;

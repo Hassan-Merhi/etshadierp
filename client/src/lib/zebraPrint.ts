@@ -22,7 +22,7 @@ export function setPrinterName(name: string) {
 
 let qzInstance = null;
 
-async function loadQzTray(): Promise<any> {
+async function loadQzTray(): Promise<unknown> {
   if ((window as unknown as (Window & typeof globalThis) & { qz: unknown }).qz)
     return (window as unknown as (Window & typeof globalThis) & { qz: unknown }).qz;
 
@@ -44,7 +44,7 @@ async function loadQzTray(): Promise<any> {
   });
 }
 
-async function getConnection(): Promise<any> {
+async function getConnection(): Promise<unknown> {
   const qz = await loadQzTray();
   if (!qz.websocket.isActive()) {
     try {

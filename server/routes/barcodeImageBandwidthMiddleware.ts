@@ -13,9 +13,9 @@ const MAX_BARCODE_CACHE_ENTRIES = 512;
 const barcodeImageCache = new Map<string, BarcodeImage>();
 const BWIP_MODULE_NAME: string = "bwip-js";
 
-let bwipjsPromise: Promise<any> | null = null;
+let bwipjsPromise: Promise<unknown> | null = null;
 
-function getBwipjs(): Promise<any> {
+function getBwipjs(): Promise<unknown> {
   if (!bwipjsPromise) {
     // Keep this as a runtime-resolved module name. The package ships without a
     // declaration surface compatible with this project's TypeScript settings,

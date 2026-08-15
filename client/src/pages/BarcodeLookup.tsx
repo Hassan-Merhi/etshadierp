@@ -150,7 +150,7 @@ export default function BarcodeLookup() {
       id: number;
       action: string;
       username: string;
-      changes: Record<string, { old: any; new: any }> | null;
+      changes: Record<string, { old: unknown; new: unknown }> | null;
       createdAt: string;
     }>;
   } | null>(null);

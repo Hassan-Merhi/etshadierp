@@ -51,7 +51,7 @@ export default function MixBatches() {
 
   const deleteBatch = deleteId ? (batches?.find((b) => b.id === deleteId) ?? null) : null;
 
-  const { data: unlinkedBales } = useQuery<any[]>({
+  const { data: unlinkedBales } = useQuery<unknown[]>({
     queryKey: ["/api/factory/bales/unlinked"],
     enabled: assignDialogOpen,
   });
@@ -172,7 +172,7 @@ export default function MixBatches() {
 
     // Build row data
     const totals: Record<string, number> = {};
-    const rows: any[] = dates.map((date) => {
+    const rows: unknown[] = dates.map((date) => {
       const row: any = { DATE: date };
       for (const name of batchNames) {
         const val = matrix[date]?.[name] || 0;

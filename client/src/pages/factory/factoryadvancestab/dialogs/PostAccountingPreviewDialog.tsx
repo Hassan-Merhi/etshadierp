@@ -31,15 +31,15 @@ export function PostAccountingPreviewDialog({
   unvouchered,
   unvoucheredLoading,
 }: {
-  cashAccounts: any;
-  formatDate: any;
-  postAccountingMutation: any;
-  postAccountingOpen: any;
-  postCashAccountId: any;
-  setPostAccountingOpen: any;
-  setPostCashAccountId: any;
-  unvouchered: any;
-  unvoucheredLoading: any;
+  cashAccounts: unknown;
+  formatDate: unknown;
+  postAccountingMutation: unknown;
+  postAccountingOpen: unknown;
+  postCashAccountId: unknown;
+  setPostAccountingOpen: unknown;
+  setPostCashAccountId: unknown;
+  unvouchered: unknown;
+  unvoucheredLoading: unknown;
 }) {
   return (
     <Dialog

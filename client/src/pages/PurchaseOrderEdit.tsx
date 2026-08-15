@@ -54,7 +54,7 @@ export default function PurchaseOrderEdit() {
   const sidebarRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const { data: stockItems } = useQuery<any[]>({
+  const { data: stockItems } = useQuery<unknown[]>({
     queryKey: ["/api/stock-items/light", selectedCompany?.id],
     staleTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,

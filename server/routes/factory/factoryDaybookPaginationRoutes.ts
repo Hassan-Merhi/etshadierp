@@ -40,11 +40,11 @@ function normalizeDateFilter(value: unknown): string | undefined {
   return trimmed || undefined;
 }
 
-async function deriveBaleStockEntryAmounts(rows: any[], companyId: number): Promise<void> {
+async function deriveBaleStockEntryAmounts(rows: unknown[], companyId: number): Promise<void> {
   const baleRows = rows.filter((row) => row.txType === "BALE_STOCK_ENTRY" && row.metaJson);
   if (baleRows.length === 0) return;
 
-  const baleIdToRows = new Map<number, any[]>();
+  const baleIdToRows = new Map<number, unknown[]>();
   for (const row of baleRows) {
     try {
       const meta = JSON.parse(row.metaJson || "{}");
@@ -99,7 +99,7 @@ async function deriveBaleStockEntryAmounts(rows: any[], companyId: number): Prom
 
   const priceByProductId = new Map<number, number>();
   const priceByArticleCode = new Map<string, number>();
-  for (const product of products as any[]) {
+  for (const product of products as unknown[]) {
     const price = Number.parseFloat(product.productionPrice || "0") || 0;
     priceByProductId.set(product.id, price);
     if (product.articleCode) priceByArticleCode.set(product.articleCode, price);

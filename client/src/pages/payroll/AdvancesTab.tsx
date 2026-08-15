@@ -41,7 +41,7 @@ import {
 } from "./payrollSchemas";
 
 interface AdvancesTabProps {
-  cashAccounts?: any[];
+  cashAccounts?: unknown[];
 }
 
 export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
@@ -63,7 +63,7 @@ export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
   const { data: workerStaff = [] } = useQuery<Employee[]>({
     queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id],
     enabled: !!selectedCompany,
-    select: (data: any[]) => data.filter((e) => e.employeeType === "Worker"),
+    select: (data: unknown[]) => data.filter((e) => e.employeeType === "Worker"),
   });
 
   const { data: salaryAdvances = [], isLoading: advancesLoading } = useQuery<SalaryAdvance[]>({
@@ -71,14 +71,14 @@ export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
     enabled: !!selectedCompany,
   });
 
-  const { data: repayments = [], isLoading: repaymentsLoading } = useQuery<any[]>({
+  const { data: repayments = [], isLoading: repaymentsLoading } = useQuery<unknown[]>({
     queryKey: ["/api/salary-advance-deductions", selectedCompany?.id],
     enabled: !!selectedCompany,
   });
 
   const workerDeductionsBase =
     appMode === "factory" ? "/api/factory/worker-deductions" : "/api/payroll/worker-deductions";
-  const { data: workerDeductions = [], isLoading: deductionsLoading } = useQuery<any[]>({
+  const { data: workerDeductions = [], isLoading: deductionsLoading } = useQuery<unknown[]>({
     queryKey: [workerDeductionsBase, selectedCompany?.id],
     queryFn: async () => {
       if (!selectedCompany?.id) return [];

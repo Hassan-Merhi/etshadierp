@@ -47,10 +47,10 @@ function exactConfirmation(req: any, expected: string, sourceName: string): stri
 }
 
 async function invokeMigrationHandler(
-  handler: (req: Request, res: Response) => Promise<any>,
+  handler: (req: Request, res: Response) => Promise<unknown>,
   req: any,
   body: any
-): Promise<any> {
+): Promise<unknown> {
   let statusCode = 200;
   let payload: any = null;
   const captureResponse: any = {
@@ -74,7 +74,7 @@ async function invokeMigrationHandler(
   return payload;
 }
 
-async function harmfulTargetActivity(targetId: number, activatedAt?: string | null): Promise<any> {
+async function harmfulTargetActivity(targetId: number, activatedAt?: string | null): Promise<unknown> {
   const after = activatedAt ? sql`AND created_at > ${activatedAt}` : sql``;
   const vouchers = await db.execute(sql`
     SELECT COUNT(*)::int AS count
@@ -113,7 +113,7 @@ async function harmfulTargetActivity(targetId: number, activatedAt?: string | nu
   return { ...counts, total: Object.values(counts).reduce((sum, value) => sum + value, 0) };
 }
 
-async function normalizedReadiness(sourceId: number, targetId: number): Promise<any> {
+async function normalizedReadiness(sourceId: number, targetId: number): Promise<unknown> {
   const readiness = await buildCutoverReadiness(sourceId, targetId);
   const activity = await harmfulTargetActivity(targetId);
   readiness.blockers = (readiness.blockers ?? []).filter((blocker: any) => blocker.code !== "TARGET_ALREADY_LIVE");
@@ -138,7 +138,7 @@ async function loadCutoverById(cutoverId: number): Promise<any | null> {
   return firstRow(result) ?? null;
 }
 
-async function prepareCutover(req: Request, res: Response): Promise<any> {
+async function prepareCutover(req: Request, res: Response): Promise<unknown> {
   const pair = await validateMigrationPair(req, res, false);
   if (!pair) return;
   const confirmationError = exactConfirmation(req, "PREPARE CUTOVER", pair.sourceCompany.name);
@@ -181,7 +181,7 @@ async function prepareCutover(req: Request, res: Response): Promise<any> {
   });
 }
 
-async function finalizeCutover(req: Request, res: Response): Promise<any> {
+async function finalizeCutover(req: Request, res: Response): Promise<unknown> {
   const pair = await validateMigrationPair(req, res, false);
   if (!pair) return;
   const confirmationError = exactConfirmation(req, "FINALIZE CUTOVER", pair.sourceCompany.name);
@@ -279,7 +279,7 @@ async function finalizeCutover(req: Request, res: Response): Promise<any> {
   }
 }
 
-async function rollbackCutover(req: Request, res: Response): Promise<any> {
+async function rollbackCutover(req: Request, res: Response): Promise<unknown> {
   const cutoverId = pn(req.body?.cutoverId);
   if (!cutoverId) return res.status(400).json({ message: "cutoverId is required" });
   await ensureCutoverColumns();
@@ -325,7 +325,7 @@ async function rollbackCutover(req: Request, res: Response): Promise<any> {
   });
 }
 
-async function cancelPreparedCutover(req: Request, res: Response): Promise<any> {
+async function cancelPreparedCutover(req: Request, res: Response): Promise<unknown> {
   const cutoverId = pn(req.body?.cutoverId);
   if (!cutoverId) return res.status(400).json({ message: "cutoverId is required" });
   await ensureCutoverColumns();
@@ -352,7 +352,7 @@ async function cancelPreparedCutover(req: Request, res: Response): Promise<any> 
   });
 }
 
-async function statusCutover(req: Request, res: Response): Promise<any> {
+async function statusCutover(req: Request, res: Response): Promise<unknown> {
   const pair = await validateMigrationPair(req, res, false);
   if (!pair) return;
   await ensureCutoverColumns();
@@ -369,7 +369,7 @@ async function statusCutover(req: Request, res: Response): Promise<any> {
   });
 }
 
-async function mapSuspenseEntry(req: Request, res: Response): Promise<any> {
+async function mapSuspenseEntry(req: Request, res: Response): Promise<unknown> {
   const pair = await validateMigrationPair(req, res, false);
   if (!pair) return;
   const targetEntryId = pn(req.params.targetEntryId);
@@ -402,7 +402,7 @@ async function mapSuspenseEntry(req: Request, res: Response): Promise<any> {
   return res.json({ success: true, targetEntryId, targetLedgerAccountId });
 }
 
-async function mapContainerCharge(req: Request, res: Response): Promise<any> {
+async function mapContainerCharge(req: Request, res: Response): Promise<unknown> {
   const pair = await validateMigrationPair(req, res, false);
   if (!pair) return;
   const chargeId = pn(req.params.chargeId);

@@ -18,8 +18,8 @@ import type { ContainerWithSupplier } from "./otwHelpers";
 
 interface ContainerDetailDialogProps {
   container: ContainerWithSupplier | null;
-  suppliers: any[] | undefined;
-  ledgerAccounts: any[];
+  suppliers: unknown[] | undefined;
+  ledgerAccounts: unknown[];
   onClose: () => void;
   onEdit: (c: ContainerWithSupplier) => void;
 }
@@ -31,7 +31,7 @@ export function ContainerDetailDialog({
   onClose,
   onEdit,
 }: ContainerDetailDialogProps) {
-  const { data: viewContainerCharges = [] } = useQuery<any[]>({
+  const { data: viewContainerCharges = [] } = useQuery<unknown[]>({
     queryKey: ["/api/factory/containers", container?.id, "other-charges"],
     queryFn: async () => {
       if (!container) return [];

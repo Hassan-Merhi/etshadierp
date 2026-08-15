@@ -81,7 +81,7 @@ export async function calculateNetPositionAsOf(
   const supplierBalances = new Map<number, { debit: number; credit: number }>();
   const employeeBalances = new Map<number, { debit: number; credit: number }>();
 
-  for (const row of acctGrouped.rows as any[]) {
+  for (const row of acctGrouped.rows as unknown[]) {
     const d = parseFloat(row.total_debit || "0");
     const c = parseFloat(row.total_credit || "0");
     if (row.ledger_account_id != null) {
@@ -90,7 +90,7 @@ export async function calculateNetPositionAsOf(
       accountBalances.set(id, { debit: cur.debit + d, credit: cur.credit + c });
     }
   }
-  for (const row of suppGrouped.rows as any[]) {
+  for (const row of suppGrouped.rows as unknown[]) {
     const d = parseFloat(row.total_debit || "0");
     const c = parseFloat(row.total_credit || "0");
     if (row.supplier_id != null) {

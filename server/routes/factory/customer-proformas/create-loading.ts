@@ -72,7 +72,7 @@ export function registerFactoryCustomerProformaLoadingRoutes(app: Express) {
       );
       logger.info(`[create-loading] proformaId=${proformaId} companyId=${companyId}`);
       const alreadyLoadedMap = new Map<string, number>(
-        (resultRows(alreadyLoadedRaw) || (alreadyLoadedRaw as unknown as any[])).map((r: any) => [
+        (resultRows(alreadyLoadedRaw) || (alreadyLoadedRaw as unknown as unknown[])).map((r: any) => [
           r.articleCode,
           Number(r.loaded),
         ])

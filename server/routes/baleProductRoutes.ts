@@ -347,7 +347,7 @@ export function registerBaleProductRoutes(app: Express) {
           categoryCache[cat.name.toLowerCase()] = cat.id;
         }
 
-        for (const row of rows as any[]) {
+        for (const row of rows as unknown[]) {
           const itemNumber = row.itemNumber || row.item_number || row.ItemNumber;
           let articleCode = row.articleCode || row.article_code || row.ArticleCode || "";
           if (!articleCode && itemNumber) {

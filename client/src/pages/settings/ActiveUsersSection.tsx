@@ -39,12 +39,12 @@ export function ActiveUsersSection() {
   const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const isDeveloper = currentUser?.role === "Developer";
 
-  const { data: presenceData, isLoading } = useQuery<any[]>({
+  const { data: presenceData, isLoading } = useQuery<unknown[]>({
     queryKey: ["/api/user-presence"],
     refetchInterval: 30000,
   });
 
-  const { data: companies } = useQuery<any[]>({
+  const { data: companies } = useQuery<unknown[]>({
     queryKey: ["/api/companies"],
   });
 
@@ -80,7 +80,7 @@ export function ActiveUsersSection() {
         acc[companyId].push(presence);
         return acc;
       },
-      {} as Record<string, any[]>
+      {} as Record<string, unknown[]>
     ) || {};
 
   return (

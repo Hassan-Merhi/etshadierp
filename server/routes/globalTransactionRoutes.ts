@@ -130,7 +130,7 @@ export function registerGlobalTransactionRoutes(app: Express, requireAuth: any) 
       }
 
       // 3. Build WHERE conditions
-      const conditions: any[] = [inArray(vouchers.companyId, targetCompanyIds), isNull(vouchers.deletedAt)];
+      const conditions: unknown[] = [inArray(vouchers.companyId, targetCompanyIds), isNull(vouchers.deletedAt)];
 
       if (startDate) conditions.push(gte(vouchers.voucherDate, startDate));
       if (endDate) conditions.push(lte(vouchers.voucherDate, endDate));

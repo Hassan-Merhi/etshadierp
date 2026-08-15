@@ -12,7 +12,7 @@ interface VoucherListPanelProps {
 }
 
 export function VoucherListPanel({ onEdit, formatAmount }: VoucherListPanelProps) {
-  const { data: vouchers = [], isLoading } = useQuery<any[]>({
+  const { data: vouchers = [], isLoading } = useQuery<unknown[]>({
     queryKey: ["/api/vouchers"],
   });
 

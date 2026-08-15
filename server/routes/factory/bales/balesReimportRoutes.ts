@@ -69,7 +69,7 @@ export function registerBalesReimportRoutes(app: Express) {
             .json({ message: "Excel must have at least: Reference Number, Product Name, Weight (kg) columns" });
         }
 
-        const rows: any[] = [];
+        const rows: unknown[] = [];
         const fileRefSet = new Set<string>();
         const fileDuplicates: string[] = [];
 
@@ -167,7 +167,7 @@ export function registerBalesReimportRoutes(app: Express) {
             allCategories.map((c: ImportedBaleCategory) => [c.name?.toLowerCase(), c] as const)
           );
 
-          const createdBales: any[] = [];
+          const createdBales: unknown[] = [];
           let totalWeight = 0;
 
           for (const row of rows) {
@@ -418,7 +418,7 @@ export function registerBalesReimportRoutes(app: Express) {
         const { read: readXlsx, utils } = await import("xlsx");
         const wb = readXlsx(req.file.buffer, { type: "buffer" });
         const sheet = wb.Sheets[wb.SheetNames[0]];
-        const rows: any[] = utils.sheet_to_json(sheet, { defval: "" });
+        const rows: unknown[] = utils.sheet_to_json(sheet, { defval: "" });
 
         let updated = 0;
         let skipped = 0;

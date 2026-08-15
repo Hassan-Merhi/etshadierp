@@ -18,7 +18,7 @@ export async function updateStockTransfer(
   destinationLocationId: number,
   notes: string,
   items: Array<{ sourceLocationId: number; stockItemId: number; quantity: string; rate: string }>
-): Promise<any> {
+): Promise<unknown> {
   return await db.transaction(async (tx) => {
     const [existingTransfer] = await tx
       .select()
@@ -215,7 +215,7 @@ export async function updateStockAdjustment(
   adjustmentType: "Production" | "Consumption" | "Mixed",
   notes: string,
   items: Array<{ stockItemId: number; quantity: string; rate: string }>
-): Promise<any> {
+): Promise<unknown> {
   return await db.transaction(async (tx) => {
     const [existingAdjustment] = await tx
       .select()

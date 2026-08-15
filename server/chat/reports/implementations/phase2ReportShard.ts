@@ -51,7 +51,7 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY total_value DESC
         LIMIT ${rowLimit}
       `);
-      const tableRows2 = (rows.rows as any[]).map((r) => [
+      const tableRows2 = (rows.rows as unknown[]).map((r) => [
         r.item_name,
         r.code,
         r.location_name,
@@ -84,7 +84,7 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY (COALESCE(SUM(CAST(inv.quantity AS numeric)), 0) / NULLIF(CAST(si.reorder_level AS numeric), 0)) ASC
         LIMIT ${rowLimit}
       `);
-      const tableRows2 = (rows.rows as any[]).map((r) => [
+      const tableRows2 = (rows.rows as unknown[]).map((r) => [
         r.name,
         r.code,
         `${fmtDec(parseFloat(r.total_qty))} ${r.uom}`,
@@ -127,7 +127,7 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY v.voucher_date DESC
         LIMIT ${rowLimit}
       `);
-      const tableRows2 = (rows.rows as any[]).map((r) => [
+      const tableRows2 = (rows.rows as unknown[]).map((r) => [
         String(r.voucher_date).slice(0, 10),
         r.adjustment_type,
         r.location,
@@ -160,7 +160,7 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY po.created_at DESC
         LIMIT ${rowLimit}
       `);
-      const tableRows2 = (rows.rows as any[]).map((r) => [
+      const tableRows2 = (rows.rows as unknown[]).map((r) => [
         r.po_number,
         r.supplier,
         r.container_number,
@@ -218,7 +218,7 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         grandTotal61_90 = 0,
         grandTotalOver90 = 0,
         grandTotalAll = 0;
-      const tableRows2 = (rows.rows as any[]).map((r) => {
+      const tableRows2 = (rows.rows as unknown[]).map((r) => {
         const balance = parseFloat(r.ob) + parseFloat(r.total_debit) - parseFloat(r.total_credit);
         const b0 = parseFloat(r.bucket_0_30);
         const b1 = parseFloat(r.bucket_31_60);
@@ -296,7 +296,7 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         sgTotal61_90 = 0,
         sgTotalOver90 = 0,
         sgTotalAll = 0;
-      const tableRows2 = (rows.rows as any[]).map((r) => {
+      const tableRows2 = (rows.rows as unknown[]).map((r) => {
         const balance = parseFloat(r.ob) + parseFloat(r.total_credit) - parseFloat(r.total_debit);
         const b0 = parseFloat(r.bucket_0_30);
         const b1 = parseFloat(r.bucket_31_60);
@@ -352,7 +352,7 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY c.import_date DESC
         LIMIT ${rowLimit}
       `);
-      const tableRows2 = (rows.rows as any[]).map((r) => [
+      const tableRows2 = (rows.rows as unknown[]).map((r) => [
         r.container_number,
         r.status,
         String(r.import_date).slice(0, 10),
@@ -432,7 +432,7 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         totalPaid = 0,
         occupied = 0,
         vacant = 0;
-      const tableRows2 = (rows.rows as any[]).map((r) => {
+      const tableRows2 = (rows.rows as unknown[]).map((r) => {
         const exp = parseFloat(r.expected || "0");
         const paid = parseFloat(r.paid || "0");
         totalExpected += exp;
@@ -497,7 +497,7 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         totalBase = 0,
         totalBale = 0,
         totalDed = 0;
-      const tableRows2 = (rows.rows as any[]).map((r) => {
+      const tableRows2 = (rows.rows as unknown[]).map((r) => {
         const net = parseFloat(r.net_salary || "0");
         totalNet += net;
         totalBase += parseFloat(r.base_salary || "0");

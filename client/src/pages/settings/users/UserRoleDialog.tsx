@@ -26,7 +26,7 @@ interface UserRoleDialogProps {
   open: boolean;
   onClose: () => void;
   userId: string;
-  companies: any[];
+  companies: unknown[];
   editingRole?: any | null;
 }
 
@@ -95,7 +95,7 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
     }
   }, [open, editingRole?.id]);
 
-  const { data: locations = [] } = useQuery<any[]>({
+  const { data: locations = [] } = useQuery<unknown[]>({
     queryKey: ["/api/locations", { companyId: selectedCompanyId }],
     queryFn: async () => {
       if (!selectedCompanyId) return [];
@@ -106,7 +106,7 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
     enabled: !!selectedCompanyId && open && isPOSRole,
   });
 
-  const { data: roleDialogLedgerAccounts = [] } = useQuery<any[]>({
+  const { data: roleDialogLedgerAccounts = [] } = useQuery<unknown[]>({
     queryKey: ["/api/ledger-accounts", { companyId: selectedCompanyId }],
     queryFn: async () => {
       if (!selectedCompanyId) return [];
@@ -125,7 +125,7 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
         const missing = selectedLocationIds.filter((id) => !locationCashAccounts[id]);
         if (missing.length > 0) {
           const locNames = missing.map((id) => {
-            const loc = (locations as any[]).find((l) => l.id === id);
+            const loc = (locations as unknown[]).find((l) => l.id === id);
             return loc?.name || `Location #${id}`;
           });
           throw new Error(`Cash account required for: ${locNames.join(", ")}`);
@@ -247,7 +247,7 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
                         className="border rounded-md p-3 space-y-3 max-h-56 overflow-y-auto"
                         data-testid="select-locations"
                       >
-                        {(locations as any[]).map((loc) => {
+                        {(locations as unknown[]).map((loc) => {
                           const isChecked = selectedLocationIds.includes(loc.id);
                           return (
                             <div key={loc.id} className="space-y-1.5">

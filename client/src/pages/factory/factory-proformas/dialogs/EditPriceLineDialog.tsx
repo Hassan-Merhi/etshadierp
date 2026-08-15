@@ -16,12 +16,12 @@ export function EditPriceLineDialog({
   setEditLineValues,
   setEditingLine,
 }: {
-  editLineMutation: any;
-  editLineValues: any;
-  editingLine: any;
-  handleEditLine: any;
-  setEditLineValues: any;
-  setEditingLine: any;
+  editLineMutation: unknown;
+  editLineValues: unknown;
+  editingLine: unknown;
+  handleEditLine: unknown;
+  setEditLineValues: unknown;
+  setEditingLine: unknown;
 }) {
   return (
     <Dialog open={!!editingLine} onOpenChange={(open) => !open && setEditingLine(null)}>

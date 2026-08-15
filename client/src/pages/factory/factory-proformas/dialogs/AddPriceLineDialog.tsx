@@ -25,20 +25,20 @@ export function AddPriceLineDialog({
   setIsAddLineOpen,
   setNewLine,
 }: {
-  addLineMode: any;
-  addLineMutation: any;
-  allStockItems: any;
-  catalogSearch: any;
-  catalogSelectedItem: any;
-  handleAddLine: any;
-  isAddLineOpen: any;
-  newLine: any;
-  priceListMap: any;
-  setAddLineMode: any;
-  setCatalogSearch: any;
-  setCatalogSelectedItem: any;
-  setIsAddLineOpen: any;
-  setNewLine: any;
+  addLineMode: unknown;
+  addLineMutation: unknown;
+  allStockItems: unknown;
+  catalogSearch: unknown;
+  catalogSelectedItem: unknown;
+  handleAddLine: unknown;
+  isAddLineOpen: unknown;
+  newLine: unknown;
+  priceListMap: unknown;
+  setAddLineMode: unknown;
+  setCatalogSearch: unknown;
+  setCatalogSelectedItem: unknown;
+  setIsAddLineOpen: unknown;
+  setNewLine: unknown;
 }) {
   return (
     <Dialog

@@ -17,9 +17,9 @@ interface SalesReportPanelProps {
   factorySalesEndDate: string;
   setFactorySalesEndDate: (date: string) => void;
   loadingFactorySales: boolean;
-  factorySalesByCustomer: any[];
+  factorySalesByCustomer: unknown[];
   loadingFactoryPos: boolean;
-  factoryPosSummary: any;
+  factoryPosSummary: unknown;
   formatAmount: (amount: number) => string;
   formatNumber: (num: number) => string;
   selectedPeriod: string;

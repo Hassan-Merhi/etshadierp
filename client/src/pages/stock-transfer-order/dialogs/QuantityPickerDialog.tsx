@@ -20,13 +20,13 @@ export function QuantityPickerDialog({
   setPickerQuantity,
   setQuantityPicker,
 }: {
-  editVoucherId: any;
-  handleAddToOrder: any;
-  pickerQuantity: any;
-  quantityInputRef: any;
-  quantityPicker: any;
-  setPickerQuantity: any;
-  setQuantityPicker: any;
+  editVoucherId: unknown;
+  handleAddToOrder: unknown;
+  pickerQuantity: unknown;
+  quantityInputRef: unknown;
+  quantityPicker: unknown;
+  setPickerQuantity: unknown;
+  setQuantityPicker: unknown;
 }) {
   return (
     <Dialog open={quantityPicker.open} onOpenChange={(open) => setQuantityPicker({ ...quantityPicker, open })}>

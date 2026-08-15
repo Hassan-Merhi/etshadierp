@@ -29,7 +29,7 @@ export function registerFactoryMixBatchReadRoutes(app: Express) {
 
       // ── Display-blend calculation (read-only, no DB writes) ──
       const batchIds = results.map((b) => b.id);
-      let sourceRows: any[] = [];
+      let sourceRows: unknown[] = [];
       if (batchIds.length > 0) {
         // Only read the fields needed to compute list display totals. The old
         // select() materialized every source column even though none of the
@@ -55,7 +55,7 @@ export function registerFactoryMixBatchReadRoutes(app: Express) {
       // same stable historical derivation as before, read-only and concurrently.
       const supplierRateMap = await getLockedSupplierRatesReadOnlyBulk(db, Number(companyId), uniqueSupplierIds);
 
-      const sourcesByBatch = new Map<number, any[]>();
+      const sourcesByBatch = new Map<number, unknown[]>();
       for (const src of sourceRows) {
         if (!sourcesByBatch.has(src.mixBatchId)) sourcesByBatch.set(src.mixBatchId, []);
         sourcesByBatch.get(src.mixBatchId)!.push(src);

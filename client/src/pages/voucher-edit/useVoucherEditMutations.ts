@@ -21,7 +21,7 @@ import {
 
 interface UseVoucherEditMutationsOptions {
   id: string | undefined;
-  modeApiRequest: (method: string, url: string, body?: any) => Promise<any>;
+  modeApiRequest: (method: string, url: string, body?: any) => Promise<unknown>;
   voucherType: string | undefined;
   exchangeRate: number;
   handleBack: () => void;
@@ -40,7 +40,7 @@ export function useVoucherEditMutations({
   const [_location, navigate] = useLocation();
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { voucherUpdates: any; entries: any[] }) => {
+    mutationFn: async (data: { voucherUpdates: unknown; entries: unknown[] }) => {
       return await modeApiRequest("PUT", `/api/vouchers/${id}/with-entries`, {
         voucher: data.voucherUpdates,
         entries: data.entries,

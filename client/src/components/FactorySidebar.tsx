@@ -262,7 +262,7 @@ export function useFactoryVisibleSections(user?: any): {
   return { sections, isPinnedVisible, isAdmin, isDeveloper, isPrivileged };
 }
 
-export function FactorySidebar({ user }: { user?: any }) {
+export function FactorySidebar({ user }: { user?: unknown }) {
   const { toast } = useToast();
   const { conflictCount } = useConnectivity();
   const { selectedCompany } = useCompany();

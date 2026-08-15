@@ -99,7 +99,7 @@ export default function FactoryOpeningBalanceEdit() {
 
   const updateMutation = useMutation({
     mutationFn: async () => {
-      const body: Record<string, any> = {
+      const body: Record<string, unknown> = {
         receivedKg: form.receivedKg,
         costPerKg: form.costPerKg,
         currencyCode: form.currencyCode,

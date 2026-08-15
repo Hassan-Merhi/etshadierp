@@ -81,9 +81,9 @@ export const openBrowserPrint = (
 };
 
 export const printLabels = async (
-  bales: any[],
-  cart: any[],
-  baleProducts: any[] | undefined,
+  bales: unknown[],
+  cart: unknown[],
+  baleProducts: unknown[] | undefined,
   selectedLogoId: number | null,
   modeApiRequest: any,
   toast: any,

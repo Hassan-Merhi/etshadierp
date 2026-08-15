@@ -336,7 +336,7 @@ export function useAnalyticsLegacy() {
     return qs ? `${base}?${qs}` : base;
   };
 
-  const { data: factorySalesByCustomer = [], isLoading: loadingFactorySales } = useQuery<any[]>({
+  const { data: factorySalesByCustomer = [], isLoading: loadingFactorySales } = useQuery<unknown[]>({
     queryKey: [
       "/api/factory/analytics/sales-by-customer",
       selectedCompany?.id,

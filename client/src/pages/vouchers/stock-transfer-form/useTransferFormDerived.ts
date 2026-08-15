@@ -12,7 +12,7 @@ import { queryClient } from "@/lib/queryClient";
 import { locationInventoryLightUrl } from "@/api/inventoryApi";
 
 /** Source-location inventory, filtered by the sidebar search and sorted by name. */
-export function useFilteredTransferInventory(transferInventory: any[], transferSearchTerm: string) {
+export function useFilteredTransferInventory(transferInventory: unknown[], transferSearchTerm: string) {
   return useMemo(() => {
     const term = transferSearchTerm.trim().toLowerCase();
     const filtered = term
@@ -29,7 +29,7 @@ export function useFilteredTransferInventory(transferInventory: any[], transferS
  * Revisions still awaiting review. Approving one applies all of them, so the
  * approve dialog previews the whole set rather than just the clicked row.
  */
-export function usePendingTransferRevisions(transferRevisions: any[]) {
+export function usePendingTransferRevisions(transferRevisions: unknown[]) {
   return useMemo(() => transferRevisions.filter((rev) => rev.optional), [transferRevisions]);
 }
 
@@ -40,7 +40,7 @@ export function usePendingTransferRevisions(transferRevisions: any[]) {
  */
 export function useTransferRateAutofill(
   transferEntries: { sourceLocationId: number; stockItemId: number; rate?: string }[],
-  stockTransferForm: UseFormReturn<any>
+  stockTransferForm: UseFormReturn<unknown>
 ) {
   const signature = transferEntries.map((e) => `${e.sourceLocationId}-${e.stockItemId}-${e.rate ? 1 : 0}`).join(",");
 
@@ -59,7 +59,7 @@ export function useTransferRateAutofill(
     for (const [locationId, pending] of missingByLocation) {
       const pricingUrl = locationInventoryLightUrl(locationId, true);
       queryClient
-        .fetchQuery<any[]>({ queryKey: [pricingUrl] })
+        .fetchQuery<unknown[]>({ queryKey: [pricingUrl] })
         .then((locationInventory) => {
           if (cancelled || !Array.isArray(locationInventory)) return;
           const rateByItem = new Map<number, string>();

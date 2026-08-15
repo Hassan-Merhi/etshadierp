@@ -5,8 +5,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 interface RemoveFromStockTableProps {
   viewMode: "condensed" | "detailed";
   loading: boolean;
-  filteredBales: any[] | undefined;
-  condensedRows: any[];
+  filteredBales: unknown[] | undefined;
+  condensedRows: unknown[];
   selectedBaleIds: Set<number>;
   onToggleBale: (id: number) => void;
   onToggleCondensedRow: (ids: number[]) => void;

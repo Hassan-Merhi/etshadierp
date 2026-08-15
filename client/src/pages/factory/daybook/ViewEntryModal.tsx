@@ -57,7 +57,7 @@ export function ViewEntryModal({
   })();
   const metaContainerId: number | undefined = entryMeta.containerId;
 
-  const { data: viewEntries = [] } = useQuery<any[]>({
+  const { data: viewEntries = [] } = useQuery<unknown[]>({
     queryKey: [`/api/vouchers/${entry.referenceId}/view-entries`],
     enabled: isVoucherBacked && !!entry.referenceId,
   });
@@ -82,7 +82,7 @@ export function ViewEntryModal({
     enabled: isMixBatchCreated,
   });
 
-  const { data: mixBatchSources = [] } = useQuery<any[]>({
+  const { data: mixBatchSources = [] } = useQuery<unknown[]>({
     queryKey: [`/api/factory/mix-batches/${entry.referenceId}/sources`],
     enabled: isMixBatchCreated,
   });

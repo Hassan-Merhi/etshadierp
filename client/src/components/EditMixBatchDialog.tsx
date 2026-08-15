@@ -67,7 +67,7 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
   });
 
   // Fetch current sources for this batch
-  const { data: currentSources, isLoading: sourcesLoading } = useQuery<any[]>({
+  const { data: currentSources, isLoading: sourcesLoading } = useQuery<unknown[]>({
     queryKey: ["/api/factory/mix-batches", batch?.id, "sources"],
     queryFn: () =>
       fetch(`/api/factory/mix-batches/${batch!.id}/sources`, { credentials: "include" }).then((r) => r.json()),

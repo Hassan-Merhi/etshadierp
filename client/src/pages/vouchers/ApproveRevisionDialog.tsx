@@ -10,9 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 
 interface ApproveRevisionDialogProps {
-  approveRevisionTarget: any;
+  approveRevisionTarget: unknown;
   setApproveRevisionTarget: (target: any) => void;
-  approveRevisionMutation: any;
+  approveRevisionMutation: unknown;
   formatNumber: (num: any, decimals?: number) => string;
 }
 

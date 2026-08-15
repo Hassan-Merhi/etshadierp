@@ -103,7 +103,7 @@ export function registerFactoryDailyReportRoutes(app: Express) {
         const ExcelJS = (await import("exceljs")).default;
         const workbook = new ExcelJS.Workbook();
         const sheet = workbook.addWorksheet("Production Report");
-        const columns: any[] = [
+        const columns: unknown[] = [
           { header: "Date", key: "date", width: 14 },
           { header: "Batch Code", key: "batchCode", width: 18 },
           { header: "Batch Name", key: "batchName", width: 28 },

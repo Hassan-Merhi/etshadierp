@@ -240,7 +240,7 @@ export function buildPaginationIntegrityConditions(companyParam: string): string
  * description/amount enrichment in the legacy daybook route.
  */
 export async function buildLegacyValidSourceIds(
-  rows: any[],
+  rows: unknown[],
   companyId: number
 ): Promise<Map<string, Set<number>>> {
   // Collect referenceIds grouped by source table

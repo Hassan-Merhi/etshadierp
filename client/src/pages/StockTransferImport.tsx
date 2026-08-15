@@ -21,7 +21,7 @@ interface Location {
 }
 
 interface StockTransferImportProps {
-  posUser?: any;
+  posUser?: unknown;
 }
 
 export default function StockTransferImport({ posUser }: StockTransferImportProps) {

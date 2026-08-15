@@ -9,11 +9,11 @@ import { formatNumber } from "@/lib/formatNumber";
 interface AddToBatchDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  addToBatchSource: any;
+  addToBatchSource: unknown;
   setAddToBatchSource: (source: any) => void;
-  mixBatches: any[];
-  rawStock: any[];
-  addToBatchMutation: any;
+  mixBatches: unknown[];
+  rawStock: unknown[];
+  addToBatchMutation: unknown;
   wrapAdminAction: (action: () => void, title: string) => void;
 }
 

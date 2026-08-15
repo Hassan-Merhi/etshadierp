@@ -141,7 +141,7 @@ export function registerVoucherEntryWriteRoutes(app: Express) {
       }
 
       // Only allow updating debit/credit amounts and narration
-      const allowedUpdates: Partial<any> = {};
+      const allowedUpdates: Partial<unknown> = {};
       if (req.body.debitAmount !== undefined) allowedUpdates.debitAmount = req.body.debitAmount;
       if (req.body.creditAmount !== undefined) allowedUpdates.creditAmount = req.body.creditAmount;
       if (req.body.narration !== undefined) allowedUpdates.narration = req.body.narration;

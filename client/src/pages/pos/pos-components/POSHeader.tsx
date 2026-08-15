@@ -23,19 +23,19 @@ import {
 import { Link } from "wouter";
 
 export interface POSHeaderProps {
-  posUser: any;
+  posUser: unknown;
   editVoucherId?: string;
-  activeLocation: any;
+  activeLocation: unknown;
   showPosImport: boolean;
   onExportInventory: () => void;
   onImportClick: () => void;
   onShowStockReport: () => void;
   navigate: (path: string) => void;
-  saveMutation?: any;
+  saveMutation?: unknown;
   hasValidItems?: boolean;
   handleSaveSale?: () => void;
   lastAutosaved?: Date | null;
-  drafts?: any[];
+  drafts?: unknown[];
   onOpenDraftDialog?: () => void;
   onUpdateDraft?: () => void;
   onSummaryExport?: () => void;

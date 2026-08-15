@@ -46,7 +46,7 @@ export default function FactoryNetPosition() {
 
   // Authoritative supplier balances — only used for today (live override).
   // For historical dates we rely solely on the date-filtered net-position endpoint.
-  const { data: supplierWithBalances = [] } = useQuery<any[]>({
+  const { data: supplierWithBalances = [] } = useQuery<unknown[]>({
     queryKey: ["/api/factory/suppliers/with-balances", "net-position-merge"],
     queryFn: async () => {
       const res = await fetch("/api/factory/suppliers/with-balances?includeOtw=true", { credentials: "include" });

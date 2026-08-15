@@ -135,7 +135,7 @@ export function AccountCombobox({
 export function AdjustmentsHistoryCard({ onDeleteRequest }: { onDeleteRequest: (id: number) => void }) {
   const { formatDisplayDate } = useDateFormat();
   const [open, setOpen] = useState(false);
-  const { data: adjustments, isLoading } = useQuery<any[]>({
+  const { data: adjustments, isLoading } = useQuery<unknown[]>({
     queryKey: ["/api/factory/raw-stock/adjustments"],
     enabled: open,
   });

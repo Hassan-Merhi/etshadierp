@@ -19,8 +19,8 @@ export function StockOverloadWarningDialog({
   overloadWarning,
   setOverloadWarning,
 }: {
-  overloadWarning: any;
-  setOverloadWarning: any;
+  overloadWarning: unknown;
+  setOverloadWarning: unknown;
 }) {
   return (
     <Dialog

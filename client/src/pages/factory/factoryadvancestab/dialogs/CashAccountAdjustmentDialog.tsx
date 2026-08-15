@@ -27,12 +27,12 @@ export function CashAccountAdjustmentDialog({
   setCashAdjForm,
   setCashAdjOpen,
 }: {
-  cashAccounts: any;
-  cashAdjForm: any;
-  cashAdjMutation: any;
-  cashAdjOpen: any;
-  setCashAdjForm: any;
-  setCashAdjOpen: any;
+  cashAccounts: unknown;
+  cashAdjForm: unknown;
+  cashAdjMutation: unknown;
+  cashAdjOpen: unknown;
+  setCashAdjForm: unknown;
+  setCashAdjOpen: unknown;
 }) {
   return (
     <Dialog

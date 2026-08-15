@@ -9,7 +9,7 @@
 // Consolidated here to eliminate the duplication; behaviour is identical.
 // ---------------------------------------------------------------------------
 
-const _statCache = new Map<string, { data: any; expiresAt: number }>();
+const _statCache = new Map<string, { data: unknown; expiresAt: number }>();
 
 export function _getCached(key: string): any | null {
   const e = _statCache.get(key);

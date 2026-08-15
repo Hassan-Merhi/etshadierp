@@ -49,7 +49,7 @@ export function AccountTable({
   const accountIds = new Set(typeFiltered.map((a) => a.accountId as number));
   const parents = typeFiltered.filter((a) => !a.parentId || !accountIds.has(a.parentId));
   const childrenList = typeFiltered.filter((a) => a.parentId && accountIds.has(a.parentId));
-  const childMap = new Map<number, any[]>();
+  const childMap = new Map<number, unknown[]>();
   childrenList.forEach((c) => {
     if (!childMap.has(c.parentId)) childMap.set(c.parentId, []);
     childMap.get(c.parentId)!.push(c);

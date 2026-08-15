@@ -21,9 +21,9 @@ export function ReverseAdvanceDialog({
   reverseTarget,
   setReverseTarget,
 }: {
-  reverseMutation: any;
-  reverseTarget: any;
-  setReverseTarget: any;
+  reverseMutation: unknown;
+  reverseTarget: unknown;
+  setReverseTarget: unknown;
 }) {
   return (
     <Dialog open={!!reverseTarget} onOpenChange={(open) => !open && setReverseTarget(null)}>

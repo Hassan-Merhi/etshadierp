@@ -55,15 +55,15 @@ interface PosHandlersParams {
   dailyExchangeRate: number | null;
   activeLocation: Location | null;
   editVoucherId?: string;
-  editVoucher: any;
+  editVoucher: unknown;
   inventory: InventoryItem[];
   apiInventory: APIInventoryItem[];
   lastSoldPrices: Record<number, string>;
-  currentShift: any;
-  authUser: any;
-  posUser: any;
+  currentShift: unknown;
+  authUser: unknown;
+  posUser: unknown;
   // Mutations
-  saveMutation: any;
+  saveMutation: unknown;
   // Misc
   toast: (opts: { title: string; description?: string; variant?: "destructive" | "default" }) => void;
 }

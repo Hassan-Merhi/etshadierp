@@ -24,7 +24,7 @@ export async function getVoucherById(id: number): Promise<Voucher | undefined> {
   return voucher;
 }
 
-export async function getVouchersByDateRange(companyId: number, startDate: string, endDate: string): Promise<any[]> {
+export async function getVouchersByDateRange(companyId: number, startDate: string, endDate: string): Promise<unknown[]> {
   const vouchers = await db
     .select()
     .from(schema.vouchers)
@@ -47,8 +47,8 @@ export async function getVoucherEntriesByLedger(
   startDate?: string,
   endDate?: string,
   companyId?: number
-): Promise<any[]> {
-  const params: any[] = [ledgerAccountId];
+): Promise<unknown[]> {
+  const params: unknown[] = [ledgerAccountId];
   let dateFilters = "";
   if (startDate) {
     params.push(startDate);
@@ -103,8 +103,8 @@ export async function getVoucherEntriesByCustomer(
   startDate?: string,
   endDate?: string,
   companyId?: number
-): Promise<any[]> {
-  const params: any[] = [customerId];
+): Promise<unknown[]> {
+  const params: unknown[] = [customerId];
   let dateFilters = "";
   let companyFilter = "";
   if (startDate) {
@@ -149,8 +149,8 @@ export async function getVoucherEntriesByBankAccount(
   startDate?: string,
   endDate?: string,
   companyId?: number
-): Promise<any[]> {
-  const params: any[] = [bankAccountId];
+): Promise<unknown[]> {
+  const params: unknown[] = [bankAccountId];
   let dateFilters = "";
   let companyFilter = "";
   if (startDate) {
@@ -195,8 +195,8 @@ export async function getVoucherEntriesByFixedAsset(
   startDate?: string,
   endDate?: string,
   companyId?: number
-): Promise<any[]> {
-  const params: any[] = [fixedAssetId];
+): Promise<unknown[]> {
+  const params: unknown[] = [fixedAssetId];
   let dateFilters = "";
   let companyFilter = "";
   if (startDate) {
@@ -241,8 +241,8 @@ export async function getVoucherEntriesBySupplier(
   companyId?: number,
   startDate?: string,
   endDate?: string
-): Promise<any[]> {
-  const params: any[] = [supplierId];
+): Promise<unknown[]> {
+  const params: unknown[] = [supplierId];
   let dateFilters = "";
   let companyFilter = "";
   if (companyId) {
@@ -293,8 +293,8 @@ export async function getVoucherEntriesByEmployee(
   companyId?: number,
   startDate?: string,
   endDate?: string
-): Promise<any[]> {
-  const params: any[] = [employeeId];
+): Promise<unknown[]> {
+  const params: unknown[] = [employeeId];
   let dateFilters = "";
   let companyFilter = "";
   if (companyId) {
@@ -345,7 +345,7 @@ export async function updateVoucher(id: number, updates: Partial<InsertVoucher>)
   return updated;
 }
 
-export async function getVoucherEntriesByVoucher(voucherId: number): Promise<any[]> {
+export async function getVoucherEntriesByVoucher(voucherId: number): Promise<unknown[]> {
   const entries = await db
     .select({
       id: schema.voucherEntries.id,

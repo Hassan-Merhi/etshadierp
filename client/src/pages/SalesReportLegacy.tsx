@@ -97,12 +97,12 @@ export default function SalesReport() {
   const { formatAmount } = useCurrencyContext();
 
   // Fetch locations
-  const { data: locations = [] } = useQuery<any[]>({
+  const { data: locations = [] } = useQuery<unknown[]>({
     queryKey: ["/api/locations"],
   });
 
   // Fetch stock items (lightweight — only needs id/name/code for filter dropdown)
-  const { data: stockItems = [] } = useQuery<any[]>({
+  const { data: stockItems = [] } = useQuery<unknown[]>({
     queryKey: ["/api/stock-items/light", selectedCompany?.id],
     staleTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
@@ -111,7 +111,7 @@ export default function SalesReport() {
   });
 
   // Fetch stock groups
-  const { data: stockGroups = [] } = useQuery<any[]>({
+  const { data: stockGroups = [] } = useQuery<unknown[]>({
     queryKey: ["/api/stock-groups"],
   });
 

@@ -38,10 +38,10 @@ interface PlanStep {
   id: string;
   name: string;
   tool: string;
-  params: Record<string, any>;
+  params: Record<string, unknown>;
   requiresApproval: boolean;
   status: StepStatus;
-  result?: any;
+  result?: unknown;
   error?: string;
   approvalId?: number;
   startedAt?: string;
@@ -53,8 +53,8 @@ interface Approval {
   taskId: number;
   actionType: string;
   actionLabel: string;
-  previewJson: any;
-  payloadJson: any;
+  previewJson: unknown;
+  payloadJson: unknown;
   status: string;
   createdAt: string;
 }

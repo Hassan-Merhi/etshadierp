@@ -63,8 +63,8 @@ export function registerGitAgentRoutes(app: Express) {
             WHERE company_id = ${companyId}
             ORDER BY created_at ASC`
       );
-      const byAgent: Record<string, any[]> = {};
-      for (const r of result.rows as any[]) {
+      const byAgent: Record<string, unknown[]> = {};
+      for (const r of result.rows as unknown[]) {
         if (!byAgent[r.agent_name]) byAgent[r.agent_name] = [];
         byAgent[r.agent_name].push({
           id: r.id,
@@ -165,7 +165,7 @@ export function registerGitAgentRoutes(app: Express) {
             WHERE company_id = ${companyId} AND agent_name = ${agentName}
             ORDER BY created_at ASC`
       );
-      res.json({ designations: (result.rows as any[]).map((r) => ({ containerId: r.container_id })) });
+      res.json({ designations: (result.rows as unknown[]).map((r) => ({ containerId: r.container_id })) });
     } catch (err: unknown) {
       res.status(500).json({ message: getErrorMessage(err) });
     }
@@ -217,7 +217,7 @@ export function registerGitAgentRoutes(app: Express) {
         sql`SELECT id, container_number, duty_fee FROM containers
             WHERE id IN (${oldContainerId}, ${newContainerId})`
       );
-      const rows = cResult.rows as any[];
+      const rows = cResult.rows as unknown[];
       const oldC = rows.find((r) => r.id === oldContainerId || r.id === Number(oldContainerId));
       const newC = rows.find((r) => r.id === newContainerId || r.id === Number(newContainerId));
 
@@ -229,7 +229,7 @@ export function registerGitAgentRoutes(app: Express) {
         sql`SELECT container_id FROM git_prepaid_designations
             WHERE company_id = ${companyId} AND agent_name = ${agentName} AND container_id = ${Number(oldContainerId)}`
       );
-      if ((existing.rows as any[]).length === 0) {
+      if ((existing.rows as unknown[]).length === 0) {
         return res.status(409).json({
           message: `Container ${oldC.container_number} is not currently designated as prepaid for this agent.`,
         });

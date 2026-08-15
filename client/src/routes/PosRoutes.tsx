@@ -19,7 +19,7 @@ import {
 } from "@/lazyPages";
 
 interface PosRoutesProps {
-  user: any;
+  user: unknown;
   posImportEnabled?: boolean;
 }
 

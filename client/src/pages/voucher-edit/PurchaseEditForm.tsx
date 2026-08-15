@@ -26,8 +26,8 @@ export function PurchaseEditForm({
   formatAmount,
   grandTotal,
 }: {
-  form: UseFormReturn<any>;
-  voucher: any;
+  form: UseFormReturn<unknown>;
+  voucher: unknown;
   onSubmit: (data: any) => void;
   onCancel: () => void;
   onToggleOptional: (optional: boolean) => void;

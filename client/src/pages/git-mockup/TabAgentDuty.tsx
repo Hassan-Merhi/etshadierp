@@ -52,7 +52,7 @@ export function TabAgentDuty() {
 
       fetch(`/api/git/agent-adjustments-bulk/${cid}`, { credentials: "include" })
         .then((r) => (r.ok ? r.json() : null))
-        .then((body: { byAgent: Record<string, any[]> } | null) => {
+        .then((body: { byAgent: Record<string, unknown[]> } | null) => {
           if (!body) return;
           for (const [agentName, adjustments] of Object.entries(body.byAgent)) {
             const key = `/api/git/agent-adjustments/${cid}/${encodeURIComponent(agentName)}`;

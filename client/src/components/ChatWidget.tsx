@@ -61,7 +61,7 @@ export function ChatWidget() {
   const [voucherSubmitting, setVoucherSubmitting] = useState(false);
   const [pendingStockAdj, setPendingStockAdj] = useState<StockAdjustmentDraft | null>(null);
   const [stockAdjSubmitting, setStockAdjSubmitting] = useState(false);
-  const [voucherSearchResults, setVoucherSearchResults] = useState<any[] | null>(null);
+  const [voucherSearchResults, setVoucherSearchResults] = useState<unknown[] | null>(null);
   const [pendingStockItem, setPendingStockItem] = useState<StockItemDraft | null>(null);
   const [stockItemSubmitting, setStockItemSubmitting] = useState(false);
   const [pendingPriceUpdate, setPendingPriceUpdate] = useState<PriceUpdateDraft | null>(null);

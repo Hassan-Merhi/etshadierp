@@ -4,7 +4,7 @@ import { logger } from "../../lib/logger";
 
 import { CompanyExportData } from "./types";
 
-async function q(sql: string, params?: any[]): Promise<any[]> {
+async function q(sql: string, params?: unknown[]): Promise<unknown[]> {
   try {
     const result = params ? await pool.query(sql, params) : await pool.query(sql);
     return result.rows;
@@ -14,7 +14,7 @@ async function q(sql: string, params?: any[]): Promise<any[]> {
   }
 }
 
-export async function fetchAllCompanies(): Promise<any[]> {
+export async function fetchAllCompanies(): Promise<unknown[]> {
   return q(`SELECT * FROM companies ORDER BY id`);
 }
 

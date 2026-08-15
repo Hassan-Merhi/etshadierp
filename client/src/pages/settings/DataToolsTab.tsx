@@ -96,9 +96,9 @@ export function DataToolsTab() {
   const [silentSrcId, setSilentSrcId] = useState("");
   const [silentDstId, setSilentDstId] = useState("");
   const [silentFile, setSilentFile] = useState<File | null>(null);
-  const [silentValidItems, setSilentValidItems] = useState<any[]>([]);
-  const [silentWarnItems, setSilentWarnItems] = useState<any[]>([]);
-  const [silentErrorLines, setSilentErrorLines] = useState<any[]>([]);
+  const [silentValidItems, setSilentValidItems] = useState<unknown[]>([]);
+  const [silentWarnItems, setSilentWarnItems] = useState<unknown[]>([]);
+  const [silentErrorLines, setSilentErrorLines] = useState<unknown[]>([]);
   const [silentIncludeWarnings, setSilentIncludeWarnings] = useState(false);
   const [silentParseError, setSilentParseError] = useState("");
   const [silentStep, setSilentStep] = useState<"setup" | "validation" | "done">("setup");
@@ -108,12 +108,12 @@ export function DataToolsTab() {
   // Bulk rename dialog state
   const [bulkRenameOpen, setBulkRenameOpen] = useState(false);
   // Fetch locations for the current company
-  const { data: locations = [] } = useQuery<any[]>({
+  const { data: locations = [] } = useQuery<unknown[]>({
     queryKey: ["/api/locations", selectedCompany?.id],
     enabled: !!selectedCompany,
   });
   // Fetch stock items for silent production picker (developer-only, lightweight)
-  const { data: allStockItems = [] } = useQuery<any[]>({
+  const { data: allStockItems = [] } = useQuery<unknown[]>({
     queryKey: ["/api/stock-items/light", selectedCompany?.id],
     enabled: !!selectedCompany && dtCurrentUser?.role === "Developer",
     staleTime: 10 * 60 * 1000,
@@ -415,12 +415,12 @@ export function DataToolsTab() {
         return;
       }
       const rows = utils.sheet_to_json<{
-        Code?: any;
-        Name?: any;
-        "Qty Change"?: any;
-        "Item Name"?: any;
-        Change?: any;
-        Rate?: any;
+        Code?: unknown;
+        Name?: unknown;
+        "Qty Change"?: unknown;
+        "Item Name"?: unknown;
+        Change?: unknown;
+        Rate?: unknown;
       }>(ws);
 
       const preview: SilentImportRow[] = rows
@@ -432,10 +432,10 @@ export function DataToolsTab() {
           const rate = parseFloat(String(row.Rate ?? "0")) || 0;
 
           let matched: any = code
-            ? (allStockItems as any[]).find((s: any) => s.code?.toLowerCase() === code.toLowerCase())
+            ? (allStockItems as unknown[]).find((s: any) => s.code?.toLowerCase() === code.toLowerCase())
             : undefined;
           if (!matched && name)
-            matched = (allStockItems as any[]).find((s: any) => s.name.toLowerCase() === name.toLowerCase());
+            matched = (allStockItems as unknown[]).find((s: any) => s.name.toLowerCase() === name.toLowerCase());
 
           if (!matched) {
             return {
@@ -500,7 +500,7 @@ export function DataToolsTab() {
     doc.text("Silent Adjustment Preview", 14, 18);
     doc.setFontSize(10);
     doc.text(
-      `Location: ${(locations as any[]).find((l: any) => String(l.id) === silentProdLocId)?.name || ""}   Date: ${new Date().toLocaleDateString()}`,
+      `Location: ${(locations as unknown[]).find((l: any) => String(l.id) === silentProdLocId)?.name || ""}   Date: ${new Date().toLocaleDateString()}`,
       14,
       25
     );
@@ -869,7 +869,7 @@ export function DataToolsTab() {
                       <SelectValue placeholder="Select location..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {(locations as any[]).map((loc: any) => (
+                      {(locations as unknown[]).map((loc: any) => (
                         <SelectItem key={loc.id} value={String(loc.id)}>
                           {loc.name}
                         </SelectItem>
@@ -931,7 +931,7 @@ export function DataToolsTab() {
                                   </div>
                                 );
                               }
-                              const filtered = (allStockItems as any[]).filter(
+                              const filtered = (allStockItems as unknown[]).filter(
                                 (si: any) =>
                                   si.name.toLowerCase().includes(term) ||
                                   (si.code && si.code.toLowerCase().includes(term))
@@ -1382,7 +1382,7 @@ export function DataToolsTab() {
                       <SelectValue placeholder="From location..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {(locations as any[]).map((loc: any) => (
+                      {(locations as unknown[]).map((loc: any) => (
                         <SelectItem key={loc.id} value={String(loc.id)}>
                           {loc.name}
                         </SelectItem>
@@ -1397,7 +1397,7 @@ export function DataToolsTab() {
                       <SelectValue placeholder="To location..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {(locations as any[])
+                      {(locations as unknown[])
                         .filter((l: any) => String(l.id) !== silentSrcId)
                         .map((loc: any) => (
                           <SelectItem key={loc.id} value={String(loc.id)}>

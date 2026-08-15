@@ -42,7 +42,7 @@ async function latestActiveCutover(companyId: number): Promise<any | null> {
   return firstRow(result) ?? null;
 }
 
-export async function buildSpProductionClosureStatus(companyId: number): Promise<any> {
+export async function buildSpProductionClosureStatus(companyId: number): Promise<unknown> {
   const cutover = await latestActiveCutover(companyId);
   if (!cutover) {
     return {

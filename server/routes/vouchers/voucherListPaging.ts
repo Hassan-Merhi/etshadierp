@@ -65,7 +65,7 @@ export function parseVoucherListQuery(raw: Record<string, unknown>):
   };
 }
 
-export function filterAndSortVouchers<T extends Record<string, any>>(rows: T[], query: VoucherFilterQuery): T[] {
+export function filterAndSortVouchers<T extends Record<string, unknown>>(rows: T[], query: VoucherFilterQuery): T[] {
   const search = query.search?.trim().toLowerCase() ?? "";
   const minimum = query.minAmount ? Number.parseFloat(query.minAmount) : null;
   const maximum = query.maxAmount ? Number.parseFloat(query.maxAmount) : null;
@@ -92,7 +92,7 @@ export function filterAndSortVouchers<T extends Record<string, any>>(rows: T[], 
     });
 }
 
-export function toCompactVoucher(row: Record<string, any>) {
+export function toCompactVoucher(row: Record<string, unknown>) {
   return {
     id: row.id,
     voucherNumber: row.voucherNumber,
@@ -109,7 +109,7 @@ export function toCompactVoucher(row: Record<string, any>) {
   };
 }
 
-export function buildVoucherPage<T extends Record<string, any>>(rows: T[], page: number, pageSize: number) {
+export function buildVoucherPage<T extends Record<string, unknown>>(rows: T[], page: number, pageSize: number) {
   const total = rows.length;
   const totalPages = total === 0 ? 0 : Math.ceil(total / pageSize);
   const safePage = totalPages === 0 ? 1 : Math.min(page, totalPages);

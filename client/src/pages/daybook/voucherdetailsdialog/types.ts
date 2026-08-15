@@ -12,7 +12,7 @@ export interface VoucherDetailsDialogProps {
   viewEntriesLoading: boolean;
   viewVoucherEntries: ViewVoucherEntry[];
   isStockTransferVoucher: boolean;
-  voucherRevisions: any[];
+  voucherRevisions: unknown[];
   revisionsLoading: boolean;
   revisionsError: boolean;
   revisionsErrorMessage?: string;
@@ -22,7 +22,7 @@ export interface VoucherDetailsDialogProps {
   formatDisplayTime: (date: string) => string;
   cashAccountBalance: string;
   entryBalances: Record<number, string>;
-  purchaseOrderData: any;
+  purchaseOrderData: unknown;
   poSupplierBalance: string | null;
   selectedDialogRow: number | null;
   setSelectedDialogRow: (n: number | null) => void;
@@ -31,7 +31,7 @@ export interface VoucherDetailsDialogProps {
   bankAccounts?: BankAccount[];
   viewProfitFilter: "all" | "gain" | "loss" | "even";
   setViewProfitFilter: (v: "all" | "gain" | "loss" | "even") => void;
-  user: any;
+  user: unknown;
   handleEdit: (v: Voucher) => void;
   canEdit: (v: Voucher) => boolean;
   navigate: (path: string) => void;

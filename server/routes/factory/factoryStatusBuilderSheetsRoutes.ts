@@ -12,7 +12,7 @@ import { read as readExcel, utils as xlsxUtils, write as writeExcel, WorkBook } 
 const upload = multer({ storage: multer.memoryStorage() });
 
 type CellVal = number | string | null;
-type SRow = { id?: string; label: string; cells: any[] };
+type SRow = { id?: string; label: string; cells: unknown[] };
 
 function getColLabel(col: any): string {
   if (typeof col === "string") return col;
@@ -42,9 +42,9 @@ async function logStatusBuilderChanges(
   sheetId: number,
   sheetName: string,
   oldRows: SRow[],
-  oldColumns: any[],
+  oldColumns: unknown[],
   newRows: SRow[],
-  newColumns: any[],
+  newColumns: unknown[],
   changedBy: string | undefined
 ) {
   const colLabels = newColumns.map(getColLabel);
@@ -188,9 +188,9 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
           id,
           updated.name,
           (existing.rows as SRow[]) ?? [],
-          (existing.columns as any[]) ?? [],
+          (existing.columns as unknown[]) ?? [],
           rows as SRow[],
-          (columns ?? existing.columns) as any[],
+          (columns ?? existing.columns) as unknown[],
           req.user?.username || req.user?.name
         ).catch((e) => logger.error("[StatusBuilder] history log failed:", { error: e.message }));
       }
@@ -266,7 +266,7 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
       for (let sheetIdx = 0; sheetIdx < wb.SheetNames.length; sheetIdx++) {
         const sheetName = wb.SheetNames[sheetIdx];
         const ws = wb.Sheets[sheetName];
-        const rawData: any[][] = xlsxUtils.sheet_to_json(ws, { header: 1, defval: null });
+        const rawData: unknown[][] = xlsxUtils.sheet_to_json(ws, { header: 1, defval: null });
 
         if (!rawData || rawData.length === 0) {
           const [s] = await db
@@ -350,7 +350,7 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
     try {
       const wb = xlsxUtils.book_new();
 
-      const sheet1: any[][] = [
+      const sheet1: unknown[][] = [
         ["Label", "Week 1", "Week 2", "Week 3", "Week 4"],
         ["Target", 150, 150, 150, 150],
         ["Actual", 120, 135, 140, 155],
@@ -382,7 +382,7 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
       const wb = xlsxUtils.book_new();
 
       for (const sheet of sheets) {
-        const rawColumns = (sheet.columns as any[]) ?? [];
+        const rawColumns = (sheet.columns as unknown[]) ?? [];
         const rows = (sheet.rows as SRow[]) ?? [];
         const colLabels = rawColumns.map(getColLabel);
 

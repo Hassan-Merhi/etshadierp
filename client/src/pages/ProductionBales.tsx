@@ -106,7 +106,7 @@ function generateFinalLabelHtml(
   </style></head><body><div class="print-note">FINAL LABELS - disable "Headers and Footers" in print settings for cleanest output.</div>${labelsHtml}</body></html>`;
 }
 
-function BatchDetailView({ batch, onBack }: { batch: any; onBack: () => void }) {
+function BatchDetailView({ batch, onBack }: { batch: unknown; onBack: () => void }) {
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
   const [selectedMixBatchId, setSelectedMixBatchId] = useState<string>("");
   const [scannedBaleIds, setScannedBaleIds] = useState<Set<number>>(new Set());
@@ -661,7 +661,7 @@ export default function ProductionBales() {
 
   useEscapeBack(selectedBatchId !== null ? () => setSelectedBatchId(null) : null);
 
-  const { data: pressingBatches, isLoading: batchesLoading } = useQuery<any[]>({
+  const { data: pressingBatches, isLoading: batchesLoading } = useQuery<unknown[]>({
     queryKey: ["/api/factory/pressing-batches"],
   });
 

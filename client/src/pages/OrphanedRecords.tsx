@@ -80,7 +80,7 @@ export default function OrphanedRecordsPage() {
   const orphanedRecords = recordsData?.orphanedVouchers || [];
   const unbalancedRecords = recordsData?.unbalancedVouchers || [];
 
-  const { data: locations = [] } = useQuery<any[]>({
+  const { data: locations = [] } = useQuery<unknown[]>({
     queryKey: ["/api/locations"],
   });
 
