@@ -47,6 +47,13 @@ interface RejectedEvidence {
  * clean report with the bad rows dropped. That case is shown as its own state
  * below, because "we could not trust the evidence" and "everything agrees" must
  * never look alike.
+ *
+ * That last rule is why the report is gated on `!rejected` and not merely on
+ * `data`. A rejected *refresh* leaves the previous successful report in the
+ * query cache while setting the error, so rendering on `data` alone would put
+ * "Everything agrees" directly underneath "Evidence could not be trusted" — the
+ * two states side by side, with the reassuring one describing a reconciliation
+ * that no longer holds.
  */
 export default function ConvergenceReconciliation() {
   const { data, error, isFetching, refetch } = useQuery<ConvergenceReport>({
@@ -90,7 +97,7 @@ export default function ConvergenceReconciliation() {
         </Card>
       )}
 
-      {data && (
+      {!rejected && data && (
         <>
           <div className="grid gap-4 sm:grid-cols-3">
             <Card data-testid="card-status">

@@ -13,7 +13,7 @@
  * failure mode that makes the whole reconciliation worse than useless.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import ConvergenceReconciliation from "./ConvergenceReconciliation";
@@ -120,6 +120,39 @@ describe("ConvergenceReconciliation page", () => {
     // evidence" when in fact nothing was successfully checked.
     expect(screen.queryByTestId("text-no-discrepancies")).toBeNull();
     expect(screen.queryByTestId("card-status")).toBeNull();
+  });
+
+  it("withdraws a cached report when a refresh is rejected", async () => {
+    let answer: () => unknown = () => report();
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, queryFn: async () => answer() } },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ConvergenceReconciliation />
+      </QueryClientProvider>
+    );
+    expect(await screen.findByTestId("card-status")).toHaveTextContent("Everything agrees");
+
+    answer = () => {
+      throw Object.assign(new Error("Voucher 912 has two Daybook mirror rows in company 7"), {
+        status: 409,
+        code: "DUPLICATE_DAYBOOK_MIRROR",
+      });
+    };
+    await act(async () => {
+      await queryClient.refetchQueries({ queryKey: ["/api/admin/convergence-reconciliation"] });
+    });
+
+    // A failed refetch leaves the previous report in the cache while setting the
+    // error, so rendering on `data` alone put "Everything agrees" directly under
+    // "Evidence could not be trusted" — the reassuring half describing a
+    // reconciliation that no longer holds. The stale report has to go.
+    expect(await screen.findByTestId("card-evidence-rejected")).toBeInTheDocument();
+    expect(screen.queryByTestId("card-status")).toBeNull();
+    expect(screen.queryByTestId("text-no-discrepancies")).toBeNull();
+    expect(screen.queryByTestId("text-read-only-notice")).toBeNull();
   });
 
   it("does not mistake an ordinary failure for rejected evidence", async () => {
