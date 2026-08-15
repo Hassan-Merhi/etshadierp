@@ -1,4 +1,4 @@
-name: Lint phases 5-7 semantic reduction
+name: Lint phases 8-11 semantic exhaustion
 
 on:
   push:
@@ -9,12 +9,12 @@ permissions:
   contents: write
 
 concurrency:
-  group: lint-phases-5-7-${{ github.ref }}
+  group: lint-phases-8-11-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  semantic-reduction:
-    if: ${{ !contains(github.event.head_commit.message, '[phase5-7-worker]') }}
+  semantic-exhaustion:
+    if: ${{ !contains(github.event.head_commit.message, '[phase8-11-worker]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -26,16 +26,16 @@ jobs:
           node-version: '22.14.0'
           cache: npm
       - run: npm ci
-      - name: Reduce phases 5-7 structural any debt
-        run: node scripts/lint-phases-5-7-worker.mjs
-      - name: Persist phases 5-7 semantic progress
+      - name: Exhaust phases 8-11 semantic type boundaries
+        run: node scripts/lint-phases-8-11-worker.mjs
+      - name: Persist phases 8-11 implementation
         run: |
           if git diff --quiet -- client/src server shared; then
-            echo "No Phase 5-7 implementation changes found."
+            echo "No Phase 8-11 implementation changes found."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add client/src server shared
-          git commit -m "refactor: exhaust phases 5-7 structural any debt [phase5-7-worker] [skip ci]"
+          git commit -m "refactor: exhaust phases 8-11 semantic boundaries [phase8-11-worker] [skip ci]"
           SKIP_TSC_CHECK=1 git push origin HEAD:${GITHUB_REF_NAME}
