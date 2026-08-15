@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * CreateTransferDialog — extracted sub-component.
  *
@@ -118,7 +119,7 @@ export function CreateTransferDialog({
       queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers/list"] });
       handleClose();
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });

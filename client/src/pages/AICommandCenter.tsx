@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -271,7 +272,7 @@ export default function AICommandCenter() {
       queryClient.invalidateQueries({ queryKey: ["/api/ai-agent/tasks"] });
       toast({ title: "Task created", description: `Plan ready — ${task.plan?.steps?.length ?? 0} step(s) generated` });
     },
-    onError: (e: any) => toast({ title: "Failed to create task", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Failed to create task", description: e.message, variant: "destructive" }),
   });
 
   const runTask = useMutation({
@@ -280,7 +281,7 @@ export default function AICommandCenter() {
       queryClient.invalidateQueries({ queryKey: ["/api/ai-agent/tasks", activeTaskId] });
       queryClient.invalidateQueries({ queryKey: ["/api/ai-agent/tasks"] });
     },
-    onError: (e: any) => toast({ title: "Run failed", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Run failed", description: e.message, variant: "destructive" }),
   });
 
   const cancelTask = useMutation({
@@ -298,7 +299,7 @@ export default function AICommandCenter() {
       queryClient.invalidateQueries({ queryKey: ["/api/ai-agent/tasks"] });
       toast({ title: "Approved", description: "Action approved and continuing task" });
     },
-    onError: (e: any) => toast({ title: "Approval failed", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Approval failed", description: e.message, variant: "destructive" }),
   });
 
   const rejectAction = useMutation({

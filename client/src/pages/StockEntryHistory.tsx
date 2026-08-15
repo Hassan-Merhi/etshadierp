@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
 import * as XLSX from "@/lib/excelHelper";
@@ -301,7 +302,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
       setEditingDateKey(null);
       qc.invalidateQueries({ queryKey: ["/api/factory/bales/stock-entry-history"] });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Update failed", description: err.message, variant: "destructive" });
     },
   });
@@ -315,7 +316,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
       toast({ title: "Worker assigned", description: `Worker updated for ${vars.baleIds.length} bale(s).` });
       qc.invalidateQueries({ queryKey: ["/api/factory/bales/stock-entry-history"] });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Assignment failed", description: err.message, variant: "destructive" });
     },
   });
@@ -334,7 +335,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     onSuccess: () => {
       toast({ title: "Sent", description: "Worker PDF sent to production WhatsApp group." });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       if (err?._handledGlobally) return;
       toast({ title: "Send failed", description: err.message, variant: "destructive" });
     },

@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
@@ -165,7 +166,7 @@ export default function FactoryEmployeePayrollTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employees"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employee-advances"] });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const grouped = useMemo(() => {

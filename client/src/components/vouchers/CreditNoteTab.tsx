@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -264,7 +265,7 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/locations", selectedLocationId, "inventory"] });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Error",
@@ -302,7 +303,7 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
       queryClient.invalidateQueries({ queryKey: ["/api/locations", selectedLocationId, "inventory"] });
       queryClient.invalidateQueries({ queryKey: ["/api/credit-notes", editingVoucherId] });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Error",

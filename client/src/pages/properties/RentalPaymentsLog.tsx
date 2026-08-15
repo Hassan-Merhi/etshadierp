@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -99,7 +100,7 @@ export default function RentalPaymentsLog({
       toast({ title: "Payment deleted", description: "The payment and its accounting entry have been removed." });
       setDeleteTarget(null);
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       toast({ title: "Delete failed", description: e.message, variant: "destructive" });
       setDeleteTarget(null);
     },

@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -299,7 +300,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", voucherIdToEdit] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers/list"] });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Approval failed", description: err.message, variant: "destructive" });
     },
   });
@@ -321,7 +322,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
         description: `Found ${data.items.length} item(s). Click Validate to check the data.`,
       });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Parse error", description: error.message, variant: "destructive" });
     },
@@ -348,7 +349,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
         });
       }
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Validation error", description: error.message, variant: "destructive" });
     },
@@ -374,7 +375,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       setImportDestLocation("");
       setImportNotes("");
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Import error", description: error.message, variant: "destructive" });
     },
@@ -495,7 +496,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
         });
       }
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       const isEditMode = !!voucherIdToEdit;
       toast({

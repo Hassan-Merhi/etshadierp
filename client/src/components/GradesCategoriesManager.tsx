@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { getErrorDetails } from "@shared/errorUtils";
 import { useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -89,7 +90,7 @@ function MetaList({
       setNewName("");
       toast({ title: "Created", description: `${title.slice(0, -1)} created successfully` });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to create", variant: "destructive" });
     },
@@ -104,7 +105,7 @@ function MetaList({
       setEditingId(null);
       toast({ title: "Updated", description: "Name updated successfully" });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to update", variant: "destructive" });
     },
@@ -121,7 +122,7 @@ function MetaList({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [apiPath] });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to update", variant: "destructive" });
     },

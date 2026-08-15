@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useEffect, useRef } from "react";
 import { z } from "zod";
 import { Card, CardContent } from "@/components/ui/card";
@@ -148,7 +149,7 @@ export function IntercompanyPosTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/intercompany-pos-config"] });
       toast({ title: "Saved", description: "Intercompany POS transfer config saved." });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });

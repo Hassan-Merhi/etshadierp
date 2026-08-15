@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -214,7 +215,7 @@ export function NotificationsCenter() {
       setApproveReq(null);
       setSelectedAccountId("");
     },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: ClientErrorLike) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const dismissMutation = useMutation({
@@ -226,7 +227,7 @@ export function NotificationsCenter() {
       setDismissReq(null);
       setDismissNote("");
     },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: ClientErrorLike) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   // ── Notification item click ───────────────────────────────────────────────────

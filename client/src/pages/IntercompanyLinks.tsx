@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -167,7 +168,7 @@ export default function IntercompanyLinks() {
       queryClient.invalidateQueries({ queryKey: ["/api/intercompany-links"] });
       closeDialog();
     },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: ClientErrorLike) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const updateMutation = useMutation({
@@ -178,7 +179,7 @@ export default function IntercompanyLinks() {
       queryClient.invalidateQueries({ queryKey: ["/api/intercompany-links"] });
       closeDialog();
     },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: ClientErrorLike) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -187,14 +188,14 @@ export default function IntercompanyLinks() {
       toast({ title: "Link deleted" });
       queryClient.invalidateQueries({ queryKey: ["/api/intercompany-links"] });
     },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: ClientErrorLike) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const toggleActiveMutation = useMutation({
     mutationFn: ({ id, active }: { id: number; active: boolean }) =>
       apiRequest("PUT", `/api/intercompany-links/${id}`, { active }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/intercompany-links"] }),
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: ClientErrorLike) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const saveRecipientsMutation = useMutation({
@@ -205,7 +206,7 @@ export default function IntercompanyLinks() {
       queryClient.invalidateQueries({ queryKey: ["/api/intercompany-links"] });
       setRecipientsDialogLink(null);
     },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: ClientErrorLike) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   function openCreate() {

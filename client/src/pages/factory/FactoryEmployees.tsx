@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -134,7 +135,7 @@ export default function FactoryEmployees() {
       setCreateOpen(false);
       setFormData({ ...emptyForm });
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ variant: "destructive", title: e.message });
     },
@@ -155,7 +156,7 @@ export default function FactoryEmployees() {
       toast({ title: "Employee updated" });
       setEditingEmployee(null);
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ variant: "destructive", title: e.message });
     },
@@ -175,7 +176,7 @@ export default function FactoryEmployees() {
       toast({ title: "Contract ended", description: "Employee has been deactivated" });
       setEndingContractEmployee(null);
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ variant: "destructive", title: e.message });
     },
@@ -194,7 +195,7 @@ export default function FactoryEmployees() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employees"] });
       toast({ title: "Employee reactivated" });
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ variant: "destructive", title: e.message });
     },
@@ -215,7 +216,7 @@ export default function FactoryEmployees() {
       setRecalcResult(data);
       setRecalcResultOpen(true);
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ variant: "destructive", title: "Recalculation failed", description: e.message });
     },

@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -107,7 +108,7 @@ export default function ContainerVerification() {
       setNewItem({ barcode: "", itemName: "", qty: "0", weightPerBale: "0", pricePerBale: "0" });
       if (verificationResult) generateComparison();
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
@@ -123,7 +124,7 @@ export default function ContainerVerification() {
       setEditingItemId(null);
       if (verificationResult) generateComparison();
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
@@ -137,7 +138,7 @@ export default function ContainerVerification() {
       queryClient.invalidateQueries({ queryKey: ["/api/containers", containerId, "loaded-items"] });
       if (verificationResult) generateComparison();
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
@@ -157,7 +158,7 @@ export default function ContainerVerification() {
       });
       if (verificationResult) generateComparison();
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
@@ -173,7 +174,7 @@ export default function ContainerVerification() {
       toast({ title: "Import complete", description: `${data.imported} items imported` });
       if (verificationResult) generateComparison();
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Import error", description: e.message, variant: "destructive" });
     },

@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { getErrorDetails } from "@shared/errorUtils";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -80,7 +81,7 @@ export function DailyExportSection() {
       qc.invalidateQueries({ queryKey: ["/api/export/recipients"] });
       toast({ title: "Recipient added" });
     },
-    onError: (e: any) => toast({ variant: "destructive", title: "Error", description: e.message }),
+    onError: (e: ClientErrorLike) => toast({ variant: "destructive", title: "Error", description: e.message }),
   });
 
   const removeRecipient = useMutation({
@@ -202,7 +203,7 @@ export function DailyExportSection() {
     mutationFn: () => apiRequest("POST", "/api/whatsapp/send-net-position", { startDate: npStart, endDate: npEnd }),
     onSuccess: (data: any) =>
       toast({ title: "Sent via WhatsApp", description: data?.message || "Net position report sent" }),
-    onError: (e: any) => toast({ variant: "destructive", title: "Send failed", description: e.message }),
+    onError: (e: ClientErrorLike) => toast({ variant: "destructive", title: "Send failed", description: e.message }),
   });
 
   const downloadNpExcel = () => {

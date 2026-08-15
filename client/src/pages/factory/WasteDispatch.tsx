@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -252,7 +253,7 @@ export default function WasteDispatch() {
         description: `${result.totalBales} bale(s) marked as disposed (${result.dispatch.dispatchNumber})`,
       });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
       setConfirming(false);
@@ -274,7 +275,7 @@ export default function WasteDispatch() {
         description: `${result.restoredBales} bale(s) restored to stock.`,
       });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
       setDeleteDispatchId(null);

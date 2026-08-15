@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * SupplierImport — extracted sub-component.
  *
@@ -36,7 +37,7 @@ export function SupplierImport() {
       setResult(data);
       toast({ title: "Import complete", description: `${data.imported} created, ${data.updated} updated` });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       if (err?._handledGlobally) return;
       toast({ title: "Import failed", description: err.message, variant: "destructive" });
     },

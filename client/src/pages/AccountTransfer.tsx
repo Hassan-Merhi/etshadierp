@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -214,7 +215,7 @@ export default function AccountTransfer() {
       queryClient.invalidateQueries({ queryKey: ["/api/voucher-entries/by-account", fromAccountId] });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
     },
-    onError: (e: any) => toast({ title: "Transfer failed", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Transfer failed", description: e.message, variant: "destructive" }),
   });
 
   function resetAll() {

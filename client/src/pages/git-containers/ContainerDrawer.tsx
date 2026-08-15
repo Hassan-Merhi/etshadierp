@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -74,7 +75,7 @@ export function ContainerDrawer({
       toast({ title: "Saved", description: `\${container?.containerNumber} updated.` });
       onClose();
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({
         title: "Save failed",
         description: err?.message ?? "Unknown error",
@@ -90,7 +91,7 @@ export function ContainerDrawer({
       void invalidateApiFamily(queryClient, "/api/git/containers");
       toast({ title: "Tracking settings saved" });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Save failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -157,7 +158,7 @@ export function ContainerDrawer({
         setTimeout(() => toast({ title: "Quota low", description: result.quotaWarning, variant: "destructive" }), 400);
       }
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Track Now failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });

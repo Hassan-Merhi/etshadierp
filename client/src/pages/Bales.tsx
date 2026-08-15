@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useRef } from "react";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -78,7 +79,7 @@ export default function Bales() {
         barcodeInputRef.current.focus();
       }
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Error creating bale",
@@ -97,7 +98,7 @@ export default function Bales() {
       queryClient.invalidateQueries({ queryKey: ["/api/bales", selectedCompany?.id] });
       toast({ title: "Bale deleted successfully" });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Error deleting bale",

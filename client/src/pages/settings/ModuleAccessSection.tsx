@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -41,7 +42,7 @@ export function ModuleAccessSection() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/role-permissions", selectedCompany?.id] });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       toast({ title: "Error", description: error.message || "Failed to update permission", variant: "destructive" });
     },
   });

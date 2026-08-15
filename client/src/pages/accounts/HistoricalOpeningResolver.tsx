@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
@@ -66,7 +67,7 @@ export function HistoricalOpeningResolver() {
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       toast({
         title: "Could not resolve historical value",
         description: error?.message || "Check the currency and historical rate.",

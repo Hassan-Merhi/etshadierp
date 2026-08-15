@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -307,7 +308,7 @@ export default function NetProfitDetails() {
       const body = await res.json();
       toast({ title: "Sent via WhatsApp", description: body.message });
     },
-    onError: async (err: any) => {
+    onError: async (err: ClientErrorLike) => {
       const msg = err?.message || "WhatsApp send failed";
       toast({ title: "WhatsApp Error", description: msg, variant: "destructive" });
     },

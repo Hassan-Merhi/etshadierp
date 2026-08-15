@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * OpeningStockImport — extracted sub-component.
  *
@@ -32,7 +33,7 @@ export function OpeningStockImport() {
       setResult(data);
       toast({ title: "Import complete", description: `${data.imported} opening stock records imported` });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       if (err?._handledGlobally) return;
       toast({ title: "Import failed", description: err.message, variant: "destructive" });
     },

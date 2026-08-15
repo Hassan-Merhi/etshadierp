@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { z } from "zod";
 import { Card } from "@/components/ui/card";
@@ -80,7 +81,7 @@ export function NetPositionAdjustmentCard() {
       queryClient.invalidateQueries({ queryKey: ["/api/stats/profit"] });
       setIsEditing(false);
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Error",

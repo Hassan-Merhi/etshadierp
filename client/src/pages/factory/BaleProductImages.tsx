@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
@@ -63,7 +64,7 @@ export default function BaleProductImages() {
       if (imagesQueryKey) queryClient.invalidateQueries({ queryKey: [imagesQueryKey] });
       toast({ title: "Image uploaded" });
     },
-    onError: (e: any) => toast({ title: "Upload failed", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Upload failed", description: e.message, variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -82,7 +83,7 @@ export default function BaleProductImages() {
       if (imagesQueryKey) queryClient.invalidateQueries({ queryKey: [imagesQueryKey] });
       toast({ title: "Image deleted" });
     },
-    onError: (e: any) => toast({ title: "Delete failed", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Delete failed", description: e.message, variant: "destructive" }),
   });
 
   const handleFiles = useCallback(

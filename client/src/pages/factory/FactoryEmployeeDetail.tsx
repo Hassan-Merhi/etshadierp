@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAdminOverride } from "@/hooks/use-admin-override";
@@ -212,7 +213,7 @@ export default function FactoryEmployeeDetail() {
       toast({ title: "Employee updated" });
       setEditOpen(false);
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ variant: "destructive", title: e.message });
     },
@@ -232,7 +233,7 @@ export default function FactoryEmployeeDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employees"] });
       toast({ title: "Balance recalculated", description: `New balance: $${data.newBalance?.toFixed(2)}` });
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ variant: "destructive", title: e.message });
     },
@@ -262,7 +263,7 @@ export default function FactoryEmployeeDetail() {
       setDepositNotes("");
       setDepositEffectiveDate("");
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ variant: "destructive", title: e.message });
     },
@@ -292,7 +293,7 @@ export default function FactoryEmployeeDetail() {
       setWithdrawNotes("");
       setWithdrawCashAccountId("");
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ variant: "destructive", title: e.message });
     },
@@ -328,7 +329,7 @@ export default function FactoryEmployeeDetail() {
       setPayrollAmounts({});
       setPayrollNotes("");
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ variant: "destructive", title: e.message });
     },

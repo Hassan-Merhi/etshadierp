@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useMutation, useQueryClient as useTQClient } from "@tanstack/react-query";
 import { Loader2, RefreshCw, Settings2, AlertTriangle, Boxes, XCircle, Clock } from "lucide-react";
@@ -66,7 +67,7 @@ export function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrac
         variant: data.success ? "default" : "destructive",
       });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       setTrackingNowId(null);
       toast({ title: "Tracking failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },

@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
@@ -152,7 +153,7 @@ export default function FactoryEmployeeAdvancesTab() {
       setAddForm({ employeeId: "", advanceDate: today(), amount: "", cashAccountId: "", notes: "" });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employee-advances"] });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const repayMutation = useMutation({
@@ -182,7 +183,7 @@ export default function FactoryEmployeeAdvancesTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employee-advances"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employee-advance-repayments"] });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -198,7 +199,7 @@ export default function FactoryEmployeeAdvancesTab() {
       setDeleteConfirm(null);
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employee-advances"] });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const totalOutstanding = useMemo(

@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -150,7 +151,7 @@ export default function POImport() {
         description: `Found ${data.preview.length} container(s) with ${data.preview.reduce((sum: number, p: any) => sum + p.itemsCount, 0)} items. Click Validate to check the data.`,
       });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Parse error", description: error.message, variant: "destructive" });
     },
@@ -173,7 +174,7 @@ export default function POImport() {
         variant: errorCount === 0 ? "default" : "destructive",
       });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Validation error", description: error.message, variant: "destructive" });
     },
@@ -193,7 +194,7 @@ export default function POImport() {
       setImportResult(data);
       setShowPrintDialog(true);
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Import error", description: error.message, variant: "destructive" });
     },

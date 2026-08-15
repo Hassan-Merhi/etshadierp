@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { Link } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -69,7 +70,7 @@ export function ContainerSpView({
       setSelectedContainer(null);
       setReason("");
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       toast({ title: "Cancellation failed", description: error.message, variant: "destructive" });
     },
   });

@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
@@ -119,7 +120,7 @@ export function AgentCard({
           description: "It now appears at the top of the list with a Prepaid badge.",
         });
     },
-    onError: (e: any, _vars, context) => {
+    onError: (e: ClientErrorLike, _vars, context) => {
       if (context?.previous !== undefined) queryClient.setQueryData(prepaidQKey, context.previous);
       toast({ title: "Failed to update prepaid", description: e.message, variant: "destructive" });
     },
@@ -133,7 +134,7 @@ export function AgentCard({
       setReplaceTarget(null);
       setReplaceAmountWarning(null);
     },
-    onError: (e: any) => toast({ title: "Replace failed", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Replace failed", description: e.message, variant: "destructive" }),
   });
 
   // ── Note ──────────────────────────────────────────────────────────────────
@@ -168,13 +169,13 @@ export function AgentCard({
       setNewType("debit");
       setShowAdjForm(false);
     },
-    onError: (e: any) => toast({ title: "Failed to add entry", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Failed to add entry", description: e.message, variant: "destructive" }),
   });
   const deleteAdjMutation = useMutation({
     mutationFn: (id: number) =>
       apiRequest("DELETE", `/api/git/agent-adjustments/${companyId}/${encodeURIComponent(agent.agentName)}/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: adjQKey }),
-    onError: (e: any) => toast({ title: "Failed to delete", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Failed to delete", description: e.message, variant: "destructive" }),
   });
   const saveAdj = () => {
     const amt = parseFloat(newAmount);

@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
@@ -70,7 +71,7 @@ export default function MergeBaleProducts() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products/merge-stats"] });
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       toast({ title: "Merge failed", description: e.message, variant: "destructive" });
     },
   });

@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { factoryQueryClient, factoryApiRequest } from "@/lib/factoryApi";
@@ -42,7 +43,7 @@ export function useFactoryJsonCargoEta() {
         return next;
       });
     },
-    onError: (error: any, containerId) => {
+    onError: (error: ClientErrorLike, containerId) => {
       if (error?._handledGlobally) return;
       toast({ title: "ETA Refresh Failed", description: error.message, variant: "destructive" });
       setRefreshingIds((prev) => {
@@ -62,7 +63,7 @@ export function useFactoryJsonCargoEta() {
       factoryQueryClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
       toast({ title: "Bulk ETA Refresh", description: data.message });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Bulk ETA Refresh Failed", description: error.message, variant: "destructive" });
     },

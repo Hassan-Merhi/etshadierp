@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * CreateLoadDialog — extracted sub-component.
  *
@@ -51,7 +52,7 @@ export function CreateLoadDialog({
       setNotes("");
       onClose();
     },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: ClientErrorLike) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   return (

@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -75,13 +76,13 @@ export function ContainersWhatsAppSection() {
       queryClient.invalidateQueries({ queryKey: ["/api/git/containers-wa-settings"] });
       toast({ title: "Containers WhatsApp settings saved." });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const testSendMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/git/send-containers-whatsapp", {}),
     onSuccess: () => toast({ title: "Sent", description: "Container report (PDF) sent to the configured group." }),
-    onError: (e: any) => toast({ title: "Send failed", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Send failed", description: e.message, variant: "destructive" }),
   });
 
   async function loadChats() {

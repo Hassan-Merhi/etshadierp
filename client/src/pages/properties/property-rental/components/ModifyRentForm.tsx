@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * ModifyRentForm — extracted sub-component.
  *
@@ -41,7 +42,7 @@ function ModifyRentForm({
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units", unitId, "detail"] });
       setNewAmount("");
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   return (

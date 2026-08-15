@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useCallback } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -64,7 +65,7 @@ export function useContainerTracking(filteredOtwContainers: Container[]) {
       });
       toast({ title: "Saved", description: "Tracking info updated" });
     },
-    onError: (error: any, { id }) => {
+    onError: (error: ClientErrorLike, { id }) => {
       if (error?._handledGlobally) return;
       setSavingIds((prev) => {
         const next = new Set(prev);

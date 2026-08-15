@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -155,7 +156,7 @@ export default function FactoryEmployeeAttendanceTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employee-attendance", selectedDate] });
       toast({ title: "Attendance saved", description: `Saved for ${selectedDate}` });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       if (err?._handledGlobally) return;
       toast({ title: "Save failed", description: err.message, variant: "destructive" });
     },
@@ -507,7 +508,7 @@ function PerEmployeeView() {
       });
       toast({ title: "Attendance saved", description: `${dates.length} days saved.` });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       if (err?._handledGlobally) return;
       toast({ title: "Save failed", description: err.message, variant: "destructive" });
     },

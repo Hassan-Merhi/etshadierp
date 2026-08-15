@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { getErrorDetails } from "@shared/errorUtils";
 import { QueryClient, QueryFunction, MutationCache, QueryCache } from "@tanstack/react-query";
 import { isSafeToQueue, enqueueRequest, getDescriptionForRequest } from "./offlineQueue";
@@ -467,7 +468,7 @@ export const getQueryFn: <T>(options: { on401: UnauthorizedBehavior }) => QueryF
 // a fresh fetch so the component recovers silently. If there are no observers
 // (component unmounted), just remove the error so it doesn't flash on remount.
 const globalQueryCache = new QueryCache({
-  onError: (error: any, query) => {
+  onError: (error: ClientErrorLike, query) => {
     // NOTE: 401 handling is intentionally NOT here. The global fetch interceptor
     // is the single source of session-expiry detection; it verifies /api/auth/me
     // before redirecting. Handling 401 here too would bypass that check and cause
@@ -489,7 +490,7 @@ const globalQueryCache = new QueryCache({
 // run their own onError AFTER this; they should skip another toast by checking
 // error._handledGlobally.
 const globalMutationCache = new MutationCache({
-  onError: (error: any) => {
+  onError: (error: ClientErrorLike) => {
     if (error?.name === "OfflineQueued") {
       error._handledGlobally = true;
       const label = error.description ? `${error.description} saved` : "Action saved";

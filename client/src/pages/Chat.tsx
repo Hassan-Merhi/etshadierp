@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Send, MessageCircle, CheckCheck, Plus, Search, Trash2, Paperclip, FileText, X, Download } from "lucide-react";
@@ -112,7 +113,7 @@ export default function Chat() {
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       inputRef.current?.focus();
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Message failed to send",

@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import {useState, useMemo} from "react";
 import {useQuery, useMutation} from "@tanstack/react-query";
 import {queryClient, apiRequest} from "@/lib/queryClient";
@@ -49,7 +50,7 @@ export default function FactorySheetsAndSacks() {
       toast({ title: "Item deleted" });
       setDeleteItem(null);
     },
-    onError: (e: any) => toast({ title: "Delete failed", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Delete failed", description: e.message, variant: "destructive" }),
   });
 
   const filtered = useMemo(() => {

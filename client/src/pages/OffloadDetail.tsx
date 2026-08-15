@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useParams, useLocation } from "wouter";
 import { useBackToParent } from "@/hooks/use-back-to-parent";
 import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
@@ -180,7 +181,7 @@ export default function OffloadDetail() {
       queryClient.invalidateQueries({ queryKey: [`/api/offloads/${id}`] });
       toast({ title: data.optional ? "Offload suspended" : "Offload restored", description: data.message });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });

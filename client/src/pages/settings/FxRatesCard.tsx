@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -32,7 +33,7 @@ export function FxRatesCard() {
       setNewCurrency("");
       setNewRate("");
     },
-    onError: (err: any) => toast({ title: "Failed to save rate", description: err.message, variant: "destructive" }),
+    onError: (err: ClientErrorLike) => toast({ title: "Failed to save rate", description: err.message, variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -46,7 +47,7 @@ export function FxRatesCard() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers/with-balances"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/net-position"] });
     },
-    onError: (err: any) => toast({ title: "Failed to remove rate", description: err.message, variant: "destructive" }),
+    onError: (err: ClientErrorLike) => toast({ title: "Failed to remove rate", description: err.message, variant: "destructive" }),
   });
 
   const handleAdd = () => {

@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -96,7 +97,7 @@ export function StockItemEditDialog({ open, onOpenChange, stockItemId }: StockIt
       });
       onOpenChange(false);
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Update Failed",
@@ -121,7 +122,7 @@ export function StockItemEditDialog({ open, onOpenChange, stockItemId }: StockIt
       setShowDeleteDialog(false);
       onOpenChange(false);
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Delete Failed",

@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { getErrorDetails } from "@shared/errorUtils";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient as useTQClient } from "@tanstack/react-query";
@@ -227,7 +228,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
       patchCacheContainer(variables.id, { arrivalDate: variables.arrivalDate });
       tqClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Failed to update ETA", description: err?.message, variant: "destructive" });
     },
   });
@@ -265,7 +266,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
         }
       }, POLL_MS);
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       setTrackingNowId(null);
       toast({ title: "Tracking failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },

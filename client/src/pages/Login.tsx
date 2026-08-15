@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
@@ -175,7 +176,7 @@ export default function Login() {
         window.location.href = "/";
       }
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       setPassword("");
       requestAnimationFrame(() => passwordInputRef.current?.focus());
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;

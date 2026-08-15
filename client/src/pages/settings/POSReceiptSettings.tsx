@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -24,7 +25,7 @@ export function POSReceiptSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/pos-receipt", selectedCompany?.id] });
       toast({ title: "Success", description: "Receipt settings updated" });
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
   });

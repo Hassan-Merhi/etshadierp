@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * EditableTransferDetail — extracted sub-component.
  *
@@ -96,7 +97,7 @@ function EditableTransferDetail({
       setNote("");
       onBack();
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });

@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -58,7 +59,7 @@ export function BaleWeightEditDialog({
       onClose();
       onSuccess();
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       toast({ title: "Failed", description: e.message, variant: "destructive" });
     },
   });

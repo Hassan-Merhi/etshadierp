@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { useBackToParent } from "@/hooks/use-back-to-parent";
@@ -160,7 +161,7 @@ export default function PurchaseOrderEdit() {
       });
       navigate("/daybook");
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Update Failed",
@@ -191,7 +192,7 @@ export default function PurchaseOrderEdit() {
         variant: data?.found ? "default" : "destructive",
       });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Sync Failed",

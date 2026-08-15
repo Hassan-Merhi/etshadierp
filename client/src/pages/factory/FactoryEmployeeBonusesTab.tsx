@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAdminOverride } from "@/hooks/use-admin-override";
@@ -104,7 +105,7 @@ export default function FactoryEmployeeBonusesTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employee-bonuses"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employees"] });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -121,7 +122,7 @@ export default function FactoryEmployeeBonusesTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employee-bonuses"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employees"] });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   return (

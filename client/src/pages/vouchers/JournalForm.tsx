@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { resolveWhatsAppPrompt } from "@/lib/whatsapp-prompt";
@@ -465,7 +466,7 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
         });
       }
     },
-    onError: (error: any, formData: JournalFormData) => {
+    onError: (error: ClientErrorLike, formData: JournalFormData) => {
       if (error.name === "OfflineQueued") {
         const syntheticVoucher = {
           id: -Date.now(),
@@ -516,7 +517,7 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
       toast({ title: "Statement sent to WhatsApp" });
       setWaPendingPrompt(null);
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "WhatsApp send failed", description: error.message, variant: "destructive" });
       setWaPendingPrompt(null);

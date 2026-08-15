@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -75,7 +76,7 @@ export function CompaniesTab() {
         displayCurrency: "none",
       });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       toast({ title: "Error", description: error.message || "Failed to save company.", variant: "destructive" });
     },
   });
@@ -90,7 +91,7 @@ export function CompaniesTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/companies"] });
       setCompanyToDelete(null);
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       toast({ title: "Error", description: error.message || "Failed to delete company.", variant: "destructive" });
     },
   });

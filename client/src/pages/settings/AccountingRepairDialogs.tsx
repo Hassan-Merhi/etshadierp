@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -53,7 +54,7 @@ export function ZeroBalancesDialog({ open, onOpenChange, companyId }: ZeroBalanc
       onOpenChange(false);
       setSelected([]);
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       toast({
         title: "Error",
         description: error.message || "Failed to zero balances",
@@ -179,7 +180,7 @@ export function InitializeBalancesDialog({ open, onOpenChange }: InitializeBalan
       toast({ title: "Success", description: data.message });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });

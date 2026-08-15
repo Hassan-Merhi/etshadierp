@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { formatNumber } from "@/lib/formatNumber";
@@ -213,7 +214,7 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
       onOpenChange(false);
       toast({ title: "Batch updated", description: "Sources and totals have been recalculated." });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });

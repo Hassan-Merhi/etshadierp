@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Workbook } from "@fortune-sheet/react";
@@ -352,7 +353,7 @@ export default function SpreadsheetEditor() {
       setSheetName(sheet.name);
       setSaveStatus("saved");
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error creating spreadsheet", variant: "destructive" });
     },
@@ -367,7 +368,7 @@ export default function SpreadsheetEditor() {
       setSaveStatus("saved");
       queryClient.invalidateQueries({ queryKey: ["/api/spreadsheets"], exact: true });
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       setSaveStatus("unsaved");
     },
@@ -382,7 +383,7 @@ export default function SpreadsheetEditor() {
       if (openSheetId === deleteTarget) setOpenSheetId(null);
       setDeleteTarget(null);
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error deleting spreadsheet", variant: "destructive" });
     },

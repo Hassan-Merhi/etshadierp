@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -83,7 +84,7 @@ function SheetFormDialog({
       toast({ title: isEdit ? "Updated" : "Added", description: isEdit ? "Sheet link updated." : "Sheet link added." });
       onClose();
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
@@ -202,7 +203,7 @@ export default function LiveSheets() {
       toast({ title: "Deleted", description: "Sheet link removed." });
       setDeleteTarget(null);
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },

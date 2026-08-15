@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * VacantUnitInfoForm — extracted sub-component.
  *
@@ -30,7 +31,7 @@ function VacantUnitInfoForm({ unit, testIdPrefix }: { unit: Unit; testIdPrefix: 
       toast({ title: "Unit info updated" });
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const changed = unitNumber !== unit.unitNumber || dimensions !== (unit.dimensions ?? "");

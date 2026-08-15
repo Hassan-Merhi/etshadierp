@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { KPICard } from "@/components/KPICard";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -115,7 +116,7 @@ export default function PropertiesDashboard() {
       setSelectedAccountId(0);
       toast({ title: "Success", description: "Account added to dashboard" });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to add account", variant: "destructive" });
     },
@@ -130,7 +131,7 @@ export default function PropertiesDashboard() {
       queryClient.refetchQueries({ queryKey: ["/api/dashboard-cash-accounts", selectedCompany?.id] });
       toast({ title: "Success", description: "Account removed from dashboard" });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to remove account", variant: "destructive" });
     },
@@ -147,7 +148,7 @@ export default function PropertiesDashboard() {
       setSelectedPayableAccountId(0);
       toast({ title: "Success", description: "Payable account added to dashboard" });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to add payable account", variant: "destructive" });
     },
@@ -162,7 +163,7 @@ export default function PropertiesDashboard() {
       queryClient.refetchQueries({ queryKey: ["/api/dashboard-payable-accounts", selectedCompany?.id] });
       toast({ title: "Success", description: "Payable account removed from dashboard" });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Error",

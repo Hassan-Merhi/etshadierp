@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * ShippingAvailabilityTable — extracted sub-component.
  *
@@ -38,7 +39,7 @@ export function ShippingAvailabilityTable() {
       setAdding(false);
       toast({ title: "Row added" });
     },
-    onError: (e: any) => toast({ title: "Failed to add", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Failed to add", description: e.message, variant: "destructive" }),
   });
 
   const saveMutation = useMutation({
@@ -54,7 +55,7 @@ export function ShippingAvailabilityTable() {
       setEditing(null);
       toast({ title: "Row saved" });
     },
-    onError: (e: any) => toast({ title: "Failed to save", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Failed to save", description: e.message, variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -63,7 +64,7 @@ export function ShippingAvailabilityTable() {
       queryClient.invalidateQueries({ queryKey: [AVAIL_KEY] });
       toast({ title: "Row deleted" });
     },
-    onError: (e: any) => toast({ title: "Failed to delete", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Failed to delete", description: e.message, variant: "destructive" }),
   });
 
   function startEdit(row: AvailRow) {

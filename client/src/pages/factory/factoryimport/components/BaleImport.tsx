@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * BaleImport — extracted sub-component.
  *
@@ -51,7 +52,7 @@ export function BaleImport() {
       setResult(data);
       toast({ title: "Import complete", description: `${data.imported} bales imported` });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       if (err?._handledGlobally) return;
       toast({ title: "Import failed", description: err.message, variant: "destructive" });
     },

@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useEffect } from "react";
 import { useLocation, useParams } from "wouter";
 import { useBackToParent } from "@/hooks/use-back-to-parent";
@@ -94,7 +95,7 @@ export default function EditSupplier() {
       queryClient.invalidateQueries({ queryKey: [`/api/suppliers/${supplierId}`] });
       navigate("/suppliers");
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Error",

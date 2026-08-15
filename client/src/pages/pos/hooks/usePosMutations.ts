@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient, invalidateCustomerBalances } from "@/lib/queryClient";
 import { invalidateLocationInventoryQueries } from "@/api/inventoryApi";
@@ -149,7 +150,7 @@ export function usePosMutations({
         }
       }
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       toast({
         title: "Error",
         description: error.message || `Failed to ${editVoucherId ? "update" : "save"} sale`,
@@ -212,7 +213,7 @@ export function usePosMutations({
       });
       toast({ title: "Draft Saved", description: "Your transaction has been saved as a draft" });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to save draft", variant: "destructive" });
     },

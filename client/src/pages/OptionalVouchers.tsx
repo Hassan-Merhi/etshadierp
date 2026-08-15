@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -62,7 +63,7 @@ export default function OptionalVouchers() {
       toast({ title: "Voucher Finalized", description: "The voucher has been posted successfully." });
       setFinalizeVoucherId(null);
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
@@ -79,7 +80,7 @@ export default function OptionalVouchers() {
       toast({ title: "Voucher Deleted", description: "The voucher has been deleted." });
       setDeleteVoucherId(null);
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },

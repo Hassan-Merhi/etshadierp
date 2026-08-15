@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * EndContractForm — extracted sub-component.
  *
@@ -73,7 +74,7 @@ function EndContractForm({
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units", unitId, "detail"] });
       onClose();
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   return (

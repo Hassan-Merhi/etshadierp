@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * TrackingSettingsSheet — extracted sub-component.
  *
@@ -55,7 +56,7 @@ function TrackingSettingsSheet({
       toast({ title: "Tracking settings saved" });
       onClose();
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Failed to save settings", description: err?.message, variant: "destructive" });
     },
   });

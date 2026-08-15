@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -91,7 +92,7 @@ export function WhatsAppExportSection() {
       queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/settings"] });
       toast({ title: "WhatsApp credentials saved" });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const toggleEnabled = useMutation({
@@ -102,7 +103,7 @@ export function WhatsAppExportSection() {
         enabled: value,
       }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/settings"] }),
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const addRecipient = useMutation({
@@ -113,7 +114,7 @@ export function WhatsAppExportSection() {
       setNewName("");
       toast({ title: "Recipient added" });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const addFromChat = useMutation({
@@ -123,14 +124,14 @@ export function WhatsAppExportSection() {
       queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/recipients"] });
       toast({ title: "Added from group list" });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const toggleActive = useMutation({
     mutationFn: ({ id, active }: { id: number; active: boolean }) =>
       apiRequest("PUT", `/api/whatsapp/recipients/${id}`, { active }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/recipients"] }),
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const deleteRecipient = useMutation({
@@ -139,7 +140,7 @@ export function WhatsAppExportSection() {
       queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/recipients"] });
       toast({ title: "Recipient removed" });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const handleFetchChats = async () => {

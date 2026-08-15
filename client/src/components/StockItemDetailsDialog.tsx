@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -142,7 +143,7 @@ export function StockItemDetailsDialog({
         description: "Stock item details updated successfully",
       });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Update Failed",
@@ -167,7 +168,7 @@ export function StockItemDetailsDialog({
         description: "Transaction updated successfully",
       });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Update Failed",
@@ -192,7 +193,7 @@ export function StockItemDetailsDialog({
         description: "Code alias created successfully",
       });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Creation Failed",
@@ -214,7 +215,7 @@ export function StockItemDetailsDialog({
         description: "Code alias deleted successfully",
       });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Deletion Failed",
@@ -239,7 +240,7 @@ export function StockItemDetailsDialog({
         description: "Location price saved successfully",
       });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Failed",
@@ -261,7 +262,7 @@ export function StockItemDetailsDialog({
         description: "Location price deleted successfully",
       });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Deletion Failed",

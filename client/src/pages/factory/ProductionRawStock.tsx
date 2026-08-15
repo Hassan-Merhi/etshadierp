@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useMemo, useRef } from "react";
 import { useAdminOverride } from "@/hooks/use-admin-override";
 import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -91,7 +92,7 @@ export default function ProductionRawStock() {
       setOffloadDialogOpen(false);
       toast({ title: "Success", description: "Container offloaded successfully." });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Offload Failed",
@@ -182,7 +183,7 @@ export default function ProductionRawStock() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
       toast({ title: "Deleted", description: "Mix batch deleted." });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -204,7 +205,7 @@ export default function ProductionRawStock() {
     onSuccess: () => {
       toast({ title: "Sent", description: "Mix batch details sent to WhatsApp group." });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });

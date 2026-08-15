@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, Suspense } from "react";
 import { lazyRetry as lazy } from "@/lib/lazyRetry";
 import * as XLSX from "@/lib/excelHelper";
@@ -88,7 +89,7 @@ export default function MixBatches() {
       setSelectedBaleIds(new Set());
       toast({ title: "Success", description: `${data.balesUpdated} bale(s) assigned to batch` });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
@@ -109,7 +110,7 @@ export default function MixBatches() {
       setDeleteId(null);
       toast({ title: "Deleted", description: "Batch deleted. Bales have been unlinked and are preserved." });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },

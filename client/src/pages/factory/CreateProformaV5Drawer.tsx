@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -210,7 +211,7 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
       onClose();
       onSuccess();
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       toast({ title: "Failed to create proforma", description: e.message, variant: "destructive" });
     },
   });

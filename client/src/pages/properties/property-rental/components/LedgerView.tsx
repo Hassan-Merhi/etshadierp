@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * LedgerView — extracted sub-component.
  *
@@ -66,7 +67,7 @@ function LedgerView({
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
       onNoteUpdated?.();
     },
-    onError: (err: any) =>
+    onError: (err: ClientErrorLike) =>
       toast({
         title: "Fix failed",
         description: err?.message ?? "Could not reallocate payments.",
@@ -84,7 +85,7 @@ function LedgerView({
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
       onNoteUpdated?.();
     },
-    onError: (e: any) => toast({ title: "Reversal failed", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Reversal failed", description: e.message, variant: "destructive" }),
   });
 
   // FIX #7: use backend-calculated fields when available; fall back to frontend calculation.

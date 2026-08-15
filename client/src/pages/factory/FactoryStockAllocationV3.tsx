@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 // LEGACY — Stock Allocation V3. Superseded by FactoryStockAllocationV5. Kept as fallback only. Route: /factory/stock-allocation-v3 (not in sidebar).
 import {useState} from "react";
 import {useQuery, useMutation} from "@tanstack/react-query";
@@ -69,7 +70,7 @@ export default function FactoryStockAllocationV3() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/v3/stock-overview"] });
       setActiveTab("loading");
     },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: ClientErrorLike) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const cancelMutation = useMutation({
@@ -85,7 +86,7 @@ export default function FactoryStockAllocationV3() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/v3/loads"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/v3/stock-overview"] });
     },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: ClientErrorLike) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   // If scanning panel is open, show it full-screen

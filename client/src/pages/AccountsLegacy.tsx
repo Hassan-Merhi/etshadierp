@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
@@ -149,7 +150,7 @@ export default function Accounts() {
         });
       }
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Delete failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -188,7 +189,7 @@ export default function Accounts() {
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Cannot delete", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -211,7 +212,7 @@ export default function Accounts() {
       toast({ title: "Account updated successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Update failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -233,7 +234,7 @@ export default function Accounts() {
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Update failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -254,7 +255,7 @@ export default function Accounts() {
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Delete failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -278,7 +279,7 @@ export default function Accounts() {
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Create failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -312,7 +313,7 @@ export default function Accounts() {
         description: `${data.vouchersUpdated ?? 0} voucher(s) updated · ${data.accountsDeleted ?? 0} old account(s) removed · ${(data.salaryAccountsReparented ?? 0) + (data.bonusAccountsReparented ?? 0)} account(s) grouped`,
       });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Fix failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -378,7 +379,7 @@ export default function Accounts() {
       setWaRuleDialogOpen(false);
       queryClient.invalidateQueries({ queryKey: [waRuleBase, selectedAccountId, "whatsapp-rule"] });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Save failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -396,7 +397,7 @@ export default function Accounts() {
     onSuccess: () => {
       toast({ title: "Statement sent to WhatsApp" });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "WhatsApp send failed", description: err?.message, variant: "destructive" });
     },
   });

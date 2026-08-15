@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { getErrorDetails } from "@shared/errorUtils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -293,7 +294,7 @@ export default function FactoryInvoiceDetail() {
       invalidateCustomerBalances(order?.customerId ?? undefined);
       navigate("/factory/invoicing?tab=invoices");
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
@@ -322,7 +323,7 @@ export default function FactoryInvoiceDetail() {
       }
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
@@ -348,7 +349,7 @@ export default function FactoryInvoiceDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
       setEditingArticleCode(null);
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
       setEditingArticleCode(null);
@@ -369,7 +370,7 @@ export default function FactoryInvoiceDetail() {
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
       invalidateCustomerBalances(order?.customerId ?? undefined);
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Cannot revert", description: error.message, variant: "destructive" });
     },
@@ -398,7 +399,7 @@ export default function FactoryInvoiceDetail() {
       }
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
@@ -429,7 +430,7 @@ export default function FactoryInvoiceDetail() {
       setShowProformaDialog(false);
       setSelectedProformaId("");
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
@@ -453,7 +454,7 @@ export default function FactoryInvoiceDetail() {
       setExchangeBale(null);
       setNewRefInput("");
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
@@ -473,7 +474,7 @@ export default function FactoryInvoiceDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
       setRemoveBaleState(null);
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },

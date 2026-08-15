@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -112,7 +113,7 @@ export default function SupplierProformas() {
       setSelectedProformaId(p.id);
       toast({ title: "Proforma created" });
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
@@ -127,7 +128,7 @@ export default function SupplierProformas() {
       if (selectedProformaId) setSelectedProformaId(null);
       toast({ title: "Proforma deleted" });
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
@@ -143,7 +144,7 @@ export default function SupplierProformas() {
       setAddingLine(false);
       setNewLine({ barcode: "", itemName: "", qty: "0", weightPerBale: "0", pricePerBale: "0" });
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
@@ -158,7 +159,7 @@ export default function SupplierProformas() {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers", supplierId, "proformas", selectedProformaId] });
       setEditingLineId(null);
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
@@ -171,7 +172,7 @@ export default function SupplierProformas() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers", supplierId, "proformas", selectedProformaId] });
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
@@ -188,7 +189,7 @@ export default function SupplierProformas() {
       setRenamingId(null);
       toast({ title: "Proforma renamed" });
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
@@ -221,7 +222,7 @@ export default function SupplierProformas() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers", supplierId, "proformas"] });
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
@@ -238,7 +239,7 @@ export default function SupplierProformas() {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers", supplierId, "proformas", selectedProformaId] });
       toast({ title: "Import complete", description: `${data.imported} lines imported` });
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Import error", description: e.message, variant: "destructive" });
     },

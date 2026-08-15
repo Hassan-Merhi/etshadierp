@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * ProfitOpeningRunner — extracted sub-component.
  *
@@ -38,7 +39,7 @@ export function ProfitOpeningRunner({ targetCompanyId, onDone }: { targetCompany
       toast({ title: "Profit-share opening balance posted", description: `Voucher ${r.voucherNumber}` });
       onDone();
     },
-    onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
   });
 
   return (

@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
@@ -369,7 +370,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         });
       }
     },
-    onError: (error: any, formData: VoucherFormData) => {
+    onError: (error: ClientErrorLike, formData: VoucherFormData) => {
       if (error.name === "OfflineQueued") {
         const voucherType = activeTab === "payment" ? "Payment" : "Receipt";
         const syntheticVoucher = {
@@ -424,7 +425,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       toast({ title: "Statement sent to WhatsApp" });
       setWaPendingPrompt(null);
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "WhatsApp send failed", description: error.message, variant: "destructive" });
       setWaPendingPrompt(null);

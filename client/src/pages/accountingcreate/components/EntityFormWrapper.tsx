@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * EntityFormWrapper — extracted sub-component.
  *
@@ -79,7 +80,7 @@ function EntityFormWrapper({
       form.reset(getDefaultValues(entityType) as any);
       onCreated?.();
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Error",

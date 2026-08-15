@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -134,7 +135,7 @@ export default function POSImport() {
         description: `Found ${data.items.length} item(s) totaling ${formatNumber(data.totalValue)}. Click Validate to check the data.`,
       });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Parse error",
@@ -169,7 +170,7 @@ export default function POSImport() {
         }, 100);
       }
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Validation error",
@@ -219,7 +220,7 @@ export default function POSImport() {
       setPrintTime(new Date().toLocaleTimeString());
       setShowPrintDialog(true);
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Import error",
@@ -264,7 +265,7 @@ export default function POSImport() {
       setPrintTime(new Date().toLocaleTimeString());
       setShowPrintDialog(true);
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Credit Import error",

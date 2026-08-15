@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { ArrowLeft, Package, Scale, Boxes, Pencil, Trash2 } from "lucide-react";
@@ -95,7 +96,7 @@ export default function BatchDetail({ batchId, onBack, onDeleted }: BatchDetailP
       setEditOpen(false);
       toast({ title: "Saved", description: "Batch updated successfully" });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -116,7 +117,7 @@ export default function BatchDetail({ batchId, onBack, onDeleted }: BatchDetailP
       setDeleteOpen(false);
       (onDeleted || onBack)();
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });

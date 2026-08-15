@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
@@ -345,7 +346,7 @@ export default function FactorySettings() {
       setWeeklyWaPickerOpen(false);
       toast({ title: "Saved", description: "Weekly report WhatsApp group updated." });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
@@ -371,7 +372,7 @@ export default function FactorySettings() {
       setProdWaPickerOpen(false);
       toast({ title: "Saved", description: "Production WhatsApp group updated." });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },

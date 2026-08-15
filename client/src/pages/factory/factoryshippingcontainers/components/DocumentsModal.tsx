@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * DocumentsModal — extracted sub-component.
  *
@@ -76,7 +77,7 @@ export function DocumentsModal({
       if (fileInputRef.current) fileInputRef.current.value = "";
       toast({ title: "Document uploaded", description: doc.displayName });
     },
-    onError: (e: any) => toast({ title: "Upload failed", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Upload failed", description: e.message, variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -94,7 +95,7 @@ export function DocumentsModal({
       queryClient.invalidateQueries({ queryKey: [LIST_KEY], exact: true });
       toast({ title: "Document removed" });
     },
-    onError: (e: any) => toast({ title: "Delete failed", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Delete failed", description: e.message, variant: "destructive" }),
   });
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {

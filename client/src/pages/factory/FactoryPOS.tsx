@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -385,7 +386,7 @@ export default function FactoryPOS() {
       toast({ title: "Sale recorded", description: `${data.saleNumber} – ${ccPrefix}${formatNum(total)}` });
       setShowPrintDialog(true);
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Error", description: err.message || "Failed to create sale", variant: "destructive" });
     },
   });
@@ -401,7 +402,7 @@ export default function FactoryPOS() {
       toast({ title: "Sale updated", description: `${data.saleNumber || editSaleData?.saleNumber} saved` });
       navigate("/factory/daybook");
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Error", description: err.message || "Failed to update sale", variant: "destructive" });
     },
   });
@@ -414,7 +415,7 @@ export default function FactoryPOS() {
       setVoidId(null);
       toast({ title: "Sale voided" });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
