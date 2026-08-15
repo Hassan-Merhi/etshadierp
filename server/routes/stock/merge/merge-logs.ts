@@ -66,7 +66,7 @@ export function registerStockMergeLogRoutes(app: Express) {
         LIMIT 200
       `);
 
-      const data = (rows.rows ?? rows).map((r: any) => ({
+      const data = (rows.rows ?? rows).map((r: unknown) => ({
         ...r,
         id: null,
         source: "historical",
@@ -191,7 +191,7 @@ export function registerStockMergeLogRoutes(app: Express) {
             averageRate: string;
             totalValue: string;
           };
-          const snapEntries: SnapEntry[] = Object.values(snapshotBefore as Record<string, unknown>).map((v: any) => ({
+          const snapEntries: SnapEntry[] = Object.values(snapshotBefore as Record<string, unknown>).map((v: unknown) => ({
             stockItemId: Number(v.stockItemId),
             locationId: Number(v.locationId),
             quantity: String(v.quantity),

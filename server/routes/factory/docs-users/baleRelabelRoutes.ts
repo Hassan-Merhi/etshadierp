@@ -35,7 +35,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
         return res.status(400).json({ message: "rows array is required" });
       }
 
-      const refCodes: string[] = rows.map((r: any) => String(r.currentRef || "").trim()).filter(Boolean);
+      const refCodes: string[] = rows.map((r: unknown) => String(r.currentRef || "").trim()).filter(Boolean);
       if (refCodes.length === 0) return res.status(400).json({ message: "No reference codes provided" });
 
       // fetch all bales in one query
@@ -50,7 +50,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
         .from(factoryBales)
         .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.referenceNumber, refCodes)));
 
-      const baleMap = new Map<string, any>(baleRows.map((b: any) => [b.referenceNumber, b]));
+      const baleMap = new Map<string, unknown>(baleRows.map((b: unknown) => [b.referenceNumber, b]));
 
       // detect duplicate refs in the uploaded file
       const seen = new Set<string>();
@@ -60,7 +60,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
         seen.add(ref);
       }
 
-      const results = rows.map((r: any) => {
+      const results = rows.map((r: unknown) => {
         const ref = String(r.currentRef || "").trim();
         if (!ref) return { currentRef: ref, valid: false, error: "Empty reference code" };
         if (dupes.has(ref)) return { currentRef: ref, valid: false, error: "Duplicate in upload" };
@@ -76,7 +76,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
         };
       });
 
-      const validCount = results.filter((r: any) => r.valid).length;
+      const validCount = results.filter((r: unknown) => r.valid).length;
       const invalidCount = results.length - validCount;
       res.json({ results, validCount, invalidCount });
     } catch (error: unknown) {
@@ -98,12 +98,12 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
         return res.status(400).json({ message: "rows array is required" });
       }
 
-      const validRows = rows.filter((r: any) => String(r.currentRef || "").trim());
+      const validRows = rows.filter((r: unknown) => String(r.currentRef || "").trim());
       if (validRows.length === 0) return res.status(400).json({ message: "No valid rows to apply" });
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx: unknown) => {
         // 1. Fetch bales to recode
-        const refCodes = validRows.map((r: any) => String(r.currentRef).trim());
+        const refCodes = validRows.map((r: unknown) => String(r.currentRef).trim());
         const baleRows = await tx
           .select({
             id: factoryBales.id,
@@ -116,7 +116,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
           .from(factoryBales)
           .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.referenceNumber, refCodes)));
 
-        const baleMap = new Map<string, any>(baleRows.map((b: any) => [b.referenceNumber, b]));
+        const baleMap = new Map<string, unknown>(baleRows.map((b: unknown) => [b.referenceNumber, b]));
         const notFound = refCodes.filter((r) => !baleMap.has(r));
         if (notFound.length > 0) {
           throw new Error(
@@ -237,7 +237,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
         .limit(10);
 
       // attach items counts
-      const sessionIds = sessions.map((s: any) => s.id);
+      const sessionIds = sessions.map((s: unknown) => s.id);
       const itemsBySession: Record<number, unknown[]> = {};
       if (sessionIds.length > 0) {
         const items = await db.select().from(baleRecodeItems).where(inArray(baleRecodeItems.sessionId, sessionIds));
@@ -247,7 +247,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
         }
       }
 
-      const enriched = sessions.map((s: any) => ({
+      const enriched = sessions.map((s: unknown) => ({
         ...s,
         items: itemsBySession[s.id] || [],
       }));

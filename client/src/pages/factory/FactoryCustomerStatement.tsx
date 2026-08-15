@@ -138,7 +138,7 @@ export default function FactoryCustomerStatement() {
         return next;
       });
     }
-  }, [statement]);
+  }, [draftNote, statement]);
 
   const saveNoteMutation = useMutation({
     mutationFn: async (note: string) => {

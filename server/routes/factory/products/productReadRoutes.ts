@@ -237,7 +237,7 @@ export function registerFactoryProductReadRoutes(app: Express) {
           for (const order of allRelevantOrders) {
             const balesInOrder = orderBalesForProduct.filter((b) => b.orderId === order.id);
             const qty = balesInOrder.length;
-            const total = balesInOrder.reduce((s: number, b: any) => s + parseFloat(b.priceUsed || "0"), 0);
+            const total = balesInOrder.reduce((s: number, b: unknown) => s + parseFloat(b.priceUsed || "0"), 0);
             const pricePerBale = qty > 0 ? total / qty : 0;
 
             const [customer] = await db
@@ -264,8 +264,8 @@ export function registerFactoryProductReadRoutes(app: Express) {
             }
           }
 
-          sales.sort((a: any, b: any) => b.orderDate.localeCompare(a.orderDate));
-          loaded.sort((a: any, b: any) => b.orderDate.localeCompare(a.orderDate));
+          sales.sort((a: unknown, b: unknown) => b.orderDate.localeCompare(a.orderDate));
+          loaded.sort((a: unknown, b: unknown) => b.orderDate.localeCompare(a.orderDate));
         }
       }
 

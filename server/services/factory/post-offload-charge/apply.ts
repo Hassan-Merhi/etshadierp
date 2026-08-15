@@ -22,7 +22,7 @@ import { computeRemainingFraction, loadActiveCharges, loadCostInputs } from "./l
 import { PostOffloadMutationParams, PostOffloadMutationResult } from "./types";
 
 export async function applyPostOffloadChargeMutation(
-  tx: any,
+  tx: unknown,
   params: PostOffloadMutationParams
 ): Promise<PostOffloadMutationResult> {
   const { action, companyId, containerId, txDate, userId } = params;
@@ -76,7 +76,7 @@ export async function applyPostOffloadChargeMutation(
       .for("update");
     if (!chargeRow) throw new Error("Charge not found or already undone");
     if (expectedVersion !== undefined && chargeRow.version !== expectedVersion) {
-      const err: any = new Error("Charge was modified by another request — please retry");
+      const err: unknown = new Error("Charge was modified by another request — please retry");
       err.status = 409;
       throw err;
     }
@@ -347,7 +347,7 @@ export async function applyPostOffloadChargeMutation(
       .for("update");
     if (!rawCharge) throw new Error("Charge not found or already undone");
     if (expectedVersion !== undefined && rawCharge.version !== expectedVersion) {
-      const err: any = new Error("Charge was modified by another request — please retry");
+      const err: unknown = new Error("Charge was modified by another request — please retry");
       err.status = 409;
       throw err;
     }
@@ -391,7 +391,7 @@ export async function applyPostOffloadChargeMutation(
 
     const isLegacyUnknownBaseline =
       chargeRow.supplierLockedRateBefore === null && params.legacyBaselineRate !== undefined;
-    let cascadeResult: any = null;
+    let cascadeResult: unknown = null;
 
     // Update container cost
     await updateContainerCost(tx, containerId, newCost);
@@ -507,7 +507,7 @@ export async function applyPostOffloadChargeMutation(
         newVoucherId = null;
       } else {
         // Update existing voucher header + recreate entries
-        const { voucherCompanyId, chargesPayableAcctId } = accountingCtx || {
+        const { _voucherCompanyId, chargesPayableAcctId } = accountingCtx || {
           voucherCompanyId: companyId,
           chargesPayableAcctId: 0,
         };
@@ -676,7 +676,7 @@ export async function applyPostOffloadChargeMutation(
     }
 
     if (expectedVersion !== undefined && rawCharge.version !== expectedVersion) {
-      const err: any = new Error("Charge was modified by another request — please retry");
+      const err: unknown = new Error("Charge was modified by another request — please retry");
       err.status = 409;
       throw err;
     }
@@ -702,7 +702,7 @@ export async function applyPostOffloadChargeMutation(
       .where(eq(factoryOffloadAdditionalCharges.id, chargeId));
 
     // Compute NEW canonical cost (without this charge)
-    const remainingActiveCharges = activeCharges.filter((c: any) => c.id !== chargeId);
+    const remainingActiveCharges = activeCharges.filter((c: unknown) => c.id !== chargeId);
     const newCost = computeCorrectContainerCost(container, remainingActiveCharges, commissionRecord, otherChargeRows);
     if (newCost.fxUnresolved) throw new Error(`FX rate unresolved for container ${container.containerNumber}`);
 
@@ -720,7 +720,7 @@ export async function applyPostOffloadChargeMutation(
       ? new Decimal(supplierLockedRateBefore).times(dAuthKg).toFixed(6)
       : null;
 
-    let cascadeResult: any;
+    let cascadeResult: unknown;
     const isLegacyUnknownBaseline =
       chargeRow.supplierLockedRateBefore === null && params.legacyBaselineRate !== undefined;
 

@@ -95,7 +95,7 @@ export function validateReconciliationTarget(target: ReconciliationTarget): Reco
  * mutates or repairs balances; repair planning belongs to Phase 2I.
  */
 export async function reconcileTargetTx(
-  tx: any,
+  tx: unknown,
   target: ReconciliationTarget,
   adapter: ReconciliationAdapter
 ): Promise<ReconciliationResult> {
@@ -129,7 +129,7 @@ export async function reconcileTargetTx(
 }
 
 export async function reconcileTargetsTx(
-  tx: any,
+  tx: unknown,
   targets: ReconciliationTarget[],
   adapter: ReconciliationAdapter
 ): Promise<ReconciliationBatchResult> {

@@ -65,7 +65,7 @@ export function VoucherEntriesTable({
   onRowBlur,
   isFactoryCompany = false,
   onAutoCreateAccount,
-  isAutoCreating = false,
+  _isAutoCreating = false,
 }: VoucherEntriesTableProps) {
   const { fields, append, remove } = fieldArray;
   const { formatAmount, selectedCurrency, convertToUSD } = useCurrencyContext();

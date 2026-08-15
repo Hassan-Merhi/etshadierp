@@ -36,7 +36,7 @@ export function registerV5ProformaCreateRoutes(app: Express) {
 
       const names: string[] = Array.isArray(containerNames) ? containerNames.filter(Boolean) : [];
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx: unknown) => {
         const [proforma] = await tx
           .insert(customerProformas)
           .values({ companyId, customerId: Number(customerId), name, isActive: isActive ?? false })
@@ -170,7 +170,7 @@ export function registerV5ProformaCreateRoutes(app: Express) {
         .from(customerProformaLines)
         .where(eq(customerProformaLines.proformaId, proformaId));
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx: unknown) => {
         const today = getClientDate(req);
         const orderValues = containerNames.map((containerName: string) => ({
           companyId,

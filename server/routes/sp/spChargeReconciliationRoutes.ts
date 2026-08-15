@@ -6,7 +6,7 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { requireSpCompany } from "./spHelpers";
 import { ensureSpOffloadReversalStorage } from "./spOffloadLifecycleRoutes";
 
-function first(result: any): unknown {
+function first(result: unknown): unknown {
   return (result?.rows ?? result ?? [])[0] ?? {};
 }
 

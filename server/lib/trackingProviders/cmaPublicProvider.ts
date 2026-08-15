@@ -121,7 +121,7 @@ function parseResponse(containerNumber: string, data: unknown, base: CarrierTrac
   const d = data as Record<string, unknown>;
 
   // CMA response shapes vary — be defensive
-  const shipment: any =
+  const shipment: unknown =
     d.shipment ??
     d.tracking ??
     (Array.isArray(d.shipments) ? d.shipments[0] : null) ??
@@ -132,7 +132,7 @@ function parseResponse(containerNumber: string, data: unknown, base: CarrierTrac
 
   const events: TrackingEvent[] = (Array.isArray(rawEvents) ? rawEvents : [])
     .map(
-      (e: any): TrackingEvent => ({
+      (e: unknown): TrackingEvent => ({
         date: parseDate(e.eventDateTime ?? e.actualDate ?? e.timestamp ?? e.date ?? null),
         status: e.typeCode ?? e.eventCode ?? e.activityCode ?? e.status ?? null,
         location:

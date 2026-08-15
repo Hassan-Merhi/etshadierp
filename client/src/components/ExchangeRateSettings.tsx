@@ -42,7 +42,7 @@ export function ExchangeRateSettings() {
     },
   });
 
-  const { data: company } = useQuery<any>({
+  const { data: company } = useQuery<unknown>({
     queryKey: [`/api/companies/${selectedCompany?.id}`],
     enabled: !!selectedCompany?.id,
   });
@@ -52,7 +52,7 @@ export function ExchangeRateSettings() {
     enabled: !!selectedCompany?.id && !!company?.displayCurrency,
   });
 
-  const { data: latestRate } = useQuery<any>({
+  const { data: latestRate } = useQuery<unknown>({
     queryKey: ["/api/exchange-rates/latest", company?.baseCurrency, company?.displayCurrency],
     queryFn: async () => {
       if (!company?.baseCurrency || !company?.displayCurrency) return null;

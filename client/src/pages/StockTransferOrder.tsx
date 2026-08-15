@@ -166,7 +166,7 @@ export default function StockTransferOrder() {
   const { formatAmount } = useCurrencyContext();
 
   // History dialog data query
-  const { data: historyData, isLoading: historyLoading } = useQuery<any>({
+  const { data: historyData, isLoading: historyLoading } = useQuery<unknown>({
     queryKey: [
       "/api/locations",
       historyLocation?.id,
@@ -186,7 +186,7 @@ export default function StockTransferOrder() {
     enabled: historyDialogOpen && !!historyItem && !!historyLocation,
   });
 
-  const { data: detailData, isLoading: detailLoading } = useQuery<{ inTransactions: any[]; outTransactions: any[] }>({
+  const { data: detailData, isLoading: detailLoading } = useQuery<{ inTransactions: unknown[]; outTransactions: unknown[] }>({
     queryKey: [
       "/api/locations",
       historyLocation?.id,
@@ -206,7 +206,7 @@ export default function StockTransferOrder() {
     enabled: detailOpen && !!historyItem && !!historyLocation && detailMonth > 0,
   });
 
-  const { data: existingTransfer } = useQuery<any>({
+  const { data: existingTransfer } = useQuery<unknown>({
     queryKey: ["/api/stock-transfers", editVoucherId],
     queryFn: async () => {
       const res = await fetch(`/api/stock-transfers?voucherId=${editVoucherId}`, { credentials: "include" });
@@ -218,7 +218,7 @@ export default function StockTransferOrder() {
     enabled: !!editVoucherId,
   });
 
-  const { data: existingVoucher } = useQuery<any>({
+  const { data: existingVoucher } = useQuery<unknown>({
     queryKey: ["/api/vouchers", editVoucherId],
     queryFn: async () => {
       const res = await fetch(`/api/vouchers/${editVoucherId}`, { credentials: "include" });
@@ -236,7 +236,7 @@ export default function StockTransferOrder() {
     refetchOnReconnect: false,
   });
 
-  const { data: revisions = [] } = useQuery<any[]>({
+  const { data: revisions = [] } = useQuery<unknown[]>({
     queryKey: ["/api/stock-transfers", existingTransfer?.id, "revisions"],
     queryFn: async () => {
       const res = await fetch(`/api/stock-transfers/${existingTransfer!.id}/revisions`, { credentials: "include" });
@@ -298,7 +298,7 @@ export default function StockTransferOrder() {
       if (existingTransfer.items && existingTransfer.items.length > 0) {
         setSelectedLocationIds(locations.map((l) => l.id));
 
-        const preloaded: OrderItem[] = existingTransfer.items.map((item: any) => {
+        const preloaded: OrderItem[] = existingTransfer.items.map((item: unknown) => {
           const srcLoc = locations.find((l) => l.id === item.sourceLocationId);
           const stockItem = stockItems.find((s) => s.id === item.stockItemId);
           return {
@@ -518,7 +518,7 @@ export default function StockTransferOrder() {
         return { row, col };
       });
     },
-    [flatItems, selectedLocations, quantityPicker.open, openQuantityPicker, focusedCell, navigate]
+    [flatItems, selectedLocations, quantityPicker.open, openQuantityPicker, focusedCell]
   );
 
   const handleCellClick = async (
@@ -1018,7 +1018,7 @@ export default function StockTransferOrder() {
         navigate("/daybook");
       }
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Error",
@@ -1107,12 +1107,12 @@ export default function StockTransferOrder() {
         return;
       }
       const rows = utils.sheet_to_json<{
-        Code?: any;
-        Name?: any;
-        "Qty Change"?: any;
-        "Item Name"?: any;
-        Change?: any;
-        Qty?: any;
+        Code?: unknown;
+        Name?: unknown;
+        "Qty Change"?: unknown;
+        "Item Name"?: unknown;
+        Change?: unknown;
+        Qty?: unknown;
       }>(ws);
 
       const preview: ImportPreviewRow[] = rows
@@ -1970,7 +1970,7 @@ export default function StockTransferOrder() {
                   No revisions yet. Use "Save as Revision" to record tracked changes.
                 </p>
               ) : (
-                revisions.map((rev: any) => (
+                revisions.map((rev: unknown) => (
                   <div key={rev.id} className="border rounded-md overflow-hidden">
                     <div className="flex items-center justify-between gap-3 p-3 bg-muted/40 flex-wrap">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -2034,7 +2034,7 @@ export default function StockTransferOrder() {
                             </tr>
                           </thead>
                           <tbody>
-                            {rev.items.map((item: any, idx: number) => {
+                            {rev.items.map((item: unknown, idx: number) => {
                               const delta = parseFloat(item.delta);
                               return (
                                 <tr key={idx} className="border-t">

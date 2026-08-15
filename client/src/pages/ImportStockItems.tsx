@@ -74,7 +74,7 @@ function NewItemsTab() {
       const data = await selectedFile.arrayBuffer();
       const workbook = await read(data);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = utils.sheet_to_json<any>(worksheet);
+      const jsonData = utils.sheet_to_json<unknown>(worksheet);
       if (jsonData.length === 0) {
         toast({ title: "Empty File", description: "The Excel file is empty.", variant: "destructive" });
         return;
@@ -138,7 +138,7 @@ function NewItemsTab() {
       const stockGroupsData: unknown[] = await fetch("/api/stock-groups", { credentials: "include" }).then((r) => r.json());
       const stockGroupMap = new Map(stockGroupsData.map((sg) => [sg.code, sg.id]));
       const itemsToImport = previewData.map((row) => {
-        const item: any = {
+        const item: unknown = {
           companyId: selectedCompany.id,
           code: row.code,
           name: row.name,
@@ -331,7 +331,7 @@ function BarcodesTab() {
       const data = await f.arrayBuffer();
       const workbook = await read(data);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = utils.sheet_to_json<any>(worksheet);
+      const jsonData = utils.sheet_to_json<unknown>(worksheet);
 
       if (jsonData.length === 0) {
         toast({ title: "Empty File", description: "The file has no data rows.", variant: "destructive" });
@@ -392,7 +392,7 @@ function BarcodesTab() {
     try {
       const res = (await apiRequest("POST", "/api/stock-items/import-barcodes", {
         rows: validRows.map((r) => ({ itemCode: r.itemCode, barcode: r.barcode })),
-      })) as any;
+      })) as unknown;
       setResult(res);
       toast({
         title: "Import Complete",
@@ -620,7 +620,7 @@ function UpdateCategoriesTab() {
       const data = await f.arrayBuffer();
       const workbook = await read(data);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = utils.sheet_to_json<any>(worksheet);
+      const jsonData = utils.sheet_to_json<unknown>(worksheet);
       if (jsonData.length === 0) {
         toast({ title: "Empty File", variant: "destructive" });
         return;

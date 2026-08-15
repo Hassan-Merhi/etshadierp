@@ -75,7 +75,7 @@ export function registerPayrollBonusRoutes(app: Express) {
 
       // Fetch all active employees
       const allEmployees = await storage.getAllEmployees(companyId);
-      const activeEmployees = allEmployees.filter((e: any) => e.status !== "inactive");
+      const activeEmployees = allEmployees.filter((e: unknown) => e.status !== "inactive");
 
       // Cache sales queries by "companyId|locationId"
       const salesCache = new Map<string, { totalQuantity: string; totalSalesAmount: string; locationName: string }>();
@@ -262,7 +262,7 @@ export function registerPayrollBonusRoutes(app: Express) {
       const bonusSingleName = bonusSingleIsDefault ? "Bonus Expense" : `Bonus Expense - ${bonusSingleGrp}`;
 
       const bonusSingleAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
-      let bonusSingleAccount = bonusSingleAccounts.find((a: any) => a.code === bonusSingleCode);
+      let bonusSingleAccount = bonusSingleAccounts.find((a: unknown) => a.code === bonusSingleCode);
       if (!bonusSingleAccount) {
         bonusSingleAccount = await storage.createLedgerAccount({
           companyId: req.session.currentCompanyId!,

@@ -199,7 +199,7 @@ export function ContainerDrawer({
     ...frontendQueryPolicies.operational,
   });
 
-  const { data: trackingStatus } = useQuery<any>({
+  const { data: trackingStatus } = useQuery<unknown>({
     queryKey: ["/api/container-tracking/status"],
     staleTime: 5 * 60_000,
   });

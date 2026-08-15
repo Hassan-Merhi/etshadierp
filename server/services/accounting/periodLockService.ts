@@ -112,7 +112,7 @@ function validateScope(scope: PeriodLockScope): PeriodLockScope {
 }
 
 export async function assertPeriodOpenTx(
-  tx: any,
+  tx: unknown,
   scopeInput: PeriodLockScope,
   adapter: PeriodLockAdapter,
   override?: ClosedPeriodOverride

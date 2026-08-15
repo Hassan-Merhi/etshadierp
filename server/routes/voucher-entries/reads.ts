@@ -208,7 +208,7 @@ export function registerVoucherEntryReadRoutes(app: Express) {
             const supplierCode = supplier?.code || "";
             const containerNumber = container?.containerNumber || "";
 
-            const itemsWithDetails = lineItems.map((item: any) => ({
+            const itemsWithDetails = lineItems.map((item: unknown) => ({
               id: item.id,
               voucherId: id,
               purchaseOrderId: purchaseOrder.id,
@@ -232,7 +232,7 @@ export function registerVoucherEntryReadRoutes(app: Express) {
 
             // SECURITY: Also redact ledger entries for POS users
             const redactedEntries = isPOSUser
-              ? entries.map((entry: any) => ({
+              ? entries.map((entry: unknown) => ({
                   ...entry,
                   debitAmount: "0",
                   creditAmount: "0",
@@ -413,7 +413,7 @@ export function registerVoucherEntryReadRoutes(app: Express) {
 
       // SECURITY: Final fallback redaction for POS users - ensure no cost data leaks
       if (isPOSUser) {
-        const redactedFallbackEntries = entries.map((entry: any) => ({
+        const redactedFallbackEntries = entries.map((entry: unknown) => ({
           ...entry,
           debitAmount: "0",
           creditAmount: "0",

@@ -48,7 +48,7 @@ function filterBalesByDate(bales: unknown[], startDate: Date): unknown[] {
 
 export default function ProductionSummary() {
   const appMode = useAppMode();
-  const modeApiRequest = getApiRequest(appMode);
+  const _modeApiRequest = getApiRequest(appMode);
   const { data: balesData, isLoading: balesLoading } = useQuery<unknown[]>({
     queryKey: ["/api/factory/bales"],
   });

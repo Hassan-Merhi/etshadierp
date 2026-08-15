@@ -11,7 +11,7 @@ export interface CredentialVersionSession {
 const DEFAULT_REFRESH_MS = 60_000;
 let credentialVersionSchemaPromise: Promise<void> | null = null;
 
-async function ensureCredentialVersionSchema(db: any): Promise<void> {
+async function ensureCredentialVersionSchema(db: unknown): Promise<void> {
   if (!credentialVersionSchemaPromise) {
     credentialVersionSchemaPromise = (async () => {
       await db.execute(sql`
@@ -36,7 +36,7 @@ async function ensureCredentialVersionSchema(db: any): Promise<void> {
   await credentialVersionSchemaPromise;
 }
 
-export async function loadCredentialVersion(db: any, userId: string): Promise<number> {
+export async function loadCredentialVersion(db: unknown, userId: string): Promise<number> {
   await ensureCredentialVersionSchema(db);
 
   const [row] = await db
@@ -57,7 +57,7 @@ export async function loadCredentialVersion(db: any, userId: string): Promise<nu
 }
 
 export async function hydrateActiveCredentialVersion(
-  db: any,
+  db: unknown,
   session: CredentialVersionSession,
   options: { now?: number; refreshMs?: number } = {}
 ): Promise<number> {
@@ -90,7 +90,7 @@ export async function hydrateActiveCredentialVersion(
   return active;
 }
 
-export async function bumpCredentialVersion(tx: any, userId: string): Promise<number> {
+export async function bumpCredentialVersion(tx: unknown, userId: string): Promise<number> {
   await ensureCredentialVersionSchema(tx);
 
   const [row] = await tx
@@ -108,7 +108,7 @@ export async function bumpCredentialVersion(tx: any, userId: string): Promise<nu
   return Number(row?.credentialVersion) || 1;
 }
 
-export async function revokeUserSessions(pool: any, userId: string, exceptSid?: string | null): Promise<void> {
+export async function revokeUserSessions(pool: unknown, userId: string, exceptSid?: string | null): Promise<void> {
   if (exceptSid) {
     await pool.query(`DELETE FROM session WHERE sess->>'userId' = $1 AND sid <> $2`, [userId, exceptSid]);
     return;
@@ -117,12 +117,12 @@ export async function revokeUserSessions(pool: any, userId: string, exceptSid?: 
 }
 
 export async function rotateCredentialsAndRevokeSessions(
-  db: any,
-  pool: any,
+  db: unknown,
+  pool: unknown,
   userId: string,
   options: { exceptSid?: string | null } = {}
 ): Promise<number> {
-  const version = await db.transaction((tx: any) => bumpCredentialVersion(tx, userId));
+  const version = await db.transaction((tx: unknown) => bumpCredentialVersion(tx, userId));
   await revokeUserSessions(pool, userId, options.exceptSid);
   return version;
 }

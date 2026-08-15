@@ -6,7 +6,7 @@ import { storage } from "../../storage";
 
 type CurrencyBalance = Record<string, { debit: number; credit: number; net: number }>;
 
-function addCurrencyBalance(balances: Map<number, CurrencyBalance>, key: number, entry: any): void {
+function addCurrencyBalance(balances: Map<number, CurrencyBalance>, key: number, entry: unknown): void {
   const currency = entry.transactionCurrency || "USD";
   const debit = Number.parseFloat(entry.transactionDebitAmount ?? entry.debitAmount ?? "0");
   const credit = Number.parseFloat(entry.transactionCreditAmount ?? entry.creditAmount ?? "0");
@@ -18,7 +18,7 @@ function addCurrencyBalance(balances: Map<number, CurrencyBalance>, key: number,
   balances.set(key, currencyMap);
 }
 
-function addNetBalance(balances: Map<number, number>, key: number, entry: any): void {
+function addNetBalance(balances: Map<number, number>, key: number, entry: unknown): void {
   const debit = Number.parseFloat(entry.debitAmount || "0");
   const credit = Number.parseFloat(entry.creditAmount || "0");
   const current = balances.get(key) ?? 0;
@@ -26,7 +26,7 @@ function addNetBalance(balances: Map<number, number>, key: number, entry: any): 
   else if (credit > 0 && debit === 0) balances.set(key, current - credit);
 }
 
-function addHistoricalBaseBalance(balances: Map<number, number>, key: number, entry: any): void {
+function addHistoricalBaseBalance(balances: Map<number, number>, key: number, entry: unknown): void {
   const debit = Number.parseFloat(entry.baseDebitAmount ?? entry.debitAmount ?? "0");
   const credit = Number.parseFloat(entry.baseCreditAmount ?? entry.creditAmount ?? "0");
   const current = balances.get(key) ?? 0;

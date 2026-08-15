@@ -170,7 +170,7 @@ export function registerContainerFreightWriteRoutes(app: Express) {
       const newHasOwnFreight = newFreightPaidBy === "own" && newFreight > 0 && !!newFreightOwnAccountId;
       const newHasParentFreight = newFreightPaidBy === "parent" && newFreight > 0 && !!newFreightParentAccountId;
       const newHasEmbeddedFreight = newHasOwnFreight || newHasParentFreight;
-      const newFreightAccountId = newHasParentFreight
+      const _newFreightAccountId = newHasParentFreight
         ? newFreightParentAccountId
         : newHasOwnFreight
           ? newFreightOwnAccountId

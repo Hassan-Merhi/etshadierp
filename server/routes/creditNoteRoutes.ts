@@ -29,7 +29,7 @@ import {
 import { eq, and, or, desc, ilike } from "drizzle-orm";
 import { adjustInventory } from "../inventoryHelper";
 
-async function getOrCreateSalesReturnsAccount(companyId: number, txOrDb: any = db): Promise<number | null> {
+async function getOrCreateSalesReturnsAccount(companyId: number, txOrDb: unknown = db): Promise<number | null> {
   const byName = await txOrDb
     .select({ id: ledgerAccounts.id })
     .from(ledgerAccounts)

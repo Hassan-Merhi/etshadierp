@@ -197,7 +197,7 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: unknown 
     };
     window.addEventListener("keydown", handleKeyDown, { capture: true });
     return () => window.removeEventListener("keydown", handleKeyDown, { capture: true });
-  }, [selectedRowIndex, visibleRows, isAllLocationsMode]);
+  }, [selectedRowIndex, visibleRows, isAllLocationsMode, handleMonthClick]);
 
   useEffect(() => {
     if (selectedRowIndex < 0 || !tableScrollContainer.current) return;
@@ -218,7 +218,7 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: unknown 
         }),
     });
     return () => clearCursorNav();
-  }, [selectedRowIndex, visibleRows]);
+  }, [clearCursorNav, registerCursorNav, selectedRowIndex, visibleRows]);
 
   if (isLoading) {
     return (

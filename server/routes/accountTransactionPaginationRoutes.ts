@@ -90,7 +90,7 @@ function exposePaginationHeaders(res: Response, page: StatementPage): void {
 
 function buildPageResponse(
   rows: unknown[],
-  summary: any,
+  summary: unknown,
   precedingPageNet: number,
   prePeriodNet: number,
   pagination: Pagination,

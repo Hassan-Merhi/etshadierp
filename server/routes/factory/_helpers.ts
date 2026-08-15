@@ -46,7 +46,7 @@ function buildValidatedUrl(baseUrl: string, dateISO: string, currencyCode: strin
 }
 
 export async function writeDaybookEntry(
-  dbOrTx: any,
+  dbOrTx: unknown,
   opts: {
     companyId: number;
     txDate: string;
@@ -208,7 +208,7 @@ export async function verifySupervisorPassword(password: string, hash: string): 
   return bcrypt.compare(password, hash);
 }
 
-export async function recalculateOrderTotals(dbConn: any, orderId: number) {
+export async function recalculateOrderTotals(dbConn: unknown, orderId: number) {
   const bales = await dbConn.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
 
   // Fetch proforma pricing mode and per-kg rate for this order (if proforma-linked)
@@ -280,11 +280,11 @@ export async function recalculateOrderTotals(dbConn: any, orderId: number) {
 
   const charges = await dbConn.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
   const freightAmount = charges
-    .filter((c: any) => c.chargeType === "FREIGHT")
-    .reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0);
+    .filter((c: unknown) => c.chargeType === "FREIGHT")
+    .reduce((sum: number, c: unknown) => sum + parseFloat(c.amount), 0);
   const otherChargesTotal = charges
-    .filter((c: any) => c.chargeType === "OTHER")
-    .reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0);
+    .filter((c: unknown) => c.chargeType === "OTHER")
+    .reduce((sum: number, c: unknown) => sum + parseFloat(c.amount), 0);
 
   // For per_kg articles: always use proformaRate × totalWeight as the authoritative price.
   // This matches the totalPrice stored in the order lines above and the verify-page display.
@@ -325,7 +325,7 @@ export async function recalculateOrderTotals(dbConn: any, orderId: number) {
  * Returns the new { totalCost, inclusiveCostPerKg, costPerKgUsd, rawStockId }.
  */
 export async function recalculateContainerCosts(
-  tx: any,
+  tx: unknown,
   companyId: number,
   containerId: number
 ): Promise<{ totalCost: number; inclusiveCostPerKg: number; costPerKgUsd: number; rawStockId: number | null }> {
@@ -401,7 +401,7 @@ export async function recalculateContainerCosts(
         eq(factoryOffloadAdditionalCharges.companyId, companyId)
       )
     );
-  const additionalTotal = additionalCharges.reduce((sum: number, c: any) => {
+  const additionalTotal = additionalCharges.reduce((sum: number, c: unknown) => {
     const amt = parseFloat(c.amount || "0");
     const ccy = c.currencyCode || containerCcy;
     const cfx = parseFloat(c.fxRateToUsd || String(fxRate));
@@ -464,8 +464,8 @@ export async function recalculateContainerCosts(
         .select()
         .from(factoryMixBatchSources)
         .where(eq(factoryMixBatchSources.mixBatchId, batchId));
-      const batchTotalCost = allSrc.reduce((s: number, r: any) => s + parseFloat(r.totalCost || "0"), 0);
-      const batchTotalWeight = allSrc.reduce((s: number, r: any) => s + parseFloat(r.weightKg || "0"), 0);
+      const batchTotalCost = allSrc.reduce((s: number, r: unknown) => s + parseFloat(r.totalCost || "0"), 0);
+      const batchTotalWeight = allSrc.reduce((s: number, r: unknown) => s + parseFloat(r.weightKg || "0"), 0);
       const batchCostPerKg = batchTotalWeight > 0 ? batchTotalCost / batchTotalWeight : 0;
       await tx
         .update(factoryMixBatches)

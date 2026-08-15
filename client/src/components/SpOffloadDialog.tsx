@@ -49,7 +49,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
   const [chargeLines, setChargeLines] = useState<ChargeLine[]>([]);
   const [selectedLocationId, setSelectedLocationId] = useState("");
 
-  const { data: statusData } = useQuery<any>({
+  const { data: statusData } = useQuery<unknown>({
     queryKey: ["/api/sp/setup/status"],
     enabled: open,
   });

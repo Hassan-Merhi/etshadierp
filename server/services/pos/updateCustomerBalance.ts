@@ -15,7 +15,7 @@ import { eq, and } from "drizzle-orm";
  * Without this, the customer ledger / statement views can't
  * attribute the entry to the customer.
  */
-export async function findLinkedCustomerId(tx: any, companyId: number, accountId: number): Promise<number | undefined> {
+export async function findLinkedCustomerId(tx: unknown, companyId: number, accountId: number): Promise<number | undefined> {
   try {
     const [linkedCust] = await tx
       .select({ id: customers.id })

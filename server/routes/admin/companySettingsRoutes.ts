@@ -331,7 +331,7 @@ export function registerCompanySettingsRoutes(app: Express) {
         ),
       ]);
 
-      const pick = (r: any) => Number((r.rows ?? r)[0]?.n ?? 0);
+      const pick = (r: unknown) => Number((r.rows ?? r)[0]?.n ?? 0);
 
       res.json({
         timestamp: new Date().toISOString(),

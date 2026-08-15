@@ -260,7 +260,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
   const entryWs = wb.getWorksheet("ENTRY");
   const costingWs = wb.getWorksheet("Costing");
   const salesWs = wb.getWorksheet("Sales");
-  const ageingWs = wb.getWorksheet("Ageing");
+  const _ageingWs = wb.getWorksheet("Ageing");
   const summaryIWs = wb.getWorksheet("Summary-Itemwise");
 
   if (!entryWs || !costingWs) throw new Error("ENTRY or Costing sheet missing from template");
@@ -282,8 +282,8 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
     const rawName =
       typeof nameCell === "string"
         ? nameCell.trim()
-        : typeof (nameCell as any)?.result === "string"
-          ? (nameCell as any).result.trim()
+        : typeof (nameCell as unknown)?.result === "string"
+          ? (nameCell as unknown).result.trim()
           : "";
     if (!rawName || rawName.startsWith("Total ")) continue;
 
@@ -309,8 +309,8 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
     const displayName =
       typeof nameRaw === "string"
         ? nameRaw.trim()
-        : typeof (nameRaw as any)?.result === "string"
-          ? (nameRaw as any).result.trim()
+        : typeof (nameRaw as unknown)?.result === "string"
+          ? (nameRaw as unknown).result.trim()
           : "";
 
     // For rows with no readable name (formula-name with null result), still
@@ -437,8 +437,8 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
       const displayName =
         typeof nameRaw === "string"
           ? nameRaw.trim()
-          : typeof (nameRaw as any)?.result === "string"
-            ? (nameRaw as any).result.trim()
+          : typeof (nameRaw as unknown)?.result === "string"
+            ? (nameRaw as unknown).result.trim()
             : "";
 
       // Completely skip blank/unnamed rows.
@@ -720,7 +720,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
     let bmFormulaChecked = false;
     for (let r = E_DATA_START; r <= Math.min(E_DATA_START + 5, E_DATA_END); r++) {
       const bmCell = entryWs.getRow(r).getCell(bmColIdx);
-      const v = bmCell.value as any;
+      const v = bmCell.value as unknown;
       const fmla: string = v?.formula ?? v?.sharedFormula ?? "";
       if (fmla) {
         if (!fmla.includes("Sales!")) {
@@ -765,7 +765,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
     for (const ws of wbCheck.worksheets) {
       ws.eachRow({ includeEmpty: false }, (row) => {
         row.eachCell({ includeEmpty: false }, (cell) => {
-          const v = cell.value as any;
+          const v = cell.value as unknown;
           const result = v?.result ?? (typeof v === "string" ? v : null);
           if (typeof result === "string" && EXCEL_ERRORS.some((e) => result.includes(e))) {
             (errorsBySheet[ws.name] ??= []).push(`${ws.name}!${cell.address}: ${result}`);

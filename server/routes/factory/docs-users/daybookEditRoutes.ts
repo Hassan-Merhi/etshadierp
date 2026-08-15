@@ -36,7 +36,7 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
     try {
       const rawEntryId = Number(req.params.entryId);
       if (isNaN(rawEntryId)) return res.status(400).json({ message: "Invalid entry ID" });
-      const session = req.session as any;
+      const session = req.session as unknown;
       const companyId = session.factoryCompanyId || session.currentCompanyId;
       const userId = session.userId || null;
       const { reason, description, amountCurrency, amountUsd, currencyCode, fxRateToUsd, txDate } = req.body;
@@ -49,7 +49,7 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
       const canEdit = ["admin", "owner", "developer"].includes(currentRole) || session.daybookEditDays > 0;
       if (!canEdit) return res.status(403).json({ message: "You do not have permission to edit daybook entries" });
 
-      let existing: any;
+      let existing: unknown;
       let realEntryId: number;
 
       if (rawEntryId < 0) {
@@ -113,7 +113,7 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
 
       const beforeJson = JSON.stringify(existing);
 
-      const updates: any = {};
+      const updates: unknown = {};
       if (description !== undefined) updates.description = description;
       if (amountCurrency !== undefined) updates.amountCurrency = String(amountCurrency);
       if (amountUsd !== undefined) updates.amountUsd = String(amountUsd);
@@ -138,7 +138,7 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
 
       // ── Sync description and date back to the source voucher so Accounts statements stay in sync ──
       if (updated.referenceTable === "vouchers" && updated.referenceId) {
-        const voucherUpdates: any = {};
+        const voucherUpdates: unknown = {};
         if (description !== undefined) voucherUpdates.description = description;
         if (txDate !== undefined) voucherUpdates.voucherDate = txDate;
         if (Object.keys(voucherUpdates).length > 0) {
@@ -175,7 +175,7 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
   // Restricted to admin/owner/developer. Triggers full container cost recalculation.
   app.patch("/api/factory/daybook/:entryId/cost-edit", requireAuth, async (req: Request, res: Response) => {
     try {
-      const session = req.session as any;
+      const session = req.session as unknown;
       const companyId = session.factoryCompanyId || session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const userId = session.userId || null;
@@ -211,7 +211,7 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
       }
 
       // Parse metaJson to determine exact source
-      let meta: any = {};
+      let meta: unknown = {};
       try {
         meta = JSON.parse(entry.metaJson || "{}");
       } catch {
@@ -250,7 +250,7 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
       const beforeJson = JSON.stringify(entry);
       const sourceType: string = meta.sourceType || entry.txType;
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx: unknown) => {
         // ── 1. Update the specific source record ────────────────────────────────
         if (sourceType === "BASE_MATERIAL" || entry.txType === "OFFLOAD_RAW_STOCK") {
           // Editing base material cost: derive new ratePerKg from amount / actualKg
@@ -272,11 +272,11 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
           if (newFxRate) {
             fx = String(newFxRate); // fresh explicit request input — trust it even if it equals 1
           } else {
-            const fallbackRaw = (container as any).fxRateToUsdOffload || container.fxRateToUsd;
+            const fallbackRaw = (container as unknown).fxRateToUsdOffload || container.fxRateToUsd;
             const { fxRate: resolvedFx, looksSet } = resolveStoredFxRate(
               ccy,
               fallbackRaw,
-              (container as any).fxRateConfirmed
+              (container as unknown).fxRateConfirmed
             );
             if (!looksSet) throw new UnresolvedExchangeRateError(ccy);
             fx = String(resolvedFx);
@@ -447,7 +447,7 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
   // DELETE /api/factory/daybook/entry/:id — Hard delete a non-voucher-backed entry (admin/developer only)
   app.delete("/api/factory/daybook/entry/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const session = req.session as any;
+      const session = req.session as unknown;
       const companyId = session.factoryCompanyId || session.currentCompanyId;
       const role = (session.currentRole || session.role || "").toLowerCase();
       if (role !== "admin" && role !== "developer") {
@@ -479,7 +479,7 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
   // DELETE /api/factory/daybook/entry/:id/void — Void a voucher-backed daybook entry
   app.delete("/api/factory/daybook/entry/:id/void", requireAuth, async (req: Request, res: Response) => {
     try {
-      const session = req.session as any;
+      const session = req.session as unknown;
       const companyId = session.factoryCompanyId || session.currentCompanyId;
       const role = (session.currentRole || session.role || "").toLowerCase();
       if (role !== "admin" && role !== "owner" && role !== "developer") {
@@ -522,7 +522,7 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
       const txTypeVal = voucherTxTypeMap[voucher.voucherType] || "JOURNAL";
       const today = getClientDate(req);
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx: unknown) => {
         // 0. Read employee-linked entries BEFORE deletion so we can reverse balances
         const empEntries = await tx
           .select()

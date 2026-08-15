@@ -25,9 +25,9 @@ function reconnectDelay(): number {
   return MIN_RECONNECT_DELAY_MS + Math.floor(Math.random() * (MAX_RECONNECT_JITTER_MS + 1));
 }
 
-function frameEtag(userId: string, frame: any): string {
+function frameEtag(userId: string, frame: unknown): string {
   const latestClickTs = Array.isArray(frame?.clicks)
-    ? frame.clicks.reduce((latest: number, click: any) => Math.max(latest, Number(click?.ts) || 0), 0)
+    ? frame.clicks.reduce((latest: number, click: unknown) => Math.max(latest, Number(click?.ts) || 0), 0)
     : 0;
   const identity = [
     userId,
@@ -56,7 +56,7 @@ function matchesEtag(header: string | string[] | undefined, etag: string): boole
 function installReconnectJitter(res: Response): void {
   const originalWrite = res.write.bind(res) as (...args: unknown[]) => boolean;
   let retryRewritten = false;
-  res.write = ((chunk: any, ...args: unknown[]) => {
+  res.write = ((chunk: unknown, ...args: unknown[]) => {
     if (!retryRewritten && typeof chunk === "string" && chunk.includes("retry: 3000")) {
       retryRewritten = true;
       chunk = chunk.replace("retry: 3000", `retry: ${reconnectDelay()}`);
@@ -67,7 +67,7 @@ function installReconnectJitter(res: Response): void {
 
 function installConditionalFrameResponse(req: Request, res: Response, watchedUserId: string): void {
   const originalJson = res.json.bind(res);
-  res.json = ((body: any) => {
+  res.json = ((body: unknown) => {
     const fastEnabled = isRemoteSupportEnabled("fastScreenFeed");
     res.setHeader("X-Screen-Feed-Transport", fastEnabled ? "fast" : "legacy");
 

@@ -244,7 +244,7 @@ export default function CustomerInvoiceCreate() {
         proformaIdUsed: activeProforma.id,
       });
     }
-  }, [customerId, activeProforma?.id]);
+  }, [customerId, activeProforma.id, selectedCompany.id, activeProforma, orderDate, orderId, createOrderMutation]);
 
   const handleScan = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {

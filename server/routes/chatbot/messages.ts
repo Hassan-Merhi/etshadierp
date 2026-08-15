@@ -168,7 +168,7 @@ export function registerChatbotMessageRoutes(app: Express) {
       }));
 
       res.json(enrichedHistory);
-    } catch (error: unknown) {
+    } catch (_error: unknown) {
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -201,7 +201,7 @@ export function registerChatbotMessageRoutes(app: Express) {
           lastMessageTime: r.lastMessageTime,
         }))
       );
-    } catch (error: unknown) {
+    } catch (_error: unknown) {
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -259,7 +259,7 @@ export function registerChatbotMessageRoutes(app: Express) {
         .delete(chatMessages)
         .where(and(eq(chatMessages.sessionId, sessionId), eq(chatMessages.companyId, companyId)));
       res.json({ success: true });
-    } catch (error: unknown) {
+    } catch (_error: unknown) {
       res.status(500).json({ message: "Internal server error" });
     }
   });

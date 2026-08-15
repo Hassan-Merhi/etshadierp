@@ -164,7 +164,7 @@ export function useVoucherQueries({
           .map((a) => ({ type: "ledger" as const, id: a.id, name: a.name, code: a.code })),
         ...bankAccounts.map((a) => ({ type: "bank" as const, id: a.id, name: a.bankName, code: a.accountNumber })),
       ].sort((a, b) => (a.name || "").localeCompare(b.name || "")),
-    [ledgerAccounts, bankAccounts]
+    [ledgerAccounts, bankAccounts, PAY_FROM_LEDGER_TYPES]
   );
 
   const allAccounts = useMemo<CombinedAccount[]>(() => {
@@ -189,7 +189,7 @@ export function useVoucherQueries({
         code: f.code,
         openingBalance: f.openingBalance,
       })),
-      ...customers.map((c: any) => ({
+      ...customers.map((c: unknown) => ({
         type: "customer" as const,
         id: c.id,
         name: c.legalName,
@@ -197,8 +197,8 @@ export function useVoucherQueries({
         openingBalance: c.openingBalance,
       })),
       ...customerSearchResults
-        .filter((c: any) => !customers.find((p: any) => p.id === c.id))
-        .map((c: any) => ({
+        .filter((c: unknown) => !customers.find((p: unknown) => p.id === c.id))
+        .map((c: unknown) => ({
           type: "customer" as const,
           id: c.id,
           name: c.legalName,

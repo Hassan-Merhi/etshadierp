@@ -185,7 +185,7 @@ export function useFactoryVisibleSections(user?: unknown): {
   const isDeveloper = user?.role === "Developer";
   const isAdmin = user?.role === "Admin" || user?.role === "Owner" || isDeveloper;
 
-  const { data: settings } = useQuery<any>({
+  const { data: settings } = useQuery<unknown>({
     queryKey: companyQueryKey("/api/factory/settings", selectedCompany?.id),
     queryFn: async () => {
       const r = await fetch("/api/factory/settings");
@@ -288,14 +288,14 @@ export function FactorySidebar({ user }: { user?: unknown }) {
     if (count > prevUnreadRef.current)
       toast({ title: "New message", description: `You have ${count} unread message${count > 1 ? "s" : ""}.` });
     prevUnreadRef.current = count;
-  }, [chatUnread?.count]);
+  }, [chatUnread?.count, toast]);
 
   const {
     sections: visibleSections,
     isPinnedVisible,
     isAdmin,
     isDeveloper,
-    isPrivileged,
+    _isPrivileged,
   } = useFactoryVisibleSections(user);
 
   const { openSections, toggleSection } = useOpenSections(visibleSections);

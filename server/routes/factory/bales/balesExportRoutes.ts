@@ -42,9 +42,9 @@ export function registerBalesExportRoutes(app: Express) {
         return res.status(404).json({ message: `No bales found for date ${date}` });
       }
 
-      const locIds = [...new Set(bales.map((b: any) => b.erpLocationId).filter(Boolean))];
+      const locIds = [...new Set(bales.map((b: unknown) => b.erpLocationId).filter(Boolean))];
       const locs = locIds.length > 0 ? await db.select().from(locations).where(inArray(locations.id, locIds)) : [];
-      const locMap = new Map(locs.map((l: any) => [l.id, l]));
+      const locMap = new Map(locs.map((l: unknown) => [l.id, l]));
 
       const [fCfgBale] = await db
         .select({ hideAvgCost: factorySettings.hideAvgCost })
@@ -88,7 +88,7 @@ export function registerBalesExportRoutes(app: Express) {
 
       for (const bale of bales) {
         const loc = locMap.get(bale.erpLocationId);
-        const baleRowData: any = {
+        const baleRowData: unknown = {
           referenceNumber: bale.referenceNumber,
           articleCode: bale.articleCode ?? "",
           productName: bale.productName ?? "",

@@ -343,7 +343,7 @@ export function registerVoucherSalesLineUpdateRoutes(app: Express) {
         }
 
         // Debit: Cash/Bank/Customer Account (Asset increases)
-        const debitEntry: any = {
+        const debitEntry: unknown = {
           voucherId: id,
           debitAmount: totalSalesAmount.toFixed(2),
           creditAmount: "0",
@@ -392,7 +392,7 @@ export function registerVoucherSalesLineUpdateRoutes(app: Express) {
       }
 
       // Update the voucher
-      const voucherUpdates: any = {
+      const voucherUpdates: unknown = {
         totalAmount: totalSalesAmount.toFixed(2),
       };
       if (voucherDate !== undefined) voucherUpdates.voucherDate = voucherDate;

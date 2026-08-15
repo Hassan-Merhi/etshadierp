@@ -150,7 +150,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
       const dutyStatus = reqDutyStatus || "NONE";
 
       // ── Commission computation (DB insert deferred into the transaction) ──────
-      let commissionRecord: any = null;
+      let commissionRecord: unknown = null;
       const costing = await computeOffloadCosting({
         companyId,
         containerId,
@@ -199,7 +199,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
       } = costing;
 
       // ── Single atomic transaction: all DB writes happen here or not at all ────
-      let rawStock: any;
+      let rawStock: unknown;
 
       await db.transaction(async (tx) => {
         // ── SUBSEQUENT RECEIPT PATH ───────────────────────────────────────────────

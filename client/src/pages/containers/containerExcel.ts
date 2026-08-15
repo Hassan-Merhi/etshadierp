@@ -1,5 +1,5 @@
 // Safely extract a primitive value from an ExcelJS cell (which can return rich objects)
-export const cellVal = (value: any): unknown => {
+export const cellVal = (value: unknown): unknown => {
   if (value === null || value === undefined) return "";
   if (typeof value !== "object") return value;
   if (value instanceof Date) return value;
@@ -7,7 +7,7 @@ export const cellVal = (value: any): unknown => {
   if ("result" in value) return value.result ?? "";
   // Rich-text cell: { richText: [...] }
   if ("richText" in value && Array.isArray(value.richText))
-    return value.richText.map((r: any) => r.text ?? "").join("");
+    return value.richText.map((r: unknown) => r.text ?? "").join("");
   // Shared-string / cell-model: { text }
   if ("text" in value) return value.text ?? "";
   // Hyperlink cell: { text, hyperlink }
@@ -15,20 +15,20 @@ export const cellVal = (value: any): unknown => {
   return "";
 };
 
-export const cellStr = (value: any): string => {
+export const cellStr = (value: unknown): string => {
   const v = cellVal(value);
   if (v === null || v === undefined) return "";
   return String(v);
 };
 
-export const cellNum = (value: any): string => {
+export const cellNum = (value: unknown): string => {
   const v = cellVal(value);
   if (v === null || v === undefined || v === "") return "";
   const n = parseFloat(String(v).replace(/,/g, ""));
   return isNaN(n) ? "" : String(n);
 };
 
-export const excelDateToString = (value: any): string => {
+export const excelDateToString = (value: unknown): string => {
   if (!value) return "";
 
   const toYMD = (d: Date): string => {

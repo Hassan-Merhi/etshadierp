@@ -126,7 +126,7 @@ export function registerRawStockAdjRoutes(app: Express) {
       // Aggregate multiple source rows for the same batch into one timeline entry.
       // costPerKg is derived as totalCost / kg across THIS supplier's source rows only,
       // so a batch fed by this supplier more than once still shows one correct weighted rate.
-      const batchAggMap = new Map<number, any>();
+      const batchAggMap = new Map<number, unknown>();
       for (const r of batchSourceRows) {
         const kg = parseFloat(r.weightKg as string) || 0;
         const cost = parseFloat(r.totalCost as string) || kg * (parseFloat(r.costPerKg as string) || 0);
@@ -286,7 +286,7 @@ export function registerRawStockAdjRoutes(app: Express) {
         }
       }
 
-      let inserted: any;
+      let inserted: unknown;
       await db.transaction(async (tx) => {
         [inserted] = await tx
           .insert(factoryRawMaterialAdjustments)
@@ -429,7 +429,7 @@ export function registerRawStockAdjRoutes(app: Express) {
         });
       } else {
         // For ADD / REMOVE: soft-delete + clean up linked daybook entries and vouchers
-        await db.transaction(async (tx: any) => {
+        await db.transaction(async (tx: unknown) => {
           await tx
             .update(factoryRawMaterialAdjustments)
             .set({ deletedAt: new Date() })
@@ -460,7 +460,7 @@ export function registerRawStockAdjRoutes(app: Express) {
               )
             );
           if (linkedVouchers.length > 0) {
-            const vIds = linkedVouchers.map((v: any) => v.id);
+            const vIds = linkedVouchers.map((v: unknown) => v.id);
             await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
             await tx.delete(vouchers).where(inArray(vouchers.id, vIds));
           }
@@ -485,7 +485,7 @@ export function registerRawStockAdjRoutes(app: Express) {
       if (isNaN(batchId) || isNaN(supplierId))
         return res.status(400).json({ message: "batchId and supplierId are required" });
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx: unknown) => {
         // Verify batch belongs to this company
         const [batch] = await tx
           .select()
@@ -576,7 +576,7 @@ export function registerRawStockAdjRoutes(app: Express) {
         });
       }
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx: unknown) => {
         // Soft-delete the raw stock record
         await tx
           .update(factoryRawStock)
@@ -678,10 +678,10 @@ export function registerRawStockAdjRoutes(app: Express) {
           )
         );
 
-      const enriched = results.map((r: any) => {
+      const enriched = results.map((r: unknown) => {
         const received = parseFloat(r.receivedKg) || 0;
         const used = parseFloat(r.usedKg) || 0;
-        const costPerKg = parseFloat(r.costPerKg) || 0;
+        const _costPerKg = parseFloat(r.costPerKg) || 0;
         const remainingKg = received - used;
         return { ...r, remainingKg: remainingKg.toFixed(3) };
       });

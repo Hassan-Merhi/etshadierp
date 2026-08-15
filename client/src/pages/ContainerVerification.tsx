@@ -66,7 +66,7 @@ export default function ContainerVerification() {
   });
   const [viewMode, setViewMode] = useState<"detailed" | "summary">("detailed");
 
-  const { data: containerData } = useQuery<any>({
+  const { data: containerData } = useQuery<unknown>({
     queryKey: [`/api/containers/${containerId}`],
     enabled: !!containerId,
   });
@@ -293,7 +293,7 @@ export default function ContainerVerification() {
     ) {
       autoPopulateMutation.mutate();
     }
-  }, [loadedItems, loadingItems, containerData]);
+  }, [loadedItems, loadingItems, containerData, autoPopulateMutation]);
 
   // Auto-select supplier when opened via "Compare" from Daybook (supplierId URL param).
   useEffect(() => {

@@ -4,7 +4,7 @@ import { utils, writeFile } from "@/lib/excelHelper";
 interface ExportParams {
   formData: unknown;
   activeTab: string;
-  toast: (opts: any) => void;
+  toast: (opts: unknown) => void;
   detailed: boolean;
 }
 
@@ -13,7 +13,7 @@ export async function exportVoucherHelper({ formData, activeTab, toast, detailed
   const voucherDate = formData.voucherDate
     ? format(formData.voucherDate, "yyyy-MM-dd")
     : format(new Date(), "yyyy-MM-dd");
-  const validEntries = formData.entries.filter((e: any) => e.accountId > 0 && parseFloat(e.amount) > 0);
+  const validEntries = formData.entries.filter((e: unknown) => e.accountId > 0 && parseFloat(e.amount) > 0);
 
   if (validEntries.length === 0) {
     toast({
@@ -24,10 +24,10 @@ export async function exportVoucherHelper({ formData, activeTab, toast, detailed
     return;
   }
 
-  const total = validEntries.reduce((sum: number, e: any) => sum + (parseFloat(e.amount) || 0), 0);
+  const total = validEntries.reduce((sum: number, e: unknown) => sum + (parseFloat(e.amount) || 0), 0);
 
   if (detailed) {
-    const exportData = validEntries.map((entry: any) => ({
+    const exportData = validEntries.map((entry: unknown) => ({
       "Voucher Type": voucherType,
       Date: voucherDate,
       "Pay From/Receive In": formData.paymentAccountName || "",

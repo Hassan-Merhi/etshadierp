@@ -319,14 +319,14 @@ async function sendInvoicePdf(req: Request, res: Response, data: NonNullable<Awa
   doc.end();
 }
 
-async function loadBales(orderId: number) {
+async function _loadBales(orderId: number) {
   const links = await db
     .select()
     .from(customerOrderBales)
     .where(eq(customerOrderBales.orderId, orderId))
     .orderBy(customerOrderBales.id);
   const rows = await db.select().from(factoryBales).where(eq(factoryBales.companyId, -1));
-  const map = new Map<number, any>(rows.map((row) => [row.id, row]));
+  const map = new Map<number, unknown>(rows.map((row) => [row.id, row]));
   return { links, map };
 }
 

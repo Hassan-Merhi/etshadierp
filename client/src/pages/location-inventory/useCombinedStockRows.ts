@@ -35,7 +35,7 @@ export function useCombinedStockRows({
   }, [allInventoryData]);
 
   const combinedStockRows = useMemo(() => {
-    const itemMap = new Map<number, any>();
+    const itemMap = new Map<number, unknown>();
     allInventoryData.forEach((item) => {
       const qty = parseFloat(item.quantity || "0");
       if (qty === 0) return;
@@ -94,14 +94,7 @@ export function useCombinedStockRows({
       .sort(
         (a, b) => a.stockGroupName.localeCompare(b.stockGroupName) || a.stockItemName.localeCompare(b.stockItemName)
       );
-  }, [
-    combinedStockRows,
-    allStockGroupFilter,
-    allStockCategoryFilter,
-    allStockLocationFilter,
-    allStockSearchTerm,
-    allInventoryLocations,
-  ]);
+  }, [combinedStockRows, allStockGroupFilter, allStockCategoryFilter, allStockLocationFilter, allStockSearchTerm]);
 
   return { allInventoryLocations, allInventoryGroups, filteredCombinedRows };
 }

@@ -22,7 +22,7 @@ import {
 
 import { verifyContainerOwnership } from "./_helpers";
 
-export function registerContainerLoadedItemSummaryRoutes(app: Express, requireAuth: any) {
+export function registerContainerLoadedItemSummaryRoutes(app: Express, requireAuth: unknown) {
   app.get(
     "/api/suppliers/:supplierId/containers/:containerId/verification-summary-export.xlsx",
     requireAuth,
@@ -60,7 +60,7 @@ export function registerContainerLoadedItemSummaryRoutes(app: Express, requireAu
 
         const { map: aliasMap } = await buildAliasMap(companyId);
 
-        const proformaByBarcode = new Map<string, any>();
+        const proformaByBarcode = new Map<string, unknown>();
         for (const line of proformaLinesList) {
           const bc = resolveBarcode((line.barcode || "").trim(), aliasMap);
           if (proformaByBarcode.has(bc)) {
@@ -74,7 +74,7 @@ export function registerContainerLoadedItemSummaryRoutes(app: Express, requireAu
             });
           }
         }
-        const loadedByBarcode = new Map<string, any>();
+        const loadedByBarcode = new Map<string, unknown>();
         for (const item of loadedItemsList) {
           const bc = resolveBarcode((item.barcode || "").trim(), aliasMap);
           if (loadedByBarcode.has(bc)) {
@@ -189,7 +189,7 @@ export function registerContainerLoadedItemSummaryRoutes(app: Express, requireAu
           sectionColor: string,
           columns: ColDef[],
           data: unknown[],
-          statusColorFn?: (row: any) => string | null,
+          statusColorFn?: (row: unknown) => string | null,
           includeAutoFilter = false
         ) => {
           const numCols = columns.length;
@@ -218,7 +218,7 @@ export function registerContainerLoadedItemSummaryRoutes(app: Express, requireAu
           const headerRowNum = sheet.rowCount + 1;
           const headerRow = sheet.addRow(columns.map((c) => c.header));
           headerRow.height = 24;
-          headerRow.eachCell((cell: any) => {
+          headerRow.eachCell((cell: unknown) => {
             cell.font = { bold: true, size: 10, color: { argb: sc.headerFont } };
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: sectionColor } };
             cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
@@ -242,7 +242,7 @@ export function registerContainerLoadedItemSummaryRoutes(app: Express, requireAu
               const values = columns.map((c) => item[c.key]);
               const dataRow = sheet.addRow(values);
               const rowBg = statusColorFn ? statusColorFn(item) : i % 2 !== 0 ? sc.summaryBg : null;
-              dataRow.eachCell((cell: any) => {
+              dataRow.eachCell((cell: unknown) => {
                 cell.border = sThin;
                 cell.alignment = { vertical: "middle" };
                 if (rowBg) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowBg } };
@@ -253,14 +253,14 @@ export function registerContainerLoadedItemSummaryRoutes(app: Express, requireAu
             const totalValues = columns.map((c, i) => {
               if (i === 0) return "TOTAL";
               const sum = data.reduce(
-                (s: number, item: any) => s + (typeof item[c.key] === "number" ? item[c.key] : 0),
+                (s: number, item: unknown) => s + (typeof item[c.key] === "number" ? item[c.key] : 0),
                 0
               );
               return typeof data[0]?.[c.key] === "number" ? sum : "";
             });
             const totalRow = sheet.addRow(totalValues);
             totalRow.font = { bold: true, size: 10 };
-            totalRow.eachCell((cell: any, colN: number) => {
+            totalRow.eachCell((cell: unknown, colN: number) => {
               cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: sc.summaryBg } };
               cell.border = dblBorder;
               const col = columns[colN - 1];
@@ -289,7 +289,7 @@ export function registerContainerLoadedItemSummaryRoutes(app: Express, requireAu
             { header: "Status", key: "status", width: 16 },
           ],
           fullComparison,
-          (item: any) => {
+          (item: unknown) => {
             if (item.status === "OVERLOADED") return sc.overloadedBg;
             if (item.status === "SHORT" || item.status === "MISSING") return sc.shortBg;
             if (item.status === "NOT REQUESTED") return sc.notRequestedBg;

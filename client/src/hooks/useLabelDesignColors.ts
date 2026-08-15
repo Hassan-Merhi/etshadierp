@@ -21,7 +21,7 @@ const STATIC_FALLBACK: DesignColorOption[] = A4_DESIGN_OPTIONS.map((o) => ({
   lastModified: null,
 }));
 
-function rowToOption(r: any): DesignColorOption {
+function rowToOption(r: unknown): DesignColorOption {
   const ts: number | null = r.hasCustom && r.lastModified ? r.lastModified : null;
   // previewUrl is for screen/UI display only (small WebP thumbnail).
   // Custom images use the original URL (stable ?t= timestamp → browser caches correctly).

@@ -95,7 +95,7 @@ export function registerPayrollVoucherBackfillRoutes(app: Express) {
 
       const backfilledIds: number[] = [];
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx: unknown) => {
         const payrollAccountCache = new Map<number, number>();
 
         for (const cid of companyIds) {

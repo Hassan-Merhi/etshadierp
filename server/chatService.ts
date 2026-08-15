@@ -321,7 +321,7 @@ export async function chat(
             const { content, totalLines, truncated } = await readProjectFile(fp);
             codeContext += `\n\n**File: ${fp}** (${totalLines} lines${truncated ? `, first 300 shown` : ""})\n\`\`\`typescript\n${content}\n\`\`\``;
             if (!codeReadFiles.includes(fp)) codeReadFiles.push(fp);
-          } catch (err: unknown) {
+          } catch (_err: unknown) {
             // Still not found — fall back to grep by base name
             const basename = fp.replace(/.*\//, "").replace(/\.\w+$/, "");
             const grepResult = await grepProjectFiles(basename, ".").catch(() => "(not found)");
@@ -437,7 +437,7 @@ export async function chat(
         }
       }
 
-      const primaryFilePath = resolvedPaths[0] ?? codeReadFiles[0] ?? "path/to/file.ts";
+      const _primaryFilePath = resolvedPaths[0] ?? codeReadFiles[0] ?? "path/to/file.ts";
       const contentSection = contentBlocks.length > 0 ? "\n\n" + contentBlocks.join("\n\n") : "";
 
       systemPrompt = `You are a senior TypeScript engineer on this ERP/POS project (React 18 + Express + Drizzle ORM + shadcn/ui). You MUST respond with ONLY a valid JSON object — no markdown, no explanation, ONLY raw JSON.
@@ -552,15 +552,15 @@ Rules:
           if (parsed && Array.isArray(parsed.patches) && parsed.patches.length > 0) {
             // Multi-file patches
             filePatchDrafts = parsed.patches
-              .filter((p: any) => p.filePath && "newContent" in p)
-              .map((p: any) => ({
+              .filter((p: unknown) => p.filePath && "newContent" in p)
+              .map((p: unknown) => ({
                 filePath: p.filePath,
                 description: p.description || parsed.description || "Apply code changes",
                 originalContent: p.originalContent ?? codeEditOriginalMap[p.filePath] ?? "",
                 newContent: p.newContent ?? "",
               }));
             if (filePatchDrafts && filePatchDrafts.length > 0) {
-              const fileList = filePatchDrafts.map((p: any) => `- \`${p.filePath}\``).join("\n");
+              const fileList = filePatchDrafts.map((p: unknown) => `- \`${p.filePath}\``).join("\n");
               finalResponse = `I've prepared changes for **${filePatchDrafts.length} file${filePatchDrafts.length > 1 ? "s" : ""}**.\n\n${parsed.description || "Review the diffs below."}\n\n${fileList}\n\nClick **Apply** on each diff, or **Apply All** to write all changes at once.`;
             }
           } else if (parsed && parsed.filePath && "newContent" in parsed) {
@@ -584,7 +584,7 @@ Rules:
     // ── Phase 5b: detect voucher creation intent ──────────────────────────
     // Ask the AI to extract a voucher draft if the message contains creation intent.
     // We do a lightweight structured extraction call only when keywords are found.
-    let voucherDraft: any = undefined;
+    let voucherDraft: unknown = undefined;
 
     // Gate on the classified intent, not the raw regex — RE_VOUCHER's generic
     // "transfer ... <digit>" heuristic can match stock-transfer requests too
@@ -674,7 +674,7 @@ If the intent is unclear or amounts/accounts are too ambiguous to resolve, respo
     }
 
     // ── Stock adjustment detection ─────────────────────────────────────
-    let stockAdjustmentDraft: any = undefined;
+    let stockAdjustmentDraft: unknown = undefined;
 
     if (RE_STOCK_ADJ.test(userMessage)) {
       try {
@@ -729,7 +729,7 @@ If intent is unclear, respond with exactly: null`;
           const parsedAdj = JSON.parse(rawAdj);
           if (parsedAdj && parsedAdj.locationId && parsedAdj.items && parsedAdj.items.length > 0) {
             // Auto-fill rates from inventory averageRate
-            const itemIds = parsedAdj.items.map((i: any) => i.stockItemId).filter(Boolean);
+            const itemIds = parsedAdj.items.map((i: unknown) => i.stockItemId).filter(Boolean);
             if (itemIds.length > 0) {
               const invRows = await db
                 .select({ stockItemId: schema.inventory.stockItemId, averageRate: schema.inventory.averageRate })
@@ -738,7 +738,7 @@ If intent is unclear, respond with exactly: null`;
                   and(eq(schema.inventory.locationId, parsedAdj.locationId), eq(schema.inventory.companyId, companyId))
                 );
               const rateMap = new Map(invRows.map((r) => [r.stockItemId, parseFloat(r.averageRate ?? "0")]));
-              parsedAdj.items = parsedAdj.items.map((item: any) => ({
+              parsedAdj.items = parsedAdj.items.map((item: unknown) => ({
                 ...item,
                 rate: rateMap.get(item.stockItemId) ?? 0,
               }));
@@ -820,7 +820,7 @@ Return ONLY the search term as plain text (e.g. "rent", "electricity bill", "cli
     }
 
     // ── New stock item creation ────────────────────────────────────────
-    let stockItemDraft: any = undefined;
+    let stockItemDraft: unknown = undefined;
 
     if (RE_STOCK_ITEM_CREATE.test(userMessage)) {
       try {
@@ -882,7 +882,7 @@ If the user is not clearly trying to create a stock item, respond with exactly: 
     }
 
     // ── Price list update ──────────────────────────────────────────────
-    let priceUpdateDraft: any = undefined;
+    let priceUpdateDraft: unknown = undefined;
 
     if (RE_PRICE_UPDATE.test(userMessage)) {
       try {
@@ -979,7 +979,7 @@ If intent is not a price update, respond with exactly: null`;
     }
 
     // ── Account queries: balance / transaction search / balance history ──
-    let accountQueryResult: any = undefined;
+    let accountQueryResult: unknown = undefined;
 
     if (RE_ACCOUNT_QUERY.test(userMessage)) {
       try {
@@ -1177,7 +1177,7 @@ If intent is not about an account query, respond with exactly: null`;
     }
 
     // ── Stock transfer detection ───────────────────────────────────────
-    let stockTransferDraft: any = undefined;
+    let stockTransferDraft: unknown = undefined;
     let stockTransferDrafts: unknown[] | undefined = undefined;
     // When set, this is used verbatim as the assistant's text response for the
     // stock-transfer flow, bypassing the generic "prepared a draft" acknowledgement
@@ -1396,7 +1396,7 @@ If this is not this kind of quantity-target multi-source transfer request, respo
               const parsedMulti = JSON.parse(rawMulti);
               destinationName = parsedMulti.destinationLocationName || "";
               sourceNames = Array.isArray(parsedMulti.sourceLocationNames)
-                ? parsedMulti.sourceLocationNames.filter((n: any) => typeof n === "string" && n.trim())
+                ? parsedMulti.sourceLocationNames.filter((n: unknown) => typeof n === "string" && n.trim())
                 : [];
               targetQty =
                 Number.isFinite(Number(parsedMulti.targetQty)) && Number(parsedMulti.targetQty) > 0
@@ -1621,7 +1621,7 @@ If intent is unclear or this is not a stock transfer request, respond with exact
     // ── Verify Container Excel detection ──────────────────────────────
     const VERIFY_CONTAINER_KEYWORDS =
       /\b(verif(y|ication)|container\s+verif|verif.*container|verification\s+excel|excel.*verif|download.*verif|container.*excel)\b/i;
-    let verifyContainerDraft: any = undefined;
+    let verifyContainerDraft: unknown = undefined;
 
     if (VERIFY_CONTAINER_KEYWORDS.test(userMessage)) {
       try {
@@ -1683,7 +1683,7 @@ If intent is unclear or this is not a stock transfer request, respond with exact
     // Handles read-only ERP data queries: P&L, cash position, statements, etc.
     const PHASE1_KEYWORDS =
       /profit.{0,15}loss|p&l\b|pl\b.{0,10}report|balance.{0,8}sheet|cash.{0,12}(balance|position|account)|who.{0,20}owe[ds]?|overdue|outstanding.{0,15}(balance|amount|supplier)|customer.{0,15}statement|supplier.{0,15}statement|top.{0,10}(customer|buyer)s?|worker.{0,12}attend|how many.{0,20}(absent|present|worker)|bale.{0,12}(produc|today|week|this|last)|produc.{0,12}bale|how many bale|container.{0,12}status|where.{0,12}(is.{0,5})?container|pending.{0,10}offload|not.{0,10}offload|how much.{0,20}(stock|do we have|in stock)|stock.{0,10}(level|balance|position)|inventory.{0,10}(level|check|status)|low.{0,10}stock|below.{0,10}reorder|reorder.{0,10}level|stock.{0,10}movement|stock.{0,10}histor|movement.{0,10}(for|of).{0,20}\w|open.{0,10}(purchase order|po\b|p\.o\.)|pending.{0,10}(po\b|purchase)|aging|age.{0,10}(report|analysis)|receivable|payable.{0,10}(aging|due)|container.{0,10}list|all container|month.{0,10}(comparison|vs|versus|compare)|last month vs|rental.{0,10}(summary|report|occupan)|occupan|tenant|rent.{0,10}(due|overdue|collect)|payroll.{0,10}(summary|total|report)|total.{0,10}payroll|salary.{0,10}(total|summary)|sales.{0,10}(analys|by item|report|revenue)|how much.{0,15}(did we sell|sold)|top.{0,10}(sell|item|product)|best.{0,10}(sell|item)|container.{0,10}profit|profit.{0,10}per container|how much.{0,15}profit.{0,15}container|stock.{0,10}valuat|inventory.{0,10}value|total.{0,10}inventory.{0,10}(value|worth)|expense.{0,10}(break|categ|by type)|top.{0,10}expense|where.{0,20}money.{0,10}(going|spent)|customer.{0,10}order.{0,10}status|order.{0,10}(pending|draft|verified|finalized|loading)|credit.{0,10}note|recent.{0,10}credit|bank.{0,10}(transaction|movement|histor)|cash.{0,10}(transaction|movement|histor)|recent.{0,10}(payment|receipt|bank)|fixed.{0,10}asset|asset.{0,10}(list|register|summar)|kpi|factory.{0,10}(kpi|performance|daily)|daily.{0,10}(production|output)|efficiency|pos.{0,10}(sale|revenue|summary)|point.{0,10}of.{0,10}sale|shop.{0,10}sale|intercompany|inter.{0,10}company.{0,10}transfer|money.{0,10}(moved|transferred).{0,15}between|offload.{0,10}detail|what.{0,15}(was|were).{0,10}offload|what.{0,10}(arrive|came).{0,15}(in|container)|worker.{0,10}(product|rank|top|best)|top.{0,10}worker|best.{0,10}worker|supplier.{0,10}(spend|history|bought|purchase.{0,10}from)|how much.{0,15}(bought|spend).{0,10}(from|supplier)|upcoming.{0,10}(arrival|container|shipment)|container.{0,10}(arriving|due|expected)|waste.{0,10}(analys|report|trend|summary)|factory.{0,10}waste|customer.{0,10}(payment.{0,10}histor|paid|receipt)|when.{0,10}did.{0,15}pay|voucher.{0,10}(summary|count|by type|breakdown)|how many.{0,10}voucher|stock.{0,10}by.{0,10}location|per.{0,10}location.{0,10}stock|location.{0,10}stock|trial.{0,5}balance|all.{0,10}account.{0,10}balance|balance.{0,10}(of all|per account)|po.{0,10}(detail|line|item)|purchase.{0,10}order.{0,10}(detail|items|break)|what.{0,10}(is|was).{0,10}in.{0,10}(the.{0,5})?po|container.{0,10}(cost|charge|break)|cost.{0,10}break.{0,10}(of|for).{0,10}container|document.{0,10}expir|visa.{0,10}expir|permit.{0,10}expir|worker.{0,10}(doc|expir)|stock.{0,10}transfer|transfer.{0,10}(between|from.{0,10}to).{0,10}(location|warehouse)|move.{0,10}stock|cash.{0,10}flow|money.{0,10}(in|out).{0,10}(this|last|for)|inflow.{0,10}outflow|account.{0,10}(movement|ledger|balance.{0,10}for)|ledger.{0,10}(balance|statement|for)|transaction.{0,10}(of|for).{0,10}account|day.{0,10}(summary|report|sales)|today.{0,10}(sales|voucher)|sale.{0,10}today|profit.{0,10}(by|per).{0,10}location|location.{0,10}profit|which.{0,10}location.{0,10}(most|best)|debit.{0,10}note|supplier.{0,10}debit|customer.{0,10}list|list.{0,10}(of.{0,5})?customer|all.{0,10}customer|supplier.{0,10}list|list.{0,10}(of.{0,5})?supplier|all.{0,10}supplier|stock.{0,10}item.{0,10}(detail|info|profile)|item.{0,10}(detail|info|profile).{0,10}(for|of)|what.{0,10}(is|are).{0,5}(the.{0,5})?details.{0,10}(of|for).{0,10}item|mix.{0,10}batch|batch.{0,10}(list|status|summary)|material.{0,10}batch|customer.{0,10}proforma|price.{0,10}list.{0,10}(for.{0,5})?customer|proforma.{0,10}(for|customer)|supplier.{0,10}proforma|price.{0,10}(list|sheet).{0,10}(from|supplier)|weekly.{0,10}(sale|revenue|breakdown)|sale.{0,10}(by week|per week|week.{0,5}by.{0,5}week)|container.{0,10}(items|content|loaded|what.{0,10}inside)|what.{0,10}(is|are|was).{0,10}(in|inside|loaded).{0,5}container|employee.{0,10}(list|roster|staff)|all.{0,10}(employee|staff)|staff.{0,10}list|journal.{0,10}(entry|entries|voucher)|recent.{0,10}journal|journal.{0,10}posting|audit.{0,10}(log|trail|history)|who.{0,10}(created|deleted|changed|modified|updated)|recent.{0,10}change|bank.{0,10}account.{0,10}(list|balance|all)|all.{0,10}bank|list.{0,10}(of.{0,5})?bank|stock.{0,10}adjust|production.{0,10}(stock|entry|voucher)|consumption.{0,10}(stock|entry)|tracking.{0,10}(event|update|histor)|container.{0,10}tracking|where.{0,10}(is|was).{0,15}container|shipment.{0,10}update|pending.{0,10}(container.{0,10}sale|payment.{0,10}container)|unpaid.{0,10}container|outstanding.{0,10}container|container.{0,10}(unpaid|pending.{0,10}payment)|supplier.{0,10}container|containers.{0,10}(from|by).{0,10}supplier|how many.{0,10}container.{0,10}(from|supplier)|income.{0,10}(break|categ|by type)|revenue.{0,10}(break|by account)|top.{0,10}income.{0,10}account|worker.{0,10}(profile|detail|info)|info.{0,10}(about|for|on).{0,15}worker|who.{0,10}is.{0,10}worker|location.{0,10}(list|all)|all.{0,10}(location|warehouse)|list.{0,10}(of.{0,5})?location|quarterly|quarter.{0,10}(comparison|breakdown|vs)|q[1-4].{0,10}(vs|comparison|revenue)/i;
-    let dataQueryResult: any = undefined;
+    let dataQueryResult: unknown = undefined;
 
     if (
       PHASE1_KEYWORDS.test(userMessage) &&

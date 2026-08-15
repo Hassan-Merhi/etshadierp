@@ -201,7 +201,7 @@ export function registerOrderLoadingStatusExportRoutes(app: Express) {
           "NOT LOADED": { bg: "FFEEEEEE", fg: "FF555555" },
         };
 
-        const setFill = (cell: any, argb: string) => {
+        const setFill = (cell: unknown, argb: string) => {
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb } };
         };
         const merge = (r: number, c1: number, c2: number) => sheet.mergeCells(r, c1, r, c2);
@@ -258,7 +258,7 @@ export function registerOrderLoadingStatusExportRoutes(app: Express) {
         // Table header
         const hdr = sheet.addRow(["#", "Article Code", "Product", "Requested", "Loaded", "Diff", "Status"]);
         hdr.height = 24;
-        hdr.eachCell((cell: any) => {
+        hdr.eachCell((cell: unknown) => {
           cell.font = { bold: true, color: { argb: WHITE }, size: 11 };
           setFill(cell, DARK_BLUE);
           cell.alignment = { horizontal: "center", vertical: "middle" };
@@ -284,10 +284,10 @@ export function registerOrderLoadingStatusExportRoutes(app: Express) {
             row.status,
           ]);
           dr.height = 20;
-          dr.eachCell((cell: any) => {
+          dr.eachCell((cell: unknown) => {
             cell.font = { size: 11 };
           });
-          if (idx % 2 === 1) dr.eachCell((cell: any) => setFill(cell, LIGHT_GRAY));
+          if (idx % 2 === 1) dr.eachCell((cell: unknown) => setFill(cell, LIGHT_GRAY));
           // Status cell: always coloured
           const statusCell = dr.getCell(7);
           setFill(statusCell, style.bg);
@@ -302,7 +302,7 @@ export function registerOrderLoadingStatusExportRoutes(app: Express) {
           dr.getCell(1).alignment = { horizontal: "center" };
           dr.getCell(4).alignment = { horizontal: "right" };
           dr.getCell(5).alignment = { horizontal: "right" };
-          dr.eachCell((cell: any) => {
+          dr.eachCell((cell: unknown) => {
             cell.border = {
               top: { style: "thin", color: { argb: "FFDDDDDD" } },
               bottom: { style: "thin", color: { argb: "FFDDDDDD" } },
@@ -326,7 +326,7 @@ export function registerOrderLoadingStatusExportRoutes(app: Express) {
           "",
         ]);
         totRow.height = 22;
-        totRow.eachCell((cell: any) => {
+        totRow.eachCell((cell: unknown) => {
           cell.font = { bold: true, size: 11, color: { argb: WHITE } };
           setFill(cell, DARK_BLUE);
           cell.alignment = { horizontal: "right" };
@@ -364,7 +364,7 @@ export function registerOrderLoadingStatusExportRoutes(app: Express) {
 
         const refHdr = refSheet.addRow(["#", "Reference Number", "Article Code", "Product"]);
         refHdr.height = 24;
-        refHdr.eachCell((cell: any) => {
+        refHdr.eachCell((cell: unknown) => {
           cell.font = { bold: true, color: { argb: WHITE }, size: 11 };
           setFill(cell, DARK_BLUE);
           cell.alignment = { horizontal: "center", vertical: "middle" };
@@ -391,12 +391,12 @@ export function registerOrderLoadingStatusExportRoutes(app: Express) {
         baleRefRows.forEach((r, idx) => {
           const dr = refSheet.addRow([idx + 1, r.refNum, r.code, r.prodName]);
           dr.height = 20;
-          dr.eachCell((cell: any) => {
+          dr.eachCell((cell: unknown) => {
             cell.font = { size: 11 };
           });
-          if (idx % 2 === 1) dr.eachCell((cell: any) => setFill(cell, LIGHT_GRAY));
+          if (idx % 2 === 1) dr.eachCell((cell: unknown) => setFill(cell, LIGHT_GRAY));
           dr.getCell(1).alignment = { horizontal: "center" };
-          dr.eachCell((cell: any) => {
+          dr.eachCell((cell: unknown) => {
             cell.border = {
               top: { style: "thin", color: { argb: "FFDDDDDD" } },
               bottom: { style: "thin", color: { argb: "FFDDDDDD" } },
@@ -406,7 +406,7 @@ export function registerOrderLoadingStatusExportRoutes(app: Express) {
           });
         });
 
-        const fileDateStr = getClientDate(req);
+        const _fileDateStr = getClientDate(req);
         const xlsBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         res.setHeader(

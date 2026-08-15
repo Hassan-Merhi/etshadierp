@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { db } from "../../db";
 import * as schema from "@shared/schema";
 
-export async function getStockTransferByVoucherId(voucherId: number): Promise<any | null> {
+export async function getStockTransferByVoucherId(voucherId: number): Promise<unknown | null> {
   const [transfer] = await db
     .select()
     .from(schema.stockTransferVouchers)
@@ -15,7 +15,7 @@ export async function getStockTransferByVoucherId(voucherId: number): Promise<an
   return { ...transfer, items };
 }
 
-export async function getStockAdjustmentByVoucherId(voucherId: number): Promise<any | null> {
+export async function getStockAdjustmentByVoucherId(voucherId: number): Promise<unknown | null> {
   const [adjustment] = await db
     .select()
     .from(schema.stockAdjustmentVouchers)

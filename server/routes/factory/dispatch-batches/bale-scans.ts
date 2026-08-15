@@ -33,7 +33,7 @@ export function registerDispatchBaleScanRoutes(app: Express) {
       const { barcode } = req.body;
       if (!barcode) return res.status(400).json({ message: "barcode is required" });
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx: unknown) => {
         // 1. Validate ride
         const [ride] = await tx
           .select()
@@ -110,7 +110,7 @@ export function registerDispatchBaleScanRoutes(app: Express) {
             .from(customerProformaLines)
             .where(eq(customerProformaLines.proformaId, batch.proformaId));
 
-          const matchingLine = proformaLines.find((l: any) => l.articleCode === bale.articleCode);
+          const matchingLine = proformaLines.find((l: unknown) => l.articleCode === bale.articleCode);
           if (!matchingLine) {
             throw new Error(
               `Bale ${barcode} has article code "${bale.articleCode}" which is not in the linked proforma. Scan blocked.`
@@ -216,7 +216,7 @@ export function registerDispatchBaleScanRoutes(app: Express) {
 
       const { reason } = req.body;
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx: unknown) => {
         const [scan] = await tx
           .select()
           .from(customerDispatchBaleScans)

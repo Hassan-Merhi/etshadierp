@@ -35,7 +35,7 @@ interface EligiblePosition {
  * backdated Stock Entry from before its membership interval ended.
  */
 export async function resolveStockEntryProductionAttributions(
-  tx: any,
+  tx: unknown,
   companyId: number,
   stockEntryDate: string,
   items: StockEntryProductionAttributionInput[]
@@ -77,7 +77,7 @@ export async function resolveStockEntryProductionAttributions(
     );
 
   const workerById = new Map<number, { id: number; fullName: string }>(
-    workers.map((worker: any) => [worker.id, worker])
+    workers.map((worker: unknown) => [worker.id, worker])
   );
   if (workerById.size !== workerIds.length) {
     throw new Error("One or more selected workers are inactive or belong to another company");

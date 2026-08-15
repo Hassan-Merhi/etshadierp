@@ -80,7 +80,7 @@ export function computeMonthlyPayFromAttendance(
  * separate modules; it previously relied on closing over the register body.
  */
 export async function writeDaybookEntry(
-  dbOrTx: any,
+  dbOrTx: unknown,
   opts: {
     companyId: number;
     txDate: string;

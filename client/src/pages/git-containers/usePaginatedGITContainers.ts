@@ -65,25 +65,7 @@ export function usePaginatedGITContainers(filters: PaginatedContainerFilters) {
         filters.etaFilter !== "ALL" && filters.etaFilter.includeNoEta ? true : undefined,
     };
     return canonicalApiUrl("/api/git/containers", params);
-  }, [
-    filters.allCompanies,
-    filters.page,
-    filters.pageSize,
-    filters.companyFilter,
-    filters.containerFilters.join(","),
-    filters.supplierFilters.join(","),
-    filters.transporterFilters.join(","),
-    filters.agentFilters.join(","),
-    filters.truckFilters.join(","),
-    filters.locationFilters.join(","),
-    filters.docsFilter,
-    filters.delayedFilter,
-    filters.freightFilter,
-    filters.etaFilter === "ALL" ? "ALL" : JSON.stringify(filters.etaFilter),
-    filters.notesFilter,
-    filters.sortOrder,
-    debouncedSearch,
-  ]);
+  }, [filters.etaFilter, filters.page, filters.pageSize, filters.allCompanies, filters.companyFilter, filters.containerFilters, filters.supplierFilters, filters.transporterFilters, filters.agentFilters, filters.truckFilters, filters.locationFilters, filters.docsFilter, filters.delayedFilter, filters.freightFilter, filters.notesFilter, filters.sortOrder, debouncedSearch]);
 
   const query = useQuery<GitContainersResponse>({
     queryKey: paginatedCompanyDataKey(

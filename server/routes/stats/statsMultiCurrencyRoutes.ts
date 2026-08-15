@@ -25,7 +25,7 @@ function rebuildBreakdown(accounts: unknown[]): Array<{ name: string; value: num
     .sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
 }
 
-function applyCurrentCashTranslation(payload: any, summaries: CashBankCurrencySummary[]) {
+function applyCurrentCashTranslation(payload: unknown, summaries: CashBankCurrencySummary[]) {
   if (!payload?.forUs || !payload?.onUs) return payload;
 
   const resolved = summaries.filter((row) => row.currentTranslatedBaseBalance !== null);
@@ -33,11 +33,11 @@ function applyCurrentCashTranslation(payload: any, summaries: CashBankCurrencySu
 
   const oldForUsAccounts = Array.isArray(payload.forUs.accounts) ? payload.forUs.accounts : [];
   const oldOnUsAccounts = Array.isArray(payload.onUs.accounts) ? payload.onUs.accounts : [];
-  const removedForUs = oldForUsAccounts.filter((row: any) => row.id && resolvedLedgerIds.has(row.id));
-  const removedOnUs = oldOnUsAccounts.filter((row: any) => row.id && resolvedLedgerIds.has(row.id));
+  const removedForUs = oldForUsAccounts.filter((row: unknown) => row.id && resolvedLedgerIds.has(row.id));
+  const removedOnUs = oldOnUsAccounts.filter((row: unknown) => row.id && resolvedLedgerIds.has(row.id));
 
-  const forUsAccounts = oldForUsAccounts.filter((row: any) => !row.id || !resolvedLedgerIds.has(row.id));
-  const onUsAccounts = oldOnUsAccounts.filter((row: any) => !row.id || !resolvedLedgerIds.has(row.id));
+  const forUsAccounts = oldForUsAccounts.filter((row: unknown) => !row.id || !resolvedLedgerIds.has(row.id));
+  const onUsAccounts = oldOnUsAccounts.filter((row: unknown) => !row.id || !resolvedLedgerIds.has(row.id));
 
   let forUsTotal = new Decimal(payload.forUs.total ?? payload.forUsTotal ?? 0);
   let onUsTotal = new Decimal(payload.onUs.total ?? payload.onUsTotal ?? 0);
@@ -71,8 +71,8 @@ function applyCurrentCashTranslation(payload: any, summaries: CashBankCurrencySu
   const onUsRounded = round2(onUsTotal.toNumber());
   const netPosition = round2(forUsRounded - onUsRounded);
 
-  payload.forUs.accounts = forUsAccounts.sort((a: any, b: any) => Number(b.value || 0) - Number(a.value || 0));
-  payload.onUs.accounts = onUsAccounts.sort((a: any, b: any) => Number(b.value || 0) - Number(a.value || 0));
+  payload.forUs.accounts = forUsAccounts.sort((a: unknown, b: unknown) => Number(b.value || 0) - Number(a.value || 0));
+  payload.onUs.accounts = onUsAccounts.sort((a: unknown, b: unknown) => Number(b.value || 0) - Number(a.value || 0));
   payload.forUs.total = forUsRounded;
   payload.onUs.total = onUsRounded;
   payload.forUs.breakdown = rebuildBreakdown(payload.forUs.accounts);
@@ -103,7 +103,7 @@ export function registerStatsMultiCurrencyRoutes(app: Express) {
     try {
       const revaluation = await getCashBankRevaluation(companyId);
       const originalJson = res.json.bind(res);
-      res.json = ((payload: any) => {
+      res.json = ((payload: unknown) => {
         // The existing report engine caches its object. Clone before adjusting so
         // repeated requests never reapply translation to the cached reference.
         const copy = payload == null ? payload : JSON.parse(JSON.stringify(payload));

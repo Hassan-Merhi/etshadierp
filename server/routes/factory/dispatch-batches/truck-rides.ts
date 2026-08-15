@@ -25,7 +25,7 @@ export function registerDispatchTruckRideRoutes(app: Express) {
       const batchId = parseId(req.params.id);
       if (batchId === null) return res.status(400).json({ message: "Invalid id" });
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx: unknown) => {
         const [batch] = await tx
           .select()
           .from(customerDispatchBatches)
@@ -93,7 +93,7 @@ export function registerDispatchTruckRideRoutes(app: Express) {
       if (ride.status === "CANCELLED") return res.status(400).json({ message: "Ride is cancelled" });
 
       const { truckPlate, driverName, destination, notes } = req.body;
-      const updates: any = { updatedAt: new Date() };
+      const updates: unknown = { updatedAt: new Date() };
       if (truckPlate !== undefined) updates.truckPlate = truckPlate;
       if (driverName !== undefined) updates.driverName = driverName;
       if (destination !== undefined) updates.destination = destination;

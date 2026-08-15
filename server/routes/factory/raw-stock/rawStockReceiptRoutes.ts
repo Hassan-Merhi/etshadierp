@@ -95,7 +95,7 @@ export function registerRawStockReceiptRoutes(app: Express) {
           )
         );
 
-      const supplierMap = new Map<string, any>();
+      const supplierMap = new Map<string, unknown>();
       for (const r of results) {
         const isOB = r.containerStatus === "OPENING_BALANCE";
         // Always merge by supplier — one row per supplier regardless of OB vs Container
@@ -660,7 +660,7 @@ export function registerRawStockReceiptRoutes(app: Express) {
         return a.type === "ADD" ? sum + k : sum - k;
       }, 0);
 
-      const totalFree = totalFreeFromRows + Math.max(0, adjFree);
+      const _totalFree = totalFreeFromRows + Math.max(0, adjFree);
 
       // Allow over-use: no guard here — deduction can drive remaining stock negative
 
@@ -717,9 +717,9 @@ export function registerRawStockReceiptRoutes(app: Express) {
         }
 
         // 2. REMOVE adjustment for any overflow (from adjustment-sourced free)
-        let insertedAdj = null;
+        const insertedAdj = null;
         if (adjDeductKg > 0) {
-          [insertedAdj] = await tx
+          [_insertedAdj] = await tx
             .insert(factoryRawMaterialAdjustments)
             .values({
               companyId,

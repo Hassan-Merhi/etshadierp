@@ -98,7 +98,7 @@ export async function generateBilingualWorkerBalesPdf(
     const rowHeight = 24;
     const columns = [90, 115, 225, 70];
     const align = rtl ? "right" : "left";
-    const textOptions = rtl && arabicFont ? ({ align, features: ["rtla", "arab"] } as any) : { align };
+    const textOptions = rtl && arabicFont ? ({ align, features: ["rtla", "arab"] } as unknown) : { align };
 
     const setFont = (bold = false) => {
       if (rtl && arabicFont) doc.font("FactoryArabic");
@@ -151,7 +151,7 @@ export async function generateBilingualWorkerBalesPdf(
                 align: valueAlign,
                 features: ["rtla", "arab"],
                 lineBreak: false,
-              } as any)
+              } as unknown)
             : { width: columns[columnIndex] - 8, align: valueAlign, lineBreak: false };
         doc.text(String(value), cx + 4, y + 7, options);
         cx += columns[columnIndex];

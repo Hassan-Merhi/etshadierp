@@ -10,7 +10,7 @@ import { logger } from "../../lib/logger";
 import { pool } from "../../db";
 import { logAudit } from "../_helpers";
 
-export function registerFactoryMixBatchWhatsappRoutes(app: Express, requireAuth: any, db: any) {
+export function registerFactoryMixBatchWhatsappRoutes(app: Express, requireAuth: unknown, _db: unknown) {
   // ── Send mix batch image to WhatsApp ─────────────────────────────────────
   app.post("/api/factory/send-mix-batch-image-whatsapp", requireAuth, async (req: Request, res: Response) => {
     try {

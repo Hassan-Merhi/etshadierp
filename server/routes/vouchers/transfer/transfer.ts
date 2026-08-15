@@ -214,7 +214,7 @@ export function registerVoucherTransferOnlyRoutes(app: Express) {
 
           // Update the main voucher
           const parsedSourceLocationId = parseInt(sourceLocationId);
-          const voucherUpdates: any = {
+          const voucherUpdates: unknown = {
             totalAmount: totalAmount.toFixed(2),
             locationId: parsedSourceLocationId, // Use source location as the primary location for the voucher
           };

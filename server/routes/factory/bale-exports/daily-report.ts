@@ -120,7 +120,7 @@ export function registerFactoryDailyReportRoutes(app: Express) {
         });
 
         for (const usage of usages) {
-          const rowData: any = {
+          const rowData: unknown = {
             date: usage.usedDate,
             batchCode: usage.batchCode,
             batchName: usage.batchName || "",
@@ -132,7 +132,7 @@ export function registerFactoryDailyReportRoutes(app: Express) {
           sheet.addRow(rowData);
         }
 
-        const totalRowData: any = {
+        const totalRowData: unknown = {
           date: "TOTAL",
           batchCode: "",
           batchName: "",

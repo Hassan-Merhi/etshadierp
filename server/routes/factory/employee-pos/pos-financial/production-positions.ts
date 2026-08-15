@@ -103,11 +103,11 @@ async function getPositionState(companyId: number, positionId: number, asOf: str
 }
 
 async function writeRuleVersion(
-  tx: any,
+  tx: unknown,
   companyId: number,
   positionId: number,
   effectiveFrom: string,
-  values: any,
+  values: unknown,
   createdBy: string
 ) {
   const [current] = await tx
@@ -150,7 +150,7 @@ async function writeRuleVersion(
 }
 
 async function replaceMemberships(
-  tx: any,
+  tx: unknown,
   companyId: number,
   positionId: number,
   effectiveFrom: string,
@@ -176,7 +176,7 @@ async function replaceMemberships(
       .set({ effectiveTo: effectiveFrom, updatedAt: new Date() })
       .where(eq(factoryProductionPositionMemberships.id, row.id));
   }
-  const currentIds = new Set(activeRows.filter((r: any) => desired.has(r.workerId)).map((r: any) => r.workerId));
+  const currentIds = new Set(activeRows.filter((r: unknown) => desired.has(r.workerId)).map((r: unknown) => r.workerId));
   const toAdd = workerIds.filter((id) => !currentIds.has(id));
   if (toAdd.length) {
     await tx

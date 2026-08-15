@@ -40,17 +40,17 @@ export function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrac
     otwStatusFilter === "all" ? containers : containers.filter((c) => c.status === otwStatusFilter);
 
   const today = new Date().toDateString();
-  const checkedToday = containers.filter((c) => {
-    const fc = c as any;
+  const _checkedToday = containers.filter((c) => {
+    const fc = c as unknown;
     return fc.trackingLastCheckedAt && new Date(fc.trackingLastCheckedAt).toDateString() === today;
   }).length;
-  const withErrors = containers.filter((c) => !!(c as { trackingError: unknown }).trackingError).length;
+  const _withErrors = containers.filter((c) => !!(c as { trackingError: unknown }).trackingError).length;
   const timelineContainer = containers.find((c) => c.id === timelineId) ?? null;
 
   const trackNowMutation = useMutation({
     mutationFn: async (containerId: number) => {
       const res = await factoryApiRequest("POST", `/api/factory/container-tracking/${containerId}/track-now`, {});
-      return res as any;
+      return res as unknown;
     },
     onMutate: (id) => {
       setTrackingNowId(id);
@@ -168,7 +168,7 @@ export function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrac
             </TableHeader>
             <TableBody>
               {filteredPanelContainers.map((c) => {
-                const fc = c as any;
+                const fc = c as unknown;
                 const lastChecked: Date | null = fc.trackingLastCheckedAt ? new Date(fc.trackingLastCheckedAt) : null;
                 const isTracking = trackingNowId === c.id;
                 const hasError = !!fc.trackingError;

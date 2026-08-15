@@ -32,7 +32,7 @@ export function toAuditLogInsert(input: SecurityEventInput, username: string) {
   };
 }
 
-export async function persistSecurityEvent(db: any, input: SecurityEventInput, username: string): Promise<SecurityAuditRecord> {
+export async function persistSecurityEvent(db: unknown, input: SecurityEventInput, username: string): Promise<SecurityAuditRecord> {
   const { record, insert } = toAuditLogInsert(input, username);
   await db.insert(auditLog).values(insert);
   return record;
@@ -51,7 +51,7 @@ function isSecurityAuditRecord(value: unknown): value is SecurityAuditRecord {
 }
 
 export async function loadCompanySecurityAnomalies(
-  db: any,
+  db: unknown,
   companyId: number,
   options: { now?: number; windowMs?: number; denialThreshold?: number; limit?: number } = {}
 ) {
@@ -71,7 +71,7 @@ export async function loadCompanySecurityAnomalies(
     )
     .orderBy(desc(auditLog.createdAt))
     .limit(limit);
-  const events = rows.map((row: any) => row.changes).filter(isSecurityAuditRecord);
+  const events = rows.map((row: unknown) => row.changes).filter(isSecurityAuditRecord);
   return {
     windowMs,
     eventCount: events.length,

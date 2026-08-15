@@ -559,7 +559,7 @@ export default function FactoryNetPositionDetails() {
       if (!res.ok) {
         const text = await res.text();
         // Attach the parsed code so the retry handler can inspect it
-        const err: any = new Error(text);
+        const err: unknown = new Error(text);
         try {
           err.code = JSON.parse(text)?.code;
         } catch {

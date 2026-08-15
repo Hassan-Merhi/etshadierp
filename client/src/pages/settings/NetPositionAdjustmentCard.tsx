@@ -14,9 +14,9 @@ import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema } fr
 import { useCompany } from "@/contexts/CompanyContext";
 import { formatNumber } from "@/lib/formatNumber";
 
-const userFormSchema = insertUserSchema;
-const companyFormSchema = insertCompanySchema;
-const roleAssignmentSchema = insertUserCompanyRoleSchema.refine(
+const _userFormSchema = insertUserSchema;
+const _companyFormSchema = insertCompanySchema;
+const _roleAssignmentSchema = insertUserCompanyRoleSchema.refine(
   (data) => {
     // If role is POS, assignedLocationId must be present
     if (data.role === "POS" && !data.assignedLocationId) {
@@ -30,9 +30,9 @@ const roleAssignmentSchema = insertUserCompanyRoleSchema.refine(
   }
 );
 
-type UserFormData = z.infer<typeof userFormSchema>;
-type CompanyFormData = z.infer<typeof companyFormSchema>;
-type RoleAssignmentData = z.infer<typeof roleAssignmentSchema>;
+type _UserFormData = z.infer<typeof userFormSchema>;
+type _CompanyFormData = z.infer<typeof companyFormSchema>;
+type _RoleAssignmentData = z.infer<typeof roleAssignmentSchema>;
 
 export function NetPositionAdjustmentCard() {
   const { toast } = useToast();
@@ -46,7 +46,7 @@ export function NetPositionAdjustmentCard() {
     queryKey: ["/api/auth/me"],
   });
 
-  const { data: companySettings } = useQuery<any>({
+  const { data: companySettings } = useQuery<unknown>({
     queryKey: ["/api/company-settings", selectedCompany?.id],
     enabled: !!selectedCompany?.id,
     queryFn: async () => {

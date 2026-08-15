@@ -94,7 +94,7 @@ export function registerOrderUnfinalizeRoutes(app: Express) {
 
       if (orderId === null) return res.status(400).json({ message: "Invalid id" });
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx: unknown) => {
         const [order] = await tx
           .select()
           .from(customerOrders)
@@ -137,7 +137,7 @@ export function registerOrderUnfinalizeRoutes(app: Express) {
           .select({ id: customerOrderCharges.id, voucherId: customerOrderCharges.voucherId })
           .from(customerOrderCharges)
           .where(and(eq(customerOrderCharges.orderId, orderId), sql`${customerOrderCharges.voucherId} IS NOT NULL`));
-        const linkedVoucherIds = linkedChargeRows.map((r: any) => r.voucherId).filter(Boolean);
+        const linkedVoucherIds = linkedChargeRows.map((r: unknown) => r.voucherId).filter(Boolean);
 
         if (linkedVoucherIds.length > 0) {
           await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, linkedVoucherIds));

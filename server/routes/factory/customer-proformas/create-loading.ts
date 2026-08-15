@@ -72,7 +72,7 @@ export function registerFactoryCustomerProformaLoadingRoutes(app: Express) {
       );
       logger.info(`[create-loading] proformaId=${proformaId} companyId=${companyId}`);
       const alreadyLoadedMap = new Map<string, number>(
-        (resultRows(alreadyLoadedRaw) || (alreadyLoadedRaw as unknown as unknown[])).map((r: any) => [
+        (resultRows(alreadyLoadedRaw) || (alreadyLoadedRaw as unknown as unknown[])).map((r: unknown) => [
           r.articleCode,
           Number(r.loaded),
         ])
@@ -108,7 +108,7 @@ export function registerFactoryCustomerProformaLoadingRoutes(app: Express) {
       }
 
       // Pre-fetch product names for all article codes in this proforma
-      const proformaArticleCodes = [...new Set(lines.map((l: any) => l.articleCode).filter(Boolean))];
+      const proformaArticleCodes = [...new Set(lines.map((l: unknown) => l.articleCode).filter(Boolean))];
       const proformaProductNameMap = new Map<string, string>();
       if (proformaArticleCodes.length > 0) {
         const proformaProducts = await db

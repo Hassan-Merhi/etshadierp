@@ -172,12 +172,12 @@ export function WatchUserDialog({
   const watchStartRef = useRef(Date.now());
   const lastFrameIdentityRef = useRef<string | null>(null);
 
-  const { data: presenceRaw } = useQuery<any>({
+  const { data: presenceRaw } = useQuery<unknown>({
     queryKey: ["/api/user-presence", userId],
     queryFn: () => apiRequest("GET", `/api/user-presence/${userId}`).then((response) => response.json()),
     refetchInterval: 30000,
   });
-  const { data: activityRaw } = useQuery<any>({
+  const { data: activityRaw } = useQuery<unknown>({
     queryKey: ["/api/user-presence", userId, "activity"],
     queryFn: () => apiRequest("GET", `/api/user-presence/${userId}/activity`).then((response) => response.json()),
     refetchInterval: 30000,
@@ -186,7 +186,7 @@ export function WatchUserDialog({
     data: screenFrameRaw,
     refetch: refetchFrame,
     isFetching: isFetchingFrame,
-  } = useQuery<any>({
+  } = useQuery<unknown>({
     queryKey: ["/api/screen-feed", userId],
     queryFn: () => apiRequest("GET", `/api/screen-feed/${userId}`).then((response) => response.json()),
     refetchInterval: liveConnected ? false : 3000,

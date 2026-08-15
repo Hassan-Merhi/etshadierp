@@ -74,7 +74,7 @@ export default function FactoryContainerLoadingScan() {
   const [ignoreProforma, setIgnoreProforma] = useState(false);
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
   const [finalizeDate, setFinalizeDate] = useState(new Date().toLocaleDateString("en-CA"));
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [_expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<"detailed" | "condensed">("detailed");
   const [lastScannedRef, setLastScannedRef] = useState<{
     baleReference: string;
@@ -244,7 +244,7 @@ export default function FactoryContainerLoadingScan() {
       setPendingBypassOverloadRef(null);
       setScanFlash("success");
       setShowScanSuccessPopup(true);
-      const speechMsg = variables.allowBypassProforma ? "Bypass confirmed. Item added." : "Scanned successfully";
+      const _speechMsg = variables.allowBypassProforma ? "Bypass confirmed. Item added." : "Scanned successfully";
       try {
         const ctx = new (
           window.AudioContext ||
@@ -790,7 +790,7 @@ export default function FactoryContainerLoadingScan() {
         ? "ring-2 ring-red-500 bg-red-50 dark:bg-red-950 transition-all"
         : "";
 
-  const activeProforma =
+  const _activeProforma =
     selectedProformaId && selectedProformaId !== "none"
       ? proformas.find((p) => p.id === parseInt(selectedProformaId)) || null
       : null;

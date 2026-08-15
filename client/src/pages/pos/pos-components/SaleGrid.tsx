@@ -30,7 +30,7 @@ export interface SaleGridProps {
 export function SaleGrid({
   rows,
   columns,
-  selectedCell,
+  _selectedCell,
   setSelectedCell,
   updateRow,
   handleDeleteRow,
@@ -79,7 +79,7 @@ export function SaleGrid({
                     <div
                       key={col.key}
                       className={`${col.width} border-r h-9 ${col.key === "amount" ? "bg-muted/30" : ""}`}
-                      onMouseDown={(e) => {
+                      onMouseDown={(_e) => {
                         // In edit mode all rows are loaded from the DB and already
                         // have valid stockItemIds, so the incomplete-item guard is
                         // irrelevant and would incorrectly lock the grid.

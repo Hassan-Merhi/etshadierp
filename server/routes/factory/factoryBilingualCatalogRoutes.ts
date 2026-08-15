@@ -251,7 +251,7 @@ function prepareMutation(req: import("express").Request, res: import("express").
   if (!needsProduct && !needsCategory) return next();
 
   const originalJson = res.json.bind(res);
-  res.json = ((payload: any) => {
+  res.json = ((payload: unknown) => {
     void (async () => {
       let output = payload;
       if (needsProduct) output = await applyDeferredProductArabic(req, output, productArabic, suppressFallbacks);

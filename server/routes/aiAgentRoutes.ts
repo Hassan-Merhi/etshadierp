@@ -135,11 +135,11 @@ async function generateTaskPlan(instruction: string): Promise<TaskPlan> {
   };
 }
 
-function normalise(raw: any): TaskPlan {
+function normalise(raw: unknown): TaskPlan {
   return {
     taskType: String(raw.taskType || "general"),
     description: String(raw.description || ""),
-    steps: (raw.steps || []).slice(0, 6).map((s: any, i: number) => {
+    steps: (raw.steps || []).slice(0, 6).map((s: unknown, i: number) => {
       const toolDef = TOOL_REGISTRY_MAP.get(s.tool);
       return {
         id: s.id || `step_${i + 1}`,
@@ -275,7 +275,7 @@ export function registerAiAgentRoutes(app: Express) {
           .limit(50);
 
         res.json(tasks);
-      } catch (err: unknown) {
+      } catch (_err: unknown) {
         res.status(500).json({ message: "Internal server error" });
       }
     }
@@ -484,7 +484,7 @@ export function registerAiAgentRoutes(app: Express) {
 
         // Check if there are more pending steps
         const hasMore = plan.steps.some((s) => s.status === "pending");
-        const newTaskStatus = hasMore ? "running" : "completed";
+        const _newTaskStatus = hasMore ? "running" : "completed";
 
         // If more steps, run them now
         if (hasMore) {

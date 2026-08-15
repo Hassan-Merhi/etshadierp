@@ -25,11 +25,10 @@ import {
 
 // Module-level bwip-js cache — loaded once on first barcode request, then reused.
 // This avoids the cold-start latency of re-importing the library on every request.
-let _bwipjs: any = null;
+let _bwipjs: unknown = null;
 async function getBwipjs(): Promise<unknown> {
   if (!_bwipjs) {
-    // @ts-ignore - bwip-js types are incomplete
-    _bwipjs = await import("bwip-js");
+        _bwipjs = await import("bwip-js");
   }
   return _bwipjs;
 }
@@ -43,7 +42,7 @@ export function registerProductionBaleRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const filters: any = {};
+      const filters: unknown = {};
       if (req.query.mixBatchId) filters.mixBatchId = parseInt(req.query.mixBatchId as string);
       if (req.query.status) filters.status = req.query.status as string;
       if (req.query.category) filters.category = req.query.category as string;
@@ -117,7 +116,7 @@ export function registerProductionBaleRoutes(app: Express) {
         return res.status(404).json({ message: "Product not found" });
       }
 
-      let batch: any = null;
+      let batch: unknown = null;
       let costPerKg = 0;
       let totalCostPerBale = "0";
 
@@ -154,7 +153,7 @@ export function registerProductionBaleRoutes(app: Express) {
               productId,
               expectedCount: numBales,
               status: "PENDING",
-              createdBy: (req.session as any).userId || null,
+              createdBy: (req.session as unknown).userId || null,
             })
             .returning();
           pressingBatchId = pb.id;

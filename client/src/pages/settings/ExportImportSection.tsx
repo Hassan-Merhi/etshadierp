@@ -15,7 +15,7 @@ export function ExportImportSection({ companies }: { companies: unknown[] }) {
   const [isImporting, setIsImporting] = useState(false);
   const [selectedExport, setSelectedExport] = useState("");
   const [selectedImport, setSelectedImport] = useState("");
-  const [importResult, setImportResult] = useState<any>(null);
+  const [importResult, setImportResult] = useState<unknown>(null);
 
   const handleExport = async () => {
     if (!selectedExport) return;

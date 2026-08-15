@@ -78,7 +78,7 @@ export interface FxResolutionPlan {
   containerStatus: string | null;
 }
 
-async function loadRow(dbOrTx: any, source: FxResolutionSource, id: number, companyId: number, forUpdate = false) {
+async function loadRow(dbOrTx: unknown, source: FxResolutionSource, id: number, companyId: number, forUpdate = false) {
   if (source === "container") {
     let q = dbOrTx
       .select()
@@ -194,7 +194,7 @@ export interface ApplyFxResolutionRepairOptions {
   /** Called with the transaction handle AFTER the FX row update but BEFORE
    * commit, so an audit-log insert here is atomic with the update: if this
    * throws, the entire transaction (including the FX update) rolls back. */
-  onAudit?: (tx: any, result: FxResolutionApplyResult) => Promise<void>;
+  onAudit?: (tx: unknown, result: FxResolutionApplyResult) => Promise<void>;
 }
 
 /**

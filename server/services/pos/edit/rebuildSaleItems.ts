@@ -23,7 +23,7 @@ export interface RebuildSaleItemsResult {
 }
 
 export async function rebuildSaleItems(
-  tx: any,
+  tx: unknown,
   params: {
     voucherId: number;
     targetLocationId: number;
@@ -35,7 +35,7 @@ export async function rebuildSaleItems(
 ): Promise<RebuildSaleItemsResult> {
   const { voucherId, targetLocationId, items, oldItemsMap, canSellNegativeStock, companyId } = params;
 
-  const sortedNewItems = [...items].sort((a: any, b: any) => a.stockItemId - b.stockItemId);
+  const sortedNewItems = [...items].sort((a: unknown, b: unknown) => a.stockItemId - b.stockItemId);
   let grandTotal = toInventoryDecimal(0);
   let totalSupplierCostEdit = toInventoryDecimal(0);
   let totalQtySoldEdit = toInventoryDecimal(0);

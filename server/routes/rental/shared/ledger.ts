@@ -9,7 +9,7 @@ export function getCompanyId(req: Request): number | null {
 }
 
 export async function findOrCreateLedgerAccount(
-  tx: any,
+  tx: unknown,
   companyId: number,
   name: string,
   accountType: "Income" | "Liability" | "Indirect Expense" | "Indirect Income" | "Intercompany" | "Asset",

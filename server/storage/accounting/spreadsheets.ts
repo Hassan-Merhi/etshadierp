@@ -28,7 +28,7 @@ export async function getSpreadsheet(id: number, companyId: number): Promise<sch
 export async function createSpreadsheet(
   companyId: number,
   name: string,
-  data: any,
+  data: unknown,
   createdBy?: string
 ): Promise<schema.Spreadsheet> {
   const [row] = await db

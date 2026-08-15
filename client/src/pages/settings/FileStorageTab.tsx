@@ -105,7 +105,7 @@ export function FileStorageTab() {
     return visibleName(f).toLowerCase().includes(search.toLowerCase());
   });
 
-  const fileCountForFolder = (id: number | null) =>
+  const _fileCountForFolder = (id: number | null) =>
     allFiles.filter((f) => (id === null ? f.folderId == null : f.folderId === id)).length;
 
   const onRenameFolder = (id: number, name: string) => {

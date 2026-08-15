@@ -117,7 +117,7 @@ export async function getMixBatchSourceCostMismatchPreview(
     if (!chargesByContainer.has(c.containerId)) chargesByContainer.set(c.containerId, []);
     chargesByContainer.get(c.containerId)!.push(c);
   }
-  const commissionByContainer = new Map<number, any>();
+  const commissionByContainer = new Map<number, unknown>();
   for (const c of allCommissions) {
     const ex = commissionByContainer.get(c.containerId);
     if (!ex || c.id > ex.id) commissionByContainer.set(c.containerId, c);
@@ -130,7 +130,7 @@ export async function getMixBatchSourceCostMismatchPreview(
 
   // Compute corrected USD cost per container
   const correctedUsdByContainer = new Map<number, { costPerKgUsd: number; fxUnresolved: boolean }>();
-  const uniqueContainers = new Map<number, any>();
+  const uniqueContainers = new Map<number, unknown>();
   for (const { container } of rows) {
     if (container && !uniqueContainers.has(container.id)) uniqueContainers.set(container.id, container);
   }
@@ -304,7 +304,7 @@ export async function applyZeroCostMixBatchSourcesFix(
   sourceIds: number[],
   opts: {
     manualRates?: Record<number, number>;
-    onAudit?: (tx: any, result: ZeroCostSourceFixResult) => Promise<void>;
+    onAudit?: (tx: unknown, result: ZeroCostSourceFixResult) => Promise<void>;
   } = {}
 ): Promise<ZeroCostSourceFixResult[]> {
   const results: ZeroCostSourceFixResult[] = [];
@@ -391,7 +391,7 @@ export async function applyZeroCostMixBatchSourcesFix(
                   )
                 ),
             ]);
-            const comm = comms.sort((a: any, b: any) => b.id - a.id)[0] || null;
+            const comm = comms.sort((a: unknown, b: unknown) => b.id - a.id)[0] || null;
             const computed = computeCorrectContainerCost(container, addl, comm, ocs);
             if (!computed.fxUnresolved && computed.costPerKgUsd > 0) {
               correctedCostPerKgUsd = computed.costPerKgUsd;

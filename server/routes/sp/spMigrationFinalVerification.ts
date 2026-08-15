@@ -22,7 +22,7 @@ export function summarizeVerification(areas: VerificationArea[]): VerificationSt
   return "PASS";
 }
 
-async function companyRow(companyId: number): Promise<any | null> {
+async function companyRow(companyId: number): Promise<unknown | null> {
   const result = await db.execute(sql`
     SELECT id, code, name, company_type, active
     FROM companies
@@ -64,7 +64,7 @@ export async function buildFinalSpVerification(sourceId: number, targetId: numbe
     area: "Cutover readiness",
     status: readiness.blockers.length === 0 ? "PASS" : "FAIL",
     detail: `${readiness.blockers.length} blocker(s), ${readiness.deltas.length} final delta(s).`,
-    mismatches: readiness.blockers.map((item: any) => `${item.code}: ${item.message}`),
+    mismatches: readiness.blockers.map((item: unknown) => `${item.code}: ${item.message}`),
   });
 
   const suspense = await getSuspenseReview(sourceId, targetId);
@@ -78,7 +78,7 @@ export async function buildFinalSpVerification(sourceId: number, targetId: numbe
     mismatches: suspense.items
       .slice(0, 50)
       .map(
-        (item: any) =>
+        (item: unknown) =>
           `${item.target_voucher_number ?? item.target_voucher_id}: ${item.source_account_name ?? item.review_reason}`
       ),
   });

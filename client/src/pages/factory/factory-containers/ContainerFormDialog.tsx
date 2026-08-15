@@ -190,7 +190,7 @@ export function ContainerFormDialog({
         );
       })
       .catch(() => setOtherChargeLines([]));
-  }, [editingContainer?.id]);
+  }, [editingContainer, editingContainer.id]);
 
   useEffect(() => {
     if (currency === "USD") {
@@ -222,7 +222,7 @@ export function ContainerFormDialog({
     const sup = suppliers?.find((s) => s.id === parseInt(formData.supplierId));
     if (sup?.parentId) setFormData((f) => ({ ...f, commissionSupplierId: String(sup.parentId) }));
     else if (!formData.commissionSupplierId) setFormData((f) => ({ ...f, commissionSupplierId: "" }));
-  }, [formData.supplierId, suppliers]);
+  }, [formData.commissionSupplierId, formData.supplierId, suppliers]);
 
   const activeSuppliers = suppliers?.filter((s) => s.isActive) ?? [];
   const brokerIdNum = formData.commissionSupplierId ? parseInt(formData.commissionSupplierId) : null;
@@ -357,7 +357,7 @@ export function ContainerFormDialog({
           currencyCode: l.currencyCode || currency,
           ledgerAccountId: l.ledgerAccountId ? parseInt(l.ledgerAccountId) : null,
         }));
-      let container: any;
+      let container: unknown;
       try {
         const res = await factoryApiRequest("PATCH", `/api/factory/containers/${id}`, payload);
         if (!res.ok) {

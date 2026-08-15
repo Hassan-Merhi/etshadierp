@@ -9,7 +9,7 @@ export async function getAllCustomers(companyId: number, search?: string, limit?
     .select()
     .from(schema.customers)
     .where(and(...conditions))
-    .orderBy(schema.customers.legalName) as any;
+    .orderBy(schema.customers.legalName) as unknown;
   if (limit) query = query.limit(limit);
   return await query;
 }
@@ -30,7 +30,7 @@ export async function getCustomerByCode(code: string, companyId: number): Promis
 export async function createCustomer(customer: schema.InsertCustomer): Promise<schema.Customer> {
   const [newCustomer] = await db
     .insert(schema.customers)
-    .values(customer as any)
+    .values(customer as unknown)
     .returning();
   return newCustomer;
 }

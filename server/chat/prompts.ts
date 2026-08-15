@@ -38,7 +38,7 @@ import {
 } from "./intent";
 
 function buildSystemPrompt(context: ERPContext, userPreferences?: UserPreferences): string {
-  const currency = userPreferences?.currency || "USD";
+  const _currency = userPreferences?.currency || "USD";
   const profitMargin =
     parseFloat(context.profitAnalysis.totalSales) > 0
       ? (
@@ -313,7 +313,7 @@ ${context.stockItemsWithInventory
   .slice(0, 300)
   .map(
     (i) =>
-      `${i.code}|${i.name}|${i.groupName}|${i.totalQuantity.toFixed(0)}|$${i.totalValue.toFixed(0)}|${i.locations.map((l: any) => `${l.locationName}:${l.quantity.toFixed(0)}:$${l.averageRate.toFixed(2)}`).join(",")}`
+      `${i.code}|${i.name}|${i.groupName}|${i.totalQuantity.toFixed(0)}|$${i.totalValue.toFixed(0)}|${i.locations.map((l: unknown) => `${l.locationName}:${l.quantity.toFixed(0)}:$${l.averageRate.toFixed(2)}`).join(",")}`
   )
   .join("\n")}
 
@@ -728,7 +728,7 @@ function buildToolSystemPrompt(
         prompt +=
           items
             .map(
-              (i: any) =>
+              (i: unknown) =>
                 `- ${i.name} (${i.code}): qty=${i.totalQty}, sellingPrice=${i.sellingPrice}, avgCost=${i.avgCost}, value=${i.totalValue}, pricing=${i.pricingStatus}`
             )
             .join("\n") + "\n";
@@ -737,7 +737,7 @@ function buildToolSystemPrompt(
         prompt += `\n## LOCATION BREAKDOWN for ${items[0]?.name}:\n`;
         prompt +=
           locationBreakdown
-            .map((l: any) => `- ${l.location}: qty=${l.quantity}, avgCost=${l.avgCost}, value=${l.totalValue}`)
+            .map((l: unknown) => `- ${l.location}: qty=${l.quantity}, avgCost=${l.avgCost}, value=${l.totalValue}`)
             .join("\n") + "\n";
       }
       if (lowStock.length > 0) {
@@ -745,7 +745,7 @@ function buildToolSystemPrompt(
         prompt +=
           lowStock
             .map(
-              (i: any) => `- ${i.name} (${i.code}): qty=${i.qty}, reorderLevel=${i.reorderLevel}, status=${i.status}`
+              (i: unknown) => `- ${i.name} (${i.code}): qty=${i.qty}, reorderLevel=${i.reorderLevel}, status=${i.status}`
             )
             .join("\n") + "\n";
       }
@@ -761,7 +761,7 @@ function buildToolSystemPrompt(
         prompt +=
           suppliers
             .map(
-              (s: any) =>
+              (s: unknown) =>
                 `- ${s.name} (${s.code}): phone=${s.phone || "—"}, email=${s.email || "—"}, openingBalance=${s.openingBalance}`
             )
             .join("\n") + "\n";
@@ -771,7 +771,7 @@ function buildToolSystemPrompt(
         prompt +=
           (supplierBalances as unknown[])
             .slice(0, 15)
-            .map((s: any) => `- ${s.supplierName} (${s.supplierCode}): balance=${s.balance} [${s.status}]`)
+            .map((s: unknown) => `- ${s.supplierName} (${s.supplierCode}): balance=${s.balance} [${s.status}]`)
             .join("\n") + "\n";
       }
       break;
@@ -783,7 +783,7 @@ function buildToolSystemPrompt(
       if (customers.length === 0) {
         prompt += "No matching customers found.\n";
       } else {
-        prompt += customers.map((c: any) => `- ${c.name} (${c.code}): phone=${c.phone || "—"}`).join("\n") + "\n";
+        prompt += customers.map((c: unknown) => `- ${c.name} (${c.code}): phone=${c.phone || "—"}`).join("\n") + "\n";
       }
       break;
     }
@@ -797,7 +797,7 @@ function buildToolSystemPrompt(
         prompt += `\nTop items this month:\n`;
         prompt +=
           summary.topItemsThisMonth
-            .map((i: any) => `- ${i.name}: revenue=${i.revenue}, profit=${i.profit}, qty=${i.qty}`)
+            .map((i: unknown) => `- ${i.name}: revenue=${i.revenue}, profit=${i.profit}, qty=${i.qty}`)
             .join("\n") + "\n";
       }
       if (matchedItems.length > 0) {
@@ -810,7 +810,7 @@ function buildToolSystemPrompt(
           salesHistory
             .slice(0, 10)
             .map(
-              (s: any) =>
+              (s: unknown) =>
                 `- ${s.date} | ${s.voucherNumber} | qty=${s.qty} | price=${s.sellingPrice} | cost=${s.costPrice} | profit=${s.profit}`
             )
             .join("\n") + "\n";
@@ -828,15 +828,15 @@ function buildToolSystemPrompt(
         prompt += `\nTop items this month:\n`;
         prompt +=
           summary.topItemsThisMonth
-            .map((i: any) => `- ${i.name}: revenue=${i.revenue}, profit=${i.profit}, qty=${i.qty}`)
+            .map((i: unknown) => `- ${i.name}: revenue=${i.revenue}, profit=${i.profit}, qty=${i.qty}`)
             .join("\n") + "\n";
       }
       if (lowStock.length > 0) {
-        prompt += `\nLow stock alerts (${lowStock.length} items): ${lowStock.map((i: any) => `${i.name} (${i.qty} left)`).join(", ")}\n`;
+        prompt += `\nLow stock alerts (${lowStock.length} items): ${lowStock.map((i: unknown) => `${i.name} (${i.qty} left)`).join(", ")}\n`;
       }
-      if (pricingHealth.filter((i: any) => i.status === "LOSING").length > 0) {
-        const losing = pricingHealth.filter((i: any) => i.status === "LOSING");
-        prompt += `\nPricing issues — selling below cost: ${losing.map((i: any) => `${i.name} (gap=${i.priceGap})`).join(", ")}\n`;
+      if (pricingHealth.filter((i: unknown) => i.status === "LOSING").length > 0) {
+        const losing = pricingHealth.filter((i: unknown) => i.status === "LOSING");
+        prompt += `\nPricing issues — selling below cost: ${losing.map((i: unknown) => `${i.name} (gap=${i.priceGap})`).join(", ")}\n`;
       }
       break;
     }

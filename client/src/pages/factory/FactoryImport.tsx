@@ -12,7 +12,7 @@ import {OpeningStockImport} from "./factoryimport/components/OpeningStockImport"
 import {SupplierObEdit} from "./factoryimport/components/SupplierObEdit";
 export default function FactoryImport() {
   const [activeTab, setActiveTab] = useState<ImportTab>("suppliers");
-  const { toast } = useToast();
+  const { _toast } = useToast();
 
   const tabs: { key: ImportTab; label: string; icon: typeof Users }[] = [
     { key: "suppliers", label: "Supplier Balances", icon: Users },

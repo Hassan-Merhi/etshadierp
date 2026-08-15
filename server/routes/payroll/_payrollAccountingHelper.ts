@@ -59,7 +59,7 @@ export async function findOrCreateLedger(
       .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\\d+$'`));
     const nextCode = String((parseInt((maxCodeRow as { maxCode: string })?.maxCode || "0") || 0) + 1 + attempt);
     try {
-      const insertVals: any = {
+      const insertVals: unknown = {
         companyId,
         code: nextCode,
         name,
@@ -112,7 +112,7 @@ export async function findOrCreateLedger(
  * @param excludePayrollId  The payroll id being deleted (excluded from "remaining" query)
  */
 export async function rebuildPayrollGenVoucher(
-  tx: any,
+  tx: unknown,
   companyId: number,
   periodStart: string,
   periodEnd: string,
@@ -132,7 +132,7 @@ export async function rebuildPayrollGenVoucher(
     );
 
   if (existingGenVouchers.length > 0) {
-    const vIds = existingGenVouchers.map((v: any) => v.id);
+    const vIds = existingGenVouchers.map((v: unknown) => v.id);
     await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
     await tx.delete(vouchers).where(inArray(vouchers.id, vIds));
   }

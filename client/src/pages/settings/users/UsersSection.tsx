@@ -7,7 +7,7 @@ import { UserManagementDrawer } from "./UserManagementDrawer";
 import { AddUserDialog } from "./AddUserDialog";
 
 export function UsersSection() {
-  const [selectedUser, setSelectedUser] = useState<any | null>(null);
+  const [selectedUser, setSelectedUser] = useState<unknown | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
 

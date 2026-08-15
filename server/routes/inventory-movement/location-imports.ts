@@ -92,7 +92,7 @@ export function registerLocationImportRoutes(app: Express) {
       // Per-session barcode registry: once a barcode resolves to an item it
       // ALWAYS resolves to that same item for the rest of this import run.
       // This prevents the same barcode from ever mapping to more than one product.
-      const barcodeItemMap = new Map<string, any>();
+      const barcodeItemMap = new Map<string, unknown>();
 
       for (const item of items) {
         try {

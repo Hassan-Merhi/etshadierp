@@ -11,7 +11,7 @@ export type ExcelSpreadsheetData = {
 
 export type SpreadsheetData = ExcelSpreadsheetData | FortuneSheet[];
 
-export function isExcelMode(data: any): data is ExcelSpreadsheetData {
+export function isExcelMode(data: unknown): data is ExcelSpreadsheetData {
   return (
     data !== null &&
     typeof data === "object" &&
@@ -84,7 +84,7 @@ function hexToArgb(hex?: string): string {
 }
 
 /** Iterates Fortune Sheet cells regardless of sparse (celldata) or dense (data) format */
-function iterateFortuneCells(sheet: FortuneSheet, cb: (r: number, c: number, v: any) => void): void {
+function iterateFortuneCells(sheet: FortuneSheet, cb: (r: number, c: number, v: unknown) => void): void {
   const s = sheet;
   if (Array.isArray(s.celldata)) {
     for (const { r, c, v } of s.celldata) {
@@ -103,7 +103,7 @@ function iterateFortuneCells(sheet: FortuneSheet, cb: (r: number, c: number, v: 
 }
 
 /** Maps Fortune Sheet cell value object into an ExcelJS cell */
-function applyFortuneStyleToCell(excelCell: ExcelJS.Cell, v: any): void {
+function applyFortuneStyleToCell(excelCell: ExcelJS.Cell, v: unknown): void {
   if (!v) {
     excelCell.value = null;
     return;
@@ -206,7 +206,7 @@ export async function syncFortuneToXlsx(rawXlsx: string, sheets: FortuneSheet[])
     if (!ws) continue;
 
     // Build a map of Fortune Sheet cells: "r_c" → cell value object
-    const cellMap = new Map<string, any>();
+    const cellMap = new Map<string, unknown>();
     let maxFsR = 0;
     let maxFsC = 0;
 
@@ -220,7 +220,7 @@ export async function syncFortuneToXlsx(rawXlsx: string, sheets: FortuneSheet[])
     let maxExcelR = 0;
     let maxExcelC = 0;
     try {
-      const dim = (ws as any).dimensions;
+      const dim = (ws as unknown).dimensions;
       if (dim) {
         maxExcelR = Math.max(0, (dim.bottom ?? dim.e?.r ?? 0) - 1);
         maxExcelC = Math.max(0, (dim.right ?? dim.e?.c ?? 0) - 1);

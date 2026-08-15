@@ -92,7 +92,7 @@ export function aggregateSourceStockRequirements(
   );
 }
 
-async function lockTransfer(tx: any, transferId: number) {
+async function lockTransfer(tx: unknown, transferId: number) {
   const result = await tx.execute(sql`
     SELECT stv.*, v.company_id, v.optional, v.voucher_type, v.deleted_at, v.total_amount
     FROM stock_transfer_vouchers stv
@@ -103,7 +103,7 @@ async function lockTransfer(tx: any, transferId: number) {
   return result.rows?.[0] ?? result[0];
 }
 
-async function lockTransferByVoucher(tx: any, voucherId: number) {
+async function lockTransferByVoucher(tx: unknown, voucherId: number) {
   const result = await tx.execute(sql`
     SELECT stv.*, v.company_id, v.optional, v.voucher_type, v.deleted_at, v.total_amount
     FROM stock_transfer_vouchers stv
@@ -114,7 +114,7 @@ async function lockTransferByVoucher(tx: any, voucherId: number) {
   return result.rows?.[0] ?? result[0];
 }
 
-async function loadTransferItems(tx: any, transferId: number) {
+async function loadTransferItems(tx: unknown, transferId: number) {
   return tx.select().from(stockTransferItems).where(eq(stockTransferItems.transferId, transferId));
 }
 
@@ -139,7 +139,7 @@ function persistedRowsToItems(
 }
 
 async function assertCompanyScope(
-  tx: any,
+  tx: unknown,
   companyId: number,
   destinationLocationId: number,
   items: StockTransferLifecycleItem[]
@@ -171,7 +171,7 @@ async function assertCompanyScope(
 }
 
 async function reverseAppliedItems(
-  tx: any,
+  tx: unknown,
   companyId: number,
   destinationLocationId: number,
   items: StockTransferLifecycleItem[]
@@ -183,7 +183,7 @@ async function reverseAppliedItems(
 }
 
 async function validateAndApplyItems(
-  tx: any,
+  tx: unknown,
   companyId: number,
   destinationLocationId: number,
   items: StockTransferLifecycleItem[]
@@ -199,7 +199,7 @@ async function validateAndApplyItems(
   }
 }
 
-async function replaceTransferItems(tx: any, transferId: number, items: StockTransferLifecycleItem[]) {
+async function replaceTransferItems(tx: unknown, transferId: number, items: StockTransferLifecycleItem[]) {
   await tx.delete(stockTransferItems).where(eq(stockTransferItems.transferId, transferId));
   return tx
     .insert(stockTransferItems)

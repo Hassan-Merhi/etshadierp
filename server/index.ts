@@ -28,7 +28,7 @@ import { startupMigrations } from "./startup-schema";
 // In development: log only — keeps the dev server alive for investigation.
 const isProduction = process.env.NODE_ENV === "production";
 
-process.on("unhandledRejection", (reason: any) => {
+process.on("unhandledRejection", (reason: unknown) => {
   logger.error("[UnhandledRejection]", { reason: reason?.message ?? reason, stack: reason?.stack ?? "" });
   if (isProduction) process.exit(1);
 });
@@ -1450,7 +1450,7 @@ END $mig$`;
     });
   };
 
-  server.on("error", (err: any) => {
+  server.on("error", (err: unknown) => {
     if (err.code === "EADDRINUSE") {
       logger.warn(`Port ${port} in use — killing zombie process and retrying...`);
       try {
@@ -1461,7 +1461,7 @@ END $mig$`;
       }
       setTimeout(() => {
         server.removeAllListeners("error");
-        server.on("error", (e: any) => {
+        server.on("error", (e: unknown) => {
           logger.error("Server error:", { error: e });
         });
         doListen();

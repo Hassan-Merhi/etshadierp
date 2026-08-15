@@ -33,7 +33,7 @@ async function auditExport(req: import("express").Request, companyId: number, ty
   }
 }
 
-export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: any, db: any) {
+export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: unknown, db: unknown) {
   app.post("/api/factory/payroll/export-pdf", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = Number(req.body?.companyId);
@@ -64,7 +64,7 @@ export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: an
 
       const productionTotals = await getProductionBonusTotalsForPayrollIds(
         db,
-        payrollData.map((row: any) => row.payroll.id)
+        payrollData.map((row: unknown) => row.payroll.id)
       );
 
       const doc = new PDFDocument({ margin: 30, size: "A4", layout: "landscape" });
@@ -232,7 +232,7 @@ export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: an
 
       const productionTotals = await getProductionBonusTotalsForPayrollIds(
         db,
-        payrollData.map((row: any) => row.payroll.id)
+        payrollData.map((row: unknown) => row.payroll.id)
       );
 
       const workbook = new ExcelJS.Workbook();

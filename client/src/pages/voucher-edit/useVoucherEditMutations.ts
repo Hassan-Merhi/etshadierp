@@ -21,7 +21,7 @@ import {
 
 interface UseVoucherEditMutationsOptions {
   id: string | undefined;
-  modeApiRequest: (method: string, url: string, body?: any) => Promise<unknown>;
+  modeApiRequest: (method: string, url: string, body?: unknown) => Promise<unknown>;
   voucherType: string | undefined;
   exchangeRate: number;
   handleBack: () => void;
@@ -58,7 +58,7 @@ export function useVoucherEditMutations({
       toast({ title: "Success", description: "Voucher updated successfully" });
       handleBack();
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to update voucher", variant: "destructive" });
     },
@@ -74,7 +74,7 @@ export function useVoucherEditMutations({
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       toast({ title: "Success", description: "Optional status updated successfully" });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Error",
@@ -101,7 +101,7 @@ export function useVoucherEditMutations({
       toast({ title: "Success", description: "Sales voucher updated successfully" });
       navigate(`${modePrefix}/daybook`);
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to update sales voucher", variant: "destructive" });
     },
@@ -124,7 +124,7 @@ export function useVoucherEditMutations({
       toast({ title: "Success", description: "Purchase voucher updated successfully" });
       navigate(`${modePrefix}/daybook`);
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Error",
@@ -151,7 +151,7 @@ export function useVoucherEditMutations({
       toast({ title: "Success", description: "Adjustment voucher updated successfully" });
       navigate(`${modePrefix}/daybook`);
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Error",
@@ -178,7 +178,7 @@ export function useVoucherEditMutations({
       toast({ title: "Success", description: "Stock transfer voucher updated successfully" });
       navigate(`${modePrefix}/daybook`);
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Error",

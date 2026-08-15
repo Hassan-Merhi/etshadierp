@@ -45,7 +45,7 @@ export function useAccountBalance({
         const transactions = await transRes.json();
         let openingBalance = parseFloat(account.openingBalance || "0");
         if (account.openingBalanceSide === "Cr") openingBalance = -openingBalance;
-        return transactions.reduce((sum: number, t: any) => {
+        return transactions.reduce((sum: number, t: unknown) => {
           return sum + parseFloat(t.debitAmount || "0") - parseFloat(t.creditAmount || "0");
         }, openingBalance);
       } else if (paymentAccountType === "supplier") {
@@ -54,21 +54,21 @@ export function useAccountBalance({
         const transRes = await fetch(`/api/accounts/supplier/${paymentAccountId}/transactions`);
         const transactions = await transRes.json();
         const openingBalance = parseFloat(supplier.openingBalance || "0");
-        return transactions.reduce((sum: number, t: any) => {
+        return transactions.reduce((sum: number, t: unknown) => {
           return sum + parseFloat(t.creditAmount || "0") - parseFloat(t.debitAmount || "0");
         }, openingBalance);
       } else if (paymentAccountType === "employee") {
         const openingBalance = parseFloat(selectedAccountOpeningBalance || "0");
         const transRes = await fetch(`/api/accounts/employee/${paymentAccountId}/transactions`);
         const transactions = await transRes.json();
-        return transactions.reduce((sum: number, t: any) => {
+        return transactions.reduce((sum: number, t: unknown) => {
           return sum + parseFloat(t.creditAmount || "0") - parseFloat(t.debitAmount || "0");
         }, openingBalance);
       } else if (paymentAccountType === "fixedAsset") {
         const openingBalance = parseFloat(selectedAccountOpeningBalance || "0");
         const transRes = await fetch(`/api/accounts/fixed-asset/${paymentAccountId}/transactions`);
         const transactions = await transRes.json();
-        return transactions.reduce((sum: number, t: any) => {
+        return transactions.reduce((sum: number, t: unknown) => {
           return sum + parseFloat(t.debitAmount || "0") - parseFloat(t.creditAmount || "0");
         }, openingBalance);
       } else if (paymentAccountType === "customer") {
@@ -77,7 +77,7 @@ export function useAccountBalance({
         const transRes = await fetch(`/api/accounts/customer/${paymentAccountId}/transactions`);
         const transactions = await transRes.json();
         const openingBalance = parseFloat(customer.openingBalance || "0");
-        return transactions.reduce((sum: number, t: any) => {
+        return transactions.reduce((sum: number, t: unknown) => {
           return sum + parseFloat(t.debitAmount || "0") - parseFloat(t.creditAmount || "0");
         }, openingBalance);
       } else if (paymentAccountType === "factorySupplier") {

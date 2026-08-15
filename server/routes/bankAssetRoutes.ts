@@ -566,7 +566,7 @@ export function registerBankAssetRoutes(app: Express) {
       const allStockItems = await storage.getAllStockItems(req.session.currentCompanyId!);
 
       // Helper function to find column value with flexible naming
-      const getColumnValue = (row: any, ...possibleNames: string[]): string | undefined => {
+      const getColumnValue = (row: unknown, ...possibleNames: string[]): string | undefined => {
         for (const name of possibleNames) {
           if (row[name] !== undefined && row[name] !== null && row[name] !== "") {
             return row[name];
@@ -677,8 +677,8 @@ export function registerBankAssetRoutes(app: Express) {
       );
 
       // Calculate container totals
-      const preview = Object.values(containerGroups).map((container: any) => {
-        const itemsTotal = container.items.reduce((sum: number, item: any) => sum + item.lineTotal, 0);
+      const preview = Object.values(containerGroups).map((container: unknown) => {
+        const itemsTotal = container.items.reduce((sum: number, item: unknown) => sum + item.lineTotal, 0);
 
         // Get charges from rows or aggregate from columns
         const charges = {
@@ -702,7 +702,7 @@ export function registerBankAssetRoutes(app: Express) {
           });
         } else {
           // Aggregate from item row columns
-          container.items.forEach((item: any) => {
+          container.items.forEach((item: unknown) => {
             charges.freight += item.freight;
             charges.surcharge += item.surcharge;
             charges.fumigation += item.fumigation;

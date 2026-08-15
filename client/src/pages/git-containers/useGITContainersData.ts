@@ -8,9 +8,9 @@ interface UseGITContainersDataProps {
   isAllowed: boolean;
   refetch: () => void;
   toast: unknown;
-  setImportResult: (v: any) => void;
+  setImportResult: (v: unknown) => void;
   setShowProgressBanner: (v: boolean) => void;
-  setBulkProgress: (v: any) => void;
+  setBulkProgress: (v: unknown) => void;
   queryClient: unknown;
   showProgressBanner: boolean;
 }
@@ -95,7 +95,7 @@ export function useGITContainersData({
           : `Auto-tracking disabled for ${data.updated} containers`,
       });
     },
-    onError: (err: any) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
+    onError: (err: unknown) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
   });
 
   const bulkTrackMutation = useMutation({
@@ -116,7 +116,7 @@ export function useGITContainersData({
         setShowProgressBanner(true);
       }
     },
-    onError: (err: any) => toast({ title: "Track All failed", description: err.message, variant: "destructive" }),
+    onError: (err: unknown) => toast({ title: "Track All failed", description: err.message, variant: "destructive" }),
   });
 
   const isBulkPending = bulkTrackMutation.isPending;
@@ -161,7 +161,7 @@ export function useGITContainersData({
       if (intervalId) clearInterval(intervalId);
       if (stopTimeoutId) clearTimeout(stopTimeoutId);
     };
-  }, [isBulkPending, showProgressBanner, isAllowed, queryClient]);
+  }, [isBulkPending, showProgressBanner, isAllowed, queryClient, setBulkProgress, setShowProgressBanner, bulkTrackMutation.isPending]);
 
   return {
     importMutation,

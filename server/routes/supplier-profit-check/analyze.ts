@@ -9,7 +9,7 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { pool } from "../../db";
 
-export function registerSupplierProfitAnalyzeRoutes(app: Express, requireAuth: any) {
+export function registerSupplierProfitAnalyzeRoutes(app: Express, requireAuth: unknown) {
   app.post("/api/supplier-profit-check/analyze", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;
@@ -120,7 +120,7 @@ export function registerSupplierProfitAnalyzeRoutes(app: Express, requireAuth: a
       if (items.length === 0) return res.json([]);
 
       const stockItemIds = items.map((r) => r.id);
-      const idsParam = stockItemIds.map((_, i: number) => `$${i + 1}`).join(",");
+      const _idsParam = stockItemIds.map((_, i: number) => `$${i + 1}`).join(",");
 
       // 2. Average selling price + total sales qty per item in date range
       const avgSellResult = allTime
@@ -282,7 +282,7 @@ export function registerSupplierProfitAnalyzeRoutes(app: Express, requireAuth: a
 
         // N Cost kept for proforma save (not shown in UI)
         const nCost = nCostMap.get(id) ?? 0;
-        const nCostSource = nCostMap.has(id) ? "po" : "missing";
+        const _nCostSource = nCostMap.has(id) ? "po" : "missing";
 
         // Hassan's Price = selling price set on the stock item
         const configPrice = hassansPriceMap.get(id) ?? 0;

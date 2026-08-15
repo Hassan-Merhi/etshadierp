@@ -170,7 +170,7 @@ export default function Daybook({ user }: { user?: unknown } = {}) {
   const VOUCHER_PAGE_SIZE = 100;
   const [voucherPage, setVoucherPage] = useState(1);
   const [daybookRowLimit, setDaybookRowLimit] = useState(DAYBOOK_PAGE_SIZE);
-  const scrollYRef = useRef(0);
+  const _scrollYRef = useRef(0);
   const [viewMode, setViewMode] = useState<"detailed" | "condensed">(() => loadDaybookState()?.viewMode ?? "detailed");
   const [expandedVoucherId, setExpandedVoucherId] = useState<number | null>(null);
   const [expandedCondensedGroups, setExpandedCondensedGroups] = useState<Set<string>>(new Set());
@@ -210,7 +210,7 @@ export default function Daybook({ user }: { user?: unknown } = {}) {
     setVoucherPage(1);
   }, [selectedCompany?.id]);
 
-  const [purchaseOrderData, setPurchaseOrderData] = useState<any>(null);
+  const [purchaseOrderData, setPurchaseOrderData] = useState<unknown>(null);
   const [poSupplierBalance, setPoSupplierBalance] = useState<string | null>(null);
   // Declared here — before any useEffect that references it — to avoid TDZ errors.
   const [balanceRefreshKey, setBalanceRefreshKey] = useState(0);
@@ -228,7 +228,7 @@ export default function Daybook({ user }: { user?: unknown } = {}) {
   }, [purchaseOrderData?.supplierId, balanceRefreshKey]);
 
   const viewEntriesUrl = selectedVoucher ? `/api/vouchers/${selectedVoucher.id}/view-entries` : "";
-  const { data: viewVoucherEntriesRaw, isLoading: viewEntriesLoading } = useQuery<any>({
+  const { data: viewVoucherEntriesRaw, isLoading: viewEntriesLoading } = useQuery<unknown>({
     queryKey: selectedVoucher ? companyDataKey(viewEntriesUrl, selectedCompany?.id, "daybook-view-entries") : [],
     enabled: !!selectedVoucher && viewDialogOpen,
     ...frontendQueryPolicies.live,
@@ -240,7 +240,7 @@ export default function Daybook({ user }: { user?: unknown } = {}) {
   }, [viewVoucherEntriesRaw]);
 
   const expandedEntriesUrl = expandedVoucherId ? `/api/vouchers/${expandedVoucherId}/view-entries` : "";
-  const { data: expandedEntriesRaw, isLoading: expandedLoading } = useQuery<any>({
+  const { data: expandedEntriesRaw, isLoading: expandedLoading } = useQuery<unknown>({
     queryKey: expandedVoucherId
       ? companyDataKey(expandedEntriesUrl, selectedCompany?.id, "daybook-expanded-entries")
       : [],
@@ -467,7 +467,7 @@ export default function Daybook({ user }: { user?: unknown } = {}) {
         description: voucherToEdit.description || "",
         optional: voucherToEdit.optional,
         entries: voucherEntries.map((e) => ({
-          accountType: e.accountType as any,
+          accountType: e.accountType as unknown,
           accountId: e.accountId,
           accountName: e.accountName,
           debitAmount: e.debitAmount || "0",
@@ -528,7 +528,7 @@ export default function Daybook({ user }: { user?: unknown } = {}) {
       }),
     [periodFilter.fromDate, periodFilter.toDate]
   );
-  const { data: offloads = [], isLoading: offloadsLoading } = useQuery<OffloadListItem[]>({
+  const { data: offloads = [], isLoading: _offloadsLoading } = useQuery<OffloadListItem[]>({
     queryKey: companyDataKey(offloadsUrl, selectedCompany?.id, "daybook-offloads"),
     queryFn: async ({ signal }) => {
       const response = await fetch(offloadsUrl, { credentials: "include", signal });
@@ -582,7 +582,7 @@ export default function Daybook({ user }: { user?: unknown } = {}) {
         idB = b.data.id;
       return filters.sortOrder === "asc" ? idA - idB : idB - idA;
     });
-  }, [filteredVouchers, offloads, filters.sortOrder]);
+  }, [filters.voucherType, filters.sortOrder, filteredVouchers, voucherPage, offloads]);
 
   const visibleRows = useMemo(
     () =>

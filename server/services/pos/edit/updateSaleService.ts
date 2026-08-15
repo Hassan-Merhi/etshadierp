@@ -73,7 +73,7 @@ export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ stat
   const paymentAccountType = rawPaymentAccountType;
   const paymentAccountId = rawPaymentAccountId;
 
-  const transactionResult: any = await db.transaction(async (tx) => {
+  const transactionResult: unknown = await db.transaction(async (tx) => {
     const [lockedVoucher] = await tx
       .select()
       .from(vouchers)

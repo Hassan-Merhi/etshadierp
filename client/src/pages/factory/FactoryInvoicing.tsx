@@ -12,7 +12,7 @@ export default function FactoryInvoicing() {
   const [, navigate] = useLocation();
   const search = useSearch();
 
-  const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 5 * 60000 });
+  const { data: myAccess } = useQuery<unknown>({ queryKey: ["/api/factory/my-access"], staleTime: 5 * 60000 });
   const hidden: string[] = myAccess?.hiddenCostFields ?? [];
 
   // ── Proformas tab access (existing restriction) ──────────────────────────
@@ -28,7 +28,7 @@ export default function FactoryInvoicing() {
     myAccess.pageKeys.includes("factory/sales/loadings");
 
   // ── Pending loadings — mirrors FactoryLoadingsHub restrictions ───────────
-  const { data: settings } = useQuery<any>({
+  const { data: settings } = useQuery<unknown>({
     queryKey: ["/api/factory/settings"],
     queryFn: async () => {
       const r = await fetch("/api/factory/settings");

@@ -94,7 +94,7 @@ export function AuditLog({
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
   const [page, setPage] = useState(1);
-  const [selectedLog, setSelectedLog] = useState<any>(null);
+  const [selectedLog, setSelectedLog] = useState<unknown>(null);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 

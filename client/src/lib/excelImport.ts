@@ -47,9 +47,9 @@ const V_ALIGN: Record<string, number> = {
 
 // ─── Fortune Sheet conditional format helpers ────────────────────────────────
 
-function cfStyleToFortune(style: any): unknown {
+function cfStyleToFortune(style: unknown): unknown {
   if (!style) return {};
-  const result: any = {};
+  const result: unknown = {};
   if (style.fill?.fgColor?.argb) result.bg = argbToHex(style.fill.fgColor.argb);
   if (style.font?.color?.argb) result.fc = argbToHex(style.font.color.argb);
   if (style.font?.bold) result.bl = 1;
@@ -57,14 +57,14 @@ function cfStyleToFortune(style: any): unknown {
   return result;
 }
 
-function buildConditions(ws: any): unknown[] {
+function buildConditions(ws: unknown): unknown[] {
   const conditions: unknown[] = [];
   try {
     const cfs: unknown[] = ws.conditionalFormattings || [];
     for (const cf of cfs) {
       for (const rule of cf.rules || []) {
         try {
-          const base: any = {
+          const base: unknown = {
             ref: cf.ref,
             type: rule.type,
             priority: rule.priority ?? 1,
@@ -80,7 +80,7 @@ function buildConditions(ws: any): unknown[] {
             conditions.push({
               ...base,
               cfvo: rule.cfvo,
-              color: (rule.color || []).map((c: any) => argbToHex(c?.argb) ?? "#ffffff"),
+              color: (rule.color || []).map((c: unknown) => argbToHex(c?.argb) ?? "#ffffff"),
             });
           } else if (rule.type === "dataBar") {
             conditions.push({
@@ -117,7 +117,7 @@ function buildConditions(ws: any): unknown[] {
 
 // ─── AutoFilter decoder ──────────────────────────────────────────────────────
 
-function decodeAutoFilter(af: any): { row: [number, number]; column: [number, number] } | null {
+function decodeAutoFilter(af: unknown): { row: [number, number]; column: [number, number] } | null {
   try {
     let refStr: string | undefined;
     if (typeof af === "string") {
@@ -162,7 +162,7 @@ export async function excelToFortune(buf: ArrayBuffer): Promise<FortuneSheet[]> 
   wb.eachSheet((ws, sheetId) => {
     const order = sheetId - 1;
     const celldata: unknown[] = [];
-    const config: any = {};
+    const config: unknown = {};
 
     // ── Cells ────────────────────────────────────────────────────────────
     ws.eachRow({ includeEmpty: false }, (row) => {
@@ -173,7 +173,7 @@ export async function excelToFortune(buf: ArrayBuffer): Promise<FortuneSheet[]> 
         const r = (cell.row as unknown as number) - 1;
         const c = (cell.col as unknown as number) - 1;
 
-        const v: any = {};
+        const v: unknown = {};
 
         // Value / formula
         const val = cell.value;
@@ -219,7 +219,7 @@ export async function excelToFortune(buf: ArrayBuffer): Promise<FortuneSheet[]> 
         }
 
         // Fill
-        const fill = cell.fill as any;
+        const fill = cell.fill as unknown;
         if (fill && fill.type === "pattern" && fill.pattern && fill.pattern !== "none") {
           const bg = argbToHex(fill.fgColor?.argb);
           if (bg && bg !== "#000000" && bg !== "#FFFFFF") v.bg = bg;
@@ -235,9 +235,9 @@ export async function excelToFortune(buf: ArrayBuffer): Promise<FortuneSheet[]> 
         }
 
         // Borders
-        const border = cell.border as any;
+        const border = cell.border as unknown;
         if (border) {
-          const b: any = {};
+          const b: unknown = {};
           for (const [side, fsKey] of [
             ["left", "l"],
             ["right", "r"],
@@ -310,7 +310,7 @@ export async function excelToFortune(buf: ArrayBuffer): Promise<FortuneSheet[]> 
     if (Object.keys(rowhidden).length > 0) config.rowhidden = rowhidden;
 
     // ── Auto filter ──────────────────────────────────────────────────────
-    let filter_select: any = null;
+    let filter_select: unknown = null;
     const af = (ws as { autoFilter: unknown }).autoFilter;
     if (af) {
       filter_select = decodeAutoFilter(af);
@@ -328,7 +328,7 @@ export async function excelToFortune(buf: ArrayBuffer): Promise<FortuneSheet[]> 
     }
     if (maxColIdx > maxC) maxC = maxColIdx;
 
-    const sheet: any = {
+    const sheet: unknown = {
       id: String(order + 1),
       name: ws.name,
       status: order === 0 ? 1 : 0,

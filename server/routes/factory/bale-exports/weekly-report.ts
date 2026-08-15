@@ -155,7 +155,7 @@ export function registerFactoryWeeklyReportExportRoutes(app: Express) {
         }
 
         const dateStr =
-          typeof adj.date === "string" ? adj.date.slice(0, 10) : (adj.date as any).toISOString().slice(0, 10);
+          typeof adj.date === "string" ? adj.date.slice(0, 10) : (adj.date as unknown).toISOString().slice(0, 10);
         if (isAdd) {
           // Treat manual ADD the same as receiving container stock
           if (!stockInByDate.has(dateStr)) stockInByDate.set(dateStr, new Map());
@@ -370,7 +370,7 @@ export function registerFactoryWeeklyReportExportRoutes(app: Express) {
         const LIGHT_BLUE = "FFE0EAFF";
         const DARK_GRAY = "FF374151";
         const TOTAL_BG = "FFD1FAE5";
-        const BORDER_STYLE: any = { style: "thin", color: { argb: "FFD1D5DB" } };
+        const BORDER_STYLE: unknown = { style: "thin", color: { argb: "FFD1D5DB" } };
         const BORDER_ALL = { top: BORDER_STYLE, left: BORDER_STYLE, bottom: BORDER_STYLE, right: BORDER_STYLE };
 
         sh.getColumn(1).width = 24;

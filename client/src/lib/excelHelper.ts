@@ -88,7 +88,7 @@ export const utils = {
     return numToCol(cell.c) + (cell.r + 1);
   },
 
-  book_append_sheet: (workbook: ExcelJS.Workbook, sheetData: any, name: string) => {
+  book_append_sheet: (workbook: ExcelJS.Workbook, sheetData: unknown, name: string) => {
     const worksheet = workbook.addWorksheet(name);
 
     if ("aoa" in sheetData) {
@@ -140,7 +140,7 @@ export const utils = {
       worksheet.eachRow((row) => {
         const rowData: unknown[] = [];
         row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-          let value: any = cell.value;
+          let value: unknown = cell.value;
           if (value && typeof value === "object" && "result" in value) {
             value = value.result;
           }
@@ -164,7 +164,7 @@ export const utils = {
         row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
           const header = headers[colNumber - 1];
           if (header) {
-            let value: any = cell.value;
+            let value: unknown = cell.value;
             if (value && typeof value === "object" && "result" in value) {
               value = value.result;
             }

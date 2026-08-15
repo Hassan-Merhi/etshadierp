@@ -36,7 +36,7 @@ export function registerFactoryEmployeeBulkWithdrawRoutes(app: Express) {
         .where(and(eq(ledgerAccounts.id, parseInt(cashAccountId)), eq(ledgerAccounts.companyId, companyId)));
       if (!cashAccount) return res.status(404).json({ message: "Cash account not found" });
 
-      const totalAmount = validWithdrawals.reduce((s: number, w: any) => s + parseFloat(w.amount), 0);
+      const totalAmount = validWithdrawals.reduce((s: number, w: unknown) => s + parseFloat(w.amount), 0);
       const voucherNumber = `EMP-WD-BULK-${Date.now()}`;
 
       const [bulkVoucher] = await db

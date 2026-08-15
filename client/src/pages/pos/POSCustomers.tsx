@@ -57,7 +57,7 @@ export default function POSCustomers() {
   });
 
   // Fetch transactions when a customer is selected — uses POS-specific endpoint
-  const { data: ledgerTxnsRaw, isLoading: txnsLoading } = useQuery<any>({
+  const { data: ledgerTxnsRaw, isLoading: txnsLoading } = useQuery<unknown>({
     queryKey: ["/api/pos/customers", statementCustomer?.id, "transactions"],
     queryFn: () => fetch(`/api/pos/customers/${statementCustomer!.id}/transactions`).then((r) => r.json()),
     enabled: !!statementCustomer?.id,

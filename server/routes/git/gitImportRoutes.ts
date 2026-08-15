@@ -45,7 +45,7 @@ export function registerGitImportRoutes(app: Express) {
 
         // ── Header row ──────────────────────────────────────────────────────
         const headerRow = ws.addRow(["Container #", "New ETA"]);
-        headerRow.eachCell((cell: any) => {
+        headerRow.eachCell((cell: unknown) => {
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "1F4E79" } };
           cell.font = { bold: true, color: { argb: "FFFFFF" }, size: 12 };
           cell.alignment = { vertical: "middle", horizontal: "center" };
@@ -127,7 +127,7 @@ export function registerGitImportRoutes(app: Express) {
 
         // Header row — dark blue
         const headerRow = ws.addRow(headers);
-        headerRow.eachCell((cell: any) => {
+        headerRow.eachCell((cell: unknown) => {
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "1F4E79" } };
           cell.font = { bold: true, color: { argb: "FFFFFF" }, size: 11 };
           cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
@@ -159,7 +159,7 @@ export function registerGitImportRoutes(app: Express) {
           "e.g. ABC SHOP",
         ];
         const hintRow = ws.addRow(hints);
-        hintRow.eachCell((cell: any) => {
+        hintRow.eachCell((cell: unknown) => {
           if (cell.value) {
             cell.font = { italic: true, color: { argb: "888888" }, size: 9 };
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "F5F5F5" } };
@@ -187,7 +187,7 @@ export function registerGitImportRoutes(app: Express) {
           "MAERSK",
           "ABC SHOP",
         ]);
-        ex1.eachCell((cell: any) => {
+        ex1.eachCell((cell: unknown) => {
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDE7" } };
           cell.font = { italic: true, color: { argb: "5D4037" } };
         });
@@ -213,7 +213,7 @@ export function registerGitImportRoutes(app: Express) {
           "",
           "XYZ STORE",
         ]);
-        ex2.eachCell((cell: any) => {
+        ex2.eachCell((cell: unknown) => {
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDE7" } };
           cell.font = { italic: true, color: { argb: "5D4037" } };
         });
@@ -246,7 +246,7 @@ export function registerGitImportRoutes(app: Express) {
     requireAuth,
     requireRole("Admin", "Owner", "Developer"),
     (req: Request, res: Response, next: NextFunction) => {
-      gitUpload.single("file")(req, res, (err: any) => {
+      gitUpload.single("file")(req, res, (err: unknown) => {
         if (!err) return next();
         if (err.code === "LIMIT_FILE_SIZE") {
           return res.status(413).json({ message: "File too large. Maximum allowed size is 10 MB." });
@@ -271,7 +271,7 @@ export function registerGitImportRoutes(app: Express) {
         const rawRows: unknown[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
 
         /** Convert any value to a plain string — handles JS Date objects from Excel */
-        function toStr(v: any): string {
+        function toStr(v: unknown): string {
           if (v === null || v === undefined) return "";
           if (v instanceof Date) {
             // Format as YYYY-MM-DD in UTC to avoid timezone shifts
@@ -286,7 +286,7 @@ export function registerGitImportRoutes(app: Express) {
         /**
          * For optional text fields: treats numeric 0 (Excel blank) as empty string.
          */
-        function toOptStr(v: any): string {
+        function toOptStr(v: unknown): string {
           if (v === null || v === undefined || v === 0 || v === "") return "";
           const s = String(v).trim();
           return s === "0" ? "" : s;
@@ -298,7 +298,7 @@ export function registerGitImportRoutes(app: Express) {
          * (which appear as plain integers like 46043 when the cell has no date format).
          * Treats 0 / "0" / blank as empty (Excel stores empty date cells as 0).
          */
-        function toDateStr(v: any): string {
+        function toDateStr(v: unknown): string {
           // Numeric 0 = blank date cell in Excel
           if (v === null || v === undefined || v === "" || v === 0) return "";
           if (v instanceof Date) {

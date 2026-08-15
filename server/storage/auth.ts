@@ -71,7 +71,7 @@ export async function updateCompany(id: number, updates: Partial<InsertCompany>)
 }
 
 export async function deleteCompany(id: number): Promise<void> {
-  const safe = async (query: any) => {
+  const safe = async (query: unknown) => {
     try {
       await db.execute(query);
     } catch (e: unknown) {

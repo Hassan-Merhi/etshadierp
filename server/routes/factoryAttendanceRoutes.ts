@@ -9,7 +9,7 @@ function getFactoryCompanyId(req: import("express").Request): number | undefined
   return req.session.factoryCompanyId || req.session.currentCompanyId;
 }
 
-export function registerFactoryAttendanceRoutes(app: Express, requireAuth: any, db: any) {
+export function registerFactoryAttendanceRoutes(app: Express, requireAuth: unknown, db: unknown) {
   // GET /api/factory/attendance?date=YYYY-MM-DD&shift=
   // Returns active workers + merged attendance for that date
   app.get("/api/factory/attendance", requireAuth, async (req: Request, res: Response) => {
@@ -17,7 +17,7 @@ export function registerFactoryAttendanceRoutes(app: Express, requireAuth: any, 
       const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company" });
 
-      const { date, shift } = req.query as { date?: string; shift?: string };
+      const { date, _shift } = req.query as { date?: string; shift?: string };
       if (!date) return res.status(400).json({ message: "date is required" });
 
       // Return ALL workers (active + inactive) with the active flag so the
@@ -39,7 +39,7 @@ export function registerFactoryAttendanceRoutes(app: Express, requireAuth: any, 
 
       if (workers.length === 0) return res.json({ workers: [], attendance: [] });
 
-      const workerIds = workers.map((w: any) => w.id);
+      const workerIds = workers.map((w: unknown) => w.id);
 
       const existing = await db
         .select()
@@ -173,7 +173,7 @@ export function registerFactoryAttendanceRoutes(app: Express, requireAuth: any, 
 
       if (workers.length === 0) return res.json({ workers: [], attendance: [] });
 
-      const workerIds = workers.map((w: any) => w.id);
+      const workerIds = workers.map((w: unknown) => w.id);
 
       const attendance = await db
         .select()
@@ -214,7 +214,7 @@ export function registerFactoryAttendanceRoutes(app: Express, requireAuth: any, 
         .where(and(eq(factoryWorkers.companyId, companyId), eq(factoryWorkers.active, true)))
         .orderBy(factoryWorkers.fullName);
 
-      const workerIds = workers.map((w: any) => w.id);
+      const workerIds = workers.map((w: unknown) => w.id);
 
       const existing =
         workerIds.length > 0
@@ -233,15 +233,15 @@ export function registerFactoryAttendanceRoutes(app: Express, requireAuth: any, 
       const attendanceMap: Record<number, string> = {};
       for (const a of existing) attendanceMap[a.workerId] = a.status;
 
-      const rows = workers.map((w: any) => ({
+      const rows = workers.map((w: unknown) => ({
         ...w,
         status: attendanceMap[w.id] || "—",
       }));
 
-      const present = rows.filter((r: any) => r.status === "Present").length;
-      const absent = rows.filter((r: any) => r.status === "Absent").length;
-      const other = rows.filter((r: any) => r.status !== "Present" && r.status !== "Absent" && r.status !== "—").length;
-      const unmarked = rows.filter((r: any) => r.status === "—").length;
+      const present = rows.filter((r: unknown) => r.status === "Present").length;
+      const absent = rows.filter((r: unknown) => r.status === "Absent").length;
+      const other = rows.filter((r: unknown) => r.status !== "Present" && r.status !== "Absent" && r.status !== "—").length;
+      const unmarked = rows.filter((r: unknown) => r.status === "—").length;
 
       const doc = new PDFDocument({ margin: 40, size: "A4" });
       res.setHeader("Content-Type", "application/pdf");

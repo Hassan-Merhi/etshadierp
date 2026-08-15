@@ -52,7 +52,7 @@ export async function buildOrderExcelBuffer(
     .where(eq(customerOrderCharges.orderId, orderId));
   const rawLines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
 
-  const articleCodes = [...new Set(rawLines.map((l: any) => l.articleCode).filter(Boolean))];
+  const articleCodes = [...new Set(rawLines.map((l: unknown) => l.articleCode).filter(Boolean))];
   const productNameMap = new Map<string, string>();
   const wtPerBaleMap = new Map<string, number>();
   if (articleCodes.length > 0) {
@@ -73,7 +73,7 @@ export async function buildOrderExcelBuffer(
   }
 
   const helperLines = rawLines
-    .map((l: any) => ({
+    .map((l: unknown) => ({
       articleCode: l.articleCode || "",
       productName: productNameMap.get(l.articleCode) || l.baleName || l.articleCode || "",
       qty: parseInt(l.qty || "0"),
@@ -84,8 +84,8 @@ export async function buildOrderExcelBuffer(
       pricingMode: (l.pricingMode as string) || "per_bale",
       pricePerKg: parseFloat(l.pricePerKg || "0"),
     }))
-    .sort((a: any, b: any) => a.articleCode.localeCompare(b.articleCode));
-  const anyPerKgH = helperLines.some((l: any) => l.pricingMode === "per_kg");
+    .sort((a: unknown, b: unknown) => a.articleCode.localeCompare(b.articleCode));
+  const anyPerKgH = helperLines.some((l: unknown) => l.pricingMode === "per_kg");
 
   const baseCurrency = company?.baseCurrency || "USD";
   const currencySymbolMap: Record<string, string> = {
@@ -121,11 +121,11 @@ export async function buildOrderExcelBuffer(
   const WHITE = "FFFFFFFF";
 
   const merge = (r: number, c1: number, c2: number) => sheet.mergeCells(r, c1, r, c2);
-  const setFill = (cell: any, argb: string) => {
+  const setFill = (cell: unknown, argb: string) => {
     cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb } };
   };
-  const setBorderH = (row: any) => {
-    row.eachCell((cell: any) => {
+  const setBorderH = (row: unknown) => {
+    row.eachCell((cell: unknown) => {
       cell.border = {
         top: { style: "thin", color: { argb: "FFDDDDDD" } },
         bottom: { style: "thin", color: { argb: "FFDDDDDD" } },
@@ -194,7 +194,7 @@ export async function buildOrderExcelBuffer(
     ...(hideSelling ? [] : [unitPriceLabelH, "Total"]),
   ]);
   hdrRow.height = 24;
-  hdrRow.eachCell((cell: any) => {
+  hdrRow.eachCell((cell: unknown) => {
     cell.font = { bold: true, color: { argb: WHITE }, size: 11 };
     setFill(cell, DARK_BLUE);
     cell.alignment = { horizontal: "center", vertical: "middle" };
@@ -209,7 +209,7 @@ export async function buildOrderExcelBuffer(
   let totalQtyH = 0,
     totalWtH = 0,
     totalH = 0;
-  helperLines.forEach((g: any, idx: number) => {
+  helperLines.forEach((g: unknown, idx: number) => {
     totalQtyH += g.qty;
     totalWtH += g.totalWt;
     totalH += g.total;
@@ -222,10 +222,10 @@ export async function buildOrderExcelBuffer(
     }
     const dr = sheet.addRow(rowCells);
     dr.height = 20;
-    dr.eachCell((cell: any) => {
+    dr.eachCell((cell: unknown) => {
       cell.font = { size: 11 };
     });
-    if (idx % 2 === 1) dr.eachCell((cell: any) => setFill(cell, LIGHT_GRAY));
+    if (idx % 2 === 1) dr.eachCell((cell: unknown) => setFill(cell, LIGHT_GRAY));
     dr.getCell(1).alignment = { horizontal: "center" };
     dr.getCell(4).alignment = { horizontal: "right" };
     dr.getCell(5).alignment = { horizontal: "right" };
@@ -244,7 +244,7 @@ export async function buildOrderExcelBuffer(
   }
   const totRow = sheet.addRow(totRowCells);
   totRow.height = 22;
-  totRow.eachCell((cell: any) => {
+  totRow.eachCell((cell: unknown) => {
     cell.font = { bold: true, size: 11, color: { argb: WHITE } };
     setFill(cell, DARK_BLUE);
     cell.alignment = { horizontal: "right" };
@@ -258,10 +258,10 @@ export async function buildOrderExcelBuffer(
     const otherChargesTotal = parseFloat(order.otherChargesTotal || "0");
     const grandTotal = parseFloat(order.grandTotal || "0");
 
-    const otherChargeLines = orderChargesHelper.filter((ch: any) => ch.chargeType !== "FREIGHT");
+    const otherChargeLines = orderChargesHelper.filter((ch: unknown) => ch.chargeType !== "FREIGHT");
     const chargeRows: [string, number][] =
       otherChargeLines.length > 0
-        ? otherChargeLines.map((ch: any) => [ch.name, parseFloat(ch.amount || "0")] as [string, number])
+        ? otherChargeLines.map((ch: unknown) => [ch.name, parseFloat(ch.amount || "0")] as [string, number])
         : otherChargesTotal > 0
           ? [["Other Charges", otherChargesTotal]]
           : [];

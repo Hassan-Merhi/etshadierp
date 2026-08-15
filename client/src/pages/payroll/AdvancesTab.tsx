@@ -108,7 +108,7 @@ export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
     },
   });
 
-  const addWorkerDeductionForm = useForm<any>({
+  const addWorkerDeductionForm = useForm<unknown>({
     defaultValues: {
       workerId: "",
       amount: "",

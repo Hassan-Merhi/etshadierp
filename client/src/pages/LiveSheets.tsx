@@ -51,7 +51,7 @@ function SheetFormDialog({
   open,
   onClose,
   existing,
-  isAdmin,
+  _isAdmin,
 }: {
   open: boolean;
   onClose: () => void;
@@ -188,7 +188,7 @@ export default function LiveSheets() {
   const [editTarget, setEditTarget] = useState<LiveSpreadsheet | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<LiveSpreadsheet | null>(null);
 
-  const { data: me } = useQuery<any>({ queryKey: ["/api/auth/me"] });
+  const { data: me } = useQuery<unknown>({ queryKey: ["/api/auth/me"] });
   const isAdmin = me?.role === "Admin" || me?.role === "Owner" || me?.role === "Developer";
 
   const { data: sheets = [], isLoading } = useQuery<LiveSpreadsheet[]>({

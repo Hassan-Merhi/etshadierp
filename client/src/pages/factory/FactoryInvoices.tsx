@@ -118,7 +118,7 @@ export default function FactoryInvoices() {
     [toast]
   );
 
-  const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 5 * 60000 });
+  const { data: myAccess } = useQuery<unknown>({ queryKey: ["/api/factory/my-access"], staleTime: 5 * 60000 });
   const isAdmin = myAccess?.fullAccess === true;
   const hidden: string[] = myAccess?.hiddenCostFields ?? [];
   const hideProformaCol = !isAdmin || hidden.includes("hide_invoicing_proforma_col");

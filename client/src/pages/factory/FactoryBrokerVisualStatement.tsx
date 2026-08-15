@@ -16,8 +16,8 @@ import { FileText, TrendingUp, CreditCard, DollarSign } from "lucide-react";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const DISPLAY_CURRENCIES = ["EUR", "AUD", "USD"] as const;
-type DisplayCcy = (typeof DISPLAY_CURRENCIES)[number];
+const _DISPLAY_CURRENCIES = ["EUR", "AUD", "USD"] as const;
+type _DisplayCcy = (typeof DISPLAY_CURRENCIES)[number];
 
 function fmt(n: number, decimals = 2) {
   if (!n || n === 0) return "";
@@ -73,7 +73,7 @@ export default function FactoryBrokerVisualStatement() {
     data: statement,
     isLoading,
     error,
-  } = useQuery<any>({
+  } = useQuery<unknown>({
     queryKey: ["/api/factory/suppliers", brokerId, "broker-visual-statement", from, to],
     queryFn: async () => {
       const qs = queryParams ? `?${queryParams}` : "";

@@ -8,7 +8,7 @@ import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { pool } from "../../db";
 
-export function registerSupplierProfitPoOverrideRoutes(app: Express, requireAuth: any) {
+export function registerSupplierProfitPoOverrideRoutes(app: Express, requireAuth: unknown) {
   app.get("/api/supplier-profit-check/po-overrides", requireAuth, async (req: Request, res: Response) => {
     try {
       const supplierId = parseInt(req.query.supplierId as string);

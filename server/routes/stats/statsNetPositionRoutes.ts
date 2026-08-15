@@ -115,7 +115,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
       const accountsForClassify = isSupplierPartner
         ? companyAccounts.filter((a) => a.accountType === "Cash" || a.subType === "sp_payable")
         : companyAccounts.filter(
-            (a: any) =>
+            (a: unknown) =>
               a.subType !== "sp_stock" &&
               a.subType !== "sp_cost_clearing" &&
               !(a.accountType === "Liability" && (a.name as string)?.startsWith("Insurance"))
@@ -174,7 +174,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
       // Factory workers live in factory_workers / factory_worker_advances tables, not employees.
       // Remove the "Factory Worker Advances" ledger account (replaced by table sum below).
       const fwaLedgerIdx2 = forUsAccounts.findIndex(
-        (a: any) => (a.name || "").toLowerCase() === "factory worker advances"
+        (a: unknown) => (a.name || "").toLowerCase() === "factory worker advances"
       );
       if (fwaLedgerIdx2 !== -1) {
         forUsTotal = round2(forUsTotal - forUsAccounts[fwaLedgerIdx2].value);
@@ -288,14 +288,14 @@ export function registerStatsNetPositionRoutes(app: Express) {
       // ── Sheet 1: Summary ──────────────────────────────────────────────────
       // ── Merge stock accounts into one combined Inventory line (Excel) ────────
       {
-        const isStockEntry = (a: any) => {
+        const isStockEntry = (a: unknown) => {
           const nl = (a.name || "").toLowerCase();
           const cat = (a.category || "").toLowerCase();
           return cat === "inventory" || nl.includes("stock in hand") || nl.includes("stock on floor");
         };
         const stockEntries = forUsAccounts.filter(isStockEntry);
         if (stockEntries.length > 1) {
-          const combined = round2(stockEntries.reduce((s: number, a: any) => s + (a.value || 0), 0));
+          const combined = round2(stockEntries.reduce((s: number, a: unknown) => s + (a.value || 0), 0));
           for (let i = forUsAccounts.length - 1; i >= 0; i--) {
             if (isStockEntry(forUsAccounts[i])) forUsAccounts.splice(i, 1);
           }
@@ -319,7 +319,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
         { key: "note", width: 40 },
       ];
 
-      const addTitle = (ws: any, text: string, argb: string) => {
+      const addTitle = (ws: unknown, text: string, argb: string) => {
         const row = ws.addRow([text]);
         row.height = 28;
         const cell = row.getCell(1);
@@ -329,7 +329,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
         ws.mergeCells(`A${row.number}:C${row.number}`);
       };
 
-      const addSubheader = (ws: any, text: string, argb: string) => {
+      const addSubheader = (ws: unknown, text: string, argb: string) => {
         const row = ws.addRow([text]);
         row.height = 18;
         const cell = row.getCell(1);
@@ -366,7 +366,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
       // Summary table
       const sumHeaders = ws1.addRow(["Category", "Amount (USD)", "Notes"]);
       sumHeaders.height = 18;
-      sumHeaders.eachCell((cell: any) => {
+      sumHeaders.eachCell((cell: unknown) => {
         cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: DARK_NAVY } };
         cell.alignment = { horizontal: "center" };
@@ -419,7 +419,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
       for (const a of forUsAccounts)
         assetCatMap[a.category || "Other"] = (assetCatMap[a.category || "Other"] || 0) + a.value;
       const catHdr = ws1.addRow(["Category", "Total (USD)", ""]);
-      catHdr.eachCell((cell: any) => {
+      catHdr.eachCell((cell: unknown) => {
         cell.font = { bold: true };
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD9EAD3" } };
       });
@@ -428,7 +428,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
         .forEach(([cat, val], i) => {
           const r = ws1.addRow([cat, currency(round2(val)), ""]);
           if (i % 2 === 1)
-            r.eachCell((c: any) => {
+            r.eachCell((c: unknown) => {
               c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ALT_ROW } };
             });
           r.getCell(2).alignment = { horizontal: "right" };
@@ -442,7 +442,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
       for (const a of onUsAccounts)
         liabCatMap[a.category || "Other"] = (liabCatMap[a.category || "Other"] || 0) + a.value;
       const liabHdr = ws1.addRow(["Category", "Total (USD)", ""]);
-      liabHdr.eachCell((cell: any) => {
+      liabHdr.eachCell((cell: unknown) => {
         cell.font = { bold: true };
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF4CCCC" } };
       });
@@ -451,7 +451,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
         .forEach(([cat, val], i) => {
           const r = ws1.addRow([cat, currency(round2(val)), ""]);
           if (i % 2 === 1)
-            r.eachCell((c: any) => {
+            r.eachCell((c: unknown) => {
               c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ALT_ROW } };
             });
           r.getCell(2).alignment = { horizontal: "right" };
@@ -467,7 +467,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
       ];
       const ws2Hdr = ws2.getRow(1);
       ws2Hdr.height = 20;
-      ws2Hdr.eachCell((cell: any) => {
+      ws2Hdr.eachCell((cell: unknown) => {
         cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: DARK_GREEN } };
         cell.alignment = { vertical: "middle", horizontal: "center" };
@@ -492,14 +492,14 @@ export function registerStatsNetPositionRoutes(app: Express) {
         r.getCell("value").numFmt = NUM_FMT;
         r.getCell("value").alignment = { horizontal: "right" };
         if (i % 2 === 1)
-          r.eachCell((c: any) => {
+          r.eachCell((c: unknown) => {
             c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ALT_ROW } };
           });
       });
 
       // Total row
       const assetTotalRow = ws2.addRow({ name: "TOTAL", code: "", category: "", value: round2(forUsTotal) });
-      assetTotalRow.eachCell((c: any) => {
+      assetTotalRow.eachCell((c: unknown) => {
         c.font = { bold: true, color: { argb: DARK_GREEN } };
         c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_GREEN } };
       });
@@ -522,7 +522,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
       ws3Title.height = 24;
       const ws3Hdr = ws3.getRow(2);
       ws3Hdr.height = 20;
-      ws3Hdr.eachCell((cell: any) => {
+      ws3Hdr.eachCell((cell: unknown) => {
         cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: DARK_RED } };
         cell.alignment = { vertical: "middle", horizontal: "center" };
@@ -539,13 +539,13 @@ export function registerStatsNetPositionRoutes(app: Express) {
         r.getCell("value").numFmt = NUM_FMT;
         r.getCell("value").alignment = { horizontal: "right" };
         if (i % 2 === 1)
-          r.eachCell((c: any) => {
+          r.eachCell((c: unknown) => {
             c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ALT_ROW } };
           });
       });
 
       const liabTotalRow = ws3.addRow({ name: "TOTAL", code: "", category: "", value: round2(onUsTotal) });
-      liabTotalRow.eachCell((c: any) => {
+      liabTotalRow.eachCell((c: unknown) => {
         c.font = { bold: true, color: { argb: DARK_RED } };
         c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_RED } };
       });

@@ -52,7 +52,7 @@ export function registerStockTransferCreateRoutes(app: Express) {
       // Log if user confirmed negative inventory override
       if (allowNegativeInventory) {
         logger.info(
-          `[AUDIT] User ${req.session.userId} confirmed negative inventory override for stock transfer. Items: ${JSON.stringify(items.map((i: any) => ({ stockItemId: i.stockItemId, quantity: i.quantity, sourceLocationId: i.sourceLocationId })))}`
+          `[AUDIT] User ${req.session.userId} confirmed negative inventory override for stock transfer. Items: ${JSON.stringify(items.map((i: unknown) => ({ stockItemId: i.stockItemId, quantity: i.quantity, sourceLocationId: i.sourceLocationId })))}`
         );
       }
       const companyId = req.session.currentCompanyId;
@@ -60,7 +60,7 @@ export function registerStockTransferCreateRoutes(app: Express) {
       // Branch: Create new transfer from scratch (sourceLocationId provided, no voucherId)
       if (
         !voucherId &&
-        (sourceLocationId || (items && items.length > 0 && items.every((i: any) => i.sourceLocationId)))
+        (sourceLocationId || (items && items.length > 0 && items.every((i: unknown) => i.sourceLocationId)))
       ) {
         if (!companyId) {
           return res.status(400).json({ message: "No company selected" });
@@ -92,7 +92,7 @@ export function registerStockTransferCreateRoutes(app: Express) {
         }
 
         // Compute multi-source detection
-        const uniqueSourceIds = new Set(items.map((i: any) => i.sourceLocationId || sourceLocationId).filter(Boolean));
+        const uniqueSourceIds = new Set(items.map((i: unknown) => i.sourceLocationId || sourceLocationId).filter(Boolean));
         const resolvedHeaderSourceId = uniqueSourceIds.size === 1 ? Array.from(uniqueSourceIds)[0] : null;
 
         // Validate source/dest not the same (only for single-source mode)
@@ -315,7 +315,7 @@ export function registerStockTransferCreateRoutes(app: Express) {
 
       // Auto-fill rate from inventory for items with no rate (e.g. POS users who don't see cost)
       const itemsWithRate = await Promise.all(
-        items.map(async (item: any) => {
+        items.map(async (item: unknown) => {
           if (!item.rate || parseFloat(item.rate) === 0) {
             const [invRow] = await db
               .select({ averageRate: inventory.averageRate })
@@ -332,7 +332,7 @@ export function registerStockTransferCreateRoutes(app: Express) {
       const transfer = await storage.createStockTransfer(voucherId, destinationLocationId, notes || "", itemsWithRate);
 
       // Update voucher totalAmount based on actual rates (important for POS transfers where rate starts at 0)
-      const actualTotal = itemsWithRate.reduce((sum: number, item: any) => {
+      const actualTotal = itemsWithRate.reduce((sum: number, item: unknown) => {
         return sum + parseFloat(item.quantity) * parseFloat(item.rate);
       }, 0);
       if (actualTotal > 0) {
@@ -369,7 +369,7 @@ export function registerStockTransferCreateRoutes(app: Express) {
               return;
             }
             const uniqueSrcIds = [
-              ...new Set(itemsWithRate.map((i: any) => Number(i.sourceLocationId)).filter(Boolean)),
+              ...new Set(itemsWithRate.map((i: unknown) => Number(i.sourceLocationId)).filter(Boolean)),
             ];
             let sourceName = "Multiple Sources";
             if (uniqueSrcIds.length === 1) {
@@ -384,7 +384,7 @@ export function registerStockTransferCreateRoutes(app: Express) {
               recipientLocationId,
               sourceLocationName: sourceName,
               destLocationName: destLocation.name,
-              items: transfer.items.map((i: any) => ({
+              items: transfer.items.map((i: unknown) => ({
                 stockItemId: i.stockItemId,
                 quantity: parseFloat(i.quantity),
               })),

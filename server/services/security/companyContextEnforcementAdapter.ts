@@ -43,7 +43,7 @@ function assertionValues(req: Request, fields: string[]): number[] {
 }
 
 export function decideExplicitCompanyContext(
-  session: any,
+  session: unknown,
   requestAssertions: number[] = [],
   includeLegacyFactorySessionAssertion = true
 ): CompanyContextDecision {
@@ -76,7 +76,7 @@ export function decideExplicitCompanyContext(
  * assertions must always match the company selected by the route policy.
  */
 export function decideRouteCompanyContext(
-  session: any,
+  session: unknown,
   path: string,
   requestAssertions: number[] = [],
   includeLegacyFactorySessionAssertion = true

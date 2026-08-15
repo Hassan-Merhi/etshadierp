@@ -105,7 +105,7 @@ export function registerPayrollMarkPaidRoutes(app: Express) {
         ? await findOrCreateLedger(companyId, "Payroll Payable", "Liability")
         : null;
 
-      const updated = await db.transaction(async (tx: any) => {
+      const updated = await db.transaction(async (tx: unknown) => {
         const [payroll] = await tx
           .update(factoryPayrolls)
           .set({ status: "PAID", paidAt: new Date(paymentDate), cashAccountId })
@@ -244,7 +244,7 @@ export function registerPayrollMarkPaidRoutes(app: Express) {
       if (!pendingGuard.ok) return res.status(pendingGuard.status).json(pendingGuard);
 
       const payableAccBulk = cashId ? await findOrCreateLedger(companyId, "Payroll Payable", "Liability") : null;
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx: unknown) => {
         const payrollsToMark = await tx
           .select()
           .from(factoryPayrolls)
@@ -255,12 +255,12 @@ export function registerPayrollMarkPaidRoutes(app: Express) {
           .set({ status: "PAID", paidAt: new Date(bulkPrToday), cashAccountId: cashId })
           .where(and(eq(factoryPayrolls.companyId, companyId), inArray(factoryPayrolls.id, normalizedIds)));
 
-        const workerIds = Array.from(new Set<number>(payrollsToMark.map((payroll: any) => payroll.workerId)));
+        const workerIds = Array.from(new Set<number>(payrollsToMark.map((payroll: unknown) => payroll.workerId)));
         const workerRows = await tx
           .select({ id: factoryWorkers.id, fullName: factoryWorkers.fullName })
           .from(factoryWorkers)
           .where(inArray(factoryWorkers.id, workerIds));
-        const workerMap = new Map(workerRows.map((worker: any) => [worker.id, worker.fullName]));
+        const workerMap = new Map(workerRows.map((worker: unknown) => [worker.id, worker.fullName]));
 
         for (const payroll of payrollsToMark) {
           if (cashId && payableAccBulk) {

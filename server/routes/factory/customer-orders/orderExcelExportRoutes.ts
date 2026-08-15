@@ -96,8 +96,8 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
   const { orderId, companyId, hideSelling, noCharges } = params;
 
   // Sanitize helpers — used throughout to prevent NaN/null/undefined reaching ExcelJS cells.
-  const safeStr = (v: any): string => (v == null ? "" : String(v));
-  const safeNum = (v: any): number => {
+  const safeStr = (v: unknown): string => (v == null ? "" : String(v));
+  const safeNum = (v: unknown): number => {
     const n = Number(v);
     return isFinite(n) ? n : 0;
   };
@@ -130,16 +130,16 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
       // Failure here is non-fatal and the surrounding flow continues deliberately.
     }
   };
-  const setFill = (cell: any, argb: string) => {
+  const setFill = (cell: unknown, argb: string) => {
     try {
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb } };
     } catch {
       // Failure here is non-fatal and the surrounding flow continues deliberately.
     }
   };
-  const setBorder = (row: any) => {
+  const setBorder = (row: unknown) => {
     try {
-      row.eachCell((cell: any) => {
+      row.eachCell((cell: unknown) => {
         cell.border = {
           top: { style: "thin", color: { argb: "FFDDDDDD" } },
           bottom: { style: "thin", color: { argb: "FFDDDDDD" } },
@@ -239,7 +239,7 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
   ]);
   hdrRow.height = 24;
   try {
-    hdrRow.eachCell((cell: any) => {
+    hdrRow.eachCell((cell: unknown) => {
       cell.font = { bold: true, color: { argb: WHITE }, size: 11 };
       setFill(cell, DARK_BLUE);
       cell.alignment = { horizontal: "center", vertical: "middle" };
@@ -287,11 +287,11 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
     const dr = sheet.addRow(rowCells);
     dr.height = 20;
     try {
-      dr.eachCell((cell: any) => {
+      dr.eachCell((cell: unknown) => {
         cell.font = { size: 11 };
       });
       if (idx % 2 === 1) {
-        dr.eachCell((cell: any) => setFill(cell, LIGHT_GRAY));
+        dr.eachCell((cell: unknown) => setFill(cell, LIGHT_GRAY));
       }
       dr.getCell(1).alignment = { horizontal: "center" };
       dr.getCell(4).alignment = { horizontal: "right" };
@@ -316,7 +316,7 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
   const totRow = sheet.addRow(totRowCells);
   totRow.height = 22;
   try {
-    totRow.eachCell((cell: any) => {
+    totRow.eachCell((cell: unknown) => {
       cell.font = { bold: true, size: 11, color: { argb: WHITE } };
       setFill(cell, DARK_BLUE);
       cell.alignment = { horizontal: "right" };
@@ -447,7 +447,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
       const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
 
       const baleLinks = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
-      const baleIds = baleLinks.map((b: any) => b.baleId).filter(Boolean);
+      const baleIds = baleLinks.map((b: unknown) => b.baleId).filter(Boolean);
       const baleRows: unknown[] =
         baleIds.length > 0 ? await db.select().from(factoryBales).where(inArray(factoryBales.id, baleIds)) : [];
       const orderCharges = await db
@@ -455,7 +455,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
         .from(customerOrderCharges)
         .where(eq(customerOrderCharges.orderId, orderId));
 
-      const productIds = [...new Set(baleRows.map((b: any) => b.productId).filter((id: any) => id != null))];
+      const productIds = [...new Set(baleRows.map((b: unknown) => b.productId).filter((id: unknown) => id != null))];
       const productRecords: unknown[] =
         productIds.length > 0
           ? await db
@@ -463,9 +463,9 @@ export function registerOrderExcelExportRoutes(app: Express) {
               .from(factoryBaleProducts)
               .where(inArray(factoryBaleProducts.id, productIds as number[]))
           : [];
-      const productMap = new Map<number, any>(productRecords.map((p: any) => [p.id, p]));
+      const productMap = new Map<number, unknown>(productRecords.map((p: unknown) => [p.id, p]));
       const balePriceMap = new Map<number, number>(
-        baleLinks.map((l: any) => [l.baleId, parseFloat(l.priceUsed || "0")])
+        baleLinks.map((l: unknown) => [l.baleId, parseFloat(l.priceUsed || "0")])
       );
 
       // Also read order lines for pricing mode metadata
@@ -545,7 +545,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
           pricingMode: g.pricingMode,
           pricePerKg: g.pricePerKg,
         })),
-        charges: orderCharges.map((ch: any) => ({
+        charges: orderCharges.map((ch: unknown) => ({
           name: ch.name ?? null,
           amount: ch.amount ?? null,
           chargeType: ch.chargeType || "",
@@ -629,7 +629,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
       const rawLines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
 
       // Canonical product names from factoryBaleProducts
-      const articleCodes = [...new Set(rawLines.map((l: any) => l.articleCode).filter(Boolean))];
+      const articleCodes = [...new Set(rawLines.map((l: unknown) => l.articleCode).filter(Boolean))];
       const productNameMap = new Map<string, string>();
       const wtPerBaleMap = new Map<string, number>();
       if (articleCodes.length > 0) {
@@ -652,7 +652,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
       }
 
       const lines = rawLines
-        .map((l: any) => ({
+        .map((l: unknown) => ({
           articleCode: l.articleCode || "",
           productName: productNameMap.get(l.articleCode) || l.baleName || l.articleCode || "",
           qty: parseInt(l.qty || "0"),
@@ -663,7 +663,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
           pricingMode: (l.pricingMode as string) || "per_bale",
           pricePerKg: parseFloat(l.pricePerKg || "0"),
         }))
-        .sort((a: any, b: any) => a.articleCode.localeCompare(b.articleCode));
+        .sort((a: unknown, b: unknown) => a.articleCode.localeCompare(b.articleCode));
 
       const fileName = buildExportFilename([order.containerNumber, order.customerName, order.destination], "xlsx");
       const xlsBuffer = await buildInvoiceWorkbookBuffer({
@@ -674,7 +674,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
         containerNumber: order.containerNumber ?? null,
         customerName: order.customerName ?? null,
         baseCurrency: company?.baseCurrency || "USD",
-        lines: lines.map((l: any) => ({
+        lines: lines.map((l: unknown) => ({
           articleCode: l.articleCode,
           productName: l.productName,
           qty: l.qty,
@@ -685,7 +685,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
           pricingMode: l.pricingMode,
           pricePerKg: l.pricePerKg,
         })),
-        charges: orderCharges2.map((ch: any) => ({
+        charges: orderCharges2.map((ch: unknown) => ({
           name: ch.name ?? null,
           amount: ch.amount ?? null,
           chargeType: ch.chargeType || "",

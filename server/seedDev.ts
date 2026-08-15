@@ -105,7 +105,7 @@ export async function runDevSeed() {
         VALUES (${COMPANY_ID}, ${batchId}, ${LOCATION_ID}, ${baleCode}, ${barcodeValue}, ${pieces}, ${weightKg}, ${costPerKg}, ${totalCost}, 'LABEL_PRINTED', ${createdAt}, ${createdAt})
         RETURNING *
       `);
-      const bale = result.rows[0] as any;
+      const bale = result.rows[0] as unknown;
       createdBales.push({ ...bale, product });
     } catch (e: unknown) {
       if (getErrorMessage(e)?.includes("duplicate")) continue;

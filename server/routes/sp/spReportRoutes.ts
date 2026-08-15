@@ -30,7 +30,7 @@ export function registerSpReportRoutes(app: Express) {
 
       const entries = resultRows(rows);
       let runningBalance = 0;
-      const movements = entries.map((e: any) => {
+      const movements = entries.map((e: unknown) => {
         const credit = parseNum(e.credit_amount);
         const debit = parseNum(e.debit_amount);
         runningBalance += credit - debit;
@@ -70,8 +70,8 @@ export function registerSpReportRoutes(app: Express) {
         LIMIT 1
       `);
       const settingsRow = resultRows(settingsRows)[0];
-      const spPosProfitAccountId = settingsRow?.sp_pos_profit_account_id ?? null;
-      const spPosPayableAccountId = settingsRow?.sp_pos_payable_account_id ?? null;
+      const _spPosProfitAccountId = settingsRow?.sp_pos_profit_account_id ?? null;
+      const _spPosPayableAccountId = settingsRow?.sp_pos_payable_account_id ?? null;
 
       let totalRevenue = 0;
       let totalCogs = 0;
@@ -151,7 +151,7 @@ export function registerSpReportRoutes(app: Express) {
         .orderBy(asc(spStockMovements.articleCode));
 
       // Group by articleCode
-      const groups = new Map<string, any>();
+      const groups = new Map<string, unknown>();
       for (const m of movements) {
         const key = m.articleCode;
         if (!groups.has(key)) {
@@ -245,10 +245,10 @@ export function registerSpReportRoutes(app: Express) {
 
       const salesArr = resultRows(salesRows);
       const stockArr = resultRows<{ article_code: string }>(stockRows);
-      const stockMap = new Map<string, any>();
+      const stockMap = new Map<string, unknown>();
       for (const s of stockArr) stockMap.set(s.article_code, s);
 
-      const rows = salesArr.map((r: any) => {
+      const rows = salesArr.map((r: unknown) => {
         const stk = stockMap.get(r.article_code) || {};
         const soldQty = parseNum(r.sold_qty);
         const salesTotal = parseNum(r.sales_total);

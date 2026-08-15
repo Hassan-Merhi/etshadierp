@@ -8,7 +8,7 @@ interface AdjEntry {
   amount: number;
   type: string;
 }
-interface ReplaceTarget {
+interface _ReplaceTarget {
   id: number;
   containerNumber: string;
   dutyFee: number;
@@ -38,7 +38,7 @@ export async function sendAgentCardToWhatsApp(params: SendAgentDutyWaParams): Pr
 
     const agentName = agent.agentName;
     const ledgerBalance = agent.ledgerBalance;
-    const openBalance = agent.openBalance;
+    const _openBalance = agent.openBalance;
     const hasBalance = ledgerBalance !== null;
     const activePreviewRows = agent.activePreviewRows.filter((r) => !!(r.numberPlate ?? "").trim());
     const cbClearedRows = agent.clearedRows as ApiAllocatedRow[];
@@ -84,13 +84,13 @@ export async function sendAgentCardToWhatsApp(params: SendAgentDutyWaParams): Pr
     const displayBal = ledgerBalance ?? waOpenSum;
     const adjustedBal = displayBal;
     const adjIsDebit = adjustedBal >= 0;
-    const waMismatch = hasAdj && Math.abs(adjustedBal - waOpenSum) > 0.01;
+    const _waMismatch = hasAdj && Math.abs(adjustedBal - waOpenSum) > 0.01;
     const isReconciledWa = hasAdj && hasBalance && Math.abs(adjustedBal) <= 0.01;
 
     const waPrepaidSet = new Set<number>(dbPrepaidIds);
     const waPrepaidRows = activePreviewRows.filter((r) => waPrepaidSet.has(r.id));
     const waRemainingRows = activePreviewRows.filter((r) => !waPrepaidSet.has(r.id));
-    const designatedPrepaidSum = waPrepaidRows.reduce((s: number, r: any) => s + Number(r.dutyFee ?? 0), 0);
+    const designatedPrepaidSum = waPrepaidRows.reduce((s: number, r: unknown) => s + Number(r.dutyFee ?? 0), 0);
     const waPrepaidBudget = Math.max(0, ledgerBalance ?? 0);
     const minOpenRem =
       cbAllOpenPartial.length > 0
@@ -220,9 +220,9 @@ export async function sendAgentCardToWhatsApp(params: SendAgentDutyWaParams): Pr
       ? waRemainingRows.filter((r) => r.transporter === transitTransporterFilter)
       : waRemainingRows;
     if (waTransitRows.length > 0) {
-      const transitTotal = waTransitRows.reduce((s: number, r: any) => s + r.dutyFee, 0);
+      const transitTotal = waTransitRows.reduce((s: number, r: unknown) => s + r.dutyFee, 0);
       let transitRowsHtml = "";
-      const sortedWaTransitRows = [...waTransitRows].sort((a: any, b: any) => {
+      const sortedWaTransitRows = [...waTransitRows].sort((a: unknown, b: unknown) => {
         const tA = (a.transporter ?? "").toLowerCase(),
           tB = (b.transporter ?? "").toLowerCase();
         if (tA !== tB) return tA < tB ? -1 : 1;

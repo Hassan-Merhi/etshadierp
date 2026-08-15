@@ -104,14 +104,14 @@ export function registerCoreAuthRoutes(app: Express) {
         req.session.daybookEditDays = firstCompany.daybookEditDays;
         req.session.canAccessCustomers = firstCompany.canAccessCustomers;
         req.session.canDeleteRecords = firstCompany.canDeleteRecords;
-        req.session.currentCompanyName = (firstCompany as any).companyName || null;
+        req.session.currentCompanyName = (firstCompany as unknown).companyName || null;
       }
 
       const clientIp =
         (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
       const userAgentStr = req.headers["user-agent"] || "unknown";
       const loginCompanyId = userCompanies.length > 0 ? userCompanies[0].companyId : null;
-      const loginCompanyName = userCompanies.length > 0 ? (userCompanies[0] as any).companyName : null;
+      const loginCompanyName = userCompanies.length > 0 ? (userCompanies[0] as unknown).companyName : null;
 
       void (async () => {
         try {

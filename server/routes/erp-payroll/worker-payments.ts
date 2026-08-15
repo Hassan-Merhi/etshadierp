@@ -139,7 +139,7 @@ export function registerPayrollWorkerPaymentRoutes(app: Express) {
       }
 
       // Calculate total amount
-      const totalAmount = payments.reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+      const totalAmount = payments.reduce((sum: number, p: unknown) => sum + parseFloat(p.amount), 0);
 
       // Create single voucher for all payments
       const voucherNumber = `SAL-BULK-${Date.now()}`;
@@ -194,7 +194,7 @@ export function registerPayrollWorkerPaymentRoutes(app: Express) {
       }
 
       // Create credit entry for bank/cash account
-      const creditEntry: any = {
+      const creditEntry: unknown = {
         voucherId: voucher.id,
         debitAmount: "0",
         creditAmount: totalAmount.toFixed(2),

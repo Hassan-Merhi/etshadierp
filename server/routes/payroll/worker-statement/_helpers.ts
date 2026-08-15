@@ -18,7 +18,7 @@ export function getFactoryCompanyId(req: import("express").Request): number | un
 
 /** Write a single daybook entry (factory audit log). */
 export async function writeDaybookEntry(
-  dbOrTx: any,
+  dbOrTx: unknown,
   opts: {
     companyId: number;
     txDate: string;

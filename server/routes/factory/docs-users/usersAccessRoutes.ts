@@ -106,7 +106,7 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
         return res.status(400).json({ message: "Username already exists" });
       }
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx: unknown) => {
         const hashedPassword = await bcrypt.hash(password, 10);
         const [newUser] = await tx
           .insert(users)
@@ -177,8 +177,8 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
         username,
       } = req.body;
 
-      await db.transaction(async (tx: any) => {
-        const userUpdates: any = {};
+      await db.transaction(async (tx: unknown) => {
+        const userUpdates: unknown = {};
         if (password && password.length >= 4) {
           userUpdates.password = await bcrypt.hash(password, 10);
         }
@@ -196,7 +196,7 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
           await tx.update(users).set(userUpdates).where(eq(users.id, userId));
         }
 
-        const profileUpdates: any = { updatedAt: new Date() };
+        const profileUpdates: unknown = { updatedAt: new Date() };
         if (displayName !== undefined) profileUpdates.displayName = displayName;
         if (hasErpAccess !== undefined) profileUpdates.hasErpAccess = hasErpAccess;
         if (hasFactoryAccess !== undefined) profileUpdates.hasFactoryAccess = hasFactoryAccess;
@@ -262,7 +262,7 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
       if (userId === sessionUserId) {
         return res.status(400).json({ message: "You cannot delete your own account" });
       }
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx: unknown) => {
         await tx.delete(factoryUserPageAccess).where(eq(factoryUserPageAccess.userId, userId));
         await tx.delete(factoryUserProfiles).where(eq(factoryUserProfiles.userId, userId));
         await tx.delete(userCompanyRoles).where(eq(userCompanyRoles.userId, userId));

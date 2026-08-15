@@ -102,7 +102,7 @@ export function registerRawStockContainerRoutes(app: Express) {
       // offload mutations from racing this route. All financial writes (duty fields,
       // financials, cascade, daybook) are inside one transaction — a partial failure
       // rolls everything back.
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx: unknown) => {
         // 1. Lock container FOR UPDATE — authoritative source for all reads below.
         const [lockedContainer] = await tx
           .select()
@@ -135,7 +135,7 @@ export function registerRawStockContainerRoutes(app: Express) {
               eq(factoryContainerCommissions.companyId, companyId)
             )
           );
-        const commissionRecord = commissionRows.sort((a: any, b: any) => b.id - a.id)[0] || null;
+        const commissionRecord = commissionRows.sort((a: unknown, b: unknown) => b.id - a.id)[0] || null;
 
         // 3. Build in-memory snapshot with the confirmed duty so the helper sees the
         //    correct, complete cost picture without a second round-trip.
@@ -230,7 +230,7 @@ export function registerRawStockContainerRoutes(app: Express) {
         return res.status(400).json({ message: "At least one charge is required" });
       }
 
-      const validCharges = charges.filter((c: any) => parseFloat(c.amount || "0") > 0);
+      const validCharges = charges.filter((c: unknown) => parseFloat(c.amount || "0") > 0);
       if (validCharges.length === 0) {
         return res.status(400).json({ message: "All charge amounts are zero" });
       }
@@ -325,7 +325,7 @@ export function registerRawStockContainerRoutes(app: Express) {
       const oldContainerCostPerKgUsd = parseFloat(container.ratePerKgUsd || "0");
       const oldContainerTotalUsd = parseFloat(container.finalPayableAmountUsd || "0");
 
-      let lastResult: any = null;
+      let lastResult: unknown = null;
       const allCascadeResults: unknown[] = [];
 
       await db.transaction(async (tx) => {
@@ -396,7 +396,7 @@ export function registerRawStockContainerRoutes(app: Express) {
         supplierLockedRateOldExact: r.supplierLockedRateBefore,
         supplierLockedRateNewExact: r.supplierLockedRateAfter,
         rawStockRateWasStale: false,
-        affectedBatches: (cascadeResult?.affectedBatches ?? []).map((b: any) => ({
+        affectedBatches: (cascadeResult?.affectedBatches ?? []).map((b: unknown) => ({
           batchId: b.batchId,
           batchCode: b.batchCode,
           status: b.status ?? null,
@@ -528,7 +528,7 @@ export function registerRawStockContainerRoutes(app: Express) {
         }
 
         const userId = String(req.session.userId || req.user?.id || "system");
-        let mutResult: any;
+        let mutResult: unknown;
 
         try {
           await db.transaction(async (tx) => {
@@ -565,7 +565,7 @@ export function registerRawStockContainerRoutes(app: Express) {
           ...mutResult,
           supplierLockedRateOldExact: mutResult.supplierLockedRateBefore,
           supplierLockedRateNewExact: mutResult.supplierLockedRateAfter,
-          affectedBatches: (mutResult.cascadeResult?.affectedBatches ?? []).map((b: any) => ({
+          affectedBatches: (mutResult.cascadeResult?.affectedBatches ?? []).map((b: unknown) => ({
             batchId: b.batchId,
             batchCode: b.batchCode,
             status: b.status ?? null,
@@ -608,7 +608,7 @@ export function registerRawStockContainerRoutes(app: Express) {
 
         const txDate = undoDate || getClientDate(req);
         const userId = String(req.session.userId || req.user?.id || "system");
-        let mutResult: any;
+        let mutResult: unknown;
 
         try {
           await db.transaction(async (tx) => {
@@ -638,7 +638,7 @@ export function registerRawStockContainerRoutes(app: Express) {
           ...mutResult,
           supplierLockedRateOldExact: mutResult.supplierLockedRateBefore,
           supplierLockedRateNewExact: mutResult.supplierLockedRateAfter,
-          affectedBatches: (mutResult.cascadeResult?.affectedBatches ?? []).map((b: any) => ({
+          affectedBatches: (mutResult.cascadeResult?.affectedBatches ?? []).map((b: unknown) => ({
             batchId: b.batchId,
             batchCode: b.batchCode,
             status: b.status ?? null,
@@ -683,7 +683,7 @@ export function registerRawStockContainerRoutes(app: Express) {
         if (!container) return res.status(404).json({ message: "Container not found" });
 
         const userId = String(req.session.userId || req.user?.id || "system");
-        let mutResult: any;
+        let mutResult: unknown;
 
         try {
           await db.transaction(async (tx) => {

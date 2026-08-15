@@ -8,10 +8,10 @@ import {
 } from "../../../../shared/schema";
 
 export async function resolveLegacyPostOffloadAccountingLinks(
-  tx: any,
+  tx: unknown,
   companyId: number,
   containerId: number,
-  chargeRow: any
+  chargeRow: unknown
 ) {
   let { daybookEntryId, voucherId } = chargeRow;
 
@@ -76,7 +76,7 @@ export async function resolveLegacyPostOffloadAccountingLinks(
  * (later containers offloaded, later active post-offload charges, later duty corrections).
  * Throws if a later event is found.
  */
-export async function assertNoLaterSupplierCostEvents(tx: any, companyId: number, supplierId: number, afterDate: Date) {
+export async function assertNoLaterSupplierCostEvents(tx: unknown, companyId: number, supplierId: number, afterDate: Date) {
   // 1. Later offloaded container
   const laterContainers = await tx
     .select({ id: factoryContainers.id, containerNumber: factoryContainers.containerNumber })
@@ -131,7 +131,7 @@ export async function updateContainerCost(tx: unknown, containerId: number, next
 }
 
 /** Capture supplier locked rate (FOR UPDATE lock). */
-export async function getSupplierRateForUpdate(tx: any, companyId: number, supplierId: number) {
+export async function getSupplierRateForUpdate(tx: unknown, companyId: number, supplierId: number) {
   const [row] = await tx
     .select({ rate: factorySuppliers.currentRawMaterialCostPerKgUsd })
     .from(factorySuppliers)

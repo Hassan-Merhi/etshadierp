@@ -53,7 +53,7 @@ export function registerSecurityPermissionRoutes(app: Express) {
       const actorUserId = req.session.userId;
       if (!companyId || !actorUserId) return res.status(403).json({ message: "Forbidden" });
       const permissions = normalizePermissionList(req.body?.permissions);
-      const saved = await db.transaction((tx: any) =>
+      const saved = await db.transaction((tx: unknown) =>
         replaceNamedPermissions(tx, {
           userId: req.params.userId,
           companyId,

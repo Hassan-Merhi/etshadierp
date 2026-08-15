@@ -62,11 +62,11 @@ export interface ReviewImmutableRevisionResult {
   totalAmount: string;
 }
 
-function rows<T = Record<string, unknown>>(result: any): T[] {
+function rows<T = Record<string, unknown>>(result: unknown): T[] {
   return (result?.rows ?? result ?? []) as T[];
 }
 
-function firstRow<T = Record<string, unknown>>(result: any): T | undefined {
+function firstRow<T = Record<string, unknown>>(result: unknown): T | undefined {
   return rows<T>(result)[0];
 }
 
@@ -77,13 +77,13 @@ function positiveInteger(value: unknown, label: string): number {
 }
 
 function lifecycleError(message: string, code: string): Error {
-  const error: any = new Error(message);
+  const error: unknown = new Error(message);
   error.code = code;
   return error;
 }
 
-async function lockTransfer(tx: any, transferId: number) {
-  return firstRow<any>(
+async function lockTransfer(tx: unknown, transferId: number) {
+  return firstRow<unknown>(
     await tx.execute(sql`
       SELECT
         stv.id,
@@ -108,7 +108,7 @@ async function lockTransfer(tx: any, transferId: number) {
   );
 }
 
-function assertTransfer(transfer: any, companyId: number): asserts transfer {
+function assertTransfer(transfer: unknown, companyId: number): asserts transfer {
   if (!transfer) throw new Error("Stock transfer not found");
   if (Number(transfer.company_id) !== companyId) {
     throw lifecycleError("Stock transfer belongs to a different company", "STOCK_TRANSFER_REVISION_SCOPE");
@@ -120,7 +120,7 @@ function assertTransfer(transfer: any, companyId: number): asserts transfer {
 }
 
 async function assertCompanyScope(
-  tx: any,
+  tx: unknown,
   companyId: number,
   destinationLocationId: number,
   items: Array<{ sourceLocationId: number; stockItemId: number }>
@@ -157,7 +157,7 @@ async function assertCompanyScope(
   }
 }
 
-async function assertSubmittedBaseline(tx: any, transferId: number, items: NormalizedImmutableRevisionItem[]) {
+async function assertSubmittedBaseline(tx: unknown, transferId: number, items: NormalizedImmutableRevisionItem[]) {
   const current = await tx.select().from(stockTransferItems).where(eq(stockTransferItems.transferId, transferId));
   for (const item of items) {
     const row = current.find(
@@ -166,7 +166,7 @@ async function assertSubmittedBaseline(tx: any, transferId: number, items: Norma
     );
     const currentQuantity = Number(row?.quantity ?? 0);
     if (Math.abs(currentQuantity - item.originalQuantity) > 0.001) {
-      const error: any = lifecycleError(
+      const error: unknown = lifecycleError(
         `Revision is stale for item ${item.stockItemId} at source ${item.sourceLocationId}. Expected ${item.originalQuantity}, current transfer quantity is ${currentQuantity}.`,
         "STOCK_TRANSFER_REVISION_STALE"
       );
@@ -208,7 +208,7 @@ export async function createImmutableStockTransferRevision(
     await assertSubmittedBaseline(tx, transferId, normalized);
 
     const previousPending = input.pending
-      ? rows<any>(
+      ? rows<unknown>(
           await tx.execute(sql`
             SELECT id, payload_hash
             FROM stock_transfer_revisions
@@ -240,7 +240,7 @@ export async function createImmutableStockTransferRevision(
         .where(and(inArray(stockTransferRevisions.id, previousIds), eq(stockTransferRevisions.status, "pending")));
     }
 
-    const maxRow = firstRow<any>(
+    const maxRow = firstRow<unknown>(
       await tx.execute(sql`
         SELECT COALESCE(MAX(revision_number), 0) AS max_revision
         FROM stock_transfer_revisions
@@ -250,7 +250,7 @@ export async function createImmutableStockTransferRevision(
     const revisionNumber = Number(maxRow?.max_revision ?? 0) + 1;
     const status: StockTransferRevisionStatus = input.pending ? "pending" : "approved";
 
-    const created = firstRow<any>(
+    const created = firstRow<unknown>(
       await tx.execute(sql`
         INSERT INTO stock_transfer_revisions (
           transfer_id,
@@ -338,8 +338,8 @@ export async function createImmutableStockTransferRevision(
  * collects one pending revision per submitter, and approving only the clicked
  * row would silently discard the others.
  */
-async function lockedPendingRevisions(tx: any, transferId: number) {
-  return rows<any>(
+async function lockedPendingRevisions(tx: unknown, transferId: number) {
+  return rows<unknown>(
     await tx.execute(sql`
       SELECT id, revision_number
       FROM stock_transfer_revisions
@@ -351,8 +351,8 @@ async function lockedPendingRevisions(tx: any, transferId: number) {
   ).map((revision) => ({ id: Number(revision.id), revisionNumber: Number(revision.revision_number) }));
 }
 
-async function lockedRevision(tx: any, revisionId: number) {
-  return firstRow<any>(
+async function lockedRevision(tx: unknown, revisionId: number) {
+  return firstRow<unknown>(
     await tx.execute(sql`
       SELECT
         revision.id AS revision_id,
@@ -494,7 +494,7 @@ export async function approveImmutableStockTransferRevision(
       const oldQuantity = Number(existing?.quantity ?? 0);
       const expectedQuantity = Number(item.originalQuantity);
       if (Math.abs(oldQuantity - expectedQuantity) > 0.001) {
-        const error: any = lifecycleError(
+        const error: unknown = lifecycleError(
           `Revision #${revisionNumbersById.get(item.revisionId) ?? revisionNumber} is stale for ${item.stockItemName}. Expected ${expectedQuantity}, current transfer quantity is ${oldQuantity}.`,
           "STOCK_TRANSFER_REVISION_STALE"
         );
@@ -542,7 +542,7 @@ export async function approveImmutableStockTransferRevision(
     if (inventoryApplied) {
       for (const change of changes) {
         if (change.delta > 0) {
-          const sourceInventory = firstRow<any>(
+          const sourceInventory = firstRow<unknown>(
             await tx.execute(sql`
               SELECT quantity
               FROM inventory
@@ -554,7 +554,7 @@ export async function approveImmutableStockTransferRevision(
           );
           const available = Number(sourceInventory?.quantity ?? 0);
           if (available + 1e-9 < change.delta) {
-            const error: any = lifecycleError(
+            const error: unknown = lifecycleError(
               `Insufficient stock for revision item ${change.stockItemId}: required ${change.delta}, available ${available}`,
               "STOCK_TRANSFER_INSUFFICIENT_STOCK"
             );
@@ -565,7 +565,7 @@ export async function approveImmutableStockTransferRevision(
             throw error;
           }
         } else if (change.delta < 0) {
-          const destinationInventory = firstRow<any>(
+          const destinationInventory = firstRow<unknown>(
             await tx.execute(sql`
               SELECT quantity
               FROM inventory
@@ -578,7 +578,7 @@ export async function approveImmutableStockTransferRevision(
           const required = Math.abs(change.delta);
           const available = Number(destinationInventory?.quantity ?? 0);
           if (available + 1e-9 < required) {
-            const error: any = lifecycleError(
+            const error: unknown = lifecycleError(
               `Destination stock is too low to reduce transfer item ${change.stockItemId}: required ${required}, available ${available}`,
               "STOCK_TRANSFER_DESTINATION_STOCK_CONFLICT"
             );
@@ -764,7 +764,7 @@ export async function resolveTransferIdByVoucher(
 ): Promise<number | null> {
   const companyId = positiveInteger(companyIdInput, "Company ID");
   const voucherId = positiveInteger(voucherIdInput, "Voucher ID");
-  const row = firstRow<any>(
+  const row = firstRow<unknown>(
     await db.execute(sql`
       SELECT transfer.id
       FROM stock_transfer_vouchers transfer
@@ -781,7 +781,7 @@ export async function resolveTransferIdByVoucher(
 export async function listImmutableStockTransferRevisions(companyIdInput: number, transferIdInput: number) {
   const companyId = positiveInteger(companyIdInput, "Company ID");
   const transferId = positiveInteger(transferIdInput, "Transfer ID");
-  const revisionRows = rows<any>(
+  const revisionRows = rows<unknown>(
     await db.execute(sql`
       SELECT
         revision.id,

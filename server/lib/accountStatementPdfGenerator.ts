@@ -344,7 +344,7 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
     const formatted = abs % 1 === 0 ? abs.toLocaleString("en") : abs.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     return currSym + formatted;
   };
-  const fmtDate = (s: any) => {
+  const fmtDate = (s: unknown) => {
     if (!s) return "";
     const str = typeof s === "string" ? s : s instanceof Date ? s.toISOString() : String(s);
     const d = new Date(str.split("T")[0] + "T00:00:00");
@@ -378,7 +378,7 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
   let convertArabic: ((t: string) => string) | null = null;
   let bidiInst: {
     getEmbeddingLevels: (t: string, d: string) => unknown;
-    getReorderedString: (t: string, l: any) => string;
+    getReorderedString: (t: string, l: unknown) => string;
   } | null = null;
   try {
     const reshaperMod = require("arabic-reshaper") as { convertArabic: (t: string) => string };

@@ -27,7 +27,7 @@ function getFactoryCompanyId(req: import("express").Request): number | undefined
 
 /** Write a single daybook entry (factory audit log). */
 async function writeDaybookEntry(
-  dbOrTx: any,
+  dbOrTx: unknown,
   opts: {
     companyId: number;
     txDate: string;
@@ -66,7 +66,7 @@ async function writeDaybookEntry(
 
 /** Find or create a ledger account by name for a company. Returns the account row.
  *  Skips soft-deleted accounts and handles race-condition unique-constraint failures. */
-async function findOrCreateLedger(companyId: number, name: string, accountType: string): Promise<{ id: number }> {
+async function _findOrCreateLedger(companyId: number, name: string, accountType: string): Promise<{ id: number }> {
   const [existing] = await db
     .select({ id: ledgerAccounts.id })
     .from(ledgerAccounts)
@@ -108,7 +108,7 @@ async function findOrCreateLedger(companyId: number, name: string, accountType: 
   throw new Error(`Unable to create ledger account "${name}" after multiple attempts`);
 }
 
-const workerUpload = multer({
+const _workerUpload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => {
       const dir = path.join(process.cwd(), "uploads", "workers");
@@ -122,7 +122,7 @@ const workerUpload = multer({
   }),
 });
 
-function computeMonthlyPay(salary: number, startStr: string, endStr: string): number {
+function _computeMonthlyPay(salary: number, startStr: string, endStr: string): number {
   const start = new Date(startStr + "T00:00:00");
   const end = new Date(endStr + "T00:00:00");
   let total = 0;
@@ -144,7 +144,7 @@ function computeMonthlyPay(salary: number, startStr: string, endStr: string): nu
 // Helper: Compute monthly pay from actual attendance records.
 // Monthly payroll uses attendance-based calculation (Present/Late = 1 day, Half Day = 0.5 day)
 // rather than calendar-day proration to match actual work performed.
-function computeMonthlyPayFromAttendance(baseSalary: number, periodStart: string, attendanceRows: unknown[]): number {
+function _computeMonthlyPayFromAttendance(baseSalary: number, periodStart: string, attendanceRows: unknown[]): number {
   const daysInMonth = (dateStr: string) => {
     const d = new Date(dateStr);
     return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
@@ -226,7 +226,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
       }
 
       let updatedCount = 0;
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx: unknown) => {
         for (const [workerId, advances] of advancesByWorker) {
           // Step 1: Reset each advance to its original amount minus manual repayments
           const balances: { id: number; bal: number }[] = [];
@@ -294,7 +294,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
 
       const today = getClientDate(req);
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx: unknown) => {
         const repayments = await tx
           .select()
           .from(factoryAdvanceRepayments)
@@ -303,7 +303,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
         if (repayments.length > 0) {
           // Delete ADVANCE_REPAYMENT daybook entries for these repayments before
           // removing the repayment records so orphaned daybook rows don't linger.
-          const repaymentIds = repayments.map((r: any) => r.id);
+          const repaymentIds = repayments.map((r: unknown) => r.id);
           await tx
             .delete(factoryDaybookEntries)
             .where(
@@ -326,7 +326,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
             and(eq(vouchers.companyId, companyId), sql`${vouchers.voucherNumber} LIKE ${"PAYMENT-ADV-" + id + "-%"}`)
           );
         if (advanceVouchers.length > 0) {
-          const vIds = advanceVouchers.map((v: any) => v.id);
+          const vIds = advanceVouchers.map((v: unknown) => v.id);
           await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
           await tx.delete(vouchers).where(inArray(vouchers.id, vIds));
         }
@@ -393,7 +393,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
 
       const today = getClientDate(req);
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx: unknown) => {
         // Delete all repayment records for this advance
         const repayments = await tx
           .select()
@@ -488,7 +488,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
         .where(and(eq(ledgerAccounts.id, cashAccountId), eq(ledgerAccounts.companyId, companyId)));
       if (!acct) return res.status(400).json({ message: "Cash account not found for this company" });
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx: unknown) => {
         const allAdvances = await tx
           .select({
             id: factoryWorkerAdvances.id,
@@ -512,8 +512,8 @@ export function registerAdvanceManagementRoutes(app: Express) {
           if (match) alreadyPostedIds.add(parseInt(match[1]));
         }
 
-        const eligible = allAdvances.filter((a: any) => !alreadyPostedIds.has(a.id) || a.cashAccountId === null);
-        const eligibleIds = new Set(eligible.map((a: any) => a.id));
+        const eligible = allAdvances.filter((a: unknown) => !alreadyPostedIds.has(a.id) || a.cashAccountId === null);
+        const eligibleIds = new Set(eligible.map((a: unknown) => a.id));
 
         if (eligibleIds.size === 0) {
           return { posted: 0, skipped: 0 };
@@ -640,10 +640,10 @@ export function registerAdvanceManagementRoutes(app: Express) {
         .where(and(eq(ledgerAccounts.id, cashAccountId), eq(ledgerAccounts.companyId, companyId)));
       if (!acct) return res.status(400).json({ message: "Cash account not found for this company" });
 
-      const ids = advanceIds.map((x: any) => parseInt(x)).filter((x: number) => !isNaN(x));
+      const ids = advanceIds.map((x: unknown) => parseInt(x)).filter((x: number) => !isNaN(x));
       const today = getClientDate(req);
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx: unknown) => {
         // Load the advance records we're updating (need amount, date, workerId)
         const advanceRows = await tx
           .select()
@@ -651,7 +651,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
           .where(and(eq(factoryWorkerAdvances.companyId, companyId), inArray(factoryWorkerAdvances.id, ids)));
 
         // Load worker names for narration
-        const workerIds = [...new Set(advanceRows.map((a: any) => a.workerId))];
+        const workerIds = [...new Set(advanceRows.map((a: unknown) => a.workerId))];
         const workerRows =
           workerIds.length > 0
             ? await tx
@@ -659,7 +659,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
                 .from(factoryWorkers)
                 .where(inArray(factoryWorkers.id, workerIds as number[]))
             : [];
-        const workerMap = new Map<number, string>(workerRows.map((w: any) => [w.id, w.fullName]));
+        const workerMap = new Map<number, string>(workerRows.map((w: unknown) => [w.id, w.fullName]));
 
         // Find or create the "Factory Worker Advances" asset ledger account
         let [advancesAccount] = await tx
@@ -726,8 +726,8 @@ export function registerAdvanceManagementRoutes(app: Express) {
               .where(eq(voucherEntries.voucherId, voucherId));
 
             const creditEntry = entries
-              .filter((e: any) => parseFloat(e.creditAmount || "0") > 0)
-              .sort((a: any, b: any) => parseFloat(b.creditAmount) - parseFloat(a.creditAmount))[0];
+              .filter((e: unknown) => parseFloat(e.creditAmount || "0") > 0)
+              .sort((a: unknown, b: unknown) => parseFloat(b.creditAmount) - parseFloat(a.creditAmount))[0];
 
             if (creditEntry) {
               await tx
@@ -819,7 +819,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
           )
         );
 
-      const totalBalance = outstanding.reduce((s: number, a: any) => s + parseFloat(a.remainingBalance || "0"), 0);
+      const totalBalance = outstanding.reduce((s: number, a: unknown) => s + parseFloat(a.remainingBalance || "0"), 0);
       res.json({ totalBalance: totalBalance.toFixed(2), count: outstanding.length });
     } catch (error: unknown) {
       logger.error("Error fetching advance balance:", { error: error });

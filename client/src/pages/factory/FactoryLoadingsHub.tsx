@@ -9,7 +9,7 @@ type LoadingsTab = "loadings" | "pending";
 export default function FactoryLoadingsHub() {
   const hash = typeof window !== "undefined" ? window.location.hash.replace("#", "") : "";
 
-  const { data: settings, isSuccess: settingsLoaded } = useQuery<any>({
+  const { data: settings, isSuccess: settingsLoaded } = useQuery<unknown>({
     queryKey: ["/api/factory/settings"],
     queryFn: async () => {
       const r = await fetch("/api/factory/settings");
@@ -18,7 +18,7 @@ export default function FactoryLoadingsHub() {
     staleTime: 60000,
   });
 
-  const { data: myAccess, isSuccess: accessLoaded } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 5 * 60000 });
+  const { data: myAccess, isSuccess: accessLoaded } = useQuery<unknown>({ queryKey: ["/api/factory/my-access"], staleTime: 5 * 60000 });
   const hiddenTabs = myAccess?.hiddenCostFields ?? [];
 
   const showPending =

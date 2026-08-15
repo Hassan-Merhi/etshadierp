@@ -21,7 +21,7 @@ import {
 
 import { computeMonthlyPay, computeMonthlyPayFromAttendance, getFactoryCompanyId, writeDaybookEntry } from "./_helpers";
 
-export function registerFactoryWorkerBaleSettleRoutes(app: Express, requireAuth: any, db: any) {
+export function registerFactoryWorkerBaleSettleRoutes(app: Express, requireAuth: unknown, db: unknown) {
   // GET /api/factory/workers/:id/bales - Get bales associated with worker
   app.get("/api/factory/workers/:id/bales", requireAuth, async (req: Request, res: Response) => {
     try {
@@ -98,7 +98,7 @@ export function registerFactoryWorkerBaleSettleRoutes(app: Express, requireAuth:
 
       if (!startDate || !endDate) return res.status(400).json({ message: "startDate and endDate required" });
 
-      const toDateStr = (v: any): string | null => {
+      const toDateStr = (v: unknown): string | null => {
         if (!v) return null;
         if (v instanceof Date) return v.toISOString().split("T")[0];
         return String(v).split("T")[0];
@@ -131,7 +131,7 @@ export function registerFactoryWorkerBaleSettleRoutes(app: Express, requireAuth:
         }
         return count;
       };
-      const daysInMonth = (dateStr: string) => {
+      const _daysInMonth = (dateStr: string) => {
         const d = new Date(dateStr);
         return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
       };
@@ -171,7 +171,7 @@ export function registerFactoryWorkerBaleSettleRoutes(app: Express, requireAuth:
         if (salType === "Per Bale") {
           earned = bales.length * parseFloat(worker.perBaleRate || "0");
         } else {
-          const totalKg = bales.reduce((s: number, b: any) => s + parseFloat(b.weightKg || "0"), 0);
+          const totalKg = bales.reduce((s: number, b: unknown) => s + parseFloat(b.weightKg || "0"), 0);
           earned = totalKg * parseFloat(worker.perKgRate || "0");
         }
       } else {
@@ -220,7 +220,7 @@ export function registerFactoryWorkerBaleSettleRoutes(app: Express, requireAuth:
           )
         );
       const totalPaid = paidPayrolls.reduce(
-        (s: number, p: any) =>
+        (s: number, p: unknown) =>
           s + parseFloat(p.netSalary || "0") + parseFloat(p.advances || "0") + parseFloat(p.deductions || "0"),
         0
       );
@@ -237,7 +237,7 @@ export function registerFactoryWorkerBaleSettleRoutes(app: Express, requireAuth:
           )
         );
       const totalAdvances = outstandingAdvances.reduce(
-        (s: number, a: any) => s + parseFloat(a.remainingBalance || "0"),
+        (s: number, a: unknown) => s + parseFloat(a.remainingBalance || "0"),
         0
       );
 

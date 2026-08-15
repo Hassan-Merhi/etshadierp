@@ -59,7 +59,7 @@ interface SyncIntercoResult {
 }
 
 export async function syncIntercoParentVoucher(
-  dbOrTx: any,
+  dbOrTx: unknown,
   poNumbers: string | string[],
   grossTotal: number,
   containerNumber?: string,
@@ -264,7 +264,7 @@ export async function syncIntercoParentVoucher(
     let freightNarrationMismatch = false;
     if (freightOpts && freightOpts.freightAmount > 0) {
       const fe = parentEntries.find(
-        (e: any) => e.ledgerAccountId === freightOpts.freightParentAccountId && parseFloat(e.creditAmount || "0") > 0
+        (e: unknown) => e.ledgerAccountId === freightOpts.freightParentAccountId && parseFloat(e.creditAmount || "0") > 0
       );
       freightEntryMissing = !fe || Math.abs(parseFloat(fe.creditAmount || "0") - freightOpts.freightAmount) > 0.001;
       if (fe && containerNumber) {

@@ -41,7 +41,7 @@ export async function getSpAccount(companyId: number, subType: string) {
   return acct;
 }
 
-export function parseNum(v: any): number {
+export function parseNum(v: unknown): number {
   const n = parseFloat(String(v ?? "0"));
   return isNaN(n) ? 0 : n;
 }

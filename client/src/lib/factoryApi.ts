@@ -168,7 +168,7 @@ async function attachPostOffloadImpactPreview(
   const previewResponse = await delegate("POST", `${pathWithoutQuery}/preview`, data);
   if (!previewResponse.ok) {
     const payload = await previewResponse.json().catch(() => null);
-    const error: any = new Error(payload?.message || "Failed to preview post-offload cost impact");
+    const error: unknown = new Error(payload?.message || "Failed to preview post-offload cost impact");
     error.status = previewResponse.status;
     throw error;
   }
@@ -181,7 +181,7 @@ async function attachPostOffloadImpactPreview(
   const confirmed =
     typeof window === "undefined" || window.confirm(buildPostOffloadImpactConfirmation(prepared.preview));
   if (!confirmed) {
-    const cancelled: any = new Error("Post-offload charge save cancelled.");
+    const cancelled: unknown = new Error("Post-offload charge save cancelled.");
     cancelled.name = "UserCancelled";
     cancelled._handledGlobally = true;
     throw cancelled;
@@ -338,7 +338,7 @@ async function factoryApiRequestBase(method: string, url: string, data?: unknown
   } catch (error) {
     if (unsafeLoadingScan && getErrorDetails(error).name === "OfflineQueued") {
       purgeUnsafeFactoryLoadingScans();
-      const onlineOnlyError: any = new Error(
+      const onlineOnlyError: unknown = new Error(
         "Loading scans require an internet connection. Reconnect and scan this bale again; it was not queued."
       );
       onlineOnlyError.name = "OnlineRequired";

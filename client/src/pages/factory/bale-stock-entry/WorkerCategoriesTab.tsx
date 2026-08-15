@@ -23,7 +23,7 @@ export function WorkerCategoriesTab() {
   const appMode = useAppMode();
   const catApiRequest = getApiRequest(appMode);
   const [catDialogOpen, setCatDialogOpen] = useState(false);
-  const [editingCat, setEditingCat] = useState<any>(null);
+  const [editingCat, setEditingCat] = useState<unknown>(null);
   const [catName, setCatName] = useState("");
   const [catWorkerIds, setCatWorkerIds] = useState<number[]>([]);
 

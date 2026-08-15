@@ -10,9 +10,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Building2, Loader2, Eye } from "lucide-react";
 import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema } from "@shared/schema";
 
-const userFormSchema = insertUserSchema;
-const companyFormSchema = insertCompanySchema;
-const roleAssignmentSchema = insertUserCompanyRoleSchema.refine(
+const _userFormSchema = insertUserSchema;
+const _companyFormSchema = insertCompanySchema;
+const _roleAssignmentSchema = insertUserCompanyRoleSchema.refine(
   (data) => {
     // If role is POS, assignedLocationId must be present
     if (data.role === "POS" && !data.assignedLocationId) {
@@ -26,9 +26,9 @@ const roleAssignmentSchema = insertUserCompanyRoleSchema.refine(
   }
 );
 
-type UserFormData = z.infer<typeof userFormSchema>;
-type CompanyFormData = z.infer<typeof companyFormSchema>;
-type RoleAssignmentData = z.infer<typeof roleAssignmentSchema>;
+type _UserFormData = z.infer<typeof userFormSchema>;
+type _CompanyFormData = z.infer<typeof companyFormSchema>;
+type _RoleAssignmentData = z.infer<typeof roleAssignmentSchema>;
 
 import { getPageLabel } from "./WatchUserDialog";
 import { RemoteSupportWatchDialog } from "./RemoteSupportWatchDialog";
@@ -36,7 +36,7 @@ import { RemoteSupportWatchDialog } from "./RemoteSupportWatchDialog";
 export function ActiveUsersSection() {
   const [watchingUser, setWatchingUser] = useState<{ userId: string; username: string } | null>(null);
 
-  const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
+  const { data: currentUser } = useQuery<unknown>({ queryKey: ["/api/auth/me"] });
   const isDeveloper = currentUser?.role === "Developer";
 
   const { data: presenceData, isLoading } = useQuery<unknown[]>({
@@ -104,7 +104,7 @@ export function ActiveUsersSection() {
         </Card>
       ) : (
         <div className="space-y-4">
-          {Object.entries(groupedUsers).map(([companyId, users]: [string, any]) => (
+          {Object.entries(groupedUsers).map(([companyId, users]: [string, unknown]) => (
             <Card key={companyId} className="overflow-hidden">
               <div className="px-4 py-3 bg-muted/50 border-b">
                 <div className="flex items-center gap-2">

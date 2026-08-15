@@ -67,7 +67,7 @@ export function registerAdvanceRepayByMonthRoutes(app: Express) {
         .where(inArray(factoryWorkers.id, workerIds));
       const workerMap: Record<number, string> = Object.fromEntries(workerRows.map((w) => [w.id, w.fullName]));
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx: unknown) => {
         // Resolve/create the Factory Worker Advances ledger account once
         let [advancesAccount] = await tx
           .select({ id: ledgerAccounts.id })

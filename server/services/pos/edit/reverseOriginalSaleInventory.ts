@@ -13,7 +13,7 @@ import { toInventoryDecimal } from "../../../lib/inventoryMath";
  * Add back the old quantities without passing a rate. POS activity must not
  * change the inventory cost basis during a reversal.
  */
-export async function reverseOriginalSaleInventory(tx: any, existingVoucher: any, oldSalesItems: unknown[]): Promise<void> {
+export async function reverseOriginalSaleInventory(tx: unknown, existingVoucher: unknown, oldSalesItems: unknown[]): Promise<void> {
   for (const oldItem of oldSalesItems) {
     const oldQuantity = toInventoryDecimal(oldItem.quantity);
     await adjustInventory(
@@ -26,7 +26,7 @@ export async function reverseOriginalSaleInventory(tx: any, existingVoucher: any
   }
 }
 
-export async function clearOldSaleRecords(tx: any, voucherId: number): Promise<void> {
+export async function clearOldSaleRecords(tx: unknown, voucherId: number): Promise<void> {
   await tx.delete(salesItems).where(eq(salesItems.voucherId, voucherId));
   await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
 }

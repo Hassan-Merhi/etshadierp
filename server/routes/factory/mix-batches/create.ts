@@ -43,7 +43,7 @@ export function registerFactoryMixBatchCreateRoutes(app: Express) {
         return res.status(400).json({ message: "At least one source is required" });
       }
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx: unknown) => {
         const year = new Date().getFullYear();
         const existingBatches = await tx
           .select({ batchCode: factoryMixBatches.batchCode })

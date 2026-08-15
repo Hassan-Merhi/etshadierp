@@ -94,7 +94,7 @@ interface CreditNoteTabProps {
 
 export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps) {
   const { toast } = useToast();
-  const { formatDisplayDate } = useDateFormat();
+  const { _formatDisplayDate } = useDateFormat();
   const [items, setItems] = useState<CreditNoteItem[]>([]);
   const [selectedLocationId, setSelectedLocationId] = useState<number>(0);
   const [searchTerm, setSearchTerm] = useState("");
@@ -226,7 +226,7 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [filteredItems, highlightedIndex, itemQuantity, refundRate, selectedLocationId]);
+  }, [addItemToCart, filteredItems, highlightedIndex, itemQuantity, refundRate, selectedLocationId]);
 
   useEffect(() => {
     if (itemListRef.current) {

@@ -196,7 +196,7 @@ export function registerRawStockRecalculateUsedRoutes(app: Express) {
 
           await tx
             .update(factoryRawStock)
-            .set({ usedKg: correctedUsedKg.toFixed(3), updatedAt: now } as any)
+            .set({ usedKg: correctedUsedKg.toFixed(3), updatedAt: now } as unknown)
             .where(eq(factoryRawStock.id, c.rawStockId));
 
           appliedChanges.push(c);

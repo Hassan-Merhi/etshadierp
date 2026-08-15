@@ -145,7 +145,7 @@ export function registerChatbotPoImportRoutes(app: Express) {
       if (fileExt === "pdf") {
         let pdfText = "";
         try {
-          const pdfParseModule: any = await import("pdf-parse");
+          const pdfParseModule: unknown = await import("pdf-parse");
           const pdfParse = (pdfParseModule.default ?? pdfParseModule) as (buf: Buffer) => Promise<{ text: string }>;
           const parsed = await pdfParse(req.file.buffer);
           pdfText = parsed.text;
@@ -362,10 +362,10 @@ export function registerChatbotPoImportRoutes(app: Express) {
       if (!supplierId) return res.status(400).json({ message: "Supplier is required" });
       if (!lines?.length) return res.status(400).json({ message: "At least one line item is required" });
 
-      const unresolved = lines.filter((l: any) => !l.stockItemId);
+      const unresolved = lines.filter((l: unknown) => !l.stockItemId);
       if (unresolved.length > 0) {
         return res.status(400).json({
-          message: `${unresolved.length} item(s) still unresolved: ${unresolved.map((l: any) => l.rawName || l.itemName).join(", ")}`,
+          message: `${unresolved.length} item(s) still unresolved: ${unresolved.map((l: unknown) => l.rawName || l.itemName).join(", ")}`,
         });
       }
 
@@ -401,12 +401,12 @@ export function registerChatbotPoImportRoutes(app: Express) {
 
         if (existingPOs.length > 0) {
           return res.status(409).json({
-            message: `Container "${containerNumber}" already has ${existingPOs.length} PO(s) imported (${existingPOs.map((p: any) => p.poNumber).join(", ")}). To avoid duplicates, please delete the existing POs first or use a different container number.`,
+            message: `Container "${containerNumber}" already has ${existingPOs.length} PO(s) imported (${existingPOs.map((p: unknown) => p.poNumber).join(", ")}). To avoid duplicates, please delete the existing POs first or use a different container number.`,
           });
         }
       }
 
-      const itemsTotal = lines.reduce((s: number, l: any) => s + parseFloat(l.qty) * parseFloat(l.rate), 0);
+      const itemsTotal = lines.reduce((s: number, l: unknown) => s + parseFloat(l.qty) * parseFloat(l.rate), 0);
       const freightAmt = parseFloat(charges?.freight || "0") || 0;
       const surchargeAmt = parseFloat(charges?.surcharge || "0") || 0;
       const fumigationAmt = parseFloat(charges?.fumigation || "0") || 0;

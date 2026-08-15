@@ -157,7 +157,7 @@ export function registerOrderBaleRemovalRoutes(app: Express) {
         });
       }
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx: unknown) => {
         // 5. Remove from customer_order_bales
         await tx.delete(customerOrderBales).where(eq(customerOrderBales.id, orderBale.id));
 

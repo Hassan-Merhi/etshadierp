@@ -67,7 +67,7 @@ export function isMaerskDirectScraperAvailable(): boolean {
 // One Chrome process is kept alive and reused across all scrape calls.
 // Replaced automatically if it crashes.
 
-let _sharedBrowser: any = null;
+let _sharedBrowser: unknown = null;
 let _stealthRegistered = false;
 
 async function getSharedBrowser(): Promise<unknown> {
@@ -203,7 +203,7 @@ function parseEvents(rawEvents: unknown[]): TrackingEvent[] {
   if (!Array.isArray(rawEvents)) return [];
   return rawEvents
     .map(
-      (e: any): TrackingEvent => ({
+      (e: unknown): TrackingEvent => ({
         date: parseDate(e.eventDateTime ?? e.eventDate ?? e.timestamp ?? e.date ?? null),
         status: e.transportEventTypeCode ?? e.activityName ?? e.eventCode ?? e.activity ?? e.status ?? null,
         location:
@@ -302,7 +302,7 @@ export function extractFromJson(
 
         // Priority 1: expected Arrived / Discharged event at the last location
         const arrivalEv = lastLocEvents.find(
-          (ev: any) =>
+          (ev: unknown) =>
             ev.event_time_type === "EXPECTED" &&
             ev.event_time &&
             /arrived|discharged|discharge|arrival|delivered|delivery/i.test(ev.activity ?? "")
@@ -313,7 +313,7 @@ export function extractFromJson(
           // Priority 2: latest (by event_time) expected event at the last location
           const expectedAtDest = lastLocEvents
             .filter((ev) => ev.event_time_type === "EXPECTED" && ev.event_time)
-            .sort((a: any, b: any) => new Date(b.event_time).getTime() - new Date(a.event_time).getTime());
+            .sort((a: unknown, b: unknown) => new Date(b.event_time).getTime() - new Date(a.event_time).getTime());
           if (expectedAtDest.length > 0) {
             // Pick the earliest future expected event as the true ETA
             const futureExpected = expectedAtDest
@@ -437,7 +437,7 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
   }
   logger.info(`[MaerskDirect] ${containerNumber}: Puppeteer slot acquired`);
 
-  let page: any = null;
+  let page: unknown = null;
   const hardStop = setTimeout(() => {
     logger.warn(`[MaerskDirect] ${containerNumber}: hard timeout — closing page`);
     try {

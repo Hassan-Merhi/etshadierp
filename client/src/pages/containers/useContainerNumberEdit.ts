@@ -24,7 +24,7 @@ export function useContainerNumberEdit() {
       setEditingNumberValue("");
       toast({ title: "Updated", description: "Container number changed" });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },

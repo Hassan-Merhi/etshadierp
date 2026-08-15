@@ -31,7 +31,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
       const rawProformaRes = await db.execute(
         sql`SELECT * FROM customer_proformas WHERE id = ${id} AND company_id = ${companyId} AND deleted_at IS NULL LIMIT 1`
       );
-      const rawProformaRows = (rawProformaRes as any).rows ?? (rawProformaRes as unknown as unknown[]);
+      const rawProformaRows = (rawProformaRes as unknown).rows ?? (rawProformaRes as unknown as unknown[]);
       if (!rawProformaRows.length) return res.status(404).json({ message: "Proforma not found" });
       const pr = rawProformaRows[0];
       const proforma = {
@@ -45,7 +45,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
         updatedAt: pr.updated_at ?? pr.created_at,
       };
       const rawLinesRes = await db.execute(sql`SELECT * FROM customer_proforma_lines WHERE proforma_id = ${id}`);
-      const lines = ((rawLinesRes as any).rows ?? (rawLinesRes as unknown as unknown[])).map((l: any) => ({
+      const lines = ((rawLinesRes as unknown).rows ?? (rawLinesRes as unknown as unknown[])).map((l: unknown) => ({
         id: l.id,
         proformaId: l.proforma_id,
         articleCode: l.article_code ?? "",
@@ -58,7 +58,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
         pricePerKg: l.price_per_kg ?? null,
         createdAt: l.created_at,
       }));
-      const articleCodes = [...new Set(lines.map((l: any) => l.articleCode).filter(Boolean))];
+      const articleCodes = [...new Set(lines.map((l: unknown) => l.articleCode).filter(Boolean))];
       const weightMap = new Map<string, string>();
       if (articleCodes.length > 0) {
         const baleProds = await db
@@ -74,11 +74,11 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
               inArray(factoryBaleProducts.articleCode, articleCodes as string[])
             )
           );
-        baleProds.forEach((p: any) => {
+        baleProds.forEach((p: unknown) => {
           if (p.articleCode) weightMap.set(p.articleCode, p.weightPerBaleKg || "0");
         });
       }
-      const enrichedLines = lines.map((l: any) => ({ ...l, weightPerBaleKg: weightMap.get(l.articleCode) || "0" }));
+      const enrichedLines = lines.map((l: unknown) => ({ ...l, weightPerBaleKg: weightMap.get(l.articleCode) || "0" }));
       res.set("Cache-Control", "private, max-age=60");
       res.json({ ...proforma, lines: enrichedLines });
     } catch (error: unknown) {
@@ -137,8 +137,8 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
           GROUP BY cp.id, cp.company_id, cp.customer_id, cp.name, cp.is_active, cp.created_at
           ORDER BY cp.name ASC
         `);
-        const summaryRows = (rawSummary as any).rows ?? (rawSummary as unknown as unknown[]);
-        const summaries = summaryRows.map((row: any) => ({
+        const summaryRows = (rawSummary as unknown).rows ?? (rawSummary as unknown as unknown[]);
+        const summaries = summaryRows.map((row: unknown) => ({
           id: row.id,
           companyId: row.company_id,
           customerId: row.customer_id,
@@ -166,7 +166,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
               AND deleted_at IS NULL
             ORDER BY name ASC`
       );
-      const proformas = ((rawProformasRes as any).rows ?? (rawProformasRes as unknown as unknown[])).map((r: any) => ({
+      const proformas = ((rawProformasRes as unknown).rows ?? (rawProformasRes as unknown as unknown[])).map((r: unknown) => ({
         id: r.id,
         companyId: r.company_id,
         customerId: r.customer_id,
@@ -177,7 +177,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
         updatedAt: r.updated_at ?? r.created_at,
       }));
 
-      const proformaIds = proformas.map((p: any) => p.id);
+      const proformaIds = proformas.map((p: unknown) => p.id);
       let lines = [];
       if (proformaIds.length > 0) {
         const idList = sql.join(
@@ -193,8 +193,8 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
           FROM customer_proforma_lines
           WHERE proforma_id IN (${idList})
         `);
-        const rawRows = (rawLines as any).rows ?? (rawLines as unknown as unknown[]);
-        lines = rawRows.map((l: any) => ({
+        const rawRows = (rawLines as unknown).rows ?? (rawLines as unknown as unknown[]);
+        lines = rawRows.map((l: unknown) => ({
           id: l.id,
           proformaId: l.proforma_id,
           articleCode: l.article_code ?? "",
@@ -208,7 +208,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
         }));
       }
 
-      const articleCodes = [...new Set(lines.map((l: any) => l.articleCode).filter(Boolean))];
+      const articleCodes = [...new Set(lines.map((l: unknown) => l.articleCode).filter(Boolean))];
       const weightMap = new Map<string, string>();
       const nameMap = new Map<string, string>();
       if (articleCodes.length > 0) {
@@ -225,7 +225,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
               inArray(factoryBaleProducts.articleCode, articleCodes as string[])
             )
           );
-        baleProds.forEach((p: any) => {
+        baleProds.forEach((p: unknown) => {
           if (p.articleCode) {
             weightMap.set(p.articleCode, p.weightPerBaleKg || "0");
             if (p.name) nameMap.set(p.articleCode, p.name);
@@ -233,7 +233,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
         });
       }
 
-      const enrichedLines = lines.map((l: any) => ({
+      const enrichedLines = lines.map((l: unknown) => ({
         ...l,
         weightPerBaleKg: weightMap.get(l.articleCode) || "0",
         productName: nameMap.get(l.articleCode) || l.productName,
@@ -245,7 +245,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
         current.push(line);
         linesByProforma.set(line.proformaId, current);
       }
-      const result = proformas.map((p: any) => ({
+      const result = proformas.map((p: unknown) => ({
         ...p,
         lines: linesByProforma.get(p.id) || [],
       }));

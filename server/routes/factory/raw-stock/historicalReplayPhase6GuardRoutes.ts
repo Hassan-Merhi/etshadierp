@@ -364,7 +364,7 @@ export function registerHistoricalReplayPhase6GuardRoutes(app: Express): void {
         loadBalanceProjectionBase(companyId, preview),
       ]);
       const originalJson = res.json.bind(res);
-      res.json = (payload: any) => {
+      res.json = (payload: unknown) => {
         if (!payload?.dryRun) return originalJson(payload);
         const expandedSupplierIds = parsePositiveIntegerIds(payload.safeSupplierIds) ?? supplierIds;
         let batchIds: number[];

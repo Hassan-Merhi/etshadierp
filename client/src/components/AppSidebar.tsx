@@ -147,7 +147,7 @@ export function useErpVisibleSections(user?: unknown): {
     enabled: !!user && !!selectedCompany?.id,
   });
 
-  const { data: companySettings } = useQuery<any>({
+  const { data: companySettings } = useQuery<unknown>({
     queryKey: companyQueryKey("/api/company-settings", selectedCompany?.id),
     ...stableSettingsQueryPolicy,
     enabled: !!selectedCompany?.id,
@@ -232,7 +232,7 @@ export function AppSidebar({ user }: { user?: unknown }) {
     if (count > prevUnreadRef.current)
       toast({ title: "New message", description: `You have ${count} unread message${count > 1 ? "s" : ""}.` });
     prevUnreadRef.current = count;
-  }, [chatUnread?.count]);
+  }, [chatUnread?.count, toast]);
 
   const { sections: visibleSections, isItemVisible } = useErpVisibleSections(user);
   const supplierPartnerSections = selectedCompany?.companyType === "supplier_partner" ? SUPPLIER_PARTNER_SECTIONS : [];

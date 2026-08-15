@@ -17,7 +17,7 @@ import { generateAccountStatementPdf } from "../lib/accountStatementPdfGenerator
 import { sendWhatsAppFileByUploadPos } from "../services/whatsappService";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 
-export function registerFactoryWhatsappRoutes(app: Express, requireAuth: any) {
+export function registerFactoryWhatsappRoutes(app: Express, requireAuth: unknown) {
   // ── GET rule ──────────────────────────────────────────────────────────────
   app.get("/api/factory/accounts/:accountId/whatsapp-rule", requireAuth, async (req: Request, res: Response) => {
     try {

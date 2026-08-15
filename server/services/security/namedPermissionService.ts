@@ -24,11 +24,11 @@ export class SecuritySchemaUnavailableError extends Error {
   }
 }
 
-function postgresErrorCode(error: any): string {
+function postgresErrorCode(error: unknown): string {
   return String(error?.code || error?.cause?.code || "");
 }
 
-function isSecuritySchemaError(error: any): boolean {
+function isSecuritySchemaError(error: unknown): boolean {
   const code = postgresErrorCode(error);
   return code === "42P01" || code === "42703";
 }
@@ -41,13 +41,13 @@ export function normalizePermissionList(value: unknown): string[] {
   return normalized.sort();
 }
 
-export async function loadNamedPermissions(db: any, userId: string, companyId: number): Promise<string[]> {
+export async function loadNamedPermissions(db: unknown, userId: string, companyId: number): Promise<string[]> {
   try {
     const rows = await db
       .select({ permission: userSecurityPermissions.permission })
       .from(userSecurityPermissions)
       .where(and(eq(userSecurityPermissions.userId, userId), eq(userSecurityPermissions.companyId, companyId)));
-    const permissions: string[] = rows.map((row: any) => String(row.permission));
+    const permissions: string[] = rows.map((row: unknown) => String(row.permission));
     return [...new Set(permissions)].sort();
   } catch (error) {
     if (isSecuritySchemaError(error)) throw new SecuritySchemaUnavailableError(error);
@@ -55,7 +55,7 @@ export async function loadNamedPermissions(db: any, userId: string, companyId: n
   }
 }
 
-export async function assertUserBelongsToCompany(db: any, userId: string, companyId: number): Promise<void> {
+export async function assertUserBelongsToCompany(db: unknown, userId: string, companyId: number): Promise<void> {
   const [membership] = await db
     .select({ userId: userCompanyRoles.userId })
     .from(userCompanyRoles)
@@ -65,7 +65,7 @@ export async function assertUserBelongsToCompany(db: any, userId: string, compan
 }
 
 export async function replaceNamedPermissions(
-  tx: any,
+  tx: unknown,
   params: { userId: string; companyId: number; permissions: string[]; grantedBy: string }
 ): Promise<string[]> {
   const permissions = normalizePermissionList(params.permissions);
@@ -89,7 +89,7 @@ export async function replaceNamedPermissions(
   return permissions;
 }
 
-export async function hydrateSessionNamedPermissions(db: any, session: any): Promise<string[]> {
+export async function hydrateSessionNamedPermissions(db: unknown, session: unknown): Promise<string[]> {
   const userId = session?.userId;
   const companyId = session?.currentCompanyId;
   if (!userId || !Number.isSafeInteger(companyId) || companyId <= 0) {
@@ -110,7 +110,7 @@ export async function hydrateSessionNamedPermissions(db: any, session: any): Pro
   return permissions;
 }
 
-export async function invalidateUserCompanySessions(pool: any, userId: string, companyId: number): Promise<void> {
+export async function invalidateUserCompanySessions(pool: unknown, userId: string, companyId: number): Promise<void> {
   await pool.query(
     `DELETE FROM session WHERE sess->>'userId' = $1 AND COALESCE((sess->>'currentCompanyId')::int, 0) = $2`,
     [userId, companyId]

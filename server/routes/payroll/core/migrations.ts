@@ -82,7 +82,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
 
       let vouchersUpdated = 0;
       for (const row of genVouchers.rows as unknown[]) {
-        const voucherDate = row.voucher_date as string;
+        const _voucherDate = row.voucher_date as string;
         // Parse period end from description: "Payroll expense: N workers (YYYY-MM-DD – YYYY-MM-DD)"
         const periodMatch = (row.description as string).match(/\((\d{4}-\d{2}-\d{2})\s*[–-]\s*(\d{4}-\d{2}-\d{2})\)/);
         if (!periodMatch) continue;
@@ -234,7 +234,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
       if (req.body?.confirm !== true) {
         return res.status(400).json({ message: PAYROLL_MIGRATION_CONFIRMATION_REQUIRED });
       }
-      const currentRole = (req.session as any).currentRole;
+      const currentRole = (req.session as unknown).currentRole;
       if (!["Admin", "Owner", "Developer"].includes(currentRole)) {
         return res.status(403).json({ message: "Only Admin, Owner, or Developer can run this migration" });
       }
@@ -407,7 +407,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
       if (req.body?.confirm !== true) {
         return res.status(400).json({ message: PAYROLL_MIGRATION_CONFIRMATION_REQUIRED });
       }
-      const currentRole = (req.session as any).currentRole;
+      const currentRole = (req.session as unknown).currentRole;
       if (!["Admin", "Owner", "Developer"].includes(currentRole)) {
         return res.status(403).json({ message: "Only Admin, Owner, or Developer can run this migration" });
       }

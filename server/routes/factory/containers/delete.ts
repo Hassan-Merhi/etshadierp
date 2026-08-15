@@ -47,7 +47,7 @@ export function registerFactoryContainerDeleteRoutes(app: Express) {
             isNull(factoryContainers.deletedAt)
           )
         );
-      const ownedIds = owned.map((c: any) => c.id);
+      const ownedIds = owned.map((c: unknown) => c.id);
       if (ownedIds.length === 0) return res.status(404).json({ message: "No containers found" });
 
       // Soft-delete: hide containers from main listings while preserving all child rows
@@ -83,7 +83,7 @@ export function registerFactoryContainerDeleteRoutes(app: Express) {
       if (id === null) return res.status(400).json({ message: "Invalid id" });
 
       let updatedId: number | null = null;
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx: unknown) => {
         // Soft-delete the container
         const [updated] = await tx
           .update(factoryContainers)
@@ -104,7 +104,7 @@ export function registerFactoryContainerDeleteRoutes(app: Express) {
           .select({ id: factoryRawStock.id })
           .from(factoryRawStock)
           .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryRawStock.containerId, id)));
-        const rsIds = rsRows.map((r: any) => r.id);
+        const rsIds = rsRows.map((r: unknown) => r.id);
 
         const commRows = await tx
           .select({ id: factoryContainerCommissions.id })
@@ -112,7 +112,7 @@ export function registerFactoryContainerDeleteRoutes(app: Express) {
           .where(
             and(eq(factoryContainerCommissions.companyId, companyId), eq(factoryContainerCommissions.containerId, id))
           );
-        const commIds = commRows.map((r: any) => r.id);
+        const commIds = commRows.map((r: unknown) => r.id);
 
         // 2. Delete daybook entries linked to this container
         if (rsIds.length > 0) {
@@ -170,7 +170,7 @@ export function registerFactoryContainerDeleteRoutes(app: Express) {
             )
           );
         if (containerVouchers.length > 0) {
-          const vIds = containerVouchers.map((v: any) => v.id);
+          const vIds = containerVouchers.map((v: unknown) => v.id);
           await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
           await tx.delete(vouchers).where(inArray(vouchers.id, vIds));
         }

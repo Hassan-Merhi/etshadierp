@@ -14,12 +14,12 @@ const upload = multer({ storage: multer.memoryStorage() });
 type CellVal = number | string | null;
 type SRow = { id?: string; label: string; cells: unknown[] };
 
-function getColLabel(col: any): string {
+function getColLabel(col: unknown): string {
   if (typeof col === "string") return col;
   return col?.label ?? "";
 }
 
-function getCellRawValue(cell: any): CellVal {
+function getCellRawValue(cell: unknown): CellVal {
   if (cell === null || cell === undefined) return null;
   if (typeof cell === "number" || typeof cell === "string") return cell;
   if (typeof cell === "object" && "value" in cell) return cell.value ?? null;
@@ -29,7 +29,7 @@ function getCellRawValue(cell: any): CellVal {
 // Human-readable representation of a cell for the history log: manual values
 // are shown as-is, linked cells are shown as "→ linked" since the resolved
 // number lives on another sheet and isn't meaningful to diff here.
-function describeCellForLog(cell: any): string {
+function describeCellForLog(cell: unknown): string {
   if (cell && typeof cell === "object" && "value" in cell) {
     if (cell.link) return "→ linked";
     return cell.value === null || cell.value === undefined ? "" : String(cell.value);

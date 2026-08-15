@@ -24,7 +24,7 @@ export class AccountMigrationControlConflict extends Error {
 }
 
 export async function detachAccountMigrationControlReferences(
-  tx: any,
+  tx: unknown,
   sourceCompanyId: number,
   accountIds: number[],
 ): Promise<AccountMigrationControlSnapshot> {
@@ -52,20 +52,20 @@ export async function detachAccountMigrationControlReferences(
     await tx
       .update(userCompanyRoles)
       .set({ cashAccountId: null })
-      .where(inArray(userCompanyRoles.id, roleRows.map((row: any) => row.id)));
+      .where(inArray(userCompanyRoles.id, roleRows.map((row: unknown) => row.id)));
   }
 
   if (locationRows.length > 0) {
     await tx
       .delete(userLocationCashAccounts)
-      .where(inArray(userLocationCashAccounts.id, locationRows.map((row: any) => row.id)));
+      .where(inArray(userLocationCashAccounts.id, locationRows.map((row: unknown) => row.id)));
   }
 
   return {
     roleCashAccounts: roleRows
-      .filter((row: any) => row.cashAccountId !== null)
-      .map((row: any) => ({ roleId: row.id, accountId: row.cashAccountId })),
-    locationCashAccounts: locationRows.map((row: any) => ({
+      .filter((row: unknown) => row.cashAccountId !== null)
+      .map((row: unknown) => ({ roleId: row.id, accountId: row.cashAccountId })),
+    locationCashAccounts: locationRows.map((row: unknown) => ({
       userId: row.userId,
       companyId: row.companyId,
       locationId: row.locationId,
@@ -77,7 +77,7 @@ export async function detachAccountMigrationControlReferences(
 }
 
 export async function assertDestinationControlReferencesAreClear(
-  tx: any,
+  tx: unknown,
   destinationCompanyId: number,
   accountIds: number[],
 ): Promise<void> {
@@ -108,7 +108,7 @@ export async function assertDestinationControlReferencesAreClear(
 }
 
 export async function restoreAccountMigrationControlReferences(
-  tx: any,
+  tx: unknown,
   sourceCompanyId: number,
   snapshot: AccountMigrationControlSnapshot,
 ): Promise<void> {
@@ -134,7 +134,7 @@ export async function restoreAccountMigrationControlReferences(
       .from(userLocationCashAccounts)
       .where(eq(userLocationCashAccounts.companyId, sourceCompanyId));
     const occupied = new Set(
-      existing.map((row: any) => `${row.userId}:${row.companyId}:${row.locationId}`),
+      existing.map((row: unknown) => `${row.userId}:${row.companyId}:${row.locationId}`),
     );
     const conflict = snapshot.locationCashAccounts.find((row) =>
       occupied.has(`${row.userId}:${row.companyId}:${row.locationId}`),

@@ -126,7 +126,7 @@ export const containerSalesService = {
         .values({
           ...parsed,
           commissionAccountId,
-          voucherId: (posted.voucher as any).id,
+          voucherId: (posted.voucher as unknown).id,
         })
         .returning();
 

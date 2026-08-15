@@ -31,7 +31,7 @@ const RECALC_REFUSED_STATUSES = new Set(["CLOSED", "COMPLETED"]);
 const RECALC_LOCK_NAMESPACE = 9001;
 
 export interface ApplyRawStockRecalcOptions {
-  onAudit?: (tx: any, result: ApplyResult) => Promise<void>;
+  onAudit?: (tx: unknown, result: ApplyResult) => Promise<void>;
   expectedFingerprints?: Record<number, string>;
   includeCompletedBatches?: boolean;
   /** Allow CLOSED/COMPLETED containers when all safety checks pass. */
@@ -158,7 +158,7 @@ export async function applyRawStockRecalc(
             )
           ),
       ]);
-      const commissionRecord = commissionRecords.sort((a: any, b: any) => b.id - a.id)[0] || null;
+      const commissionRecord = commissionRecords.sort((a: unknown, b: unknown) => b.id - a.id)[0] || null;
 
       const rawStockRows = await tx
         .select()

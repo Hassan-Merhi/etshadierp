@@ -122,7 +122,7 @@ export function PaymentReceiptTab({
   onEffectiveDateChange,
 }: PaymentReceiptTabProps) {
   const { formatAmount } = useCurrencyContext();
-  const { formatDisplayDate } = useDateFormat();
+  const { _formatDisplayDate } = useDateFormat();
 
   // Notes collapse state — auto-open if there is already a notes value
   const [notesOpen, setNotesOpen] = useState<boolean>(() => {
@@ -156,7 +156,7 @@ export function PaymentReceiptTab({
 
   // Tab-specific styling / labels
   const Icon = isPayment ? ArrowUpCircle : ArrowDownCircle;
-  const iconColor = isPayment ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400";
+  const _iconColor = isPayment ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400";
   const accentColor = isPayment ? "#f59e0b" : "#10b981";
   const title = isPayment ? "Payment Voucher" : "Receipt Voucher";
   const accountLabel = isPayment ? "Pay From" : "Receive Into";

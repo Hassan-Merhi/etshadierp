@@ -22,7 +22,7 @@ export function ProfitOpeningRunner({ targetCompanyId, onDone }: { targetCompany
   const [useManualSplit, setUseManualSplit] = useState(false);
   const [ourShareAmount, setOurShareAmount] = useState("");
   const [supplierShareAmount, setSupplierShareAmount] = useState("");
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<unknown>(null);
 
   const mutation = useMutation({
     mutationFn: () =>

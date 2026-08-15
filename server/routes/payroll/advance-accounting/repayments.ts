@@ -98,7 +98,7 @@ export function registerAdvanceRepaymentRoutes(app: Express) {
         .from(factoryWorkers)
         .where(eq(factoryWorkers.id, advance.workerId));
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx: unknown) => {
         const [repayment] = await tx
           .insert(factoryAdvanceRepayments)
           .values({

@@ -233,7 +233,7 @@ export function SettingsHubPage({ onNavigate, currentUser, appMode }: SettingsHu
 
   const role = currentUser?.role;
   const isFactory = appMode === "factory";
-  const isAdmin = role === "Admin" || role === "Developer" || role === "Owner";
+  const _isAdmin = role === "Admin" || role === "Developer" || role === "Owner";
   const isDev = role === "Developer";
 
   const visibleCategories = useMemo(() => {

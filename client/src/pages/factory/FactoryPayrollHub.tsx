@@ -8,7 +8,7 @@ import { useHubQueryState } from "@/hooks/use-hub-query-state";
 type Section = "workers" | "employees" | "insurance";
 
 export default function FactoryPayrollHub() {
-  const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 5 * 60000 });
+  const { data: myAccess } = useQuery<unknown>({ queryKey: ["/api/factory/my-access"], staleTime: 5 * 60000 });
 
   const hasInsuranceAccess =
     !myAccess ||

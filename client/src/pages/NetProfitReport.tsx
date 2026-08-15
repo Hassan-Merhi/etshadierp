@@ -244,7 +244,7 @@ function AccountSection({
 }
 
 export default function NetProfitReport() {
-  const { data: user } = useQuery<any>({ queryKey: ["/api/auth/me"] });
+  const { data: user } = useQuery<unknown>({ queryKey: ["/api/auth/me"] });
   const isAdminOrDev = user?.role === "Admin" || user?.role === "Developer";
 
   const now = new Date();
@@ -288,7 +288,7 @@ export default function NetProfitReport() {
     return p.toString();
   }, [startDate, endDate, selectedCompanyId, isAdminOrDev]);
 
-  const { data, isLoading, error } = useQuery<any>({
+  const { data, isLoading, error } = useQuery<unknown>({
     queryKey: ["/api/reports/net-profit-statement", queryParams],
     queryFn: async ({ queryKey }) => {
       const params = queryKey[1] as string;

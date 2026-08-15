@@ -201,7 +201,7 @@ export default function OffloadDetail() {
       : displayDuties + displayOfficeCharges + displayTransportFees + displayTransferCharges + displayAddlCharges) +
     storedAdditionalCharges;
 
-  const displayCostPerBale = live?.hasVouchers
+  const _displayCostPerBale = live?.hasVouchers
     ? live.additionalCostPerBale
     : Number(offload?.additionalCostPerBale || 0);
 

@@ -59,7 +59,7 @@ export function registerPosSaleWriteRoutes(app: Express) {
       const depositAmt = isCredit ? Math.max(0, parseFloat(depositAmount || "0")) : 0;
 
       const totalAmount = items.reduce(
-        (s: number, it: any) => s + parseFloat(it.unitPrice || "0") * parseInt(it.quantity || "1"),
+        (s: number, it: unknown) => s + parseFloat(it.unitPrice || "0") * parseInt(it.quantity || "1"),
         0
       );
 
@@ -85,7 +85,7 @@ export function registerPosSaleWriteRoutes(app: Express) {
       const nextNum = (Number(seqRow?.count || 0) + 1).toString().padStart(4, "0");
       const saleNumber = `FPOS-${nextNum}`;
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx: unknown) => {
         // 1. Create sale record
         const [sale] = await tx
           .insert(factoryPosSales)
@@ -151,7 +151,7 @@ export function registerPosSaleWriteRoutes(app: Express) {
                 `INSUFFICIENT_BALE_STOCK: requested ${qty} bale(s) of "${item.productName || item.articleCode || item.productId}" at this location, only ${availableBales.length} available`
               );
             }
-            const baleIds = availableBales.map((b: any) => b.id);
+            const baleIds = availableBales.map((b: unknown) => b.id);
             await tx
               .update(factoryBales)
               .set({ status: "SOLD", updatedAt: new Date() })
@@ -338,7 +338,7 @@ export function registerPosSaleWriteRoutes(app: Express) {
       const parsedCustomerId = customerId ? parseInt(customerId) : null;
       const depositAmt = isCredit ? Math.max(0, parseFloat(depositAmount || "0")) : 0;
       const totalAmount = items.reduce(
-        (s: number, it: any) => s + parseFloat(it.unitPrice || "0") * parseInt(it.quantity || "1"),
+        (s: number, it: unknown) => s + parseFloat(it.unitPrice || "0") * parseInt(it.quantity || "1"),
         0
       );
 
@@ -354,7 +354,7 @@ export function registerPosSaleWriteRoutes(app: Express) {
       const totalExpenses = expenseRows.reduce((s, e) => s + e.amount, 0);
       const netCash = isCredit ? depositAmt - totalExpenses : totalAmount - totalExpenses;
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx: unknown) => {
         // Step 1: Restore bales for old items
         const oldItems = await tx.select().from(factoryPosSaleItems).where(eq(factoryPosSaleItems.saleId, saleId));
         for (const oldItem of oldItems) {
@@ -373,7 +373,7 @@ export function registerPosSaleWriteRoutes(app: Express) {
               .orderBy(desc(factoryBales.id))
               .limit(oldItem.quantity)
               .for("update");
-            const baleIds = soldBales.map((b: any) => b.id);
+            const baleIds = soldBales.map((b: unknown) => b.id);
             if (baleIds.length > 0) {
               await tx
                 .update(factoryBales)
@@ -441,7 +441,7 @@ export function registerPosSaleWriteRoutes(app: Express) {
                 `INSUFFICIENT_BALE_STOCK: requested ${qty} bale(s) of "${item.productName || item.articleCode || item.productId}" at this location, only ${availableBales.length} available`
               );
             }
-            const baleIds = availableBales.map((b: any) => b.id);
+            const baleIds = availableBales.map((b: unknown) => b.id);
             await tx
               .update(factoryBales)
               .set({ status: "SOLD", updatedAt: new Date() })

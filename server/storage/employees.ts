@@ -148,7 +148,7 @@ export async function getEmployeeById(id: number): Promise<Employee | undefined>
 export async function createEmployee(employee: InsertEmployee): Promise<Employee> {
   const [created] = await db
     .insert(schema.employees)
-    .values([employee as any])
+    .values([employee as unknown])
     .returning();
   return created;
 }

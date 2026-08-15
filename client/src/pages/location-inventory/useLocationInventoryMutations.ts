@@ -3,7 +3,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { InventoryLocation as Location } from "./locationInventoryTypes";
 
 interface UseLocationInventoryMutationsParams {
-  toast: (opts: any) => void;
+  toast: (opts: unknown) => void;
   selectedLocationLocal: Location | null;
   setSelectedLocationLocal: (loc: Location | null) => void;
   setRenameDialogOpen: (open: boolean) => void;

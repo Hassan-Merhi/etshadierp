@@ -1,7 +1,7 @@
 import { and, eq, isNull } from "drizzle-orm";
 import * as schema from "@shared/schema";
 
-export async function findOrCreateImportChargeAccounts(tx: any, companyId: number) {
+export async function findOrCreateImportChargeAccounts(tx: unknown, companyId: number) {
   let [parent] = await tx
     .select()
     .from(schema.ledgerAccounts)

@@ -66,7 +66,7 @@ function SpContainerDetailView() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const { toast } = useToast();
 
-  const { data: spc, isLoading } = useQuery<any>({
+  const { data: spc, isLoading } = useQuery<unknown>({
     queryKey: [`/api/sp/containers/${id}`],
     queryFn: () => fetch(`/api/sp/containers/${id}`, { credentials: "include" }).then((r) => r.json()),
     enabled: !!id,

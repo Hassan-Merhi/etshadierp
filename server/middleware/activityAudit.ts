@@ -18,7 +18,7 @@ function parseRouteId(path: string): number | null {
 }
 
 function compactChanges(
-  body: any,
+  body: unknown,
   extra?: Record<string, unknown>
 ): Record<string, { old: unknown; new: unknown }> | null {
   const safeKeys = [

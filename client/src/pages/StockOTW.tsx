@@ -51,7 +51,7 @@ interface GroupedStockItem {
 function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boolean; onToggleCombined: () => void }) {
   const { formatAmount } = useCurrencyContext();
   const appMode = useAppMode();
-  const modeApiRequest = getApiRequest(appMode);
+  const _modeApiRequest = getApiRequest(appMode);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedGrade, setSelectedGrade] = useState<string>("all");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");

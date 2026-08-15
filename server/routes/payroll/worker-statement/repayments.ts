@@ -43,7 +43,7 @@ export function registerWorkerRepaymentDeleteRoutes(app: Express) {
       const currentBal = parseFloat(advance?.remainingBalance || "0");
       const restoredBal = currentBal + repayAmt;
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx: unknown) => {
         await tx.delete(factoryAdvanceRepayments).where(eq(factoryAdvanceRepayments.id, repaymentId));
 
         if (advance) {

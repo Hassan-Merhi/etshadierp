@@ -193,7 +193,7 @@ function parseResponse(containerNumber: string, data: unknown, base: CarrierTrac
   const d = data as Record<string, unknown>;
 
   // Maersk may wrap in various shapes
-  const entry: any = (Array.isArray(d) ? d[0] : null) ?? d.containers?.[0] ?? d.shipment ?? d.trackingData ?? d;
+  const entry: unknown = (Array.isArray(d) ? d[0] : null) ?? d.containers?.[0] ?? d.shipment ?? d.trackingData ?? d;
 
   if (!entry) return { ...base, noData: true, error: "no_entry" };
 
@@ -201,7 +201,7 @@ function parseResponse(containerNumber: string, data: unknown, base: CarrierTrac
 
   const events: TrackingEvent[] = (Array.isArray(rawEvents) ? rawEvents : [])
     .map(
-      (e: any): TrackingEvent => ({
+      (e: unknown): TrackingEvent => ({
         date: parseDate(e.eventDateTime ?? e.eventDate ?? e.timestamp ?? e.date ?? null),
         status: e.transportEventTypeCode ?? e.activityName ?? e.eventCode ?? e.status ?? null,
         location:

@@ -16,11 +16,11 @@ import {
 import { SP_RELEASE_CURRENCY, SP_RELEASE_EXCHANGE_RATE } from "../../services/sp/spReleasePolicy";
 import { requireSpCompany } from "./spHelpers";
 
-function rows(result: any): unknown[] {
+function rows(result: unknown): unknown[] {
   return result?.rows ?? result ?? [];
 }
 
-function first(result: any): any | null {
+function first(result: unknown): unknown | null {
   return rows(result)[0] ?? null;
 }
 
@@ -57,7 +57,7 @@ export async function ensureSpOffloadReversalStorage(): Promise<void> {
 }
 
 async function createExactVoucherReversal(
-  tx: any,
+  tx: unknown,
   input: {
     companyId: number;
     originalVoucherId: number;

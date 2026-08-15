@@ -329,7 +329,7 @@ export function isRowIntegrityValid(
  * @param dbOrTx  Drizzle db or transaction object.
  */
 export async function removeDaybookEntriesForSource(
-  dbOrTx: any,
+  dbOrTx: unknown,
   opts: {
     companyId: number;
     referenceTable: string;

@@ -37,9 +37,9 @@ export function useLocationInventoryState({ companyId, toast }: UseLocationInven
   const tableRef = useRef<HTMLDivElement>(null);
   const [allStockSelectedRowIndex, setAllStockSelectedRowIndex] = useState<number>(-1);
   const [stockMovementOpen, setStockMovementOpen] = useState(false);
-  const [stockMovementItem, setStockMovementItem] = useState<any>(null);
-  const [stockMovementPeriod, setStockMovementPeriod] = useState<any>(() => getDefaultPeriodValue("this_month"));
-  const [drillMonth, setDrillMonth] = useState<any>(null);
+  const [stockMovementItem, setStockMovementItem] = useState<unknown>(null);
+  const [stockMovementPeriod, setStockMovementPeriod] = useState<unknown>(() => getDefaultPeriodValue("this_month"));
+  const [drillMonth, setDrillMonth] = useState<unknown>(null);
   const allStockTableRef = useRef<HTMLDivElement>(null);
 
   // Keep the shared location context aligned with the Location Inventory page so

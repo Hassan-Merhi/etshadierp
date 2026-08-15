@@ -120,7 +120,7 @@ export function collectEmployeeBalanceDeltas(input: {
 }
 
 async function applyDeltaByEmployeeId(
-  tx: any,
+  tx: unknown,
   companyId: number,
   employeeId: number,
   delta: EmployeeBalanceDelta,
@@ -142,7 +142,7 @@ async function applyDeltaByEmployeeId(
 }
 
 async function applyDeltaByEmployeeCode(
-  tx: any,
+  tx: unknown,
   companyId: number,
   employeeCode: string,
   delta: EmployeeBalanceDelta

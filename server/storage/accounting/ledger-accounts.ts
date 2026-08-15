@@ -55,7 +55,7 @@ export async function getLedgerAccountByName(name: string, companyId: number): P
 export async function createLedgerAccount(account: InsertLedgerAccount): Promise<LedgerAccount> {
   // Explicitly strip id/createdAt so a caller that accidentally passes a full
   // LedgerAccount object (structural typing) never includes id in the INSERT.
-  const { id: _id, createdAt: _ca, ...fields } = account as any;
+  const { id: _id, createdAt: _ca, ...fields } = account as unknown;
   const [created] = await db
     .insert(schema.ledgerAccounts)
     .values({

@@ -211,7 +211,7 @@ export async function getRawMaterialReconciliation(companyId: number): Promise<R
     bumpExposure(c.supplierId, c.currencyCode, amt, looksSet);
   }
 
-  const allContainersById = new Map<number, any>(
+  const allContainersById = new Map<number, unknown>(
     (await db.select().from(factoryContainers).where(eq(factoryContainers.companyId, companyId))).map((c) => [c.id, c])
   );
 

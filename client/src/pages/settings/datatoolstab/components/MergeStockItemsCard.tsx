@@ -20,7 +20,7 @@ import { formatNumber } from "@/lib/formatNumber";
 
 import type { MergePreviewResult } from "../types";
 
-export function MergeStockItemsCard({ embedded }: { embedded?: boolean } = {}) {
+export function MergeStockItemsCard({ _embedded }: { embedded?: boolean } = {}) {
   const { toast } = useToast();
   const [keptItem, setKeptItem] = useState<{ id: number; name: string } | null>(null);
   const [dupItem, setDupItem] = useState<{ id: number; name: string } | null>(null);

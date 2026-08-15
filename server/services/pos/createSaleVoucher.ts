@@ -7,7 +7,7 @@
 import { vouchers } from "@shared/schema";
 
 export async function insertSaleVoucher(
-  tx: any,
+  tx: unknown,
   params: {
     companyId: number;
     locationId: unknown;

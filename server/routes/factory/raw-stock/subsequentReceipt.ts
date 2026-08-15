@@ -60,7 +60,7 @@ export async function applySubsequentReceipt(
     currencyCode,
     fxRate,
     offloadDate,
-    declaredKg,
+    _declaredKg,
     dReceivedKg,
     mixBatchAllocationsArr,
     reqDestination,

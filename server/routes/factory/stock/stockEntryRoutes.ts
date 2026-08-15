@@ -47,8 +47,8 @@ export function registerFactoryStockEntryRoutes(app: Express) {
         effectiveDateStr = entryDate;
       }
 
-      const result = await db.transaction(async (tx: any) => {
-        let mixBatch: any = null;
+      const result = await db.transaction(async (tx: unknown) => {
+        let mixBatch: unknown = null;
         if (mixBatchId) {
           const [mb] = await tx
             .select()
@@ -60,7 +60,7 @@ export function registerFactoryStockEntryRoutes(app: Express) {
         }
 
         const totalExpected = items.reduce(
-          (sum: number, item: any) => sum + parseInt(item.quantity || item.qty || "1"),
+          (sum: number, item: unknown) => sum + parseInt(item.quantity || item.qty || "1"),
           0
         );
 
@@ -107,10 +107,10 @@ export function registerFactoryStockEntryRoutes(app: Express) {
           productIds.length > 0
             ? await tx.select().from(factoryBaleProducts).where(inArray(factoryBaleProducts.id, productIds))
             : [];
-        const productMap = new Map<number, any>(factoryProducts.map((p: any) => [p.id, p]));
+        const productMap = new Map<number, unknown>(factoryProducts.map((p: unknown) => [p.id, p]));
 
         const categoryIdSet = new Set<number>();
-        factoryProducts.forEach((p: any) => {
+        factoryProducts.forEach((p: unknown) => {
           if (p.categoryId) categoryIdSet.add(p.categoryId);
         });
         const categoryIds = Array.from(categoryIdSet);
@@ -118,7 +118,7 @@ export function registerFactoryStockEntryRoutes(app: Express) {
           categoryIds.length > 0
             ? await tx.select().from(factoryCategories).where(inArray(factoryCategories.id, categoryIds))
             : [];
-        const categoryMap = new Map<number, any>(factoryCats.map((c: any) => [c.id, c]));
+        const categoryMap = new Map<number, unknown>(factoryCats.map((c: unknown) => [c.id, c]));
 
         // Resolve worker and production-position attribution against the exact
         // stock-entry date. This validates company scope and effective-dated
@@ -187,7 +187,7 @@ export function registerFactoryStockEntryRoutes(app: Express) {
         // with no configured production position and for unassigned bales.
         if (insertedBales.length > 0) {
           await tx.insert(factoryBaleProductionAttributions).values(
-            insertedBales.map((bale: any, idx: number) => {
+            insertedBales.map((bale: unknown, idx: number) => {
               const attribution = baleAttributionRefs[idx];
               return {
                 companyId,
@@ -202,7 +202,7 @@ export function registerFactoryStockEntryRoutes(app: Express) {
           );
         }
 
-        const bales: unknown[] = insertedBales.map((b: any, idx: number) => {
+        const bales: unknown[] = insertedBales.map((b: unknown, idx: number) => {
           const attribution = baleAttributionRefs[idx];
           return {
             ...b,
@@ -341,12 +341,12 @@ export function registerFactoryStockEntryRoutes(app: Express) {
       }
       const descParts = Array.from(productGroups.keys());
       const stockEntryDesc = `${result.bales.length} bale${result.bales.length !== 1 ? "s" : ""} - ${descParts.join(" | ")}`;
-      const totalBaleValue = result.bales.reduce((sum: number, b: any) => {
+      const totalBaleValue = result.bales.reduce((sum: number, b: unknown) => {
         const prodPrice = parseFloat(b._product?.productionPrice || "0");
         return sum + prodPrice;
       }, 0);
       const baleMetaJson = JSON.stringify({
-        bales: result.bales.map((b: any) => ({
+        bales: result.bales.map((b: unknown) => ({
           id: b.id,
           ref: b.referenceNumber,
           productName: b.productName || b.articleCode || "Unknown",
@@ -418,12 +418,12 @@ export function registerFactoryStockEntryRoutes(app: Express) {
           .json({ message: `Duplicate ref numbers within import file: ${Array.from(payloadDupes).join(", ")}` });
       }
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx: unknown) => {
         const existingBarcodes = await tx
           .select({ referenceNumber: factoryBales.referenceNumber })
           .from(factoryBales)
           .where(eq(factoryBales.companyId, companyId));
-        const existingRefSet = new Set(existingBarcodes.map((b: any) => b.referenceNumber));
+        const existingRefSet = new Set(existingBarcodes.map((b: unknown) => b.referenceNumber));
 
         const conflicting = allIntendedRefs.filter((ref) => existingRefSet.has(ref));
         if (conflicting.length > 0) {

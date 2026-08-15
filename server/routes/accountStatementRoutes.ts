@@ -43,7 +43,7 @@ export function registerAccountStatementRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       // Build the account-specific filter on voucherEntries
-      let entryFilter: any;
+      let entryFilter: unknown;
       switch (accountType) {
         case "ledger":
           entryFilter = eq(voucherEntries.ledgerAccountId, accountId);
@@ -453,8 +453,8 @@ export function registerAccountStatementRoutes(app: Express) {
         return { ...r, dr, cr, runBal };
       });
 
-      const totalDr = enrichedRows.reduce((s: number, r: any) => s + r.dr, 0);
-      const totalCr = enrichedRows.reduce((s: number, r: any) => s + r.cr, 0);
+      const totalDr = enrichedRows.reduce((s: number, r: unknown) => s + r.dr, 0);
+      const totalCr = enrichedRows.reduce((s: number, r: unknown) => s + r.cr, 0);
       const closingRaw = runBal;
       const closingBalance2 = Math.abs(closingRaw);
       const closingBalanceSide2 = closingRaw >= 0 ? "Dr" : "Cr";
@@ -542,7 +542,7 @@ export function registerAccountStatementRoutes(app: Express) {
 
       // Opening balance row (no filter) or B/F row (filtered)
       if (!startDate && openingBalance > 0 && accountType === "ledger") {
-        const obBal = openingBalanceSide === "Dr" ? openingBalance : -openingBalance;
+        const _obBal = openingBalanceSide === "Dr" ? openingBalance : -openingBalance;
         const obRow = sheet.addRow([
           new Date().toLocaleDateString("en-GB"),
           "—",

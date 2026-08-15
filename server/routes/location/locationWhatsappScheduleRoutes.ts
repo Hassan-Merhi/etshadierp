@@ -133,14 +133,14 @@ function zonedLocalToUtc(
   return new Date(guess);
 }
 
-function lastScheduledLocalDate(value: any): string | null {
+function lastScheduledLocalDate(value: unknown): string | null {
   if (!value) return null;
   if (typeof value === "string") return value.slice(0, 10);
   if (value instanceof Date) return value.toISOString().slice(0, 10);
   return String(value).slice(0, 10);
 }
 
-function computeNextSendAt(row: any, now = new Date()): string | null {
+function computeNextSendAt(row: unknown, now = new Date()): string | null {
   if (!row?.enabled) return null;
   const timezone = row.timezone || DEFAULT_TIMEZONE;
   if (!isValidTimezone(timezone)) return null;
@@ -194,7 +194,7 @@ function defaultSchedule(locationId: number) {
   };
 }
 
-function serializeSchedule(row: any, locationId: number) {
+function serializeSchedule(row: unknown, locationId: number) {
   if (!row) return defaultSchedule(locationId);
   const sendTime = typeof row.send_time === "string" ? row.send_time.slice(0, 5) : "18:00";
   return {

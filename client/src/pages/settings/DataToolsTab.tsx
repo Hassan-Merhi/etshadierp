@@ -56,15 +56,15 @@ export function DataToolsTab() {
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   // Separate location selection for each import operation
-  const [costPriceLocationId, setCostPriceLocationId] = useState<string>("");
+  const [costPriceLocationId, _setCostPriceLocationId] = useState<string>("");
   const [stockLocationId, setStockLocationId] = useState<string>("");
   // Cost price import state
-  const [costPriceImportOpen, setCostPriceImportOpen] = useState(false);
-  const [costPriceFile, setCostPriceFile] = useState<File | null>(null);
+  const [_costPriceImportOpen, setCostPriceImportOpen] = useState(false);
+  const [_costPriceFile, setCostPriceFile] = useState<File | null>(null);
   const [costPricePreview, setCostPricePreview] = useState<Array<{ barcode: string; costPrice: number }>>([]);
   const [costPriceErrors, setCostPriceErrors] = useState<string[]>([]);
-  const [isImportingCostPrice, setIsImportingCostPrice] = useState(false);
-  const [costPriceImportComplete, setCostPriceImportComplete] = useState(false);
+  const [_isImportingCostPrice, setIsImportingCostPrice] = useState(false);
+  const [_costPriceImportComplete, setCostPriceImportComplete] = useState(false);
   // Stock import state
   const [stockImportOpen, setStockImportOpen] = useState(false);
   const [stockFile, setStockFile] = useState<File | null>(null);
@@ -161,7 +161,7 @@ export function DataToolsTab() {
     },
   });
   // Cost price import functions
-  const downloadCostPriceTemplate = async () => {
+  const _downloadCostPriceTemplate = async () => {
     const template = [
       { barcode: "ITEM001", costPrice: "125.50" },
       { barcode: "ITEM002", costPrice: "95.75" },
@@ -175,7 +175,7 @@ export function DataToolsTab() {
       description: "Use this template to update cost prices",
     });
   };
-  const handleCostPriceFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const _handleCostPriceFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
     setCostPriceFile(selectedFile);
@@ -186,7 +186,7 @@ export function DataToolsTab() {
       const data = await selectedFile.arrayBuffer();
       const workbook = await read(data);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = utils.sheet_to_json<any>(worksheet);
+      const jsonData = utils.sheet_to_json<unknown>(worksheet);
       if (jsonData.length === 0) {
         toast({ title: "Empty File", description: "The Excel file is empty.", variant: "destructive" });
         return;
@@ -220,11 +220,11 @@ export function DataToolsTab() {
       });
       setCostPricePreview(rows);
       setCostPriceErrors(errors);
-    } catch (error) {
+    } catch (_error) {
       toast({ title: "Error Reading File", description: "Please ensure valid Excel file.", variant: "destructive" });
     }
   };
-  const handleCostPriceImport = async () => {
+  const _handleCostPriceImport = async () => {
     if (!costPriceLocationId) {
       toast({ title: "No Location Selected", description: "Please select a location first", variant: "destructive" });
       return;
@@ -255,7 +255,7 @@ export function DataToolsTab() {
       setIsImportingCostPrice(false);
     }
   };
-  const handleCostPriceDialogClose = async () => {
+  const _handleCostPriceDialogClose = async () => {
     setCostPriceImportOpen(false);
     setCostPriceFile(null);
     setCostPricePreview([]);
@@ -285,7 +285,7 @@ export function DataToolsTab() {
       const data = await selectedFile.arrayBuffer();
       const workbook = await read(data);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = utils.sheet_to_json<any>(worksheet);
+      const jsonData = utils.sheet_to_json<unknown>(worksheet);
       if (jsonData.length === 0) {
         toast({ title: "Empty File", description: "The Excel file is empty.", variant: "destructive" });
         return;
@@ -337,7 +337,7 @@ export function DataToolsTab() {
       });
       setStockPreview(rows);
       setStockErrors(errors);
-    } catch (error) {
+    } catch (_error) {
       toast({ title: "Error Reading File", description: "Please ensure valid Excel file.", variant: "destructive" });
     }
   };
@@ -431,7 +431,7 @@ export function DataToolsTab() {
           const change = parseFloat(String(row["Qty Change"] ?? row.Change ?? "0")) || 0;
           const rate = parseFloat(String(row.Rate ?? "0")) || 0;
 
-          let matched: any = code
+          let matched: unknown = code
             ? (allStockItems as unknown[]).find((s: unknown) => s.code?.toLowerCase() === code.toLowerCase())
             : undefined;
           if (!matched && name)

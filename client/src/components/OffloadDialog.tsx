@@ -219,7 +219,7 @@ export function OffloadDialog({ open, onOpenChange, containerId, containerNumber
     enabled: open && !isSpCompany,
   });
 
-  const { data: spStatusData } = useQuery<any>({
+  const { data: spStatusData } = useQuery<unknown>({
     queryKey: ["/api/sp/setup/status"],
     enabled: open && isSpCompany,
   });
@@ -229,7 +229,7 @@ export function OffloadDialog({ open, onOpenChange, containerId, containerNumber
     enabled: open && isSpCompany,
   });
 
-  const { data: containerData } = useQuery<any>({
+  const { data: containerData } = useQuery<unknown>({
     queryKey: [`/api/containers/${containerId}`],
     enabled: open && !!containerId,
   });

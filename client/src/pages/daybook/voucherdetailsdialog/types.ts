@@ -17,8 +17,8 @@ export interface VoucherDetailsDialogProps {
   revisionsError: boolean;
   revisionsErrorMessage?: string;
   retryVoucherRevisions: () => void;
-  formatAmount: (amt: any) => string;
-  formatDisplayDate: (date: any) => string;
+  formatAmount: (amt: unknown) => string;
+  formatDisplayDate: (date: unknown) => string;
   formatDisplayTime: (date: string) => string;
   cashAccountBalance: string;
   entryBalances: Record<number, string>;

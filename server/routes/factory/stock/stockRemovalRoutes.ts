@@ -50,7 +50,7 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
         return res.status(403).json({ message: "Supervisor must have Admin, Owner, or Manager role" });
       }
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx: unknown) => {
         const balesToRemove = await tx
           .select()
           .from(factoryBales)
@@ -67,7 +67,7 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
           productIds.length > 0
             ? await tx.select().from(factoryBaleProducts).where(inArray(factoryBaleProducts.id, productIds))
             : [];
-        const productMap = new Map<number, any>(factoryProducts.map((p: any) => [p.id, p]));
+        const productMap = new Map<number, unknown>(factoryProducts.map((p: unknown) => [p.id, p]));
 
         const stockItemCache = new Map<string, number>();
 
@@ -117,7 +117,7 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
 
       const today = getClientDate(req);
       const removalMetaJson = JSON.stringify({
-        bales: result.removed.map((b: any) => ({
+        bales: result.removed.map((b: unknown) => ({
           id: b.id,
           ref: b.referenceNumber,
           productName: b.productName || "Unknown",
@@ -171,7 +171,7 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
         return res.status(403).json({ message: "Supervisor must have Admin, Owner, or Manager role" });
       }
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx: unknown) => {
         const balesToRemove = await tx
           .select()
           .from(factoryBales)
@@ -224,7 +224,7 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
 
       const today = getClientDate(req);
       const baleMetaJson = JSON.stringify({
-        bales: result.removed.map((b: any) => ({
+        bales: result.removed.map((b: unknown) => ({
           id: b.id,
           ref: b.referenceNumber,
           productName: b.productName || "Unknown",

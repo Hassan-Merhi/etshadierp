@@ -17,7 +17,7 @@ import { supplierProformas, supplierProformaLines, suppliers } from "@shared/sch
  * decimal point with fractional digits, optional currency prefix/suffix, and surrounding
  * whitespace.  Everything else (text, "N/A", scientific notation, etc.) returns "0".
  */
-function sanitizeDecimal(v: any): string {
+function sanitizeDecimal(v: unknown): string {
   const raw = String(v ?? "").trim();
   // Strip leading/trailing currency symbols and whitespace
   const stripped = raw.replace(/^[^0-9\-(]+/, "").replace(/[^0-9.]+$/, "");
@@ -45,7 +45,7 @@ async function batchInsertProformaLines(rows: unknown[]) {
   });
 }
 
-export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
+export function registerSupplierProformaRoutes(app: Express, requireAuth: unknown) {
   app.get("/api/suppliers/:supplierId/proformas", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;
@@ -141,7 +141,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
       const proformaId = parseId(req.params.proformaId);
       if (proformaId === null) return res.status(400).json({ message: "Invalid id" });
       const { reference, notes } = req.body;
-      const updates: any = { updatedAt: new Date() };
+      const updates: unknown = { updatedAt: new Date() };
       if (reference !== undefined) updates.reference = reference;
       if (notes !== undefined) updates.notes = notes;
       const [updated] = await db
@@ -229,7 +229,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         .from(supplierProformas)
         .where(and(eq(supplierProformas.id, line.proformaId), eq(supplierProformas.companyId, companyId)));
       if (!proforma) return res.status(403).json({ message: "Access denied" });
-      const updates: any = {};
+      const updates: unknown = {};
       if (req.body.barcode !== undefined) updates.barcode = req.body.barcode;
       if (req.body.itemName !== undefined) updates.itemName = req.body.itemName;
       if (req.body.qty !== undefined) updates.qty = parseInt(req.body.qty) || 0;
@@ -376,7 +376,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
 
         const thin = (c = C.borderCol) => ({ style: "thin" as const, color: { argb: c } });
         const medium = (c = C.navy) => ({ style: "medium" as const, color: { argb: c } });
-        const allBorder = (t = thin(), m?: any) => ({
+        const allBorder = (t = thin(), m?: unknown) => ({
           top: m ?? t,
           bottom: m ?? t,
           left: t,
@@ -460,7 +460,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         const hdrRow = ws.getRow(hdrRowNum);
         hdrRow.values = headers;
         hdrRow.height = 30;
-        hdrRow.eachCell((cell: any, col: number) => {
+        hdrRow.eachCell((cell: unknown, col: number) => {
           cell.font = { bold: true, size: 10, color: { argb: C.headerText } };
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.blueMid } };
           cell.alignment = {
@@ -500,7 +500,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
           const isAlt = i % 2 === 1;
           const rowBg = isAlt ? C.altRow : C.whiteRow;
 
-          row.eachCell((cell: any, col: number) => {
+          row.eachCell((cell: unknown, col: number) => {
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowBg } };
             cell.border = allBorder();
             cell.alignment = {
@@ -529,7 +529,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         const totalRow = ws.getRow(nextRowIdx);
         totalRow.values = ["", "", "TOTAL", totQty, "", "", totWeightKg, totValue];
         totalRow.height = 28;
-        totalRow.eachCell((cell: any, col: number) => {
+        totalRow.eachCell((cell: unknown, col: number) => {
           cell.font = { bold: true, size: 11, color: { argb: C.totalText } };
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.totalBg } };
           cell.border = { top: medium(), bottom: medium(), left: thin(), right: thin() };

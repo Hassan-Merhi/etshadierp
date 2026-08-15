@@ -166,7 +166,7 @@ function OfflineBannerInner() {
       }
     }
     refreshQueue();
-  }, [isOnline]);
+  }, [isOnline, replayQueue]);
 
   useEffect(() => {
     refreshQueue();

@@ -140,7 +140,7 @@ export function RemoteControllerSessionProvider({ children }: { children: ReactN
       releaseRemoteControlPanelHost(host);
       setPortalHost((current) => (current === host ? null : current));
     };
-  }, [target?.userId]);
+  }, [target, target.userId]);
 
   const refreshSession = useCallback(async (): Promise<RemoteControllerSessionView | null> => {
     const activeTarget = targetRef.current;
@@ -221,7 +221,7 @@ export function RemoteControllerSessionProvider({ children }: { children: ReactN
       window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [refreshSession, target?.userId]);
+  }, [refreshSession, target, target.userId]);
 
   useEffect(() => {
     const targetUserId = target?.userId;

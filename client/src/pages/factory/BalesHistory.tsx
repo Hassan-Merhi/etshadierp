@@ -88,7 +88,7 @@ export default function BalesHistory() {
   const { colors: designColors } = useLabelDesignColors();
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [batchFilter, setBatchFilter] = useState("all");
+  const [batchFilter, _setBatchFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState(() => new Date().toLocaleDateString("en-CA"));
   const [currentPage, setCurrentPage] = useState(1);
@@ -100,8 +100,8 @@ export default function BalesHistory() {
   const [editingNameValue, setEditingNameValue] = useState("");
   const [designPickerOpen, setDesignPickerOpen] = useState(false);
   const [pendingReprintLabels, setPendingReprintLabels] = useState<LabelData[] | null>(null);
-  const [repackConfirm, setRepackConfirm] = useState<any>(null);
-  const [returnToStockBale, setReturnToStockBale] = useState<any>(null);
+  const [repackConfirm, setRepackConfirm] = useState<unknown>(null);
+  const [returnToStockBale, setReturnToStockBale] = useState<unknown>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const nameInputRef = useRef<HTMLInputElement>(null);
   const reimportFileRef = useRef<HTMLInputElement>(null);
@@ -176,7 +176,7 @@ export default function BalesHistory() {
   const { data: myAccess } = useQuery<{ fullAccess: boolean; pageKeys: string[]; hiddenCostFields: string[] }>({
     queryKey: ["/api/factory/my-access"],
   });
-  const hiddenCost = myAccess?.hiddenCostFields ?? [];
+  const _hiddenCost = myAccess?.hiddenCostFields ?? [];
 
   type BalesPage = { items: unknown[]; total: number; page: number; limit: number; totalPages: number };
   const { data: balesResponse, isLoading } = useQuery<BalesPage>({
@@ -215,7 +215,7 @@ export default function BalesHistory() {
   const serverTotalPages = balesResponse?.totalPages ?? 1;
   const serverTotal = balesResponse?.total ?? 0;
 
-  const { data: mixBatches } = useQuery<FactoryMixBatch[]>({
+  const { data: _mixBatches } = useQuery<FactoryMixBatch[]>({
     queryKey: ["/api/factory/mix-batches"],
   });
 
@@ -283,7 +283,7 @@ export default function BalesHistory() {
     },
   });
 
-  const { data: returnToStockOrderInfo, isLoading: orderInfoLoading } = useQuery<any>({
+  const { data: returnToStockOrderInfo, isLoading: orderInfoLoading } = useQuery<unknown>({
     queryKey: ["/api/factory/bales", returnToStockBale?.bale?.id, "order-info"],
     queryFn: async () => {
       if (!returnToStockBale) return null;

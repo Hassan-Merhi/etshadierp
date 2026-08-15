@@ -14,10 +14,10 @@ import {
 import type { CompanyIsolationLookupAdapter, CompanyScopedResourceType } from "./companyIsolationPolicy";
 
 async function lookupCompany(
-  tx: any,
-  table: any,
-  idColumn: any,
-  companyColumn: any,
+  tx: unknown,
+  table: unknown,
+  idColumn: unknown,
+  companyColumn: unknown,
   resourceId: string | number
 ): Promise<number | null> {
   const numericId = typeof resourceId === "number" ? resourceId : Number(resourceId);

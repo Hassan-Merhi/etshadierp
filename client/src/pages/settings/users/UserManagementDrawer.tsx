@@ -20,7 +20,7 @@ import { Shield, Save } from "lucide-react";
 import { UserManagementForm } from "./UserManagementForm";
 
 interface UserManagementDrawerProps {
-  user: any | null;
+  user: unknown | null;
   open: boolean;
   onClose: () => void;
   companies: unknown[];
@@ -41,9 +41,9 @@ export function UserManagementDrawer({ user, open, onClose, companies, onUserDel
   const [hiddenErpCostFields, setHiddenErpCostFields] = useState<string[]>([]);
 
   const [newPassword, setNewPassword] = useState("");
-  const [showPasswordReset, setShowPasswordReset] = useState(false);
+  const [_showPasswordReset, setShowPasswordReset] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [_advancedOpen, setAdvancedOpen] = useState(false);
   const [openTabGroups, setOpenTabGroups] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -58,7 +58,7 @@ export function UserManagementDrawer({ user, open, onClose, companies, onUserDel
       setShowPasswordReset(false);
       setAdvancedOpen(false);
     }
-  }, [user?.id]);
+  }, [isPrivileged, user, user.id]);
 
   const { data: erpHiddenCostData } = useQuery<{ hiddenCostFields: string[] }>({
     queryKey: ["/api/erp-user-hidden-costs", user?.id],
@@ -116,7 +116,7 @@ export function UserManagementDrawer({ user, open, onClose, companies, onUserDel
     },
   });
 
-  const handleSaveAccount = () => {
+  const _handleSaveAccount = () => {
     updateMutation.mutate({
       username: username !== user.username ? username : undefined,
       displayName,
@@ -124,21 +124,21 @@ export function UserManagementDrawer({ user, open, onClose, companies, onUserDel
     });
   };
 
-  const handleSaveAccess = () => {
+  const _handleSaveAccess = () => {
     updateMutation.mutate({
       hasErpAccess: isPrivileged ? true : hasErpAccess,
       hasFactoryAccess: isPrivileged ? true : hasFactoryAccess,
     });
   };
 
-  const handleSaveRestrictions = () => {
+  const _handleSaveRestrictions = () => {
     updateMutation.mutate({
       pageAccess: Array.from(pageAccess),
       hiddenCostFields: isPrivileged ? [] : hiddenCostFields,
     });
   };
 
-  const togglePage = (key: string) => {
+  const _togglePage = (key: string) => {
     setPageAccess((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key); else next.add(key);
@@ -146,7 +146,7 @@ export function UserManagementDrawer({ user, open, onClose, companies, onUserDel
     });
   };
 
-  const toggleGroup = (group: string, pages: { key: string }[]) => {
+  const _toggleGroup = (group: string, pages: { key: string }[]) => {
     const allSelected = pages.every((p) => pageAccess.has(p.key));
     setPageAccess((prev) => {
       const next = new Set(prev);
@@ -155,11 +155,11 @@ export function UserManagementDrawer({ user, open, onClose, companies, onUserDel
     });
   };
 
-  const toggleCostField = (key: string) => {
+  const _toggleCostField = (key: string) => {
     setHiddenCostFields((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
   };
 
-  const toggleErpCostField = (key: string) => {
+  const _toggleErpCostField = (key: string) => {
     setHiddenErpCostFields((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
   };
 
@@ -183,7 +183,7 @@ export function UserManagementDrawer({ user, open, onClose, companies, onUserDel
     },
   });
 
-  const handleSaveErpRestrictions = () => saveErpRestrictionsMutation.mutate();
+  const _handleSaveErpRestrictions = () => saveErpRestrictionsMutation.mutate();
 
   const toggleTabGroup = (group: string) => {
     setOpenTabGroups((prev) => {
@@ -227,7 +227,7 @@ export function UserManagementDrawer({ user, open, onClose, companies, onUserDel
   ]);
 
   const handleSaveAll = () => {
-    const payload: any = {
+    const payload: unknown = {
       displayName,
     };
     if (username !== user.username) payload.username = username;
@@ -269,7 +269,7 @@ export function UserManagementDrawer({ user, open, onClose, companies, onUserDel
           ? "Factory only"
           : "No access";
 
-  const restrictionCount =
+  const _restrictionCount =
     (isPrivileged ? 0 : pageAccess.size) +
     (isPrivileged ? 0 : hiddenCostFields.length) +
     (isPrivileged ? 0 : hiddenErpCostFields.length);

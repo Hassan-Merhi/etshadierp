@@ -33,7 +33,7 @@ export function usePosRowCalculations({
   posUser,
   focusCell,
 }: PosRowCalculationsParams) {
-  const selectItem = (item: any, targetRowOverride?: number) => {
+  const selectItem = (item: unknown, targetRowOverride?: number) => {
     // authUser is refreshed for the active company and must win over the route
     // prop if the company changed after the app first authenticated.
     const canSellNegativeStock = authUser?.canSellNegativeStock ?? posUser?.canSellNegativeStock ?? false;
@@ -93,7 +93,7 @@ export function usePosRowCalculations({
     setTimeout(() => focusCell(targetRow, 1), 0);
   };
 
-  const updateRow = (index: number, field: keyof SaleRow, value: any) => {
+  const updateRow = (index: number, field: keyof SaleRow, value: unknown) => {
     const newRows = [...rows];
     newRows[index] = { ...newRows[index], [field]: value };
     if (field === "quantity" || field === "rate") {

@@ -23,7 +23,7 @@ export type WhatsAppPromptState = {
  *   2. `data.whatsapp.accountId` is a non-zero number
  *   3. `data.whatsapp.month` is a non-empty string
  */
-export function resolveWhatsAppPrompt(data: any): WhatsAppPromptState {
+export function resolveWhatsAppPrompt(data: unknown): WhatsAppPromptState {
   if (
     data?.whatsapp?.prompt &&
     data.whatsapp.accountId &&

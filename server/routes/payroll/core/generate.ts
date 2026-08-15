@@ -72,7 +72,7 @@ export function registerPayrollGenerateRoutes(app: Express) {
       };
 
       // Fetch all attendance records for the period (for monthly attendance-based calculation)
-      const workerIdList = targetWorkers.map((w: any) => w.id);
+      const workerIdList = targetWorkers.map((w: unknown) => w.id);
       const attendanceRecords = workerIdList.length
         ? await db
             .select()
@@ -147,7 +147,7 @@ export function registerPayrollGenerateRoutes(app: Express) {
         workerAccCache.set(worker.id, { salaryId: sa.id, bonusId: ba.id });
       }
 
-      const created = await db.transaction(async (tx: any) => {
+      const created = await db.transaction(async (tx: unknown) => {
         let count = 0;
         let totalNet = 0;
         let totalAdvanceDeductions = 0;
@@ -266,7 +266,7 @@ export function registerPayrollGenerateRoutes(app: Express) {
               )
             );
           if (staleGenVouchers.length > 0) {
-            const vIds = staleGenVouchers.map((v: any) => v.id);
+            const vIds = staleGenVouchers.map((v: unknown) => v.id);
             await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
             await tx.delete(vouchers).where(inArray(vouchers.id, vIds));
           }

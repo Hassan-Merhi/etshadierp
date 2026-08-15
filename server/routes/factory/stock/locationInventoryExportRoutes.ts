@@ -106,13 +106,13 @@ export function registerFactoryLocationInventoryExportRoutes(app: Express) {
       const ROW_ALT = "FFF5F8FF";
       const ROW_WG_ALT = "FFFAF5FF";
       const TOTAL_BG = "FFE8F0FE";
-      const LOC_SEP = "FFDCE6F1"; // light blue for location separator rows
+      const _LOC_SEP = "FFDCE6F1"; // light blue for location separator rows
       const NUM_FMT = "#,##0.00";
       const INT_FMT = "#,##0";
 
-      const styleHeaderRow = (row: any, argbColor: string) => {
+      const styleHeaderRow = (row: unknown, argbColor: string) => {
         row.height = 20;
-        row.eachCell((cell: any) => {
+        row.eachCell((cell: unknown) => {
           cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: argbColor } };
           cell.alignment = { vertical: "middle", horizontal: "center" };
@@ -120,13 +120,13 @@ export function registerFactoryLocationInventoryExportRoutes(app: Express) {
         });
       };
 
-      const applyDataRow = (row: any, isAlt: boolean, altArgb: string) => {
+      const applyDataRow = (row: unknown, isAlt: boolean, altArgb: string) => {
         if (isAlt) {
-          row.eachCell({ includeEmpty: false }, (cell: any) => {
+          row.eachCell({ includeEmpty: false }, (cell: unknown) => {
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: altArgb } };
           });
         }
-        row.eachCell({ includeEmpty: false }, (cell: any) => {
+        row.eachCell({ includeEmpty: false }, (cell: unknown) => {
           cell.alignment = { vertical: "middle" };
         });
       };
@@ -175,7 +175,7 @@ export function registerFactoryLocationInventoryExportRoutes(app: Express) {
       const wgRows = sortRows(Array.from(wgGrouped.values()));
 
       // Helper: build a summary sheet (location-grouped)
-      const buildSheet = (ws: any, rows: GroupedLocRow[], label: string, headerColor: string, altColor: string) => {
+      const buildSheet = (ws: unknown, rows: GroupedLocRow[], label: string, headerColor: string, altColor: string) => {
         const cols: unknown[] = [
           { header: "Location", key: "locationName", width: 22 },
           { header: "Article Code", key: "articleCode", width: 18 },
@@ -215,7 +215,7 @@ export function registerFactoryLocationInventoryExportRoutes(app: Express) {
           totalKg += row.totalWeight;
           totalValue += tv;
 
-          const rd: any = {
+          const rd: unknown = {
             locationName: row.locationName,
             articleCode: row.articleCode,
             productName: row.productName,
@@ -241,7 +241,7 @@ export function registerFactoryLocationInventoryExportRoutes(app: Express) {
         }
 
         ws.addRow({});
-        const td: any = {
+        const td: unknown = {
           locationName: "GRAND TOTAL",
           articleCode: "",
           productName: `${rows.length} ${label} across ${locationRecords.length} locations`,
@@ -256,7 +256,7 @@ export function registerFactoryLocationInventoryExportRoutes(app: Express) {
         }
         const tr = ws.addRow(td);
         tr.font = { bold: true };
-        tr.eachCell({ includeEmpty: false }, (cell: any) => {
+        tr.eachCell({ includeEmpty: false }, (cell: unknown) => {
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: TOTAL_BG } };
         });
         tr.getCell("baleCount").numFmt = INT_FMT;
@@ -302,7 +302,7 @@ export function registerFactoryLocationInventoryExportRoutes(app: Express) {
       mainBales.forEach((b, idx) => {
         const locId = b.erpLocationId ?? 0;
         const pid = b.productId ?? 0;
-        const rd: any = {
+        const rd: unknown = {
           locationName: locationMap.get(locId) || `Location #${locId}`,
           referenceNumber: b.referenceNumber,
           articleCode: b.articleCode || "",
@@ -362,7 +362,7 @@ export function registerFactoryLocationInventoryExportRoutes(app: Express) {
         const pid = b.productId ?? 0;
         const w = parseFloat(String(b.weightKg || "0"));
         gbTotalKgAll += w;
-        const rd: any = {
+        const rd: unknown = {
           locationName: locationMap.get(locId) || `Location #${locId}`,
           referenceNumber: b.referenceNumber,
           baleCode: b.baleCode || "",
@@ -387,7 +387,7 @@ export function registerFactoryLocationInventoryExportRoutes(app: Express) {
 
       if (garbageBalesAll.length > 0) {
         garbageDetailSheetAll.addRow({});
-        const gtd: any = {
+        const gtd: unknown = {
           locationName: "GRAND TOTAL",
           referenceNumber: "",
           baleCode: "",
@@ -405,7 +405,7 @@ export function registerFactoryLocationInventoryExportRoutes(app: Express) {
         }
         const gtr = garbageDetailSheetAll.addRow(gtd);
         gtr.font = { bold: true };
-        gtr.eachCell({ includeEmpty: false }, (cell: any) => {
+        gtr.eachCell({ includeEmpty: false }, (cell: unknown) => {
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: TOTAL_BG_ALL } };
         });
         gtr.getCell("weightKg").numFmt = NUM_FMT;

@@ -128,9 +128,9 @@ export default function POS({ posUser, editVoucherId }: { posUser?: unknown; edi
     currentShift,
     authUser,
     lastSoldPrices,
-    posCustomers,
+    _posCustomers,
     editVoucher,
-    editVoucherLoading,
+    _editVoucherLoading,
     editVoucherViewEntries,
     stockInventory,
     stockInventoryLoading,
@@ -151,7 +151,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: unknown; edi
   useEffect(() => {
     if (!isSpCompany) return;
     setIsCreditSale(false);
-  }, [isSpCompany]);
+  }, [isSpCompany, setIsCreditSale]);
 
   // Keep autoSaveStateRef in sync
   autoSaveStateRef.current.activeLocation = activeLocation;
@@ -170,7 +170,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: unknown; edi
     if (posUser && posAssignedLocations.length > 0 && !posSelectedLocation) {
       setPosSelectedLocation(posAssignedLocations[0]);
     }
-  }, [posUser, posAssignedLocations, posSelectedLocation]);
+  }, [posUser, posAssignedLocations, posSelectedLocation, setPosSelectedLocation]);
 
   // Set default cash account for POS users from location mapping — applies to
   // Supplier Partner companies too, same as normal ERP POS.
@@ -181,7 +181,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: unknown; edi
       setPaymentAccountType("cash");
       setPaymentAccountId(String(locCashId));
     }
-  }, [posUser, posSelectedLocation, editVoucherId]);
+  }, [posUser, posSelectedLocation, editVoucherId, setPaymentAccountType, setPaymentAccountId]);
 
   // Auto-attach to today's draft
   useEffect(() => {
@@ -196,7 +196,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: unknown; edi
       return dateObj.toISOString().slice(0, 10) === todayUTC;
     });
     if (todayDraft) setCurrentDraftId(todayDraft.id);
-  }, [drafts]);
+  }, [currentDraftId, drafts, setCurrentDraftId]);
 
   // Set location from edit voucher
   useEffect(() => {
@@ -270,7 +270,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: unknown; edi
 
     if (editVoucher.description) setNotes(editVoucher.description);
     if (editVoucher.voucherDate) setSaleDate(editVoucher.voucherDate);
-  }, [editVoucherId, editVoucher, editVoucherViewEntries]);
+  }, [editVoucherId, editVoucher, editVoucherViewEntries, setRows, setNotes, setSaleDate]);
 
   // Effect 2: Detect payment account type once ledger accounts are available.
   // This is separate from Effect 1 so that ledger-account re-fetches never
@@ -311,7 +311,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: unknown; edi
         setPaymentAccountId(String(debitEntry.ledgerAccountId));
       }
     }
-  }, [editVoucher, allLedgerAccounts]);
+  }, [editVoucher, allLedgerAccounts, setPaymentAccountType, setPaymentAccountId, setIsCreditSale, setSelectedCustomerId]);
 
   // ── WhatsApp / mutations / autosave ───────────────────────────────────────
   const { handleSendInvoiceWhatsApp, handleSendWhatsAppReport } = usePosWhatsApp({

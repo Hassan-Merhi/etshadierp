@@ -41,7 +41,7 @@ const ROLE_PRESETS: Record<string, RolePreset[]> = {
 interface InlineRoleEditorProps {
   userId: string;
   companies: unknown[];
-  editingRole: any | null;
+  editingRole: unknown | null;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -138,7 +138,7 @@ export function InlineRoleEditor({ userId, companies, editingRole, onClose, onSa
       setPosViewOnly(false);
       setCanDeleteRecords(false);
     }
-  }, [editingRole?.id]);
+  }, [companies, editingRole, editingRole.id]);
 
   const { data: locations = [] } = useQuery<unknown[]>({
     queryKey: ["/api/locations", { companyId }],
@@ -223,7 +223,7 @@ export function InlineRoleEditor({ userId, companies, editingRole, onClose, onSa
     },
   });
 
-  const toggleLocation = (locId: number) => {
+  const _toggleLocation = (locId: number) => {
     setSelectedLocationIds((prev) => {
       const isRemoving = prev.includes(locId);
       const next = isRemoving ? prev.filter((id) => id !== locId) : [...prev, locId];
@@ -239,13 +239,13 @@ export function InlineRoleEditor({ userId, companies, editingRole, onClose, onSa
     });
   };
 
-  const selectAllLocations = () => {
+  const _selectAllLocations = () => {
     const all = locations.map((l) => l.id);
     setSelectedLocationIds(all);
     if (all.length > 0) setAssignedLocationId(all[0]);
   };
 
-  const clearLocations = () => {
+  const _clearLocations = () => {
     setSelectedLocationIds([]);
     setAssignedLocationId(undefined);
     setLocationCashAccounts({});

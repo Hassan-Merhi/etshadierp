@@ -92,7 +92,7 @@ export function registerWorkerStatementReadRoutes(app: Express) {
         });
       }
 
-      entries.sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      entries.sort((a: unknown, b: unknown) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
       let runningBalance = 0;
       for (const entry of entries) {
@@ -188,8 +188,8 @@ export function registerWorkerStatementReadRoutes(app: Express) {
         .from(companySettings)
         .where(eq(companySettings.companyId, companyId))
         .catch(() => [null]);
-      const companyName = co?.name ?? "Company";
-      const logoUrl: string | null = sett?.logoUrl ?? null;
+      const _companyName = co?.name ?? "Company";
+      const _logoUrl: string | null = sett?.logoUrl ?? null;
       const baseCurrency = co?.baseCurrency ?? "USD";
       const currMap: Record<string, string> = { USD: "$ ", GBP: "£", EUR: "€", CFA: "CFA ", AED: "AED " };
       const sym = currMap[baseCurrency.toUpperCase()] ?? baseCurrency + " ";
@@ -232,7 +232,7 @@ export function registerWorkerStatementReadRoutes(app: Express) {
       let wConvertArabic: ((t: string) => string) | null = null;
       let wBidiInst: {
         getEmbeddingLevels: (t: string, d: string) => unknown;
-        getReorderedString: (t: string, l: any) => string;
+        getReorderedString: (t: string, l: unknown) => string;
       } | null = null;
       try {
         const reshaperMod = require("arabic-reshaper") as { convertArabic: (t: string) => string };

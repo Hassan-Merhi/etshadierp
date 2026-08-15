@@ -137,7 +137,7 @@ export function registerChatbotPatchRoutes(app: Express) {
         .orderBy(desc(codePatchHistory.appliedAt))
         .limit(100);
       res.json(rows);
-    } catch (error: unknown) {
+    } catch (_error: unknown) {
       res.status(500).json({ message: "Internal server error" });
     }
   });

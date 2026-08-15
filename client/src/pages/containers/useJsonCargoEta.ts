@@ -42,7 +42,7 @@ export function useJsonCargoEta() {
         return next;
       });
     },
-    onError: (error: any, containerId) => {
+    onError: (error: unknown, containerId) => {
       if (error?._handledGlobally) return;
       toast({ title: "ETA Refresh Failed", description: error.message, variant: "destructive" });
       setRefreshingIds((prev) => {
@@ -62,7 +62,7 @@ export function useJsonCargoEta() {
       queryClient.invalidateQueries({ queryKey: ["/api/containers/active"] });
       toast({ title: "Bulk ETA Refresh", description: data.message });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if (error?._handledGlobally) return;
       toast({ title: "Bulk ETA Refresh Failed", description: error.message, variant: "destructive" });
     },

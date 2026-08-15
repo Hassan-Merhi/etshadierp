@@ -80,7 +80,7 @@ async function loadSalesData(voucherId: number, locationId: number | null | unde
   });
 }
 
-async function loadAdjustmentData(voucher: any) {
+async function loadAdjustmentData(voucher: unknown) {
   const [adjustment] = await db
     .select()
     .from(schema.stockAdjustmentVouchers)
@@ -123,7 +123,7 @@ async function loadAdjustmentData(voucher: any) {
   };
 }
 
-async function loadTransferData(voucher: any) {
+async function loadTransferData(voucher: unknown) {
   const [transfer] = await db
     .select()
     .from(schema.stockTransferVouchers)
@@ -178,12 +178,12 @@ async function loadTransferData(voucher: any) {
   };
 }
 
-export async function loadVoucherRelatedData(voucher: any) {
+export async function loadVoucherRelatedData(voucher: unknown) {
   const result = {
-    purchaseOrder: null as any,
-    salesItems: null as any,
-    adjustmentData: null as any,
-    transferData: null as any,
+    purchaseOrder: null as unknown,
+    salesItems: null as unknown,
+    adjustmentData: null as unknown,
+    transferData: null as unknown,
   };
 
   if (voucher.voucherType === "Purchase") {

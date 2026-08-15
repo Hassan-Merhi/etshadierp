@@ -405,7 +405,7 @@ export function registerRentalPaymentsAccrualRoutes(
 
         // Separate posted (effective) and scheduled
         postedPayments = rentPaymentsAll.filter(
-          (p: any) => p.postingStatus === "POSTED" && String(p.paymentDate) <= asOfDate
+          (p: unknown) => p.postingStatus === "POSTED" && String(p.paymentDate) <= asOfDate
         );
         scheduledPayments = rentPaymentsAll.filter((p) => p.postingStatus === "SCHEDULED");
 

@@ -55,7 +55,7 @@ interface LocationItem {
   transferWaGroupChatId?: string | null;
 }
 
-interface CompanyRowProps {
+interface _CompanyRowProps {
   company: CompanyWaSetting;
   chats: GreenChat[];
   chatsLoading: boolean;
@@ -162,8 +162,8 @@ export function TransferWhatsAppSection() {
 
   const filteredChats = chats.filter((c) => c.name.toLowerCase().includes(chatSearch.toLowerCase()));
 
-  const configuredCount = settings?.companies.filter((c) => c.groupChatId).length ?? 0;
-  const totalCount = settings?.companies.length ?? 0;
+  const _configuredCount = settings?.companies.filter((c) => c.groupChatId).length ?? 0;
+  const _totalCount = settings?.companies.length ?? 0;
   const locConfiguredCount = locations.filter((l) => l.transferWaGroupChatId).length;
 
   return (

@@ -17,7 +17,7 @@ import {
   factorySuppliers,
 } from "@shared/schema";
 
-export function registerFactorySupplierScoreRoutes(app: Express, requireAuth: any, db: any) {
+export function registerFactorySupplierScoreRoutes(app: Express, requireAuth: unknown, db: unknown) {
   app.get("/api/factory/suppliers/score", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
@@ -40,7 +40,7 @@ export function registerFactorySupplierScoreRoutes(app: Express, requireAuth: an
 
       const containers = await db.select().from(factoryContainers).where(eq(factoryContainers.companyId, companyId));
 
-      const containerMap = new Map<number, any>(containers.map((c: any) => [c.id, c]));
+      const containerMap = new Map<number, unknown>(containers.map((c: unknown) => [c.id, c]));
 
       const wasteEntries = await db
         .select()
@@ -55,7 +55,7 @@ export function registerFactorySupplierScoreRoutes(app: Express, requireAuth: an
 
       const suppliers = await db.select().from(factorySuppliers).where(eq(factorySuppliers.companyId, companyId));
 
-      const supplierMap = new Map<number, any>(suppliers.map((s: any) => [s.id, s]));
+      const supplierMap = new Map<number, unknown>(suppliers.map((s: unknown) => [s.id, s]));
 
       const mixSources = await db.select().from(factoryMixBatchSources);
 
@@ -103,11 +103,11 @@ export function registerFactorySupplierScoreRoutes(app: Express, requireAuth: an
       }
 
       for (const suppId of Object.keys(supplierStats).map(Number)) {
-        const supplierContainerIds = containers.filter((c: any) => c.supplierId === suppId).map((c: any) => c.id);
+        const supplierContainerIds = containers.filter((c: unknown) => c.supplierId === suppId).map((c: unknown) => c.id);
 
-        const supplierMixSources = mixSources.filter((s: any) => supplierContainerIds.includes(s.containerId));
-        const mixBatchIds = Array.from(new Set(supplierMixSources.map((s: any) => s.mixBatchId))) as number[];
-        const balesFromSupplier = allBales.filter((b: any) => mixBatchIds.includes(b.mixBatchId));
+        const supplierMixSources = mixSources.filter((s: unknown) => supplierContainerIds.includes(s.containerId));
+        const mixBatchIds = Array.from(new Set(supplierMixSources.map((s: unknown) => s.mixBatchId))) as number[];
+        const balesFromSupplier = allBales.filter((b: unknown) => mixBatchIds.includes(b.mixBatchId));
         supplierStats[suppId].outputBales = balesFromSupplier.length;
       }
 

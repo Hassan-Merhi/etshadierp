@@ -198,7 +198,7 @@ export async function buildExactInventoryPlan(sourceId: number, targetId: number
   }
 
   const targetRows = await loadTargetInventoryRows(targetId, Array.from(new Set(Array.from(stockItemMap.values()))));
-  const targetByKey = new Map<string, any>();
+  const targetByKey = new Map<string, unknown>();
   for (const targetRow of targetRows) {
     const key = `${pn(targetRow.stock_item_id)}:${pn(targetRow.location_id)}`;
     if (targetByKey.has(key)) {
@@ -263,7 +263,7 @@ export async function buildExactInventoryPlan(sourceId: number, targetId: number
   };
 }
 
-async function snapshotDelta(tx: any, cutoverId: number, entry: InventoryPlanEntry): Promise<void> {
+async function snapshotDelta(tx: unknown, cutoverId: number, entry: InventoryPlanEntry): Promise<void> {
   await tx.execute(sql`
     INSERT INTO sp_migration_cutover_stock_deltas
       (cutover_id, delta_key, source_inventory_id, target_inventory_id,
@@ -300,7 +300,7 @@ export async function synchronizeExactCutoverStock(
   let zeroed = 0;
   let unchanged = 0;
 
-  await db.transaction(async (tx: any) => {
+  await db.transaction(async (tx: unknown) => {
     for (const originalEntry of plan.entries) {
       if (!originalEntry.changed) {
         unchanged++;
@@ -349,7 +349,7 @@ export async function restoreExactCutoverStock(
   `);
   let restored = 0;
   let deleted = 0;
-  await db.transaction(async (tx: any) => {
+  await db.transaction(async (tx: unknown) => {
     for (const row of resultRows(result)) {
       if (row.created_target_inventory) {
         await tx.execute(

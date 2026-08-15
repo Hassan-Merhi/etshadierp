@@ -16,7 +16,7 @@ import {
   factoryWorkers,
 } from "@shared/schema";
 
-export function registerFactoryKpiRoutes(app: Express, requireAuth: any, db: any) {
+export function registerFactoryKpiRoutes(app: Express, requireAuth: unknown, db: unknown) {
   app.get("/api/factory/kpis/daily", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
@@ -98,7 +98,7 @@ export function registerFactoryKpiRoutes(app: Express, requireAuth: any, db: any
 
       const workers = await db.select().from(factoryWorkers).where(eq(factoryWorkers.companyId, companyId));
 
-      const workerMap = new Map<number, any>(workers.map((w: any) => [w.id, w]));
+      const workerMap = new Map<number, unknown>(workers.map((w: unknown) => [w.id, w]));
 
       const workerStats: Record<number, { workerId: number; workerName: string; balesCount: number; totalKg: number }> =
         {};
@@ -147,7 +147,7 @@ export function registerFactoryKpiRoutes(app: Express, requireAuth: any, db: any
           )
         );
 
-      const mixIds = mixes.map((m: any) => m.id);
+      const mixIds = mixes.map((m: unknown) => m.id);
       if (mixIds.length === 0) return res.json([]);
 
       const sources = await db
@@ -173,13 +173,13 @@ export function registerFactoryKpiRoutes(app: Express, requireAuth: any, db: any
           )
         );
 
-      const result = mixes.map((mix: any) => {
-        const mixSources = sources.filter((s: any) => s.mixBatchId === mix.id);
-        const totalInputKg = mixSources.reduce((s: number, src: any) => s + parseFloat(src.weightKg || "0"), 0);
+      const result = mixes.map((mix: unknown) => {
+        const mixSources = sources.filter((s: unknown) => s.mixBatchId === mix.id);
+        const totalInputKg = mixSources.reduce((s: number, src: unknown) => s + parseFloat(src.weightKg || "0"), 0);
 
-        const mixBales = bales.filter((b: any) => b.mixBatchId === mix.id);
+        const mixBales = bales.filter((b: unknown) => b.mixBatchId === mix.id);
         const outputBalesCount = mixBales.length;
-        const totalOutputKg = mixBales.reduce((s: number, b: any) => s + parseFloat(b.weightKg || "0"), 0);
+        const totalOutputKg = mixBales.reduce((s: number, b: unknown) => s + parseFloat(b.weightKg || "0"), 0);
 
         const wasteKg = totalInputKg - totalOutputKg;
         const wastePct = totalInputKg > 0 ? (wasteKg / totalInputKg) * 100 : 0;
@@ -196,7 +196,7 @@ export function registerFactoryKpiRoutes(app: Express, requireAuth: any, db: any
         };
       });
 
-      result.sort((a: any, b: any) => a.wastePct - b.wastePct);
+      result.sort((a: unknown, b: unknown) => a.wastePct - b.wastePct);
       res.json(result);
     } catch (error: unknown) {
       logger.error("Error fetching mix KPIs:", { error: error });

@@ -13,7 +13,7 @@ export interface HandlerErrorResult {
 export interface ResolvedPaymentAccount {
   accountType: "cash" | "bank" | "credit";
   accountId: number;
-  customerAccount: any | null;
+  customerAccount: unknown | null;
 }
 
 export interface ValidatedInventoryItem {

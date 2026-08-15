@@ -9,7 +9,7 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { pool } from "../../db";
 
-export function registerSupplierProfitImportRoutes(app: Express, requireAuth: any) {
+export function registerSupplierProfitImportRoutes(app: Express, requireAuth: unknown) {
   // ── Add a new stock item directly from Supplier Profit Check ────────────────
   // ── Import by codes (Excel upload) ─────────────────────────────────────────
   // Accepts a list of item codes (from Excel). Looks up stock_items by code for

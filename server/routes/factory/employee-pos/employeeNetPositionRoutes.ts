@@ -115,7 +115,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
           )
         );
 
-      const fVoucherIds = factoryVouchers.map((v: any) => v.id);
+      const fVoucherIds = factoryVouchers.map((v: unknown) => v.id);
       const factoryEntries =
         fVoucherIds.length > 0
           ? await db.select().from(voucherEntries).where(inArray(voucherEntries.voucherId, fVoucherIds))
@@ -168,19 +168,19 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       // Build a set of ledger account IDs owned by customers so we can strip them
       // from the ledger classification output (prevents double-counting).
       const customerLedgerIds = new Set<number>(
-        (allCustomersForNP as unknown[]).filter((c: any) => c.ledgerAccountId).map((c: any) => c.ledgerAccountId as number)
+        (allCustomersForNP as unknown[]).filter((c: unknown) => c.ledgerAccountId).map((c: unknown) => c.ledgerAccountId as number)
       );
 
       // Strip customer-linked accounts from the classifier output.
-      const ledgerForUs = classified.forUsAccounts.filter((a: any) => !customerLedgerIds.has(a.id));
-      const ledgerOnUsRaw = classified.onUsAccounts.filter((a: any) => !customerLedgerIds.has(a.id));
+      const ledgerForUs = classified.forUsAccounts.filter((a: unknown) => !customerLedgerIds.has(a.id));
+      const ledgerOnUsRaw = classified.onUsAccounts.filter((a: unknown) => !customerLedgerIds.has(a.id));
 
       // ── Strip any ledger-based "Payroll Payable" accounts ─────────────────────
       // The authoritative source for payroll payable is employees.currentBalance
       // (tracked directly via employeeId on voucher entries, not via a ledger account).
       // Any ledger account named/coded as "Payroll Payable" duplicates that and
       // must be excluded here — the single correct figure is injected below.
-      const ledgerOnUs = ledgerOnUsRaw.filter((a: any) => {
+      const ledgerOnUs = ledgerOnUsRaw.filter((a: unknown) => {
         const nameLower = (a.name || "").toLowerCase();
         const code = (a.code || "").toUpperCase();
         const isPayrollPayable =
@@ -200,13 +200,13 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         const isInsuranceMember = /^insurance\s*[-–]/i.test(a.name || "");
         return !isPayrollPayable && !isAccruedRentPayable && !isFactoryWorkerAdvances && !isInsuranceMember;
       });
-      const ledgerForUsTotal = round2(ledgerForUs.reduce((s: number, a: any) => s + a.value, 0));
-      const ledgerOnUsTotal = round2(ledgerOnUs.reduce((s: number, a: any) => s + a.value, 0));
+      const _ledgerForUsTotal = round2(ledgerForUs.reduce((s: number, a: unknown) => s + a.value, 0));
+      const ledgerOnUsTotal = round2(ledgerOnUs.reduce((s: number, a: unknown) => s + a.value, 0));
 
       const customerItems: { name: string; balanceUsd: number; ledgerAccountId?: number }[] = [];
 
       if ((allCustomersForNP as unknown[]).length > 0) {
-        const cIds = (allCustomersForNP as unknown[]).map((c: any) => c.id);
+        const cIds = (allCustomersForNP as unknown[]).map((c: unknown) => c.id);
         const custLedgerIds = [...customerLedgerIds];
 
         // ── Customer balance formula — mirrors GET /api/factory/customers exactly ──
@@ -226,7 +226,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
           )
           .groupBy(customerBalances.customerId);
 
-        const cCbNetMap = new Map(cCbNetRows.map((r: any) => [r.customerId, parseFloat(r.net || "0")]));
+        const cCbNetMap = new Map(cCbNetRows.map((r: unknown) => [r.customerId, parseFloat(r.net || "0")]));
 
         // 2. Correction for INVOICE rows: replace stored debitAmount with live grandTotal
         //    of FINALIZED orders — identical to the statement correction on the Customers page.
@@ -255,7 +255,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
           )
           .groupBy(customerBalances.customerId);
 
-        const cInvCorrMap = new Map(cInvCorrRows.map((r: any) => [r.customerId, parseFloat(r.correction || "0")]));
+        const cInvCorrMap = new Map(cInvCorrRows.map((r: unknown) => [r.customerId, parseFloat(r.correction || "0")]));
 
         // 3. Voucher entries via ledgerAccountId — EXCLUDE CHARGE-* AND INV-* (matches Customers page).
         const cLedgerVoucherRows =
@@ -280,7 +280,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
                 .groupBy(voucherEntries.ledgerAccountId)
             : [];
         const cLedgerVoucherMap = new Map(
-          (cLedgerVoucherRows as unknown[]).map((r: any) => [r.ledgerAccountId, parseFloat(r.net || "0")])
+          (cLedgerVoucherRows as unknown[]).map((r: unknown) => [r.ledgerAccountId, parseFloat(r.net || "0")])
         );
 
         // 4. Voucher entries directly linked via customerId — EXCLUDE CHARGE-* AND INV-* (matches Customers page).
@@ -303,7 +303,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
           .where(and(inArray(voucherEntries.customerId, cIds), isNull(voucherEntries.ledgerAccountId)))
           .groupBy(voucherEntries.customerId);
 
-        const cVoucherMap = new Map((cVoucherRows as unknown[]).map((r: any) => [r.customerId, parseFloat(r.net || "0")]));
+        const cVoucherMap = new Map((cVoucherRows as unknown[]).map((r: unknown) => [r.customerId, parseFloat(r.net || "0")]));
 
         for (const c of allCustomersForNP as unknown[]) {
           const cbNet = cCbNetMap.get(c.id) ?? 0;
@@ -365,7 +365,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         )
         .orderBy(desc(customerOrders.orderDate));
 
-      const mapOrder = (r: any) => ({
+      const mapOrder = (r: unknown) => ({
         id: r.id,
         customerName: r.customerName || `Customer #${r.customerId}`,
         orderDate: r.orderDate,

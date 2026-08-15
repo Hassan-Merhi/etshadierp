@@ -87,7 +87,7 @@ function normalizePosEntry(
  * voucher row (existingVoucher.currency / existingVoucher.exchangeRate).
  */
 export async function rebuildSaleAccountingEntries(
-  tx: any,
+  tx: unknown,
   params: {
     voucherId: number;
     oldEntries: unknown[];
@@ -133,7 +133,7 @@ export async function rebuildSaleAccountingEntries(
 
   // Debit entry (payment account) with dual-currency fields
   const normDR = normalizePosEntry(Math.abs(grandTotal), 0, voucherCurrency, voucherRate);
-  const newDebitEntry: any = {
+  const newDebitEntry: unknown = {
     voucherId,
     debitAmount: grandTotal >= 0 ? normDR.debitAmount : "0",
     creditAmount: grandTotal < 0 ? normDR.debitAmount : "0",

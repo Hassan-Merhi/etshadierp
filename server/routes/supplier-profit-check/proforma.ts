@@ -9,7 +9,7 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { pool } from "../../db";
 
-export function registerSupplierProfitProformaRoutes(app: Express, requireAuth: any) {
+export function registerSupplierProfitProformaRoutes(app: Express, requireAuth: unknown) {
   app.post("/api/supplier-profit-check/save-proforma", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;

@@ -28,7 +28,7 @@ const ALL_TAB_OPTIONS: {
 ];
 
 export default function FactoryWorkersHub() {
-  const { data: settings } = useQuery<any>({
+  const { data: settings } = useQuery<unknown>({
     queryKey: ["/api/factory/settings"],
     queryFn: async () => {
       const response = await fetch("/api/factory/settings");
@@ -37,7 +37,7 @@ export default function FactoryWorkersHub() {
     staleTime: 60000,
   });
 
-  const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 5 * 60000 });
+  const { data: myAccess } = useQuery<unknown>({ queryKey: ["/api/factory/my-access"], staleTime: 5 * 60000 });
   const hiddenTabs = myAccess?.hiddenCostFields ?? [];
 
   const visibleOptions = ALL_TAB_OPTIONS.filter(({ settingKey, hiddenKey }) => {

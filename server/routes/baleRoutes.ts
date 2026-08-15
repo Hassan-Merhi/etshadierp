@@ -20,11 +20,10 @@ import { eq, and, sql } from "drizzle-orm";
 
 // Module-level bwip-js cache — loaded once on first barcode request, then reused.
 // This avoids the cold-start latency of re-importing the library on every request.
-let _bwipjs: any = null;
+let _bwipjs: unknown = null;
 async function getBwipjs(): Promise<unknown> {
   if (!_bwipjs) {
-    // @ts-ignore - bwip-js types are incomplete
-    _bwipjs = await import("bwip-js");
+        _bwipjs = await import("bwip-js");
   }
   return _bwipjs;
 }
@@ -276,7 +275,7 @@ export function registerBaleRoutes(app: Express) {
   // Helper: generate a reference number that is guaranteed not to clash with any
   // existing factory_bales ref for this company, by taking the max across both
   // sequence tables and the actual data.
-  async function generateSafeRef(tx: any, companyId: number): Promise<string> {
+  async function generateSafeRef(tx: unknown, companyId: number): Promise<string> {
     // Find the true max numeric ref already in use for this company
     const [maxRow] = await tx
       .select({

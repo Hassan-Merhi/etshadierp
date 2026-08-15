@@ -27,7 +27,7 @@ import {
 } from "../../shared/schema";
 import { eq, and, gte, lte, inArray, or, ilike, desc, sql, count, isNull } from "drizzle-orm";
 
-export function registerGlobalTransactionRoutes(app: Express, requireAuth: any) {
+export function registerGlobalTransactionRoutes(app: Express, requireAuth: unknown) {
   // GET /api/global/transactions
   // Returns vouchers across all ERP companies the user has access to.
   app.get("/api/global/transactions", requireAuth, requireNonPOS, async (req, res) => {
@@ -35,7 +35,7 @@ export function registerGlobalTransactionRoutes(app: Express, requireAuth: any) 
       const userId = req.session.userId as string;
       const userRole = req.session.currentRole as string;
       const isAdmin = userRole === "Admin" || userRole === "Developer";
-      const isPrivileged = ["Admin", "Owner", "Manager", "Developer"].includes(userRole);
+      const _isPrivileged = ["Admin", "Owner", "Manager", "Developer"].includes(userRole);
 
       const {
         startDate,

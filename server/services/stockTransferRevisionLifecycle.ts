@@ -110,7 +110,7 @@ export function normalizePendingRevisionItems(items: PendingRevisionItemInput[])
   return normalized;
 }
 
-async function lockTransferScope(tx: any, transferId: number) {
+async function lockTransferScope(tx: unknown, transferId: number) {
   const result = await tx.execute(sql`
     SELECT
       stv.id,
@@ -131,7 +131,7 @@ async function lockTransferScope(tx: any, transferId: number) {
   return firstRow(result);
 }
 
-function assertLockedTransfer(locked: any, companyId: number): asserts locked {
+function assertLockedTransfer(locked: unknown, companyId: number): asserts locked {
   if (!locked) throw new Error("Stock transfer not found");
   if (Number(locked.company_id) !== companyId) throw new Error("Stock transfer belongs to a different company");
   if (locked.voucher_type !== "Stock Transfer" && locked.voucher_type !== "StockTransfer" && locked.voucher_type !== "Transfer") {
@@ -141,7 +141,7 @@ function assertLockedTransfer(locked: any, companyId: number): asserts locked {
 }
 
 async function assertCompanyScope(
-  tx: any,
+  tx: unknown,
   companyId: number,
   destinationLocationId: number,
   items: Array<{ sourceLocationId: number; stockItemId: number }>
@@ -433,7 +433,7 @@ export async function approvePendingStockTransferRevision(
         ) || null;
       const oldQuantity = existing ? Number(existing.quantity) : 0;
       if (Math.abs(oldQuantity - target.originalQuantity) > 0.001) {
-        const error: any = new Error(
+        const error: unknown = new Error(
           `Revision is stale for item ${target.stockItemId} at source ${target.sourceLocationId}. ` +
             `Expected ${target.originalQuantity}, current transfer quantity is ${oldQuantity}.`
         );
@@ -508,7 +508,7 @@ export async function approvePendingStockTransferRevision(
         const row = firstRow(lockedInventory);
         const available = Number(row?.quantity ?? 0);
         if (available + 1e-9 < requirement.quantity) {
-          const error: any = new Error(
+          const error: unknown = new Error(
             `Insufficient stock for revision item ${requirement.stockItemId} at source ${requirement.sourceLocationId}: ` +
               `required ${requirement.quantity}, available ${available}`
           );
@@ -533,7 +533,7 @@ export async function approvePendingStockTransferRevision(
         const row = firstRow(lockedDestination);
         const available = Number(row?.quantity ?? 0);
         if (available + 1e-9 < required) {
-          const error: any = new Error(
+          const error: unknown = new Error(
             `Destination stock is too low to reduce transfer item ${stockItemId}: required ${required}, available ${available}`
           );
           error.code = "STOCK_TRANSFER_DESTINATION_STOCK_CONFLICT";

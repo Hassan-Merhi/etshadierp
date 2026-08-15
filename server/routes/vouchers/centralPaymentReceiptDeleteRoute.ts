@@ -23,7 +23,7 @@ import { buildVoucherChangesForDelete, logAudit, snapshotVoucherEntries } from "
 
 class LegacyPaymentReceiptDeleteRequired extends Error {}
 
-async function countSalesItems(connection: any, voucherId: number): Promise<number> {
+async function countSalesItems(connection: unknown, voucherId: number): Promise<number> {
   const rows = await connection
     .select({ id: salesItems.id })
     .from(salesItems)

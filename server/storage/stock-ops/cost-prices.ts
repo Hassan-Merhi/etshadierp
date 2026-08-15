@@ -24,7 +24,7 @@ export async function updateCostPricesByBarcode(
       }
 
       await db.transaction(async (tx) => {
-        const inventoryRows = await (tx as any).execute(
+        const inventoryRows = await (tx as unknown).execute(
           sql`SELECT * FROM inventory WHERE location_id = ${locationId} AND stock_item_id = ${stockItem.id} FOR UPDATE`
         );
         const inventory = inventoryRows.rows?.[0] || inventoryRows[0];
@@ -63,7 +63,7 @@ export async function updateStockTransferItem(
   const [currentItem] = await db.select().from(schema.stockTransferItems).where(eq(schema.stockTransferItems.id, id));
   if (!currentItem) throw new Error("Stock transfer item not found");
 
-  const updateData: any = {};
+  const updateData: unknown = {};
   if (updates.stockItemId !== undefined) updateData.stockItemId = updates.stockItemId;
   if (updates.quantity !== undefined) updateData.quantity = updates.quantity;
   if (updates.rate !== undefined) updateData.rate = updates.rate;
@@ -93,7 +93,7 @@ export async function updateStockAdjustmentItem(
     .where(eq(schema.stockAdjustmentItems.id, id));
   if (!currentItem) throw new Error("Stock adjustment item not found");
 
-  const updateData: any = {};
+  const updateData: unknown = {};
   if (updates.stockItemId !== undefined) updateData.stockItemId = updates.stockItemId;
   if (updates.quantity !== undefined) updateData.quantity = updates.quantity;
   if (updates.rate !== undefined) updateData.rate = updates.rate;

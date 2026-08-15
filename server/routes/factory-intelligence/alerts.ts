@@ -19,7 +19,7 @@ import {
   containerDocumentTypes,
 } from "@shared/schema";
 
-export function registerFactoryAlertRoutes(app: Express, requireAuth: any, db: any) {
+export function registerFactoryAlertRoutes(app: Express, requireAuth: unknown, db: unknown) {
   app.get("/api/factory/alerts", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
@@ -74,7 +74,7 @@ export function registerFactoryAlertRoutes(app: Express, requireAuth: any, db: a
 
       const alertExists = (type: string, entityType: string, entityId: number) => {
         return existingAlerts.some(
-          (a: any) => a.type === type && a.entityType === entityType && a.entityId === entityId
+          (a: unknown) => a.type === type && a.entityType === entityType && a.entityId === entityId
         );
       };
 
@@ -88,7 +88,7 @@ export function registerFactoryAlertRoutes(app: Express, requireAuth: any, db: a
           )
         );
       const requiredDocTypeCount = requiredDocTypes.length;
-      const requiredDocTypeIds = requiredDocTypes.map((d: any) => d.id);
+      const requiredDocTypeIds = requiredDocTypes.map((d: unknown) => d.id);
 
       if (requiredDocTypeCount > 0) {
         const allContainers = await db
@@ -99,9 +99,9 @@ export function registerFactoryAlertRoutes(app: Express, requireAuth: any, db: a
         const docs = await db.select().from(containerDocuments).where(eq(containerDocuments.companyId, companyId));
 
         for (const container of allContainers) {
-          const containerDocs = docs.filter((d: any) => d.containerId === container.id);
+          const containerDocs = docs.filter((d: unknown) => d.containerId === container.id);
           const uploadedRequiredIds = new Set(
-            containerDocs.filter((d: any) => requiredDocTypeIds.includes(d.docTypeId)).map((d: any) => d.docTypeId)
+            containerDocs.filter((d: unknown) => requiredDocTypeIds.includes(d.docTypeId)).map((d: unknown) => d.docTypeId)
           );
           if (uploadedRequiredIds.size < requiredDocTypeCount) {
             if (!alertExists("MISSING_DOCS", "container", container.id)) {
@@ -133,8 +133,8 @@ export function registerFactoryAlertRoutes(app: Express, requireAuth: any, db: a
 
         const amount = parseFloat(f.freightAmount || "0");
         const paid = freightPayments
-          .filter((p: any) => p.containerFreightId === f.id)
-          .reduce((s: number, p: any) => s + parseFloat(p.amount || "0"), 0);
+          .filter((p: unknown) => p.containerFreightId === f.id)
+          .reduce((s: number, p: unknown) => s + parseFloat(p.amount || "0"), 0);
 
         if (amount - paid > 0.01) {
           if (!alertExists("FREIGHT_OVERDUE", "freight", f.id)) {

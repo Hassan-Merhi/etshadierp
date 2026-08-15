@@ -39,7 +39,7 @@ interface UseAdminOverrideReturn {
  *   // On a button: onClick={() => wrapAdminAction(() => deleteMutation.mutate(id), "Delete Item")}
  */
 export function useAdminOverride(): UseAdminOverrideReturn {
-  const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
+  const { data: currentUser } = useQuery<unknown>({ queryKey: ["/api/auth/me"] });
 
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [actionLabel, setActionLabel] = useState<string | undefined>(undefined);

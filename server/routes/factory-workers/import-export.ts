@@ -16,7 +16,7 @@ import { factoryWorkers } from "@shared/schema";
 
 import { getFactoryCompanyId, workerUpload, writeDaybookEntry } from "./_helpers";
 
-export function registerFactoryWorkerImportExportRoutes(app: Express, requireAuth: any, db: any) {
+export function registerFactoryWorkerImportExportRoutes(app: Express, requireAuth: unknown, db: unknown) {
   // GET /api/factory/workers/template.xlsx - Download Excel import template
   app.get("/api/factory/workers/template.xlsx", requireAuth, async (req: Request, res: Response) => {
     try {
@@ -63,7 +63,7 @@ export function registerFactoryWorkerImportExportRoutes(app: Express, requireAut
       ];
       const headerRow = sheet.addRow(headers);
       headerRow.font = { bold: true };
-      headerRow.eachCell((cell: any) => {
+      headerRow.eachCell((cell: unknown) => {
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "1F4E79" } };
         cell.font = { bold: true, color: { argb: "FFFFFF" } };
       });
@@ -109,7 +109,7 @@ export function registerFactoryWorkerImportExportRoutes(app: Express, requireAut
         "",
       ];
       const hintRow = sheet.addRow(hintValues);
-      hintRow.eachCell((cell: any) => {
+      hintRow.eachCell((cell: unknown) => {
         if (cell.value) {
           cell.font = { italic: true, color: { argb: "888888" }, size: 9 };
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "F5F5F5" } };
@@ -156,7 +156,7 @@ export function registerFactoryWorkerImportExportRoutes(app: Express, requireAut
         "Bank",
         "Example row — delete before importing",
       ]);
-      exampleRow.eachCell((cell: any) => {
+      exampleRow.eachCell((cell: unknown) => {
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDE7" } };
         cell.font = { italic: true, color: { argb: "5D4037" } };
       });
@@ -247,22 +247,22 @@ export function registerFactoryWorkerImportExportRoutes(app: Express, requireAut
 
         // Determine next HMD code number for auto-assignment during import
         const importPrefix = "HMD";
-        let nextHmdNum = existingWorkers.reduce((max: number, w: any) => {
+        let nextHmdNum = existingWorkers.reduce((max: number, w: unknown) => {
           if (!w.employeeCode) return max;
           const m = w.employeeCode.match(new RegExp(`^${importPrefix}(\\d+)$`));
           return m ? Math.max(max, parseInt(m[1], 10)) : max;
         }, 0);
-        const byCode = new Map<string, any>(
-          existingWorkers.filter((w: any) => w.employeeCode).map((w: any) => [w.employeeCode, w])
+        const byCode = new Map<string, unknown>(
+          existingWorkers.filter((w: unknown) => w.employeeCode).map((w: unknown) => [w.employeeCode, w])
         );
-        const byPassport = new Map<string, any>(
-          existingWorkers.filter((w: any) => w.passportNumber).map((w: any) => [w.passportNumber, w])
+        const byPassport = new Map<string, unknown>(
+          existingWorkers.filter((w: unknown) => w.passportNumber).map((w: unknown) => [w.passportNumber, w])
         );
-        const byNationalId = new Map<string, any>(
-          existingWorkers.filter((w: any) => w.nationalId).map((w: any) => [w.nationalId, w])
+        const byNationalId = new Map<string, unknown>(
+          existingWorkers.filter((w: unknown) => w.nationalId).map((w: unknown) => [w.nationalId, w])
         );
 
-        const parseDate = (v: any): string | null => {
+        const parseDate = (v: unknown): string | null => {
           if (!v) return null;
           if (typeof v === "number") {
             // Excel serial date
@@ -279,7 +279,7 @@ export function registerFactoryWorkerImportExportRoutes(app: Express, requireAut
           const raw = rows[i];
           try {
             // Map raw keys to field names
-            const mapped: any = {};
+            const mapped: unknown = {};
             for (const [rawKey, rawVal] of Object.entries(raw)) {
               const key = colMap[normalize(rawKey)];
               if (key) mapped[key] = rawVal;

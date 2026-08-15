@@ -73,7 +73,7 @@ export function registerAdvanceBulkRepayRoutes(app: Express) {
         return res.status(400).json({ message: "No outstanding manual repayment advances found for this worker" });
       }
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx: unknown) => {
         let advancesAccountId: number | null = null;
         if (cashAccountId) {
           let [found] = await tx

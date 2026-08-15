@@ -18,12 +18,12 @@ export function registerFactoryCustomerLogoRoutes(app: Express) {
   // ── Customer Logos ──────────────────────────────────────────────────────────
 
   const customerLogoStorage = multer.diskStorage({
-    destination: (_req: any, _file: any, cb: any) => {
+    destination: (_req: unknown, _file: unknown, cb: unknown) => {
       const dir = path.join(process.cwd(), "uploads", "customer-logos");
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       cb(null, dir);
     },
-    filename: (_req: any, file: any, cb: any) => {
+    filename: (_req: unknown, file: unknown, cb: unknown) => {
       const ext = path.extname(file.originalname).toLowerCase();
       cb(null, `cust-logo-${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
     },
@@ -32,7 +32,7 @@ export function registerFactoryCustomerLogoRoutes(app: Express) {
   const customerLogoUpload = multer({
     storage: customerLogoStorage,
     limits: { fileSize: 500 * 1024 },
-    fileFilter: (_req: any, file: any, cb: any) => {
+    fileFilter: (_req: unknown, file: unknown, cb: unknown) => {
       if (["image/png", "image/jpeg", "image/webp"].includes(file.mimetype)) cb(null, true);
       else cb(new Error("Only PNG, JPG and WEBP images are allowed"));
     },
@@ -62,7 +62,7 @@ export function registerFactoryCustomerLogoRoutes(app: Express) {
   });
 
   app.post("/api/factory/customers/:id/logos", requireAuth, (req: Request, res: Response) => {
-    customerLogoUpload.single("image")(req, res, async (err: any) => {
+    customerLogoUpload.single("image")(req, res, async (err: unknown) => {
       try {
         if (err) return res.status(400).json({ message: err.message });
         const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;

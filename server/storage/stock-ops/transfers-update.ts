@@ -49,7 +49,7 @@ export async function updateStockTransfer(
         const totalAmount = multiplyInventoryValues(quantity, rate);
         const sourceLocationId = oldItem.sourceLocationId || existingTransfer.sourceLocationId;
 
-        const sourceInventoryRows = await (tx as any).execute(
+        const sourceInventoryRows = await (tx as unknown).execute(
           sql`SELECT * FROM inventory WHERE location_id = ${sourceLocationId} AND stock_item_id = ${oldItem.stockItemId} FOR UPDATE`
         );
         const sourceInventory = sourceInventoryRows.rows?.[0] || sourceInventoryRows[0];
@@ -85,7 +85,7 @@ export async function updateStockTransfer(
           }
         }
 
-        const destInventoryRows = await (tx as any).execute(
+        const destInventoryRows = await (tx as unknown).execute(
           sql`SELECT * FROM inventory WHERE location_id = ${existingTransfer.destinationLocationId} AND stock_item_id = ${oldItem.stockItemId} FOR UPDATE`
         );
         const destInventory = destInventoryRows.rows?.[0] || destInventoryRows[0];
@@ -143,7 +143,7 @@ export async function updateStockTransfer(
       transferItems.push(transferItem);
 
       if (!isOptional) {
-        const sourceInventoryRows2 = await (tx as any).execute(
+        const sourceInventoryRows2 = await (tx as unknown).execute(
           sql`SELECT * FROM inventory WHERE location_id = ${item.sourceLocationId} AND stock_item_id = ${item.stockItemId} FOR UPDATE`
         );
         const sourceInventory = sourceInventoryRows2.rows?.[0] || sourceInventoryRows2[0];
@@ -167,7 +167,7 @@ export async function updateStockTransfer(
           );
         }
 
-        const destInventoryRows2 = await (tx as any).execute(
+        const destInventoryRows2 = await (tx as unknown).execute(
           sql`SELECT * FROM inventory WHERE location_id = ${destinationLocationId} AND stock_item_id = ${item.stockItemId} FOR UPDATE`
         );
         const destInventory = destInventoryRows2.rows?.[0] || destInventoryRows2[0];
@@ -252,7 +252,7 @@ export async function updateStockAdjustment(
         const wasProduction =
           oldAdjustmentType === "Production" || (oldAdjustmentType === "Mixed" && quantity.isPositive());
 
-        const currentInventoryRows = await (tx as any).execute(
+        const currentInventoryRows = await (tx as unknown).execute(
           sql`SELECT * FROM inventory WHERE location_id = ${existingAdjustment.locationId} AND stock_item_id = ${oldItem.stockItemId} FOR UPDATE`
         );
         const currentInventory = currentInventoryRows.rows?.[0] || currentInventoryRows[0];
@@ -407,7 +407,7 @@ export async function updateStockAdjustment(
       let actualTotalAmount = multiplyInventoryValues(absoluteQuantity, rate);
 
       if (!isOptional) {
-        const currentInventoryRows2 = await (tx as any).execute(
+        const currentInventoryRows2 = await (tx as unknown).execute(
           sql`SELECT * FROM inventory WHERE location_id = ${locationId} AND stock_item_id = ${item.stockItemId} FOR UPDATE`
         );
         const currentInventory = currentInventoryRows2.rows?.[0] || currentInventoryRows2[0];

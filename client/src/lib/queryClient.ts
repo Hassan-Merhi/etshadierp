@@ -299,7 +299,7 @@ async function throwIfResNotOk(res: Response) {
     }
 
     // Create error with structured data for proper handling
-    const error: any = new Error(errorData.message || res.statusText);
+    const error: unknown = new Error(errorData.message || res.statusText);
     error.status = res.status;
     error.requiresConfirmation = errorData.requiresConfirmation;
     error.employeeBalance = errorData.employeeBalance;
@@ -310,7 +310,7 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-function isNetworkError(error: any): boolean {
+function isNetworkError(error: unknown): boolean {
   if (error instanceof TypeError) return true;
   if (error instanceof DOMException && error.name === "NetworkError") return true;
   const msg: string = error?.message ?? "";
@@ -393,7 +393,7 @@ export async function apiRequest(
       const description = getDescriptionForRequest(url);
       const body = data ? JSON.stringify(data) : "";
       enqueueRequest(url, method, body, description, getAppDate());
-      const offlineError: any = new Error(`Saved offline — will sync when connected`);
+      const offlineError: unknown = new Error(`Saved offline — will sync when connected`);
       offlineError.name = "OfflineQueued";
       offlineError.description = description;
       throw offlineError;
@@ -467,7 +467,7 @@ export const getQueryFn: <T>(options: { on401: UnauthorizedBehavior }) => QueryF
 // a fresh fetch so the component recovers silently. If there are no observers
 // (component unmounted), just remove the error so it doesn't flash on remount.
 const globalQueryCache = new QueryCache({
-  onError: (error: any, query) => {
+  onError: (error: unknown, query) => {
     // NOTE: 401 handling is intentionally NOT here. The global fetch interceptor
     // is the single source of session-expiry detection; it verifies /api/auth/me
     // before redirecting. Handling 401 here too would bypass that check and cause
@@ -489,7 +489,7 @@ const globalQueryCache = new QueryCache({
 // run their own onError AFTER this; they should skip another toast by checking
 // error._handledGlobally.
 const globalMutationCache = new MutationCache({
-  onError: (error: any) => {
+  onError: (error: unknown) => {
     if (error?.name === "OfflineQueued") {
       error._handledGlobally = true;
       const label = error.description ? `${error.description} saved` : "Action saved";

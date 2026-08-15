@@ -85,8 +85,8 @@ export const printLabels = async (
   cart: unknown[],
   baleProducts: unknown[] | undefined,
   selectedLogoId: number | null,
-  modeApiRequest: any,
-  toast: any,
+  modeApiRequest: unknown,
+  toast: unknown,
   preOpenedWindowsRef: React.MutableRefObject<{ a4: Window | null; sticker: Window | null } | null>
 ) => {
   try {
@@ -129,7 +129,7 @@ export const printLabels = async (
           if (preOpenedWindowsRef.current.sticker) preOpenedWindowsRef.current.sticker.close();
           preOpenedWindowsRef.current = null;
         }
-      } catch (err) {
+      } catch (_err) {
         openBrowserPrint(labels, undefined, preOpenedWindowsRef);
       }
     } else {

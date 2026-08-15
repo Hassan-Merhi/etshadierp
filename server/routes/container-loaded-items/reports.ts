@@ -22,7 +22,7 @@ import {
 
 import { verifyContainerOwnership } from "./_helpers";
 
-export function registerContainerLoadedItemReportRoutes(app: Express, requireAuth: any) {
+export function registerContainerLoadedItemReportRoutes(app: Express, requireAuth: unknown) {
   app.get(
     "/api/suppliers/:supplierId/containers/:containerId/verification-summary",
     requireAuth,
@@ -67,7 +67,7 @@ export function registerContainerLoadedItemReportRoutes(app: Express, requireAut
         ]);
         const aliasConflicts = allAliasConflicts.filter((c) => relevantRawCodes.has(c.aliasCode.trim().toLowerCase()));
 
-        const proformaByBarcode = new Map<string, any>();
+        const proformaByBarcode = new Map<string, unknown>();
         for (const line of proformaLines) {
           const bc = resolveBarcode((line.barcode || "").trim(), aliasMap);
           if (proformaByBarcode.has(bc)) {
@@ -84,7 +84,7 @@ export function registerContainerLoadedItemReportRoutes(app: Express, requireAut
           }
         }
 
-        const loadedByBarcode = new Map<string, any>();
+        const loadedByBarcode = new Map<string, unknown>();
         for (const item of loadedItems) {
           const bc = resolveBarcode((item.barcode || "").trim(), aliasMap);
           if (loadedByBarcode.has(bc)) {
@@ -208,7 +208,7 @@ export function registerContainerLoadedItemReportRoutes(app: Express, requireAut
 
         const { map: aliasMap } = await buildAliasMap(companyId);
 
-        const proformaByBarcode = new Map<string, any>();
+        const proformaByBarcode = new Map<string, unknown>();
         for (const line of proformaLinesList) {
           const bc = resolveBarcode((line.barcode || "").trim(), aliasMap);
           if (proformaByBarcode.has(bc)) {
@@ -222,7 +222,7 @@ export function registerContainerLoadedItemReportRoutes(app: Express, requireAut
             });
           }
         }
-        const loadedByBarcode = new Map<string, any>();
+        const loadedByBarcode = new Map<string, unknown>();
         for (const item of loadedItemsList) {
           const bc = resolveBarcode((item.barcode || "").trim(), aliasMap);
           if (loadedByBarcode.has(bc)) {
@@ -347,7 +347,7 @@ export function registerContainerLoadedItemReportRoutes(app: Express, requireAut
           titleFont: "FFFFFF",
         };
 
-        const thinBorder: any = {
+        const thinBorder: unknown = {
           top: { style: "thin", color: { argb: "BDBDBD" } },
           left: { style: "thin", color: { argb: "BDBDBD" } },
           bottom: { style: "thin", color: { argb: "BDBDBD" } },
@@ -360,7 +360,7 @@ export function registerContainerLoadedItemReportRoutes(app: Express, requireAut
           sectionColor: string,
           columns: { header: string; key: string; width: number; numFmt?: string }[],
           data: unknown[],
-          statusColorFn?: (row: any) => string | null
+          statusColorFn?: (row: unknown) => string | null
         ) => {
           const sheet = workbook.addWorksheet(name);
 
@@ -388,7 +388,7 @@ export function registerContainerLoadedItemReportRoutes(app: Express, requireAut
           const headerRowNum = sheet.rowCount + 1;
           const headerRow = sheet.addRow(columns.map((c) => c.header));
           headerRow.height = 24;
-          headerRow.eachCell((cell: any) => {
+          headerRow.eachCell((cell: unknown) => {
             cell.font = { bold: true, size: 10, color: { argb: colors.headerFont } };
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: sectionColor } };
             cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
@@ -411,7 +411,7 @@ export function registerContainerLoadedItemReportRoutes(app: Express, requireAut
               const values = columns.map((c) => item[c.key]);
               const dataRow = sheet.addRow(values);
               const rowBg = statusColorFn ? statusColorFn(item) : i % 2 === 0 ? null : "F5F5F5";
-              dataRow.eachCell((cell: any) => {
+              dataRow.eachCell((cell: unknown) => {
                 cell.border = thinBorder;
                 cell.alignment = { vertical: "middle" };
                 if (rowBg) {
@@ -426,14 +426,14 @@ export function registerContainerLoadedItemReportRoutes(app: Express, requireAut
               "",
               ...columns.slice(2).map((c) => {
                 const sum = data.reduce(
-                  (s: number, item: any) => s + (typeof item[c.key] === "number" ? item[c.key] : 0),
+                  (s: number, item: unknown) => s + (typeof item[c.key] === "number" ? item[c.key] : 0),
                   0
                 );
                 return sum;
               }),
             ]);
             totalRow.font = { bold: true, size: 10 };
-            totalRow.eachCell((cell: any) => {
+            totalRow.eachCell((cell: unknown) => {
               cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: colors.summaryBg } };
               cell.border = {
                 top: { style: "double", color: { argb: "424242" } },
@@ -467,7 +467,7 @@ export function registerContainerLoadedItemReportRoutes(app: Express, requireAut
             { header: "Status", key: "status", width: 16 },
           ],
           fullComparison,
-          (item: any) => {
+          (item: unknown) => {
             if (item.status === "OVERLOADED") return colors.overloadedBg;
             if (item.status === "SHORT" || item.status === "MISSING") return colors.shortBg;
             if (item.status === "NOT REQUESTED") return colors.notRequestedBg;
@@ -570,7 +570,7 @@ export function registerContainerLoadedItemReportRoutes(app: Express, requireAut
         ];
 
         const sumHeaderRow = summarySheet.addRow([summaryData[0][0], summaryData[0][1]]);
-        sumHeaderRow.eachCell((cell: any) => {
+        sumHeaderRow.eachCell((cell: unknown) => {
           cell.font = { bold: true, size: 11, color: { argb: colors.headerFont } };
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: colors.headerBg } };
           cell.border = thinBorder;

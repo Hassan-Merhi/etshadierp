@@ -20,18 +20,18 @@ export function registerFactoryFreightRoutes(app: Express) {
   app.get("/api/factory/containers/:containerId/freight", requireAuth, async (req: Request, res: Response) => {
     try {
       const containerId = Number(req.params.containerId);
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = (req.session as unknown).factoryCompanyId || (req.session as unknown).currentCompanyId;
       if (!companyId || !(await verifyContainerOwnership(containerId, companyId))) {
         return res.status(403).json({ message: "Access denied" });
       }
       const freightRows = await db.select().from(containerFreight).where(eq(containerFreight.containerId, containerId));
       const freightWithPayments = await Promise.all(
-        freightRows.map(async (fr: any) => {
+        freightRows.map(async (fr: unknown) => {
           const payments = await db
             .select()
             .from(containerFreightPayments)
             .where(eq(containerFreightPayments.containerFreightId, fr.id));
-          const totalPaid = payments.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
+          const totalPaid = payments.reduce((sum: number, p: unknown) => sum + Number(p.amount), 0);
           const freightAmount = Number(fr.freightAmount);
           const computedStatus = totalPaid >= freightAmount ? "PAID" : totalPaid > 0 ? "PARTIAL" : "UNPAID";
           return { ...fr, payments, totalPaid, computedStatus };
@@ -46,7 +46,7 @@ export function registerFactoryFreightRoutes(app: Express) {
   app.post("/api/factory/containers/:containerId/freight", requireAuth, async (req: Request, res: Response) => {
     try {
       const containerId = Number(req.params.containerId);
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = (req.session as unknown).factoryCompanyId || (req.session as unknown).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       if (!(await verifyContainerOwnership(containerId, companyId))) {
@@ -78,7 +78,7 @@ export function registerFactoryFreightRoutes(app: Express) {
         currencyCode: row.currency,
         amountCurrency: Number(row.freightAmount),
         metaJson: JSON.stringify({ freightId: row.id, vendorName: row.vendorName }),
-        createdBy: (req.session as any).userId || undefined,
+        createdBy: (req.session as unknown).userId || undefined,
       });
 
       res.json(row);
@@ -94,7 +94,7 @@ export function registerFactoryFreightRoutes(app: Express) {
       try {
         const freightId = Number(req.params.freightId);
         const containerId = Number(req.params.containerId);
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = (req.session as unknown).factoryCompanyId || (req.session as unknown).currentCompanyId;
 
         if (!companyId || !(await verifyContainerOwnership(containerId, companyId))) {
           return res.status(403).json({ message: "Access denied" });
@@ -122,7 +122,7 @@ export function registerFactoryFreightRoutes(app: Express) {
           description: `Deleted freight charge ${deleted.currency} ${deleted.freightAmount} from container #${containerId}`,
           currencyCode: deleted.currency,
           amountCurrency: Number(deleted.freightAmount),
-          createdBy: (req.session as any).userId || undefined,
+          createdBy: (req.session as unknown).userId || undefined,
         });
 
         res.json({ success: true });
@@ -137,7 +137,7 @@ export function registerFactoryFreightRoutes(app: Express) {
   app.post("/api/factory/freight/:freightId/payments", requireAuth, async (req: Request, res: Response) => {
     try {
       const freightId = Number(req.params.freightId);
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = (req.session as unknown).factoryCompanyId || (req.session as unknown).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       // Verify the freight belongs to this company (via its container)
@@ -153,7 +153,7 @@ export function registerFactoryFreightRoutes(app: Express) {
           amount: String(req.body.amount),
           method: req.body.method || null,
           reference: req.body.reference || null,
-          createdBy: (req.session as any).userId || null,
+          createdBy: (req.session as unknown).userId || null,
         })
         .returning();
 
@@ -162,7 +162,7 @@ export function registerFactoryFreightRoutes(app: Express) {
         .select()
         .from(containerFreightPayments)
         .where(eq(containerFreightPayments.containerFreightId, freightId));
-      const totalPaid = payments.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
+      const totalPaid = payments.reduce((sum: number, p: unknown) => sum + Number(p.amount), 0);
       const freightAmount = Number(fr.freightAmount);
       const newStatus = totalPaid >= freightAmount ? "PAID" : totalPaid > 0 ? "PARTIAL" : "UNPAID";
       await db
@@ -180,7 +180,7 @@ export function registerFactoryFreightRoutes(app: Express) {
         currencyCode: fr.currency,
         amountCurrency: Number(req.body.amount),
         metaJson: JSON.stringify({ freightId, paymentId: payment.id }),
-        createdBy: (req.session as any).userId || undefined,
+        createdBy: (req.session as unknown).userId || undefined,
       });
 
       res.json(payment);
@@ -196,7 +196,7 @@ export function registerFactoryFreightRoutes(app: Express) {
       try {
         const freightId = Number(req.params.freightId);
         const paymentId = Number(req.params.paymentId);
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = (req.session as unknown).factoryCompanyId || (req.session as unknown).currentCompanyId;
 
         // Verify the freight belongs to this company
         if (!companyId || (await getFreightContainerId(freightId, companyId)) === null) {
@@ -221,7 +221,7 @@ export function registerFactoryFreightRoutes(app: Express) {
             .select()
             .from(containerFreightPayments)
             .where(eq(containerFreightPayments.containerFreightId, freightId));
-          const totalPaid = payments.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
+          const totalPaid = payments.reduce((sum: number, p: unknown) => sum + Number(p.amount), 0);
           const freightAmount = Number(fr.freightAmount);
           const newStatus = totalPaid >= freightAmount ? "PAID" : totalPaid > 0 ? "PARTIAL" : "UNPAID";
           await db
@@ -238,7 +238,7 @@ export function registerFactoryFreightRoutes(app: Express) {
           referenceTable: "containers",
           description: `Deleted freight payment of ${deleted.amount} for freight #${freightId}`,
           amountCurrency: Number(deleted.amount),
-          createdBy: (req.session as any).userId || undefined,
+          createdBy: (req.session as unknown).userId || undefined,
         });
 
         res.json({ success: true });
@@ -252,7 +252,7 @@ export function registerFactoryFreightRoutes(app: Express) {
 
   app.get("/api/factory/containers/freight-status", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = (req.session as unknown).factoryCompanyId || (req.session as unknown).currentCompanyId;
       if (!companyId) return res.json({});
       const allFreight = await db.select().from(containerFreight).where(eq(containerFreight.companyId, companyId));
       const freightIds = allFreight.map((f) => f.id);

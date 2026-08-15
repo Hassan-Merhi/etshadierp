@@ -3,7 +3,7 @@ import * as schema from "@shared/schema";
 
 import { ContainerOffloadLifecycleError, ContainerOffloadLifecycleInput, amount } from "./types";
 
-async function getSpAccount(tx: any, companyId: number, subType: string) {
+async function getSpAccount(tx: unknown, companyId: number, subType: string) {
   const [account] = await tx
     .select()
     .from(schema.ledgerAccounts)
@@ -19,7 +19,7 @@ async function getSpAccount(tx: any, companyId: number, subType: string) {
 }
 
 export async function postSupplierPartnerJournals(
-  tx: any,
+  tx: unknown,
   container: typeof schema.containers.$inferSelect,
   purchaseOrders: Array<typeof schema.purchaseOrders.$inferSelect>,
   input: ContainerOffloadLifecycleInput

@@ -51,9 +51,9 @@ export function StockTransferRevisionHistory({
   transferRevisionsExpanded,
   setTransferRevisionsExpanded,
   setApproveRevisionTarget,
-  modeApiRequest,
-  queryClient,
-  lastKnownTransferIdRef,
+  _modeApiRequest,
+  _queryClient,
+  _lastKnownTransferIdRef,
   formatNumber,
 }: StockTransferRevisionHistoryProps) {
   if (!voucherIdToEdit || !stableTransferId) return null;

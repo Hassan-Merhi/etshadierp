@@ -143,7 +143,7 @@ export function registerFileRoutes(app: Express) {
       const companyId = req.session?.currentCompanyId;
       const fileId = parseInt(req.params.id);
       const { displayName, folderId } = req.body;
-      const updates: any = {};
+      const updates: unknown = {};
       if (displayName !== undefined) updates.displayName = displayName || null;
       if (folderId !== undefined) updates.folderId = folderId === null ? null : parseInt(folderId);
       if (Object.keys(updates).length === 0) return res.status(400).json({ message: "Nothing to update" });

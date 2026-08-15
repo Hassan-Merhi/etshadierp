@@ -75,7 +75,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const [transactionRate, setTransactionRate] = useState<number | null>(null);
   const exchangeRate = transactionRate || dailyExchangeRate;
   const [voucherEffectiveDate, setVoucherEffectiveDate] = useState<string>("");
-  const [location, setLocation] = useLocation();
+  const [_location, setLocation] = useLocation();
   const printRef = useRef<HTMLDivElement>(null);
   const isPOS = !!posUser;
   const posLocationId = posUser?.assignedLocationId;
@@ -153,17 +153,17 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     employees,
     fixedAssets,
     factorySuppliersList,
-    stockItems,
-    locations,
-    posLocationName,
-    myLocations,
+    _stockItems,
+    _locations,
+    _posLocationName,
+    _myLocations,
     sidebarAccounts,
     voucherToEdit,
-    supplierSearchResults,
-    customerSearchResults,
+    _supplierSearchResults,
+    _customerSearchResults,
     allAccounts,
     payFromAccounts,
-    liveAccountSearch,
+    _liveAccountSearch,
     setLiveAccountSearch,
   } = useVoucherQueries({
     selectedCompany,
@@ -200,7 +200,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   });
 
   const fieldArray = useFieldArray({ control: form.control, name: "entries" });
-  const { fields, append, remove } = fieldArray;
+  const { fields, append, _remove } = fieldArray;
   const entries = form.watch("entries");
   const watchedEntries = useWatch({ control: form.control, name: "entries" });
   const total = entries.reduce((sum, entry) => sum + (parseFloat(entry.amount) || 0), 0);
@@ -230,7 +230,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   useEffect(() => {
     if (voucherIdToEdit) return;
     schedulePaymentSave(allFormValues);
-  }, [JSON.stringify(allFormValues), voucherIdToEdit]);
+  }, [allFormValues, schedulePaymentSave, voucherIdToEdit]);
 
   const { hydratedVoucherIdRef } = useVoucherHydration({
     voucherToEdit,
@@ -266,7 +266,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       setEditVoucherId(null);
       hydratedVoucherIdRef.current = null;
     }
-  }, [tabParam, voucherIdToEdit]);
+  }, [hydratedVoucherIdRef, tabParam, voucherIdToEdit]);
 
   const paymentAccountType = form.watch("paymentAccountType");
   const paymentAccountId = form.watch("paymentAccountId");
@@ -467,7 +467,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     }
   }, [watchedEntries, activeRowIndex]);
 
-  const handleKeyDown = (e: React.KeyboardEvent, rowIndex: number, fieldName: "account" | "amount") => {
+  const _handleKeyDown = (e: React.KeyboardEvent, rowIndex: number, fieldName: "account" | "amount") => {
     handlePaymentKeyDown(e, rowIndex, fieldName, fields.length, append);
   };
 

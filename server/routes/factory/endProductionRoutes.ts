@@ -65,7 +65,7 @@ async function getProductionWaGroupId(companyId: number): Promise<string | null>
     .select({ extraSettings: factorySettings.extraSettings })
     .from(factorySettings)
     .where(eq(factorySettings.companyId, companyId));
-  const extra = (settings?.extraSettings as any) ?? {};
+  const extra = (settings?.extraSettings as unknown) ?? {};
   return extra.productionWorkerMatrixWhatsappGroupId ?? null;
 }
 
@@ -80,7 +80,7 @@ function caption(companyName: string, date: string, language: FactoryCatalogLang
     : `Worker Matrix — ${companyName} — ${date}`;
 }
 
-export function registerEndProductionRoutes(app: Express, requireAuth: any) {
+export function registerEndProductionRoutes(app: Express, requireAuth: unknown) {
   app.get("/api/factory/stock-entry/production-session", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session?.factoryCompanyId || req.session?.currentCompanyId;

@@ -46,7 +46,7 @@ export function registerBalesFinalizeRoutes(app: Express) {
           .json({ message: "pressingBatchId, scannedBaleIds, erpLocationId, and mixBatchId are required" });
       }
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx: unknown) => {
         const [pressingBatch] = await tx
           .select()
           .from(factoryPressingBatches)
@@ -71,15 +71,15 @@ export function registerBalesFinalizeRoutes(app: Express) {
           .where(and(eq(factoryBales.pressingBatchId, pressingBatchId), eq(factoryBales.status, "PENDING_PRESSING")));
 
         const scannedSet = new Set(scannedBaleIds);
-        const pendingBaleIds = new Set(pendingBales.map((b: any) => b.id));
+        const pendingBaleIds = new Set(pendingBales.map((b: unknown) => b.id));
         for (const scannedId of scannedBaleIds) {
           if (!pendingBaleIds.has(scannedId)) {
             throw new Error(`Bale ID ${scannedId} is not a valid pending bale for this pressing batch`);
           }
         }
 
-        const balesToFinalize = pendingBales.filter((b: any) => scannedSet.has(b.id));
-        const missingBales = pendingBales.filter((b: any) => !scannedSet.has(b.id));
+        const balesToFinalize = pendingBales.filter((b: unknown) => scannedSet.has(b.id));
+        const missingBales = pendingBales.filter((b: unknown) => !scannedSet.has(b.id));
 
         let totalWeight = 0;
         for (const bale of balesToFinalize) {
@@ -105,7 +105,7 @@ export function registerBalesFinalizeRoutes(app: Express) {
 
         let costPerKg: number;
         if (mixSources.length > 0) {
-          const sourceContainerIds = mixSources.map((s: any) => s.containerId).filter(Boolean) as number[];
+          const sourceContainerIds = mixSources.map((s: unknown) => s.containerId).filter(Boolean) as number[];
           const rawStockCostMap: Record<number, number> = {};
           if (sourceContainerIds.length > 0) {
             const rawStockRecs = await tx
@@ -181,10 +181,10 @@ export function registerBalesFinalizeRoutes(app: Express) {
             ? await tx.select().from(factoryBaleProducts).where(inArray(factoryBaleProducts.id, productIds))
             : [];
 
-        const productMap = new Map<number, any>(factoryProducts.map((p: any) => [p.id, p]));
+        const productMap = new Map<number, unknown>(factoryProducts.map((p: unknown) => [p.id, p]));
 
         const categoryIdSet = new Set<number>();
-        factoryProducts.forEach((p: any) => {
+        factoryProducts.forEach((p: unknown) => {
           if (p.categoryId) categoryIdSet.add(p.categoryId);
         });
         const categoryIds = Array.from(categoryIdSet);
@@ -192,7 +192,7 @@ export function registerBalesFinalizeRoutes(app: Express) {
           categoryIds.length > 0
             ? await tx.select().from(factoryCategories).where(inArray(factoryCategories.id, categoryIds))
             : [];
-        const categoryMap = new Map<number, any>(factoryCats.map((c: any) => [c.id, c]));
+        const categoryMap = new Map<number, unknown>(factoryCats.map((c: unknown) => [c.id, c]));
 
         const stockGroupCache = new Map<string, number>();
 
@@ -292,7 +292,7 @@ export function registerBalesFinalizeRoutes(app: Express) {
         return {
           updated: updatedBales.length,
           bales: updatedBales,
-          missingBales: missingBales.map((b: any) => ({
+          missingBales: missingBales.map((b: unknown) => ({
             id: b.id,
             referenceNumber: b.referenceNumber,
             productName: b.productName,
@@ -348,7 +348,7 @@ export function registerBalesFinalizeRoutes(app: Express) {
 
       if (balesWithMix.length === 0) return res.json({ updated: 0 });
 
-      const uniqueMixIds = [...new Set(balesWithMix.map((b: any) => b.mixBatchId))] as number[];
+      const uniqueMixIds = [...new Set(balesWithMix.map((b: unknown) => b.mixBatchId))] as number[];
 
       const allSources = await db
         .select({
@@ -360,7 +360,7 @@ export function registerBalesFinalizeRoutes(app: Express) {
         .from(factoryMixBatchSources)
         .where(inArray(factoryMixBatchSources.mixBatchId, uniqueMixIds));
 
-      const allContainerIds = [...new Set(allSources.map((s: any) => s.containerId).filter(Boolean))] as number[];
+      const allContainerIds = [...new Set(allSources.map((s: unknown) => s.containerId).filter(Boolean))] as number[];
       const rawStockCostMap: Record<number, number> = {};
       if (allContainerIds.length > 0) {
         const rawStockRecs = await db
@@ -374,7 +374,7 @@ export function registerBalesFinalizeRoutes(app: Express) {
 
       const mixCostMap: Record<number, number> = {};
       for (const mixId of uniqueMixIds) {
-        const sources = allSources.filter((s: any) => s.mixBatchId === mixId);
+        const sources = allSources.filter((s: unknown) => s.mixBatchId === mixId);
         if (sources.length === 0) continue;
         let totalCost = 0,
           totalWt = 0;

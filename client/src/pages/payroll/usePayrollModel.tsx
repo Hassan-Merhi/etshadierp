@@ -157,14 +157,14 @@ export function usePayrollModel() {
         active: selectedWorkerForEdit.active ?? true,
       });
     }
-  }, [selectedWorkerForEdit]);
+  }, [editWorkerForm, selectedWorkerForEdit]);
   const createEmployeeForm = useForm<EmployeeFormData>();
   const editEmployeeForm = useForm<EmployeeFormData>();
 
   // Reset statementExpanded whenever a new employee statement is opened
   useEffect(() => {
     if (statementEmployee) setStatementExpanded(false);
-  }, [statementEmployee?.id]);
+  }, [setStatementExpanded, statementEmployee, statementEmployee.id]);
 
   // Pre-populate edit employee form + load bale rates when editingEmployee changes
   useEffect(() => {
@@ -210,7 +210,7 @@ export function usePayrollModel() {
         )
       )
       .catch(() => setEditBalePctRates([]));
-  }, [editingEmployee?.id]);
+  }, [editEmployeeForm, editingEmployee, editingEmployee.id, setEditBalePctRates, setEditBaleRates]);
 
   // Mutations (Logic simplified for orchestrator)
   const depositMutation = useMutation({

@@ -82,7 +82,7 @@ export function registerPosImportRoutes(app: Express) {
 
       await storage.getAllStockItems(req.session.currentCompanyId!);
       for (const item of items) {
-        const validatedItem: any = { ...item };
+        const validatedItem: unknown = { ...item };
         const stockItem = await storage.getStockItemByCodeOrAlias(item.barcode, req.session.currentCompanyId!);
         if (!stockItem) {
           validatedItem.error = `Barcode '${item.barcode}' not found in stock items`;
@@ -174,7 +174,7 @@ export function registerPosImportRoutes(app: Express) {
       });
 
       let totalSales = toInventoryDecimal(0);
-      let createdVoucher: any = null;
+      let createdVoucher: unknown = null;
 
       await db.transaction(async (tx) => {
         const voucherNumber = `SALES-${Date.now()}`;
@@ -195,7 +195,7 @@ export function registerPosImportRoutes(app: Express) {
         for (const item of items) {
           const stockItem = await storage.getStockItemByCodeOrAlias(item.barcode, req.session.currentCompanyId!);
           if (!stockItem) {
-            const inputError: any = new Error(`Stock item not found for barcode: ${item.barcode}`);
+            const inputError: unknown = new Error(`Stock item not found for barcode: ${item.barcode}`);
             inputError.httpStatus = 400;
             throw inputError;
           }

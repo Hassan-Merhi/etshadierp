@@ -88,7 +88,7 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
           // the join row + flip status atomically. Two concurrent bulk-imports
           // referencing the same physical bale will block at the lock; only
           // one will see status='IN_STOCK', the other will skip.
-          const refResult = await db.transaction(async (tx: any) => {
+          const refResult = await db.transaction(async (tx: unknown) => {
             // Try referenceNumber first, then fall back to baleCode
             let [bale] = await tx
               .select()
@@ -249,7 +249,7 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
         // then insert + status-update inside the same tx. Concurrent imports
         // for the same article will block at the lock and re-evaluate, so
         // they cannot grab the same physical bales.
-        const articleResult = await db.transaction(async (tx: any) => {
+        const articleResult = await db.transaction(async (tx: unknown) => {
           // Find available bales, oldest first
           const availableBales = await tx
             .select()
@@ -271,7 +271,7 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
           // taken before this tx. Note: the snapshot can be stale, so for V5
           // we re-verify each candidate inside the tx below before inserting.
           const candidateBales = availableBales.filter(
-            (b: any) => !alreadyAddedBaleIds.has(b.id) && !v5BlockedBaleIds.has(b.id)
+            (b: unknown) => !alreadyAddedBaleIds.has(b.id) && !v5BlockedBaleIds.has(b.id)
           );
 
           const addedIds: number[] = [];
