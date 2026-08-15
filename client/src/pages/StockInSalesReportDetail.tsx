@@ -278,7 +278,6 @@ export default function StockInSalesReportDetail() {
   const summary = data?.summary ?? EMPTY_METRICS;
   const roundedMoney = (value: number) =>
     value < 0 ? `-${formatAmount(Math.round(Math.abs(value)))}` : formatAmount(Math.round(value));
-  const signedQty = (value: number) => `${value > 0 ? "+" : ""}${formatNumber(value, 0)}`;
   const rate = (value: number) =>
     selectedCurrency === "CFA" ? `CFA ${formatNumber(convertToDisplay(value), 2)}` : `$ ${formatNumber(value, 2)}`;
   const displayDate = (value: string) => {
@@ -440,26 +439,55 @@ export default function StockInSalesReportDetail() {
         </DropdownMenu>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
-        {isLoading
-          ? Array.from({ length: 10 }).map((_, index) => <Skeleton key={index} className="h-20 rounded-xl" />)
-          : [
-              ["Opening Qty", formatNumber(summary.openingStockQty, 0)],
-              ["Opening Value", roundedMoney(summary.openingStockValue)],
-              ["Stock In Qty", formatNumber(summary.stockInQty, 0)],
-              ["Adjustments", signedQty(summary.stockAdjustmentQty)],
-              ["Available", formatNumber(summary.totalAvailableQty, 0)],
-              ["Stock Out", formatNumber(summary.stockOutQty, 0)],
-              ["Closing / In Hand", formatNumber(summary.closingStockQty, 0)],
-              ["Closing Value", roundedMoney(summary.closingStockValue)],
-              ["Gross Profit", roundedMoney(summary.costProfit)],
-              ["Avg Profit / Bale", roundedMoney(summary.avgProfitPerBale)],
-            ].map(([label, value]) => (
-              <div key={label} className="rounded-xl border bg-muted/30 p-3">
-                <p className="text-xs text-muted-foreground">{label}</p>
-                <p className="mt-1 font-mono text-lg font-semibold">{value}</p>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        {isLoading ? (
+          Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-24 rounded-xl" />)
+        ) : (
+          <>
+            <div className="rounded-xl border bg-muted/30 p-3">
+              <p className="text-xs text-muted-foreground">Opening Stock</p>
+              <div className="mt-1 flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-[11px] text-muted-foreground">Qty</p>
+                  <p className="font-mono text-lg font-semibold">{formatNumber(summary.openingStockQty, 0)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[11px] text-muted-foreground">Value</p>
+                  <p className="font-mono text-lg font-semibold">{roundedMoney(summary.openingStockValue)}</p>
+                </div>
               </div>
-            ))}
+            </div>
+            <div className="rounded-xl border bg-muted/30 p-3">
+              <p className="text-xs text-muted-foreground">Stock In Qty</p>
+              <p className="mt-1 font-mono text-lg font-semibold">{formatNumber(summary.stockInQty, 0)}</p>
+            </div>
+            <div className="rounded-xl border bg-muted/30 p-3">
+              <p className="text-xs text-muted-foreground">Stock Out</p>
+              <p className="mt-1 font-mono text-lg font-semibold">{formatNumber(summary.stockOutQty, 0)}</p>
+            </div>
+            <div className="rounded-xl border bg-muted/30 p-3">
+              <p className="text-xs text-muted-foreground">Closing / In Hand</p>
+              <div className="mt-1 flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-[11px] text-muted-foreground">Qty</p>
+                  <p className="font-mono text-lg font-semibold">{formatNumber(summary.closingStockQty, 0)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[11px] text-muted-foreground">Value</p>
+                  <p className="font-mono text-lg font-semibold">{roundedMoney(summary.closingStockValue)}</p>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-xl border bg-muted/30 p-3">
+              <p className="text-xs text-muted-foreground">Gross Profit</p>
+              <p className="mt-1 font-mono text-lg font-semibold">{roundedMoney(summary.costProfit)}</p>
+            </div>
+            <div className="rounded-xl border bg-muted/30 p-3">
+              <p className="text-xs text-muted-foreground">Avg Profit / Bale</p>
+              <p className="mt-1 font-mono text-lg font-semibold">{roundedMoney(summary.avgProfitPerBale)}</p>
+            </div>
+          </>
+        )}
       </div>
 
       {isFetching && !isLoading && (
