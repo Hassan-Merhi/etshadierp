@@ -20,39 +20,52 @@ jobs:
         with:
           node-version: '22.14.0'
           cache: npm
-      - name: Roll back unsafe Phase 15 pass in probe workspace
+      - name: Roll back unsafe mechanical exhaustion passes in probe workspace
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          set +e
-          git revert --no-commit a4ec34ab3b22cfd9dc6aae8e1be7f0c0e9fc42f2
-          rc=$?
-          set -e
-          echo "REVERT_EXIT=$rc"
-          git diff --name-only --diff-filter=U | tee /tmp/revert-conflicts.txt
-          if [ $rc -ne 0 ]; then
-            while IFS= read -r f; do
-              [ -z "$f" ] && continue
-              git show 567e8d9143f5496591f30390e7ec67ff90b98736:"$f" > "$f"
-              git add -- "$f"
-            done < /tmp/revert-conflicts.txt
-          fi
-          git add -A
-          git commit -m "probe: roll back unsafe phase 15 exhaustion" || true
+          : > /tmp/revert-conflicts.txt
+          revert_one() {
+            commit="$1"; parent="$2"; label="$3"
+            echo "=== REVERT $label $commit ==="
+            set +e
+            git revert --no-commit "$commit"
+            rc=$?
+            set -e
+            echo "$label REVERT_EXIT=$rc"
+            if [ $rc -ne 0 ]; then
+              git diff --name-only --diff-filter=U | sed "s#^#$label #" >> /tmp/revert-conflicts.txt
+              while IFS= read -r f; do
+                [ -z "$f" ] && continue
+                if git cat-file -e "$parent:$f" 2>/dev/null; then
+                  git show "$parent:$f" > "$f"
+                  git add -- "$f"
+                else
+                  git rm -f -- "$f" || true
+                fi
+              done < <(git diff --name-only --diff-filter=U)
+            fi
+            git add -A
+            git commit -m "probe: roll back $label" || true
+          }
+          revert_one a4ec34ab3b22cfd9dc6aae8e1be7f0c0e9fc42f2 567e8d9143f5496591f30390e7ec67ff90b98736 phase12-15
+          revert_one 2c7a00a96c72524e3a9c559664729e1de002e772 a04cb7a9d37cd6ef18687c5a38a0cf9a232ff0fc phase8-11
+          revert_one 55b1a292a7d0b7b44e3583d53656d182997b25c0 f9c8e96b325f870c0f2a624ef02a364467fca9a8 phase5-7
           echo "POST_REVERT_HEAD=$(git rev-parse HEAD)"
+          cat /tmp/revert-conflicts.txt
       - name: Merge current main in probe workspace
         shell: bash
         run: |
           set -euo pipefail
           git fetch origin main
+          : > /tmp/merge-conflicts.txt
           set +e
           git merge --no-edit origin/main
           rc=$?
           set -e
           if [ $rc -ne 0 ]; then
-            echo '=== MERGE CONFLICTS ==='
             git diff --name-only --diff-filter=U | tee /tmp/merge-conflicts.txt
             while IFS= read -r f; do
               [ -z "$f" ] && continue
@@ -74,7 +87,7 @@ jobs:
           npm run check > /tmp/ts.log 2>&1
           rc=$?
           echo "TSC_EXIT=$rc"
-          grep -c 'error TS' /tmp/ts.log | xargs -I{} echo "TSC_ERROR_LINES={}" || true
+          printf 'TSC_ERROR_LINES='; grep -c 'error TS' /tmp/ts.log || true
           tail -n 120 /tmp/ts.log
           exit 0
       - name: ESLint exact diagnostics
@@ -97,13 +110,13 @@ jobs:
           set +e
           npm run audit:type-escapes > /tmp/type-escapes.log 2>&1
           rc=$?
-          cat /tmp/type-escapes.log
+          tail -n 80 /tmp/type-escapes.log
           echo "TYPE_ESCAPE_EXIT=$rc"
           exit 0
       - name: Upload diagnostic bundle
         uses: actions/upload-artifact@v4
         with:
-          name: phase18-rollback-probe
+          name: phase18-three-pass-rollback-probe
           path: |
             /tmp/ts.log
             /tmp/eslint.json
