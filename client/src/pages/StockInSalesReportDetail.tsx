@@ -3,8 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import {
   ArrowLeft,
-  ChevronLeft,
-  ChevronRight,
   Download,
   FileSpreadsheet,
   FileText,
@@ -48,13 +46,6 @@ interface Metrics {
   costOfSales: number;
   costProfit: number;
   avgProfitPerBale: number;
-  salesOutQty?: number;
-  salesOutValue?: number;
-  transferOutQty?: number;
-  transferOutValue?: number;
-  otherStockOutQty?: number;
-  otherStockOutValue?: number;
-  netSalesQty?: number;
 }
 
 interface StockInRow {
@@ -62,6 +53,7 @@ interface StockInRow {
   activityDate: string;
   containerNumber: string;
   locationName: string;
+  stockItemId?: number;
   stockItemName: string;
   quantity: number;
   avgRate: number;
@@ -74,8 +66,10 @@ interface StockOutRow {
   activityDate: string;
   isCreditSale: boolean | null;
   locationName: string;
+  stockItemId?: number;
   stockItemName: string;
   quantity: number;
+  sellingRate?: number;
   totalSales: number;
   totalCost: number;
   costProfit: number;
@@ -99,6 +93,27 @@ interface DetailResponse {
   stockOut: PagedRows<StockOutRow>;
 }
 
+interface GroupedStockInRow {
+  key: string;
+  stockItemName: string;
+  quantity: number;
+  avgRate: number;
+  totalValue: number;
+  dates: string[];
+  containers: Array<{ name: string; quantity: number }>;
+  locations: Array<{ name: string; quantity: number }>;
+}
+
+interface GroupedSalesRow {
+  key: string;
+  activityDate: string;
+  stockItemName: string;
+  quantity: number;
+  avgRate: number;
+  totalValue: number;
+  locations: Array<{ name: string; quantity: number }>;
+}
+
 const EMPTY_METRICS: Metrics = {
   openingStockQty: 0,
   openingStockValue: 0,
@@ -118,47 +133,108 @@ const EMPTY_METRICS: Metrics = {
   avgProfitPerBale: 0,
 };
 
-function Pagination({
-  page,
-  totalPages,
-  total,
-  onChange,
-}: {
-  page: number;
-  totalPages: number;
-  total: number;
-  onChange: (page: number) => void;
-}) {
-  if (totalPages <= 1) {
-    return <p className="px-3 py-2 text-xs text-muted-foreground">{formatNumber(total, 0)} rows</p>;
-  }
-
-  return (
-    <div className="flex items-center justify-between gap-3 border-t px-3 py-2 print:hidden">
-      <p className="text-xs text-muted-foreground">
-        Page {page} of {totalPages} · {formatNumber(total, 0)} rows
-      </p>
-      <div className="flex gap-1">
-        <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onChange(page - 1)}>
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => onChange(page + 1)}>
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-      </div>
-    </div>
-  );
+function sumMap(target: Map<string, number>, key: string, quantity: number): void {
+  target.set(key || "Unassigned", (target.get(key || "Unassigned") || 0) + quantity);
 }
 
-function compareDateLocationItem(
-  a: { activityDate: string; locationName: string; stockItemName: string },
-  b: { activityDate: string; locationName: string; stockItemName: string }
-): number {
-  const date = b.activityDate.localeCompare(a.activityDate);
-  if (date !== 0) return date;
-  const location = a.locationName.localeCompare(b.locationName, undefined, { numeric: true, sensitivity: "base" });
-  if (location !== 0) return location;
-  return a.stockItemName.localeCompare(b.stockItemName, undefined, { numeric: true, sensitivity: "base" });
+function mapToBreakdown(map: Map<string, number>): Array<{ name: string; quantity: number }> {
+  return [...map.entries()]
+    .map(([name, quantity]) => ({ name, quantity }))
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
+}
+
+function groupStockInRows(rows: StockInRow[]): GroupedStockInRow[] {
+  const groups = new Map<
+    string,
+    {
+      stockItemName: string;
+      quantity: number;
+      totalValue: number;
+      dates: Set<string>;
+      containers: Map<string, number>;
+      locations: Map<string, number>;
+    }
+  >();
+
+  for (const row of rows) {
+    const key = String(row.stockItemId ?? row.stockItemName);
+    const group = groups.get(key) ?? {
+      stockItemName: row.stockItemName,
+      quantity: 0,
+      totalValue: 0,
+      dates: new Set<string>(),
+      containers: new Map<string, number>(),
+      locations: new Map<string, number>(),
+    };
+    group.quantity += Number(row.quantity || 0);
+    group.totalValue += Number(row.totalValue || 0);
+    group.dates.add(row.activityDate);
+    sumMap(group.containers, row.containerNumber, Number(row.quantity || 0));
+    sumMap(group.locations, row.locationName, Number(row.quantity || 0));
+    groups.set(key, group);
+  }
+
+  return [...groups.entries()]
+    .map(([key, group]) => ({
+      key,
+      stockItemName: group.stockItemName,
+      quantity: group.quantity,
+      totalValue: group.totalValue,
+      avgRate: group.quantity === 0 ? 0 : group.totalValue / group.quantity,
+      dates: [...group.dates].sort((a, b) => b.localeCompare(a)),
+      containers: mapToBreakdown(group.containers),
+      locations: mapToBreakdown(group.locations),
+    }))
+    .sort((a, b) => a.stockItemName.localeCompare(b.stockItemName, undefined, { numeric: true, sensitivity: "base" }));
+}
+
+function groupSalesRows(rows: StockOutRow[]): GroupedSalesRow[] {
+  const groups = new Map<
+    string,
+    {
+      activityDate: string;
+      stockItemName: string;
+      quantity: number;
+      totalValue: number;
+      locations: Map<string, number>;
+    }
+  >();
+
+  for (const row of rows) {
+    const itemKey = String(row.stockItemId ?? row.stockItemName);
+    const key = `${row.activityDate}|${itemKey}`;
+    const group = groups.get(key) ?? {
+      activityDate: row.activityDate,
+      stockItemName: row.stockItemName,
+      quantity: 0,
+      totalValue: 0,
+      locations: new Map<string, number>(),
+    };
+    group.quantity += Number(row.quantity || 0);
+    group.totalValue += Number(row.totalSales || 0);
+    sumMap(group.locations, row.locationName, Number(row.quantity || 0));
+    groups.set(key, group);
+  }
+
+  return [...groups.entries()]
+    .map(([key, group]) => ({
+      key,
+      activityDate: group.activityDate,
+      stockItemName: group.stockItemName,
+      quantity: group.quantity,
+      totalValue: group.totalValue,
+      avgRate: group.quantity === 0 ? 0 : group.totalValue / group.quantity,
+      locations: mapToBreakdown(group.locations),
+    }))
+    .sort((a, b) => {
+      const date = b.activityDate.localeCompare(a.activityDate);
+      if (date !== 0) return date;
+      return a.stockItemName.localeCompare(b.stockItemName, undefined, { numeric: true, sensitivity: "base" });
+    });
+}
+
+function breakdownTitle(label: string, rows: Array<{ name: string; quantity: number }>): string {
+  return `${label}\n${rows.map((row) => `${row.name}: ${formatNumber(row.quantity, 0)}`).join("\n")}`;
 }
 
 export default function StockInSalesReportDetail() {
@@ -166,8 +242,6 @@ export default function StockInSalesReportDetail() {
   const { formatAmount, selectedCurrency, convertToDisplay } = useCurrencyContext();
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
-  const [stockInPage, setStockInPage] = useState(1);
-  const [stockOutPage, setStockOutPage] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
 
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
@@ -188,11 +262,9 @@ export default function StockInSalesReportDetail() {
 
   const queryUrl = useMemo(() => {
     const query = new URLSearchParams(baseParams);
-    query.set("stockInPage", String(stockInPage));
-    query.set("stockOutPage", String(stockOutPage));
-    query.set("limit", "100");
+    query.set("exportAll", "true");
     return `/api/reports/stock-in-sales/detail?${query.toString()}`;
-  }, [baseParams, stockInPage, stockOutPage]);
+  }, [baseParams]);
 
   const { data, isLoading, isFetching, isError, error, refetch } = useQuery<DetailResponse, Error>({
     queryKey: [queryUrl, selectedCompany?.id],
@@ -200,22 +272,15 @@ export default function StockInSalesReportDetail() {
     staleTime: 30_000,
   });
 
-  const sortedStockIn = useMemo(
-    () => [...(data?.stockIn.rows || [])].sort(compareDateLocationItem),
-    [data?.stockIn.rows]
-  );
-  const sortedStockOut = useMemo(
-    () => [...(data?.stockOut.rows || [])].sort(compareDateLocationItem),
-    [data?.stockOut.rows]
-  );
+  const groupedStockIn = useMemo(() => groupStockInRows(data?.stockIn.rows || []), [data?.stockIn.rows]);
+  const groupedSales = useMemo(() => groupSalesRows(data?.stockOut.rows || []), [data?.stockOut.rows]);
 
   const summary = data?.summary ?? EMPTY_METRICS;
-  const money = (value: number) => (value < 0 ? `-${formatAmount(Math.abs(value))}` : formatAmount(value));
   const roundedMoney = (value: number) =>
     value < 0 ? `-${formatAmount(Math.round(Math.abs(value)))}` : formatAmount(Math.round(value));
   const signedQty = (value: number) => `${value > 0 ? "+" : ""}${formatNumber(value, 0)}`;
   const rate = (value: number) =>
-    selectedCurrency === "CFA" ? `CFA ${formatNumber(convertToDisplay(value), 2)}` : `$ ${formatNumber(value, 6)}`;
+    selectedCurrency === "CFA" ? `CFA ${formatNumber(convertToDisplay(value), 2)}` : `$ ${formatNumber(value, 2)}`;
   const displayDate = (value: string) => {
     try {
       return formatDisplayDate(parseISO(value));
@@ -236,6 +301,8 @@ export default function StockInSalesReportDetail() {
       if (!detailResponse.ok) throw new Error("Failed to load export details");
 
       const exportData = (await detailResponse.json()) as DetailResponse;
+      const exportStockIn = groupStockInRows(exportData.stockIn.rows);
+      const exportSales = groupSalesRows(exportData.stockOut.rows);
 
       const summarySheet = workbook.addWorksheet("Summary");
       summarySheet.columns = [
@@ -251,8 +318,6 @@ export default function StockInSalesReportDetail() {
         ["Stock Adjustments", exportData.summary.stockAdjustmentQty],
         ["Total Available Qty", exportData.summary.totalAvailableQty],
         ["Stock Out Qty", exportData.summary.stockOutQty],
-        ["Sales Out Qty", exportData.summary.salesOutQty || 0],
-        ["Transfer Out Qty", exportData.summary.transferOutQty || 0],
         ["Closing Stock Qty", exportData.summary.closingStockQty],
         ["Closing Stock Value", exportData.summary.closingStockValue],
         ["Total Sales", exportData.summary.totalSales],
@@ -264,19 +329,19 @@ export default function StockInSalesReportDetail() {
 
       const stockInSheet = workbook.addWorksheet("Container Stock In");
       stockInSheet.columns = [
-        { header: "Date", key: "date", width: 14 },
-        { header: "Container", key: "container", width: 18 },
-        { header: "Location", key: "location", width: 20 },
+        { header: "Dates", key: "date", width: 18 },
+        { header: "Containers", key: "containers", width: 42 },
+        { header: "Locations", key: "locations", width: 36 },
         { header: "Item", key: "item", width: 34 },
         { header: "Qty", key: "qty", width: 14 },
         { header: "Avg Rate", key: "rate", width: 16 },
         { header: "Value", key: "value", width: 18 },
       ];
-      [...exportData.stockIn.rows].sort(compareDateLocationItem).forEach((row) =>
+      exportStockIn.forEach((row) =>
         stockInSheet.addRow({
-          date: row.activityDate,
-          container: row.containerNumber,
-          location: row.locationName,
+          date: row.dates.join(", "),
+          containers: row.containers.map((entry) => `${entry.name} (${formatNumber(entry.quantity, 0)})`).join(", "),
+          locations: row.locations.map((entry) => `${entry.name} (${formatNumber(entry.quantity, 0)})`).join(", "),
           item: row.stockItemName,
           qty: row.quantity,
           rate: row.avgRate,
@@ -285,29 +350,23 @@ export default function StockInSalesReportDetail() {
       );
       stockInSheet.getRow(1).font = { bold: true };
 
-      const salesSheet = workbook.addWorksheet("Sales and Returns");
+      const salesSheet = workbook.addWorksheet("Sales");
       salesSheet.columns = [
         { header: "Date", key: "date", width: 14 },
-        { header: "Type", key: "type", width: 16 },
-        { header: "Location", key: "location", width: 20 },
+        { header: "Locations", key: "locations", width: 36 },
         { header: "Item", key: "item", width: 34 },
         { header: "Qty", key: "qty", width: 14 },
-        { header: "Sales", key: "sales", width: 18 },
-        { header: "Cost", key: "cost", width: 18 },
-        { header: "Profit", key: "profit", width: 18 },
-        { header: "Profit / Bale", key: "profitPerBale", width: 18 },
+        { header: "Avg Rate", key: "rate", width: 16 },
+        { header: "Value", key: "value", width: 18 },
       ];
-      [...exportData.stockOut.rows].sort(compareDateLocationItem).forEach((row) =>
+      exportSales.forEach((row) =>
         salesSheet.addRow({
           date: row.activityDate,
-          type: row.sourceType === "Sale" && row.isCreditSale ? "Credit Sale" : row.sourceType,
-          location: row.locationName,
+          locations: row.locations.map((entry) => `${entry.name} (${formatNumber(entry.quantity, 0)})`).join(", "),
           item: row.stockItemName,
           qty: row.quantity,
-          sales: row.totalSales,
-          cost: row.totalCost,
-          profit: row.costProfit,
-          profitPerBale: row.avgProfitPerBale,
+          rate: row.avgRate,
+          value: row.totalValue,
         })
       );
       salesSheet.getRow(1).font = { bold: true };
@@ -403,14 +462,6 @@ export default function StockInSalesReportDetail() {
             ))}
       </div>
 
-      <div className="rounded-xl border bg-muted/20 p-3 text-sm">
-        <span className="font-medium">Outbound breakdown:</span> Sales/returns{" "}
-        <span className="font-mono font-semibold">{formatNumber(summary.salesOutQty || 0, 0)}</span> · Transfer out{" "}
-        <span className="font-mono font-semibold">{formatNumber(summary.transferOutQty || 0, 0)}</span> · Other out{" "}
-        <span className="font-mono font-semibold">{formatNumber(summary.otherStockOutQty || 0, 0)}</span>. Transfers
-        reduce stock but do not create sales or profit.
-      </div>
-
       {isFetching && !isLoading && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground print:hidden">
           <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Refreshing details
@@ -432,11 +483,13 @@ export default function StockInSalesReportDetail() {
             <div className="flex items-center gap-2">
               <PackagePlus className="h-5 w-5" />
               <h2 className="text-lg font-semibold">Container Stock In</h2>
-              <span className="text-xs text-muted-foreground">{formatNumber(data?.stockIn.total || 0, 0)} lines</span>
+              <span className="text-xs text-muted-foreground">
+                {formatNumber(groupedStockIn.length, 0)} items · merged across all offloads
+              </span>
             </div>
             <div className="overflow-hidden rounded-xl border">
-              <div className="overflow-x-auto">
-                <Table className="min-w-[850px]">
+              <div className="max-h-[520px] overflow-auto">
+                <Table className="min-w-[900px]">
                   <TableHeader>
                     <TableRow className="bg-muted/40 hover:bg-muted/40">
                       <TableHead>Date</TableHead>
@@ -457,18 +510,35 @@ export default function StockInSalesReportDetail() {
                           </TableCell>
                         </TableRow>
                       ))
-                    ) : sortedStockIn.length === 0 ? (
+                    ) : groupedStockIn.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
                           No direct container offloads found.
                         </TableCell>
                       </TableRow>
                     ) : (
-                      sortedStockIn.map((row) => (
-                        <TableRow key={row.id}>
-                          <TableCell>{displayDate(row.activityDate)}</TableCell>
-                          <TableCell className="font-mono">{row.containerNumber}</TableCell>
-                          <TableCell>{row.locationName}</TableCell>
+                      groupedStockIn.map((row) => (
+                        <TableRow key={row.key}>
+                          <TableCell
+                            title={row.dates.length > 1 ? `Offloaded on:\n${row.dates.map(displayDate).join("\n")}` : undefined}
+                            className={row.dates.length > 1 ? "cursor-help underline decoration-dotted underline-offset-4" : ""}
+                          >
+                            {row.dates.length === 1 ? displayDate(row.dates[0]) : `${row.dates.length} dates`}
+                          </TableCell>
+                          <TableCell
+                            className="cursor-help font-mono underline decoration-dotted underline-offset-4"
+                            title={breakdownTitle("Containers / Qty", row.containers)}
+                          >
+                            {formatNumber(row.containers.length, 0)} {row.containers.length === 1 ? "container" : "containers"}
+                          </TableCell>
+                          <TableCell
+                            className={row.locations.length > 1 ? "cursor-help underline decoration-dotted underline-offset-4" : ""}
+                            title={row.locations.length > 1 ? breakdownTitle("Locations / Qty", row.locations) : undefined}
+                          >
+                            {row.locations.length === 1
+                              ? row.locations[0].name
+                              : `${formatNumber(row.locations.length, 0)} locations`}
+                          </TableCell>
                           <TableCell className="font-medium">{row.stockItemName}</TableCell>
                           <TableCell className="text-right font-mono">{formatNumber(row.quantity, 0)}</TableCell>
                           <TableCell className="text-right font-mono">{rate(row.avgRate)}</TableCell>
@@ -479,97 +549,76 @@ export default function StockInSalesReportDetail() {
                   </TableBody>
                 </Table>
               </div>
-              {data?.stockIn && (
-                <Pagination
-                  page={data.stockIn.page}
-                  totalPages={data.stockIn.totalPages}
-                  total={data.stockIn.total}
-                  onChange={setStockInPage}
-                />
-              )}
             </div>
           </section>
 
           <section className="space-y-2">
             <div className="flex items-center gap-2">
               <PackageMinus className="h-5 w-5" />
-              <h2 className="text-lg font-semibold">Sales / Returns</h2>
+              <h2 className="text-lg font-semibold">Sales</h2>
               <span className="text-xs text-muted-foreground">
-                Sales, credit notes and debit notes only · {formatNumber(data?.stockOut.total || 0, 0)} lines
+                {formatNumber(groupedSales.length, 0)} item/day totals
               </span>
             </div>
             <div className="overflow-hidden rounded-xl border">
-              <div className="overflow-x-auto">
-                <Table className="min-w-[1050px]">
+              <div className="max-h-[520px] overflow-auto">
+                <Table className="min-w-[850px]">
                   <TableHeader>
                     <TableRow className="bg-muted/40 hover:bg-muted/40">
                       <TableHead>Date</TableHead>
-                      <TableHead>Type</TableHead>
                       <TableHead>Location</TableHead>
                       <TableHead>Item</TableHead>
                       <TableHead className="text-right">Qty</TableHead>
-                      <TableHead className="text-right">Sales</TableHead>
-                      <TableHead className="text-right">Cost</TableHead>
-                      <TableHead className="text-right">Profit</TableHead>
-                      <TableHead className="text-right">Profit/Bale</TableHead>
+                      <TableHead className="text-right">Avg Rate</TableHead>
+                      <TableHead className="text-right">Value</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {isLoading ? (
                       Array.from({ length: 4 }).map((_, i) => (
                         <TableRow key={i}>
-                          <TableCell colSpan={9}>
+                          <TableCell colSpan={6}>
                             <Skeleton className="h-5 w-full" />
                           </TableCell>
                         </TableRow>
                       ))
-                    ) : sortedStockOut.length === 0 ? (
+                    ) : groupedSales.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={9} className="py-8 text-center text-sm text-muted-foreground">
-                          No sales, credit notes, or debit notes found.
+                        <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                          No sales found.
                         </TableCell>
                       </TableRow>
                     ) : (
-                      sortedStockOut.map((row) => (
-                        <TableRow key={`${row.sourceType}-${row.id}`}>
+                      groupedSales.map((row) => (
+                        <TableRow key={row.key}>
                           <TableCell>{displayDate(row.activityDate)}</TableCell>
-                          <TableCell>
-                            {row.sourceType === "Sale" && row.isCreditSale ? "Credit Sale" : row.sourceType}
+                          <TableCell
+                            className={row.locations.length > 1 ? "cursor-help underline decoration-dotted underline-offset-4" : ""}
+                            title={row.locations.length > 1 ? breakdownTitle("Locations / Qty Sold", row.locations) : undefined}
+                          >
+                            {row.locations.length === 1
+                              ? row.locations[0].name
+                              : `${formatNumber(row.locations.length, 0)} locations`}
                           </TableCell>
-                          <TableCell>{row.locationName}</TableCell>
                           <TableCell className="font-medium">{row.stockItemName}</TableCell>
                           <TableCell className="text-right font-mono">{formatNumber(row.quantity, 0)}</TableCell>
-                          <TableCell className="text-right font-mono">{money(row.totalSales)}</TableCell>
-                          <TableCell className="text-right font-mono text-muted-foreground">
-                            {money(row.totalCost)}
-                          </TableCell>
-                          <TableCell
-                            className={`text-right font-mono font-semibold ${row.costProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}
-                          >
-                            {money(row.costProfit)}
-                          </TableCell>
-                          <TableCell
-                            className={`text-right font-mono ${row.avgProfitPerBale >= 0 ? "text-emerald-600" : "text-red-600"}`}
-                          >
-                            {money(row.avgProfitPerBale)}
-                          </TableCell>
+                          <TableCell className="text-right font-mono">{rate(row.avgRate)}</TableCell>
+                          <TableCell className="text-right font-mono">{formatAmount(row.totalValue)}</TableCell>
                         </TableRow>
                       ))
                     )}
                   </TableBody>
                 </Table>
               </div>
-              {data?.stockOut && (
-                <Pagination
-                  page={data.stockOut.page}
-                  totalPages={data.stockOut.totalPages}
-                  total={data.stockOut.total}
-                  onChange={setStockOutPage}
-                />
-              )}
             </div>
           </section>
         </>
+      )}
+
+      {(data?.stockIn.truncated || data?.stockOut.truncated) && (
+        <p className="text-xs text-amber-600">
+          Detail data reached the 20,000-line safety limit; totals above remain based on the report summary.
+        </p>
       )}
 
       <div className="hidden print:block text-xs text-muted-foreground">
