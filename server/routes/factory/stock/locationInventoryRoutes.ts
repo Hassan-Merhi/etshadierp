@@ -686,7 +686,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
           }
           const gtr = garbageDetailSheet.addRow(gtd);
           gtr.font = { bold: true };
-          gtr.eachCell({ includeEmpty: false }, (cell: any) => {
+          gtr.eachCell({ includeEmpty: false }, (cell) => {
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: TOTAL_BG } };
           });
           gtr.getCell("weightKg").numFmt = NUM_FMT;

@@ -83,7 +83,7 @@ export function registerPayrollSummaryRoutes(app: Express) {
       );
 
       // Calculate grand total
-      const grandTotal = workerPayments.reduce((sum: number, wp: any) => sum + parseFloat(wp.totalPaid), 0);
+      const grandTotal = workerPayments.reduce((sum: number, wp) => sum + parseFloat(wp.totalPaid), 0);
 
       res.json({
         workerPayments,

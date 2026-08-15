@@ -388,7 +388,7 @@ export function registerContainerLoadedItemReportRoutes(app: Express, requireAut
           const headerRowNum = sheet.rowCount + 1;
           const headerRow = sheet.addRow(columns.map((c) => c.header));
           headerRow.height = 24;
-          headerRow.eachCell((cell: any) => {
+          headerRow.eachCell((cell) => {
             cell.font = { bold: true, size: 10, color: { argb: colors.headerFont } };
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: sectionColor } };
             cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
@@ -411,7 +411,7 @@ export function registerContainerLoadedItemReportRoutes(app: Express, requireAut
               const values = columns.map((c) => item[c.key]);
               const dataRow = sheet.addRow(values);
               const rowBg = statusColorFn ? statusColorFn(item) : i % 2 === 0 ? null : "F5F5F5";
-              dataRow.eachCell((cell: any) => {
+              dataRow.eachCell((cell) => {
                 cell.border = thinBorder;
                 cell.alignment = { vertical: "middle" };
                 if (rowBg) {
@@ -433,7 +433,7 @@ export function registerContainerLoadedItemReportRoutes(app: Express, requireAut
               }),
             ]);
             totalRow.font = { bold: true, size: 10 };
-            totalRow.eachCell((cell: any) => {
+            totalRow.eachCell((cell) => {
               cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: colors.summaryBg } };
               cell.border = {
                 top: { style: "double", color: { argb: "424242" } },
@@ -570,7 +570,7 @@ export function registerContainerLoadedItemReportRoutes(app: Express, requireAut
         ];
 
         const sumHeaderRow = summarySheet.addRow([summaryData[0][0], summaryData[0][1]]);
-        sumHeaderRow.eachCell((cell: any) => {
+        sumHeaderRow.eachCell((cell) => {
           cell.font = { bold: true, size: 11, color: { argb: colors.headerFont } };
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: colors.headerBg } };
           cell.border = thinBorder;

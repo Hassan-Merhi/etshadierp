@@ -87,7 +87,7 @@ export function registerDispatchBatchCrudRoutes(app: Express) {
       if (!customerId) return res.status(400).json({ message: "customerId is required" });
       if (!batchDate) return res.status(400).json({ message: "batchDate is required" });
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         // Validate customer
         const [customer] = await tx
           .select({ id: customers.id, legalName: customers.legalName })
@@ -309,7 +309,7 @@ export function registerDispatchBatchCrudRoutes(app: Express) {
       const batchId = parseId(req.params.id);
       if (batchId === null) return res.status(400).json({ message: "Invalid id" });
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         const [batch] = await tx
           .select()
           .from(customerDispatchBatches)

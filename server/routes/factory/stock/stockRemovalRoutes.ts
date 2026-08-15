@@ -67,7 +67,7 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
           productIds.length > 0
             ? await tx.select().from(factoryBaleProducts).where(inArray(factoryBaleProducts.id, productIds))
             : [];
-        const productMap = new Map<number, any>(factoryProducts.map((p: any) => [p.id, p]));
+        const productMap = new Map<number, any>(factoryProducts.map((p) => [p.id, p]));
 
         const stockItemCache = new Map<string, number>();
 
@@ -224,7 +224,7 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
 
       const today = getClientDate(req);
       const baleMetaJson = JSON.stringify({
-        bales: result.removed.map((b: any) => ({
+        bales: result.removed.map((b) => ({
           id: b.id,
           ref: b.referenceNumber,
           productName: b.productName || "Unknown",

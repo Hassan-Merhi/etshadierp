@@ -460,7 +460,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         const hdrRow = ws.getRow(hdrRowNum);
         hdrRow.values = headers;
         hdrRow.height = 30;
-        hdrRow.eachCell((cell: any, col: number) => {
+        hdrRow.eachCell((cell, col: number) => {
           cell.font = { bold: true, size: 10, color: { argb: C.headerText } };
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.blueMid } };
           cell.alignment = {
@@ -500,7 +500,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
           const isAlt = i % 2 === 1;
           const rowBg = isAlt ? C.altRow : C.whiteRow;
 
-          row.eachCell((cell: any, col: number) => {
+          row.eachCell((cell, col: number) => {
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowBg } };
             cell.border = allBorder();
             cell.alignment = {
@@ -529,7 +529,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         const totalRow = ws.getRow(nextRowIdx);
         totalRow.values = ["", "", "TOTAL", totQty, "", "", totWeightKg, totValue];
         totalRow.height = 28;
-        totalRow.eachCell((cell: any, col: number) => {
+        totalRow.eachCell((cell, col: number) => {
           cell.font = { bold: true, size: 11, color: { argb: C.totalText } };
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.totalBg } };
           cell.border = { top: medium(), bottom: medium(), left: thin(), right: thin() };

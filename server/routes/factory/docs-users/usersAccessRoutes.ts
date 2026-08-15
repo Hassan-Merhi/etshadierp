@@ -106,7 +106,7 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
         return res.status(400).json({ message: "Username already exists" });
       }
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         const hashedPassword = await bcrypt.hash(password, 10);
         const [newUser] = await tx
           .insert(users)
@@ -177,7 +177,7 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
         username,
       } = req.body;
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         const userUpdates: any = {};
         if (password && password.length >= 4) {
           userUpdates.password = await bcrypt.hash(password, 10);
@@ -262,7 +262,7 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
       if (userId === sessionUserId) {
         return res.status(400).json({ message: "You cannot delete your own account" });
       }
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         await tx.delete(factoryUserPageAccess).where(eq(factoryUserPageAccess.userId, userId));
         await tx.delete(factoryUserProfiles).where(eq(factoryUserProfiles.userId, userId));
         await tx.delete(userCompanyRoles).where(eq(userCompanyRoles.userId, userId));

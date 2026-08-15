@@ -116,7 +116,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
           .from(factoryBales)
           .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.referenceNumber, refCodes)));
 
-        const baleMap = new Map<string, any>(baleRows.map((b: any) => [b.referenceNumber, b]));
+        const baleMap = new Map<string, any>(baleRows.map((b) => [b.referenceNumber, b]));
         const notFound = refCodes.filter((r) => !baleMap.has(r));
         if (notFound.length > 0) {
           throw new Error(

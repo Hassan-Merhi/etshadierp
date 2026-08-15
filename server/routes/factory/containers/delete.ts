@@ -104,7 +104,7 @@ export function registerFactoryContainerDeleteRoutes(app: Express) {
           .select({ id: factoryRawStock.id })
           .from(factoryRawStock)
           .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryRawStock.containerId, id)));
-        const rsIds = rsRows.map((r: any) => r.id);
+        const rsIds = rsRows.map((r) => r.id);
 
         const commRows = await tx
           .select({ id: factoryContainerCommissions.id })
@@ -112,7 +112,7 @@ export function registerFactoryContainerDeleteRoutes(app: Express) {
           .where(
             and(eq(factoryContainerCommissions.companyId, companyId), eq(factoryContainerCommissions.containerId, id))
           );
-        const commIds = commRows.map((r: any) => r.id);
+        const commIds = commRows.map((r) => r.id);
 
         // 2. Delete daybook entries linked to this container
         if (rsIds.length > 0) {
@@ -170,7 +170,7 @@ export function registerFactoryContainerDeleteRoutes(app: Express) {
             )
           );
         if (containerVouchers.length > 0) {
-          const vIds = containerVouchers.map((v: any) => v.id);
+          const vIds = containerVouchers.map((v) => v.id);
           await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
           await tx.delete(vouchers).where(inArray(vouchers.id, vIds));
         }

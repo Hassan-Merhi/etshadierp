@@ -85,7 +85,7 @@ export function registerFactoryMixBatchUpdateRoutes(app: Express) {
       if (!batchBefore) return res.status(404).json({ message: "Mix batch not found" });
 
       // Full source edit: reverse old consumption, apply new
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         const [batch] = await tx
           .select()
           .from(factoryMixBatches)

@@ -255,12 +255,12 @@ export function registerPayrollMarkPaidRoutes(app: Express) {
           .set({ status: "PAID", paidAt: new Date(bulkPrToday), cashAccountId: cashId })
           .where(and(eq(factoryPayrolls.companyId, companyId), inArray(factoryPayrolls.id, normalizedIds)));
 
-        const workerIds = Array.from(new Set<number>(payrollsToMark.map((payroll: any) => payroll.workerId)));
+        const workerIds = Array.from(new Set<number>(payrollsToMark.map((payroll) => payroll.workerId)));
         const workerRows = await tx
           .select({ id: factoryWorkers.id, fullName: factoryWorkers.fullName })
           .from(factoryWorkers)
           .where(inArray(factoryWorkers.id, workerIds));
-        const workerMap = new Map(workerRows.map((worker: any) => [worker.id, worker.fullName]));
+        const workerMap = new Map(workerRows.map((worker) => [worker.id, worker.fullName]));
 
         for (const payroll of payrollsToMark) {
           if (cashId && payableAccBulk) {

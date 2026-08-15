@@ -414,7 +414,7 @@ export function registerShippingContainerRowRoutes(app: Express) {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         const [existing] = await tx
           .select({
             id: factoryShippingContainerRows.id,

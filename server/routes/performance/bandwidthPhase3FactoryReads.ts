@@ -213,7 +213,7 @@ async function sendLedgerDetails(companyId: number, req: any, res: any): Promise
  * existing Factory route module unchanged.
  */
 export function registerBandwidthPhase3FactoryReads(app: Express): void {
-  app.use("/api/factory/bale-ledger", requireAuth, (async (req: any, res: any, next: any) => {
+  app.use("/api/factory/bale-ledger", requireAuth, (async (req: any, res: any, next) => {
     if (req.method !== "GET") return next();
 
     try {

@@ -173,7 +173,7 @@ export function registerFactorySupplierPaymentRoutes(app: Express) {
           .from(vouchers)
           .where(and(eq(vouchers.companyId, companyId), sql`${vouchers.voucherNumber} LIKE ${payVoucherPattern}`));
         if (payVouchers.length > 0) {
-          const vIds = payVouchers.map((v: any) => v.id);
+          const vIds = payVouchers.map((v) => v.id);
           await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
           await tx.delete(vouchers).where(inArray(vouchers.id, vIds));
         }

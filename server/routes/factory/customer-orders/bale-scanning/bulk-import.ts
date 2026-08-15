@@ -271,7 +271,7 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
           // taken before this tx. Note: the snapshot can be stale, so for V5
           // we re-verify each candidate inside the tx below before inserting.
           const candidateBales = availableBales.filter(
-            (b: any) => !alreadyAddedBaleIds.has(b.id) && !v5BlockedBaleIds.has(b.id)
+            (b) => !alreadyAddedBaleIds.has(b.id) && !v5BlockedBaleIds.has(b.id)
           );
 
           const addedIds: number[] = [];

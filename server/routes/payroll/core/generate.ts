@@ -266,7 +266,7 @@ export function registerPayrollGenerateRoutes(app: Express) {
               )
             );
           if (staleGenVouchers.length > 0) {
-            const vIds = staleGenVouchers.map((v: any) => v.id);
+            const vIds = staleGenVouchers.map((v) => v.id);
             await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
             await tx.delete(vouchers).where(inArray(vouchers.id, vIds));
           }

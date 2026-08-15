@@ -172,7 +172,7 @@ function fortuneToXlsx(sheets: FortuneSheet[]): any {
 
     // Merged cells
     if (cfg.merge) {
-      ws["!merges"] = Object.values(cfg.merge).map((m: any) => ({
+      ws["!merges"] = Object.values(cfg.merge).map((m) => ({
         s: { r: m.r, c: m.c },
         e: { r: m.r + m.rs - 1, c: m.c + m.cs - 1 },
       }));

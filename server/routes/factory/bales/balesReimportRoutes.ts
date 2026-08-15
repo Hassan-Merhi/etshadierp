@@ -117,7 +117,7 @@ export function registerBalesReimportRoutes(app: Express) {
             .select({ referenceNumber: factoryBales.referenceNumber })
             .from(factoryBales)
             .where(eq(factoryBales.companyId, companyId));
-          const existingRefSet = new Set(existingBarcodes.map((b: any) => b.referenceNumber));
+          const existingRefSet = new Set(existingBarcodes.map((b) => b.referenceNumber));
 
           const duplicates = rows.filter((r) => existingRefSet.has(r.referenceNumber));
           if (duplicates.length > 0) {
@@ -134,7 +134,7 @@ export function registerBalesReimportRoutes(app: Express) {
             .select({ id: locations.id })
             .from(locations)
             .where(eq(locations.companyId, companyId));
-          allLocs.forEach((l: any) => validLocIds.add(l.id));
+          allLocs.forEach((l) => validLocIds.add(l.id));
 
           const invalidLocRows = rows.filter((r) => r.erpLocationId && !validLocIds.has(r.erpLocationId));
           if (invalidLocRows.length > 0) {

@@ -460,7 +460,7 @@ export function registerRawStockAdjRoutes(app: Express) {
               )
             );
           if (linkedVouchers.length > 0) {
-            const vIds = linkedVouchers.map((v: any) => v.id);
+            const vIds = linkedVouchers.map((v) => v.id);
             await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
             await tx.delete(vouchers).where(inArray(vouchers.id, vIds));
           }

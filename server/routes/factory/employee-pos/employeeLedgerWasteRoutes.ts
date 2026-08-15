@@ -493,7 +493,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
       });
 
       const filtered = search
-        ? enriched.filter((b: any) => {
+        ? enriched.filter((b) => {
             const s = search.toLowerCase();
             return (
               b.referenceNumber?.toLowerCase().includes(s) ||
@@ -693,12 +693,12 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
 
         const now = new Date();
 
-        const productIds = [...new Set(balesToDispose.map((b: any) => b.productId).filter(Boolean))] as number[];
+        const productIds = [...new Set(balesToDispose.map((b) => b.productId).filter(Boolean))] as number[];
         const factoryProducts =
           productIds.length > 0
             ? await tx.select().from(factoryBaleProducts).where(inArray(factoryBaleProducts.id, productIds))
             : [];
-        const productMap = new Map<number, any>(factoryProducts.map((p: any) => [p.id, p]));
+        const productMap = new Map<number, any>(factoryProducts.map((p) => [p.id, p]));
         const stockItemCache = new Map<string, number>();
 
         for (const bale of balesToDispose) {
@@ -746,7 +746,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
         totalBales: result.bales.length,
         totalWeightKg: result.totalWeightKg,
         totalCostWrittenOff: result.totalCostWrittenOff,
-        bales: result.bales.map((b: any) => ({
+        bales: result.bales.map((b) => ({
           id: b.id,
           referenceNumber: b.referenceNumber,
           weightKg: parseFloat(b.weightKg as string) || 0,

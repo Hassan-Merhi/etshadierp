@@ -46,7 +46,7 @@ export function registerPosSaleDeleteRoutes(app: Express) {
               .orderBy(desc(factoryBales.id))
               .limit(item.quantity)
               .for("update");
-            const baleIds = soldBales.map((b: any) => b.id);
+            const baleIds = soldBales.map((b) => b.id);
             if (baleIds.length > 0) {
               await tx
                 .update(factoryBales)
