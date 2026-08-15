@@ -21,62 +21,54 @@ function render(original, edits) {
   return text;
 }
 
-const stats = { 5: 0, 6: 0, 7: 0 };
-const kinds = new Map();
-let changedFiles = 0;
-
-for (const file of sourceFiles) {
-  const original = fs.readFileSync(file, "utf8");
-  const sf = ts.createSourceFile(file, original, ts.ScriptTarget.Latest, true, file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
-  const edits = [];
+function collect(sf) {
+  const out = [];
   const seen = new Set();
-  const add = (start, end, replacement, phase, kind) => {
+  const add = (node, replacement, phase, kind) => {
+    const start = node.getStart(sf);
+    const end = node.end;
     const key = `${start}:${end}`;
     if (seen.has(key)) return;
     seen.add(key);
-    edits.push({ start, end, replacement, phase, kind });
+    out.push({ start, end, replacement, phase, kind });
   };
-
   const visit = (node) => {
-    // Phase 5: dynamic object/API map shapes.
     if (ts.isTypeReferenceNode(node) && node.typeName.getText(sf) === "Record" && node.typeArguments?.length === 2 && anyKeyword(node.typeArguments[1])) {
-      add(node.typeArguments[1].getStart(sf), node.typeArguments[1].end, "unknown", 5, "Record-value");
+      add(node.typeArguments[1], "unknown", 5, "Record-value");
     }
-    if (ts.isIndexSignatureDeclaration(node) && anyKeyword(node.type)) {
-      add(node.type.getStart(sf), node.type.end, "unknown", 5, "index-signature");
-    }
+    if (ts.isIndexSignatureDeclaration(node) && anyKeyword(node.type)) add(node.type, "unknown", 5, "index-signature");
 
-    // Phase 6: explicit Promise/return/generic any.
     if (ts.isFunctionLike(node) && node.type) {
-      const colon = node.getChildren(sf).find((c) => c.kind === ts.SyntaxKind.ColonToken && c.end <= node.type.getStart(sf));
-      if (anyKeyword(node.type) && colon) add(colon.getStart(sf), node.type.end, "", 6, "return-infer");
+      if (anyKeyword(node.type)) add(node.type, "unknown", 6, "return-any");
       if (ts.isTypeReferenceNode(node.type) && node.type.typeName.getText(sf) === "Promise" && node.type.typeArguments?.length === 1 && anyKeyword(node.type.typeArguments[0])) {
-        if (colon) add(colon.getStart(sf), node.type.end, "", 6, "promise-return-infer");
-        else add(node.type.typeArguments[0].getStart(sf), node.type.typeArguments[0].end, "unknown", 6, "Promise-value");
+        add(node.type.typeArguments[0], "unknown", 6, "Promise-return");
       }
     }
     if (ts.isTypeReferenceNode(node) && node.typeArguments?.length) {
       const name = node.typeName.getText(sf);
-      if (name !== "Record" && name !== "Promise" && name !== "Array") {
-        for (const arg of node.typeArguments) if (anyKeyword(arg)) add(arg.getStart(sf), arg.end, "unknown", 6, `generic:${name}`);
+      if (name !== "Record" && name !== "Array") {
+        for (const arg of node.typeArguments) if (anyKeyword(arg)) add(arg, "unknown", 6, name === "Promise" ? "Promise-value" : `generic:${name}`);
       }
     }
 
-    // Phase 7: arrays, interface/model fields.
-    if (ts.isArrayTypeNode(node) && anyKeyword(node.elementType)) {
-      add(node.elementType.getStart(sf), node.elementType.end, "unknown", 7, "any-array");
-    }
+    if (ts.isArrayTypeNode(node) && anyKeyword(node.elementType)) add(node.elementType, "unknown", 7, "any-array");
     if (ts.isTypeReferenceNode(node) && node.typeName.getText(sf) === "Array" && node.typeArguments?.length === 1 && anyKeyword(node.typeArguments[0])) {
-      add(node.typeArguments[0].getStart(sf), node.typeArguments[0].end, "unknown", 7, "Array-any");
+      add(node.typeArguments[0], "unknown", 7, "Array-any");
     }
-    if ((ts.isPropertySignature(node) || ts.isPropertyDeclaration(node)) && anyKeyword(node.type)) {
-      add(node.type.getStart(sf), node.type.end, "unknown", 7, "model-field");
-    }
-
+    if ((ts.isPropertySignature(node) || ts.isPropertyDeclaration(node)) && anyKeyword(node.type)) add(node.type, "unknown", 7, "model-field");
     ts.forEachChild(node, visit);
   };
   visit(sf);
+  return out;
+}
 
+const stats = { 5: 0, 6: 0, 7: 0 };
+const kinds = new Map();
+let changedFiles = 0;
+for (const file of sourceFiles) {
+  const original = fs.readFileSync(file, "utf8");
+  const sf = ts.createSourceFile(file, original, ts.ScriptTarget.Latest, true, file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+  const edits = collect(sf);
   if (!edits.length) continue;
   for (const e of edits) {
     stats[e.phase]++;
@@ -87,8 +79,19 @@ for (const file of sourceFiles) {
   changedFiles++;
 }
 
+const remaining = { 5: 0, 6: 0, 7: 0 };
+for (const file of sourceFiles) {
+  const text = fs.readFileSync(file, "utf8");
+  const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+  for (const e of collect(sf)) remaining[e.phase]++;
+}
+
 console.log(`PHASE5_REMOVED=${stats[5]}`);
 console.log(`PHASE6_REMOVED=${stats[6]}`);
 console.log(`PHASE7_REMOVED=${stats[7]}`);
 console.log(`CHANGED_FILES=${changedFiles}`);
+console.log(`PHASE5_REMAINING=${remaining[5]}`);
+console.log(`PHASE6_REMAINING=${remaining[6]}`);
+console.log(`PHASE7_REMAINING=${remaining[7]}`);
 for (const [k, v] of [...kinds].sort((a, b) => b[1] - a[1])) console.log(`${v}\t${k}`);
+if (remaining[5] || remaining[6] || remaining[7]) process.exitCode = 2;
