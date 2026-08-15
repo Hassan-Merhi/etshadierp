@@ -102,7 +102,7 @@ export function registerStockItemWriteRoutes(app: Express) {
 
       const updated = await storage.updateStockItem(stockItemId, updates);
       try {
-        const _stockChanges: Record<string, { old?: unknown; new?: unknown }> = {};
+        const _stockChanges: Record<string, { old?: any; new?: any }> = {};
         for (const _f of ["name", "code", "uom", "barcode", "sellingPrice", "active"] as const) {
           if (
             String((existingItem as { [key: string]: unknown })[_f] ?? "") !==
@@ -161,7 +161,7 @@ export function registerStockItemWriteRoutes(app: Express) {
       const anyInventory = await db.execute(
         sql`SELECT COUNT(*) as count FROM inventory WHERE stock_item_id = ${stockItemId}`
       );
-      const inventoryCount = parseInt((anyInventory.rows as unknown[])[0]?.count || "0");
+      const inventoryCount = parseInt((anyInventory.rows as any[])[0]?.count || "0");
 
       if (inventoryCount > 0) {
         return res.status(400).json({

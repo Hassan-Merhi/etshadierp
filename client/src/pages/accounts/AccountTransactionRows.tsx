@@ -2,7 +2,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export interface AccountTransactionRowsProps {
-  vouchersWithBalance: unknown[];
+  vouchersWithBalance: any[];
   selectedVoucherIds: Set<number>;
   toggleSelectAll: () => void;
   toggleVoucherSelection: (id: number) => void;
@@ -12,7 +12,7 @@ export interface AccountTransactionRowsProps {
   appMode: string;
   openingBalance: number;
   closingBalance: number;
-  selectedAccount: unknown;
+  selectedAccount: any;
   formatDisplayDate: (date: Date | string) => string;
 }
 

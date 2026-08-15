@@ -124,7 +124,7 @@ export function registerV5ProformaCreateRoutes(app: Express) {
       }
 
       // Trim names
-      containerNames = (containerNames as unknown[]).map((n) => String(n ?? "").trim());
+      containerNames = (containerNames as any[]).map((n) => String(n ?? "").trim());
 
       // Reject empty names
       if (containerNames.some((n: string) => !n)) {

@@ -7,7 +7,7 @@
 
 export interface HandlerErrorResult {
   status: number;
-  body: Record<string, unknown>;
+  body: Record<string, any>;
 }
 
 /** Result of fetching the supplier-partner accounting configuration for edit-sale. */
@@ -27,12 +27,12 @@ export interface UpdatePosSaleParams {
   userRole: string | undefined;
   canSellNegativeStock: boolean;
   body: {
-    description: unknown;
-    items: unknown[];
-    paymentAccountType: unknown;
-    paymentAccountId: unknown;
-    isCreditSale: unknown;
-    voucherDate: unknown;
-    locationId: unknown;
+    description: any;
+    items: any[];
+    paymentAccountType: any;
+    paymentAccountId: any;
+    isCreditSale: any;
+    voucherDate: any;
+    locationId: any;
   };
 }

@@ -20,7 +20,7 @@ import type { A4DesignColor } from "@/lib/labelHtml";
 
 interface CartItem {
   productId: number;
-  product: unknown;
+  product: any;
   qty: number;
   weightPerBaleKg: number;
   finalizedBy: number | null;

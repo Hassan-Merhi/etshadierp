@@ -62,10 +62,10 @@ export interface WaChat {
 export interface AccountDialogsProps {
   bankToEdit: any | null;
   setBankToEdit: (bank: any | null) => void;
-  bankForm: unknown;
+  bankForm: any;
   onBankSubmit: (data: any) => void;
-  updateBankMutation: unknown;
-  deleteBankMutation: unknown;
+  updateBankMutation: any;
+  deleteBankMutation: any;
   handleDeleteBankAccount: () => void;
   accountToEdit: any | null;
   setAccountToEdit: (acc: any | null) => void;
@@ -75,9 +75,9 @@ export interface AccountDialogsProps {
   setCustomerToEdit: (acc: any | null) => void;
   employeeToEdit: any | null;
   setEmployeeToEdit: (acc: any | null) => void;
-  editForm: unknown;
+  editForm: any;
   onEditSubmit: (data: any) => void;
-  updateLedgerMutation: unknown;
+  updateLedgerMutation: any;
   handleDeleteAccount: () => void;
   pendingDelete: (() => void) | null;
   setPendingDelete: (fn: (() => void) | null) => void;
@@ -88,16 +88,16 @@ export interface AccountDialogsProps {
   waRuleDraft: WaRule;
   setWaRuleDraft: (rule: WaRule) => void;
   filteredWaChats: WaChat[];
-  saveWaRuleMutation: unknown;
+  saveWaRuleMutation: any;
   waChatsLoading: boolean;
 }
 
 export interface AccountStatementViewProps {
   selectedAccount: Account;
   onClose: () => void;
-  periodFilter: unknown;
+  periodFilter: any;
   setPeriodFilter: (filter: any) => void;
-  vouchersWithBalance: unknown[];
+  vouchersWithBalance: any[];
   closingBalance: number;
   openingBalance: number;
   transactionsLoading: boolean;
@@ -109,7 +109,7 @@ export interface AccountStatementViewProps {
   setFilterCurrency: (updater: any) => void;
   showDeletedVouchers: boolean;
   setShowDeletedVouchers: (updater: any) => void;
-  currentUser: unknown;
+  currentUser: any;
   formatAmount: (amt: number) => string;
   hideBalances: boolean;
   printRef: React.RefObject<HTMLDivElement>;
@@ -119,22 +119,22 @@ export interface AccountStatementViewProps {
   handleOpenVoucher: (v: any) => void;
   waRule: WaRule | null;
   openWaRuleDialog: () => void;
-  sendWaStatementMutation: unknown;
+  sendWaStatementMutation: any;
   isMultiCurrency: boolean;
-  ledgerCurrencyBalances?: unknown[];
+  ledgerCurrencyBalances?: any[];
   isBrokerSupplier: boolean;
-  brokerStatementData: unknown;
-  factorySupplierStatement: unknown;
+  brokerStatementData: any;
+  factorySupplierStatement: any;
   factoryStatementLoading: boolean;
   brokerStatementLoading: boolean;
   handlePrint: () => void;
   exportLang: "en" | "fr" | "ar";
   setExportLang: (lang: "en" | "fr" | "ar") => void;
-  exportLabels: unknown;
+  exportLabels: any;
 }
 
 export interface AccountTableProps {
-  filteredAccounts: unknown[];
+  filteredAccounts: any[];
   expandedParents: Set<string>;
   toggleParent: (id: string) => void;
   handleAccountChange: (id: string) => void;

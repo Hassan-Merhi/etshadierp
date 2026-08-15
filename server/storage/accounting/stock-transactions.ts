@@ -8,7 +8,7 @@ export async function getStockItemTransactions(
   companyId: number,
   startDate?: string,
   endDate?: string
-): Promise<unknown[]> {
+): Promise<any[]> {
   const conditions = [eq(schema.vouchers.companyId, companyId), eq(schema.vouchers.optional, false)];
   if (startDate) conditions.push(sql`${schema.vouchers.voucherDate} >= ${startDate}`);
   if (endDate) conditions.push(sql`${schema.vouchers.voucherDate} <= ${endDate}`);

@@ -539,7 +539,7 @@ export default function FactoryDaybook() {
 
   // ── Mutations ─────────────────────────────────────────────────────────────
   const editMutation = useMutation({
-    mutationFn: async ({ entryId, data }: { entryId: number; data: unknown }) => {
+    mutationFn: async ({ entryId, data }: { entryId: number; data: any }) => {
       const res = await factoryApiRequest("PUT", `/api/factory/daybook/${entryId}`, data);
       return res.json();
     },

@@ -5,7 +5,7 @@ import { db } from "../../db";
 import type { InventoryListFilters } from "./inventoryRequestContext";
 
 function buildInventoryConditions(companyId: number, filters: InventoryListFilters) {
-  const conditions: unknown[] = [
+  const conditions: any[] = [
     eq(inventory.companyId, companyId),
     isNull(locations.deletedAt),
     isNull(stockItems.deletedAt),

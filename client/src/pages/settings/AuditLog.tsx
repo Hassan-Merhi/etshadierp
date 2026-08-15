@@ -41,11 +41,11 @@ const ACTION_FILTER_OPTIONS: { label: string; value: string }[] = [
 type DayGroup = {
   dateKey: string;
   dateLabel: string;
-  logs: unknown[];
+  logs: any[];
 };
 
-function groupLogsByDay(logs: unknown[]): DayGroup[] {
-  const dayMap = new Map<string, unknown[]>();
+function groupLogsByDay(logs: any[]): DayGroup[] {
+  const dayMap = new Map<string, any[]>();
 
   for (const log of logs) {
     const date = new Date(log.createdAt);
@@ -174,7 +174,7 @@ export function AuditLog({
   });
 
   const activityLoading = isCompanyLoading || activeCompanyId === null || isLoading;
-  const rawAuditLogs: unknown[] = useMemo(() => (data?.logs || []), [data?.logs]);
+  const rawAuditLogs: any[] = data?.logs || [];
 
   // Defence in depth: the API is company-scoped, but the browser also rejects
   // any unexpected row so a stale cache or future backend regression cannot

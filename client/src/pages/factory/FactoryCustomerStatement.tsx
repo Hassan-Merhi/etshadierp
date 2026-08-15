@@ -51,7 +51,7 @@ interface BalanceEntry {
 
 interface StatementData {
   customer: CustomerInfo;
-  invoices: unknown[];
+  invoices: any[];
   balanceHistory: BalanceEntry[];
   currentBalance: number;
   currentBalanceSide: string;
@@ -244,7 +244,7 @@ export default function FactoryCustomerStatement() {
         const data = new Uint8Array(ev.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: "array" });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
+        const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: "" });
         const lines: { articleCode: string; pricePerBale: string | number }[] = [];
         for (const row of rows) {
           const code = String(

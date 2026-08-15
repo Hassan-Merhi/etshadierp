@@ -82,12 +82,12 @@ export async function upsertCorrection(params: {
 export async function validateRows(
   companyId: number,
   importType: string,
-  rows: { id: number; rowNumber: number; rawData: unknown }[]
+  rows: { id: number; rowNumber: number; rawData: any }[]
 ): Promise<
   {
     id: number;
     status: "valid" | "warning" | "error";
-    mappedData: unknown;
+    mappedData: any;
     errors: string[];
     warnings: string[];
   }[]
@@ -108,7 +108,7 @@ export async function validateRows(
 
 export async function validateStockItemRows(
   companyId: number,
-  rows: { id: number; rowNumber: number; rawData: unknown }[]
+  rows: { id: number; rowNumber: number; rawData: any }[]
 ) {
   // Pre-fetch lookup data (including correction memory for stock-group aliases)
   const [existingCodes, groups, itemCorrections] = await Promise.all([
@@ -142,10 +142,10 @@ export async function validateStockItemRows(
   const batchCodes = new Set<string>();
 
   return rows.map((row) => {
-    const raw = row.rawData as Record<string, unknown>;
+    const raw = row.rawData as Record<string, any>;
     const errors: string[] = [];
     const warnings: string[] = [];
-    const mapped: Record<string, unknown> = {};
+    const mapped: Record<string, any> = {};
 
     // name
     const name = String(raw.name ?? raw.Name ?? raw["Item Name"] ?? "").trim();
@@ -196,7 +196,7 @@ export async function validateStockItemRows(
   });
 }
 
-export async function validateCustomerRows(companyId: number, rows: { id: number; rowNumber: number; rawData: unknown }[]) {
+export async function validateCustomerRows(companyId: number, rows: { id: number; rowNumber: number; rawData: any }[]) {
   const existingCodes = await db
     .select({ code: customers.code })
     .from(customers)
@@ -205,10 +205,10 @@ export async function validateCustomerRows(companyId: number, rows: { id: number
   const batchCodes = new Set<string>();
 
   return rows.map((row) => {
-    const raw = row.rawData as Record<string, unknown>;
+    const raw = row.rawData as Record<string, any>;
     const errors: string[] = [];
     const warnings: string[] = [];
-    const mapped: Record<string, unknown> = {};
+    const mapped: Record<string, any> = {};
 
     const name = String(raw.name ?? raw.Name ?? raw["Customer Name"] ?? "").trim();
     if (!name) errors.push("name is required");
@@ -232,16 +232,16 @@ export async function validateCustomerRows(companyId: number, rows: { id: number
   });
 }
 
-export async function validateSupplierRows(companyId: number, rows: { id: number; rowNumber: number; rawData: unknown }[]) {
+export async function validateSupplierRows(companyId: number, rows: { id: number; rowNumber: number; rawData: any }[]) {
   const existingCodes = await db.select({ code: suppliers.code }).from(suppliers).where(isNull(suppliers.deletedAt));
   const existingCodeSet = new Set(existingCodes.map((r) => (r.code || "").toLowerCase()));
   const batchCodes = new Set<string>();
 
   return rows.map((row) => {
-    const raw = row.rawData as Record<string, unknown>;
+    const raw = row.rawData as Record<string, any>;
     const errors: string[] = [];
     const warnings: string[] = [];
-    const mapped: Record<string, unknown> = {};
+    const mapped: Record<string, any> = {};
 
     const legalName = String(raw.legalName ?? raw["Legal Name"] ?? raw.name ?? raw.Name ?? "").trim();
     if (!legalName) errors.push("legalName is required");
@@ -265,7 +265,7 @@ export async function validateSupplierRows(companyId: number, rows: { id: number
   });
 }
 
-export async function validateVoucherRows(companyId: number, rows: { id: number; rowNumber: number; rawData: unknown }[]) {
+export async function validateVoucherRows(companyId: number, rows: { id: number; rowNumber: number; rawData: any }[]) {
   const [accounts, ledgerCorrections] = await Promise.all([
     db
       .select({ id: ledgerAccounts.id, name: ledgerAccounts.name, code: ledgerAccounts.code })
@@ -291,10 +291,10 @@ export async function validateVoucherRows(companyId: number, rows: { id: number;
   const ledgerCorrMap = new Map(ledgerCorrections.map((c) => [c.rawValue.toLowerCase(), c]));
 
   return rows.map((row) => {
-    const raw = row.rawData as Record<string, unknown>;
+    const raw = row.rawData as Record<string, any>;
     const errors: string[] = [];
     const warnings: string[] = [];
-    const mapped: Record<string, unknown> = {};
+    const mapped: Record<string, any> = {};
 
     // date
     const rawDate = String(raw.date ?? raw.Date ?? raw["Voucher Date"] ?? "").trim();
@@ -347,7 +347,7 @@ export async function validateVoucherRows(companyId: number, rows: { id: number;
   });
 }
 
-export function validateGenericRows(rows: { id: number; rowNumber: number; rawData: unknown }[]) {
+export function validateGenericRows(rows: { id: number; rowNumber: number; rawData: any }[]) {
   return rows.map((row) => ({
     id: row.id,
     status: "valid" as const,
@@ -364,7 +364,7 @@ export async function postRows(
   userId: string,
   username: string,
   importType: string,
-  rows: { id: number; mappedData: unknown }[],
+  rows: { id: number; mappedData: any }[],
   tx: typeof db
 ): Promise<{ rowId: number; recordType: string; recordId: number }[]> {
   switch (importType) {
@@ -383,12 +383,12 @@ export async function postStockItemRows(
   companyId: number,
   userId: string,
   username: string,
-  rows: { id: number; mappedData: unknown }[],
+  rows: { id: number; mappedData: any }[],
   tx: typeof db
 ) {
   const results: { rowId: number; recordType: string; recordId: number }[] = [];
   for (const row of rows) {
-    const d = row.mappedData as Record<string, unknown>;
+    const d = row.mappedData as Record<string, any>;
     const [created] = await tx
       .insert(stockItems)
       .values({
@@ -422,12 +422,12 @@ export async function postCustomerRows(
   companyId: number,
   userId: string,
   username: string,
-  rows: { id: number; mappedData: unknown }[],
+  rows: { id: number; mappedData: any }[],
   tx: typeof db
 ) {
   const results: { rowId: number; recordType: string; recordId: number }[] = [];
   for (const row of rows) {
-    const d = row.mappedData as Record<string, unknown>;
+    const d = row.mappedData as Record<string, any>;
     const [created] = await tx
       .insert(customers)
       .values({
@@ -461,12 +461,12 @@ export async function postSupplierRows(
   companyId: number,
   userId: string,
   username: string,
-  rows: { id: number; mappedData: unknown }[],
+  rows: { id: number; mappedData: any }[],
   tx: typeof db
 ) {
   const results: { rowId: number; recordType: string; recordId: number }[] = [];
   for (const row of rows) {
-    const d = row.mappedData as Record<string, unknown>;
+    const d = row.mappedData as Record<string, any>;
     const [created] = await tx
       .insert(suppliers)
       .values({

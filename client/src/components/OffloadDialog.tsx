@@ -42,7 +42,7 @@ interface AdditionalCharge {
 interface AccountComboboxProps {
   value: string;
   onValueChange: (value: string) => void;
-  accounts: unknown[];
+  accounts: any[];
   placeholder?: string;
   disabled?: boolean;
   testId?: string;
@@ -214,7 +214,7 @@ export function OffloadDialog({ open, onOpenChange, containerId, containerNumber
     queryKey: ["/api/locations"],
   });
 
-  const { data: ledgerAccounts = [] } = useQuery<unknown[]>({
+  const { data: ledgerAccounts = [] } = useQuery<any[]>({
     queryKey: ["/api/ledger-accounts"],
     enabled: open && !isSpCompany,
   });
@@ -224,7 +224,7 @@ export function OffloadDialog({ open, onOpenChange, containerId, containerNumber
     enabled: open && isSpCompany,
   });
 
-  const { data: parentAgents = [] } = useQuery<unknown[]>({
+  const { data: parentAgents = [] } = useQuery<any[]>({
     queryKey: ["/api/sp/parent-agents"],
     enabled: open && isSpCompany,
   });
@@ -474,7 +474,7 @@ export function OffloadDialog({ open, onOpenChange, containerId, containerNumber
                             <SelectValue placeholder="Select agent" />
                           </SelectTrigger>
                           <SelectContent>
-                            {(parentAgents as unknown[]).map((a: any) => (
+                            {(parentAgents as any[]).map((a: any) => (
                               <SelectItem key={a.ledger_account_id} value={String(a.ledger_account_id)}>
                                 {a.account_name}
                               </SelectItem>
@@ -529,7 +529,7 @@ export function OffloadDialog({ open, onOpenChange, containerId, containerNumber
                             <SelectValue placeholder="Select agent" />
                           </SelectTrigger>
                           <SelectContent>
-                            {(parentAgents as unknown[]).map((a: any) => (
+                            {(parentAgents as any[]).map((a: any) => (
                               <SelectItem key={a.ledger_account_id} value={String(a.ledger_account_id)}>
                                 {a.account_name}
                               </SelectItem>

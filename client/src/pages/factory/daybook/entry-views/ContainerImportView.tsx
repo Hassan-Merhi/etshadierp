@@ -19,12 +19,12 @@ export function ContainerImportView({
   formatDisplayDate,
   onNavigate,
 }: {
-  entry: unknown;
-  containerDetail: unknown;
-  supplierBalance: unknown;
-  onClose: unknown;
-  formatDisplayDate: unknown;
-  onNavigate: unknown;
+  entry: any;
+  containerDetail: any;
+  supplierBalance: any;
+  onClose: any;
+  formatDisplayDate: any;
+  onNavigate: any;
 }) {
   const c = containerDetail;
   const csym = c ? currencySymbol(c.currencyCode || "USD") : "$";

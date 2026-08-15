@@ -29,7 +29,7 @@ async function completedPairLinks(
   targetId: number,
   sourceTable: string,
   targetTable: string
-): Promise<unknown[]> {
+): Promise<any[]> {
   const result = await db.execute(sql`
     SELECT DISTINCT ON (l.source_id) l.source_id, l.target_id
     FROM sp_migration_source_links l
@@ -51,7 +51,7 @@ async function verifyHistoricalSales(
   blockers: VerificationIssue[];
   deltas: VerificationIssue[];
   area: VerificationArea;
-  counts: unknown;
+  counts: any;
 }> {
   const blockers: VerificationIssue[] = [];
   const deltas: VerificationIssue[] = [];
@@ -166,7 +166,7 @@ async function verifyContainers(
   blockers: VerificationIssue[];
   deltas: VerificationIssue[];
   area: VerificationArea;
-  counts: unknown;
+  counts: any;
 }> {
   const blockers: VerificationIssue[] = [];
   const deltas: VerificationIssue[] = [];
@@ -363,7 +363,7 @@ async function verifyUserMappings(
 ): Promise<{
   blockers: VerificationIssue[];
   area: VerificationArea;
-  counts: unknown;
+  counts: any;
 }> {
   const blockers: VerificationIssue[] = [];
   const rolesResult = await db.execute(sql`
@@ -439,7 +439,7 @@ async function verifyUserMappings(
   };
 }
 
-export async function buildFinalMigrationVerification(sourceId: number, targetId: number): Promise<unknown> {
+export async function buildFinalMigrationVerification(sourceId: number, targetId: number): Promise<any> {
   const base = await buildCutoverReadiness(sourceId, targetId);
   const blockers: VerificationIssue[] = (base.blockers ?? []).filter(
     (issue: VerificationIssue) => !["UNMAPPED_INVENTORY", "TARGET_ALREADY_LIVE"].includes(issue.code)

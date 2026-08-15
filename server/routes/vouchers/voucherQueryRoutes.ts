@@ -82,7 +82,7 @@ export function registerVoucherQueryRoutes(app: Express) {
         }
       }
 
-      const filteredVouchers = filterAndSortVouchers(sanitizedVouchers as unknown[], listQuery);
+      const filteredVouchers = filterAndSortVouchers(sanitizedVouchers as any[], listQuery);
       res.setHeader("Cache-Control", "private, max-age=30, stale-while-revalidate=30");
       if (!listQuery.paginated) return res.json(filteredVouchers);
       return res.json(buildVoucherPage(filteredVouchers, listQuery.page, listQuery.pageSize));
@@ -126,7 +126,7 @@ export function registerVoucherQueryRoutes(app: Express) {
       const companyMap = new Map(companyRows.filter(Boolean).map((company) => [company!.id, company!] as const));
 
       // Combine all transactions with company information
-      const transactions: unknown[] = [];
+      const transactions: any[] = [];
 
       // Add voucher entries (which already include PO-generated vouchers)
       // No need to add POs separately as they're already represented by voucher entries
@@ -166,7 +166,7 @@ export function registerVoucherQueryRoutes(app: Express) {
       const openingBalance = isParentContext ? globalOpeningBalance : 0;
 
       // Add opening balance as first row if it exists
-      const result: unknown[] = [];
+      const result: any[] = [];
       if (openingBalance !== 0) {
         result.push({
           type: "opening",
@@ -282,7 +282,7 @@ export function registerVoucherQueryRoutes(app: Express) {
 
       const { type, locationId, startDate, endDate, search } = req.query;
 
-      const conditions: unknown[] = [
+      const conditions: any[] = [
         eq(vouchers.companyId, companyId),
         eq(vouchers.optional, true),
         isNull(vouchers.deletedAt),

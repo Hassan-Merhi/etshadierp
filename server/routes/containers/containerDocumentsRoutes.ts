@@ -177,7 +177,7 @@ export function registerContainerDocumentsRoutes(app: Express) {
         const supplier = await storage.getSupplierById(container.supplierId);
         const purchaseOrders = await storage.getPurchaseOrdersByContainer(container.id);
 
-        const sheetData: unknown[][] = [];
+        const sheetData: any[][] = [];
 
         sheetData.push(["CONTAINER DETAILS"]);
         sheetData.push(["Container Number", container.containerNumber]);

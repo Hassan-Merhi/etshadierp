@@ -36,9 +36,9 @@ export const utils = {
   book_new: () => new ExcelJS.Workbook(),
 
   json_to_sheet: (
-    data: Record<string, unknown>[],
+    data: Record<string, any>[],
     options?: { header?: string[] }
-  ): { data: Record<string, unknown>[]; headers: string[]; [key: string]: unknown } => {
+  ): { data: Record<string, any>[]; headers: string[]; [key: string]: any } => {
     if (!data || data.length === 0) {
       return { data: [], headers: options?.header ?? [] };
     }
@@ -46,13 +46,13 @@ export const utils = {
     return { data, headers };
   },
 
-  aoa_to_sheet: (data: unknown[][]): { aoa: unknown[][]; [key: string]: unknown } => {
+  aoa_to_sheet: (data: any[][]): { aoa: any[][]; [key: string]: any } => {
     return { aoa: data ?? [] };
   },
 
   sheet_add_aoa: (
-    sheet: { aoa?: unknown[][] } & Record<string, unknown>,
-    rows: unknown[][],
+    sheet: { aoa?: any[][] } & Record<string, any>,
+    rows: any[][],
     options?: { origin?: string | { r: number; c: number } }
   ) => {
     if (!sheet.aoa) sheet.aoa = [];
@@ -92,13 +92,13 @@ export const utils = {
     const worksheet = workbook.addWorksheet(name);
 
     if ("aoa" in sheetData) {
-      for (const row of sheetData.aoa as unknown[][]) {
+      for (const row of sheetData.aoa as any[][]) {
         worksheet.addRow(row || []);
       }
     } else if ("data" in sheetData && "headers" in sheetData) {
       worksheet.addRow(sheetData.headers);
       for (const item of sheetData.data) {
-        const row: unknown[] = [];
+        const row: any[] = [];
         for (const header of sheetData.headers) {
           row.push(item[header] ?? "");
         }
@@ -128,17 +128,17 @@ export const utils = {
     return worksheet;
   },
 
-  sheet_to_json: <T = Record<string, unknown>>(
+  sheet_to_json: <T = Record<string, any>>(
     worksheet: ExcelJS.Worksheet,
-    options?: { header?: number | string; defval?: unknown }
+    options?: { header?: number | string; defval?: any }
   ): T[] => {
-    const data: unknown[] = [];
+    const data: any[] = [];
     const headers: string[] = [];
     const defval = options?.defval;
 
     if (options?.header === 1) {
       worksheet.eachRow((row) => {
-        const rowData: unknown[] = [];
+        const rowData: any[] = [];
         row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
           let value: any = cell.value;
           if (value && typeof value === "object" && "result" in value) {
@@ -160,7 +160,7 @@ export const utils = {
           headers[colNumber - 1] = String(cell.value || "");
         });
       } else {
-        const rowData: Record<string, unknown> = {};
+        const rowData: Record<string, any> = {};
         row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
           const header = headers[colNumber - 1];
           if (header) {

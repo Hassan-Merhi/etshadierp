@@ -92,7 +92,7 @@ export default function ProformaAddLine() {
 
   const { data: baleProducts = [] } = useQuery<BaleProductWeight[]>({
     queryKey: ["/api/factory/bale-products"],
-    select: (data: unknown[]) =>
+    select: (data: any[]) =>
       data.map((p) => ({ articleCode: p.articleCode || p.code, weightPerBaleKg: p.weightPerBaleKg ?? null })),
   });
 

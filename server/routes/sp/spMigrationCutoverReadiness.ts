@@ -158,7 +158,7 @@ async function getCompletedActions(sourceId: number, targetId: number): Promise<
   return new Set(resultRows(result).map((row: any) => String(row.action)));
 }
 
-export async function buildCutoverReadiness(sourceId: number, targetId: number): Promise<unknown> {
+export async function buildCutoverReadiness(sourceId: number, targetId: number): Promise<any> {
   await Promise.all([ensurePhase2Schema(), ensureCutoverSchema()]);
   const blockers: Array<{ code: string; message: string; count?: number }> = [];
   const deltas: Array<{ code: string; message: string; count: number }> = [];
@@ -454,7 +454,7 @@ export async function buildCutoverReadiness(sourceId: number, targetId: number):
   };
 }
 
-export async function synchronizeCutoverStock(cutoverId: number, sourceId: number, targetId: number): Promise<unknown> {
+export async function synchronizeCutoverStock(cutoverId: number, sourceId: number, targetId: number): Promise<any> {
   await ensureCutoverSchema();
   const stockItemMap = await loadStockItemMap(sourceId, targetId);
   const sourceResult = await db.execute(sql`

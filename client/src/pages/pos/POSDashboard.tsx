@@ -137,7 +137,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
   });
 
   // Fetch today's sales data
-  const { data: todayVouchers = [], isLoading: salesLoading } = useQuery<unknown[]>({
+  const { data: todayVouchers = [], isLoading: salesLoading } = useQuery<any[]>({
     queryKey: locationId ? [`/api/locations/${locationId}/vouchers/today`] : [],
     enabled: !!locationId,
   });

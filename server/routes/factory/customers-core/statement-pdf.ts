@@ -48,7 +48,7 @@ export function registerFactoryCustomerStatementPdfRoutes(app: Express) {
         .orderBy(customerBalances.transactionDate, customerBalances.id);
 
       // Pull voucher entries (same logic as statement endpoint)
-      const voucherRowsPdf: unknown[] = [];
+      const voucherRowsPdf: any[] = [];
       const ledgerAccountIdPdf = customer.ledgerAccountId;
       const voucherCondPdf = ledgerAccountIdPdf
         ? sql`(${voucherEntries.ledgerAccountId} = ${ledgerAccountIdPdf} OR ${voucherEntries.customerId} = ${customerId})`
@@ -265,7 +265,7 @@ export function registerFactoryCustomerStatementPdfRoutes(app: Express) {
       // ── Arabic reshaper ──
       let custConvAr: ((t: string) => string) | null = null;
       let custBidi: {
-        getEmbeddingLevels: (t: string, d: string) => unknown;
+        getEmbeddingLevels: (t: string, d: string) => any;
         getReorderedString: (t: string, l: any) => string;
       } | null = null;
       try {

@@ -104,7 +104,7 @@ export function registerInvoiceLoadingScanRoutes(app: Express) {
         const _linkResult = await db.execute(
           sql`SELECT bale_id FROM customer_order_bales WHERE order_id = ${invoiceId} AND bale_id = ${bale.id} LIMIT 1`
         );
-        const _linkRows: unknown[] = resultRows(_linkResult);
+        const _linkRows: any[] = resultRows(_linkResult);
         const invoiceBaleLink = _linkRows.length > 0 ? { baleId: _linkRows[0].bale_id as number } : undefined;
 
         if (!invoiceBaleLink) {

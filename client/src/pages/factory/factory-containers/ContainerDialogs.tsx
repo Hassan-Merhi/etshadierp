@@ -26,7 +26,7 @@ interface ImportDialogProps {
 export function ImportDialog({ open, onClose }: ImportDialogProps) {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [importPreview, setImportPreview] = [[] as unknown[], (v: unknown[]) => {}];
+  const [importPreview, setImportPreview] = [[] as any[], (v: any[]) => {}];
 
   const handleClose = () => {
     setImportPreview([]);
@@ -328,7 +328,7 @@ export function ReverseOffloadDialog({ container, onClose }: ReverseOffloadDialo
 
 // ── Excel Import/Export Utilities ─────────────────────────────────────────────
 
-export async function exportContainers(rows: ContainerWithSupplier[], suppliersData?: unknown[]) {
+export async function exportContainers(rows: ContainerWithSupplier[], suppliersData?: any[]) {
   const XLSX = await import("@/lib/excelHelper");
   const headers = [
     "Container Number",
@@ -459,7 +459,7 @@ export async function downloadContainerTemplate() {
   await XLSX.writeFile(wb, "factory_containers_template.xlsx");
 }
 
-export async function parseContainerImportFile(file: File): Promise<unknown[]> {
+export async function parseContainerImportFile(file: File): Promise<any[]> {
   const XLSX = await import("@/lib/excelHelper");
   const data = await file.arrayBuffer();
   const wb = await XLSX.read(data, { type: "array" });
@@ -504,7 +504,7 @@ interface FullImportDialogProps {
 export function FullImportDialog({ open, onClose }: FullImportDialogProps) {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [importPreview, setImportPreview] = [[] as unknown[], (_v: unknown[]) => {}];
+  const [importPreview, setImportPreview] = [[] as any[], (_v: any[]) => {}];
   const [importResult, setImportResult] = [null, (_v: any) => {}];
 
   // This component is intentionally kept simple since the import state

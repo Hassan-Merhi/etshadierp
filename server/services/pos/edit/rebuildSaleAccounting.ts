@@ -90,10 +90,10 @@ export async function rebuildSaleAccountingEntries(
   tx: any,
   params: {
     voucherId: number;
-    oldEntries: unknown[];
+    oldEntries: any[];
     grandTotal: number;
-    paymentAccountType: unknown;
-    paymentAccountId: unknown;
+    paymentAccountType: any;
+    paymentAccountId: any;
     isSpCompanyEdit: boolean;
     editSpPayableAccountId: number | null;
     editSpDeductionClrAccountId: number | null;

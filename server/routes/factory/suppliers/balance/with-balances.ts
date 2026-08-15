@@ -55,7 +55,7 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
       // Voucher-based payments: debit entries on voucherEntries where factorySupplierId is set.
       // Exclude FACTORY-PAY-* vouchers — those are auto-generated from factorySupplierPayments
       // and are already counted in allPayments (would double-count otherwise).
-      const allSupplierIds = (suppliersList as unknown[]).map((s: any) => s.id);
+      const allSupplierIds = (suppliersList as any[]).map((s: any) => s.id);
       const voucherPaidBySupplier: Record<number, number> = {};
       const voucherFxUnresolvedSuppliers = new Set<number>();
       const voucherPaidBySupplierCurrency: Record<number, Record<string, number>> = {};
@@ -78,7 +78,7 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
               sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-PAY-%'`
             )
           );
-        for (const row of voucherPaymentRows as unknown[]) {
+        for (const row of voucherPaymentRows as any[]) {
           const suppId = row.factorySupplierId;
           if (!suppId) continue;
           if (row.optional) continue; // optional vouchers don't affect the balance
@@ -114,7 +114,7 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
         ORDER BY currency_code, effective_date DESC
       `);
       const configuredFxRates: Record<string, number> = {};
-      for (const row of fxRateRows.rows as unknown[]) {
+      for (const row of fxRateRows.rows as any[]) {
         configuredFxRates[row.currency_code] = parseFloat(row.rate_to_usd);
       }
 
@@ -331,7 +331,7 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
         }
 
         // Post-offload additional charges explicitly assigned to this supplier
-        for (const oc of allOffloadAdditionalCharges as unknown[]) {
+        for (const oc of allOffloadAdditionalCharges as any[]) {
           if (oc.supplierId !== s.id) continue;
           const amt = parseFloat(oc.amount || "0");
           if (amt <= 0) continue;
@@ -452,19 +452,19 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
 
       // First pass: compute each supplier's own stats
       const statsById: Record<number, ReturnType<typeof computeStats>> = {};
-      for (const s of suppliersList as unknown[]) {
+      for (const s of suppliersList as any[]) {
         statsById[s.id] = computeStats(s, includeOtw);
       }
 
       // Pre-compute broker statements for each broker parent so the list card
       // balance matches the detail page exactly (same data source).
       const brokerParentIds = new Set<number>(
-        (suppliersList as unknown[])
-          .filter((s: any) => (suppliersList as unknown[]).some((c: any) => c.parentId === s.id))
+        (suppliersList as any[])
+          .filter((s: any) => (suppliersList as any[]).some((c: any) => c.parentId === s.id))
           .map((s: any) => s.id as number)
       );
-      const brokerStmtMap: Record<number, unknown> = {};
-      for (const s of suppliersList as unknown[]) {
+      const brokerStmtMap: Record<number, any> = {};
+      for (const s of suppliersList as any[]) {
         if (brokerParentIds.has(s.id)) {
           const stmt = await buildBrokerStatement(s.id, companyId, includeOtw);
           if (stmt) brokerStmtMap[s.id] = stmt;
@@ -472,9 +472,9 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
       }
 
       // Second pass: for parent suppliers, roll up children's stats
-      const suppliersWithBalances = (suppliersList as unknown[]).map((s: any) => {
+      const suppliersWithBalances = (suppliersList as any[]).map((s: any) => {
         const own = statsById[s.id];
-        const children = (suppliersList as unknown[]).filter((c: any) => c.parentId === s.id);
+        const children = (suppliersList as any[]).filter((c: any) => c.parentId === s.id);
 
         if (children.length === 0) {
           // Leaf supplier — use own stats

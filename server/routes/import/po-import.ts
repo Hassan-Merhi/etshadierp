@@ -338,7 +338,7 @@ export function registerPoImportRoutes(app: Express) {
 
       // Calculate total items value across all POs for pro-rating charges
       const totalAllItemsValue = Object.values(poGroups).reduce((sum: number, items: any) => {
-        return sum + (items as unknown[]).reduce((s, item) => s + item.lineTotal, 0);
+        return sum + (items as any[]).reduce((s, item) => s + item.lineTotal, 0);
       }, 0);
 
       // Track allocated charges for remainder reconciliation
@@ -354,7 +354,7 @@ export function registerPoImportRoutes(app: Express) {
       for (let poIndex = 0; poIndex < poEntries.length; poIndex++) {
         const [poNumber, items] = poEntries[poIndex];
         const isLastPO = poIndex === poEntries.length - 1;
-        const poItems = items as unknown[];
+        const poItems = items as any[];
         const poItemsTotal = poItems.reduce((sum, item) => sum + item.lineTotal, 0);
 
         // Pro-rate charges based on this PO's items proportion of total

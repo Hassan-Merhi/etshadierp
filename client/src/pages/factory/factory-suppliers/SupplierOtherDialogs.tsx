@@ -17,15 +17,15 @@ interface SupplierOtherDialogsProps {
   setObEditSupplier: (val: any) => void;
   obEditValue: string;
   setObEditValue: (val: string) => void;
-  obEditMutation: UseMutationResult<unknown, unknown, unknown>;
+  obEditMutation: UseMutationResult<any, any, any>;
 
-  dueDialogSupplier: { name: string; containers: unknown[] } | null;
+  dueDialogSupplier: { name: string; containers: any[] } | null;
   setDueDialogSupplier: (val: any) => void;
   formatDate: (val: string) => string;
 
   editObComm: null | { rawStockId: number; amount: string; currencyCode: string; personName: string; notes: string };
   setEditObComm: (val: any) => void;
-  updateObCommissionMutation: UseMutationResult<unknown, unknown, unknown>;
+  updateObCommissionMutation: UseMutationResult<any, any, any>;
   wrapAdminAction: (fn: () => void, title: string) => void;
 }
 

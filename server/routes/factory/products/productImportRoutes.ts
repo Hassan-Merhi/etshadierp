@@ -36,7 +36,7 @@ export function registerFactoryProductImportRoutes(app: Express) {
           } = await import("xlsx");
           const workbook = readExcel(req.file.buffer, { type: "buffer" });
           const sheetName = workbook.SheetNames[0];
-          const rows: unknown[] = sheetToJson(workbook.Sheets[sheetName]);
+          const rows: any[] = sheetToJson(workbook.Sheets[sheetName]);
 
           let created = 0;
           let updated = 0;
@@ -238,9 +238,9 @@ export function registerFactoryProductImportRoutes(app: Express) {
           const XLSX = await import("xlsx");
           const workbook = XLSX.read(req.file.buffer, { type: "buffer", cellDates: true });
           const sheetName = workbook.SheetNames[0];
-          const rows: unknown[] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+          const rows: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
-          const getVal = (row: any, ...keys: string[]): unknown => {
+          const getVal = (row: any, ...keys: string[]): any => {
             const rowKeys = Object.keys(row);
             for (const k of keys) {
               const found = rowKeys.find((rk) => rk.trim().toLowerCase() === k.toLowerCase());
@@ -381,9 +381,9 @@ export function registerFactoryProductImportRoutes(app: Express) {
           const XLSX = await import("xlsx");
           const workbook = XLSX.read(req.file.buffer, { type: "buffer", cellDates: true });
           const sheetName = workbook.SheetNames[0];
-          const rows: unknown[] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+          const rows: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
-          const getVal = (row: any, ...keys: string[]): unknown => {
+          const getVal = (row: any, ...keys: string[]): any => {
             const rowKeys = Object.keys(row);
             for (const k of keys) {
               const found = rowKeys.find((rk) => rk.trim().toLowerCase() === k.toLowerCase());
@@ -406,7 +406,7 @@ export function registerFactoryProductImportRoutes(app: Express) {
           let skippedRows = 0;
           const skippedDetails: string[] = [];
 
-          const rowGroups: { product: unknown; qty: number; weight: number; prodDate: Date }[] = [];
+          const rowGroups: { product: any; qty: number; weight: number; prodDate: Date }[] = [];
           let totalBalesNeeded = 0;
 
           logger.info(`Bale import: processing ${rows.length} rows`, {

@@ -18,7 +18,7 @@ export function AdvanceRow({ adv, isLoan, isExpanded, onToggleExpand, onRepay, f
     refetchOnWindowFocus: false,
   });
 
-  const { data: repayments } = useQuery<unknown[]>({
+  const { data: repayments } = useQuery<any[]>({
     queryKey: ["/api/factory/advances", adv.id, "repayments"],
     queryFn: async () => {
       const res = await fetch(`/api/factory/advances/${adv.id}/repayments`, { credentials: "include" });
@@ -33,7 +33,7 @@ export function AdvanceRow({ adv, isLoan, isExpanded, onToggleExpand, onRepay, f
   const repaymentsWithRunningBalance = (repayments || [])
     .slice()
     .sort((a: any, b: any) => new Date(a.repaymentDate).getTime() - new Date(b.repaymentDate).getTime())
-    .reduce((acc: unknown[], r: any) => {
+    .reduce((acc: any[], r: any) => {
       const prevBal = acc.length > 0 ? acc[acc.length - 1].balanceAfter : parseFloat(adv.amount || "0");
       const balAfter = prevBal - parseFloat(r.amount || "0");
       acc.push({ ...r, balanceAfter: Math.max(0, balAfter) });

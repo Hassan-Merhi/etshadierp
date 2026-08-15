@@ -47,7 +47,7 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         grand_total: string;
       };
       let grandRev = 0;
-      const tableRows4 = (rows.rows as unknown[]).map((r) => {
+      const tableRows4 = (rows.rows as any[]).map((r) => {
         const rev = parseFloat(r.total_revenue || "0");
         grandRev += rev;
         return [
@@ -97,7 +97,7 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       `);
       // No in/out totals are computed here: the shard renders rows and a count,
       // and the accumulators that used to sit here were written but never read.
-      const tableRows4 = (rows.rows as unknown[]).map((r) => {
+      const tableRows4 = (rows.rows as any[]).map((r) => {
         const amt = parseFloat(r.amount || "0");
         return [
           String(r.transfer_date).slice(0, 10),
@@ -146,7 +146,7 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         LIMIT ${rowLimit}
       `);
       let totalVal = 0;
-      const tableRows4 = (rows.rows as unknown[]).map((r) => {
+      const tableRows4 = (rows.rows as any[]).map((r) => {
         const val = parseFloat(r.total_value || "0");
         totalVal += val;
         return [
@@ -184,7 +184,7 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY total_bales DESC
         LIMIT ${rowLimit}
       `);
-      const tableRows4 = (rows.rows as unknown[]).map((r, i) => [
+      const tableRows4 = (rows.rows as any[]).map((r, i) => [
         String(i + 1),
         r.full_name,
         String(r.total_bales),
@@ -221,7 +221,7 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         LIMIT ${rowLimit}
       `);
       let grandItems = 0;
-      const tableRows4 = (rows.rows as unknown[]).map((r) => {
+      const tableRows4 = (rows.rows as any[]).map((r) => {
         const items = parseFloat(r.total_items || "0");
         const charges = parseFloat(r.total_charges || "0");
         grandItems += items;
@@ -260,7 +260,7 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY c.eta ASC
         LIMIT ${rowLimit}
       `);
-      const tableRows4 = (rows.rows as unknown[]).map((r) => {
+      const tableRows4 = (rows.rows as any[]).map((r) => {
         const days = parseInt(r.days_until_eta || "0");
         const daysLabel = days <= 0 ? "TODAY/OVERDUE" : `${days}d`;
         return [
@@ -299,7 +299,7 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       `);
       let totalWaste = 0;
       const typeMap: Record<string, number> = {};
-      const tableRows4 = (rows.rows as unknown[]).map((r) => {
+      const tableRows4 = (rows.rows as any[]).map((r) => {
         const kg = parseFloat(r.kg_waste || "0");
         totalWaste += kg;
         const wt = r.waste_type || "Unknown";
@@ -342,7 +342,7 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       `);
       let totalReceipts = 0,
         totalPayments = 0;
-      const tableRows4 = (rows.rows as unknown[]).map((r) => {
+      const tableRows4 = (rows.rows as any[]).map((r) => {
         const amt = parseFloat(r.amount || "0");
         if (r.voucher_type === "Receipt") totalReceipts += amt;
         else totalPayments += amt;
@@ -390,7 +390,7 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       `);
       let grandCount = 0,
         grandTotal = 0;
-      const tableRows4 = (rows.rows as unknown[]).map((r) => {
+      const tableRows4 = (rows.rows as any[]).map((r) => {
         const cnt = parseInt(r.count || "0");
         const amt = parseFloat(r.total_amount || "0");
         grandCount += cnt;
@@ -432,7 +432,7 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       `);
       let grandItems = 0,
         grandValue = 0;
-      const tableRows4 = (rows.rows as unknown[]).map((r) => {
+      const tableRows4 = (rows.rows as any[]).map((r) => {
         const items = parseInt(r.item_count || "0");
         const val = parseFloat(r.total_value || "0");
         grandItems += items;

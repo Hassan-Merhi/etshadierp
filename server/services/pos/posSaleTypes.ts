@@ -7,7 +7,7 @@
 
 export interface HandlerErrorResult {
   status: number;
-  body: Record<string, unknown>;
+  body: Record<string, any>;
 }
 
 export interface ResolvedPaymentAccount {
@@ -17,8 +17,8 @@ export interface ResolvedPaymentAccount {
 }
 
 export interface ValidatedInventoryItem {
-  item: unknown;
-  inventoryRecord: unknown;
+  item: any;
+  inventoryRecord: any;
   currentQty: number;
   saleQty: number;
   newQty: number;
@@ -45,17 +45,17 @@ export interface CreatePosSaleParams {
   sessionCashAccountId: number | null | undefined;
   voucherDateFallback: string;
   body: {
-    locationId: unknown;
-    cashAccountId: unknown;
-    paymentAccountType: unknown;
-    paymentAccountId: unknown;
-    items: unknown[];
-    notes: unknown;
-    isCreditSale: unknown;
-    voucherDate: unknown;
-    shiftId: unknown;
-    clientSaleId: unknown;
-    currency: unknown;
-    exchangeRate: unknown;
+    locationId: any;
+    cashAccountId: any;
+    paymentAccountType: any;
+    paymentAccountId: any;
+    items: any[];
+    notes: any;
+    isCreditSale: any;
+    voucherDate: any;
+    shiftId: any;
+    clientSaleId: any;
+    currency: any;
+    exchangeRate: any;
   };
 }

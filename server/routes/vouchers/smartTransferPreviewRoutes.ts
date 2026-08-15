@@ -100,7 +100,7 @@ export function registerSmartTransferPreviewRoutes(app: Express) {
         companyId,
         userId,
         requestInput: parsed,
-        preview: responsePreview as Record<string, unknown>,
+        preview: responsePreview as Record<string, any>,
       });
 
       res.set("Cache-Control", "no-store");

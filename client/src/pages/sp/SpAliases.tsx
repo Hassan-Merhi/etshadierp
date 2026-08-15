@@ -15,7 +15,7 @@ export default function SpAliases() {
   const [stockItemId, setStockItemId] = useState("");
   const [description, setDescription] = useState("");
 
-  const { data: aliases = [], isLoading } = useQuery<unknown[]>({
+  const { data: aliases = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/sp/aliases"],
   });
 
@@ -134,7 +134,7 @@ export default function SpAliases() {
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading...
           </div>
-        ) : (aliases as unknown[]).length === 0 ? (
+        ) : (aliases as any[]).length === 0 ? (
           <p className="text-sm text-muted-foreground">No aliases configured.</p>
         ) : (
           <Card>
@@ -150,7 +150,7 @@ export default function SpAliases() {
                     <span className="col-span-4">Description</span>
                     <span className="col-span-1"></span>
                   </div>
-                  {(aliases as unknown[]).map((a) => (
+                  {(aliases as any[]).map((a) => (
                     <div
                       key={a.id}
                       className="grid grid-cols-12 text-xs py-2 border-b border-border/30 last:border-0 items-center"

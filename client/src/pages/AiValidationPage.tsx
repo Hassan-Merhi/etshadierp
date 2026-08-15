@@ -38,7 +38,7 @@ interface ValidationResult {
   validationType: string;
   file1Name: string | null;
   file2Name: string | null;
-  summary: Record<string, unknown>;
+  summary: Record<string, any>;
   errors: ValidationItem[];
   warnings: ValidationItem[];
   suggestedFixes: SuggestedFix[];

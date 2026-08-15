@@ -10,11 +10,11 @@ import { PeriodFilter } from "@/components/ui/period-filter";
 interface StockMovementDialogProps {
   stockMovementOpen: boolean;
   setStockMovementOpen: (o: boolean) => void;
-  stockMovementItem: unknown;
+  stockMovementItem: any;
   setStockMovementItem: (item: any) => void;
-  stockMovementPeriod: unknown;
+  stockMovementPeriod: any;
   setStockMovementPeriod: (p: any) => void;
-  drillMonth: unknown;
+  drillMonth: any;
   setDrillMonth: (m: any) => void;
   formatAmount: (amt: number) => string;
   navigate: (path: string) => void;

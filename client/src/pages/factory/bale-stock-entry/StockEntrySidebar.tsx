@@ -14,10 +14,10 @@ interface StockEntrySidebarProps {
   onEntryDateChange: (val: string) => void;
   workerCategoryFilter: string;
   onWorkerCategoryFilterChange: (val: string) => void;
-  workerCategoryGroups: unknown[];
+  workerCategoryGroups: any[];
   selectedCustomerId: string;
   onCustomerIdChange: (val: string) => void;
-  allCustomers: unknown[];
+  allCustomers: any[];
   totalQty: number;
   totalKg: number;
   isPending: boolean;

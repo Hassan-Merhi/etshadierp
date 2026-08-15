@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 interface StockTransferImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  locations: unknown[];
+  locations: any[];
   importFile: File | null;
   handleImportFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   downloadImportTemplate: () => void;
@@ -30,8 +30,8 @@ interface StockTransferImportDialogProps {
   handleImportSubmit: () => void;
   importMutationPending: boolean;
   importValidItemsCount: number;
-  importPreview: unknown;
-  importValidationResult: unknown;
+  importPreview: any;
+  importValidationResult: any;
   formatNumber: (num: any, decimals?: number) => string;
 }
 

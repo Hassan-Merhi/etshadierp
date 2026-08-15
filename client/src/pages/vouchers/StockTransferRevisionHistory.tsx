@@ -34,13 +34,13 @@ function revisionStatusVariant(status: RevisionStatus): "default" | "secondary" 
 interface StockTransferRevisionHistoryProps {
   voucherIdToEdit: number | null;
   stableTransferId: number | null;
-  transferRevisions: unknown[];
+  transferRevisions: any[];
   transferRevisionsExpanded: boolean;
   setTransferRevisionsExpanded: (val: boolean | ((v: boolean) => boolean)) => void;
   setApproveRevisionTarget: (rev: any) => void;
-  modeApiRequest: unknown;
-  queryClient: unknown;
-  lastKnownTransferIdRef: unknown;
+  modeApiRequest: any;
+  queryClient: any;
+  lastKnownTransferIdRef: any;
   formatNumber: (num: any, decimals?: number) => string;
 }
 

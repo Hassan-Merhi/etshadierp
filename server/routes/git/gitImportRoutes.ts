@@ -268,7 +268,7 @@ export function registerGitImportRoutes(app: Express) {
         // No range override — let sheet_to_json use the first row (the real header row) as
         // column names. The hint row (row 2) and the two example rows are caught later by
         // the knownExamples set and the "required / used to match" text check below.
-        const rawRows: unknown[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+        const rawRows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
 
         /** Convert any value to a plain string — handles JS Date objects from Excel */
         function toStr(v: any): string {
@@ -449,7 +449,7 @@ export function registerGitImportRoutes(app: Express) {
         let skipped = 0;
         let notFound = 0;
         const errors: string[] = [];
-        const undoChanges: Array<{ id: number; containerNumber: string; prevData: Record<string, unknown> }> = [];
+        const undoChanges: Array<{ id: number; containerNumber: string; prevData: Record<string, any> }> = [];
 
         for (let i = 0; i < rawRows.length; i++) {
           const raw = rawRows[i];
@@ -459,7 +459,7 @@ export function registerGitImportRoutes(app: Express) {
           // Build two maps from each raw column:
           //   rawMap  — raw cell value (for date/number fields that need special parsing)
           //   row     — string representation of each mapped field (for text/status fields)
-          const rawMap: Record<string, unknown> = {};
+          const rawMap: Record<string, any> = {};
           const row: Record<string, string> = {};
           for (const [rawKey, rawVal] of Object.entries(raw)) {
             const mapped = COL[norm(rawKey)];
@@ -505,7 +505,7 @@ export function registerGitImportRoutes(app: Express) {
             continue;
           }
 
-          const updateData: Record<string, unknown> = {};
+          const updateData: Record<string, any> = {};
 
           // ── Status (optional, case-insensitive) ─────────────────────────────
           const statusVal = toOptStr(rawMap.status);
@@ -604,7 +604,7 @@ export function registerGitImportRoutes(app: Express) {
           }
 
           // Capture "before" snapshot for undo (only keys we're about to overwrite)
-          const prevData: Record<string, unknown> = {};
+          const prevData: Record<string, any> = {};
           const [current] = await db.select().from(containers).where(eq(containers.id, match.id)).limit(1);
           if (current) {
             for (const key of Object.keys(updateData)) {

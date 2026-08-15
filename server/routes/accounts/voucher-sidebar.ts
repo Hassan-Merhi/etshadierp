@@ -14,7 +14,7 @@ import { vouchers, voucherEntries, factorySuppliers, factoryContainers, factoryS
 import { eq, and, sql, isNull } from "drizzle-orm";
 
 export function registerAccountVoucherSidebarRoutes(app: Express) {
-  const _vsBCache = new Map<number, { data: unknown; expiresAt: number }>();
+  const _vsBCache = new Map<number, { data: any; expiresAt: number }>();
 
   app.get("/api/accounts/voucher-sidebar", requireAuth, async (req, res) => {
     try {
@@ -58,20 +58,20 @@ export function registerAccountVoucherSidebarRoutes(app: Express) {
         storage.getAllBankAccounts(companyId),
         storage.getAllFixedAssets(companyId),
         storage.getAllEmployees(companyId),
-        isFactoryCompany || isPropertiesCompany ? Promise.resolve([] as unknown[]) : storage.getAllSuppliers(),
+        isFactoryCompany || isPropertiesCompany ? Promise.resolve([] as any[]) : storage.getAllSuppliers(),
         isFactoryCompany
           ? db
               .select()
               .from(factorySuppliers)
               .where(eq(factorySuppliers.companyId, companyId))
               .orderBy(factorySuppliers.name)
-          : Promise.resolve([] as unknown[]),
+          : Promise.resolve([] as any[]),
         isFactoryCompany
           ? db.select().from(factoryContainers).where(eq(factoryContainers.companyId, companyId))
-          : Promise.resolve([] as unknown[]),
+          : Promise.resolve([] as any[]),
         isFactoryCompany
           ? db.select().from(factorySupplierPayments).where(eq(factorySupplierPayments.companyId, companyId))
-          : Promise.resolve([] as unknown[]),
+          : Promise.resolve([] as any[]),
         db
           .select({
             id: vouchers.id,
@@ -98,11 +98,11 @@ export function registerAccountVoucherSidebarRoutes(app: Express) {
       // FACTORY-PAY-* voucher IDs — excluded when computing factory supplier voucher-paid amounts
       // to prevent double-counting with fPayments (factorySupplierPayments).
       const factoryPayVoucherIds = new Set(
-        (companyVouchers as unknown[]).filter((v) => (v.voucherNumber || "").startsWith("FACTORY-PAY-")).map((v) => v.id)
+        (companyVouchers as any[]).filter((v) => (v.voucherNumber || "").startsWith("FACTORY-PAY-")).map((v) => v.id)
       );
       // Map from voucherId -> {currency, exchangeRate} for USD conversion of factory supplier entries
       const voucherCurrencyMap = new Map<number, { currency: string; exchangeRate: string }>(
-        (companyVouchers as unknown[]).map((v) => [
+        (companyVouchers as any[]).map((v) => [
           v.id,
           { currency: v.currency || "USD", exchangeRate: v.exchangeRate || "1" },
         ])
@@ -300,7 +300,7 @@ export function registerAccountVoucherSidebarRoutes(app: Express) {
           const openingBalance = parseFloat(supplier.openingBalance || "0");
 
           // Collect all supplier IDs to aggregate (the supplier itself + any children brokered through it)
-          const linkedChildIds = (fSuppliers as unknown[]).filter((s) => s.parentId === supplier.id).map((s) => s.id);
+          const linkedChildIds = (fSuppliers as any[]).filter((s) => s.parentId === supplier.id).map((s) => s.id);
           const aggregateIds = [supplier.id, ...linkedChildIds];
 
           // Container value: sum((actualReceivedKg || totalKg) * ratePerKg + freight) * fxRateToUsd

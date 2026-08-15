@@ -45,7 +45,7 @@ export function ExportAccountsSection() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
 
-  const { data: allAccounts = [] } = useQuery<unknown[]>({
+  const { data: allAccounts = [] } = useQuery<any[]>({
     // Include company ID in the cache key so that switching companies forces a
     // fresh fetch instead of reusing a different company's cached response.
     queryKey: ["/api/accounts/all", selectedCompany?.id],
@@ -75,7 +75,7 @@ export function ExportAccountsSection() {
 
   const filtered = allAccounts.filter((a) => a.name.toLowerCase().includes(search.toLowerCase()));
 
-  const grouped = filtered.reduce<Record<string, unknown[]>>((acc, account: any) => {
+  const grouped = filtered.reduce<Record<string, any[]>>((acc, account: any) => {
     const type = account.type || "ledger";
     if (!acc[type]) acc[type] = [];
     acc[type].push(account);
@@ -124,7 +124,7 @@ export function ExportAccountsSection() {
     baseName: string,
     part: number,
     totalParts: number,
-    txnsChunk: unknown[],
+    txnsChunk: any[],
     startBalance: number
   ) => {
     const suffix = totalParts > 1 ? ` ${part}` : "";

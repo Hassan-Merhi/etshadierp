@@ -115,7 +115,7 @@ export function registerSpOffloadRoutes(app: Express) {
       );
 
       // Landed charges
-      const charges: unknown[] = chargeLines || [];
+      const charges: any[] = chargeLines || [];
       const totalLandedCost = charges.reduce((s: number, c: any) => s + parseNum(c.amountUsd), 0);
       const landedPerUnit = totalQty > 0 ? totalLandedCost / totalQty : 0;
       const totalFinalCost = totalBaseCost + totalLandedCost;

@@ -137,7 +137,7 @@ export function registerOrderBaleScanRoutes(app: Express) {
             line: ScannedArticleTotalsPatch["line"];
             totals: ScannedArticleTotalsPatch["totals"];
           }
-        | { ok: false; httpStatus: number; body: unknown };
+        | { ok: false; httpStatus: number; body: any };
 
       const result: PickResult = await db.transaction(async (tx: any) => {
         const [bale] = await tx

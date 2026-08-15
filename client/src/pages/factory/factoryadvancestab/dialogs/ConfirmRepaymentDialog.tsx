@@ -24,12 +24,12 @@ export function ConfirmRepaymentDialog({
   setConfirmRepay,
   setRepayingMonth,
 }: {
-  cashAccounts: unknown;
-  confirmRepay: unknown;
-  repayByMonthForm: unknown;
-  repayByMonthMutation: unknown;
-  setConfirmRepay: unknown;
-  setRepayingMonth: unknown;
+  cashAccounts: any;
+  confirmRepay: any;
+  repayByMonthForm: any;
+  repayByMonthMutation: any;
+  setConfirmRepay: any;
+  setRepayingMonth: any;
 }) {
   return (
     <Dialog

@@ -18,12 +18,12 @@ export function MixBatchView({
   mixBatchSources,
   onNavigate,
 }: {
-  entry: unknown;
-  mixBatchDetail: unknown;
-  onClose: unknown;
-  formatDisplayDate: unknown;
-  mixBatchSources: unknown;
-  onNavigate: unknown;
+  entry: any;
+  mixBatchDetail: any;
+  onClose: any;
+  formatDisplayDate: any;
+  mixBatchSources: any;
+  onNavigate: any;
 }) {
   const mb = mixBatchDetail;
   const totalKg = mb ? parseFloat(mb.totalWeightKg || "0") : 0;

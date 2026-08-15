@@ -83,7 +83,7 @@ function EditableTransferDetail({
   });
 
   const revisionMutation = useMutation({
-    mutationFn: async (payload: { transferId: number; note: string; items: unknown[] }) => {
+    mutationFn: async (payload: { transferId: number; note: string; items: any[] }) => {
       return apiRequest("POST", `/api/stock-transfers/${payload.transferId}/revisions`, {
         note: payload.note,
         items: payload.items,
@@ -118,7 +118,7 @@ function EditableTransferDetail({
   };
 
   const myItems = detail.items;
-  const locationInventory = (rawInventory as unknown[]).map((i) => ({
+  const locationInventory = (rawInventory as any[]).map((i) => ({
     stockItemId: i.stockItemId ?? i.id,
     name: i.stockItemName ?? i.name ?? "",
     quantity: i.quantity ?? "0",

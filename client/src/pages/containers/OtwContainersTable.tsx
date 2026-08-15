@@ -36,7 +36,7 @@ interface OtwContainersTableProps {
   getSupplierName: (id: number) => string;
   formatAmount: (n: number) => string;
   freightStatusMap: Record<number, { totalFreight: number; totalPaid: number; status: string }>;
-  getEditValue: (container: Container, field: keyof Container) => unknown;
+  getEditValue: (container: Container, field: keyof Container) => any;
   setEditValue: (id: number, field: keyof Container, value: any) => Promise<void>;
   hasChanges: (id: number) => boolean;
   saveTracking: (id: number) => Promise<void>;

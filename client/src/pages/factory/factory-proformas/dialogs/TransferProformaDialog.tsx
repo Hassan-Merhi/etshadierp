@@ -18,12 +18,12 @@ export function TransferProformaDialog({
   transferProformaMutation,
   transferTargetCustomerId,
 }: {
-  customers: unknown;
-  setTransferProforma: unknown;
-  setTransferTargetCustomerId: unknown;
-  transferProforma: unknown;
-  transferProformaMutation: unknown;
-  transferTargetCustomerId: unknown;
+  customers: any;
+  setTransferProforma: any;
+  setTransferTargetCustomerId: any;
+  transferProforma: any;
+  transferProformaMutation: any;
+  transferTargetCustomerId: any;
 }) {
   return (
     <Dialog

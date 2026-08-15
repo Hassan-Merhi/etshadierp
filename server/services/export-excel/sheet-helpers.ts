@@ -40,7 +40,7 @@ function guessWidth(key: string): number {
   return 16;
 }
 
-function formatValue(val: any): unknown {
+function formatValue(val: any): any {
   if (val === null || val === undefined) return "";
   if (val instanceof Date) return val.toISOString().substring(0, 19).replace("T", " ");
   // Stringify objects/arrays (e.g. JSONB columns)
@@ -71,7 +71,7 @@ function styleHeaderRow(ws: ExcelJS.Worksheet, colCount: number) {
 // NOTE: Per-cell fill and numFmt are intentionally avoided — they create one cell
 // object per cell in the ExcelJS model, causing OOM crashes on large sheets.
 // numFmt is applied at the column level (one shared style object per column).
-export function addSheet(wb: ExcelJS.Workbook, name: string, rows: unknown[]) {
+export function addSheet(wb: ExcelJS.Workbook, name: string, rows: any[]) {
   const sheetBase = name.substring(0, 31);
 
   if (!rows || rows.length === 0) {

@@ -59,7 +59,7 @@ export async function getAuthoritativeSupplierRemainingKg(
 }
 
 type RawSqlExecutor = {
-  query(text: string, params?: unknown[]): Promise<{ rows: unknown[] }>;
+  query(text: string, params?: unknown[]): Promise<{ rows: any[] }>;
 };
 
 /** Executor-aware quantity helper used inside the serializable replay transaction. */

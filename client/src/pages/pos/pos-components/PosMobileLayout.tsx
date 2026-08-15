@@ -11,7 +11,7 @@ import type { SaleRow, InventoryItem, Location } from "./posTypes";
 import { getFilteredInventory } from "../utils/posCalculations";
 
 interface PosMobileLayoutProps {
-  posUser: unknown;
+  posUser: any;
   activeLocation: Location | null;
   allLocations: Location[];
   posAssignedLocations: Location[];
@@ -24,15 +24,15 @@ interface PosMobileLayoutProps {
   setPaymentAccountType: (type: "bank" | "cash") => void;
   paymentAccountId: string | null;
   setPaymentAccountId: (id: string) => void;
-  bankAccounts: unknown[];
-  cashLedgerAccounts: unknown[];
+  bankAccounts: any[];
+  cashLedgerAccounts: any[];
   isCreditSale: boolean;
   setIsCreditSale: (v: boolean) => void;
   mobileCustomerComboOpen: boolean;
   setMobileCustomerComboOpen: (v: boolean) => void;
   selectedCustomerId: string;
   setSelectedCustomerId: (id: string) => void;
-  customerAccounts: unknown[];
+  customerAccounts: any[];
   searchTerm: string;
   setSearchTerm: (v: string) => void;
   mobileSearchInputRef: React.RefObject<HTMLInputElement>;
@@ -43,7 +43,7 @@ interface PosMobileLayoutProps {
   updateRow: (index: number, field: keyof SaleRow, value: any) => void;
   notes: string;
   setNotes: (v: string) => void;
-  saveMutation: unknown;
+  saveMutation: any;
   hasValidItems: boolean;
   handleSaveSale: () => void;
   formatDisplayAmount: (v: number) => string;

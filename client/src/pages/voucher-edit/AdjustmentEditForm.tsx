@@ -27,8 +27,8 @@ export function AdjustmentEditForm({
   grandTotal,
   voucherType,
 }: {
-  form: UseFormReturn<unknown>;
-  voucher: unknown;
+  form: UseFormReturn<any>;
+  voucher: any;
   onSubmit: (data: any) => void;
   onCancel: () => void;
   onToggleOptional: (optional: boolean) => void;

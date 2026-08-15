@@ -62,7 +62,7 @@ async function classifyReplayBales(
        AND fb.status NOT IN ('DELETED', 'REMOVED')
        AND ${selectorSql}
      ORDER BY fb.id`,
-    [companyId, ...selectorParams] as unknown[]
+    [companyId, ...selectorParams] as any[]
   );
 
   const availableIds: number[] = [];

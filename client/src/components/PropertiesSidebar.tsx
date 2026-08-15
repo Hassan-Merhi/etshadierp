@@ -57,7 +57,7 @@ const PROPERTIES_PINNED_DEFAULTS: NavItem[] = [
   { title: "Agent Ledger", url: "/properties/agents", icon: UserRound },
 ];
 
-export function PropertiesSidebar({ user }: { user?: unknown }) {
+export function PropertiesSidebar({ user }: { user?: any }) {
   const isAdmin = user?.role === "Admin" || user?.role === "Developer";
 
   const { items: pinnedItems, reorder: reorderPinned } = usePinnedOrder(

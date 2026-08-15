@@ -16,13 +16,13 @@ interface BulkDialogsProps {
   setBulkDepositDate: (v: string) => void;
   bulkDepositNotes: string;
   setBulkDepositNotes: (v: string) => void;
-  employeeStaff: unknown[];
+  employeeStaff: any[];
   bulkDepositSelections: Record<number, boolean>;
   handleSelectAllEmployees: (checked: any) => void;
   handleToggleEmployeeDeposit: (id: number) => void;
   bulkDepositTotal: number;
-  validSelectedEmployees: unknown[];
-  bulkDepositMutation: unknown;
+  validSelectedEmployees: any[];
+  bulkDepositMutation: any;
   bulkWithdrawalDialogOpen: boolean;
   setBulkWithdrawalDialogOpen: (open: boolean) => void;
   bulkWithdrawalDate: string;
@@ -35,9 +35,9 @@ interface BulkDialogsProps {
   setBulkWithdrawalNotes: (v: string) => void;
   bulkWithdrawalAmounts: Record<number, string>;
   setBulkWithdrawalAmounts: (fn: (prev: Record<number, string>) => Record<number, string>) => void;
-  bulkWithdrawalMutation: unknown;
-  cashAccounts: unknown[];
-  bankAccounts: unknown[] | undefined;
+  bulkWithdrawalMutation: any;
+  cashAccounts: any[];
+  bankAccounts: any[] | undefined;
   bulkBonusDialogOpen: boolean;
   setBulkBonusDialogOpen: (open: boolean) => void;
   bulkBonusStep: "edit" | "preview";
@@ -58,11 +58,11 @@ interface BulkDialogsProps {
   setBulkBonusAutoPctLocationId: (v: string) => void;
   bulkBonusAmounts: Record<number, string>;
   setBulkBonusAmounts: (fn: (prev: Record<number, string>) => Record<number, string>) => void;
-  pendingBonuses: Record<number, unknown>;
+  pendingBonuses: Record<number, any>;
   bulkBonusBreakdowns: Record<number, string[]>;
-  bulkBonusMutation: unknown;
+  bulkBonusMutation: any;
   handlePrintBulkBonus: () => void;
-  locations: unknown[];
+  locations: any[];
 }
 
 export function BulkDialogs({

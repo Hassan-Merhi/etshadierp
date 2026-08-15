@@ -35,7 +35,7 @@ interface MixBatchListProps {
   isSendingWhatsApp: boolean;
   mixBatchDate: string;
   setMixBatchDate: (date: string) => void;
-  mixBatchesByDate: unknown[];
+  mixBatchesByDate: any[];
   mixBatchesByDateLoading: boolean;
   mixBatchPrintRef: React.RefObject<HTMLDivElement>;
   formatDisplayDate: (date: string) => string;

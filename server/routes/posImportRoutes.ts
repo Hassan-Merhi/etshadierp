@@ -33,10 +33,10 @@ export function registerPosImportRoutes(app: Express) {
 
       const workbook = await readExcel(req.file.buffer);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows = sheetToJson(worksheet) as unknown[];
+      const rows = sheetToJson(worksheet) as any[];
       if (rows.length === 0) return res.status(400).json({ message: "Excel file is empty" });
 
-      const items: unknown[] = [];
+      const items: any[] = [];
       let totalValue = toInventoryDecimal(0);
       for (let index = 0; index < rows.length; index++) {
         const row = rows[index];
@@ -73,7 +73,7 @@ export function registerPosImportRoutes(app: Express) {
 
       const errors: string[] = [];
       const warnings: string[] = [];
-      const validatedItems: unknown[] = [];
+      const validatedItems: any[] = [];
       const location = await storage.getLocationById(locationId);
       if (!location) {
         errors.push("Selected location not found");

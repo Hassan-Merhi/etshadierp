@@ -15,14 +15,14 @@ interface WorkerProfilesTabProps {
   selectedWorkerProfileId: number | null;
   setSelectedWorkerProfileId: (val: number | null) => void;
   workerStaff: Employee[];
-  workerGroups: unknown[];
+  workerGroups: any[];
   workerProfileGroupFilter: number | null;
   setWorkerProfileGroupFilter: (val: number | null) => void;
   workerProfileSearch: string;
   setWorkerProfileSearch: (val: string) => void;
   employeesLoading: boolean;
   setNewWorkerDialogOpen: (val: boolean) => void;
-  addWorkerToWorkerGroupMutation: unknown;
+  addWorkerToWorkerGroupMutation: any;
   setWorkerDeductionTarget: (val: Employee | null) => void;
   setSelectedWorkerForEdit: (val: Employee | null) => void;
   setEditWorkerDialogOpen: (val: boolean) => void;

@@ -434,7 +434,7 @@ export default function FactorySuppliers() {
   // Bulk-assign: move multiple containers to a linked supplier in sequence
   const assignContainersMutation = useMutation({
     mutationFn: async ({ containerIds, targetSupplierId }: { containerIds: number[]; targetSupplierId: number }) => {
-      const results: unknown[] = [];
+      const results: any[] = [];
       for (const containerId of containerIds) {
         const res = await factoryApiRequest("POST", `/api/factory/containers/${containerId}/move-supplier`, {
           targetSupplierId,
@@ -618,7 +618,7 @@ export default function FactorySuppliers() {
     const voucherPmts = statementData?.voucherPayments || [];
     const fxts = statementData?.fxTransfers || [];
     const obcs = statementData?.obCommissions || [];
-    const allRows: unknown[] = [];
+    const allRows: any[] = [];
     rows.forEach((r) =>
       allRows.push({
         key: `c-${r.id}`,

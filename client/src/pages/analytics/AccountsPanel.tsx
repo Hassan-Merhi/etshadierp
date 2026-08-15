@@ -17,7 +17,7 @@ interface AccountsPanelProps {
   netProfitData?: NetProfitStatementData;
   loadingNetProfit: boolean;
   renderHierarchicalAccounts: (accounts: Account[]) => React.ReactNode;
-  renderNetProfitAccountsList: (accounts: unknown[]) => React.ReactNode;
+  renderNetProfitAccountsList: (accounts: any[]) => React.ReactNode;
   calculateTotal: (accounts: Account[]) => number;
   formatSmartCurrency: (amount: number) => string;
 }

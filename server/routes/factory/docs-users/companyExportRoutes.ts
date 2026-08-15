@@ -69,7 +69,7 @@ export function registerFactoryCompanyExportRoutes(app: Express) {
 
       const byCompany = (table: any) => eq(table.companyId, companyId);
 
-      const data: Record<string, unknown[]> = {};
+      const data: Record<string, any[]> = {};
 
       data.locations = await db.select().from(locations).where(byCompany(locations));
       data.ledger_accounts = await db.select().from(ledgerAccounts).where(byCompany(ledgerAccounts));

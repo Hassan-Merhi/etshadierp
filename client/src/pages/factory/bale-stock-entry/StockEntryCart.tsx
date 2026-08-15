@@ -20,7 +20,7 @@ import { BaleLogoPickerPopover } from "./BaleLogoPickerPopover";
 
 interface CartItem {
   productId: number;
-  product: unknown;
+  product: any;
   qty: number;
   weightPerBaleKg: number;
   finalizedBy: number | null;
@@ -43,7 +43,7 @@ export function StockEntryCart({
   filteredWorkers,
 }: {
   cart: CartItem[];
-  workers: unknown[];
+  workers: any[];
   workerCategoryFilter: string;
   onUpdateQty: (productId: number, delta: number) => void;
   onSetQty: (productId: number, qty: number) => void;
@@ -51,10 +51,10 @@ export function StockEntryCart({
   onRemoveItem: (productId: number) => void;
   onAssignWorker: (productId: number, workerId: number | null) => void;
   onSetLogoOverride: (productId: number, logoId: number | null) => void;
-  allCustomers: unknown[];
+  allCustomers: any[];
   logoPickerOpen: number | null;
   onLogoPickerOpenChange: (productId: number | null) => void;
-  filteredWorkers: unknown[];
+  filteredWorkers: any[];
 }) {
   const isMobile = useIsMobile();
 

@@ -165,7 +165,7 @@ async function applyDeltaByEmployeeCode(
 }
 
 export async function applyEmployeeBalanceDeltasTx(input: {
-  tx: unknown;
+  tx: any;
   companyId: number;
   entries: EmployeeBalancePostingEntry[];
   direction?: EmployeeBalancePostingDirection;

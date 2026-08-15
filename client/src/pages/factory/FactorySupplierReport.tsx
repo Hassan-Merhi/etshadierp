@@ -21,7 +21,7 @@ export default function FactorySupplierReport() {
   const [supplierId, setSupplierId] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const { data: companies = [] } = useQuery<unknown[]>({
+  const { data: companies = [] } = useQuery<any[]>({
     queryKey: ["/api/user/companies"],
   });
 
@@ -31,7 +31,7 @@ export default function FactorySupplierReport() {
     }
   }, [companies, companyId]);
 
-  const { data: suppliers = [], isLoading: suppliersLoading } = useQuery<unknown[]>({
+  const { data: suppliers = [], isLoading: suppliersLoading } = useQuery<any[]>({
     queryKey: ["/api/factory/suppliers", companyId],
     queryFn: async () => {
       const res = await fetch(`/api/factory/suppliers?companyId=${companyId}`, { credentials: "include" });

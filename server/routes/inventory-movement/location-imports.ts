@@ -83,10 +83,10 @@ export function registerLocationImportRoutes(app: Express) {
       const allStockGroups = await storage.getAllStockGroups(req.session.currentCompanyId);
 
       const results = {
-        created: [] as unknown[],
-        updated: [] as unknown[],
-        skipped: [] as unknown[],
-        errors: [] as unknown[],
+        created: [] as any[],
+        updated: [] as any[],
+        skipped: [] as any[],
+        errors: [] as any[],
       };
 
       // Per-session barcode registry: once a barcode resolves to an item it

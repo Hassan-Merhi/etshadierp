@@ -15,7 +15,7 @@ import { eq, and, isNull } from "drizzle-orm";
 import type { HandlerErrorResult } from "./posEditSaleTypes";
 
 /** Validates all items have positive quantities and prices. Throws (matching the original) rather than returning an error result. */
-export function validateItemsPositive(items: unknown[]): void {
+export function validateItemsPositive(items: any[]): void {
   for (const item of items) {
     const qty = parseFloat(item.quantity);
     const price = parseFloat(item.sellingPrice);
@@ -33,7 +33,7 @@ export function validateItemsPositive(items: unknown[]): void {
 export async function loadAndValidateExistingVoucher(
   voucherId: number,
   companyId: number
-): Promise<{ existingVoucher: unknown } | { error: HandlerErrorResult }> {
+): Promise<{ existingVoucher: any } | { error: HandlerErrorResult }> {
   const [existingVoucher] = await db
     .select()
     .from(vouchers)

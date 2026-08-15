@@ -53,23 +53,23 @@ export interface RawStockCostResult {
 
 export interface RawStockCostingAdapter {
   findExisting(input: {
-    tx: unknown;
+    tx: any;
     companyId: number;
     supplierId: number;
     source: RawStockCostSourceIdentity;
   }): Promise<RawStockCostResult | null>;
   validateOwnership(input: {
-    tx: unknown;
+    tx: any;
     companyId: number;
     supplierId: number;
   }): Promise<void>;
   lockCurrentState(input: {
-    tx: unknown;
+    tx: any;
     companyId: number;
     supplierId: number;
   }): Promise<RawStockCostState>;
   appendCostEvent(input: {
-    tx: unknown;
+    tx: any;
     request: RawStockCostEventRequest;
     before: RawStockCostState;
     after: RawStockCostState;
@@ -77,21 +77,21 @@ export interface RawStockCostingAdapter {
     costDelta: string;
   }): Promise<void>;
   persistState(input: {
-    tx: unknown;
+    tx: any;
     companyId: number;
     supplierId: number;
     expectedVersion: number;
     next: RawStockCostState;
   }): Promise<void>;
   recordIdempotency(input: {
-    tx: unknown;
+    tx: any;
     companyId: number;
     supplierId: number;
     source: RawStockCostSourceIdentity;
     result: RawStockCostResult;
   }): Promise<void>;
   recordAudit(input: {
-    tx: unknown;
+    tx: any;
     request: RawStockCostEventRequest;
     before: RawStockCostState;
     after: RawStockCostState;

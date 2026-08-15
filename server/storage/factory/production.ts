@@ -75,7 +75,7 @@ export async function getAllProductionBales(
     category?: string;
     grade?: string;
   }
-): Promise<unknown[]> {
+): Promise<any[]> {
   const conditions = [eq(schema.productionBales.companyId, companyId)];
 
   if (filters?.mixBatchId) {

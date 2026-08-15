@@ -55,39 +55,39 @@ export interface RepairExecutionResult {
 }
 
 export interface ReconciliationRepairAdapter extends ReconciliationAdapter {
-  findExistingReport(input: { tx: unknown; companyId: number; runKey: string }): Promise<ReconciliationReport | null>;
-  persistReport(input: { tx: unknown; report: ReconciliationReport }): Promise<void>;
+  findExistingReport(input: { tx: any; companyId: number; runKey: string }): Promise<ReconciliationReport | null>;
+  persistReport(input: { tx: any; report: ReconciliationReport }): Promise<void>;
   classifyRepair(input: {
-    tx: unknown;
+    tx: any;
     result: ReconciliationResult;
   }): Promise<{ disposition: RepairDisposition; reason: string }>;
   assertApprovalToken(input: {
-    tx: unknown;
+    tx: any;
     companyId: number;
     reportRunKey: string;
     approvalToken: string;
   }): Promise<void>;
   findExistingRepair(input: {
-    tx: unknown;
+    tx: any;
     companyId: number;
     idempotencyKey: string;
   }): Promise<RepairExecutionResult | null>;
-  lockRepairTarget(input: { tx: unknown; target: ReconciliationTarget }): Promise<void>;
-  assertPeriodOpen(input: { tx: unknown; target: ReconciliationTarget; actor: RepairActor }): Promise<void>;
+  lockRepairTarget(input: { tx: any; target: ReconciliationTarget }): Promise<void>;
+  assertPeriodOpen(input: { tx: any; target: ReconciliationTarget; actor: RepairActor }): Promise<void>;
   rebuildProjectionFromCanonical(input: {
-    tx: unknown;
+    tx: any;
     item: RepairPlanItem;
     actor: RepairActor;
   }): Promise<void>;
   recordRepair(input: {
-    tx: unknown;
+    tx: any;
     companyId: number;
     idempotencyKey: string;
     result: RepairExecutionResult;
     actor: RepairActor;
   }): Promise<void>;
   recordAudit(input: {
-    tx: unknown;
+    tx: any;
     companyId: number;
     reportRunKey: string;
     idempotencyKey: string;

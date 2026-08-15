@@ -42,7 +42,7 @@ async function runPhase3Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         totCost = 0,
         totProfit = 0,
         totQty = 0;
-      const tableRows2 = (rows.rows as unknown[]).map((r) => {
+      const tableRows2 = (rows.rows as any[]).map((r) => {
         const rev = parseFloat(r.total_revenue || "0");
         const cost = parseFloat(r.total_cost || "0");
         const profit3 = parseFloat(r.total_profit || "0");
@@ -84,7 +84,7 @@ async function runPhase3Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY total_revenue DESC
         LIMIT ${rowLimit}
       `);
-      const tableRows2 = (rows.rows as unknown[]).map((r, i) => [
+      const tableRows2 = (rows.rows as any[]).map((r, i) => [
         String(i + 1),
         r.item_name,
         r.code,
@@ -129,7 +129,7 @@ async function runPhase3Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       let totCost = 0,
         totSale = 0,
         totProfit = 0;
-      const tableRows2 = (rows.rows as unknown[]).map((r) => {
+      const tableRows2 = (rows.rows as any[]).map((r) => {
         const cost = parseFloat(r.cost || "0");
         const sale = parseFloat(r.sale_amount || "0");
         const comm = parseFloat(r.commission || "0");
@@ -195,7 +195,7 @@ async function runPhase3Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       `);
       let grandTotalValue = 0,
         grandTotalItems = 0;
-      const tableRows2 = (rows.rows as unknown[]).map((r) => {
+      const tableRows2 = (rows.rows as any[]).map((r) => {
         const val = parseFloat(r.total_value || "0");
         grandTotalValue += val;
         grandTotalItems += parseInt(r.item_count || "0");
@@ -234,7 +234,7 @@ async function runPhase3Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         LIMIT ${rowLimit}
       `);
       let grandSpend = 0;
-      const tableRows2 = (rows.rows as unknown[]).map((r) => {
+      const tableRows2 = (rows.rows as any[]).map((r) => {
         const spend = parseFloat(r.net_spend || "0");
         grandSpend += spend;
         return [r.name, r.account_type, fmt(spend)];
@@ -266,7 +266,7 @@ async function runPhase3Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY co.order_date DESC
         LIMIT ${rowLimit}
       `);
-      const tableRows2 = (rows.rows as unknown[]).map((r) => [
+      const tableRows2 = (rows.rows as any[]).map((r) => [
         r.invoice_number || "—",
         r.customer,
         String(r.order_date).slice(0, 10),
@@ -306,7 +306,7 @@ async function runPhase3Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         LIMIT ${rowLimit}
       `);
       let totValue = 0;
-      const tableRows2 = (rows.rows as unknown[]).map((r) => {
+      const tableRows2 = (rows.rows as any[]).map((r) => {
         const val = parseFloat(r.total_value || "0");
         totValue += val;
         return [
@@ -361,7 +361,7 @@ async function runPhase3Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY v.voucher_date DESC, v.id DESC
         LIMIT ${rowLimit}
       `);
-      const tableRows2 = (txRows3.rows as unknown[]).map((r) => [
+      const tableRows2 = (txRows3.rows as any[]).map((r) => [
         String(r.voucher_date).slice(0, 10),
         r.voucher_type || "—",
         (r.description || "").slice(0, 40),
@@ -392,7 +392,7 @@ async function runPhase3Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         LIMIT ${rowLimit}
       `);
       let grandTotal = 0;
-      const tableRows2 = (rows.rows as unknown[]).map((r) => {
+      const tableRows2 = (rows.rows as any[]).map((r) => {
         const amt = parseFloat(r.purchase_amount || "0");
         grandTotal += amt;
         return [
@@ -441,7 +441,7 @@ async function runPhase3Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         totKgPressed = 0,
         totBales = 0,
         totWaste = 0;
-      const tableRows2 = (rows.rows as unknown[]).map((r) => {
+      const tableRows2 = (rows.rows as any[]).map((r) => {
         const kgIn = parseFloat(r.kg_in || "0");
         const kgPressed = parseFloat(r.kg_pressed || "0");
         const bales = parseInt(r.total_bales_produced || "0");

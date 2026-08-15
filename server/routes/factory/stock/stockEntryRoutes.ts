@@ -132,9 +132,9 @@ export function registerFactoryStockEntryRoutes(app: Express) {
         );
 
         // ── Build all bale rows in memory, track per-bale metadata for later ──
-        const baleValues: unknown[] = [];
-        const baleProductRefs: unknown[] = [];
-        const baleAttributionRefs: unknown[] = [];
+        const baleValues: any[] = [];
+        const baleProductRefs: any[] = [];
+        const baleAttributionRefs: any[] = [];
 
         for (const [itemIndex, item] of items.entries()) {
           const qty = parseInt(item.quantity || item.qty || "1");
@@ -202,7 +202,7 @@ export function registerFactoryStockEntryRoutes(app: Express) {
           );
         }
 
-        const bales: unknown[] = insertedBales.map((b: any, idx: number) => {
+        const bales: any[] = insertedBales.map((b: any, idx: number) => {
           const attribution = baleAttributionRefs[idx];
           return {
             ...b,
@@ -441,7 +441,7 @@ export function registerFactoryStockEntryRoutes(app: Express) {
           allProducts.map((p: ImportedStockProduct) => [p.name.toLowerCase(), p] as const)
         );
 
-        const createdBales: unknown[] = [];
+        const createdBales: any[] = [];
         let totalWeight = 0;
 
         for (const b of bales) {

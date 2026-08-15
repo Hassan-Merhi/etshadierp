@@ -22,23 +22,23 @@ interface SupplierDialogsProps {
   setCreateOpen: (val: boolean) => void;
   editingSupplier: FactorySupplier | null;
   setEditingSupplier: (val: FactorySupplier | null) => void;
-  formData: unknown;
+  formData: any;
   setFormData: (val: any) => void;
   formRole: "broker" | "standalone" | "linked";
   setFormRole: (val: "broker" | "standalone" | "linked") => void;
   allSuppliers: SupplierWithBalance[];
   createSubAccountParentId: number | null;
   setCreateSubAccountParentId: (val: number | null) => void;
-  createMutation: UseMutationResult<unknown, unknown, unknown>;
-  updateMutation: UseMutationResult<unknown, unknown, unknown>;
+  createMutation: UseMutationResult<any, any, any>;
+  updateMutation: UseMutationResult<any, any, any>;
   resetForm: () => void;
 
   paymentDialogSupplier: SupplierWithBalance | null;
   setPaymentDialogSupplier: (val: SupplierWithBalance | null) => void;
-  paymentForm: unknown;
+  paymentForm: any;
   setPaymentForm: (val: any) => void;
-  ledgerAccounts: unknown[] | undefined;
-  paymentMutation: UseMutationResult<unknown, unknown, unknown>;
+  ledgerAccounts: any[] | undefined;
+  paymentMutation: UseMutationResult<any, any, any>;
   paymentAmtUsd: number;
   paymentBalanceUsd: number;
   isOverpayment: boolean;
@@ -46,38 +46,38 @@ interface SupplierDialogsProps {
 
   fxConversionOpen: boolean;
   setFxConversionOpen: (val: boolean) => void;
-  fxConversionForm: unknown;
+  fxConversionForm: any;
   setFxConversionForm: (val: any) => void;
   fxSourceType: "supplier" | "commission" | "both";
   setFxSourceType: (val: "supplier" | "commission" | "both") => void;
-  fxConversionMutation: UseMutationResult<unknown, unknown, unknown>;
+  fxConversionMutation: UseMutationResult<any, any, any>;
   wrapAdminAction: (fn: () => void, title: string) => void;
 
   bulkFxOpen: boolean;
   setBulkFxOpen: (val: boolean) => void;
   bulkFxBrokerId: number | null;
   bulkFxBrokerName: string;
-  bulkFxForm: unknown;
+  bulkFxForm: any;
   setBulkFxForm: (val: any) => void;
   bulkFxPreview: BulkFxPreview | null;
   setBulkFxPreview: (val: BulkFxPreview | null) => void;
-  bulkFxPreviewMutation: UseMutationResult<unknown, unknown, unknown>;
-  bulkFxMutation: UseMutationResult<unknown, unknown, unknown>;
+  bulkFxPreviewMutation: UseMutationResult<any, any, any>;
+  bulkFxMutation: UseMutationResult<any, any, any>;
 
   obEditSupplier: { id: number; name: string; currentBalance: string } | null;
   setObEditSupplier: (val: any) => void;
   obEditValue: string;
   setObEditValue: (val: string) => void;
-  obEditMutation: UseMutationResult<unknown, unknown, unknown>;
+  obEditMutation: UseMutationResult<any, any, any>;
 
-  dueDialogSupplier: { name: string; containers: unknown[] } | null;
+  dueDialogSupplier: { name: string; containers: any[] } | null;
   setDueDialogSupplier: (val: any) => void;
   formatDate: (val: string) => string;
   formatNum: (val: string) => string;
 
   editObComm: null | { rawStockId: number; amount: string; currencyCode: string; personName: string; notes: string };
   setEditObComm: (val: any) => void;
-  updateObCommissionMutation: UseMutationResult<unknown, unknown, unknown>;
+  updateObCommissionMutation: UseMutationResult<any, any, any>;
 }
 
 export function SupplierDialogs({

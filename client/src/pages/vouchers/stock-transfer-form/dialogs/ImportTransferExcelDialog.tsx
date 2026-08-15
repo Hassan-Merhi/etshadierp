@@ -40,29 +40,29 @@ export function ImportTransferExcelDialog({
   setImportDialogOpen,
   setImportNotes,
 }: {
-  downloadImportTemplate: unknown;
-  handleImportFileChange: unknown;
-  handleImportParse: unknown;
-  handleImportSubmit: unknown;
-  handleImportValidate: unknown;
-  importDate: unknown;
-  importDestLocation: unknown;
-  importDialogOpen: unknown;
-  importFile: unknown;
-  importHasErrors: unknown;
-  importIsValidated: unknown;
-  importMutation: unknown;
-  importNotes: unknown;
-  importParseMutation: unknown;
-  importPreview: unknown;
-  importValidItemsCount: unknown;
-  importValidateMutation: unknown;
-  importValidationResult: unknown;
-  locations: unknown;
-  setImportDate: unknown;
-  setImportDestLocation: unknown;
-  setImportDialogOpen: unknown;
-  setImportNotes: unknown;
+  downloadImportTemplate: any;
+  handleImportFileChange: any;
+  handleImportParse: any;
+  handleImportSubmit: any;
+  handleImportValidate: any;
+  importDate: any;
+  importDestLocation: any;
+  importDialogOpen: any;
+  importFile: any;
+  importHasErrors: any;
+  importIsValidated: any;
+  importMutation: any;
+  importNotes: any;
+  importParseMutation: any;
+  importPreview: any;
+  importValidItemsCount: any;
+  importValidateMutation: any;
+  importValidationResult: any;
+  locations: any;
+  setImportDate: any;
+  setImportDestLocation: any;
+  setImportDialogOpen: any;
+  setImportNotes: any;
 }) {
   return (
     <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>

@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { User, ChevronDown, Check, Save } from "lucide-react";
 
 export interface CheckoutSidebarProps {
-  posUser?: unknown;
+  posUser?: any;
   paymentAccountType: "bank" | "cash" | "credit";
   setPaymentAccountType: (value: "bank" | "cash") => void;
   paymentAccountId: string | null;
@@ -19,12 +19,12 @@ export interface CheckoutSidebarProps {
   setSelectedCustomerId: (id: string) => void;
   customerComboOpen: boolean;
   setCustomerComboOpen: (open: boolean) => void;
-  customerAccounts: unknown[];
-  selectedCustomer: unknown;
+  customerAccounts: any[];
+  selectedCustomer: any;
   formatAmountRaw: (amount: string | number) => string;
-  bankAccounts: unknown[];
-  cashLedgerAccounts: unknown[];
-  saveMutation: unknown;
+  bankAccounts: any[];
+  cashLedgerAccounts: any[];
+  saveMutation: any;
   hasValidItems: boolean;
   editVoucherId?: string;
   handleSaveSale: () => void;
@@ -34,11 +34,11 @@ export interface CheckoutSidebarProps {
   setSaleDate: (date: string) => void;
   total: number;
   totalQty: number;
-  rows: unknown[];
+  rows: any[];
   activeCurrency: string;
   exchangeRate: number;
   formatDisplayAmount: (amount: number) => string;
-  cn: (...args: unknown[]) => string;
+  cn: (...args: any[]) => string;
 }
 
 export function CheckoutSidebar({

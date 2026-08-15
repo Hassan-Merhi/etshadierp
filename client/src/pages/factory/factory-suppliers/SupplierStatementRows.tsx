@@ -14,12 +14,12 @@ interface SupplierStatementRowsProps {
   currencyTotals: Record<string, number>;
   statDateFilter: "all" | "today" | "yesterday" | "this_month" | "this_year";
   setStatDateFilter: (val: "all" | "today" | "yesterday" | "this_month" | "this_year") => void;
-  displayedRows: unknown[];
+  displayedRows: any[];
   balanceByKey: Record<string, { bal: number; cc: string }>;
   formatDate: (val: string) => string;
   formatNum: (val: string) => string;
   typeBadge: (type: string) => React.ReactNode;
-  statusColor: (status: string) => unknown;
+  statusColor: (status: string) => any;
   statusDisplayLabel: (status: string) => string;
   onEditPayment: (p: any) => void;
   onDeletePayment: (id: number) => void;

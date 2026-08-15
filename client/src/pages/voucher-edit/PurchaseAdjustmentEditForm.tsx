@@ -29,16 +29,16 @@ export function PurchaseEditForm({
   total,
   toggleOptionalMutation,
 }: {
-  form: UseFormReturn<unknown>;
+  form: UseFormReturn<any>;
   onSubmit: (data: any) => void;
   onCancel: () => void;
   isPending: boolean;
-  voucher: unknown;
+  voucher: any;
   stockItems: StockItem[];
   formatDisplayDate: (date: Date) => string;
   formatAmount: (amount: number) => string;
   total: number;
-  toggleOptionalMutation: unknown;
+  toggleOptionalMutation: any;
 }) {
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -304,18 +304,18 @@ export function AdjustmentEditForm({
   total,
   toggleOptionalMutation,
 }: {
-  form: UseFormReturn<unknown>;
+  form: UseFormReturn<any>;
   voucherType: string;
   onSubmit: (data: any) => void;
   onCancel: () => void;
   isPending: boolean;
-  voucher: unknown;
+  voucher: any;
   stockItems: StockItem[];
-  locations: unknown[];
+  locations: any[];
   formatDisplayDate: (date: Date) => string;
   formatAmount: (amount: number) => string;
   total: number;
-  toggleOptionalMutation: unknown;
+  toggleOptionalMutation: any;
 }) {
   const { fields, append, remove } = useFieldArray({
     control: form.control,

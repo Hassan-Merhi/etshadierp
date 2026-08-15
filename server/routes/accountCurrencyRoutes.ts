@@ -41,7 +41,7 @@ async function getBaseCurrency(companyId: number): Promise<string> {
   return company?.baseCurrency || "USD";
 }
 
-function unresolvedOpeningPayload(body: Record<string, unknown>, rawAmount: Decimal): Record<string, unknown> {
+function unresolvedOpeningPayload(body: Record<string, any>, rawAmount: Decimal): Record<string, any> {
   return {
     ...body,
     openingBalance: rawAmount.toFixed(),
@@ -53,10 +53,10 @@ function unresolvedOpeningPayload(body: Record<string, unknown>, rawAmount: Deci
 }
 
 function normalizedOpeningPayload(
-  body: Record<string, unknown>,
-  existing: Record<string, unknown> | null,
+  body: Record<string, any>,
+  existing: Record<string, any> | null,
   baseCurrency: string
-): Record<string, unknown> {
+): Record<string, any> {
   const hasExplicitCurrencyPayload = EXPLICIT_CURRENCY_FIELDS.some((field) => hasOwn(body, field));
   const existingIsResolved = Boolean(
     existing?.openingBalanceNativeAmount != null &&
@@ -139,7 +139,7 @@ export const normalizeAccountOpeningBalance: RequestHandler = async (req, res, n
     if (!companyId) return res.status(400).json({ message: "No company selected" });
     const baseCurrency = await getBaseCurrency(companyId);
 
-    let existing: Record<string, unknown> | null = null;
+    let existing: Record<string, any> | null = null;
     const idMatch = req.path.match(/\/(\d+)$/);
     if (idMatch) {
       const id = Number.parseInt(idMatch[1], 10);

@@ -39,8 +39,8 @@ export function registerReportsContainerTrackingRoutes(app: Express) {
       const companyMap = new Map(allCompanies.map((company) => [company.id, company]));
       const supplierMap = new Map(allSuppliers.map((supplier) => [supplier.id, supplier]));
 
-      const otwContainers: unknown[] = [];
-      const offloadedContainers: unknown[] = [];
+      const otwContainers: any[] = [];
+      const offloadedContainers: any[] = [];
       const containerItemCounts: Record<number, number> = {};
 
       for (const companyId of companyIds) {
@@ -138,10 +138,10 @@ export function registerReportsContainerTrackingRoutes(app: Express) {
         }
       }
 
-      const byRoute: Record<string, unknown[]> = {};
+      const byRoute: Record<string, any[]> = {};
       const byAgent: Record<
         string,
-        { containers: unknown[]; offloadedContainers: unknown[]; total: number; offloadedTotal: number; balance: number }
+        { containers: any[]; offloadedContainers: any[]; total: number; offloadedTotal: number; balance: number }
       > = {};
       const byLocation: Record<string, { count: number; total: number }> = {};
       let totalAmount = 0;
@@ -191,7 +191,7 @@ export function registerReportsContainerTrackingRoutes(app: Express) {
         totalAmount += amount;
       }
 
-      const byTransporter: Record<string, { otw: unknown[]; offloaded: unknown[]; otwTotal: number; offloadedTotal: number }> =
+      const byTransporter: Record<string, { otw: any[]; offloaded: any[]; otwTotal: number; offloadedTotal: number }> =
         {};
 
       for (const container of otwContainers) {

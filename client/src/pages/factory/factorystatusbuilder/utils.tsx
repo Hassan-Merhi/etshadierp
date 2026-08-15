@@ -11,8 +11,8 @@ export function makeId(): string {
 }
 
 export function fromApiSheet(s: ApiSheet): StatusBuilderSheet {
-  const rawCols: unknown[] = Array.isArray(s.columns) ? s.columns : [];
-  const rawRows: unknown[] = Array.isArray(s.rows) ? s.rows : [];
+  const rawCols: any[] = Array.isArray(s.columns) ? s.columns : [];
+  const rawRows: any[] = Array.isArray(s.rows) ? s.rows : [];
 
   const columns: ColumnDef[] = rawCols.map((c, i: number) => {
     if (typeof c === "string") return { id: `col_${makeId()}`, label: c };
@@ -20,7 +20,7 @@ export function fromApiSheet(s: ApiSheet): StatusBuilderSheet {
   });
 
   const rows: SheetRow[] = rawRows.map((r, ri: number) => {
-    const rawCells: unknown[] = Array.isArray(r.cells) ? r.cells : [];
+    const rawCells: any[] = Array.isArray(r.cells) ? r.cells : [];
     const cells: Cell[] = rawCells.map((c) => {
       if (c === null || c === undefined) return { value: null };
       if (typeof c === "number" || typeof c === "string") return { value: c };

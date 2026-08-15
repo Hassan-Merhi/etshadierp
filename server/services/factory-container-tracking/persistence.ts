@@ -99,7 +99,7 @@ export async function setSchedulerMeta(
 
 export function resolveEtaFromProvider(
   providerEta: string | null,
-  _events: unknown[] | undefined,
+  _events: any[] | undefined,
   currentEta: string | null
 ): { eta: string | null; source: "api" | "manual" | null } {
   if (providerEta) return { eta: providerEta, source: "api" };

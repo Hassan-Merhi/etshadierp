@@ -13,8 +13,8 @@ import type {
 } from "./voucherTypes";
 
 interface UseVoucherHydrationProps {
-  voucherToEdit: unknown;
-  allAccounts: unknown[];
+  voucherToEdit: any;
+  allAccounts: any[];
   bankAccounts: BankAccount[];
   bankAccountsFetched: boolean;
   ledgerAccounts: LedgerAccount[];

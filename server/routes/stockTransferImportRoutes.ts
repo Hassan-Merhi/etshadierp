@@ -43,8 +43,8 @@ export function registerStockTransferImportRoutes(app: Express) {
       }
 
       // Parse rows
-      const rows = rawData as unknown[];
-      const items: unknown[] = [];
+      const rows = rawData as any[];
+      const items: any[] = [];
 
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
@@ -100,7 +100,7 @@ export function registerStockTransferImportRoutes(app: Express) {
 
       const errors: string[] = [];
       const warnings: string[] = [];
-      const validatedItems: unknown[] = [];
+      const validatedItems: any[] = [];
 
       // Validate locations exist
       const sourceLocation = await storage.getLocationById(sourceLocationId);
@@ -436,8 +436,8 @@ export function registerStockTransferImportRoutes(app: Express) {
           return res.status(400).json({ message: "Excel file is empty" });
         }
 
-        const rows = rawData as unknown[];
-        const items: unknown[] = [];
+        const rows = rawData as any[];
+        const items: any[] = [];
 
         for (let i = 0; i < rows.length; i++) {
           const row = rows[i];
@@ -496,7 +496,7 @@ export function registerStockTransferImportRoutes(app: Express) {
 
       const errors: string[] = [];
       const warnings: string[] = [];
-      const validatedItems: unknown[] = [];
+      const validatedItems: any[] = [];
 
       // Validate destination location exists
       const destLocation = await storage.getLocationById(destinationLocationId);

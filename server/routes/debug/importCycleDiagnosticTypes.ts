@@ -5,7 +5,7 @@ export interface DiagnosticIssue {
   title?: string;
   description: string;
   impact: number;
-  details: unknown;
+  details: any;
   fixGuidance?: string;
   howToFix?: string;
   category?: string;

@@ -80,7 +80,7 @@ export function registerAccountingBalanceInitRoutes(app: Express) {
             `);
 
           let totalBalance = 0;
-          for (const row of rows.rows as unknown[]) {
+          for (const row of rows.rows as any[]) {
             const openingBalanceRaw = parseFloat(row.opening_balance || "0");
             const openingSide = (row.opening_balance_side as string) || "Dr";
             const signedOpening = isLiability

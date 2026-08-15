@@ -142,7 +142,7 @@ export function computeMonthlyPay(salary: number, startStr: string, endStr: stri
 export function computeMonthlyPayFromAttendance(
   baseSalary: number,
   periodStart: string,
-  attendanceRows: unknown[]
+  attendanceRows: any[]
 ): number {
   const daysInMonth = (dateStr: string) => {
     const d = new Date(dateStr);

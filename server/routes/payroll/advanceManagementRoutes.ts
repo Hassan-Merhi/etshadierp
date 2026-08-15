@@ -144,7 +144,7 @@ function computeMonthlyPay(salary: number, startStr: string, endStr: string): nu
 // Helper: Compute monthly pay from actual attendance records.
 // Monthly payroll uses attendance-based calculation (Present/Late = 1 day, Half Day = 0.5 day)
 // rather than calendar-day proration to match actual work performed.
-function computeMonthlyPayFromAttendance(baseSalary: number, periodStart: string, attendanceRows: unknown[]): number {
+function computeMonthlyPayFromAttendance(baseSalary: number, periodStart: string, attendanceRows: any[]): number {
   const daysInMonth = (dateStr: string) => {
     const d = new Date(dateStr);
     return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();

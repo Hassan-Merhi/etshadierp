@@ -21,14 +21,14 @@ export function SaveAsRevisionDialog({
   transferRevisionNote,
   transferRevisions,
 }: {
-  computeTransferRevisionItems: unknown;
-  confirmTransferSaveAsRevision: unknown;
-  isTransferSavingRevision: unknown;
-  setTransferRevisionDialogOpen: unknown;
-  setTransferRevisionNote: unknown;
-  transferRevisionDialogOpen: unknown;
-  transferRevisionNote: unknown;
-  transferRevisions: unknown;
+  computeTransferRevisionItems: any;
+  confirmTransferSaveAsRevision: any;
+  isTransferSavingRevision: any;
+  setTransferRevisionDialogOpen: any;
+  setTransferRevisionNote: any;
+  transferRevisionDialogOpen: any;
+  transferRevisionNote: any;
+  transferRevisions: any;
 }) {
   return (
     <Dialog open={transferRevisionDialogOpen} onOpenChange={setTransferRevisionDialogOpen}>

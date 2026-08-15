@@ -20,23 +20,23 @@ import type { Employee } from "@shared/schema";
 interface WorkerDialogsProps {
   newWorkerDialogOpen: boolean;
   setNewWorkerDialogOpen: (open: boolean) => void;
-  newWorkerForm: unknown;
-  createWorkerMutation: unknown;
+  newWorkerForm: any;
+  createWorkerMutation: any;
   editWorkerDialogOpen: boolean;
   setEditWorkerDialogOpen: (open: boolean) => void;
-  selectedWorkerForEdit: unknown;
-  editWorkerForm: unknown;
-  updateWorkerMutation: unknown;
-  deleteWorkerConflict: unknown;
+  selectedWorkerForEdit: any;
+  editWorkerForm: any;
+  updateWorkerMutation: any;
+  deleteWorkerConflict: any;
   setDeleteWorkerConflict: (v: any) => void;
   handleForceDeleteWorker: () => void;
   workerGroupMembersDialogOpen: boolean;
   setWorkerGroupMembersDialogOpen: (open: boolean) => void;
-  selectedWorkerGroupForMembers: unknown;
-  allWorkerGroups: unknown[];
+  selectedWorkerGroupForMembers: any;
+  allWorkerGroups: any[];
   allWorkers: Employee[];
-  addWorkerToWorkerGroupMutation: unknown;
-  removeWorkerFromWorkerGroupMutation: unknown;
+  addWorkerToWorkerGroupMutation: any;
+  removeWorkerFromWorkerGroupMutation: any;
 }
 
 export function WorkerDialogs({

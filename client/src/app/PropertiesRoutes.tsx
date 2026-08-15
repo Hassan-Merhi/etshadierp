@@ -2,7 +2,6 @@ import { Suspense } from "react";
 import { Switch, Route, Redirect } from "wouter";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import PropertiesRentalsHub from "@/pages/properties/PropertiesRentalsHub";
-import type { AuthenticatedUser } from "@/contracts/sessionContracts";
 import {
   AccountGroups,
   Agents,
@@ -30,7 +29,7 @@ import {
 } from "@/lazyPages";
 
 interface PropertiesRoutesProps {
-  user: Pick<AuthenticatedUser, "role">;
+  user: any;
   currentLocation: string;
 }
 
@@ -39,7 +38,7 @@ interface PropertiesRoutesProps {
  * All canonical workspace routes live under `/properties/*`.
  */
 export function PropertiesRoutes({ user, currentLocation }: PropertiesRoutesProps) {
-  const isAdmin = user.role === "Admin" || user.role === "Developer";
+  const isAdmin = user?.role === "Admin" || user?.role === "Developer";
 
   return (
     <ErrorBoundary resetKey={currentLocation}>
@@ -72,7 +71,7 @@ export function PropertiesRoutes({ user, currentLocation }: PropertiesRoutesProp
             {() => <Redirect replace to="/properties/rentals?tab=payments" />}
           </Route>
 
-          {user.role === "Developer" && (
+          {user?.role === "Developer" && (
             <Route path="/properties/transfer" component={CompanyTransfer} />
           )}
           <Route path="/properties/ledger-monthly/:accountId" component={PropertiesLedgerMonthly} />

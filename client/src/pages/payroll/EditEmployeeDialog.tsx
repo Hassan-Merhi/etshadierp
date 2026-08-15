@@ -10,18 +10,18 @@ interface EditEmployeeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   setEditingEmployee: (v: any) => void;
-  editEmployeeForm: unknown;
-  editEmployeeMutation: unknown;
-  employeeGroups: unknown[];
-  otherCompanies: unknown[];
-  selectedCompany: unknown;
-  locations: unknown[];
-  allCompanyLocations: unknown[];
-  editBaleRates: unknown[];
-  setEditBaleRates: (fn: (prev: unknown[]) => unknown[]) => void;
-  editBalePctRates: unknown[];
-  setEditBalePctRates: (fn: (prev: unknown[]) => unknown[]) => void;
-  pctLocations: unknown[];
+  editEmployeeForm: any;
+  editEmployeeMutation: any;
+  employeeGroups: any[];
+  otherCompanies: any[];
+  selectedCompany: any;
+  locations: any[];
+  allCompanyLocations: any[];
+  editBaleRates: any[];
+  setEditBaleRates: (fn: (prev: any[]) => any[]) => void;
+  editBalePctRates: any[];
+  setEditBalePctRates: (fn: (prev: any[]) => any[]) => void;
+  pctLocations: any[];
 }
 
 export function EditEmployeeDialog({

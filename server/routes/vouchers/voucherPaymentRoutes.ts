@@ -154,7 +154,7 @@ export function registerVoucherPaymentRoutes(app: Express) {
           })
           .returning();
 
-        const voucherEntriesToCreate: unknown[] = [];
+        const voucherEntriesToCreate: any[] = [];
 
         // Pre-compute the payment-account field once (same for every entry)
         const paymentAccountField = await buildAccountField(paymentAccountType, paymentAccountId);
@@ -526,7 +526,7 @@ export function registerVoucherPaymentRoutes(app: Express) {
         // Delete existing voucher entries
         await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
 
-        const voucherEntriesToCreate: unknown[] = [];
+        const voucherEntriesToCreate: any[] = [];
 
         // Create new entries with dual-currency normalization.
         for (const entry of entries) {

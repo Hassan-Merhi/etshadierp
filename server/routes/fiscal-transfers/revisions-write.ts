@@ -64,7 +64,7 @@ export function registerStockTransferRevisionWriteRoutes(app: Express) {
             existingRevItems.map((i) => [`${i.stockItemId}:${i.sourceLocationId ?? ""}`, i])
           );
 
-          for (const item of items as unknown[]) {
+          for (const item of items as any[]) {
             const key = `${item.stockItemId}:${item.sourceLocationId ?? ""}`;
             const existing = existingByKey.get(key);
             if (existing) {

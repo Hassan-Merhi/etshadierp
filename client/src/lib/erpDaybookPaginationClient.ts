@@ -1,6 +1,6 @@
 export type ErpDaybookRow =
-  | { _type: "voucher"; data: Record<string, unknown> }
-  | { _type: "offload"; data: Record<string, unknown> };
+  | { _type: "voucher"; data: Record<string, any> }
+  | { _type: "offload"; data: Record<string, any> };
 
 export interface ErpDaybookPage {
   items: ErpDaybookRow[];

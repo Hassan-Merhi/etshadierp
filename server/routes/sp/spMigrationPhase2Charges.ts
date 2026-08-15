@@ -20,7 +20,7 @@ export async function upsertChargeMapping(params: {
   sourceContainerId: number;
   spContainerId: number;
   candidate: ChargeCandidate;
-  sourceAccounts: Map<number, unknown>;
+  sourceAccounts: Map<number, any>;
   targetAccounts: Awaited<ReturnType<typeof loadTargetAccounts>>;
 }): Promise<{ reviewStatus: string; amountUsd: number; inserted: boolean }> {
   const { candidate } = params;
@@ -225,7 +225,7 @@ export async function getContainerChargeCandidates(container: any, po: any | nul
 export async function getSourceContainerLines(
   container: any,
   po: any | null
-): Promise<{ source: string; rows: unknown[] }> {
+): Promise<{ source: string; rows: any[] }> {
   if (po) {
     const poLines = await db.execute(sql`
       SELECT li.stock_item_id, COALESCE(si.code, li.item_name) AS article_code,

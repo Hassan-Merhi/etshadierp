@@ -6,10 +6,10 @@ import { storage } from "../../storage";
 import { resultRows } from "../../lib/queryResult";
 
 export interface NetProfitData {
-  companyRecord: unknown;
+  companyRecord: any;
   /** Ledger accounts, mapped to camelCase. Element type stays `any` because the
    *  raw pool query deliberately selects only pre-migration-safe columns. */
-  companyAccounts: unknown[];
+  companyAccounts: any[];
   parentCompanyId: number | null;
   hasMigratedEntries: boolean;
   companyBaseCurrency: string;

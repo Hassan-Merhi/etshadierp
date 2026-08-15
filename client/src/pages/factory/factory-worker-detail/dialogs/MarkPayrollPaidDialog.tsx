@@ -27,15 +27,15 @@ export function MarkPayrollPaidDialog({
   setPayTargetId,
   wrapAdminAction,
 }: {
-  cashAccounts: unknown;
-  markPaidMutation: unknown;
-  payCashAccountId: unknown;
-  payOpen: unknown;
-  payTargetId: unknown;
-  setPayCashAccountId: unknown;
-  setPayOpen: unknown;
-  setPayTargetId: unknown;
-  wrapAdminAction: unknown;
+  cashAccounts: any;
+  markPaidMutation: any;
+  payCashAccountId: any;
+  payOpen: any;
+  payTargetId: any;
+  setPayCashAccountId: any;
+  setPayOpen: any;
+  setPayTargetId: any;
+  wrapAdminAction: any;
 }) {
   return (
     <Dialog

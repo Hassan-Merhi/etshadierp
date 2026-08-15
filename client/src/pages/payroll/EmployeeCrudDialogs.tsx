@@ -20,10 +20,10 @@ import { useCurrencyContext } from "@/contexts/CurrencyContext";
 interface EmployeeCrudDialogsProps {
   createEmployeeDialogOpen: boolean;
   setCreateEmployeeDialogOpen: (open: boolean) => void;
-  createEmployeeForm: unknown;
-  createEmployeeMutation: unknown;
-  employeeGroups: unknown[];
-  deleteConflict: unknown;
+  createEmployeeForm: any;
+  createEmployeeMutation: any;
+  employeeGroups: any[];
+  deleteConflict: any;
   setDeleteConflict: (v: any) => void;
   handleForceDeleteEmployee: () => void;
   createGroupDialogOpen: boolean;
@@ -32,14 +32,14 @@ interface EmployeeCrudDialogsProps {
   setNewGroupName: (v: string) => void;
   newGroupDescription: string;
   setNewGroupDescription: (v: string) => void;
-  createGroupMutation: unknown;
+  createGroupMutation: any;
   groupMembersDialogOpen: boolean;
   setGroupMembersDialogOpen: (open: boolean) => void;
-  selectedGroupForMembers: unknown;
-  employeeStaff: unknown[];
-  groupMembers: unknown[];
-  addWorkerToGroupMutation: unknown;
-  removeWorkerFromGroupMutation: unknown;
+  selectedGroupForMembers: any;
+  employeeStaff: any[];
+  groupMembers: any[];
+  addWorkerToGroupMutation: any;
+  removeWorkerFromGroupMutation: any;
 }
 
 export function EmployeeCrudDialogs({

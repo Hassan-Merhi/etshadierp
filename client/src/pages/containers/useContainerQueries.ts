@@ -38,7 +38,7 @@ export function useContainerQueries(
     enabled: !!selectedCompany?.id && !isSupplierPartner,
   });
 
-  const { data: spContainersList = [], isLoading: spContainersLoading } = useQuery<unknown[]>({
+  const { data: spContainersList = [], isLoading: spContainersLoading } = useQuery<any[]>({
     queryKey: ["/api/sp/containers"],
     queryFn: () => fetch("/api/sp/containers", { credentials: "include" }).then((r) => r.json()),
     enabled: !!selectedCompany?.id && isSupplierPartner,

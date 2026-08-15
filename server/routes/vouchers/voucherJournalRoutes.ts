@@ -236,7 +236,7 @@ export function registerVoucherJournalRoutes(app: Express) {
           })
           .returning();
 
-        const voucherEntriesToCreate: unknown[] = [];
+        const voucherEntriesToCreate: any[] = [];
 
         // Create entries.
         // Each entry.amount is the original transaction-currency (CFA) value.
@@ -353,7 +353,7 @@ export function registerVoucherJournalRoutes(app: Express) {
         let waAccountId = mainAccountId ? Number(mainAccountId) : null;
         let waAccountType = mainAccountType ? String(mainAccountType) : "ledger";
         if (!waAccountId) {
-          const firstLedgerDr = (entries as unknown[]).find(
+          const firstLedgerDr = (entries as any[]).find(
             (e) => e.accountType === "ledger" && e.type === "DR" && Number(e.accountId) > 0
           );
           if (firstLedgerDr) {
@@ -515,7 +515,7 @@ export function registerVoucherJournalRoutes(app: Express) {
         // Delete existing voucher entries
         await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
 
-        const voucherEntriesToCreate: unknown[] = [];
+        const voucherEntriesToCreate: any[] = [];
 
         // Create new entries with dual-currency normalization.
         for (const entry of entries) {
@@ -662,7 +662,7 @@ export function registerVoucherJournalRoutes(app: Express) {
         let waAccountId = mainAccountIdPatch ? Number(mainAccountIdPatch) : null;
         let waAccountType = mainAccountTypePatch ? String(mainAccountTypePatch) : "ledger";
         if (!waAccountId) {
-          const firstLedgerDr = (entries as unknown[]).find(
+          const firstLedgerDr = (entries as any[]).find(
             (e) => e.accountType === "ledger" && e.type === "DR" && Number(e.accountId) > 0
           );
           if (firstLedgerDr) {

@@ -14,7 +14,7 @@ import { AddContainerDialog } from "../../components/AddContainerDialog";
 import type { Container, Supplier } from "@shared/schema";
 
 interface ContainerSpViewProps {
-  spContainersList: unknown[];
+  spContainersList: any[];
   allContainers: Container[];
   suppliers: Supplier[];
   searchTerm: string;

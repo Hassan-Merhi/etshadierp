@@ -104,7 +104,7 @@ export function RemoveBaleAuthDialog({
 interface AssignWorkerDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  workers: unknown[];
+  workers: any[];
   workerIdSelected: string;
   onWorkerIdChange: (val: string) => void;
   isPending: boolean;

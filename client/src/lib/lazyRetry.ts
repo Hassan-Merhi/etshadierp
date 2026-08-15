@@ -41,7 +41,7 @@ export async function importWithRetry<T>(
  * moment later. A chunk that is genuinely gone still exhausts its attempts and
  * still reaches the recovery path, so deploys behave exactly as before.
  */
-export function lazyRetry<T extends ComponentType<never>>(
+export function lazyRetry<T extends ComponentType<any>>(
   factory: ModuleFactory<T>,
   attempts: number = DEFAULT_ATTEMPTS,
 ) {

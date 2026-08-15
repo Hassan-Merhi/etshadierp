@@ -40,7 +40,7 @@ const ROLE_PRESETS: Record<string, RolePreset[]> = {
 
 interface InlineRoleEditorProps {
   userId: string;
-  companies: unknown[];
+  companies: any[];
   editingRole: any | null;
   onClose: () => void;
   onSaved: () => void;
@@ -140,7 +140,7 @@ export function InlineRoleEditor({ userId, companies, editingRole, onClose, onSa
     }
   }, [editingRole?.id]);
 
-  const { data: locations = [] } = useQuery<unknown[]>({
+  const { data: locations = [] } = useQuery<any[]>({
     queryKey: ["/api/locations", { companyId }],
     queryFn: async () => {
       if (!companyId) return [];
@@ -151,7 +151,7 @@ export function InlineRoleEditor({ userId, companies, editingRole, onClose, onSa
     enabled: !!companyId && isPOS,
   });
 
-  const { data: ledgerAccounts = [] } = useQuery<unknown[]>({
+  const { data: ledgerAccounts = [] } = useQuery<any[]>({
     queryKey: ["/api/ledger-accounts", { companyId }],
     queryFn: async () => {
       if (!companyId) return [];
@@ -173,7 +173,7 @@ export function InlineRoleEditor({ userId, companies, editingRole, onClose, onSa
         const missing = locationsNeedingCash.filter((id) => !locationCashAccounts[id]);
         if (missing.length > 0) {
           const locNames = missing.map((id) => {
-            const loc = (locations as unknown[]).find((l) => l.id === id);
+            const loc = (locations as any[]).find((l) => l.id === id);
             return loc?.name || `Location #${id}`;
           });
           throw new Error(`Cash account required for: ${locNames.join(", ")}`);

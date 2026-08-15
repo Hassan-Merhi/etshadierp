@@ -15,8 +15,8 @@ import { formatNumber } from "@/lib/formatNumber";
 interface OpeningBalanceDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  factorySuppliers: unknown[];
-  openingBalanceMutation: unknown;
+  factorySuppliers: any[];
+  openingBalanceMutation: any;
   wrapAdminAction: (action: () => void, title: string) => void;
 }
 

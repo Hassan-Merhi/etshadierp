@@ -26,7 +26,7 @@ import { buildVoucherChangesForCreate, logAudit, snapshotVoucherEntries } from "
 
 const postingDependencies = createDatabasePostingDependencies();
 
-type PersistedPostingResult = CentralPostingResult<unknown, unknown>;
+type PersistedPostingResult = CentralPostingResult<any, any>;
 
 async function syncJournalToOrderCharge(
   companyId: number,

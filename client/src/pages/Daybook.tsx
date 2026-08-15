@@ -80,7 +80,7 @@ const VOUCHER_TYPE_ORDER: Record<string, number> = {
   "Debit Note": 10,
 };
 
-export default function Daybook({ user }: { user?: unknown } = {}) {
+export default function Daybook({ user }: { user?: any } = {}) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const vouchersBase = selectedCompany?.companyType === "properties" ? "/properties/vouchers" : "/vouchers";
@@ -264,7 +264,7 @@ export default function Daybook({ user }: { user?: unknown } = {}) {
     isError: revisionsError,
     error: revisionsErrorDetail,
     refetch: retryVoucherRevisions,
-  } = useQuery<unknown[]>({
+  } = useQuery<any[]>({
     queryKey:
       selectedVoucher && isStockTransferVoucher && viewDialogOpen
         ? companyDataKey(

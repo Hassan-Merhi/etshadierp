@@ -8,7 +8,7 @@ import type { InventoryLocation as Location, StockGroupSummary } from "./locatio
 
 interface UseLocationInventoryStateParams {
   companyId: number | undefined;
-  toast: unknown;
+  toast: any;
 }
 
 export function useLocationInventoryState({ companyId, toast }: UseLocationInventoryStateParams) {

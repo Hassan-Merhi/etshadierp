@@ -101,7 +101,7 @@ export function registerAccountStatementRoutes(app: Express) {
       if (isNaN(accountId)) return res.status(400).json({ message: "Invalid account ID" });
 
       // Map type to the FK column name in voucher_entries
-      const typeToColumn: Record<string, unknown> = {
+      const typeToColumn: Record<string, any> = {
         ledger: voucherEntries.ledgerAccountId,
         bank: voucherEntries.bankAccountId,
         "fixed-asset": voucherEntries.fixedAssetId,

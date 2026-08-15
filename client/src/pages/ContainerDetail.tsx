@@ -54,9 +54,9 @@ import type { Supplier, Customer, ContainerSale } from "@shared/schema";
 import { utils, writeFile, read as readExcel, ExcelJS } from "@/lib/excelHelper";
 
 interface ContainerDetailData {
-  container: unknown;
-  pos: unknown[];
-  charges: unknown[];
+  container: any;
+  pos: any[];
+  charges: any[];
   offloadId?: number | null;
 }
 
@@ -125,7 +125,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
     enabled: !!companyId,
   });
 
-  const { data: allLedgerAccounts = [] } = useQuery<unknown[]>({
+  const { data: allLedgerAccounts = [] } = useQuery<any[]>({
     queryKey: ["/api/ledger-accounts", companyId],
     enabled: !!companyId,
   });
@@ -141,8 +141,8 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
   const containerSale = containerSales.find((sale: ContainerSale) => sale.containerId === parseInt(containerId!));
 
   const { data: docsData, isLoading: docsLoading } = useQuery<{
-    documents: unknown[];
-    docTypes: unknown[];
+    documents: any[];
+    docTypes: any[];
     completeness: { total: number; uploaded: number; complete: boolean };
   }>({
     queryKey: ["/api/factory/containers", containerId, "documents"],
@@ -154,7 +154,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
     enabled: !!containerId,
   });
 
-  const { data: freightData = [], isLoading: freightLoading } = useQuery<unknown[]>({
+  const { data: freightData = [], isLoading: freightLoading } = useQuery<any[]>({
     queryKey: ["/api/factory/containers", containerId, "freight"],
     queryFn: async () => {
       const res = await fetch(`/api/factory/containers/${containerId}/freight`);
@@ -172,7 +172,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [showPriceImportDialog, setShowPriceImportDialog] = useState(false);
-  const [priceImportPreview, setPriceImportPreview] = useState<unknown[] | null>(null);
+  const [priceImportPreview, setPriceImportPreview] = useState<any[] | null>(null);
   const [priceImportParsing, setPriceImportParsing] = useState(false);
   const [priceImportError, setPriceImportError] = useState<string | null>(null);
   const priceImportFileRef = useRef<HTMLInputElement>(null);
@@ -221,7 +221,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       let headerRow = -1;
 
       sheet.eachRow((row: any, rowNumber: number) => {
-        const vals = row.values as unknown[];
+        const vals = row.values as any[];
         if (headerRow === -1) {
           vals.forEach((cell: any, colIdx: number) => {
             const v = String(cell || "")
@@ -254,7 +254,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
           "unit price",
         ];
         sheet.eachRow((row: any) => {
-          const vals = row.values as unknown[];
+          const vals = row.values as any[];
           const firstCell = String(vals[1] ?? "")
             .toLowerCase()
             .trim();
@@ -392,7 +392,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
   });
 
   const addPaymentMutation = useMutation({
-    mutationFn: async ({ freightId, data }: { freightId: number; data: unknown }) => {
+    mutationFn: async ({ freightId, data }: { freightId: number; data: any }) => {
       const res = await apiRequest("POST", `/api/factory/freight/${freightId}/payments`, data);
       return res.json();
     },

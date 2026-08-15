@@ -8,7 +8,7 @@ import { importHistoricalSales } from "./spMigrationPhase2Sales";
 import { importContainers } from "./spMigrationPhase2Containers";
 import { resultRows, firstRow } from "../../lib/queryResult";
 
-async function rollbackMigrationRun(req: Request, res: Response): Promise<unknown> {
+async function rollbackMigrationRun(req: Request, res: Response): Promise<any> {
   const runId = String(req.body?.runId ?? "");
   if (!runId) return res.status(400).json({ message: "runId is required" });
   if (req.body?.confirmation && req.body.confirmation !== "ROLLBACK") {

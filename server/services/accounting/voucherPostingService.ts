@@ -22,7 +22,7 @@ type VoucherEntryRow = typeof voucherEntries.$inferSelect;
 // bivariantly — this lets a concrete Drizzle PgTransaction satisfy the
 // structural contract without a cast at every call site.
 interface TransactionLike {
-  insert(table: any): unknown;
+  insert(table: any): any;
 }
 
 interface DatabaseLike {

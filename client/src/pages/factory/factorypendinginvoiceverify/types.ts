@@ -55,7 +55,7 @@ export interface LoadedGroup {
 }
 
 export interface VerificationSummary {
-  order: unknown;
+  order: any;
   proformaLines: ProformaLine[];
   loadedItems: LoadedGroup[];
   comparison: ComparisonItem[];

@@ -18,12 +18,12 @@ export function CreatePendingLoadingDialog({
   setCreateLoadingLocationId,
   setCreateLoadingProforma,
 }: {
-  createLoadingLocationId: unknown;
-  createLoadingMutation: unknown;
-  createLoadingProforma: unknown;
-  locations: unknown;
-  setCreateLoadingLocationId: unknown;
-  setCreateLoadingProforma: unknown;
+  createLoadingLocationId: any;
+  createLoadingMutation: any;
+  createLoadingProforma: any;
+  locations: any;
+  setCreateLoadingLocationId: any;
+  setCreateLoadingProforma: any;
 }) {
   return (
     <Dialog

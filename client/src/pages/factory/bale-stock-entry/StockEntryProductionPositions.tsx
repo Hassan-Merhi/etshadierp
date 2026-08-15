@@ -34,7 +34,7 @@ export function StockEntryProductionPositions({
   onSelect,
 }: {
   cart: StockEntryProductionItem[];
-  workers: unknown[];
+  workers: any[];
   positions: StockEntryProductionPosition[];
   selectedByProduct: Record<number, number | null>;
   onSelect: (productId: number, positionId: number | null) => void;

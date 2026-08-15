@@ -44,7 +44,7 @@ function invariantError(message: string): Error & { code: string } {
   );
 }
 
-function rowsById(rows: Array<{ id: number }>): Map<number, unknown> {
+function rowsById(rows: Array<{ id: number }>): Map<number, any> {
   return new Map(rows.map((row) => [Number(row.id), row]));
 }
 
@@ -147,7 +147,7 @@ export function assertExactReplayCurrentCostsMatchApplied(
   for (const check of checks) {
     assertSameIds(check.appliedRows, check.currentRows, check.label);
     const currentById = rowsById(check.currentRows);
-    for (const row of check.appliedRows as unknown[]) {
+    for (const row of check.appliedRows as any[]) {
       const currentRow = currentById.get(Number(row.id));
       for (const field of check.fields) {
         if (!decimalEquals(row[field], currentRow[field])) {

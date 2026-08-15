@@ -142,7 +142,7 @@ export const ensureChromiumAvailable = ensureChromiumInstalled;
 let _sharedBrowser: any = null;
 let _stealthRegistered = false;
 
-async function getSharedBrowser(): Promise<unknown> {
+async function getSharedBrowser(): Promise<any> {
   if (_sharedBrowser) {
     try {
       await _sharedBrowser.pages(); // lightweight liveness check

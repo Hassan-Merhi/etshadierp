@@ -30,21 +30,21 @@ export function ImportProformaExcelDialog({
   setExcelImportName,
   setIsExcelImportOpen,
 }: {
-  bulkImportMutation: unknown;
-  customerId: unknown;
-  customers: unknown;
-  downloadProformaTemplate: unknown;
-  excelFileInputRef: unknown;
-  excelImportErrors: unknown;
-  excelImportLines: unknown;
-  excelImportLoading: unknown;
-  excelImportName: unknown;
-  handleExcelFile: unknown;
-  isExcelImportOpen: unknown;
-  setExcelImportErrors: unknown;
-  setExcelImportLines: unknown;
-  setExcelImportName: unknown;
-  setIsExcelImportOpen: unknown;
+  bulkImportMutation: any;
+  customerId: any;
+  customers: any;
+  downloadProformaTemplate: any;
+  excelFileInputRef: any;
+  excelImportErrors: any;
+  excelImportLines: any;
+  excelImportLoading: any;
+  excelImportName: any;
+  handleExcelFile: any;
+  isExcelImportOpen: any;
+  setExcelImportErrors: any;
+  setExcelImportLines: any;
+  setExcelImportName: any;
+  setIsExcelImportOpen: any;
 }) {
   return (
     <Dialog

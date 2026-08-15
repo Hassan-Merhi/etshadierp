@@ -2,9 +2,9 @@ import { useMemo } from "react";
 import type { InventoryItem, StockGroupSummary } from "./locationInventoryTypes";
 
 interface UseStockGroupSummariesParams {
-  openingInventoryData: unknown[];
-  inventoryData: unknown[];
-  closingInventoryData: unknown[];
+  openingInventoryData: any[];
+  inventoryData: any[];
+  closingInventoryData: any[];
   openingInventoryLoading: boolean;
   closingInventoryLoading: boolean;
   inventoryLoading: boolean;

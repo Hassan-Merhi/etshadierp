@@ -75,7 +75,7 @@ function applyPaginationHeaders(
   );
 }
 
-function sanitizeForPos(rows: unknown[]): unknown[] {
+function sanitizeForPos(rows: any[]): any[] {
   return rows.map((voucher) => {
     const voucherType = String(voucher.voucherType || "").toLowerCase();
     if (
@@ -113,7 +113,7 @@ export function registerVoucherPaginationRoutes(app: Express): void {
           endDate = end.toISOString().slice(0, 10);
         }
 
-        const conditions: unknown[] = [
+        const conditions: any[] = [
           eq(vouchers.companyId, companyId),
           isNull(vouchers.deletedAt),
           sql`${vouchers.voucherDate} >= ${startDate}`,

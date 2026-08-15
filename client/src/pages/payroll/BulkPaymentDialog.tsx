@@ -9,13 +9,13 @@ import { useCurrencyContext } from "@/contexts/CurrencyContext";
 interface BulkPaymentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  selectedPayments: unknown[];
+  selectedPayments: any[];
   totalAmount: number;
-  workerStaff: unknown[];
-  form: unknown;
-  mutation: unknown;
-  cashAccounts: unknown[];
-  bankAccounts: unknown[] | undefined;
+  workerStaff: any[];
+  form: any;
+  mutation: any;
+  cashAccounts: any[];
+  bankAccounts: any[] | undefined;
   bankAccountsLoading: boolean;
 }
 

@@ -191,7 +191,7 @@ export function ContainerDrawer({
 
   const eventsQueryKey = container?.id ? `/api/container-tracking/${container.id}/events` : null;
   const trackingCompanyIdentity = sessionCompanyId ?? container?.companyId ?? "no-company";
-  const { data: events, isLoading: eventsLoading } = useQuery<unknown[]>({
+  const { data: events, isLoading: eventsLoading } = useQuery<any[]>({
     queryKey: eventsQueryKey
       ? companyDataKey(eventsQueryKey, trackingCompanyIdentity, "container-tracking-events")
       : [],

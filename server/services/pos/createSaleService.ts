@@ -43,7 +43,7 @@ function err(result: HandlerErrorResult) {
 export async function createPosSale(
   params: CreatePosSaleParams,
   companyType: { isSpCompany: boolean }
-): Promise<{ status: number; body: unknown }> {
+): Promise<{ status: number; body: any }> {
   const {
     currentCompanyId,
     userId,
@@ -173,7 +173,7 @@ export async function createPosSale(
   if ("error" in spCtxResult) return err(spCtxResult.error);
   const spCtx = spCtxResult;
 
-  let txResult: { voucher: unknown; saleItems: unknown[]; replayed: boolean };
+  let txResult: { voucher: any; saleItems: any[]; replayed: boolean };
   try {
     txResult = await db.transaction(async (tx) => {
       const existing = await lockAndFindExistingPosSaleTx({

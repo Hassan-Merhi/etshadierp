@@ -99,7 +99,7 @@ export function installStartupMigrationCoordinator(): void {
   const coordinatedClients = new WeakSet<Client>();
   const lockedClients = new WeakSet<Client>();
 
-  Client.prototype.query = async function (this: Client, query: string | QueryConfig, ...args: unknown[]): Promise<unknown> {
+  Client.prototype.query = async function (this: Client, query: string | QueryConfig, ...args: any[]): Promise<any> {
     const result = await originalQuery.call(this, query, ...args);
 
     if (!coordinatedClients.has(this) && MIGRATION_SETUP_SQL.test(sqlText(query))) {
@@ -126,7 +126,7 @@ export function installStartupMigrationCoordinator(): void {
     return result;
   } as typeof Client.prototype.query;
 
-  Client.prototype.end = async function (this: Client, ...args: unknown[]): Promise<void> {
+  Client.prototype.end = async function (this: Client, ...args: any[]): Promise<void> {
     if (lockedClients.has(this)) {
       lockedClients.delete(this);
       await releaseStartupMigrationLock(this);

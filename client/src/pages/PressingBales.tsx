@@ -164,7 +164,7 @@ export default function PressingBales() {
   const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
   const totalKgToConsume = cart.reduce((sum, item) => sum + item.qty * item.weightPerBaleKg, 0);
 
-  const printBaleLabels = async (bales: unknown[], products: FactoryBaleProduct[], weights: string[]) => {
+  const printBaleLabels = async (bales: any[], products: FactoryBaleProduct[], weights: string[]) => {
     try {
       const labelData = bales.map((bale: any, idx: number) => ({
         productionBaleId: bale.id,

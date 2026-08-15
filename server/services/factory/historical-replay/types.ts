@@ -3,7 +3,7 @@ import { factoryContainers, factoryRawStock } from "@shared/schema";
 export interface ReplayQueryExecutor {
   query<T = any>(
     text: string,
-    params?: unknown[]
+    params?: any[]
   ): Promise<{ rows: T[]; rowCount?: number | null }>;
 }
 

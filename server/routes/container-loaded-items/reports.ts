@@ -102,7 +102,7 @@ export function registerContainerLoadedItemReportRoutes(app: Express, requireAut
         }
 
         const allBarcodes = new Set([...proformaByBarcode.keys(), ...loadedByBarcode.keys()]);
-        const comparison: unknown[] = [];
+        const comparison: any[] = [];
 
         for (const barcode of allBarcodes) {
           const exp = proformaByBarcode.get(barcode);
@@ -238,11 +238,11 @@ export function registerContainerLoadedItemReportRoutes(app: Express, requireAut
         }
 
         const allBarcodes = new Set([...proformaByBarcode.keys(), ...loadedByBarcode.keys()]);
-        const overloaded: unknown[] = [];
-        const lessLoaded: unknown[] = [];
-        const notRequested: unknown[] = [];
-        const priceDiffs: unknown[] = [];
-        const fullComparison: unknown[] = [];
+        const overloaded: any[] = [];
+        const lessLoaded: any[] = [];
+        const notRequested: any[] = [];
+        const priceDiffs: any[] = [];
+        const fullComparison: any[] = [];
 
         for (const barcode of allBarcodes) {
           const exp = proformaByBarcode.get(barcode);
@@ -359,7 +359,7 @@ export function registerContainerLoadedItemReportRoutes(app: Express, requireAut
           sectionTitle: string,
           sectionColor: string,
           columns: { header: string; key: string; width: number; numFmt?: string }[],
-          data: unknown[],
+          data: any[],
           statusColorFn?: (row: any) => string | null
         ) => {
           const sheet = workbook.addWorksheet(name);

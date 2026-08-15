@@ -20,7 +20,7 @@ export interface NetPositionInventoryContext {
   getConfigFx: (cc: string) => number;
   configFxRates: Record<string, number>;
   supplierLockedRateMapNp: Map<number, number>;
-  allContainersF: unknown[];
+  allContainersF: any[];
 }
 
 export interface NetPositionInventory {
@@ -282,7 +282,7 @@ export async function computeNetPositionInventory(ctx: NetPositionInventoryConte
   const otwAdd = (cc: string, amt: number) => {
     if (amt > 0 && cc) otwCurrBuckets[cc] = (otwCurrBuckets[cc] || 0) + amt;
   };
-  for (const c of ctx.allContainersF as unknown[]) {
+  for (const c of ctx.allContainersF as any[]) {
     if (!otwStatuses.has(c.status)) continue;
     const containerCcy = c.currencyCode || "USD";
     const goods =

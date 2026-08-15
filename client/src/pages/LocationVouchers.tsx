@@ -75,7 +75,7 @@ interface RangeVouchersData {
   };
 }
 
-export default function LocationVouchers({ posUser }: { posUser?: unknown } = {}) {
+export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
   const { formatDisplayDate } = useDateFormat();
   const { formatAmount } = useCurrencyContext();
   const { registerCursorNav, clearCursorNav } = useCursorNav();

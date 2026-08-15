@@ -30,7 +30,7 @@ interface BrokerOverviewPanelProps {
   parentViewSupplierId: number;
   allSuppliers: SupplierWithBalance[];
   subAccountsByParent: Record<number, SupplierWithBalance[]>;
-  brokerOverviewStatement: unknown;
+  brokerOverviewStatement: any;
   brokerOverviewLoading: boolean;
   brokerIncludeOtw: boolean;
   setBrokerIncludeOtw: (val: boolean) => void;

@@ -13,7 +13,7 @@ import {
   updateProductionBonusRunStatuses,
 } from "../../services/payroll/productionBonusPayrollService";
 
-function rows(result: any): unknown[] {
+function rows(result: any): any[] {
   return Array.isArray(result) ? result : (result?.rows ?? []);
 }
 

@@ -28,7 +28,7 @@ function LedgerAccountForm({
   onCancel,
   isPending,
 }: {
-  form: unknown;
+  form: any;
   onSubmit: (data: any, saveAndNew?: boolean) => void;
   onCancel: () => void;
   isPending: boolean;
@@ -58,7 +58,7 @@ function LedgerAccountForm({
   const subTypes = getSubTypes();
 
   // Fetch Group accounts for the Parent Group combobox
-  const { data: allLedgerAccounts = [] } = useQuery<unknown[]>({
+  const { data: allLedgerAccounts = [] } = useQuery<any[]>({
     queryKey: ["/api/ledger-accounts", selectedCompany?.id],
     queryFn: async () => {
       const url = selectedCompany?.id ? `/api/ledger-accounts?companyId=${selectedCompany.id}` : "/api/ledger-accounts";

@@ -20,7 +20,7 @@ interface PreviewState {
   type: PreviewType;
   blobUrl?: string;
   text?: string;
-  rows?: unknown[][];
+  rows?: any[][];
   loading: boolean;
   error?: boolean;
 }

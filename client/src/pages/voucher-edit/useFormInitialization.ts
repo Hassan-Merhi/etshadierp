@@ -19,7 +19,7 @@ export const useFormInitialization = (
   ledgerAccounts: LedgerAccount[],
   bankAccounts: BankAccount[],
   suppliers: Supplier[],
-  allAccountsData: unknown[],
+  allAccountsData: any[],
   selectedCurrency: "USD" | "CFA",
   paymentForm: UseFormReturn<VoucherFormData>,
   journalForm: UseFormReturn<JournalFormData>,
@@ -63,7 +63,7 @@ export const useFormInitialization = (
       else if (accountType === "bank") accountName = bankAccounts.find((a) => a.id === accountId)?.bankName || "";
       else if (accountType === "supplier") accountName = suppliers.find((a) => a.id === accountId)?.legalName || "";
       else if (accountType === "factorySupplier") {
-        const fsAccount = (allAccountsData as unknown[]).find(
+        const fsAccount = (allAccountsData as any[]).find(
           (a) => a.type === "factorySupplier" && Number(a.id) === accountId
         );
         accountName = fsAccount?.name || `Factory Supplier ${accountId}`;
@@ -94,7 +94,7 @@ export const useFormInitialization = (
           else if (eAccountType === "supplier")
             eAccountName = suppliers.find((a) => a.id === eAccountId)?.legalName || "";
           else if (eAccountType === "factorySupplier") {
-            const fsAccount = (allAccountsData as unknown[]).find(
+            const fsAccount = (allAccountsData as any[]).find(
               (a) => a.type === "factorySupplier" && Number(a.id) === eAccountId
             );
             eAccountName = fsAccount?.name || `Factory Supplier ${eAccountId}`;

@@ -63,7 +63,7 @@ export function ImportBalesTab() {
 
         let headerRowIdx = -1;
         for (let i = 0; i < Math.min(jsonData.length, 10); i++) {
-          const row = jsonData[i] as unknown[];
+          const row = jsonData[i] as any[];
           if (row && row.some((cell) => String(cell).toUpperCase().includes("ITEM NAME"))) {
             headerRowIdx = i;
             break;
@@ -79,7 +79,7 @@ export function ImportBalesTab() {
           return;
         }
 
-        const headers = (jsonData[headerRowIdx] as unknown[]).map((h) => String(h).toUpperCase().trim());
+        const headers = (jsonData[headerRowIdx] as any[]).map((h) => String(h).toUpperCase().trim());
         const nameIdx = headers.findIndex((h) => h.includes("ITEM NAME"));
         const weightIdx = headers.findIndex((h) => h.includes("WEIGHT"));
         const barcodeIdx = headers.findIndex((h) => h.includes("BARCODE"));
@@ -113,7 +113,7 @@ export function ImportBalesTab() {
 
         const rows: ImportBaleRow[] = [];
         for (let i = headerRowIdx + 1; i < jsonData.length; i++) {
-          const row = jsonData[i] as unknown[];
+          const row = jsonData[i] as any[];
           if (!row || !row[nameIdx]) continue;
           const itemName = String(row[nameIdx] || "").trim();
           if (!itemName) continue;

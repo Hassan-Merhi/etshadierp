@@ -47,7 +47,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
       }
 
       // ── 1. Query existing factory_daybook_entries ──────────────────────────
-      const conditions: unknown[] = [
+      const conditions: any[] = [
         eq(factoryDaybookEntries.companyId, companyId),
         // Exclude void/delete audit entries — they are internal records, not daybook events
         sql`${factoryDaybookEntries.txType} NOT LIKE '%_VOIDED'`,
@@ -192,7 +192,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
       };
       const shouldFetchVouchers = !txType || txType in voucherTypesReversed;
 
-      let syntheticRows: unknown[] = [];
+      let syntheticRows: any[] = [];
       if (shouldFetchVouchers) {
         // Build the set of voucher IDs already captured in factory_daybook_entries.
         // IMPORTANT: query ALL entries for the company (no date filter) so that when a
@@ -211,7 +211,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
           );
         const capturedVoucherIds = new Set<number>(allCapturedRows.map((r) => r.referenceId as number));
 
-        const voucherConds: unknown[] = [
+        const voucherConds: any[] = [
           eq(vouchers.companyId, companyId),
           sql`${vouchers.deletedAt} IS NULL`,
           inArray(vouchers.voucherType, ["Payment", "Receipt", "Journal"]),
@@ -278,11 +278,11 @@ export function registerFactoryDaybookRoutes(app: Express) {
         if (baleStockRows.length > 0) {
           // Collect all bale IDs across all zero bale stock entries
           // Only integer IDs are valid — old entries may have stored UUIDs which Postgres rejects
-          const baleIdToEntry = new Map<number, unknown[]>();
+          const baleIdToEntry = new Map<number, any[]>();
           for (const row of baleStockRows) {
             try {
               const meta = JSON.parse(row.metaJson || "{}");
-              const bales: unknown[] = Array.isArray(meta.bales) ? meta.bales : [];
+              const bales: any[] = Array.isArray(meta.bales) ? meta.bales : [];
               for (const b of bales) {
                 const numId = parseInt(b.id, 10);
                 if (!b.id || isNaN(numId) || String(numId) !== String(b.id)) continue; // skip UUIDs / non-integers
@@ -342,7 +342,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
             // Patch the filteredDaybookRows in-place.
             // BALE_STOCK_ENTRY is always overwritten so old rows stored with
             // selling price are corrected to production price on the fly.
-            for (const row of filteredDaybookRows as unknown[]) {
+            for (const row of filteredDaybookRows as any[]) {
               if (row.txType === "BALE_STOCK_ENTRY") {
                 const derived = rowValueMap.get(row.id);
                 if (derived && derived > 0) {
@@ -374,7 +374,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
             orderTotals.set(o.id, parseFloat(o.grandTotal || "0"));
           }
 
-          for (const row of filteredDaybookRows as unknown[]) {
+          for (const row of filteredDaybookRows as any[]) {
             if (
               ["LOADING_SUBMITTED", "ORDER_VERIFIED"].includes(row.txType) &&
               parseFloat(row.amountCurrency || "0") === 0
@@ -397,7 +397,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
       // desc by id so the first occurrence of each key is the most recent.
       const SINGLETON_TX_TYPES = new Set(["INVOICE", "INVOICE_REVERTED", "ORDER_VERIFIED", "ORDER_CANCELLED"]);
       const _seenSingletonKeys = new Set<string>();
-      const deduplicatedRows = (filteredDaybookRows as unknown[]).filter((r) => {
+      const deduplicatedRows = (filteredDaybookRows as any[]).filter((r) => {
         if (!SINGLETON_TX_TYPES.has(r.txType) || r.referenceId == null) return true;
         const key = `${r.txType}:${r.referenceId}`;
         if (_seenSingletonKeys.has(key)) return false;

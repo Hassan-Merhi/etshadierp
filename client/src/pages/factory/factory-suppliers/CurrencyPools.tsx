@@ -211,7 +211,7 @@ export function CurrencyPools({
                                 const hasBalance = netPay > 0;
                                 const netPayStr = hasBalance ? group.netPayable : "0";
                                 const toSupId = statementData.supplier.parentId || statementSupplierId!;
-                                let form: Record<string, unknown>;
+                                let form: Record<string, any>;
                                 let sourceType: string;
                                 if (isCrossFreightPool) {
                                   form = {

@@ -63,20 +63,20 @@ export interface MixBatchCostingResult {
 
 export interface MixBatchCostingAdapter {
   findExisting(input: {
-    tx: unknown;
+    tx: any;
     companyId: number;
     batchId: string;
     source: MixBatchSourceIdentity;
   }): Promise<MixBatchCostingResult | null>;
-  validateOwnership(input: { tx: unknown; companyId: number; batchId: string; supplierIds: number[] }): Promise<void>;
-  lockSupplierStates(input: { tx: unknown; companyId: number; supplierIds: number[] }): Promise<LockedSupplierCostState[]>;
+  validateOwnership(input: { tx: any; companyId: number; batchId: string; supplierIds: number[] }): Promise<void>;
+  lockSupplierStates(input: { tx: any; companyId: number; supplierIds: number[] }): Promise<LockedSupplierCostState[]>;
   appendSupplierDeductions(input: {
-    tx: unknown;
+    tx: any;
     request: MixBatchCostingRequest;
     components: MixBatchComponentResult[];
   }): Promise<void>;
   persistSupplierStates(input: {
-    tx: unknown;
+    tx: any;
     companyId: number;
     states: Array<{
       supplierId: number;
@@ -88,12 +88,12 @@ export interface MixBatchCostingAdapter {
     }>;
   }): Promise<void>;
   persistMixBatchCost(input: {
-    tx: unknown;
+    tx: any;
     request: MixBatchCostingRequest;
     result: MixBatchCostingResult;
   }): Promise<void>;
-  recordIdempotency(input: { tx: unknown; request: MixBatchCostingRequest; result: MixBatchCostingResult }): Promise<void>;
-  recordAudit(input: { tx: unknown; request: MixBatchCostingRequest; result: MixBatchCostingResult }): Promise<void>;
+  recordIdempotency(input: { tx: any; request: MixBatchCostingRequest; result: MixBatchCostingResult }): Promise<void>;
+  recordAudit(input: { tx: any; request: MixBatchCostingRequest; result: MixBatchCostingResult }): Promise<void>;
 }
 
 export class MixBatchCostingValidationError extends Error {

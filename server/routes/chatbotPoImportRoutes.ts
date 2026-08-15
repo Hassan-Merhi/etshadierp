@@ -76,7 +76,7 @@ export function registerChatbotPoImportRoutes(app: Express) {
         otherCharges: number;
       }) {
         const supplier = tryMatchSupplier(extracted.supplierCode) || tryMatchSupplier(extracted.supplierName);
-        const lines: unknown[] = [];
+        const lines: any[] = [];
         for (const item of extracted.items) {
           if (item.quantity <= 0) continue;
           const matched = await tryMatchItem(item.code || "", item.name || "");
@@ -130,7 +130,7 @@ export function registerChatbotPoImportRoutes(app: Express) {
       }
 
       // ── Flexible column lookup (Excel/CSV) ──────────────────────────
-      function col(row: Record<string, unknown>, ...keys: string[]): string {
+      function col(row: Record<string, any>, ...keys: string[]): string {
         for (const key of keys) {
           const norm = key.toLowerCase().replace(/[\s_]+/g, "");
           const found = Object.keys(row).find((k) => k.toLowerCase().replace(/[\s_]+/g, "") === norm);
@@ -168,7 +168,7 @@ export function registerChatbotPoImportRoutes(app: Express) {
       // ════════════════════════════════════════════════════════════════
       // Excel / CSV → try column mapping first, AI fallback if needed
       // ════════════════════════════════════════════════════════════════
-      let rows: Record<string, unknown>[] = [];
+      let rows: Record<string, any>[] = [];
       if (fileExt === "csv") {
         const text = req.file.buffer.toString("utf-8");
         const csvLines = text.split(/\r?\n/).filter((l) => l.trim());
@@ -177,7 +177,7 @@ export function registerChatbotPoImportRoutes(app: Express) {
         for (let i = 1; i < csvLines.length; i++) {
           const vals = csvLines[i].split(",").map((v) => v.trim().replace(/^"|"$/g, ""));
           if (vals.every((v) => !v)) continue;
-          const row: Record<string, unknown> = {};
+          const row: Record<string, any> = {};
           headers.forEach((h, idx) => {
             row[h] = vals[idx] ?? "";
           });
@@ -193,7 +193,7 @@ export function registerChatbotPoImportRoutes(app: Express) {
         }
         const sheetName = wb.SheetNames[0];
         if (!sheetName) return res.status(400).json({ message: "Excel file is empty" });
-        rows = sheetToJson(wb.Sheets[sheetName]) as Record<string, unknown>[];
+        rows = sheetToJson(wb.Sheets[sheetName]) as Record<string, any>[];
       }
 
       if (!rows.length) return res.status(400).json({ message: "File has no data rows" });
@@ -247,7 +247,7 @@ export function registerChatbotPoImportRoutes(app: Express) {
       const discount = parseFloat(col(first, "Discount", "discount") || "0") || 0;
       const otherCharges = parseFloat(col(first, "Other_Charges", "OtherCharges", "Other Charges") || "0") || 0;
 
-      const mappedLines: unknown[] = [];
+      const mappedLines: any[] = [];
       for (const row of rows) {
         const itemCode = col(
           row,

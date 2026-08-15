@@ -21,14 +21,14 @@ export function RevisionDialog({
   setRevisionDialogOpen,
   setRevisionNote,
 }: {
-  computeRevisionItems: unknown;
-  confirmSaveAsRevision: unknown;
-  isSavingRevision: unknown;
-  revisionDialogOpen: unknown;
-  revisionNote: unknown;
-  revisions: unknown;
-  setRevisionDialogOpen: unknown;
-  setRevisionNote: unknown;
+  computeRevisionItems: any;
+  confirmSaveAsRevision: any;
+  isSavingRevision: any;
+  revisionDialogOpen: any;
+  revisionNote: any;
+  revisions: any;
+  setRevisionDialogOpen: any;
+  setRevisionNote: any;
 }) {
   return (
     <Dialog open={revisionDialogOpen} onOpenChange={setRevisionDialogOpen}>

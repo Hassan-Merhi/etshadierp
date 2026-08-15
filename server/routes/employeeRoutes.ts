@@ -258,7 +258,7 @@ export function registerEmployeeRoutes(app: Express) {
         balesBonusRate,
       } = req.body;
 
-      const updates: Record<string, unknown> = {};
+      const updates: Record<string, any> = {};
       if (firstName !== undefined) updates.firstName = firstName;
       if (lastName !== undefined) updates.lastName = lastName;
       if (code !== undefined) updates.code = code;

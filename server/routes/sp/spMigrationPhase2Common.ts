@@ -75,8 +75,8 @@ export async function validateMigrationPair(
 ): Promise<{
   sourceId: number;
   targetId: number;
-  sourceCompany: unknown;
-  targetCompany: unknown;
+  sourceCompany: any;
+  targetCompany: any;
 } | null> {
   const sourceId = Number.parseInt(String(req.body?.sourceCompanyId ?? req.query?.sourceCompanyId ?? ""), 10);
   const targetId = Number.parseInt(String(req.body?.targetCompanyId ?? req.query?.targetCompanyId ?? ""), 10);
@@ -236,10 +236,10 @@ export async function loadStockItemMap(sourceId: number, targetId: number): Prom
 }
 
 export async function loadTargetAccounts(targetId: number): Promise<{
-  rows: unknown[];
-  bySubType: Map<string, unknown>;
-  byCode: Map<string, unknown>;
-  byType: Map<string, unknown[]>;
+  rows: any[];
+  bySubType: Map<string, any>;
+  byCode: Map<string, any>;
+  byType: Map<string, any[]>;
 }> {
   const result = await db.execute(sql`
     SELECT id, code, name, account_type, sub_type
@@ -249,7 +249,7 @@ export async function loadTargetAccounts(targetId: number): Promise<{
   const rows = resultRows(result);
   const bySubType = new Map<string, any>();
   const byCode = new Map<string, any>();
-  const byType = new Map<string, unknown[]>();
+  const byType = new Map<string, any[]>();
   for (const row of rows) {
     if (row.sub_type) bySubType.set(String(row.sub_type), row);
     if (row.code) byCode.set(String(row.code).trim().toLowerCase(), row);
@@ -261,7 +261,7 @@ export async function loadTargetAccounts(targetId: number): Promise<{
   return { rows, bySubType, byCode, byType };
 }
 
-export async function loadSourceAccounts(sourceId: number): Promise<Map<number, unknown>> {
+export async function loadSourceAccounts(sourceId: number): Promise<Map<number, any>> {
   const result = await db.execute(sql`
     SELECT id, code, name, account_type, sub_type
     FROM ledger_accounts
@@ -362,7 +362,7 @@ export async function resolveSupplier(
   };
 }
 
-export async function getSuspenseReview(sourceId: number, targetId: number): Promise<unknown> {
+export async function getSuspenseReview(sourceId: number, targetId: number): Promise<any> {
   const suspenseResult = await db.execute(sql`
     SELECT id FROM ledger_accounts
     WHERE company_id = ${targetId} AND sub_type = 'gc_mig_suspense' AND deleted_at IS NULL

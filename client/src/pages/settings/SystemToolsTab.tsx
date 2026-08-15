@@ -27,9 +27,9 @@ import { useLocation } from "wouter";
 
 interface SystemToolsTabProps {
   appMode: string;
-  currentUser: unknown;
-  selectedCompany: unknown;
-  companies: unknown[];
+  currentUser: any;
+  selectedCompany: any;
+  companies: any[];
 }
 
 interface ToolCard {

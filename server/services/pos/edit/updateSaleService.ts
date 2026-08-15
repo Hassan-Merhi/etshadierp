@@ -33,7 +33,7 @@ function err(result: HandlerErrorResult) {
   return { status: result.status, body: result.body };
 }
 
-export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ status: number; body: unknown }> {
+export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ status: number; body: any }> {
   const { voucherId, currentCompanyId, userId, username, userRole, canSellNegativeStock, body } = params;
 
   // Detect supplier_partner for SP-specific accounting on edit
@@ -225,7 +225,7 @@ export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ stat
   }
 
   try {
-    const changes: Record<string, { old?: unknown; new?: unknown }> = {};
+    const changes: Record<string, { old?: any; new?: any }> = {};
     if (existingVoucher.totalAmount !== updatedVoucher.totalAmount)
       changes.totalAmount = { old: existingVoucher.totalAmount, new: updatedVoucher.totalAmount };
     if (existingVoucher.voucherDate !== updatedVoucher.voucherDate)

@@ -150,7 +150,7 @@ export default function SupplierProformas() {
   });
 
   const updateLineMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: unknown }) => {
+    mutationFn: async ({ id, data }: { id: number; data: any }) => {
       const res = await apiRequest("PATCH", `/api/supplier-proforma-lines/${id}`, data);
       return res.json();
     },
@@ -228,7 +228,7 @@ export default function SupplierProformas() {
   });
 
   const importLinesMutation = useMutation({
-    mutationFn: async ({ proformaId, lines }: { proformaId: number; lines: unknown[] }) => {
+    mutationFn: async ({ proformaId, lines }: { proformaId: number; lines: any[] }) => {
       const res = await apiRequest("POST", `/api/suppliers/${supplierId}/proformas/${proformaId}/import-lines`, {
         lines,
       });

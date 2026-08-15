@@ -105,7 +105,7 @@ export const transferRepository = {
       storage.getAllCompanies(),
       accountIds.length > 0
         ? db.select().from(ledgerAccounts).where(inArray(ledgerAccounts.id, accountIds))
-        : Promise.resolve([] as unknown[]),
+        : Promise.resolve([] as any[]),
     ]);
     const companyMap = new Map(companies.map((company) => [company.id, company]));
     const accountMap = new Map(accounts.map((account) => [account.id, account]));

@@ -94,7 +94,7 @@ export async function logRun(
       (${sourceId}, ${targetId}, ${action}, ${status}, ${rowsCreated}, ${errorMessage}, ${notes})
     RETURNING id
   `)
-  ).rows as unknown[];
+  ).rows as any[];
   return row.id;
 }
 
@@ -173,7 +173,7 @@ export async function ensureSpAccounts(
                 ${acct.subType.includes("clearing") || acct.subType === "sp_opnbal"}, true)
         RETURNING id
       `)
-      ).rows as unknown[];
+      ).rows as any[];
       names.push(name);
       newIds.push(pn(row.id));
     }
@@ -204,7 +204,7 @@ export async function ensureGcProfitAccounts(
         VALUES (${targetId}, ${code}, ${name}, ${acct.accountType}, ${acct.subType}, true)
         RETURNING id
       `)
-      ).rows as unknown[];
+      ).rows as any[];
       names.push(name);
       newIds.push(pn(row.id));
     }
@@ -238,7 +238,7 @@ export async function ensureTargetStockItems(
     await db.execute(sql`
     SELECT id, code, name FROM stock_groups WHERE company_id = ${sourceId} AND deleted_at IS NULL
   `)
-  ).rows as unknown[];
+  ).rows as any[];
   for (const g of sourceGroups) {
     const existingGroup = (
       await db.execute(sql`
@@ -254,7 +254,7 @@ export async function ensureTargetStockItems(
         VALUES (${targetId}, ${g.code}, ${g.name}, true)
         RETURNING id
       `)
-      ).rows as unknown[];
+      ).rows as any[];
       const newGroupId = pn(row.id);
       groupMap.set(pn(g.id), newGroupId);
       await trackRow(runId, "stock_groups", newGroupId);
@@ -280,7 +280,7 @@ export async function ensureTargetStockItems(
           WHERE si.company_id = ${sourceId} AND si.deleted_at IS NULL AND inv.quantity > 0 AND si.grade_id IS NOT NULL
         ))
     `)
-    ).rows as unknown[];
+    ).rows as any[];
   for (const g of sourceGrades) {
     const existingGrade = (
       await db.execute(sql`SELECT id FROM stock_grades WHERE company_id = ${targetId} AND name = ${g.name} LIMIT 1`)
@@ -292,7 +292,7 @@ export async function ensureTargetStockItems(
         await db.execute(
           sql`INSERT INTO stock_grades (company_id, name, active) VALUES (${targetId}, ${g.name}, true) RETURNING id`
         )
-      ).rows as unknown[];
+      ).rows as any[];
       const newGradeId = pn(row.id);
       gradeMap.set(pn(g.id), newGradeId);
       await trackRow(runId, "stock_grades", newGradeId);
@@ -313,7 +313,7 @@ export async function ensureTargetStockItems(
           WHERE si.company_id = ${sourceId} AND si.deleted_at IS NULL AND inv.quantity > 0 AND si.category_id IS NOT NULL
         ))
     `)
-    ).rows as unknown[];
+    ).rows as any[];
   for (const c of sourceCategories) {
     const existingCategory = (
       await db.execute(sql`SELECT id FROM stock_categories WHERE company_id = ${targetId} AND name = ${c.name} LIMIT 1`)
@@ -325,7 +325,7 @@ export async function ensureTargetStockItems(
         await db.execute(
           sql`INSERT INTO stock_categories (company_id, name, active) VALUES (${targetId}, ${c.name}, true) RETURNING id`
         )
-      ).rows as unknown[];
+      ).rows as any[];
       const newCategoryId = pn(row.id);
       categoryMap.set(pn(c.id), newCategoryId);
       await trackRow(runId, "stock_categories", newCategoryId);
@@ -343,7 +343,7 @@ export async function ensureTargetStockItems(
     WHERE si.company_id = ${sourceId} AND si.deleted_at IS NULL AND inv.quantity > 0
     ORDER BY si.code
   `)
-  ).rows as unknown[];
+  ).rows as any[];
 
   for (const item of sourceItems) {
     const srcId = pn(item.id);
@@ -396,7 +396,7 @@ export async function ensureTargetStockItems(
            ${item.reorder_level ?? "0"}, ${item.selling_price ?? "0"}, ${item.active ?? true})
         RETURNING id
       `)
-      ).rows as unknown[];
+      ).rows as any[];
       targetItemId = pn(row.id);
       await trackRow(runId, "stock_items", targetItemId);
       itemsCreated++;
@@ -434,14 +434,14 @@ export async function buildGcMigrationPreview(sourceId: number, targetId: number
     WHERE si.company_id = ${sourceId} AND si.deleted_at IS NULL AND inv.quantity > 0
     ORDER BY si.code
   `)
-  ).rows as unknown[];
+  ).rows as any[];
 
   // aliasExists is a per-item display flag only — NOT the mapping check (see below).
   const existingAliases = (
     await db.execute(sql`
     SELECT alias_code FROM stock_item_code_aliases WHERE company_id = ${targetId}
   `)
-  ).rows as unknown[];
+  ).rows as any[];
   const existingAliasCodes = new Set(existingAliases.map((r) => r.alias_code));
 
   // Real mapping check: has this source stock item already been linked to a target
@@ -459,7 +459,7 @@ export async function buildGcMigrationPreview(sourceId: number, targetId: number
           sql`, `
         )})
     `)
-    ).rows as unknown[];
+    ).rows as any[];
     mappedSourceIds = new Set(linkedRows.map((r) => pn(r.source_id)));
   }
 
@@ -504,7 +504,7 @@ export async function buildGcMigrationPreview(sourceId: number, targetId: number
     SELECT sub_type FROM ledger_accounts
     WHERE company_id = ${targetId} AND deleted_at IS NULL AND sub_type LIKE 'sp_%'
   `)
-  ).rows as unknown[];
+  ).rows as any[];
   const existingSpSubTypes = new Set(spAcctRows.map((r) => r.sub_type));
   const spAccountsStatus = SP_ACCOUNTS.map((a) => ({
     subType: a.subType,
@@ -519,7 +519,7 @@ export async function buildGcMigrationPreview(sourceId: number, targetId: number
     SELECT sub_type, name FROM ledger_accounts
     WHERE company_id = ${targetId} AND deleted_at IS NULL AND sub_type = ANY(${sqlArray(gcAllSubTypes)})
   `)
-  ).rows as unknown[];
+  ).rows as any[];
   const existingGcSubTypes = new Map(gcAcctRows.map((r) => [r.sub_type, r.name]));
 
   const totalQty = stockItems.reduce((s: number, i: any) => s + i.quantity, 0);
@@ -610,7 +610,7 @@ export async function ensureTargetLocation(
       VALUES (${targetId}, ${sourceLoc.code}, ${sourceLoc.name}, true)
       RETURNING id
     `)
-    ).rows as unknown[];
+    ).rows as any[];
     targetLocId = pn(row.id);
     await trackRow(runId, "locations", targetLocId);
   }

@@ -18,15 +18,15 @@ import { getEmpAvatarColor, getEmpInitials } from "./payrollSchemas";
 
 interface WorkersTableProps {
   workers: Employee[];
-  workerPayments: Record<number, unknown>;
-  workerGroups: unknown[];
+  workerPayments: Record<number, any>;
+  workerGroups: any[];
   handleToggleWorker: (id: number) => void;
   handleUpdateAmount: (id: number, val: string) => void;
   handleDeleteWorker: (worker: Employee) => void;
   setStatementEmployee: (val: Employee | null) => void;
   setWorkerOverrides: (val: any) => void;
   formatAmount: (amt: number) => string;
-  addWorkerToWorkerGroupMutation?: unknown;
+  addWorkerToWorkerGroupMutation?: any;
   groupId?: number;
   setWorkerDeductionTarget?: (val: Employee | null) => void;
   setSelectedWorkerForEdit?: (val: Employee | null) => void;

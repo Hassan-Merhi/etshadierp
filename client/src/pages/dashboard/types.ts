@@ -9,9 +9,9 @@ export type ProfitData = {
   totalExpenses: number;
   netProfit: number;
   forUsTotal: number;
-  forUs: { total: number; breakdown: { name: string; value: number }[]; accounts: unknown[] };
+  forUs: { total: number; breakdown: { name: string; value: number }[]; accounts: any[] };
   onUsTotal: number;
-  onUs: { total: number; breakdown: { name: string; value: number }[]; accounts: unknown[] };
+  onUs: { total: number; breakdown: { name: string; value: number }[]; accounts: any[] };
   expensesTotal: number;
   expenses: {
     total: number;

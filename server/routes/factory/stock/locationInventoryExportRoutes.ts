@@ -176,7 +176,7 @@ export function registerFactoryLocationInventoryExportRoutes(app: Express) {
 
       // Helper: build a summary sheet (location-grouped)
       const buildSheet = (ws: any, rows: GroupedLocRow[], label: string, headerColor: string, altColor: string) => {
-        const cols: unknown[] = [
+        const cols: any[] = [
           { header: "Location", key: "locationName", width: 22 },
           { header: "Article Code", key: "articleCode", width: 18 },
           { header: "Product Name", key: "productName", width: 38 },
@@ -277,7 +277,7 @@ export function registerFactoryLocationInventoryExportRoutes(app: Express) {
 
       // Sheet 3: Bale Details (main items only — no wipers/garbage)
       const baleSheet = workbook.addWorksheet("Bale Details");
-      const baleCols: unknown[] = [
+      const baleCols: any[] = [
         { header: "Location", key: "locationName", width: 22 },
         { header: "Bale Ref #", key: "referenceNumber", width: 24 },
         { header: "Article Code", key: "articleCode", width: 18 },
@@ -339,7 +339,7 @@ export function registerFactoryLocationInventoryExportRoutes(app: Express) {
       });
 
       const garbageDetailSheetAll = workbook.addWorksheet("Garbage & Wiper Details");
-      const garbageBaleColsAll: unknown[] = [
+      const garbageBaleColsAll: any[] = [
         { header: "Location", key: "locationName", width: 22 },
         { header: "Bale Ref #", key: "referenceNumber", width: 24 },
         { header: "Bale Code", key: "baleCode", width: 18 },

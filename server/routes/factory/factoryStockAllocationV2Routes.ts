@@ -142,7 +142,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
         .orderBy(customerProformas.createdAt);
 
       const proformaIds = allProformas.map((p) => p.id);
-      let allLines: unknown[] = [];
+      let allLines: any[] = [];
       if (proformaIds.length > 0) {
         allLines = await db
           .select({
@@ -172,7 +172,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
       );
       type LoadedEntry = { proformaId: number; articleCode: string; loaded: number };
       const loadedByProforma: LoadedEntry[] = (
-        loadedByProformaRaw.rows || (loadedByProformaRaw as unknown as unknown[])
+        loadedByProformaRaw.rows || (loadedByProformaRaw as unknown as any[])
       ).map((r: any) => ({
         proformaId: Number(r.proformaId),
         articleCode: r.articleCode,
@@ -210,7 +210,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
               WHERE matched_code IS NOT NULL
               ORDER BY matched_code`
         );
-        (prodRaw.rows || (prodRaw as unknown as unknown[])).forEach((r: any) => {
+        (prodRaw.rows || (prodRaw as unknown as any[])).forEach((r: any) => {
           if (r.name) productNamesMap[r.articleCode] = r.name;
         });
       }
@@ -270,7 +270,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
             GROUP BY article_code`
       );
       const freeStockCounts: { articleCode: string; count: number }[] = (
-        freeStockRaw.rows || (freeStockRaw as unknown as unknown[])
+        freeStockRaw.rows || (freeStockRaw as unknown as any[])
       ).map((r: any) => ({
         articleCode: r.articleCode,
         count: Number(r.count),
@@ -284,7 +284,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
             WHERE company_id = ${companyId} AND status IN ('LOADING','PENDING_VERIFICATION')
             ORDER BY id`
       );
-      const loadings: unknown[] = (loadingsRaw.rows || (loadingsRaw as unknown as unknown[])).map((r: any) => ({
+      const loadings: any[] = (loadingsRaw.rows || (loadingsRaw as unknown as any[])).map((r: any) => ({
         id: r.id,
         customerId: r.customerId,
         containerNumber: r.containerNumber || null,
@@ -302,7 +302,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
               WHERE cob.order_id = ANY(${sqlArray(ids)})
               GROUP BY cob.order_id, fb.article_code`
         );
-        loadingBales = (balesRaw.rows || (balesRaw as unknown as unknown[])).map((r: any) => ({
+        loadingBales = (balesRaw.rows || (balesRaw as unknown as any[])).map((r: any) => ({
           orderId: r.orderId,
           articleCode: r.articleCode,
           count: Number(r.count),
@@ -377,7 +377,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
               WHERE matched_code IS NOT NULL
               ORDER BY matched_code`
         );
-        (prodRaw.rows || (prodRaw as unknown as unknown[])).forEach((r: any) => {
+        (prodRaw.rows || (prodRaw as unknown as any[])).forEach((r: any) => {
           if (r.name) productNameByCode.set(r.articleCode, r.name);
         });
       }

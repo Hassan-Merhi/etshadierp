@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Edit, Trash2, Key } from "lucide-react";
 
 interface UsersTableProps {
-  users: unknown[];
+  users: any[];
   onEdit: (user: any) => void;
   onDelete: (user: any) => void;
   onResetPassword: (user: any) => void;

@@ -30,7 +30,7 @@ type RoleAssignmentData = z.infer<typeof roleAssignmentSchema>;
 
 export function LoginHistoryTab() {
   const { formatDisplayDate } = useDateFormat();
-  const { data: history, isLoading } = useQuery<unknown[]>({
+  const { data: history, isLoading } = useQuery<any[]>({
     queryKey: ["/api/login-history"],
   });
 

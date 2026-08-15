@@ -121,7 +121,7 @@ function PageRow({
 }: {
   page: PageNode;
   depth: number;
-  rolePermissions: unknown[];
+  rolePermissions: any[];
   permissionMap: Map<string, boolean>;
   onToggle: (role: string, featureKey: string, enabled: boolean) => void;
   isPending: boolean;
@@ -207,7 +207,7 @@ export function PageVisibilityTree({ appMode }: { appMode?: string }) {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
 
-  const { data: rolePermissions = [], isLoading } = useQuery<unknown[]>({
+  const { data: rolePermissions = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/settings/role-permissions", selectedCompany?.id],
     enabled: !!selectedCompany?.id,
   });

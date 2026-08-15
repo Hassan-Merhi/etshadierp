@@ -27,16 +27,16 @@ export function DetailDialog({
   historyLocation,
   setDetailOpen,
 }: {
-  detailData: unknown;
-  detailDirection: unknown;
-  detailLoading: unknown;
-  detailMonthName: unknown;
-  detailOpen: unknown;
-  detailYear: unknown;
-  formatAmount: unknown;
-  historyItem: unknown;
-  historyLocation: unknown;
-  setDetailOpen: unknown;
+  detailData: any;
+  detailDirection: any;
+  detailLoading: any;
+  detailMonthName: any;
+  detailOpen: any;
+  detailYear: any;
+  formatAmount: any;
+  historyItem: any;
+  historyLocation: any;
+  setDetailOpen: any;
 }) {
   return (
     <Dialog open={detailOpen} onOpenChange={setDetailOpen}>

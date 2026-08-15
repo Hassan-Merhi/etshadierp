@@ -67,7 +67,7 @@ export async function getCustomersWithBalances(companyId: number) {
             )
           )
           .execute()
-      : Promise.resolve([] as unknown[]),
+      : Promise.resolve([] as any[]),
     customerOnlyIds.length > 0
       ? db
           .select({
@@ -91,7 +91,7 @@ export async function getCustomersWithBalances(companyId: number) {
             )
           )
           .execute()
-      : Promise.resolve([] as unknown[]),
+      : Promise.resolve([] as any[]),
   ]);
 
   const ledgerNet = new Map<number, number>();

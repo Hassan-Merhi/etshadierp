@@ -47,7 +47,7 @@ export function ExchangeRateSettings() {
     enabled: !!selectedCompany?.id,
   });
 
-  const { data: exchangeRates = [], isLoading } = useQuery<unknown[]>({
+  const { data: exchangeRates = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/exchange-rates"],
     enabled: !!selectedCompany?.id && !!company?.displayCurrency,
   });

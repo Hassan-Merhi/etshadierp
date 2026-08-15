@@ -130,7 +130,7 @@ export default function FactoryLocationInventory() {
 
   const [reprintDialogOpen, setReprintDialogOpen] = useState(false);
   const [reprintProduct, setReprintProduct] = useState<FactoryBaleProduct | null>(null);
-  const [reprintBales, setReprintBales] = useState<unknown[]>([]);
+  const [reprintBales, setReprintBales] = useState<any[]>([]);
   const [reprintLoading, setReprintLoading] = useState(false);
   const [reprintDesignPickerOpen, setReprintDesignPickerOpen] = useState(false);
   const [reprintPendingLabels, setReprintPendingLabels] = useState<LabelData[]>([]);
@@ -401,7 +401,7 @@ export default function FactoryLocationInventory() {
   });
 
   const bulkCreateMutation = useMutation({
-    mutationFn: async (data: { customerId: number; name: string; isActive: boolean; lines: unknown[] }) => {
+    mutationFn: async (data: { customerId: number; name: string; isActive: boolean; lines: any[] }) => {
       const res = await modeApiRequest("POST", "/api/factory/customer-proformas/bulk", data);
       return await res.json();
     },
@@ -417,7 +417,7 @@ export default function FactoryLocationInventory() {
   });
 
   const replaceLinesMutation = useMutation({
-    mutationFn: async (data: { id: number; lines: unknown[] }) => {
+    mutationFn: async (data: { id: number; lines: any[] }) => {
       const res = await modeApiRequest("PUT", `/api/factory/customer-proformas/${data.id}/replace-lines`, {
         lines: data.lines,
       });
@@ -514,7 +514,7 @@ export default function FactoryLocationInventory() {
       setProformaMode(true);
       fetch(`/api/factory/customer-proformas?customerId=${editCustId}`, { credentials: "include" })
         .then((r) => r.json())
-        .then((proformas: unknown[]) => {
+        .then((proformas: any[]) => {
           const found = proformas.find((p: any) => p.id === proformaId);
           if (found?.lines?.length) {
             setEditProformaLines(
@@ -540,7 +540,7 @@ export default function FactoryLocationInventory() {
     )
       return;
     const productByArticleCode = new Map<string, any>();
-    (inventoryData as unknown[]).forEach((prod: any) => {
+    (inventoryData as any[]).forEach((prod: any) => {
       productByArticleCode.set((prod.articleCode || "").toLowerCase(), prod);
     });
     const newSelections = new Map<number, ProformaSelection>();

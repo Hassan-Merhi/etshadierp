@@ -57,7 +57,7 @@ export function registerVoucherUpdateRoutes(app: Express) {
         if (existingVoucher.voucherType !== "Stock Transfer") {
           return res.status(403).json({ message: "Access denied: This resource is not available for POS users" });
         }
-        const updates: Partial<unknown> = {};
+        const updates: Partial<any> = {};
         if (req.body.voucherDate !== undefined) updates.voucherDate = req.body.voucherDate;
         if (Object.keys(updates).length > 0) {
           await db.update(vouchers).set(updates).where(eq(vouchers.id, id));
@@ -96,7 +96,7 @@ export function registerVoucherUpdateRoutes(app: Express) {
       // Update voucher and entries in a transaction
       await db.transaction(async (tx) => {
         // Update voucher header
-        const voucherUpdates: Partial<unknown> = {};
+        const voucherUpdates: Partial<any> = {};
         if (req.body.voucherDate !== undefined) voucherUpdates.voucherDate = req.body.voucherDate;
         if (req.body.description !== undefined) voucherUpdates.description = req.body.description;
         if (req.body.optional !== undefined) voucherUpdates.optional = req.body.optional;

@@ -72,7 +72,7 @@ export function RawStockImport() {
         const XLSX = await import("@/lib/excelHelper");
         const wb = await XLSX.read(evt.target?.result, { type: "binary" });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const data = XLSX.utils.sheet_to_json(ws) as unknown[];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
         const parsed: RawStockRow[] = data
           .map((row) => ({
             containerNumber: String(

@@ -25,7 +25,7 @@ import { usePosHandlers } from "./hooks/usePosHandlers";
 
 import { POS_COLUMNS, formatDisplayAmount } from "./utils/posCalculations";
 
-export default function POS({ posUser, editVoucherId }: { posUser?: unknown; editVoucherId?: string } = {}) {
+export default function POS({ posUser, editVoucherId }: { posUser?: any; editVoucherId?: string } = {}) {
   const { selectedLocation, setSelectedLocation } = useLocationContext();
   const { selectedCompany } = useCompany();
   const [_location, navigate] = useLocation();
@@ -730,7 +730,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: unknown; edi
         stockInventoryLoading={stockInventoryLoading}
         handleStockPrint={handleStockPrint}
         handleSendWhatsAppReport={handleSendWhatsAppReport}
-        stockInventory={(stockInventory as unknown[]).map((item: any) => ({
+        stockInventory={(stockInventory as any[]).map((item: any) => ({
           stockItemName: item.stockItemName,
           stockItemCode: item.stockItemCode,
           stock: parseFloat(item.quantity),

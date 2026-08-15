@@ -36,7 +36,7 @@ export default function OptionalVouchers() {
     isLoading,
     isError,
     error,
-  } = useQuery<unknown[]>({
+  } = useQuery<any[]>({
     queryKey: ["/api/vouchers/optional", typeFilter, startDate, endDate, search],
     queryFn: async () => {
       const res = await apiRequest("GET", queryUrl);

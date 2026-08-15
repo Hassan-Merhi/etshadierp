@@ -59,7 +59,7 @@ export async function buildLoadingSummary(invoiceId: number, companyId: number, 
   const _invoiceBalesRawResult = await db.execute(
     sql`SELECT * FROM customer_order_bales WHERE order_id = ${invoiceId}`
   );
-  const _invoiceBalesRows: unknown[] = resultRows(_invoiceBalesRawResult);
+  const _invoiceBalesRows: any[] = resultRows(_invoiceBalesRawResult);
   const invoiceBalesRaw = _invoiceBalesRows.map((r) => ({
     id: r.id as number,
     baleId: r.bale_id as number,

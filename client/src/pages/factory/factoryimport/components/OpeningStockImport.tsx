@@ -20,7 +20,7 @@ import { ImportModeChooser } from "./ImportModeChooser";
 export function OpeningStockImport() {
   const [mode, setMode] = useState<"choose" | "csv">("choose");
   const [csvData, setCsvData] = useState<OpeningStockRow[]>([]);
-  const [result, setResult] = useState<{ imported: number; errors: string[]; recalcStats?: unknown } | null>(null);
+  const [result, setResult] = useState<{ imported: number; errors: string[]; recalcStats?: any } | null>(null);
   const { toast } = useToast();
 
   const importMutation = useMutation({
@@ -43,7 +43,7 @@ export function OpeningStockImport() {
     if (!file) return;
     const ext = file.name.split(".").pop()?.toLowerCase();
 
-    const parse = (rows: unknown[]) => {
+    const parse = (rows: any[]) => {
       const parsed: OpeningStockRow[] = rows
         .map((row) => ({
           supplier: String(row.supplier || row.Supplier || "").trim(),
@@ -67,7 +67,7 @@ export function OpeningStockImport() {
       Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
-        complete: (results) => parse(results.data as unknown[]),
+        complete: (results) => parse(results.data as any[]),
       });
     } else if (ext === "xlsx" || ext === "xls") {
       const reader = new FileReader();
@@ -75,7 +75,7 @@ export function OpeningStockImport() {
         const XLSX = await import("@/lib/excelHelper");
         const wb = await XLSX.read(evt.target?.result, { type: "binary" });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        parse(XLSX.utils.sheet_to_json(ws) as unknown[]);
+        parse(XLSX.utils.sheet_to_json(ws) as any[]);
       };
       reader.readAsBinaryString(file);
     }

@@ -39,7 +39,7 @@ interface ChargeLine {
 interface SpOffloadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  container: unknown;
+  container: any;
   onSuccess?: () => void;
 }
 
@@ -54,17 +54,17 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
     enabled: open,
   });
 
-  const { data: ledgerAccounts = [] } = useQuery<unknown[]>({
+  const { data: ledgerAccounts = [] } = useQuery<any[]>({
     queryKey: ["/api/ledger-accounts"],
     enabled: open,
   });
 
-  const { data: locationsList = [] } = useQuery<unknown[]>({
+  const { data: locationsList = [] } = useQuery<any[]>({
     queryKey: ["/api/locations"],
     enabled: open,
   });
 
-  const { data: parentAgents = [] } = useQuery<unknown[]>({
+  const { data: parentAgents = [] } = useQuery<any[]>({
     queryKey: ["/api/sp/parent-agents"],
     enabled: open,
   });
@@ -172,7 +172,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                 <SelectValue placeholder="Select a location…" />
               </SelectTrigger>
               <SelectContent>
-                {(locationsList as unknown[]).map((l: any) => (
+                {(locationsList as any[]).map((l: any) => (
                   <SelectItem key={l.id} value={String(l.id)}>
                     {l.name}
                   </SelectItem>
@@ -314,7 +314,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                           <SelectValue placeholder="Select account" />
                         </SelectTrigger>
                         <SelectContent>
-                          {(ledgerAccounts as unknown[]).map((a: any) => (
+                          {(ledgerAccounts as any[]).map((a: any) => (
                             <SelectItem key={a.id} value={String(a.id)}>
                               {a.code} — {a.name}
                             </SelectItem>
@@ -330,7 +330,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                           <SelectValue placeholder="Select agent" />
                         </SelectTrigger>
                         <SelectContent>
-                          {(parentAgents as unknown[]).map((a: any) => (
+                          {(parentAgents as any[]).map((a: any) => (
                             <SelectItem key={a.ledger_account_id} value={String(a.ledger_account_id)}>
                               {a.account_name}
                             </SelectItem>
@@ -467,11 +467,11 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                     const b = (statusData?.bankAccounts || []).find((x: any) => String(x.id) === c.creditBankAccountId);
                     creditLabel = b ? b.bankName : "Bank Account";
                   } else if (c.chargeType === "unpaid_payable" || c.chargeType === "other") {
-                    const a = (ledgerAccounts as unknown[]).find((x: any) => String(x.id) === c.creditLedgerAccountId);
+                    const a = (ledgerAccounts as any[]).find((x: any) => String(x.id) === c.creditLedgerAccountId);
                     creditLabel = a ? `${a.name}` : "Ledger Account";
                   } else if (c.chargeType === "parent_agent") {
                     creditLabel = prepaidExpAcct?.name ?? "Prepaid Expenses";
-                    const agent = (parentAgents as unknown[]).find(
+                    const agent = (parentAgents as any[]).find(
                       (x: any) => String(x.ledger_account_id) === c.parentAgentAccountId
                     );
                     if (agent) creditLabel += ` (via ${agent.account_name})`;
@@ -511,7 +511,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                     <span className="text-right">Dr / Cr</span>
                   </div>
                   {agentCharges.map((c, idx) => {
-                    const agent = (parentAgents as unknown[]).find(
+                    const agent = (parentAgents as any[]).find(
                       (x: any) => String(x.ledger_account_id) === c.parentAgentAccountId
                     );
                     return (

@@ -28,7 +28,7 @@ interface Pagination {
 }
 
 interface StatementPage {
-  transactions: unknown[];
+  transactions: any[];
   preNetBalance: number;
   periodPreNetBalance: number;
   periodDebitTotal: number;
@@ -89,7 +89,7 @@ function exposePaginationHeaders(res: Response, page: StatementPage): void {
 }
 
 function buildPageResponse(
-  rows: unknown[],
+  rows: any[],
   summary: any,
   precedingPageNet: number,
   prePeriodNet: number,

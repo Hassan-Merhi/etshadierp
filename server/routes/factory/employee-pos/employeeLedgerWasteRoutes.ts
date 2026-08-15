@@ -540,7 +540,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
       `);
       const linkedBales = Array.isArray(linkedBalesRaw) ? linkedBalesRaw : resultRows(linkedBalesRaw);
 
-      const balesByDispatch = new Map<number, unknown[]>();
+      const balesByDispatch = new Map<number, any[]>();
       for (const bale of linkedBales) {
         const did = Number(bale.wasteDispatchId);
         if (!balesByDispatch.has(did)) balesByDispatch.set(did, []);

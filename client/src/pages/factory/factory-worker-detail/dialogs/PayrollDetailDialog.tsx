@@ -18,10 +18,10 @@ export function PayrollDetailDialog({
   payrollDetailLoading,
   setDetailPayrollId,
 }: {
-  detailPayrollId: unknown;
-  payrollDetail: unknown;
-  payrollDetailLoading: unknown;
-  setDetailPayrollId: unknown;
+  detailPayrollId: any;
+  payrollDetail: any;
+  payrollDetailLoading: any;
+  setDetailPayrollId: any;
 }) {
   return (
     <Dialog

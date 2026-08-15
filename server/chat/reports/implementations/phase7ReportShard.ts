@@ -32,7 +32,7 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         LIMIT ${rowLimit}
       `);
       const actionMap: Record<string, number> = {};
-      const tableRows7 = (rows.rows as unknown[]).map((r) => {
+      const tableRows7 = (rows.rows as any[]).map((r) => {
         actionMap[r.action] = (actionMap[r.action] || 0) + 1;
         return [String(r.created_at).slice(0, 16), r.username, r.action, r.table_name, r.record_identifier || "—"];
       });
@@ -72,7 +72,7 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY ba.name
       `);
       let grandBalance = 0;
-      const tableRows7 = (rows.rows as unknown[]).map((r) => {
+      const tableRows7 = (rows.rows as any[]).map((r) => {
         const ob = parseFloat(r.opening_balance || "0") * (r.opening_balance_side === "Cr" ? -1 : 1);
         const dr = parseFloat(r.total_dr || "0");
         const cr = parseFloat(r.total_cr || "0");
@@ -132,7 +132,7 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       `);
       let totalProd = 0,
         totalCons = 0;
-      const tableRows7 = (rows.rows as unknown[]).map((r) => {
+      const tableRows7 = (rows.rows as any[]).map((r) => {
         const qty = parseFloat(r.qty || "0");
         const amt = parseFloat(r.total_amount || "0");
         if (r.adjustment_type === "Production") totalProd += amt;
@@ -204,7 +204,7 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY cte.event_time DESC
         LIMIT ${rowLimit}
       `);
-      const tableRows7 = (evtRows.rows as unknown[]).map((r) => [
+      const tableRows7 = (evtRows.rows as any[]).map((r) => [
         r.event_time ? String(r.event_time).slice(0, 16) : "—",
         r.event_status || "—",
         r.event_location || "—",
@@ -248,7 +248,7 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         LIMIT ${rowLimit}
       `);
       let totalOutstanding = 0;
-      const tableRows7 = (rows.rows as unknown[]).map((r) => {
+      const tableRows7 = (rows.rows as any[]).map((r) => {
         const outstanding = parseFloat(r.outstanding || "0");
         totalOutstanding += outstanding;
         return [
@@ -315,7 +315,7 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       let totalValue = 0,
         totalKg = 0;
       const statusCounts: Record<string, number> = {};
-      const tableRows7 = (rows.rows as unknown[]).map((r) => {
+      const tableRows7 = (rows.rows as any[]).map((r) => {
         const val = parseFloat(r.grand_total || "0");
         const kg = parseFloat(r.total_kg || "0");
         totalValue += val;
@@ -372,7 +372,7 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         LIMIT ${rowLimit}
       `);
       let grandIncome = 0;
-      const tableRows7 = (rows.rows as unknown[]).map((r) => {
+      const tableRows7 = (rows.rows as any[]).map((r) => {
         const income = parseFloat(r.net_income || "0");
         grandIncome += income;
         return [r.name, r.account_type, fmt(income)];
@@ -489,7 +489,7 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       `);
       let grandValue = 0,
         grandItems = 0;
-      const tableRows7 = (rows.rows as unknown[]).map((r) => {
+      const tableRows7 = (rows.rows as any[]).map((r) => {
         const val = parseFloat(r.total_value || "0");
         const items = parseInt(r.item_count || "0");
         grandValue += val;
@@ -542,7 +542,7 @@ async function runPhase7Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         totCost = 0,
         totProfit = 0;
       const qLabels = ["Q1 (Jan-Mar)", "Q2 (Apr-Jun)", "Q3 (Jul-Sep)", "Q4 (Oct-Dec)"];
-      const tableRows7 = (rows.rows as unknown[]).map((r) => {
+      const tableRows7 = (rows.rows as any[]).map((r) => {
         const q = parseInt(r.quarter || "1");
         const rev = parseFloat(r.revenue || "0");
         const cost = parseFloat(r.cost || "0");

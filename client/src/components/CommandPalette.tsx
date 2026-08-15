@@ -49,7 +49,7 @@ interface CommandPaletteProps {
   hasFactoryAccess?: boolean;
   hasPropertiesAccess?: boolean;
   isAdminOwner?: boolean;
-  user?: unknown;
+  user?: any;
 }
 
 interface PageEntry {

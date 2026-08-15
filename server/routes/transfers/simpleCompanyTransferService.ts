@@ -32,7 +32,7 @@ function buildTransferReversalRequest(input: {
   transferId: number;
   side: TransferSide;
   transferDate: string;
-  snapshot: { voucher: unknown; entries: unknown[] };
+  snapshot: { voucher: any; entries: any[] };
   actor: PostingActor;
 }): CentralPostingRequest {
   const { transferId, side, transferDate, snapshot, actor } = input;

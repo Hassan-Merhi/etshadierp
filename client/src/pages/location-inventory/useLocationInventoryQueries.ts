@@ -22,7 +22,7 @@ interface InventoryItem {
 
 interface UseLocationInventoryQueriesParams {
   waGroupDialogOpen: boolean;
-  posUser?: unknown;
+  posUser?: any;
   companyId: number | undefined;
   selectedLocationLocal: Location | null;
   showZeroStock: boolean;
@@ -169,7 +169,7 @@ export function useLocationInventoryQueries({
   // queryFn always resolves to a flat array of inventory rows.
   const allInventoryData = Array.isArray(allInventoryRaw) ? allInventoryRaw : [];
 
-  const { data: allNegativeStock = [], isLoading: negativeStockLoading } = useQuery<unknown[]>({
+  const { data: allNegativeStock = [], isLoading: negativeStockLoading } = useQuery<any[]>({
     queryKey: companyId ? ["/api/inventory/negative", companyId] : [],
     queryFn: async () => {
       const res = await fetch("/api/inventory/negative", { credentials: "include" });

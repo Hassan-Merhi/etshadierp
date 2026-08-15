@@ -20,7 +20,7 @@ import { InlineRoleEditor } from "./InlineRoleEditor";
 
 interface UserRolesCardProps {
   userId: string;
-  companies: unknown[];
+  companies: any[];
 }
 
 export function UserRolesCard({ userId, companies }: UserRolesCardProps) {
@@ -28,7 +28,7 @@ export function UserRolesCard({ userId, companies }: UserRolesCardProps) {
   const [activeEditorRoleId, setActiveEditorRoleId] = useState<number | "new" | null>(null);
   const [roleToDelete, setRoleToDelete] = useState<any>(null);
 
-  const { data: companyRoles = [] } = useQuery<unknown[]>({
+  const { data: companyRoles = [] } = useQuery<any[]>({
     queryKey: [`/api/users/${userId}/company-roles`],
     enabled: !!userId,
   });
@@ -49,8 +49,8 @@ export function UserRolesCard({ userId, companies }: UserRolesCardProps) {
       const results = await Promise.all(
         posCompanyIds.map(async (cid) => {
           const res = await fetch(`/api/locations?companyId=${cid}`, { credentials: "include" });
-          if (!res.ok) return [] as unknown[];
-          return res.json() as Promise<unknown[]>;
+          if (!res.ok) return [] as any[];
+          return res.json() as Promise<any[]>;
         })
       );
       const map: Record<number, string> = {};

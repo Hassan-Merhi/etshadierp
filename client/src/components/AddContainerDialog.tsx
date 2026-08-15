@@ -71,7 +71,7 @@ interface AddContainerDialogProps {
 function ErpContainerForm({ onOpenChange }: { onOpenChange: (open: boolean) => void }) {
   const { toast } = useToast();
 
-  const { data: suppliers } = useQuery<unknown[]>({
+  const { data: suppliers } = useQuery<any[]>({
     queryKey: ["/api/suppliers"],
   });
 

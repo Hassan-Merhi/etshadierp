@@ -555,7 +555,7 @@ export async function preparePostOffloadImpactPreview(input: {
     version: 1,
     createdAt: new Date(`${transactionDate}T00:00:00.000Z`),
     updatedAt: new Date(`${transactionDate}T00:00:00.000Z`),
-  })) as unknown[];
+  })) as any[];
 
   const currentCost = computeCorrectContainerCost(
     state.container,

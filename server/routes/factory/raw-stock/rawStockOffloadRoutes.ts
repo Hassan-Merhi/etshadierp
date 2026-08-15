@@ -390,7 +390,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
           .where(eq(factoryContainers.id, containerId));
 
         // 6. Additional charges INSERTs
-        const insertedAdditionalCharges: unknown[] = [];
+        const insertedAdditionalCharges: any[] = [];
         if (additionalChargesArr.length > 0) {
           for (const charge of additionalChargesArr) {
             if (parseFloat(charge.amount || "0") > 0) {

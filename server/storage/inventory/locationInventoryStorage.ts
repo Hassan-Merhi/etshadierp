@@ -52,7 +52,7 @@ export async function getLocationByCode(code: string, companyId: number): Promis
 // Location Inventory
 // ---------------------------------------------------------------------------
 
-export async function getLocationInventory(companyId: number, locationId: number, includeZero = false): Promise<unknown[]> {
+export async function getLocationInventory(companyId: number, locationId: number, includeZero = false): Promise<any[]> {
   if (!includeZero) {
     // Use pool.query() directly — bypasses Drizzle result-processing layer.
     const qr = await pool.query(
@@ -161,7 +161,7 @@ export async function getLocationInventory(companyId: number, locationId: number
   return result;
 }
 
-export async function getCompanyInventory(companyId: number): Promise<unknown[]> {
+export async function getCompanyInventory(companyId: number): Promise<any[]> {
   return await db
     .select({
       inventoryId: schema.inventory.id,
@@ -201,7 +201,7 @@ export async function getCompanyInventory(companyId: number): Promise<unknown[]>
 // Stock Queries
 // ---------------------------------------------------------------------------
 
-export async function getInventoryByStockItem(stockItemId: number, companyId: number): Promise<unknown[]> {
+export async function getInventoryByStockItem(stockItemId: number, companyId: number): Promise<any[]> {
   return await db
     .select({
       locationId: schema.inventory.locationId,
@@ -249,7 +249,7 @@ export async function getTotalInventoryValue(companyId: number): Promise<number>
   return result ? parseFloat(result.total) : 0;
 }
 
-export async function getLowStockItems(companyId: number, threshold: number = 10): Promise<unknown[]> {
+export async function getLowStockItems(companyId: number, threshold: number = 10): Promise<any[]> {
   return await db
     .select({
       stockItemId: schema.inventory.stockItemId,
@@ -267,7 +267,7 @@ export async function getLowStockItems(companyId: number, threshold: number = 10
     );
 }
 
-export async function getInventorySummary(companyId: number): Promise<unknown[]> {
+export async function getInventorySummary(companyId: number): Promise<any[]> {
   return await db
     .select({
       stockItemId: schema.inventory.stockItemId,
@@ -283,7 +283,7 @@ export async function getInventorySummary(companyId: number): Promise<unknown[]>
     .groupBy(schema.inventory.stockItemId, schema.stockItems.name, schema.stockItems.code);
 }
 
-export async function getStockItemsWithInventory(companyId: number, locationId?: number): Promise<unknown[]> {
+export async function getStockItemsWithInventory(companyId: number, locationId?: number): Promise<any[]> {
   const conditions = [eq(schema.inventory.companyId, companyId)];
   if (locationId) conditions.push(eq(schema.inventory.locationId, locationId));
   return await db

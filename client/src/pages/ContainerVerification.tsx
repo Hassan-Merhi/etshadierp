@@ -71,11 +71,11 @@ export default function ContainerVerification() {
     enabled: !!containerId,
   });
 
-  const { data: suppliers = [] } = useQuery<unknown[]>({
+  const { data: suppliers = [] } = useQuery<any[]>({
     queryKey: ["/api/suppliers"],
   });
 
-  const { data: proformas = [] } = useQuery<unknown[]>({
+  const { data: proformas = [] } = useQuery<any[]>({
     queryKey: ["/api/suppliers", selectedSupplierId, "proformas"],
     queryFn: async () => {
       if (!selectedSupplierId) return [];
@@ -114,7 +114,7 @@ export default function ContainerVerification() {
   });
 
   const updateItemMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: unknown }) => {
+    mutationFn: async ({ id, data }: { id: number; data: any }) => {
       const res = await apiRequest("PATCH", `/api/container-loaded-items/${id}`, data);
       return res.json();
     },
@@ -164,7 +164,7 @@ export default function ContainerVerification() {
   });
 
   const importMutation = useMutation({
-    mutationFn: async (items: unknown[]) => {
+    mutationFn: async (items: any[]) => {
       const res = await apiRequest("POST", `/api/containers/${containerId}/import-loaded-items`, { items });
       return res.json();
     },

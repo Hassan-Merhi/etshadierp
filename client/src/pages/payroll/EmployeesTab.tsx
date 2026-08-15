@@ -35,7 +35,7 @@ interface EmployeesTabProps {
   setCreateEmployeeDialogOpen: (val: boolean) => void;
   employeeStaff: (Employee & { calculatedBalance: string })[];
   filteredEmployeeStaff: (Employee & { calculatedBalance: string })[];
-  pendingBonuses: Record<number, unknown>;
+  pendingBonuses: Record<number, any>;
   setBulkDepositSelections: (val: Record<number, boolean>) => void;
   setBulkDepositDialogOpen: (val: boolean) => void;
   setBulkBonusAmounts: (val: Record<number, string>) => void;

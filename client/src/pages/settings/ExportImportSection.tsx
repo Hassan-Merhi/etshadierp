@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Loader2, Download, Upload } from "lucide-react";
 
-export function ExportImportSection({ companies }: { companies: unknown[] }) {
+export function ExportImportSection({ companies }: { companies: any[] }) {
   const { toast } = useToast();
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);

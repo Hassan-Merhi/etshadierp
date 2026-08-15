@@ -21,7 +21,7 @@ type EntryRow = {
 };
 
 type Resolver = {
-  resolve: (rows: unknown[]) => void;
+  resolve: (rows: any[]) => void;
   reject: (error: unknown) => void;
 };
 
@@ -37,7 +37,7 @@ function companyKey(companyId?: number): string {
   return companyId ? `company:${companyId}` : "all-companies";
 }
 
-function stripInternalSupplierId(row: EntryRow): unknown {
+function stripInternalSupplierId(row: EntryRow): any {
   const { __supplierId: _supplierId, ...entry } = row;
   return entry;
 }
@@ -54,7 +54,7 @@ async function flushBatch(key: string, companyId: number | undefined, batch: Pen
   }
 
   try {
-    const params: unknown[] = [supplierIds];
+    const params: any[] = [supplierIds];
     let companyFilter = "";
     if (companyId) {
       params.push(companyId);
@@ -90,7 +90,7 @@ async function flushBatch(key: string, companyId: number | undefined, batch: Pen
       params
     );
 
-    const rowsBySupplier = new Map<number, unknown[]>();
+    const rowsBySupplier = new Map<number, any[]>();
     for (const row of result.rows as EntryRow[]) {
       const supplierId = Number(row.__supplierId);
       if (!rowsBySupplier.has(supplierId)) rowsBySupplier.set(supplierId, []);
@@ -114,7 +114,7 @@ async function flushBatch(key: string, companyId: number | undefined, batch: Pen
  * balances with Promise.all, so the previous one-query-per-supplier pattern is
  * reduced to one bounded query without changing the returned entry contract.
  */
-export function getVoucherEntriesBySupplierBatched(supplierId: number, companyId?: number): Promise<unknown[]> {
+export function getVoucherEntriesBySupplierBatched(supplierId: number, companyId?: number): Promise<any[]> {
   const key = companyKey(companyId);
   let batch = pendingByCompany.get(key);
   if (!batch) {
@@ -128,7 +128,7 @@ export function getVoucherEntriesBySupplierBatched(supplierId: number, companyId
 
   batch.supplierIds.add(supplierId);
 
-  const promise = new Promise<unknown[]>((resolve, reject) => {
+  const promise = new Promise<any[]>((resolve, reject) => {
     const resolvers = batch!.resolvers.get(supplierId) || [];
     resolvers.push({ resolve, reject });
     batch!.resolvers.set(supplierId, resolvers);

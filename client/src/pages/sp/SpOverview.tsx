@@ -93,7 +93,7 @@ export default function SpOverview() {
   const role = currentUser?.currentRole ?? currentUser?.role ?? "";
   const canReverse = role === "Admin" || role === "Developer";
 
-  const { data: sales = [], isLoading: salesLoading } = useQuery<unknown[]>({
+  const { data: sales = [], isLoading: salesLoading } = useQuery<any[]>({
     queryKey: ["/api/sp/sales"],
   });
 

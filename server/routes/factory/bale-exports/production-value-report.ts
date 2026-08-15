@@ -48,7 +48,7 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
       // ── Build date range conditions ──
       // Use COALESCE(stock_entry_date, DATE(created_at)) so bales without a stock_entry_date
       // (e.g. wipers/garbage entered via stock import) are still included using their creation date.
-      const baleConditions: unknown[] = [
+      const baleConditions: any[] = [
         eq(factoryBales.companyId, companyId),
         // Exclude deleted/removed bales and REPACKED originals.
         // REPACKED: when a bale is repacked a new IN_STOCK bale is created with the same
@@ -73,7 +73,7 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
       // that leftover and inflate the raw-material total.
       // Also exclude soft-deleted batches (deletedAt IS NOT NULL): their bales are deleted
       // and excluded from Productions, so counting them here would widen the gap unfairly.
-      const mixBatchConditions: unknown[] = [
+      const mixBatchConditions: any[] = [
         eq(factoryMixBatches.companyId, companyId),
         sql`${factoryMixBatches.carryForwardFromId} IS NULL`,
         isNull(factoryMixBatches.deletedAt),
@@ -266,7 +266,7 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
       // Mirrors GET /api/factory/mix-batches and EditMixBatchDialog: never uses the stored
       // batch cost fields directly; supplier-source rows always use the current locked USD rate.
       const reportBatchIds = mixBatchRows.map((r) => r.id);
-      let mixSourceRows: unknown[] = [];
+      let mixSourceRows: any[] = [];
       if (reportBatchIds.length > 0) {
         mixSourceRows = await db
           .select()
@@ -285,7 +285,7 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
       }
 
       // Group sources by batch
-      const reportSourcesByBatch = new Map<number, unknown[]>();
+      const reportSourcesByBatch = new Map<number, any[]>();
       for (const src of mixSourceRows) {
         if (!reportSourcesByBatch.has(src.mixBatchId)) reportSourcesByBatch.set(src.mixBatchId, []);
         reportSourcesByBatch.get(src.mixBatchId)!.push(src);
@@ -454,7 +454,7 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
       type SupDay = { date: string; supplierName: string; totalKg: number; totalCost: number };
       const supDayMap = new Map<string, SupDay>();
 
-      for (const batch of mixBatchRows as unknown[]) {
+      for (const batch of mixBatchRows as any[]) {
         const batchDate: string = batch.batchDate
           ? String(batch.batchDate).slice(0, 10)
           : String(batch.createdAt).slice(0, 10);

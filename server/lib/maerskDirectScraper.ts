@@ -70,7 +70,7 @@ export function isMaerskDirectScraperAvailable(): boolean {
 let _sharedBrowser: any = null;
 let _stealthRegistered = false;
 
-async function getSharedBrowser(): Promise<unknown> {
+async function getSharedBrowser(): Promise<any> {
   // If we already have a live browser, verify it's still responsive
   if (_sharedBrowser) {
     try {
@@ -235,7 +235,7 @@ const normContainer = (v: unknown): string =>
  * found — never blindly trusts index 0, since a response can carry several
  * containers (e.g. a bill-of-lading lookup) and [0] may be a different box.
  */
-function pickContainer(list: unknown[], wantContainer?: string): unknown {
+function pickContainer(list: any[], wantContainer?: string): any {
   if (!Array.isArray(list) || list.length === 0) return null;
   const wanted = wantContainer ? normContainer(wantContainer) : "";
   if (wanted) {
@@ -260,13 +260,13 @@ export function extractFromJson(
   synergy: boolean;
 } {
   if (!data || typeof data !== "object") return { events: [], eta: null, latestStatus: null, synergy: false };
-  const d = data as Record<string, unknown>;
+  const d = data as Record<string, any>;
 
   // ── Maersk "synergy" tracking API format ─────────────────────────────────
-  const synergyContainers: unknown[] = d.containers ?? [];
+  const synergyContainers: any[] = d.containers ?? [];
   if (synergyContainers.length > 0) {
     const c = pickContainer(synergyContainers, wantContainer);
-    const locations: unknown[] = c.locations ?? [];
+    const locations: any[] = c.locations ?? [];
 
     if (locations.length > 0) {
       const allEvents: TrackingEvent[] = [];
@@ -298,7 +298,7 @@ export function extractFromJson(
         // expected events. Do NOT fall back to earlier transit ports — those
         // expected events are departures, not the destination ETA.
         const lastLoc = locations[locations.length - 1];
-        const lastLocEvents: unknown[] = lastLoc?.events ?? [];
+        const lastLocEvents: any[] = lastLoc?.events ?? [];
 
         // Priority 1: expected Arrived / Discharged event at the last location
         const arrivalEv = lastLocEvents.find(
@@ -345,7 +345,7 @@ export function extractFromJson(
   }
 
   // ── Generic Maersk API format ─────────────────────────────────────────────
-  const containers: unknown[] = d.shipment?.containers ?? d.data?.containers ?? d.trackingData?.containers ?? [];
+  const containers: any[] = d.shipment?.containers ?? d.data?.containers ?? d.trackingData?.containers ?? [];
 
   let rawEvents: unknown[] = [];
   let etaRaw: unknown = null;
@@ -356,7 +356,7 @@ export function extractFromJson(
 
     // portCalls: destination is the last entry or the one flagged isDestination.
     // NEVER use portCalls[0] — that is the origin.
-    const cPortCalls: unknown[] = Array.isArray(c.portCalls) ? c.portCalls : [];
+    const cPortCalls: any[] = Array.isArray(c.portCalls) ? c.portCalls : [];
     const cDestCall =
       cPortCalls.find((p) => p.isDestination === true || p.isDestination === "true") ??
       (cPortCalls.length > 0 ? cPortCalls[cPortCalls.length - 1] : null);
@@ -375,7 +375,7 @@ export function extractFromJson(
   }
   if (!etaRaw) {
     // Top-level portCalls (some API shapes put them here)
-    const dPortCalls: unknown[] = Array.isArray(d.portCalls) ? d.portCalls : [];
+    const dPortCalls: any[] = Array.isArray(d.portCalls) ? d.portCalls : [];
     const dDestCall =
       dPortCalls.find((p) => p.isDestination === true || p.isDestination === "true") ??
       (dPortCalls.length > 0 ? dPortCalls[dPortCalls.length - 1] : null);

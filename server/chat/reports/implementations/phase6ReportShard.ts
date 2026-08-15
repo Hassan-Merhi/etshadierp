@@ -40,7 +40,7 @@ async function runPhase6Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         LIMIT ${rowLimit}
       `);
       let totalBalance = 0;
-      const tableRows6 = (rows.rows as unknown[]).map((r) => {
+      const tableRows6 = (rows.rows as any[]).map((r) => {
         const bal = parseFloat(r.net_balance || "0");
         totalBalance += Math.max(bal, 0);
         const balLabel = bal >= 0 ? fmt(bal) + " Dr" : fmt(Math.abs(bal)) + " Cr";
@@ -82,7 +82,7 @@ async function runPhase6Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY total_ordered DESC
         LIMIT ${rowLimit}
       `);
-      const tableRows6 = (rows.rows as unknown[]).map((r) => [
+      const tableRows6 = (rows.rows as any[]).map((r) => [
         r.code || "—",
         r.legal_name,
         r.email || "—",
@@ -156,7 +156,7 @@ async function runPhase6Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       `);
       let totalQty = 0,
         totalVal = 0;
-      const tableRows6 = (invRows.rows as unknown[]).map((r) => {
+      const tableRows6 = (invRows.rows as any[]).map((r) => {
         const qty = parseFloat(r.qty || "0");
         const val = parseFloat(r.total_value || "0");
         totalQty += qty;
@@ -207,7 +207,7 @@ async function runPhase6Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       let totWeight = 0,
         totUsed = 0,
         totCost = 0;
-      const tableRows6 = (rows.rows as unknown[]).map((r) => {
+      const tableRows6 = (rows.rows as any[]).map((r) => {
         const totalKg = parseFloat(r.total_kg || "0");
         const usedKg = parseFloat(r.used_kg || "0");
         const remainKg = totalKg - usedKg;
@@ -278,7 +278,7 @@ async function runPhase6Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY cp.is_active DESC, cu.legal_name
         LIMIT ${rowLimit}
       `);
-      const tableRows6 = (rows.rows as unknown[]).map((r) => [
+      const tableRows6 = (rows.rows as any[]).map((r) => [
         r.proforma_name,
         r.customer,
         String(r.line_count),
@@ -316,7 +316,7 @@ async function runPhase6Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY sp.created_at DESC
         LIMIT ${rowLimit}
       `);
-      const tableRows6 = (rows.rows as unknown[]).map((r) => [
+      const tableRows6 = (rows.rows as any[]).map((r) => [
         r.reference,
         r.supplier,
         String(r.line_count),
@@ -356,7 +356,7 @@ async function runPhase6Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       let totRev = 0,
         totCost = 0,
         totProfit = 0;
-      const tableRows6 = (rows.rows as unknown[]).map((r) => {
+      const tableRows6 = (rows.rows as any[]).map((r) => {
         const rev = parseFloat(r.revenue || "0");
         const cost = parseFloat(r.cost || "0");
         const profit6 = parseFloat(r.profit || "0");
@@ -412,7 +412,7 @@ async function runPhase6Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         LIMIT ${rowLimit}
       `);
       let grandItems = 0;
-      const tableRows6 = (rows.rows as unknown[]).map((r) => {
+      const tableRows6 = (rows.rows as any[]).map((r) => {
         const lt = parseFloat(r.line_total || "0");
         grandItems += lt;
         return [
@@ -456,7 +456,7 @@ async function runPhase6Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       `);
       let totalSalary = 0,
         totalBalance = 0;
-      const tableRows6 = (rows.rows as unknown[]).map((r) => {
+      const tableRows6 = (rows.rows as any[]).map((r) => {
         const sal = parseFloat(r.monthly_salary || "0");
         const bal = parseFloat(r.current_balance || "0");
         totalSalary += sal;
@@ -513,7 +513,7 @@ async function runPhase6Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         LIMIT ${rowLimit}
       `);
       const tableRows6: string[][] = [];
-      for (const r of rows.rows as unknown[]) {
+      for (const r of rows.rows as any[]) {
         const entries = typeof r.entries === "string" ? JSON.parse(r.entries) : r.entries;
         const firstEntry = entries?.[0];
         tableRows6.push([

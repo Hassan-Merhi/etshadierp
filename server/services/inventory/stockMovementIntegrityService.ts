@@ -51,24 +51,24 @@ export interface StockMovementResult {
 
 export interface StockMovementAdapter {
   findExisting(input: {
-    tx: unknown;
+    tx: any;
     companyId: number;
     source: StockMovementSourceIdentity;
   }): Promise<StockMovementResult | null>;
   validateOwnership(input: {
-    tx: unknown;
+    tx: any;
     companyId: number;
     stockItemId: number;
     locationIds: number[];
   }): Promise<void>;
   lockBalances(input: {
-    tx: unknown;
+    tx: any;
     companyId: number;
     stockItemId: number;
     locationIds: number[];
   }): Promise<Record<number, string>>;
   appendMovements(input: {
-    tx: unknown;
+    tx: any;
     request: StockMovementRequest;
     rows: Array<{
       locationId: number;
@@ -77,13 +77,13 @@ export interface StockMovementAdapter {
     }>;
   }): Promise<StockMovementRecord[]>;
   recordIdempotency(input: {
-    tx: unknown;
+    tx: any;
     companyId: number;
     source: StockMovementSourceIdentity;
     movementIds: number[];
   }): Promise<void>;
   recordAudit(input: {
-    tx: unknown;
+    tx: any;
     request: StockMovementRequest;
     movementIds: number[];
     quantity: string;

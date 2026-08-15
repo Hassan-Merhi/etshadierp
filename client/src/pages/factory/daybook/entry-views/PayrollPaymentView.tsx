@@ -16,11 +16,11 @@ export function PayrollPaymentView({
   badgeVariant,
   badgeClass,
 }: {
-  entry: unknown;
-  payrollSummary: unknown;
-  formatDisplayDate: unknown;
-  badgeVariant: unknown;
-  badgeClass: unknown;
+  entry: any;
+  payrollSummary: any;
+  formatDisplayDate: any;
+  badgeVariant: any;
+  badgeClass: any;
 }) {
   const p = payrollSummary;
   const n = (v: any) => parseFloat(v || "0");

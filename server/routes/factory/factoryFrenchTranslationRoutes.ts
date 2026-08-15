@@ -197,7 +197,7 @@ export function registerFactoryFrenchTranslationRoutes(app: Express) {
             LEFT JOIN factory_categories c ON c.id = p.category_id AND c.company_id = p.company_id
             WHERE p.company_id = ${companyId} AND UPPER(BTRIM(p.article_code)) = ANY(${codes})
           `)
-        : { rows: [] as unknown[] };
+        : { rows: [] as any[] };
       const byCode = new Map(catalog.rows.map((row: any) => [row.articleCode, row]));
       const preview = rows.map((row) => {
         const match = byCode.get(String(row.articleCode));

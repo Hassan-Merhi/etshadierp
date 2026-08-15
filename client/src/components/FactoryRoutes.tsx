@@ -110,7 +110,7 @@ const FactoryInvoiceDetailBilingual = lazy(() => import("@/pages/factory/Factory
 const WasteDispatchPage = lazy(() => import("@/pages/factory/WasteDispatchOptimized"));
 
 interface FactoryRoutesProps {
-  user: unknown;
+  user: any;
   myAccess:
     | {
         fullAccess?: boolean;

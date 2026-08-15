@@ -192,7 +192,7 @@ export function registerFactoryWorkerImportExportRoutes(app: Express, requireAut
         // Parse xlsx
         const workbook = XLSX.readFile(req.file.path);
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rows: unknown[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+        const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
         fs.unlinkSync(req.file.path);
 
         // Case-insensitive column mapping

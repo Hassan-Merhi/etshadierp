@@ -36,11 +36,11 @@ export interface ToolDef {
 
 export interface ToolResult {
   ok: boolean;
-  data?: unknown;
+  data?: any;
   error?: string;
   requiresApproval?: boolean;
-  previewJson?: unknown;
-  payloadJson?: unknown;
+  previewJson?: any;
+  payloadJson?: any;
   actionType?: string;
   actionLabel?: string;
 }
@@ -184,7 +184,7 @@ export async function runTool(
   companyId: number,
   _userId: string,
   toolName: string,
-  params: Record<string, unknown>
+  params: Record<string, any>
 ): Promise<ToolResult> {
   try {
     switch (toolName) {

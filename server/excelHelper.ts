@@ -25,7 +25,7 @@ export async function readExcel(buffer: Buffer): Promise<ExcelWorkbook> {
   return { workbook, SheetNames, Sheets };
 }
 
-export function sheetToJson<T = Record<string, unknown>>(worksheet: ExcelJS.Worksheet): T[] {
+export function sheetToJson<T = Record<string, any>>(worksheet: ExcelJS.Worksheet): T[] {
   const data: T[] = [];
   const headers: string[] = [];
 
@@ -35,7 +35,7 @@ export function sheetToJson<T = Record<string, unknown>>(worksheet: ExcelJS.Work
         headers[colNumber - 1] = String(cell.value || "");
       });
     } else {
-      const rowData: Record<string, unknown> = {};
+      const rowData: Record<string, any> = {};
       row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
         const header = headers[colNumber - 1];
         if (header) {
@@ -59,7 +59,7 @@ export function createWorkbook(): ExcelJS.Workbook {
 
 export function jsonToSheet(
   workbook: ExcelJS.Workbook,
-  data: Record<string, unknown>[],
+  data: Record<string, any>[],
   sheetName: string
 ): ExcelJS.Worksheet {
   const worksheet = workbook.addWorksheet(sheetName);
@@ -71,7 +71,7 @@ export function jsonToSheet(
   return worksheet;
 }
 
-export function aoaToSheet(workbook: ExcelJS.Workbook, data: unknown[][], sheetName: string): ExcelJS.Worksheet {
+export function aoaToSheet(workbook: ExcelJS.Workbook, data: any[][], sheetName: string): ExcelJS.Worksheet {
   const worksheet = workbook.addWorksheet(sheetName);
   for (const row of data) worksheet.addRow(row);
   return worksheet;

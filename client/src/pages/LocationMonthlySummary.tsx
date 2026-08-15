@@ -79,7 +79,7 @@ interface LocationMonthlySummaryData {
   };
 }
 
-export default function LocationMonthlySummary({ posUser }: { posUser?: unknown } = {}) {
+export default function LocationMonthlySummary({ posUser }: { posUser?: any } = {}) {
   const { formatAmount } = useCurrencyContext();
   const { registerCursorNav, clearCursorNav } = useCursorNav();
   const params = useParams();
@@ -103,7 +103,7 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: unknown 
   const [detailMonthName, setDetailMonthName] = useState("");
   const [detailDirection, setDetailDirection] = useState<"in" | "out">("out");
 
-  const { data: detailData, isLoading: detailLoading } = useQuery<{ inTransactions: unknown[]; outTransactions: unknown[] }>({
+  const { data: detailData, isLoading: detailLoading } = useQuery<{ inTransactions: any[]; outTransactions: any[] }>({
     queryKey: [
       `/api/locations/${locationId}/stock-items/${stockItemId}/monthly-detail`,
       { year: detailYear, month: detailMonth },

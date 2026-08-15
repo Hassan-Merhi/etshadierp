@@ -8,7 +8,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import type { Location } from "./posTypes";
 
 interface PosCheckoutStripProps {
-  posUser: unknown;
+  posUser: any;
   activeLocation: Location | null;
   allLocations: Location[];
   posAssignedLocations: Location[];
@@ -27,9 +27,9 @@ interface PosCheckoutStripProps {
   setCustomerComboOpen: (v: boolean) => void;
   selectedCustomerId: string;
   setSelectedCustomerId: (id: string) => void;
-  customerAccounts: unknown[];
-  bankAccounts: unknown[];
-  cashLedgerAccounts: unknown[];
+  customerAccounts: any[];
+  bankAccounts: any[];
+  cashLedgerAccounts: any[];
   /** Supplier Partner sales support cash/bank settlement like normal ERP POS — no credit option. */
   isSpCompany?: boolean;
 }

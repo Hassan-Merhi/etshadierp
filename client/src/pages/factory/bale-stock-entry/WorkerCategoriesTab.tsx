@@ -27,11 +27,11 @@ export function WorkerCategoriesTab() {
   const [catName, setCatName] = useState("");
   const [catWorkerIds, setCatWorkerIds] = useState<number[]>([]);
 
-  const { data: catWorkers = [] } = useQuery<unknown[]>({
+  const { data: catWorkers = [] } = useQuery<any[]>({
     queryKey: ["/api/factory/workers"],
     queryFn: () => fetch("/api/factory/workers", { credentials: "include" }).then((r) => r.json()),
   });
-  const { data: workerCategories = [], isLoading: catsLoading } = useQuery<unknown[]>({
+  const { data: workerCategories = [], isLoading: catsLoading } = useQuery<any[]>({
     queryKey: ["/api/factory/worker-categories"],
     queryFn: () => fetch("/api/factory/worker-categories", { credentials: "include" }).then((r) => r.json()),
   });

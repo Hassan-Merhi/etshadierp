@@ -32,20 +32,20 @@ export function RemoveBalesDialog({
   setDeleteSupervisorPass,
   setDeleteSupervisorUser,
 }: {
-  deleteDialogOpen: unknown;
-  deleteProduct: unknown;
-  deleteQty: unknown;
-  deleteReason: unknown;
-  deleteSupervisorPass: unknown;
-  deleteSupervisorUser: unknown;
-  removeBalesMutation: unknown;
-  selectedLocation: unknown;
-  setDeleteDialogOpen: unknown;
-  setDeleteProduct: unknown;
-  setDeleteQty: unknown;
-  setDeleteReason: unknown;
-  setDeleteSupervisorPass: unknown;
-  setDeleteSupervisorUser: unknown;
+  deleteDialogOpen: any;
+  deleteProduct: any;
+  deleteQty: any;
+  deleteReason: any;
+  deleteSupervisorPass: any;
+  deleteSupervisorUser: any;
+  removeBalesMutation: any;
+  selectedLocation: any;
+  setDeleteDialogOpen: any;
+  setDeleteProduct: any;
+  setDeleteQty: any;
+  setDeleteReason: any;
+  setDeleteSupervisorPass: any;
+  setDeleteSupervisorUser: any;
 }) {
   return (
     <Dialog

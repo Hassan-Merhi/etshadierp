@@ -19,7 +19,7 @@ import { LocationWhatsappScheduleDialog } from "./LocationWhatsappScheduleDialog
 import { LocationWhatsappDeliveryHistoryDialog } from "./LocationWhatsappDeliveryHistoryDialog";
 
 interface LocationInventoryHeaderProps {
-  posUser?: unknown;
+  posUser?: any;
   showNegativeStock: boolean;
   setShowNegativeStock: (v: boolean) => void;
 }

@@ -104,7 +104,7 @@ export function useAccountBalance({
           fetch(`/api/accounts/supplier/${paymentAccountId}/transactions`, { credentials: "include" }),
         ]);
         const supplier = await supplierRes.json();
-        const transactions: unknown[] = await transRes.json();
+        const transactions: any[] = await transRes.json();
         const openingBalance = parseFloat(supplier.openingBalance || "0");
         const currMap = new Map<string, number>();
         transactions.forEach((t) => {
@@ -126,7 +126,7 @@ export function useAccountBalance({
         });
         if (!res.ok) return null;
         const data = await res.json();
-        const ledgers: unknown[] = data.currencyLedgers || [];
+        const ledgers: any[] = data.currencyLedgers || [];
         if (ledgers.length <= 1) return null;
         return ledgers
           .map((section) => ({

@@ -27,7 +27,7 @@ export function registerBalesExportRoutes(app: Express) {
       const { date } = req.query;
       if (!date) return res.status(400).json({ message: "date query parameter is required (YYYY-MM-DD)" });
 
-      const conditions: unknown[] = [
+      const conditions: any[] = [
         eq(factoryBales.companyId, companyId),
         sql`${factoryBales.finalizedAt}::date = ${date}`,
       ];
@@ -58,7 +58,7 @@ export function registerBalesExportRoutes(app: Express) {
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet("Bales");
 
-      const baleCols: unknown[] = [
+      const baleCols: any[] = [
         { header: "Reference Number", key: "referenceNumber", width: 22 },
         { header: "Article Code", key: "articleCode", width: 20 },
         { header: "Product Name", key: "productName", width: 30 },
@@ -128,7 +128,7 @@ export function registerBalesExportRoutes(app: Express) {
 
       const { from, to } = req.query as { from?: string; to?: string };
 
-      const conditions: unknown[] = [
+      const conditions: any[] = [
         eq(factoryBales.companyId, companyId),
         not(inArray(factoryBales.status, ["DELETED", "REMOVED"])),
       ];

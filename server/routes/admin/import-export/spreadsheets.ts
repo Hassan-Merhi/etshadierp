@@ -52,7 +52,7 @@ export function registerSpreadsheetRoutes(app: Express) {
       const companyId = req.session?.currentCompanyId;
       const id = parseInt(req.params.id);
       const { name, data } = req.body;
-      const fields: { name?: string; data?: unknown } = {};
+      const fields: { name?: string; data?: any } = {};
       if (name !== undefined) fields.name = name;
       if (data !== undefined) fields.data = data;
       const sheet = await storage.updateSpreadsheet(id, companyId, fields);

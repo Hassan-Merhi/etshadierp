@@ -9,7 +9,7 @@ export interface VoucherEntry {
 }
 
 interface UseVoucherEntriesProps {
-  form: UseFormReturn<unknown>;
+  form: UseFormReturn<any>;
 }
 
 export function useVoucherEntries({ form }: UseVoucherEntriesProps) {

@@ -26,7 +26,7 @@ import {
 // Module-level bwip-js cache — loaded once on first barcode request, then reused.
 // This avoids the cold-start latency of re-importing the library on every request.
 let _bwipjs: any = null;
-async function getBwipjs(): Promise<unknown> {
+async function getBwipjs(): Promise<any> {
   if (!_bwipjs) {
     // @ts-ignore - bwip-js types are incomplete
     _bwipjs = await import("bwip-js");
@@ -433,7 +433,7 @@ export function registerProductionBaleRoutes(app: Express) {
       const costPerKg = parseFloat(mixBatch.costPerKg);
 
       const updated = await db.transaction(async (tx) => {
-        const finalizedBales: unknown[] = [];
+        const finalizedBales: any[] = [];
         for (const baleId of scannedIds) {
           const baleRecord = scannedBaleRecords.find((b) => b.id === baleId);
           const baleWeight = parseFloat(baleRecord?.weightKg || "0");

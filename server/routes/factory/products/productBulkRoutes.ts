@@ -223,7 +223,7 @@ export function registerFactoryProductBulkRoutes(app: Express) {
           continue;
         }
 
-        const updates: Record<string, unknown> = { updatedAt: new Date() };
+        const updates: Record<string, any> = { updatedAt: new Date() };
 
         if (row.sellingPrice !== undefined && row.sellingPrice !== null && String(row.sellingPrice).trim() !== "") {
           const sp = parseFloat(String(row.sellingPrice));

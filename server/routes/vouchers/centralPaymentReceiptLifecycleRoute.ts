@@ -89,7 +89,7 @@ async function updateActivePaymentReceipt(req: Request, res: Response, next: Nex
       return;
     }
 
-    const body = req.body as Record<string, unknown>;
+    const body = req.body as Record<string, any>;
     // Keep optional transitions and all non-Payment/Receipt edits on the legacy route.
     if (
       !isActivePaymentReceiptType(existing.voucherType) ||

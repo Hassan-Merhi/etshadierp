@@ -3,7 +3,7 @@ import { useState, useCallback } from "react";
 export interface TablePrefs {
   sortKey?: string;
   sortDir?: "asc" | "desc";
-  filters?: Record<string, unknown>;
+  filters?: Record<string, any>;
   pageSize?: number;
 }
 

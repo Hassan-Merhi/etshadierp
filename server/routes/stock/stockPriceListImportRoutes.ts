@@ -119,7 +119,7 @@ export function registerStockPriceListImportRoutes(app: Express) {
         }
       }
 
-      let rows: unknown[];
+      let rows: any[];
 
       if (showAll) {
         rows = await db
@@ -193,11 +193,11 @@ export function registerStockPriceListImportRoutes(app: Express) {
         ]);
 
         const dubaiMap = new Map<number, string>();
-        for (const r of dubaiCostRes.rows as unknown[]) {
+        for (const r of dubaiCostRes.rows as any[]) {
           dubaiMap.set(Number(r.stockItemId), String(r.costDubai ?? "0"));
         }
         const offloadMap = new Map<number, string>();
-        for (const r of offloadCostRes.rows as unknown[]) {
+        for (const r of offloadCostRes.rows as any[]) {
           offloadMap.set(Number(r.stockItemId), String(r.offloadingCost ?? "0"));
         }
 
@@ -308,8 +308,8 @@ export function registerStockPriceListImportRoutes(app: Express) {
             ORDER BY pli.stock_item_id, co.offloaded_at DESC
           `),
         ]);
-        for (const r of dubaiCostRes.rows as unknown[]) dubaiMap.set(Number(r.stockItemId), String(r.costDubai ?? "0"));
-        for (const r of offloadCostRes.rows as unknown[])
+        for (const r of dubaiCostRes.rows as any[]) dubaiMap.set(Number(r.stockItemId), String(r.costDubai ?? "0"));
+        for (const r of offloadCostRes.rows as any[])
           offloadMap.set(Number(r.stockItemId), String(r.offloadingCost ?? "0"));
       }
 
@@ -350,9 +350,9 @@ export function registerStockPriceListImportRoutes(app: Express) {
       const validStockGroupIds = new Set(validStockGroups.map((sg) => sg.id));
 
       const results = {
-        created: [] as unknown[],
-        skipped: [] as unknown[],
-        errors: [] as unknown[],
+        created: [] as any[],
+        skipped: [] as any[],
+        errors: [] as any[],
       };
 
       for (const item of items) {
@@ -559,7 +559,7 @@ export function registerStockPriceListImportRoutes(app: Express) {
         const sheetName = wb.SheetNames[0];
         if (!sheetName) return res.status(400).json({ message: "Excel file has no sheets" });
 
-        const rows = sheetToJson<Record<string, unknown>>(wb.Sheets[sheetName]);
+        const rows = sheetToJson<Record<string, any>>(wb.Sheets[sheetName]);
 
         // Pre-fetch all stock items for this company (by code)
         const allItems = await db

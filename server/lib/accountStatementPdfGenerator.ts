@@ -119,7 +119,7 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
   const isSupplier = accountType === "supplier";
 
   // ── 1. Fetch raw entries ──
-  let rawEntries: unknown[];
+  let rawEntries: any[];
   let accountName: string;
   let rawOB: number;
   let obSide: string;
@@ -232,7 +232,7 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
       }
     }
 
-    const typeToColumn: Record<string, unknown> = {
+    const typeToColumn: Record<string, any> = {
       bank: voucherEntries.bankAccountId,
       "fixed-asset": voucherEntries.fixedAssetId,
       supplier: voucherEntries.supplierId,
@@ -377,7 +377,7 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
 
   let convertArabic: ((t: string) => string) | null = null;
   let bidiInst: {
-    getEmbeddingLevels: (t: string, d: string) => unknown;
+    getEmbeddingLevels: (t: string, d: string) => any;
     getReorderedString: (t: string, l: any) => string;
   } | null = null;
   try {

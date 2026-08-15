@@ -110,7 +110,7 @@ export default function SupplierProfitCheck() {
   const [importLoading, setImportLoading] = useState(false);
   const importFileRef = useRef<HTMLInputElement>(null);
   // ─── Queries ─────────────────────────────────────────────────────────────
-  const { data: suppliers = [] } = useQuery<unknown[]>({
+  const { data: suppliers = [] } = useQuery<any[]>({
     queryKey: ["/api/suppliers-all-spc"],
     queryFn: async () => {
       const res = await fetch("/api/suppliers", { credentials: "include" });
@@ -118,7 +118,7 @@ export default function SupplierProfitCheck() {
     },
     staleTime: 5 * 60 * 1000,
   });
-  const { data: stockGroups = [] } = useQuery<unknown[]>({
+  const { data: stockGroups = [] } = useQuery<any[]>({
     queryKey: ["/api/stock-groups", companyId],
     enabled: !!companyId,
     queryFn: async () => {
@@ -138,7 +138,7 @@ export default function SupplierProfitCheck() {
     },
     onError: (err: any) => toast({ title: "Failed to update", description: err.message, variant: "destructive" }),
   });
-  const { data: proformas = [] } = useQuery<unknown[]>({
+  const { data: proformas = [] } = useQuery<any[]>({
     queryKey: ["/api/suppliers", supplierId, "proformas"],
     enabled: !!supplierId && sourceType === "proforma",
     queryFn: async () => {
@@ -235,13 +235,13 @@ export default function SupplierProfitCheck() {
         const data = await file.arrayBuffer();
         const wb = XLSX.read(data, { type: "array" });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const raw: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+        const raw: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
         if (raw.length < 2) {
           toast({ title: "Empty file", description: "The Excel file has no data rows.", variant: "destructive" });
           return;
         }
         // Detect header row — first row is headers (case-insensitive)
-        const headers = (raw[0] as unknown[]).map((h: any) => String(h).toLowerCase().trim());
+        const headers = (raw[0] as any[]).map((h: any) => String(h).toLowerCase().trim());
         const colCode = headers.findIndex((h) => h.includes("code") || h === "item" || h === "barcode");
         const colCost = headers.findIndex((h) => h.includes("cost") || h.includes("dubai") || h.includes("po"));
         const colSell = headers.findIndex((h) => h.includes("sell") || h.includes("price") || h.includes("avg"));
@@ -249,7 +249,7 @@ export default function SupplierProfitCheck() {
         const codeIdx = colCode >= 0 ? colCode : 0;
         const parsed: { code: string; costPrice?: number; sellPrice?: number; qty?: number }[] = [];
         for (let i = 1; i < raw.length; i++) {
-          const row = raw[i] as unknown[];
+          const row = raw[i] as any[];
           const code = String(row[codeIdx] ?? "").trim();
           if (!code) continue;
           const costPrice = colCost >= 0 ? parseFloat(String(row[colCost] ?? "")) : NaN;
@@ -1658,7 +1658,7 @@ export default function SupplierProfitCheck() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No group</SelectItem>
-                  {(stockGroups as unknown[]).map((g: any) => (
+                  {(stockGroups as any[]).map((g: any) => (
                     <SelectItem key={g.id} value={String(g.id)}>
                       {g.name}
                     </SelectItem>

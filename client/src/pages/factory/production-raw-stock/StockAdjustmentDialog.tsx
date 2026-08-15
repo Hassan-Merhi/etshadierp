@@ -10,11 +10,11 @@ import { Plus, PlusCircle } from "lucide-react";
 interface StockAdjustmentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  adjustingRow: unknown;
+  adjustingRow: any;
   isNewMaterial: boolean;
-  factorySuppliers: unknown[];
-  createAdjustmentMutation: unknown;
-  updateCostMutation: unknown;
+  factorySuppliers: any[];
+  createAdjustmentMutation: any;
+  updateCostMutation: any;
   wrapAdminAction: (action: () => void, title: string) => void;
 }
 

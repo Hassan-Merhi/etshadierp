@@ -5,7 +5,7 @@ import { calculateProductionBonusPreview, type ProductionBonusMemberSnapshot } f
 
 const ELIGIBLE_BALE_STATUSES = ["IN_STOCK", "SOLD", "RESERVED_FOR_ORDER", "DISPATCHED", "FINALIZED"] as const;
 
-function rows(result: any): unknown[] {
+function rows(result: any): any[] {
   return Array.isArray(result) ? result : (result?.rows ?? []);
 }
 

@@ -159,7 +159,7 @@ export function registerSupplierBulkFxSettlementRoutes(app: Express) {
           (prevAllocByContainer[a.containerId] || 0) + parseFloat(a.allocatedAmount || "0");
 
       // Build per-supplier data: available balance + their containers
-      const supplierData: Array<{ supplierId: number; name: string; available: number; containers: unknown[] }> = [];
+      const supplierData: Array<{ supplierId: number; name: string; available: number; containers: any[] }> = [];
       for (const sup of linkedSuppliers) {
         const supContainers = allContainers.filter((c) => c.supplierId === sup.id);
         const totalValue = supContainers.reduce((s: number, c: any) => {
@@ -221,7 +221,7 @@ export function registerSupplierBulkFxSettlementRoutes(app: Express) {
         allocated: number;
         toAmountUsd: number;
         overpayment: number;
-        containers: unknown[];
+        containers: any[];
       }> = [];
       for (const sd of supplierData) {
         if (rem <= 0.001) break;

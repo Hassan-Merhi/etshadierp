@@ -54,7 +54,7 @@ export async function getLastSoldPrices(companyId: number): Promise<Record<numbe
     [companyId]
   );
   const priceMap: Record<number, string> = {};
-  for (const row of result.rows as unknown[]) {
+  for (const row of result.rows as any[]) {
     priceMap[row.stock_item_id] = row.selling_price;
   }
   return priceMap;
@@ -65,7 +65,7 @@ export async function getAllPurchasesForItem(
   companyId: number,
   fromDate?: string,
   toDate?: string
-): Promise<unknown[]> {
+): Promise<any[]> {
   const conditions = [
     eq(schema.poLineItems.stockItemId, stockItemId),
     eq(schema.purchaseOrders.companyId, companyId),
@@ -97,7 +97,7 @@ export async function getAllSalesForItem(
   companyId: number,
   fromDate?: string,
   toDate?: string
-): Promise<unknown[]> {
+): Promise<any[]> {
   const conditions = [
     eq(schema.salesItems.stockItemId, stockItemId),
     eq(schema.vouchers.companyId, companyId),
@@ -124,7 +124,7 @@ export async function getAllSalesForItem(
     .orderBy(sql`${schema.vouchers.voucherDate} DESC`);
 }
 
-export async function getInventoryLocationsByItem(stockItemId: number, companyId: number): Promise<unknown[]> {
+export async function getInventoryLocationsByItem(stockItemId: number, companyId: number): Promise<any[]> {
   const results = await db.execute(sql`
     SELECT DISTINCT ON (i.location_id)
       i.location_id as "locationId",
@@ -140,10 +140,10 @@ export async function getInventoryLocationsByItem(stockItemId: number, companyId
       AND i.quantity::numeric > 0
     ORDER BY i.location_id, i.last_updated DESC
   `);
-  return (results.rows as unknown[]).sort((a, b) => (a.locationName || "").localeCompare(b.locationName || ""));
+  return (results.rows as any[]).sort((a, b) => (a.locationName || "").localeCompare(b.locationName || ""));
 }
 
-export async function getVoucherHistoryForItem(stockItemId: number, companyId: number): Promise<unknown[]> {
+export async function getVoucherHistoryForItem(stockItemId: number, companyId: number): Promise<any[]> {
   const sales = await db
     .select({
       voucherId: schema.vouchers.id,

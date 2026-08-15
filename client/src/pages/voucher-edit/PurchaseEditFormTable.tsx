@@ -6,7 +6,7 @@ import { FormField, FormItem, FormControl, FormMessage } from "@/components/ui/f
 import { StockItem, StockItemCombobox } from "./VoucherEditHelpers";
 
 interface PurchaseEditFormTableProps {
-  fields: unknown[];
+  fields: any[];
   append: (item: any) => void;
   remove: (index: number) => void;
   stockItems: StockItem[];

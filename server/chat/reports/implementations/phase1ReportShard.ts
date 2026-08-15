@@ -35,7 +35,7 @@ async function runPhase1Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       let revenue = 0,
         cogs = 0,
         opex = 0;
-      for (const row of rows.rows as unknown[]) {
+      for (const row of rows.rows as any[]) {
         const dr = parseFloat(row.total_debit || "0");
         const cr = parseFloat(row.total_credit || "0");
         if (row.account_type === "Income") revenue += cr - dr;
@@ -72,7 +72,7 @@ async function runPhase1Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY la.account_type, la.name
       `);
       let grandTotal = 0;
-      const stats = (rows.rows as unknown[]).map((row) => {
+      const stats = (rows.rows as any[]).map((row) => {
         const ob = parseFloat(row.opening_balance || "0");
         const obAdj = row.opening_balance_side === "Cr" ? -ob : ob;
         const bal = obAdj + parseFloat(row.total_debit || "0") - parseFloat(row.total_credit || "0");
@@ -121,7 +121,7 @@ async function runPhase1Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ) DESC
         LIMIT ${rowLimit}
       `);
-      const tableRows = (rows.rows as unknown[]).map((row) => {
+      const tableRows = (rows.rows as any[]).map((row) => {
         const ob = parseFloat(row.opening_balance || "0");
         const obAdj = row.opening_balance_side === "Cr" ? -ob : ob;
         const bal = obAdj + parseFloat(row.total_debit || "0") - parseFloat(row.total_credit || "0");
@@ -288,7 +288,7 @@ async function runPhase1Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY total_received DESC
         LIMIT ${rowLimit}
       `);
-      const tableRows = (rows.rows as unknown[]).map((r, i) => [
+      const tableRows = (rows.rows as any[]).map((r, i) => [
         String(i + 1),
         r.name,
         String(r.tx_count),
@@ -327,7 +327,7 @@ async function runPhase1Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ) ASC
         LIMIT ${rowLimit}
       `);
-      const tableRows = (rows.rows as unknown[]).map((row) => {
+      const tableRows = (rows.rows as any[]).map((row) => {
         const ob = parseFloat(row.opening_balance || "0");
         const obAdj = row.opening_balance_side === "Cr" ? -ob : ob;
         const bal = obAdj + parseFloat(row.total_debit || "0") - parseFloat(row.total_credit || "0");
@@ -351,8 +351,8 @@ async function runPhase1Report(ctx: DataQueryContext): Promise<DataQueryResult> 
           AND fa.attendance_date BETWEEN ${dateFrom} AND ${dateTo}
         GROUP BY fa.status ORDER BY fa.status
       `);
-      const totalRecords = (rows.rows as unknown[]).reduce((s: number, r: any) => s + parseInt(r.count || "0"), 0);
-      const stats = (rows.rows as unknown[]).map((r) => ({
+      const totalRecords = (rows.rows as any[]).reduce((s: number, r: any) => s + parseInt(r.count || "0"), 0);
+      const stats = (rows.rows as any[]).map((r) => ({
         label: r.status,
         value: `${r.count} records · ${r.workers} worker(s)`,
         highlight: r.status === "Present" ? "positive" : r.status === "Absent" ? "negative" : "muted",
@@ -377,9 +377,9 @@ async function runPhase1Report(ctx: DataQueryContext): Promise<DataQueryResult> 
           AND fb.created_at::date BETWEEN ${dateFrom} AND ${dateTo}
         GROUP BY fb.status ORDER BY count DESC
       `);
-      const totalBales = (rows.rows as unknown[]).reduce((s: number, r: any) => s + parseInt(r.count || "0"), 0);
-      const totalWeight = (rows.rows as unknown[]).reduce((s: number, r: any) => s + parseFloat(r.total_weight || "0"), 0);
-      const tableRows = (rows.rows as unknown[]).map((r) => [
+      const totalBales = (rows.rows as any[]).reduce((s: number, r: any) => s + parseInt(r.count || "0"), 0);
+      const totalWeight = (rows.rows as any[]).reduce((s: number, r: any) => s + parseFloat(r.total_weight || "0"), 0);
+      const tableRows = (rows.rows as any[]).map((r) => [
         String(r.status).replace(/_/g, " "),
         String(r.count),
         fmtDec(parseFloat(r.total_weight || "0")) + " kg",

@@ -109,7 +109,7 @@ const typeLabels: Record<string, string> = {
   customerOrder: "Customer Invoice/Order",
 };
 
-const typeIcons: Record<string, unknown> = {
+const typeIcons: Record<string, any> = {
   location: MapPin,
   stockItem: Package,
   stockGroup: FolderTree,
@@ -151,7 +151,7 @@ export default function DeletedItems() {
   });
 
   // Fetch journal entries for the selected voucher (to show accounts + descriptions)
-  const { data: voucherEntries = [], isLoading: entriesLoading } = useQuery<unknown[]>({
+  const { data: voucherEntries = [], isLoading: entriesLoading } = useQuery<any[]>({
     queryKey: ["/api/vouchers", detailItem?.id, "view-entries"],
     queryFn: async () => {
       const res = await fetch(`/api/vouchers/${detailItem!.id}/view-entries`, { credentials: "include" });

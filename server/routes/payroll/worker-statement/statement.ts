@@ -30,7 +30,7 @@ export function registerWorkerStatementReadRoutes(app: Express) {
 
       const { startDate, endDate } = req.query;
 
-      const advanceConditions: unknown[] = [
+      const advanceConditions: any[] = [
         eq(factoryWorkerAdvances.workerId, workerId),
         eq(factoryWorkerAdvances.companyId, companyId),
       ];
@@ -43,7 +43,7 @@ export function registerWorkerStatementReadRoutes(app: Express) {
         .where(and(...advanceConditions))
         .orderBy(factoryWorkerAdvances.advanceDate);
 
-      const payrollConditions: unknown[] = [
+      const payrollConditions: any[] = [
         eq(factoryPayrolls.workerId, workerId),
         eq(factoryPayrolls.companyId, companyId),
         eq(factoryPayrolls.status, "PAID"),
@@ -57,7 +57,7 @@ export function registerWorkerStatementReadRoutes(app: Express) {
         .where(and(...payrollConditions))
         .orderBy(factoryPayrolls.paidAt);
 
-      const entries: unknown[] = [];
+      const entries: any[] = [];
 
       for (const adv of advances) {
         entries.push({
@@ -126,7 +126,7 @@ export function registerWorkerStatementReadRoutes(app: Express) {
       const workerName = worker.fullName || `Worker #${workerId}`;
 
       // Advances
-      const advConds: unknown[] = [
+      const advConds: any[] = [
         eq(factoryWorkerAdvances.workerId, workerId),
         eq(factoryWorkerAdvances.companyId, companyId),
       ];
@@ -139,7 +139,7 @@ export function registerWorkerStatementReadRoutes(app: Express) {
         .orderBy(factoryWorkerAdvances.advanceDate);
 
       // Payrolls
-      const payConds: unknown[] = [
+      const payConds: any[] = [
         eq(factoryPayrolls.workerId, workerId),
         eq(factoryPayrolls.companyId, companyId),
         eq(factoryPayrolls.status, "PAID"),
@@ -153,7 +153,7 @@ export function registerWorkerStatementReadRoutes(app: Express) {
         .orderBy(factoryPayrolls.paidAt);
 
       // Build entries
-      const entries: unknown[] = [];
+      const entries: any[] = [];
       for (const adv of advances) {
         entries.push({
           date: adv.advanceDate,
@@ -231,7 +231,7 @@ export function registerWorkerStatementReadRoutes(app: Express) {
       // Arabic reshaping helpers — always loaded
       let wConvertArabic: ((t: string) => string) | null = null;
       let wBidiInst: {
-        getEmbeddingLevels: (t: string, d: string) => unknown;
+        getEmbeddingLevels: (t: string, d: string) => any;
         getReorderedString: (t: string, l: any) => string;
       } | null = null;
       try {

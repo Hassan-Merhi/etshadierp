@@ -418,7 +418,7 @@ export function registerRawStockReceiptRoutes(app: Express) {
           rows[0].freeKg = totalRemaining.toFixed(3);
         } else {
           // Proportional distribution across multiple rows
-          for (const row of rows as unknown[]) {
+          for (const row of rows as any[]) {
             const rem = parseFloat(row.remainingKg);
             const proportion = totalRemaining > 0 ? rem / totalRemaining : 0;
             row.reservedKg = (reserved * proportion).toFixed(3);
@@ -432,7 +432,7 @@ export function registerRawStockReceiptRoutes(app: Express) {
       // never remaining-value-basis or received-weighted derivations. This keeps
       // the Raw Materials table, category totals, KPIs, and the mix-batch dialog
       // (which reads this same endpoint) numerically consistent by construction.
-      for (const row of aggregated as unknown[]) {
+      for (const row of aggregated as any[]) {
         if (row._isLockedRateSupplier) {
           const freeKg = parseFloat(row.freeKg) || 0;
           const value = freeKg * (row._lockedRateUsd || 0);

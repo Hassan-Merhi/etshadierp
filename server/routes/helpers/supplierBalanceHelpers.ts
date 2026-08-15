@@ -118,7 +118,7 @@ export async function getSupplierBalanceForContext(
   const balance = balanceD.toNumber();
 
   const balancesByCurrency: Record<string, { debit: number; credit: number; net: number }> = {};
-  for (const entry of entries as unknown[]) {
+  for (const entry of entries as any[]) {
     const ccy: string = (entry.transactionCurrency as string | null) || "USD";
     const txDr = parseFloat(
       (entry.transactionDebitAmount as string | null) ?? (entry.debitAmount as string | null) ?? "0"
@@ -133,7 +133,7 @@ export async function getSupplierBalanceForContext(
   }
 
   let historicalBaseBalance = openingBalanceD.toNumber();
-  for (const entry of entries as unknown[]) {
+  for (const entry of entries as any[]) {
     const baseDr = parseFloat((entry.baseDebitAmount as string | null) ?? (entry.debitAmount as string | null) ?? "0");
     const baseCr = parseFloat(
       (entry.baseCreditAmount as string | null) ?? (entry.creditAmount as string | null) ?? "0"

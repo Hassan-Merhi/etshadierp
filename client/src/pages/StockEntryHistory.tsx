@@ -156,18 +156,18 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
 
   // (page validity effect removed — no pagination)
 
-  const { data: workers = [] } = useQuery<unknown[]>({
+  const { data: workers = [] } = useQuery<any[]>({
     queryKey: ["/api/factory/workers"],
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   });
-  const { data: products = [] } = useQuery<unknown[]>({ queryKey: ["/api/factory/bale-products"] });
+  const { data: products = [] } = useQuery<any[]>({ queryKey: ["/api/factory/bale-products"] });
   const { data: locations = [] } = useQuery<Location[]>({ queryKey: ["/api/locations"] });
-  const { data: categories = [] } = useQuery<unknown[]>({
+  const { data: categories = [] } = useQuery<any[]>({
     queryKey: ["/api/factory/worker-categories"],
     queryFn: () => fetch("/api/factory/worker-categories", { credentials: "include" }).then((r) => r.json()),
   });
-  const { data: productCategories = [] } = useQuery<unknown[]>({
+  const { data: productCategories = [] } = useQuery<any[]>({
     queryKey: ["/api/factory/categories"],
     queryFn: () => fetch("/api/factory/categories", { credentials: "include" }).then((r) => r.json()),
     staleTime: 60_000,
@@ -270,7 +270,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     // Add zero-bale entries for workers in the production plan who haven't made any bales yet
     if (Object.keys(workerTargets).length > 0) {
       const workerNameById = new Map<number, string>(
-        (workers as unknown[]).map((w: any) => [w.id, w.fullName ?? w.full_name ?? ""])
+        (workers as any[]).map((w: any) => [w.id, w.fullName ?? w.full_name ?? ""])
       );
       const selectedWorkerIds = new Set(workerIdFilter.map(Number));
       const categoryWorkerIds = selectedCategoryWorkerIds ? new Set(selectedCategoryWorkerIds) : null;

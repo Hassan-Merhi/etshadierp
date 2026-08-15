@@ -133,7 +133,7 @@ function AccountBreakdown({
   badgeClass,
 }: {
   title: string;
-  accounts: unknown[];
+  accounts: any[];
   total: number;
   type: "income" | "expense";
   badgeClass: string;

@@ -163,7 +163,7 @@ export function registerRentalPaymentsAccrualRoutes(
         .parse(req.body);
 
       const clientDate = getClientDate(req);
-      const results: unknown[] = [];
+      const results: any[] = [];
       for (const data of items) {
         try {
           const [contract] = await db
@@ -374,10 +374,10 @@ export function registerRentalPaymentsAccrualRoutes(
           )
         );
 
-      let ledger: unknown[] = [];
-      let postedPayments: unknown[] = [];
-      let scheduledPayments: unknown[] = [];
-      let guaranteePayments: unknown[] = [];
+      let ledger: any[] = [];
+      let postedPayments: any[] = [];
+      let scheduledPayments: any[] = [];
+      let guaranteePayments: any[] = [];
 
       if (contract) {
         await ensureMonthlyLedgerRows(contract.id, asOfDate);
@@ -552,7 +552,7 @@ export function registerRentalPaymentsAccrualRoutes(
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const statusFilter = req.query.status as string | undefined;
-      const conditions: unknown[] = [eq(propertyPayments.companyId, companyId), eq(propertyPayments.module, module)];
+      const conditions: any[] = [eq(propertyPayments.companyId, companyId), eq(propertyPayments.module, module)];
       if (statusFilter) {
         conditions.push(sql`${propertyPayments.postingStatus} = ${statusFilter}`);
       }

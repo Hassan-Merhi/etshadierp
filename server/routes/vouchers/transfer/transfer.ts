@@ -233,7 +233,7 @@ export function registerVoucherTransferOnlyRoutes(app: Express) {
       );
 
       try {
-        const _xfrChanges: Record<string, unknown> = {};
+        const _xfrChanges: Record<string, any> = {};
         if (existingVoucher.voucherDate !== updated.voucherDate)
           _xfrChanges.date = { old: existingVoucher.voucherDate, new: updated.voucherDate };
         if (existingVoucher.totalAmount !== updated.totalAmount)

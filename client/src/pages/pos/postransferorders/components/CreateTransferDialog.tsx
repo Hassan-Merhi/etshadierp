@@ -54,7 +54,7 @@ export function CreateTransferDialog({
 
   const searchMatches = useMemo(() => {
     const s = itemSearch.toLowerCase().trim();
-    return (sourceInventory as unknown[])
+    return (sourceInventory as any[])
       .filter(
         (i) => !addedIds.has(i.stockItemId ?? i.id) && (i.stockItemName ?? i.name ?? "").toLowerCase().includes(s)
       )

@@ -315,7 +315,7 @@ export default function Agents() {
     const fxNote = isMultiCurrency && exchangeRate
       ? `${selectedCurrency} @ rate ${exchangeRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} per USD`
       : null;
-    const rows: unknown[][] = [["Ledger", "Type", "Debit", "Credit", "Running Balance", "Date", "Notes", ...(fxNote ? ["FX Rate"] : [])]];
+    const rows: any[][] = [["Ledger", "Type", "Debit", "Credit", "Running Balance", "Date", "Notes", ...(fxNote ? ["FX Rate"] : [])]];
     if (fxNote) rows.push(["", "", "", "", "", "", "", fxNote]);
     const firstDate = vouchersWithBalance[0]?.voucherDate.split("T")[0] ?? "";
     const openingDateFmt = firstDate ? format(new Date(firstDate + "T00:00:00"), "dd MMM yyyy") : "";

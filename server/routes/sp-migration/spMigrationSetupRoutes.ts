@@ -44,7 +44,7 @@ export function registerSpMigrationSetupRoutes(app: Express) {
         VALUES (${code}, ${name}, 'supplier_partner', 'USD', true)
         RETURNING id, code, name, company_type
       `)
-        ).rows as unknown[];
+        ).rows as any[];
 
         return res.json({ success: true, company: row });
       } catch (err: unknown) {
@@ -115,7 +115,7 @@ export function registerSpMigrationSetupRoutes(app: Express) {
         WHERE company_id = ${targetId} AND deleted_at IS NULL
           AND sub_type = ANY(${sqlArray(ALL_ACCOUNT_DEFS.map((a) => a.subType))})
       `)
-        ).rows as unknown[];
+        ).rows as any[];
         const existingBySubType = new Map(existingRows.map((r) => [r.sub_type, r]));
 
         const accounts = ALL_ACCOUNT_DEFS.map((a) => {
@@ -233,7 +233,7 @@ export function registerSpMigrationSetupRoutes(app: Express) {
         WHERE company_id = ${targetId} AND account_type IN ('Cash', 'Bank') AND deleted_at IS NULL
         ORDER BY account_type, name
       `)
-        ).rows as unknown[];
+        ).rows as any[];
         return res.json({ accounts: rows });
       } catch (err: unknown) {
         return res.status(500).json({ message: "Internal server error" });
@@ -288,7 +288,7 @@ export function registerSpMigrationSetupRoutes(app: Express) {
         SELECT id FROM ledger_accounts
         WHERE company_id = ${targetId} AND sub_type = 'sp_opnbal' AND deleted_at IS NULL LIMIT 1
       `)
-        ).rows as unknown[];
+        ).rows as any[];
         if (!opnBalRows.length) {
           return res
             .status(400)
@@ -306,7 +306,7 @@ export function registerSpMigrationSetupRoutes(app: Express) {
                 ${narration ?? "GC Opening Cash Balance"}, ${amtStr}, 'USD', 'ERP')
         RETURNING id
       `)
-        ).rows as unknown[];
+        ).rows as any[];
         const voucherId = pn(vRow.id);
 
         // Dr selected Cash/Bank account

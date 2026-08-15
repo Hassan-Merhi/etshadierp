@@ -33,17 +33,17 @@ export function BulkAdvanceDialog({
   setBulkSelected,
   workers,
 }: {
-  bulkAmounts: unknown;
-  bulkForm: unknown;
-  bulkMutation: unknown;
-  bulkOpen: unknown;
-  bulkSelected: unknown;
-  cashAccounts: unknown;
-  setBulkAmounts: unknown;
-  setBulkForm: unknown;
-  setBulkOpen: unknown;
-  setBulkSelected: unknown;
-  workers: unknown;
+  bulkAmounts: any;
+  bulkForm: any;
+  bulkMutation: any;
+  bulkOpen: any;
+  bulkSelected: any;
+  cashAccounts: any;
+  setBulkAmounts: any;
+  setBulkForm: any;
+  setBulkOpen: any;
+  setBulkSelected: any;
+  workers: any;
 }) {
   return (
     <Dialog

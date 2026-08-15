@@ -32,7 +32,7 @@ export interface PostingActor {
 
 export interface PostingOwnershipValidator {
   validateVoucherOwnership(input: {
-    tx: unknown;
+    tx: any;
     companyId: number;
     voucher: VoucherInsertFields;
     entries: VoucherEntryInsertFields[];
@@ -41,12 +41,12 @@ export interface PostingOwnershipValidator {
 
 export interface PostingIdempotencyStore {
   findExisting(input: {
-    tx: unknown;
+    tx: any;
     companyId: number;
     source: PostingSourceIdentity;
   }): Promise<VoucherWithEntries | null>;
   record(input: {
-    tx: unknown;
+    tx: any;
     companyId: number;
     voucherId: number;
     source: PostingSourceIdentity;
@@ -55,7 +55,7 @@ export interface PostingIdempotencyStore {
 
 export interface PostingAuditWriter {
   recordPosting(input: {
-    tx: unknown;
+    tx: any;
     companyId: number;
     voucherId: number;
     source: PostingSourceIdentity;

@@ -73,10 +73,10 @@ export function registerFactoryContainerOtherChargesCurrencyAdminRoutes(app: Exp
 
         const grouped = new Map<
           number,
-          { containerId: number; containerNumber: string; currentCurrency: string; amount: string; charges: unknown[] }
+          { containerId: number; containerNumber: string; currentCurrency: string; amount: string; charges: any[] }
         >();
 
-        for (const row of nonUsdContainerCharges as unknown[]) {
+        for (const row of nonUsdContainerCharges as any[]) {
           grouped.set(row.id, {
             containerId: row.id,
             containerNumber: row.containerNumber,
@@ -87,7 +87,7 @@ export function registerFactoryContainerOtherChargesCurrencyAdminRoutes(app: Exp
             ],
           });
         }
-        for (const row of nonUsdTableCharges as unknown[]) {
+        for (const row of nonUsdTableCharges as any[]) {
           if (!grouped.has(row.containerId)) {
             grouped.set(row.containerId, {
               containerId: row.containerId,

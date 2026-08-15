@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { StockItem, StockItemCombobox } from "./VoucherEditHelpers";
 
 interface AdjustmentEditFormRowsProps {
-  fields: unknown[];
+  fields: any[];
   append: (item: any) => void;
   remove: (index: number) => void;
   stockItems: StockItem[];

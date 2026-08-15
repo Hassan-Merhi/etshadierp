@@ -53,8 +53,8 @@ export function registerCreditSalesImportRoutes(app: Express) {
         return res.status(400).json({ message: "Excel file is empty" });
       }
 
-      const rows = rawData as unknown[];
-      const items: unknown[] = [];
+      const rows = rawData as any[];
+      const items: any[] = [];
       let totalValue = 0;
 
       for (let i = 0; i < rows.length; i++) {
@@ -111,7 +111,7 @@ export function registerCreditSalesImportRoutes(app: Express) {
 
       const errors: string[] = [];
       const warnings: string[] = [];
-      const validatedItems: unknown[] = [];
+      const validatedItems: any[] = [];
 
       const location = await storage.getLocationById(locationId);
       if (!location) {

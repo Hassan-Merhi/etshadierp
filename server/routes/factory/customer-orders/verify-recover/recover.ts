@@ -244,7 +244,7 @@ export function registerOrderRecoverBalesRoutes(app: Express) {
               ORDER BY id
               LIMIT ${needed * 3}`
         );
-        const candidates: unknown[] = resultRows(candidatesResult);
+        const candidates: any[] = resultRows(candidatesResult);
         const available = candidates.filter((b) => !claimedIds.has(Number(b.id))).slice(0, needed);
 
         for (const bale of available) {

@@ -50,7 +50,7 @@ function pagesSummary(user: any): string {
 }
 
 interface UserListTableProps {
-  users: unknown[];
+  users: any[];
   isLoading: boolean;
   selectedUserId?: string | null;
   onSelectUser: (user: any) => void;

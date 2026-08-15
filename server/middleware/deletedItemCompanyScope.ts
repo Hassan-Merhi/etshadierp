@@ -30,7 +30,7 @@ import {
 
 async function loadCompanyId(type: DeletedItemScopeType, id: number): Promise<number | null> {
   const mappings: Partial<
-    Record<DeletedItemScopeType, { table: unknown; idColumn: unknown; companyColumn: unknown }>
+    Record<DeletedItemScopeType, { table: any; idColumn: any; companyColumn: any }>
   > = {
     location: { table: locations, idColumn: locations.id, companyColumn: locations.companyId },
     stockItem: { table: stockItems, idColumn: stockItems.id, companyColumn: stockItems.companyId },

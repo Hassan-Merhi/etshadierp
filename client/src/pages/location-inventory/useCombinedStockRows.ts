@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 
 interface UseCombinedStockRowsParams {
-  allInventoryData: unknown[];
+  allInventoryData: any[];
   allStockGroupFilter: string;
   allStockCategoryFilter: string[];
   allStockLocationFilter: string;

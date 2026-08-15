@@ -118,7 +118,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
   if (stockTransferToEdit?.id) lastKnownTransferIdRef.current = stockTransferToEdit.id;
   const stableTransferId = stockTransferToEdit?.id ?? lastKnownTransferIdRef.current;
 
-  const { data: transferRevisions = [] } = useQuery<unknown[]>({
+  const { data: transferRevisions = [] } = useQuery<any[]>({
     queryKey: ["/api/stock-transfers", stableTransferId, "revisions"],
     queryFn: async () => {
       const res = await fetch(`/api/stock-transfers/${stableTransferId}/revisions`, { credentials: "include" });
@@ -206,7 +206,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
   const importValidItemsCount = importValidItems.length;
   const importTotalItemsCount = importValidationResult?.validatedItems?.length || 0;
 
-  const { data: transferInventory = [] } = useQuery<unknown[]>({
+  const { data: transferInventory = [] } = useQuery<any[]>({
     queryKey: transferInventorySource ? [`/api/locations/${transferInventorySource}/inventory`] : [],
     enabled: !!transferInventorySource && transferInventorySource > 0,
   });
@@ -620,7 +620,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       setTransferRevisionNote("");
       setTransferRevisionDialogOpen(false);
       setTransferRevisionsExpanded(true);
-      const refreshedRevisions = queryClient.getQueryData<unknown[]>(["/api/stock-transfers", transferId, "revisions"]);
+      const refreshedRevisions = queryClient.getQueryData<any[]>(["/api/stock-transfers", transferId, "revisions"]);
       const nextRevNum = refreshedRevisions?.length ?? transferRevisions.length + 1;
       toast({ title: "Revision Saved", description: `Rev ${nextRevNum} recorded and transfer updated` });
     } catch (error) {
@@ -1216,7 +1216,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                               const delta = parseFloat(raw.startsWith("+") ? raw.slice(1) : raw);
                               if (isNaN(delta)) return;
                               if (voucherIdToEdit && stockTransferToEdit?.items) {
-                                const origItem = (stockTransferToEdit.items as unknown[]).find(
+                                const origItem = (stockTransferToEdit.items as any[]).find(
                                   (item) =>
                                     item.stockItemId === entry.stockItemId &&
                                     item.sourceLocationId === entry.sourceLocationId
@@ -1626,7 +1626,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                               if (isNaN(delta)) return;
                               if (voucherIdToEdit && stockTransferToEdit?.items) {
                                 const entry = stockTransferForm.getValues(`entries.${index}`);
-                                const origItem = (stockTransferToEdit.items as unknown[]).find(
+                                const origItem = (stockTransferToEdit.items as any[]).find(
                                   (item) =>
                                     item.stockItemId === entry.stockItemId &&
                                     item.sourceLocationId === entry.sourceLocationId

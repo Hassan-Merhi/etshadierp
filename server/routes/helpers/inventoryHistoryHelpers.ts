@@ -28,7 +28,7 @@ export async function calculateHistoricalLocationInventory(
   locationId: number,
   companyId: number,
   asOfDate: string
-): Promise<unknown[]> {
+): Promise<any[]> {
   const cutoffDateStr = asOfDate;
   const cutoffTimestamp = new Date(asOfDate + "T23:59:59.999");
 

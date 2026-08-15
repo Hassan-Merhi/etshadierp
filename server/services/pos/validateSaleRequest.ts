@@ -29,7 +29,7 @@ import type { HandlerErrorResult, ResolvedPaymentAccount } from "./posSaleTypes"
 export async function checkIdempotentSale(
   companyId: number,
   clientSaleId: string | undefined
-): Promise<{ status: number; body: unknown } | null> {
+): Promise<{ status: number; body: any } | null> {
   if (!clientSaleId) return null;
 
   const [existingVoucher] = await db
@@ -66,8 +66,8 @@ export async function checkIdempotentSale(
  */
 export async function resolvePosEnforcedCashAccount(params: {
   isPOSUser: boolean;
-  isCreditSale: unknown;
-  locationId: unknown;
+  isCreditSale: any;
+  locationId: any;
   userId: string;
   companyId: number;
   sessionCashAccountId: number | null | undefined;
@@ -120,9 +120,9 @@ export async function resolvePosEnforcedCashAccount(params: {
 
 /** Determine account type and ID by validating against actual database records. */
 export async function resolvePaymentAccount(params: {
-  isCreditSale: unknown;
-  paymentAccountId: unknown;
-  cashAccountId: unknown;
+  isCreditSale: any;
+  paymentAccountId: any;
+  cashAccountId: any;
   posEnforcedCashAccountId: number | null;
   companyId: number;
 }): Promise<ResolvedPaymentAccount | { error: HandlerErrorResult }> {
@@ -254,12 +254,12 @@ export async function resolvePaymentAccount(params: {
 
 /** Get location, validate it exists, belongs to the company, and (for POS users) is assigned to the user. */
 export async function validateLocationAccess(params: {
-  locationId: unknown;
+  locationId: any;
   parsedLocationId: number;
   companyId: number;
   isPOSUser: boolean;
   userId: string;
-}): Promise<{ location: unknown } | { error: HandlerErrorResult }> {
+}): Promise<{ location: any } | { error: HandlerErrorResult }> {
   const { locationId, parsedLocationId, companyId, isPOSUser, userId } = params;
 
   const location = await storage.getLocationById(locationId);
@@ -288,7 +288,7 @@ export async function validateLocationAccess(params: {
 /** Fix 5: Verify each stockItemId exists, belongs to this company, and is not deleted/merged. */
 export async function validateStockItemsExist(
   companyId: number,
-  items: unknown[]
+  items: any[]
 ): Promise<{ error: HandlerErrorResult } | null> {
   for (const item of items) {
     const [si] = await db

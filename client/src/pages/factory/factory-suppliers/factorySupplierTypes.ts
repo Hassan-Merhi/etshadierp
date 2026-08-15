@@ -53,7 +53,7 @@ export interface StatementEntry {
   differenceKg: string | null;
   value: string;
   finalPayableAmount: string | null;
-  commissions: unknown[];
+  commissions: any[];
   totalCommission: string;
   notes: string | null;
 }
@@ -115,7 +115,7 @@ export interface StatementResponse {
     lastActivity: string | null;
     currencyGroups: Array<{
       currencyCode: string;
-      containers: unknown[];
+      containers: any[];
       totalValue: string;
       totalCommission: string;
       totalPaid: string;

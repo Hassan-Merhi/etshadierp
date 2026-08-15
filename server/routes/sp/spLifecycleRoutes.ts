@@ -27,7 +27,7 @@ import {
 import { SP_RELEASE_CURRENCY, SP_RELEASE_EXCHANGE_RATE } from "../../services/sp/spReleasePolicy";
 import { requireSpCompany } from "./spHelpers";
 
-function resultRows(result: any): unknown[] {
+function resultRows(result: any): any[] {
   return result?.rows ?? result ?? [];
 }
 

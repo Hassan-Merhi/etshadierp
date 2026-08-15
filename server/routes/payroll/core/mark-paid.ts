@@ -234,7 +234,7 @@ export function registerPayrollMarkPaidRoutes(app: Express) {
       const { payrollIds, cashAccountId } = req.body;
       if (!payrollIds?.length) return res.status(400).json({ message: "payrollIds required" });
       const normalizedIds = [
-        ...new Set((payrollIds as unknown[]).map(Number).filter((id) => Number.isInteger(id) && id > 0)),
+        ...new Set((payrollIds as any[]).map(Number).filter((id) => Number.isInteger(id) && id > 0)),
       ];
       if (normalizedIds.length === 0) return res.status(400).json({ message: "Valid payrollIds required" });
       const cashId = cashAccountId ? parseInt(cashAccountId) : null;

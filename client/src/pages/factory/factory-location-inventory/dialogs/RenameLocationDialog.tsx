@@ -23,12 +23,12 @@ export function RenameLocationDialog({
   setRenameDialogOpen,
   setRenameInput,
 }: {
-  renameDialogOpen: unknown;
-  renameInput: unknown;
-  renameLocationMutation: unknown;
-  renamingLocation: unknown;
-  setRenameDialogOpen: unknown;
-  setRenameInput: unknown;
+  renameDialogOpen: any;
+  renameInput: any;
+  renameLocationMutation: any;
+  renamingLocation: any;
+  setRenameDialogOpen: any;
+  setRenameInput: any;
 }) {
   return (
     <Dialog

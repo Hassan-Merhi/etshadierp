@@ -54,7 +54,7 @@ function OfflineSyncPanelContent() {
   const { isOnline, isSyncing, lastSyncedAt, pendingCount, failedCount, conflictCount, triggerSync, refreshCounts } =
     useConnectivity();
   const { toast } = useToast();
-  const [logs, setLogs] = useState<unknown[]>([]);
+  const [logs, setLogs] = useState<any[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [clearing, setClearing] = useState(false);
 

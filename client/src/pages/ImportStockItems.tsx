@@ -135,7 +135,7 @@ function NewItemsTab() {
     }
     setIsProcessing(true);
     try {
-      const stockGroupsData: unknown[] = await fetch("/api/stock-groups", { credentials: "include" }).then((r) => r.json());
+      const stockGroupsData: any[] = await fetch("/api/stock-groups", { credentials: "include" }).then((r) => r.json());
       const stockGroupMap = new Map(stockGroupsData.map((sg) => [sg.code, sg.id]));
       const itemsToImport = previewData.map((row) => {
         const item: any = {

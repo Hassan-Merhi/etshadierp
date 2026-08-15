@@ -9,7 +9,7 @@ export function formatDailyNum(val: number): string {
 export function DailyStockSummary({ date }: { date: string }) {
   const todayStr = new Date().toLocaleDateString("en-CA");
 
-  const { data: summaryRows = [] } = useQuery<unknown[]>({
+  const { data: summaryRows = [] } = useQuery<any[]>({
     queryKey: ["/api/factory/bales/daily-summary", date],
     queryFn: () =>
       fetch(`/api/factory/bales/daily-summary?date=${date}`, { credentials: "include" }).then((r) => r.json()),

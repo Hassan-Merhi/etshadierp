@@ -49,44 +49,44 @@ export async function getCachedERPContext(companyId: number): Promise<ERPContext
 
 export interface ERPContext {
   dataFetchedAt: string; // ISO timestamp when data was fetched
-  inventory: unknown[];
-  stockItems: unknown[];
-  stockGroups: unknown[];
-  ledgerAccounts: unknown[];
-  suppliers: unknown[];
-  customers: unknown[];
-  locations: unknown[];
-  recentVouchers: unknown[];
-  salesSummary: unknown;
-  profitAnalysis: unknown;
-  todaysSales: unknown;
-  thisMonthSales: unknown;
-  lowStockAlerts: unknown[];
-  supplierBalances: unknown[];
-  customerBalances: unknown[];
-  purchaseOrders: unknown[];
-  containerSales: unknown[];
-  financialSummary: unknown;
-  inventoryValueByLocation: unknown[];
-  topSellingItems: unknown[];
-  recentTransactions: unknown[];
+  inventory: any[];
+  stockItems: any[];
+  stockGroups: any[];
+  ledgerAccounts: any[];
+  suppliers: any[];
+  customers: any[];
+  locations: any[];
+  recentVouchers: any[];
+  salesSummary: any;
+  profitAnalysis: any;
+  todaysSales: any;
+  thisMonthSales: any;
+  lowStockAlerts: any[];
+  supplierBalances: any[];
+  customerBalances: any[];
+  purchaseOrders: any[];
+  containerSales: any[];
+  financialSummary: any;
+  inventoryValueByLocation: any[];
+  topSellingItems: any[];
+  recentTransactions: any[];
   // New smart data
-  slowMovingStock: unknown[];
-  overdueContainers: unknown[];
-  employeeBalances: unknown[];
-  itemsToMarkdown: unknown[];
-  containersInTransit: unknown[];
+  slowMovingStock: any[];
+  overdueContainers: any[];
+  employeeBalances: any[];
+  itemsToMarkdown: any[];
+  containersInTransit: any[];
   // Full searchable data
-  stockItemsWithInventory: unknown[];
-  recentSalesHistory: unknown[];
+  stockItemsWithInventory: any[];
+  recentSalesHistory: any[];
   // Profit/loss per item
-  itemProfitabilityReport: unknown[];
+  itemProfitabilityReport: any[];
   // Price vs cost for items currently in stock
-  pricingHealthReport: unknown[];
+  pricingHealthReport: any[];
   // Sales broken down by stock group
-  salesByGroup: unknown[];
-  salesByGroupToday: unknown[];
-  salesByGroupThisMonth: unknown[];
+  salesByGroup: any[];
+  salesByGroupToday: any[];
+  salesByGroupThisMonth: any[];
 }
 
 export interface UserPreferences {
@@ -494,7 +494,7 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
     .filter((item) => parseFloat(item.avgCostPrice) > 0) // only items with known cost
     .sort((a, b) => parseFloat(a.priceGap) - parseFloat(b.priceGap)); // most losing first
 
-  const lowStockAlerts: unknown[] = [];
+  const lowStockAlerts: any[] = [];
   for (const item of stockItems) {
     const qty = parseFloat(inventoryMap.get(item.id)?.quantity || "0");
     const reorderLevel = parseFloat(item.reorderLevel || "0");
@@ -562,7 +562,7 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
   // Filter to only show suppliers with non-zero balances
   const filteredSupplierBalances = supplierBalances.filter((sb) => Math.abs(sb.balance) > 0.01);
 
-  let customerBalancesList: unknown[] = [];
+  let customerBalancesList: any[] = [];
   try {
     const customerBalancesRaw = await db
       .select({

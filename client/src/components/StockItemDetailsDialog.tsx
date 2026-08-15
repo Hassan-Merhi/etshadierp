@@ -121,7 +121,7 @@ export function StockItemDetailsDialog({
   });
 
   // Fetch location prices
-  const { data: locationPrices = [], isLoading: loadingLocationPrices } = useQuery<unknown[]>({
+  const { data: locationPrices = [], isLoading: loadingLocationPrices } = useQuery<any[]>({
     queryKey: [`/api/stock-items/${stockItemId}/location-prices`],
     enabled: open,
   });
@@ -154,7 +154,7 @@ export function StockItemDetailsDialog({
 
   // Update transaction mutation
   const updateTransactionMutation = useMutation({
-    mutationFn: async ({ id, type, updates }: { id: number; type: string; updates: unknown }) => {
+    mutationFn: async ({ id, type, updates }: { id: number; type: string; updates: any }) => {
       const endpoint = type === "transfer" ? `/api/stock-transfer-items/${id}` : `/api/stock-adjustment-items/${id}`;
       const response = await apiRequest("PATCH", endpoint, updates);
       return response.json();

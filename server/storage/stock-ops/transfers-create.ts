@@ -18,7 +18,7 @@ export async function createStockTransfer(
   destinationLocationId: number,
   notes: string,
   items: Array<{ sourceLocationId: number; stockItemId: number; quantity: string; rate: string }>
-): Promise<unknown> {
+): Promise<any> {
   return await db.transaction(async (tx) => {
     const [voucher] = await tx.select().from(schema.vouchers).where(eq(schema.vouchers.id, voucherId));
     if (!voucher) throw new Error(`Voucher ${voucherId} not found`);
@@ -134,7 +134,7 @@ export async function createStockAdjustment(
   notes: string,
   items: Array<{ stockItemId: number; quantity: string; rate: string }>,
   consumptionAccountOverride?: { code: string; name: string }
-): Promise<unknown> {
+): Promise<any> {
   return await db.transaction(async (tx) => {
     const [voucher] = await tx.select().from(schema.vouchers).where(eq(schema.vouchers.id, voucherId));
     if (!voucher) throw new Error(`Voucher ${voucherId} not found`);

@@ -377,7 +377,7 @@ export async function approvePendingStockTransferRevision(
       ORDER BY revision_number ASC
       FOR UPDATE
     `);
-    const pendingRows = (pendingResult.rows ?? pendingResult) as unknown[];
+    const pendingRows = (pendingResult.rows ?? pendingResult) as any[];
     if (pendingRows.length === 0) {
       const currentItems = await tx
         .select({ quantity: stockTransferItems.quantity, rate: stockTransferItems.rate })

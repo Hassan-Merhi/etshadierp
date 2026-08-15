@@ -25,10 +25,10 @@ interface PlanStep {
   id: string;
   name: string;
   tool: string;
-  params: Record<string, unknown>;
+  params: Record<string, any>;
   requiresApproval: boolean;
   status: "pending" | "running" | "completed" | "failed" | "waiting_approval" | "skipped";
-  result?: unknown;
+  result?: any;
   error?: string;
   approvalId?: number;
   startedAt?: string;

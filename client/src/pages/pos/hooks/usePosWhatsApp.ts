@@ -9,7 +9,7 @@ interface PosWhatsAppParams {
   pendingStockSend: boolean;
   setPendingStockSend: (val: boolean) => void;
   activeLocation: Location | null;
-  savedSale: unknown;
+  savedSale: any;
   setInvoiceWaStatus: (s: "idle" | "sending" | "sent" | "failed") => void;
   setStockWaStatus: (s: "idle" | "sending" | "sent" | "failed" | "not_configured") => void;
   setSendingInvoiceWhatsApp: (v: boolean) => void;

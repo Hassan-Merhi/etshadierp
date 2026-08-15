@@ -39,7 +39,7 @@ function getMonthStart(): Date {
   return new Date(today.getFullYear(), today.getMonth(), 1);
 }
 
-function filterBalesByDate(bales: unknown[], startDate: Date): unknown[] {
+function filterBalesByDate(bales: any[], startDate: Date): any[] {
   return bales.filter((row) => {
     const created = new Date(row.bale.createdAt);
     return created >= startDate;
@@ -49,7 +49,7 @@ function filterBalesByDate(bales: unknown[], startDate: Date): unknown[] {
 export default function ProductionSummary() {
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
-  const { data: balesData, isLoading: balesLoading } = useQuery<unknown[]>({
+  const { data: balesData, isLoading: balesLoading } = useQuery<any[]>({
     queryKey: ["/api/factory/bales"],
   });
 

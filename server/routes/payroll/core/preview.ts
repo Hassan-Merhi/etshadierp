@@ -66,7 +66,7 @@ export function registerPayrollPreviewRoutes(app: Express) {
             )
         : [];
 
-      const attendanceByWorker = new Map<number, unknown[]>();
+      const attendanceByWorker = new Map<number, any[]>();
       for (const att of attendanceRecords) {
         const list = attendanceByWorker.get(att.workerId) || [];
         list.push(att);

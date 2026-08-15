@@ -127,7 +127,7 @@ export function registerFactorySupplierUsageReportRoutes(app: Express, requireAu
       }
 
       const supplierSummaries = [];
-      const supplierGroups = new Map<number, unknown[]>();
+      const supplierGroups = new Map<number, any[]>();
 
       for (const container of allContainers) {
         const sid = container.supplierId || 0;

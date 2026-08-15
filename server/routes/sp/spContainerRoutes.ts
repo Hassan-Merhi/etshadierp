@@ -359,7 +359,7 @@ export function registerSpContainerRoutes(app: Express) {
         .from(spOffloads)
         .where(and(eq(spOffloads.containerId, id), eq(spOffloads.companyId, companyId)));
 
-      let offloadCharges: unknown[] = [];
+      let offloadCharges: any[] = [];
       if (offload) {
         offloadCharges = await db.select().from(spOffloadCharges).where(eq(spOffloadCharges.offloadId, offload.id));
       }
@@ -404,7 +404,7 @@ export function registerSpContainerRoutes(app: Express) {
         WHERE a.company_id = ${companyId}
       `);
       const aliasMap = new Map<string, { stockItemId: number; itemCode: string; itemName: string }>();
-      for (const row of aliasResult.rows as unknown[]) {
+      for (const row of aliasResult.rows as any[]) {
         aliasMap.set(row.alias_code, {
           stockItemId: row.stock_item_id,
           itemCode: row.item_code,
@@ -457,7 +457,7 @@ export function registerSpContainerRoutes(app: Express) {
 
       const containerId = req.query.containerId ? parseInt(req.query.containerId as string) : null;
 
-      const conditions: unknown[] = [eq(spPrepaidCharges.companyId, companyId)];
+      const conditions: any[] = [eq(spPrepaidCharges.companyId, companyId)];
       if (containerId) conditions.push(eq(spPrepaidCharges.containerId, containerId));
 
       const rows = await db

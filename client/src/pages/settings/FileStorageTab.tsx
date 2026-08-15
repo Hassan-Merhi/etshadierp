@@ -47,7 +47,7 @@ interface PreviewState {
   type: PreviewType;
   blobUrl?: string;
   text?: string;
-  rows?: unknown[][];
+  rows?: any[][];
   loading: boolean;
   error?: boolean;
 }
@@ -299,9 +299,9 @@ export function FileStorageTab() {
         try {
           const wb = await readFromBuffer(ab);
           const sheet = wb.worksheets[0];
-          const rows: unknown[][] = [];
+          const rows: any[][] = [];
           sheet.eachRow((row) => {
-            rows.push((row.values as unknown[]).slice(1));
+            rows.push((row.values as any[]).slice(1));
           });
           setPreview({ file, type, rows, loading: false });
         } catch {

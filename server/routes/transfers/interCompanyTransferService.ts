@@ -16,7 +16,7 @@ async function getOrCreateInterCompanyAccount(params: {
   code: string;
   name: string;
   accountType: "Asset" | "Liability";
-  accounts: unknown[];
+  accounts: any[];
 }) {
   const existing = params.accounts.find((account) => account.code === params.code);
   if (existing) return existing;

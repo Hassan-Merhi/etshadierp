@@ -22,10 +22,10 @@ export interface PeriodLockActor {
 }
 
 export interface PeriodLockAdapter {
-  findApplicableLock(input: { tx: unknown; scope: PeriodLockScope }): Promise<PeriodLockRecord | null>;
-  lockPeriodState(input: { tx: unknown; companyId: number; domain: ProtectedDomain }): Promise<PeriodLockRecord | null>;
+  findApplicableLock(input: { tx: any; scope: PeriodLockScope }): Promise<PeriodLockRecord | null>;
+  lockPeriodState(input: { tx: any; companyId: number; domain: ProtectedDomain }): Promise<PeriodLockRecord | null>;
   persistLock(input: {
-    tx: unknown;
+    tx: any;
     companyId: number;
     domain: ProtectedDomain;
     lockedThrough: string;
@@ -33,7 +33,7 @@ export interface PeriodLockAdapter {
     actor: PeriodLockActor;
   }): Promise<PeriodLockRecord>;
   recordAudit(input: {
-    tx: unknown;
+    tx: any;
     action: "lock" | "extend" | "override";
     companyId: number;
     domain: ProtectedDomain;
@@ -44,7 +44,7 @@ export interface PeriodLockAdapter {
     sourceId: string;
   }): Promise<void>;
   findExistingOverride(input: {
-    tx: unknown;
+    tx: any;
     companyId: number;
     domain: ProtectedDomain;
     sourceType: string;
@@ -52,7 +52,7 @@ export interface PeriodLockAdapter {
     idempotencyKey: string;
   }): Promise<boolean>;
   recordOverride(input: {
-    tx: unknown;
+    tx: any;
     companyId: number;
     domain: ProtectedDomain;
     sourceType: string;

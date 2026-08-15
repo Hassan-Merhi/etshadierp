@@ -32,7 +32,7 @@ async function companyRow(companyId: number): Promise<any | null> {
   return firstRow(result) ?? null;
 }
 
-export async function buildFinalSpVerification(sourceId: number, targetId: number): Promise<unknown> {
+export async function buildFinalSpVerification(sourceId: number, targetId: number): Promise<any> {
   await Promise.all([ensurePhase2Schema(), ensureCutoverSchema()]);
   const areas: VerificationArea[] = [];
   const [source, target] = await Promise.all([companyRow(sourceId), companyRow(targetId)]);

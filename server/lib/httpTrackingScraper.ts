@@ -105,7 +105,7 @@ async function tryMsc(containerNumber: string): Promise<HttpScraperResult> {
     });
     if (!resp.ok) return { success: false, shipment: null, error: `MSC HTTP ${resp.status}` };
     const data: any = await resp.json();
-    const activities: unknown[] = data?.TrackingDetails?.TrackingActivities ?? data?.trackingActivities ?? [];
+    const activities: any[] = data?.TrackingDetails?.TrackingActivities ?? data?.trackingActivities ?? [];
     if (!activities.length) return { success: false, shipment: null, error: "MSC: no activities" };
     const events = activities.map((a) => ({
       date: a.ActivityDate ?? a.date ?? "",
@@ -154,7 +154,7 @@ async function tryHapag(containerNumber: string): Promise<HttpScraperResult> {
     );
     if (!resp.ok) return { success: false, shipment: null, error: `Hapag HTTP ${resp.status}` };
     const data: any = await resp.json();
-    const moves: unknown[] = data?.containerJourneys?.[0]?.containerMoves ?? data?.moves ?? [];
+    const moves: any[] = data?.containerJourneys?.[0]?.containerMoves ?? data?.moves ?? [];
     if (!moves.length) return { success: false, shipment: null, error: "Hapag: no moves" };
     const events = moves.map((m) => ({
       date: m.eventDateTime ?? m.date ?? "",
@@ -186,7 +186,7 @@ async function tryCosco(containerNumber: string): Promise<HttpScraperResult> {
     const data: any = await resp.json();
     const detail = data?.data?.content?.[0];
     if (!detail) return { success: false, shipment: null, error: "COSCO: no data" };
-    const moves: unknown[] = detail.movementActivities ?? detail.activities ?? [];
+    const moves: any[] = detail.movementActivities ?? detail.activities ?? [];
     const events = moves.map((m) => ({
       date: m.eventDate ?? m.date ?? "",
       status: m.activity ?? m.status ?? "",
@@ -215,7 +215,7 @@ async function tryEvergreen(containerNumber: string): Promise<HttpScraperResult>
     );
     if (!resp.ok) return { success: false, shipment: null, error: `Evergreen HTTP ${resp.status}` };
     const data: any = await resp.json();
-    const moves: unknown[] = data?.EventList ?? data?.events ?? [];
+    const moves: any[] = data?.EventList ?? data?.events ?? [];
     if (!moves.length) return { success: false, shipment: null, error: "Evergreen: no events" };
     const events = moves.map((m) => ({
       date: m.EventDate ?? m.date ?? "",
@@ -260,7 +260,7 @@ async function tryMaerskHtml(containerNumber: string): Promise<HttpScraperResult
         const props = nextData?.props?.pageProps ?? {};
         const td = props?.tracking ?? props?.trackingData ?? props?.container ?? props?.shipment;
         if (td) {
-          const rawEvents: unknown[] = td.events ?? td.movements ?? td.milestones ?? td.containers?.[0]?.events ?? [];
+          const rawEvents: any[] = td.events ?? td.movements ?? td.milestones ?? td.containers?.[0]?.events ?? [];
           if (rawEvents.length > 0) {
             const events = rawEvents.map((e) => ({
               date: e.eventDateTime ?? e.eventDate ?? e.timestamp ?? e.date ?? "",
@@ -285,7 +285,7 @@ async function tryMaerskHtml(containerNumber: string): Promise<HttpScraperResult
     for (const m of html.matchAll(/<script[^>]+type="application\/json"[^>]*>([\s\S]*?)<\/script>/gi)) {
       try {
         const data = JSON.parse(m[1]);
-        const events: unknown[] = data?.events ?? data?.movements ?? [];
+        const events: any[] = data?.events ?? data?.movements ?? [];
         if (events.length > 0) {
           const mapped = events.map((e) => ({
             date: e.date ?? e.eventDateTime ?? "",
@@ -357,7 +357,7 @@ async function tryPageHtml(containerNumber: string): Promise<HttpScraperResult> 
 
 function extractFromNuxt(payload: any, containerNumber: string): ParcelsAppShipment | null {
   if (!payload || typeof payload !== "object") return null;
-  const candidates: unknown[] =
+  const candidates: any[] =
     payload?.shipments ?? payload?.parcels ?? payload?.data?.shipments ?? payload?.data?.parcels ?? [];
   if (candidates.length) {
     const match =

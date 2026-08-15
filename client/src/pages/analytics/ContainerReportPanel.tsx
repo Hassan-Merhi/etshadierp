@@ -8,7 +8,7 @@ import { ReportContainer, ContainerData, Supplier } from "./analyticsTypes";
 
 interface ContainerReportPanelProps {
   appMode: string;
-  factoryContainerSales: unknown;
+  factoryContainerSales: any;
   loadingFactoryContainerSales: boolean;
   formatAmount: (amount: number) => string;
   containerPeriodFilter: PeriodFilterValue;
@@ -20,7 +20,7 @@ interface ContainerReportPanelProps {
   setReportContainerStatus: (status: string) => void;
   reportAllCompanies: string;
   setReportAllCompanies: (id: string) => void;
-  userCompanies: unknown[];
+  userCompanies: any[];
   loadingContainers: boolean;
   containerData?: ContainerData;
 }

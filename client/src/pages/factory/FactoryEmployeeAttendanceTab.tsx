@@ -95,7 +95,7 @@ function SummaryCard({
   color,
   testId,
 }: {
-  icon: unknown;
+  icon: any;
   label: string;
   value: number;
   color: string;
@@ -150,7 +150,7 @@ export default function FactoryEmployeeAttendanceTab() {
   }, [data]);
 
   const saveMutation = useMutation({
-    mutationFn: (records: unknown[]) => apiRequest("POST", "/api/factory/employee-attendance/bulk", { records }),
+    mutationFn: (records: any[]) => apiRequest("POST", "/api/factory/employee-attendance/bulk", { records }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employee-attendance", selectedDate] });
       toast({ title: "Attendance saved", description: `Saved for ${selectedDate}` });
@@ -500,7 +500,7 @@ function PerEmployeeView() {
   const absentCount = dates.length - presentCount;
 
   const saveMutation = useMutation({
-    mutationFn: (records: unknown[]) => apiRequest("POST", "/api/factory/employee-attendance/bulk", { records }),
+    mutationFn: (records: any[]) => apiRequest("POST", "/api/factory/employee-attendance/bulk", { records }),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["/api/factory/employee-attendance/employee", empIdNum, startDate, endDate],

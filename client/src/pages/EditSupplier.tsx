@@ -34,7 +34,7 @@ export default function EditSupplier() {
     enabled: !!supplierId,
   });
 
-  const { data: stockGroups = [] } = useQuery<unknown[]>({
+  const { data: stockGroups = [] } = useQuery<any[]>({
     queryKey: ["/api/stock-groups", selectedCompany?.id],
     enabled: !!selectedCompany?.id,
     queryFn: async () => {

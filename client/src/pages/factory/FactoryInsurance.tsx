@@ -67,7 +67,7 @@ export default function FactoryInsurance() {
   const ecDrRef = useRef<HTMLDivElement>(null);
   const ecCrRef = useRef<HTMLDivElement>(null);
 
-  const { data: ledgerAccounts = [] } = useQuery<unknown[]>({
+  const { data: ledgerAccounts = [] } = useQuery<any[]>({
     queryKey: ["/api/ledger-accounts?includeHidden=true"],
     staleTime: 60_000,
     refetchOnWindowFocus: false,
@@ -75,7 +75,7 @@ export default function FactoryInsurance() {
 
   // Find the Insurance Expense account dynamically from the fetched accounts list
   const insuranceExpenseAccount = useMemo(
-    () => (ledgerAccounts as unknown[]).find((a) => a.name === "Insurance Expense"),
+    () => (ledgerAccounts as any[]).find((a) => a.name === "Insurance Expense"),
     [ledgerAccounts]
   );
   const { data: insExpenseBalance } = useQuery<{ balance: number }>({

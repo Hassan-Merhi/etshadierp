@@ -22,7 +22,7 @@ interface BaleFormDialogProps {
   form: UseFormReturn<BaleFormValues>;
   onSubmit: (data: BaleFormValues) => void;
   isPending: boolean;
-  containers: unknown[];
+  containers: any[];
 }
 
 export function BaleFormDialog({ open, onOpenChange, form, onSubmit, isPending, containers }: BaleFormDialogProps) {

@@ -171,7 +171,7 @@ export default function IntercompanyLinks() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, payload }: { id: number; payload: unknown }) =>
+    mutationFn: ({ id, payload }: { id: number; payload: any }) =>
       apiRequest("PUT", `/api/intercompany-links/${id}`, payload),
     onSuccess: () => {
       toast({ title: "Link updated" });

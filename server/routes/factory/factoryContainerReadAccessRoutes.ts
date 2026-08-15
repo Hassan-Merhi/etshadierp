@@ -111,7 +111,7 @@ export function registerFactoryContainerReadAccessRoutes(app: Express) {
           )
         );
 
-      const paymentsByFreight = new Map<number, unknown[]>();
+      const paymentsByFreight = new Map<number, any[]>();
       for (const payment of payments) {
         const existing = paymentsByFreight.get(payment.containerFreightId) ?? [];
         existing.push(payment);

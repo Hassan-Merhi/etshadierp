@@ -38,7 +38,7 @@ interface LocationDialogsProps {
   setRenameInput: (s: string) => void;
   renameDeductionInput: string;
   setRenameDeductionInput: (s: string) => void;
-  renameLocationMutation: unknown;
+  renameLocationMutation: any;
 
   // Delete Dialog
   deleteDialogOpen: boolean;
@@ -52,29 +52,29 @@ interface LocationDialogsProps {
   setArchiveDialogOpen: (o: boolean) => void;
   isArchiving: boolean;
   handleArchiveStockGroup: () => void;
-  selectedGroup: unknown;
+  selectedGroup: any;
 
   // WhatsApp Dialog
   waGroupDialogOpen: boolean;
   setWaGroupDialogOpen: (o: boolean) => void;
-  waChats: unknown[];
+  waChats: any[];
   waChatsLoading: boolean;
   waGroupSearch: string;
   setWaGroupSearch: (s: string) => void;
   waGroupSelectedId: string;
   setWaGroupSelectedId: (s: string) => void;
-  waGroupMutation: unknown;
-  waTestMutation: unknown;
+  waGroupMutation: any;
+  waTestMutation: any;
   waGroupLocation: Location | null;
 
   // Stock Movement Dialog
   stockMovementOpen: boolean;
   setStockMovementOpen: (o: boolean) => void;
-  stockMovementItem: unknown;
+  stockMovementItem: any;
   setStockMovementItem: (item: any) => void;
-  stockMovementPeriod: unknown;
+  stockMovementPeriod: any;
   setStockMovementPeriod: (p: any) => void;
-  drillMonth: unknown;
+  drillMonth: any;
   setDrillMonth: (m: any) => void;
   formatAmount: (amt: number) => string;
   navigate: (path: string) => void;

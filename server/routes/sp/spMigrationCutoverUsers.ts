@@ -67,7 +67,7 @@ async function switchUserSessions(params: {
   return resultRows(result).length;
 }
 
-async function mapSourceRole(sourceId: number, targetId: number, sourceRole: any): Promise<unknown> {
+async function mapSourceRole(sourceId: number, targetId: number, sourceRole: any): Promise<any> {
   const location = sourceRole.assigned_location_id
     ? await resolveTargetLocation(sourceId, targetId, pn(sourceRole.assigned_location_id))
     : null;
@@ -97,7 +97,7 @@ export async function moveUsersToTarget(
   sourceId: number,
   targetId: number,
   targetCompanyName: string
-): Promise<unknown> {
+): Promise<any> {
   await ensureCutoverSchema();
   const sourceRolesResult = await db.execute(sql`
     SELECT * FROM user_company_roles
@@ -258,7 +258,7 @@ export async function restoreUsersToSource(
   sourceId: number,
   targetId: number,
   sourceCompanyName: string
-): Promise<unknown> {
+): Promise<any> {
   await ensureCutoverSchema();
   const changesResult = await db.execute(sql`
     SELECT * FROM sp_migration_cutover_role_changes

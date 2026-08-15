@@ -47,7 +47,7 @@ const V_ALIGN: Record<string, number> = {
 
 // ─── Fortune Sheet conditional format helpers ────────────────────────────────
 
-function cfStyleToFortune(style: any): unknown {
+function cfStyleToFortune(style: any): any {
   if (!style) return {};
   const result: any = {};
   if (style.fill?.fgColor?.argb) result.bg = argbToHex(style.fill.fgColor.argb);
@@ -57,10 +57,10 @@ function cfStyleToFortune(style: any): unknown {
   return result;
 }
 
-function buildConditions(ws: any): unknown[] {
-  const conditions: unknown[] = [];
+function buildConditions(ws: any): any[] {
+  const conditions: any[] = [];
   try {
-    const cfs: unknown[] = ws.conditionalFormattings || [];
+    const cfs: any[] = ws.conditionalFormattings || [];
     for (const cf of cfs) {
       for (const rule of cf.rules || []) {
         try {
@@ -161,7 +161,7 @@ export async function excelToFortune(buf: ArrayBuffer): Promise<FortuneSheet[]> 
 
   wb.eachSheet((ws, sheetId) => {
     const order = sheetId - 1;
-    const celldata: unknown[] = [];
+    const celldata: any[] = [];
     const config: any = {};
 
     // ── Cells ────────────────────────────────────────────────────────────
@@ -179,12 +179,12 @@ export async function excelToFortune(buf: ArrayBuffer): Promise<FortuneSheet[]> 
         const val = cell.value;
         if (val !== null && val !== undefined) {
           if (typeof val === "object" && "formula" in (val as object)) {
-            const fv = val as { formula: string; result?: unknown };
+            const fv = val as { formula: string; result?: any };
             v.f = fv.formula;
             v.v = fv.result ?? null;
             v.m = fv.result !== undefined && fv.result !== null ? String(fv.result) : "";
           } else if (typeof val === "object" && "sharedFormula" in (val as object)) {
-            const sfv = val as { sharedFormula: string; result?: unknown };
+            const sfv = val as { sharedFormula: string; result?: any };
             v.f = sfv.sharedFormula;
             v.v = sfv.result ?? null;
             v.m = sfv.result !== undefined && sfv.result !== null ? String(sfv.result) : "";

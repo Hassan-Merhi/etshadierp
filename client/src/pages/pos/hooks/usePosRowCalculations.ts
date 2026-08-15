@@ -10,8 +10,8 @@ interface PosRowCalculationsParams {
   lastSoldPrices: Record<number, string>;
   activeCurrency: string;
   exchangeRate: number | null;
-  authUser: unknown;
-  posUser: unknown;
+  authUser: any;
+  posUser: any;
   focusCell: (row: number, col: number) => void;
 }
 

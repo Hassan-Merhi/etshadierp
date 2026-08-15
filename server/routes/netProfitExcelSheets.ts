@@ -15,14 +15,14 @@
  * to the code that moved.
  */
 export interface NetProfitSheetContext {
-  companyAccounts: unknown[];
+  companyAccounts: any[];
   importChargesIds: Set<number>;
   companyName: string;
 }
 
 export const fmt = (n: number) => parseFloat(n.toFixed(2));
 
-export function computeBalancesFromEntries(entries: unknown[]): Map<number, { debit: number; credit: number }> {
+export function computeBalancesFromEntries(entries: any[]): Map<number, { debit: number; credit: number }> {
   const bal = new Map<number, { debit: number; credit: number }>();
   for (const e of entries) {
     if (e.ledgerAccountId) {
@@ -243,7 +243,7 @@ export function writeSheet(
   };
 
   // Helper: account detail rows
-  const addAccRows = (rows: unknown[]) => {
+  const addAccRows = (rows: any[]) => {
     if (rows.length === 0) {
       const empty = ws.addRow(["", "(none)", "", "", ""]);
       empty.getCell(2).font = { italic: true, color: { argb: "FF888888" } };
@@ -413,7 +413,7 @@ export function writeSummarySheet(
   ws.getRow(1).height = 36;
 
   // Header row: [blank] | Month1 | Month2 | ... | TOTAL
-  const hdrRowData: unknown[] = [""];
+  const hdrRowData: any[] = [""];
   for (const ml of monthLabels) hdrRowData.push(ml);
   hdrRowData.push("TOTAL");
   const hdrRow = ws.addRow(hdrRowData);
@@ -446,7 +446,7 @@ export function writeSummarySheet(
       indent?: boolean;
     } = {}
   ) => {
-    const rowData: unknown[] = [opts.indent ? "  " + label : label];
+    const rowData: any[] = [opts.indent ? "  " + label : label];
     for (const v of monthVals) rowData.push(opts.pct ? v / 100 : fmt(v));
     rowData.push(opts.pct ? fmt(totalVal) / 100 : fmt(totalVal));
     const row = ws.addRow(rowData);
@@ -466,7 +466,7 @@ export function writeSummarySheet(
   };
 
   const writeSectionHdr = (label: string, color: string) => {
-    const rowData: unknown[] = [label];
+    const rowData: any[] = [label];
     for (let i = 0; i <= numMonths; i++) rowData.push("");
     const row = ws.addRow(rowData);
     row.eachCell((cell: any) => {
@@ -505,7 +505,7 @@ export function writeSummarySheet(
   writeSectionHdr("COST OF GOODS SOLD (COGS)", "FFDC2626");
   // Opening Stock: only show in total column (not per-month)
   {
-    const rowData: unknown[] = ["Opening Stock"];
+    const rowData: any[] = ["Opening Stock"];
     for (let i = 0; i < numMonths; i++) rowData.push("—");
     rowData.push(fmt(totalStats.openingSt));
     const row = ws.addRow(rowData);
@@ -533,7 +533,7 @@ export function writeSummarySheet(
   );
   // Closing Stock: only show in total column (negative, reduces COGS)
   {
-    const rowData: unknown[] = ["Less: Closing Stock"];
+    const rowData: any[] = ["Less: Closing Stock"];
     for (let i = 0; i < numMonths; i++) rowData.push("—");
     rowData.push(fmt(-totalStats.closingSt));
     const row = ws.addRow(rowData);

@@ -305,7 +305,7 @@ export function registerBaleLookupRoutes(app: Express) {
       let locationInfo: any = null;
       let pressingBatch: any = null;
       let mixBatch: any = null;
-      let containers_used: unknown[] = [];
+      let containers_used: any[] = [];
 
       const [factoryBale] = await db
         .select()
@@ -509,7 +509,7 @@ export function registerBaleLookupRoutes(app: Express) {
       }
 
       // Fetch audit history for this bale
-      let auditHistory: unknown[] = [];
+      let auditHistory: any[] = [];
       if (baleInfo?.id) {
         auditHistory = await db
           .select({

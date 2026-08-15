@@ -2,7 +2,7 @@ import { format } from "date-fns";
 import { utils, writeFile } from "@/lib/excelHelper";
 
 interface ExportParams {
-  formData: unknown;
+  formData: any;
   activeTab: string;
   toast: (opts: any) => void;
   detailed: boolean;

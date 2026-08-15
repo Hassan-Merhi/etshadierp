@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { UseFormReturn } from "react-hook-form";
 
 interface VoucherFormHeaderProps {
-  form: UseFormReturn<unknown>;
+  form: UseFormReturn<any>;
   voucherNumber?: string;
   title: string;
   description?: string;

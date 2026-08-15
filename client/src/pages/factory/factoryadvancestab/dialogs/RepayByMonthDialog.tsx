@@ -35,18 +35,18 @@ export function RepayByMonthDialog({
   setRepayByMonthOpen,
   setRepayingMonth,
 }: {
-  advances: unknown;
-  cashAccounts: unknown;
-  repayByMonthExpanded: unknown;
-  repayByMonthForm: unknown;
-  repayByMonthMutation: unknown;
-  repayByMonthOpen: unknown;
-  repayingMonth: unknown;
-  setConfirmRepay: unknown;
-  setRepayByMonthExpanded: unknown;
-  setRepayByMonthForm: unknown;
-  setRepayByMonthOpen: unknown;
-  setRepayingMonth: unknown;
+  advances: any;
+  cashAccounts: any;
+  repayByMonthExpanded: any;
+  repayByMonthForm: any;
+  repayByMonthMutation: any;
+  repayByMonthOpen: any;
+  repayingMonth: any;
+  setConfirmRepay: any;
+  setRepayByMonthExpanded: any;
+  setRepayByMonthForm: any;
+  setRepayByMonthOpen: any;
+  setRepayingMonth: any;
 }) {
   return (
     <Dialog

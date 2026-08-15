@@ -82,8 +82,8 @@ export default function WipersReEntry() {
   });
   const { data: locations } = useQuery<Location[]>({ queryKey: ["/api/locations"] });
   const { data: categories = [] } = useQuery<FactoryCategory[]>({ queryKey: ["/api/factory/categories"] });
-  const { data: workers = [] } = useQuery<unknown[]>({ queryKey: ["/api/factory/workers"] });
-  const { data: allBalesData = [], isLoading: balesLoading } = useQuery<unknown[]>({
+  const { data: workers = [] } = useQuery<any[]>({ queryKey: ["/api/factory/workers"] });
+  const { data: allBalesData = [], isLoading: balesLoading } = useQuery<any[]>({
     queryKey: ["/api/factory/bales"],
     enabled: cleanupOpen,
   });

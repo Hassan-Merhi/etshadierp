@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 interface PasswordResetDialogProps {
-  user: unknown;
+  user: any;
   onClose: () => void;
   onReset: (userId: string, newPassword: string) => void;
   newPassword: string;

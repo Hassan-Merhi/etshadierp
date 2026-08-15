@@ -12,13 +12,13 @@ import { cn } from "@/lib/utils";
 
 interface CombinedStockViewProps {
   allInventoryLoading: boolean;
-  filteredCombinedRows: unknown[];
-  allInventoryData: unknown[];
-  allInventoryLocations: unknown[];
-  allInventoryGroups: unknown[];
+  filteredCombinedRows: any[];
+  allInventoryData: any[];
+  allInventoryLocations: any[];
+  allInventoryGroups: any[];
   /** Full location list from /api/locations — used for the dropdown so empty locations are still visible */
-  allLocations?: unknown[];
-  categoriesList: unknown[];
+  allLocations?: any[];
+  categoriesList: any[];
   allStockSearchTerm: string;
   setAllStockSearchTerm: (s: string) => void;
   allStockGroupFilter: string;
@@ -30,7 +30,7 @@ interface CombinedStockViewProps {
   allStockSelectedRowIndex: number;
   openMovement: (locId: number | null, locName: string | null, stockItemId: number, stockItemName: string) => void;
   formatAmount: (amt: number) => string;
-  posUser?: unknown;
+  posUser?: any;
   allStockTableRef: React.RefObject<HTMLDivElement>;
 }
 

@@ -1,6 +1,6 @@
 export interface ReportQueryParams {
   queryType?: string;
-  [key: string]: unknown;
+  [key: string]: any;
 }
 
 export interface DataQueryContext {

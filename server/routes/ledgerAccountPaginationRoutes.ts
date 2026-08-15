@@ -89,7 +89,7 @@ export function registerLedgerAccountPaginationRoutes(app: Express): void {
             .json({ message: "Access denied for selected company" });
         }
 
-        const conditions: unknown[] = [
+        const conditions: any[] = [
           eq(ledgerAccounts.companyId, companyId),
           isNull(ledgerAccounts.deletedAt),
         ];

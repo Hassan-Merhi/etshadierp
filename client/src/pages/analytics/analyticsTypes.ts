@@ -33,7 +33,7 @@ export interface POSTransaction {
   totalAmount: number;
   totalQuantity: number;
   itemCount: number;
-  items: unknown[];
+  items: any[];
 }
 
 export interface StockLocation {

@@ -59,7 +59,7 @@ export function registerSupplierBrokerVisualStatementRoutes(app: Express) {
       const containers = await containerQuery.orderBy(factoryContainers.arrivalDate, factoryContainers.createdAt);
 
       // Build container rows
-      const containerRows = (containers as unknown[]).map((c) => {
+      const containerRows = (containers as any[]).map((c) => {
         const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
         const rate = parseFloat(c.ratePerKg || "0");
         return {
@@ -110,7 +110,7 @@ export function registerSupplierBrokerVisualStatementRoutes(app: Express) {
       const fxTransfers = await fxQuery.orderBy(factorySupplierFxTransfers.date);
 
       // Voucher payments (non-optional only)
-      let vpayRows: unknown[] = [];
+      let vpayRows: any[] = [];
       if (allSupplierIds.length > 0) {
         let vpayQ = db
           .select({
@@ -154,7 +154,7 @@ export function registerSupplierBrokerVisualStatementRoutes(app: Express) {
 
       const paymentRows: PayRow[] = [];
 
-      for (const p of payments as unknown[]) {
+      for (const p of payments as any[]) {
         const amt = parseFloat(p.amount || "0");
         const cc = p.currencyCode || "USD";
         // factory_supplier_payments has no fxRateConfirmed column yet — legacy heuristic stopgap.
@@ -175,7 +175,7 @@ export function registerSupplierBrokerVisualStatementRoutes(app: Express) {
         });
       }
 
-      for (const v of vpayRows as unknown[]) {
+      for (const v of vpayRows as any[]) {
         const amt = parseFloat(v.debitAmount || "0");
         paymentRows.push({
           id: `vpay-${v.id}`,
@@ -191,7 +191,7 @@ export function registerSupplierBrokerVisualStatementRoutes(app: Express) {
       }
 
       const seenFx = new Set<number>();
-      for (const t of fxTransfers as unknown[]) {
+      for (const t of fxTransfers as any[]) {
         if (seenFx.has(t.id)) continue;
         seenFx.add(t.id);
         const fromCc = t.fromCurrencyCode || "USD";

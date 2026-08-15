@@ -150,7 +150,7 @@ export function registerSpMigrationStockRoutes(app: Express) {
           await db.execute(sql`
           SELECT id, code, name FROM locations WHERE company_id = ${sourceId} AND deleted_at IS NULL
         `)
-        ).rows as unknown[];
+        ).rows as any[];
         const locMap = new Map<number, number>();
         for (const l of sourceLocs) await ensureTargetLocation(l, targetId, runId, locMap);
 
@@ -162,7 +162,7 @@ export function registerSpMigrationStockRoutes(app: Express) {
           JOIN stock_items si ON si.id = inv.stock_item_id
           WHERE inv.company_id = ${sourceId} AND inv.quantity > 0
         `)
-        ).rows as unknown[];
+        ).rows as any[];
 
         let movementsCreated = 0,
           skipped = 0,
@@ -198,7 +198,7 @@ export function registerSpMigrationStockRoutes(app: Express) {
                 VALUES (${targetId}, 'UNASSIGNED', 'Unassigned (migrated)', true)
                 RETURNING id
               `)
-              ).rows as unknown[];
+              ).rows as any[];
               targetLocId = pn(locRow.id);
               await trackRow(runId, "locations", targetLocId);
             }
@@ -248,7 +248,7 @@ export function registerSpMigrationStockRoutes(app: Express) {
                ${avgRate.toFixed(6)}, ${avgRate.toFixed(6)}, ${avgRate.toFixed(6)}, 'migration_opening_stock')
             RETURNING id
           `)
-          ).rows as unknown[];
+          ).rows as any[];
           await trackRow(runId, "sp_stock_movements", pn(movRow.id));
           movementsCreated++;
           rowsCreated++;
@@ -261,7 +261,7 @@ export function registerSpMigrationStockRoutes(app: Express) {
             ON CONFLICT (location_id, stock_item_id) DO NOTHING
             RETURNING id
           `)
-          ).rows as unknown[];
+          ).rows as any[];
           if (invRow) {
             await trackRow(runId, "inventory", pn(invRow.id));
             rowsCreated++;

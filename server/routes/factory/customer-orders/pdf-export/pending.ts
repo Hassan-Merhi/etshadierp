@@ -46,7 +46,7 @@ export function registerOrderPendingExportRoutes(app: Express) {
         .orderBy(customerOrderBales.id);
 
       const baleIds = baleLinks.map((b) => b.baleId).filter(Boolean);
-      const baleRows: unknown[] =
+      const baleRows: any[] =
         baleIds.length > 0 ? await db.select().from(factoryBales).where(inArray(factoryBales.id, baleIds)) : [];
       const baleMap = new Map<number, any>(baleRows.map((b) => [b.id, b]));
 

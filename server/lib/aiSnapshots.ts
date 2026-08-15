@@ -200,7 +200,7 @@ async function buildLowStock(companyId: number) {
 }
 
 // ── Registry ──────────────────────────────────────────────────────────────────
-const BUILDERS: Record<string, (companyId: number) => Promise<unknown>> = {
+const BUILDERS: Record<string, (companyId: number) => Promise<any>> = {
   business_summary: buildBusinessSummary,
   inventory_summary: buildInventorySummary,
   sales_today: buildSalesToday,
@@ -219,7 +219,7 @@ const BUILDERS: Record<string, (companyId: number) => Promise<unknown>> = {
  * @param snapshotType one of the 7 defined types
  * @param ttlSeconds   override the default TTL for this type
  */
-export async function getOrBuildAISnapshot(companyId: number, snapshotType: string, ttlSeconds?: number): Promise<unknown> {
+export async function getOrBuildAISnapshot(companyId: number, snapshotType: string, ttlSeconds?: number): Promise<any> {
   const ttl = ttlSeconds ?? DEFAULT_TTLS[snapshotType] ?? 300;
   const now = new Date();
 

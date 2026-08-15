@@ -31,10 +31,10 @@ export interface LifecycleVoucherSnapshot {
 }
 
 export interface VoucherLifecycleAdapter {
-  lockVoucher(input: { tx: unknown; companyId: number; voucherId: number }): Promise<LifecycleVoucherSnapshot | null>;
-  findOperation(input: { tx: unknown; companyId: number; idempotencyKey: string }): Promise<LifecycleResult | null>;
+  lockVoucher(input: { tx: any; companyId: number; voucherId: number }): Promise<LifecycleVoucherSnapshot | null>;
+  findOperation(input: { tx: any; companyId: number; idempotencyKey: string }): Promise<LifecycleResult | null>;
   createReversal(input: {
-    tx: unknown;
+    tx: any;
     original: LifecycleVoucherSnapshot;
     reversalDate: string;
     reason: string;
@@ -43,26 +43,26 @@ export interface VoucherLifecycleAdapter {
     entries: LifecycleVoucherSnapshot["entries"];
   }): Promise<LifecycleVoucherSnapshot>;
   createReplacement?(input: {
-    tx: unknown;
+    tx: any;
     original: LifecycleVoucherSnapshot;
     reversal: LifecycleVoucherSnapshot;
     request: ReplaceVoucherRequest;
   }): Promise<LifecycleVoucherSnapshot>;
   reverseLinkedEffects(input: {
-    tx: unknown;
+    tx: any;
     original: LifecycleVoucherSnapshot;
     reversal: LifecycleVoucherSnapshot;
     actor: PostingActor;
     reason: string;
   }): Promise<void>;
   markReversed(input: {
-    tx: unknown;
+    tx: any;
     originalVoucherId: number;
     reversalVoucherId: number;
     replacementVoucherId?: number | null;
   }): Promise<void>;
   recordOperation(input: {
-    tx: unknown;
+    tx: any;
     companyId: number;
     idempotencyKey: string;
     operation: "REVERSE" | "REPLACE";
@@ -73,7 +73,7 @@ export interface VoucherLifecycleAdapter {
 }
 
 export interface ReverseVoucherRequest {
-  tx: unknown;
+  tx: any;
   companyId: number;
   voucherId: number;
   reversalDate: string;

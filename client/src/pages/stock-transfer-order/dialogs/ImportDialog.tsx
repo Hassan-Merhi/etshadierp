@@ -23,17 +23,17 @@ export function ImportDialog({
   setImportDialogOpen,
   setImportPreview,
 }: {
-  applyImport: unknown;
-  downloadImportTemplate: unknown;
-  exportPreviewExcel: unknown;
-  exportPreviewPDF: unknown;
-  handleImportFile: unknown;
-  importDialogOpen: unknown;
-  importFileRef: unknown;
-  importLoading: unknown;
-  importPreview: unknown;
-  setImportDialogOpen: unknown;
-  setImportPreview: unknown;
+  applyImport: any;
+  downloadImportTemplate: any;
+  exportPreviewExcel: any;
+  exportPreviewPDF: any;
+  handleImportFile: any;
+  importDialogOpen: any;
+  importFileRef: any;
+  importLoading: any;
+  importPreview: any;
+  setImportDialogOpen: any;
+  setImportPreview: any;
 }) {
   return (
     <Dialog

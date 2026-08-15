@@ -185,11 +185,11 @@ export function registerTransporterStatementRoutes(app: Express) {
         GROUP BY credit_entry_id
       `);
       const paidMap = new Map<number, number>();
-      for (const a of allocRows.rows as unknown[]) {
+      for (const a of allocRows.rows as any[]) {
         paidMap.set(Number(a.credit_entry_id), parseFloat(a.paid_amount || "0"));
       }
 
-      const allRows = rawEntries.rows as unknown[];
+      const allRows = rawEntries.rows as any[];
       let totalCharged = 0;
       let totalPaid = 0;
       let runningBalance = 0;
@@ -438,7 +438,7 @@ export function registerTransporterStatementRoutes(app: Express) {
       const obSide = account.openingBalanceSide;
       let runningBalance = obSide === "Dr" ? -ob : ob;
 
-      const allRows = rawEntries.rows as unknown[];
+      const allRows = rawEntries.rows as any[];
 
       // ── FIFO allocation computed on-the-fly ──────────────────────────────────
       // In this transporter ledger:

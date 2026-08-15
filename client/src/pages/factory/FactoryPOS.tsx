@@ -83,8 +83,8 @@ export default function FactoryPOS() {
   const [mobileRowTarget, setMobileRowTarget] = useState<number | null>(null);
 
   // Queries
-  const { data: locations } = useQuery<unknown[]>({ queryKey: ["/api/locations"] });
-  const { data: allCustomers } = useQuery<unknown[]>({ queryKey: ["/api/factory/customers"] });
+  const { data: locations } = useQuery<any[]>({ queryKey: ["/api/locations"] });
+  const { data: allCustomers } = useQuery<any[]>({ queryKey: ["/api/factory/customers"] });
   const { data: inventory, isLoading: invLoading } = useQuery<InventoryItem[]>({
     queryKey: ["/api/factory/location-inventory", locationId],
     queryFn: async () => {
@@ -95,13 +95,13 @@ export default function FactoryPOS() {
     },
     enabled: !!locationId,
   });
-  const { data: ledgerAccounts } = useQuery<unknown[]>({
+  const { data: ledgerAccounts } = useQuery<any[]>({
     queryKey: ["/api/ledger-accounts?includeHidden=true"],
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   });
   const cashAccounts = (ledgerAccounts || []).filter((a: any) => a.accountType === "Cash");
-  const { data: sales, isLoading: salesLoading } = useQuery<unknown[]>({
+  const { data: sales, isLoading: salesLoading } = useQuery<any[]>({
     queryKey: ["/api/factory/pos/sales"],
     enabled: showHistory,
   });

@@ -7,11 +7,11 @@ import { BulkProgress } from "./gitContainerTypes";
 interface UseGITContainersDataProps {
   isAllowed: boolean;
   refetch: () => void;
-  toast: unknown;
+  toast: any;
   setImportResult: (v: any) => void;
   setShowProgressBanner: (v: boolean) => void;
   setBulkProgress: (v: any) => void;
-  queryClient: unknown;
+  queryClient: any;
   showProgressBanner: boolean;
 }
 

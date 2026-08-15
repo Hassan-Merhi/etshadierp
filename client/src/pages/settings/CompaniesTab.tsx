@@ -34,7 +34,7 @@ export function CompaniesTab() {
   const [companySearch, setCompanySearch] = useState("");
   const [companyToDelete, setCompanyToDelete] = useState<any>(null);
 
-  const { data: companies = [], isLoading: isLoadingCompanies } = useQuery<unknown[]>({
+  const { data: companies = [], isLoading: isLoadingCompanies } = useQuery<any[]>({
     queryKey: ["/api/companies"],
   });
 

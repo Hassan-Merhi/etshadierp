@@ -15,13 +15,13 @@ export function BaleLogoPickerPopover({
 }: {
   productId: number;
   overrideLogoId: number | null;
-  allCustomers: unknown[];
+  allCustomers: any[];
   onSelect: (logoId: number | null) => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const [pickerCustomerId, setPickerCustomerId] = useState("none");
-  const { data: logos = [] } = useQuery<unknown[]>({
+  const { data: logos = [] } = useQuery<any[]>({
     queryKey: ["/api/factory/customers", pickerCustomerId, "logos"],
     queryFn: () =>
       fetch(`/api/factory/customers/${pickerCustomerId}/logos`, { credentials: "include" }).then((r) => r.json()),

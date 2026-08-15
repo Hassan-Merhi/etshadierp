@@ -64,7 +64,7 @@ export function registerSilentTransferRoutes(app: Express) {
 
         const workbook = await readExcel(req.file.buffer);
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rawData = sheetToJson(worksheet) as unknown[];
+        const rawData = sheetToJson(worksheet) as any[];
 
         if (rawData.length === 0) return res.status(400).json({ message: "Excel file is empty" });
 

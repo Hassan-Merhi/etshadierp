@@ -88,7 +88,7 @@ export function registerNetProfitExcelRoute(app: Express) {
           : [];
 
       // Map entries by voucherId for fast monthly lookup
-      const entriesByVoucherId = new Map<number, unknown[]>();
+      const entriesByVoucherId = new Map<number, any[]>();
       for (const e of allPeriodEntries) {
         if (!entriesByVoucherId.has(e.voucherId)) entriesByVoucherId.set(e.voucherId, []);
         entriesByVoucherId.get(e.voucherId)!.push(e);

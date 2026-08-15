@@ -39,7 +39,7 @@ export function registerAiImportJobRoutes(app: Express) {
       const sheetName = workbook.SheetNames[0];
       if (!sheetName) return res.status(400).json({ message: "Excel file has no sheets" });
 
-      const rawRows: Record<string, unknown>[] = sheetToJson(workbook.Sheets[sheetName]);
+      const rawRows: Record<string, any>[] = sheetToJson(workbook.Sheets[sheetName]);
       if (!rawRows.length) return res.status(400).json({ message: "Excel file has no data rows" });
 
       // Create the job

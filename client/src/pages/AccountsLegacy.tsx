@@ -153,7 +153,7 @@ export default function Accounts() {
       toast({ title: "Delete failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
-  const { data: voucherSearchResults = [], isLoading: voucherSearchLoading } = useQuery<unknown[]>({
+  const { data: voucherSearchResults = [], isLoading: voucherSearchLoading } = useQuery<any[]>({
     queryKey: ["/api/vouchers/search", debouncedFindQuery],
     queryFn: async () => {
       if (!debouncedFindQuery.trim()) return [];
@@ -217,7 +217,7 @@ export default function Accounts() {
   });
 
   const updateBankMutation = useMutation({
-    mutationFn: async (data: { id: number; [key: string]: unknown }) => {
+    mutationFn: async (data: { id: number; [key: string]: any }) => {
       const { id, ...rest } = data;
       const res = await apiRequest("PUT", `/api/bank-accounts/${id}`, rest);
       if (!res.ok) {
@@ -260,7 +260,7 @@ export default function Accounts() {
   });
 
   const createBankMutation = useMutation({
-    mutationFn: async (data: Record<string, unknown>) => {
+    mutationFn: async (data: Record<string, any>) => {
       const res = await apiRequest("POST", "/api/bank-accounts", {
         ...data,
         companyId: selectedCompany?.id,
@@ -446,7 +446,7 @@ export default function Accounts() {
   // groups created there always appear here without needing /api/accounts/all to refresh.
   // Groups = accounts marked with subType "Group" OR accounts that happen to have children
   // (backward-compat: groups created before subType tagging still show up)
-  const { data: groupOptions = [] } = useQuery<unknown[]>({
+  const { data: groupOptions = [] } = useQuery<any[]>({
     queryKey: ["/api/ledger-accounts", selectedCompany?.id],
     queryFn: async () => {
       const url = selectedCompany?.id ? `/api/ledger-accounts?companyId=${selectedCompany.id}` : "/api/ledger-accounts";
@@ -454,7 +454,7 @@ export default function Accounts() {
       if (!res.ok) throw new Error("Failed to fetch ledger accounts");
       return res.json();
     },
-    select: (data: unknown[]) => {
+    select: (data: any[]) => {
       const parentIdSet = new Set<number>();
       data.forEach((a) => {
         if (a.parentId) parentIdSet.add(a.parentId);

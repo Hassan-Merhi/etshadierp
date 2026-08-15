@@ -42,7 +42,7 @@ export function registerPasskeyRoutes(app: Express) {
         sql`SELECT credential_id FROM passkey_credentials WHERE user_id = ${userId}`
       );
 
-      const excludeCredentials: { id: string; type: "public-key" }[] = (existingCreds.rows as unknown[]).map(
+      const excludeCredentials: { id: string; type: "public-key" }[] = (existingCreds.rows as any[]).map(
         (row: any) => ({
           id: row.credential_id as string,
           type: "public-key" as const,
@@ -114,10 +114,10 @@ export function registerPasskeyRoutes(app: Express) {
       let allowCredentials: { id: string; type: "public-key" }[] = [];
       if (username) {
         const userRow = await db.execute(sql`SELECT id FROM users WHERE username = ${username} LIMIT 1`);
-        if ((userRow.rows as unknown[]).length > 0) {
-          const uid = (userRow.rows as unknown[])[0].id;
+        if ((userRow.rows as any[]).length > 0) {
+          const uid = (userRow.rows as any[])[0].id;
           const creds = await db.execute(sql`SELECT credential_id FROM passkey_credentials WHERE user_id = ${uid}`);
-          allowCredentials = (creds.rows as unknown[]).map((r) => ({
+          allowCredentials = (creds.rows as any[]).map((r) => ({
             id: r.credential_id as string,
             type: "public-key" as const,
           }));
@@ -152,11 +152,11 @@ export function registerPasskeyRoutes(app: Express) {
         LIMIT 1
       `);
 
-      if ((credRow.rows as unknown[]).length === 0) {
+      if ((credRow.rows as any[]).length === 0) {
         return res.status(400).json({ message: "Passkey not found" });
       }
 
-      const cred = (credRow.rows as unknown[])[0];
+      const cred = (credRow.rows as any[])[0];
 
       const verification = await verifyAuthenticationResponse({
         response: req.body,

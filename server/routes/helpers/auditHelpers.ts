@@ -25,7 +25,7 @@ export type AuditAction =
 function normalizeAuditAction(params: {
   action: AuditAction;
   tableName: string;
-  changes?: Record<string, { old?: unknown; new?: unknown }> | null;
+  changes?: Record<string, { old?: any; new?: any }> | null;
 }): AuditAction {
   if (params.action !== "update" || params.tableName !== "factory_customer_orders") {
     return params.action;
@@ -50,7 +50,7 @@ export async function logAudit(
     tableName: string;
     recordId?: number | null;
     recordIdentifier?: string | null;
-    changes?: Record<string, { old?: unknown; new?: unknown }> | null;
+    changes?: Record<string, { old?: any; new?: any }> | null;
   },
   // Optional transaction/connection handle. Pass the same `tx` used for the
   // financial write so the audit INSERT is atomic with it — if the audit
@@ -202,8 +202,8 @@ export async function snapshotVoucherEntries(
   });
 }
 
-export function buildVoucherChangesForCreate(v: VoucherSnap, entries: EntrySnap[]): Record<string, { new: unknown }> {
-  const c: Record<string, { new: unknown }> = {};
+export function buildVoucherChangesForCreate(v: VoucherSnap, entries: EntrySnap[]): Record<string, { new: any }> {
+  const c: Record<string, { new: any }> = {};
   if (v.voucherType) c.voucherType = { new: v.voucherType };
   if (v.voucherDate) c.date = { new: v.voucherDate };
   if (v.totalAmount) c.amount = { new: v.totalAmount };
@@ -213,8 +213,8 @@ export function buildVoucherChangesForCreate(v: VoucherSnap, entries: EntrySnap[
   return c;
 }
 
-export function buildVoucherChangesForDelete(v: VoucherSnap, entries: EntrySnap[]): Record<string, { old: unknown }> {
-  const c: Record<string, { old: unknown }> = {};
+export function buildVoucherChangesForDelete(v: VoucherSnap, entries: EntrySnap[]): Record<string, { old: any }> {
+  const c: Record<string, { old: any }> = {};
   if (v.voucherType) c.voucherType = { old: v.voucherType };
   if (v.voucherDate) c.date = { old: v.voucherDate };
   if (v.totalAmount) c.amount = { old: v.totalAmount };
@@ -229,8 +229,8 @@ export function buildVoucherChangesForUpdate(
   newV: VoucherSnap,
   oldEntries: EntrySnap[],
   newEntries: EntrySnap[]
-): Record<string, { old?: unknown; new?: unknown }> {
-  const c: Record<string, { old?: unknown; new?: unknown }> = {};
+): Record<string, { old?: any; new?: any }> {
+  const c: Record<string, { old?: any; new?: any }> = {};
   if (oldV.voucherType !== newV.voucherType) c.voucherType = { old: oldV.voucherType, new: newV.voucherType };
   if (oldV.voucherDate !== newV.voucherDate) c.date = { old: oldV.voucherDate, new: newV.voucherDate };
   if (parseFloat(oldV.totalAmount || "0") !== parseFloat(newV.totalAmount || "0"))

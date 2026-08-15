@@ -40,7 +40,7 @@ export function registerSpMigrationReconciliationRoutes(app: Express) {
             )
           ORDER BY si.code LIMIT 50
         `)
-        ).rows as unknown[];
+        ).rows as any[];
         areas.push({
           area: "Stock master",
           status: unlinkedItemRows.length === 0 ? "PASS" : "FAIL",
@@ -62,7 +62,7 @@ export function registerSpMigrationReconciliationRoutes(app: Express) {
           JOIN sp_migration_source_links l ON l.source_table = 'stock_items' AND l.source_id = si.id AND l.target_table = 'stock_items'
           WHERE si.company_id = ${sourceId} AND si.deleted_at IS NULL
         `)
-        ).rows as unknown[];
+        ).rows as any[];
         const stockMismatches = perItemStock.filter((r) => Math.abs(pn(r.src_qty) - pn(r.tgt_qty)) > 0.01);
         const srcStock = (
           await db.execute(
@@ -94,7 +94,7 @@ export function registerSpMigrationReconciliationRoutes(app: Express) {
             )
           ORDER BY v.voucher_number LIMIT 50
         `)
-        ).rows as unknown[];
+        ).rows as any[];
         const srcSales = (
           await db.execute(
             sql`SELECT COUNT(*) AS cnt FROM vouchers WHERE company_id = ${sourceId} AND voucher_type IN ('Sales','Sale') AND deleted_at IS NULL`
@@ -124,7 +124,7 @@ export function registerSpMigrationReconciliationRoutes(app: Express) {
             AND NOT EXISTS (SELECT 1 FROM sales_items si WHERE si.voucher_id = v.id)
           ORDER BY v.voucher_number LIMIT 50
         `)
-        ).rows as unknown[];
+        ).rows as any[];
         const salesStatus =
           unmigratedSales.length > 0 ? "WARN" : migratedVouchersWithoutItems.length > 0 ? "WARN" : "PASS";
         areas.push({
@@ -152,7 +152,7 @@ export function registerSpMigrationReconciliationRoutes(app: Express) {
             )
           ORDER BY c.container_number LIMIT 50
         `)
-        ).rows as unknown[];
+        ).rows as any[];
         const srcContainers = (
           await db.execute(sql`SELECT COUNT(*) AS cnt FROM containers WHERE company_id = ${sourceId}`)
         ).rows[0];
@@ -184,7 +184,7 @@ export function registerSpMigrationReconciliationRoutes(app: Express) {
             )
           ORDER BY c.container_number LIMIT 50
         `)
-        ).rows as unknown[];
+        ).rows as any[];
         areas.push({
           area: "Container OTW accounting",
           status: missingOtwVouchers.length === 0 ? "PASS" : "WARN",
@@ -205,7 +205,7 @@ export function registerSpMigrationReconciliationRoutes(app: Express) {
           HAVING ABS(SUM(ve.debit_amount::numeric) - SUM(ve.credit_amount::numeric)) > 0.01
           LIMIT 50
         `)
-        ).rows as unknown[];
+        ).rows as any[];
         areas.push({
           area: "Accounting",
           status: unbalancedRows.length === 0 ? "PASS" : "FAIL",
@@ -223,7 +223,7 @@ export function registerSpMigrationReconciliationRoutes(app: Express) {
           await db.execute(
             sql`SELECT voucher_number, total_amount FROM vouchers WHERE company_id = ${targetId} AND voucher_number LIKE 'GC-PROFIT-OPN-%'`
           )
-        ).rows as unknown[];
+        ).rows as any[];
         areas.push({
           area: "Profit opening",
           status: profitOpening.length > 0 ? "PASS" : "WARN",

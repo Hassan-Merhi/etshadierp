@@ -51,7 +51,7 @@ export function RemoveFromStockTab() {
   const modeApiRequest = getApiRequest(appMode);
   const { formatDisplayDate } = useDateFormat();
 
-  const { data: workers = [] } = useQuery<unknown[]>({ queryKey: ["/api/factory/workers"] });
+  const { data: workers = [] } = useQuery<any[]>({ queryKey: ["/api/factory/workers"] });
   const { data: baleProducts } = useQuery<FactoryBaleProduct[]>({ queryKey: ["/api/factory/bale-products"] });
 
   const bulkUpdateNamesMutation = useMutation({
@@ -253,7 +253,7 @@ export function RemoveFromStockTab() {
   const { data: locations } = useQuery<Location[]>({ queryKey: ["/api/locations"] });
   const activeLocations = (locations || []).filter((l) => l.active);
 
-  const { data: inStockBales, isLoading: balesLoading } = useQuery<unknown[]>({
+  const { data: inStockBales, isLoading: balesLoading } = useQuery<any[]>({
     queryKey: ["/api/factory/stock-entry/in-stock", selectedLocationId],
     queryFn: async () => {
       const locParam = selectedLocationId && selectedLocationId !== "all" ? `?locationId=${selectedLocationId}` : "";

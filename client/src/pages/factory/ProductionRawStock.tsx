@@ -50,30 +50,30 @@ export default function ProductionRawStock() {
   const mixBatchPrintRef = useRef<HTMLDivElement>(null);
 
   // Queries
-  const { data: rawStock, isLoading: rawStockLoading } = useQuery<unknown[]>({
+  const { data: rawStock, isLoading: rawStockLoading } = useQuery<any[]>({
     queryKey: ["/api/factory/raw-stock"],
   });
 
-  const { data: mixBatches, isLoading: mixBatchesLoading } = useQuery<unknown[]>({
+  const { data: mixBatches, isLoading: mixBatchesLoading } = useQuery<any[]>({
     queryKey: ["/api/factory/mix-batches"],
   });
 
-  const { data: factorySuppliers = [] } = useQuery<unknown[]>({
+  const { data: factorySuppliers = [] } = useQuery<any[]>({
     queryKey: ["/api/factory/suppliers"],
   });
 
-  const { data: ledgerAccounts = [] } = useQuery<unknown[]>({
+  const { data: ledgerAccounts = [] } = useQuery<any[]>({
     queryKey: ["/api/ledger-accounts?includeHidden=true"],
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   });
 
-  const { data: availableContainersRaw = [] } = useQuery<unknown[]>({
+  const { data: availableContainersRaw = [] } = useQuery<any[]>({
     queryKey: ["/api/factory/raw-stock/available-containers"],
   });
   const availableContainers = availableContainersRaw.filter((c) => c.status !== "PARTIALLY_RECEIVED");
 
-  const { data: mixBatchesByDate = [], isLoading: mixBatchesByDateLoading } = useQuery<unknown[]>({
+  const { data: mixBatchesByDate = [], isLoading: mixBatchesByDateLoading } = useQuery<any[]>({
     queryKey: [`/api/factory/mix-batches-by-date?date=${encodeURIComponent(mixBatchDate)}`],
     enabled: !!mixBatchDate,
   });
