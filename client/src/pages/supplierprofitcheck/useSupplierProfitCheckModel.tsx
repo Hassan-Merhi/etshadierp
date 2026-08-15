@@ -175,7 +175,7 @@ export function useSupplierProfitCheckModel() {
 
   useEffect(() => {
     if (sellPriceSource === "location_group" && locationGroups.length > 0 && !selectedLocationId) setSelectedLocationId(String(locationGroups[0].id));
-  }, [locationGroups, sellPriceSource, selectedLocationId]);
+  }, [locationGroups, sellPriceSource]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveOverrideMutation = useMutation({
     mutationFn: async (payload: { supplierId: number; stockItemId: number; poPrice?: number; avgPrice?: number }) => {
@@ -329,7 +329,7 @@ export function useSupplierProfitCheckModel() {
         setAutosaveStatus("saved"); setTimeout(() => setAutosaveStatus("idle"), 2500);
       } catch { setAutosaveStatus("error"); setTimeout(() => setAutosaveStatus("idle"), 3000); }
     }, 1200);
-  }, [qtyVersion, sourceType, proformaId, savedProforma?.id, computedRows, qtyMap]);
+  }, [qtyVersion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleStatus = useCallback((value: string) => setActiveStatuses((previous) => previous.includes(value) ? previous.filter((status) => status !== value) : [...previous, value]), []);
   const statusFilterLabel = useMemo(() => activeStatuses.length === 0 ? "All Statuses" : activeStatuses.length === 1 ? STATUS_OPTIONS.find((status) => status.value === activeStatuses[0])?.label ?? activeStatuses[0] : `${activeStatuses.length} statuses`, [activeStatuses]);
