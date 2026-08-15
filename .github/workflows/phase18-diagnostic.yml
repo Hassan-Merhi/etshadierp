@@ -1,0 +1,81 @@
+name: Phase 18 Diagnostic
+
+on:
+  push:
+    branches: [agent/lint-phase-4-fast]
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    if: contains(github.event.head_commit.message, '[phase18-bootstrap]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.14.0'
+          cache: npm
+      - name: Merge current main in probe workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          set +e
+          git merge --no-edit origin/main
+          rc=$?
+          set -e
+          if [ $rc -ne 0 ]; then
+            echo '=== CONFLICTS ==='
+            git diff --name-only --diff-filter=U
+            while IFS= read -r f; do
+              [ -z "$f" ] && continue
+              case "$f" in
+                config/*lint*|config/*type-escape*|*lint*ratchet*|*type-escape*) git checkout --ours -- "$f" ;;
+                server/*) git checkout --theirs -- "$f" ;;
+                *) echo "UNHANDLED_CONFLICT=$f"; exit 2 ;;
+              esac
+              git add -- "$f"
+            done < <(git diff --name-only --diff-filter=U)
+            git commit --no-edit
+          fi
+          echo "PROBE_HEAD=$(git rev-parse HEAD)"
+          echo '=== ANY IN MERGED CONFLICT SERVER CHANGES ==='
+          git diff --name-only HEAD^1..HEAD -- server | while read -r f; do [ -f "$f" ] && grep -nE '(:|<|,|\[|\|)[[:space:]]*any\b|\bas any\b|Promise<any>|Record<[^>]*any' "$f" || true; done
+      - run: npm ci
+      - name: TypeScript diagnostics
+        shell: bash
+        run: |
+          set +e
+          npm run check > /tmp/ts.log 2>&1
+          rc=$?
+          echo "TSC_EXIT=$rc"
+          cat /tmp/ts.log
+          exit 0
+      - name: ESLint exact diagnostics
+        shell: bash
+        run: |
+          set +e
+          npx eslint . -f json -o /tmp/eslint.json
+          rc=$?
+          node - <<'NODE'
+          const fs=require('fs'); const r=JSON.parse(fs.readFileSync('/tmp/eslint.json','utf8'));
+          let e=0,w=0;
+          for(const f of r){ for(const m of f.messages){ if(m.severity===2)e++; else if(m.severity===1)w++; if(m.severity) console.log(`${f.filePath}:${m.line}:${m.column} ${m.ruleId} ${m.message}`); }}
+          console.log(`ESLINT_ERRORS=${e}`); console.log(`ESLINT_WARNINGS=${w}`);
+          NODE
+          echo "ESLINT_EXIT=$rc"
+          exit 0
+      - name: Type escape audit diagnostics
+        shell: bash
+        run: |
+          set +e
+          npm run audit:type-escapes
+          echo "TYPE_ESCAPE_EXIT=$?"
+          exit 0
