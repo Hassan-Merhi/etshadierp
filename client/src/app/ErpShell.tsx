@@ -27,10 +27,15 @@ interface ErpShellProps {
   leaveConfirmDialog: React.ReactNode;
 }
 
+function CompanyDailyRateModal() {
+  const { selectedCompany } = useCompany();
+  if (!selectedCompany?.id) return null;
+  return <DailyRateModal companyId={selectedCompany.id} />;
+}
+
 export function ErpShell({ user, hasErpAccess, handleLogout, leaveConfirmDialog }: ErpShellProps) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [currentLocation] = useLocation();
-  const { selectedCompany } = useCompany();
   const { t } = useApplicationLanguage();
   const style = { "--sidebar-width": "16rem", "--sidebar-width-icon": "3rem" };
   const hasAdminSearch = canUseAdminSearch(user);
@@ -46,7 +51,7 @@ export function ErpShell({ user, hasErpAccess, handleLogout, leaveConfirmDialog 
         <SkipLink>{t("accessibility.skipToMainContent")}</SkipLink>
         <SidebarProvider style={style as React.CSSProperties}>
           <div ref={erpContainerRef} className="flex h-full w-full min-w-0 overflow-hidden">
-            {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
+            <CompanyDailyRateModal />
             <AppSidebar user={user} />
             <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
               <OfflineBanner />
