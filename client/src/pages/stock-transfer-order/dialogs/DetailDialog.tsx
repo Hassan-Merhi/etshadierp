@@ -9,24 +9,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { Location, StockItemData } from "../../stocktransferorder/types";
-
-type StockMovementTransaction = {
-  type: string;
-  date: string;
-  reference: string;
-  qty: number;
-  rate: number;
-  value: number;
-};
-
-type DetailData = {
-  inTransactions?: StockMovementTransaction[];
-  outTransactions?: StockMovementTransaction[];
-};
+import type {
+  Location,
+  StockItemData,
+  StockMovementDetailData,
+} from "../../stocktransferorder/types";
 
 type DetailDialogProps = {
-  detailData: DetailData | undefined;
+  detailData: unknown;
   detailDirection: "in" | "out";
   detailLoading: boolean;
   detailMonthName: string;
@@ -50,10 +40,11 @@ export function DetailDialog({
   historyLocation,
   setDetailOpen,
 }: DetailDialogProps) {
+  const typedDetailData = detailData as StockMovementDetailData | undefined;
   const rows =
     detailDirection === "in"
-      ? (detailData?.inTransactions ?? [])
-      : (detailData?.outTransactions ?? []);
+      ? (typedDetailData?.inTransactions ?? [])
+      : (typedDetailData?.outTransactions ?? []);
 
   const typeBadgeClass = (type: string) => {
     if (type === "Sale") return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
@@ -130,7 +121,9 @@ export function DetailDialog({
                       {transaction.reference}
                     </td>
                     <td className="text-right px-3 py-2 tabular-nums font-medium">
-                      {(transaction.qty || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      {(transaction.qty || 0).toLocaleString(undefined, {
+                        maximumFractionDigits: 2,
+                      })}
                     </td>
                     <td className="text-right px-3 py-2 tabular-nums text-muted-foreground">
                       {(transaction.rate || 0).toLocaleString(undefined, {
@@ -157,7 +150,9 @@ export function DetailDialog({
                     {totalQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                   </td>
                   <td />
-                  <td className="text-right px-3 py-2 tabular-nums">{formatAmount(totalValue)}</td>
+                  <td className="text-right px-3 py-2 tabular-nums">
+                    {formatAmount(totalValue)}
+                  </td>
                 </tr>
               </tfoot>
             </table>
