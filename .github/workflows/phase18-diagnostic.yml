@@ -20,7 +20,7 @@ jobs:
         with:
           node-version: '22.14.0'
           cache: npm
-      - name: Roll back unsafe mechanical exhaustion passes in probe workspace
+      - name: Recover pre-mechanical lint tree
         shell: bash
         run: |
           set -euo pipefail
@@ -29,12 +29,10 @@ jobs:
           : > /tmp/revert-conflicts.txt
           revert_one() {
             commit="$1"; parent="$2"; label="$3"
-            echo "=== REVERT $label $commit ==="
             set +e
             git revert --no-commit "$commit"
             rc=$?
             set -e
-            echo "$label REVERT_EXIT=$rc"
             if [ $rc -ne 0 ]; then
               git diff --name-only --diff-filter=U | sed "s#^#$label #" >> /tmp/revert-conflicts.txt
               while IFS= read -r f; do
@@ -53,12 +51,6 @@ jobs:
           revert_one a4ec34ab3b22cfd9dc6aae8e1be7f0c0e9fc42f2 567e8d9143f5496591f30390e7ec67ff90b98736 phase12-15
           revert_one 2c7a00a96c72524e3a9c559664729e1de002e772 a04cb7a9d37cd6ef18687c5a38a0cf9a232ff0fc phase8-11
           revert_one 55b1a292a7d0b7b44e3583d53656d182997b25c0 f9c8e96b325f870c0f2a624ef02a364467fca9a8 phase5-7
-          echo "POST_REVERT_HEAD=$(git rev-parse HEAD)"
-          cat /tmp/revert-conflicts.txt
-      - name: Merge current main in probe workspace
-        shell: bash
-        run: |
-          set -euo pipefail
           git fetch origin main
           : > /tmp/merge-conflicts.txt
           set +e
@@ -78,51 +70,60 @@ jobs:
             done < /tmp/merge-conflicts.txt
             git commit --no-edit
           fi
-          echo "PROBE_HEAD=$(git rev-parse HEAD)"
+          echo "RECOVERED_HEAD=$(git rev-parse HEAD)"
       - run: npm ci
-      - name: TypeScript diagnostics
+      - name: Inventory explicit any contexts
+        shell: bash
+        run: |
+          node - <<'NODE' > /tmp/any-inventory.json
+          const fs=require('fs'), path=require('path'), ts=require('typescript');
+          const roots=['client/src','server','shared'];
+          const files=[];
+          const walk=d=>{for(const ent of fs.readdirSync(d,{withFileTypes:true})){const p=path.join(d,ent.name); if(ent.isDirectory()) walk(p); else if(/\.(ts|tsx)$/.test(p)&&!p.endsWith('.d.ts')) files.push(p)}};
+          for(const r of roots) if(fs.existsSync(r)) walk(r);
+          const counts={}, examples={}, byFile={};
+          const add=(kind,file,node,sf)=>{counts[kind]=(counts[kind]||0)+1; (examples[kind]??=[]); if(examples[kind].length<12) examples[kind].push(`${file}:${sf.getLineAndCharacterOfPosition(node.getStart(sf)).line+1}:${node.getText(sf).slice(0,120)}`); byFile[file]=(byFile[file]||0)+1;};
+          for(const file of files){const text=fs.readFileSync(file,'utf8');const sf=ts.createSourceFile(file,text,ts.ScriptTarget.Latest,true,file.endsWith('.tsx')?ts.ScriptKind.TSX:ts.ScriptKind.TS); const visit=n=>{
+            if(n.kind===ts.SyntaxKind.AnyKeyword){let k='other-any-keyword',p=n.parent;
+              if(ts.isParameter(p)) k='parameter';
+              else if(ts.isVariableDeclaration(p)) k=p.initializer?'variable-with-initializer':'variable-no-initializer';
+              else if(ts.isPropertySignature(p)||ts.isPropertyDeclaration(p)) k='property';
+              else if(ts.isFunctionDeclaration(p)||ts.isMethodDeclaration(p)||ts.isArrowFunction(p)||ts.isFunctionExpression(p)) k='return-type';
+              else if(ts.isArrayTypeNode(p)) k='any-array-element';
+              else if(ts.isTypeArgumentNode?.(p)) k='type-argument';
+              else if(ts.isTypeReferenceNode(p)) k='type-reference-argument';
+              else if(ts.isAsExpression(p)||ts.isTypeAssertionExpression(p)) k='cast';
+              else if(ts.isIndexSignatureDeclaration(p)) k='index-signature';
+              add(k,file,n,sf);
+            }
+            ts.forEachChild(n,visit)
+          };visit(sf)}
+          console.log(JSON.stringify({total:Object.values(counts).reduce((a,b)=>a+b,0),counts,examples,topFiles:Object.entries(byFile).sort((a,b)=>b[1]-a[1]).slice(0,100)},null,2));
+          NODE
+          cat /tmp/any-inventory.json
+      - name: TypeScript baseline
         shell: bash
         run: |
           set +e
           npm run check > /tmp/ts.log 2>&1
           rc=$?
           echo "TSC_EXIT=$rc"
-          printf 'TSC_ERROR_LINES='; grep -c 'error TS' /tmp/ts.log || true
-          tail -n 120 /tmp/ts.log
+          grep 'error TS' /tmp/ts.log || true
           exit 0
-      - name: ESLint exact diagnostics
+      - name: Package recovered source
         shell: bash
         run: |
-          set +e
-          npx eslint . -f json -o /tmp/eslint.json
-          rc=$?
-          node - <<'NODE' | tee /tmp/eslint.txt
-          const fs=require('fs'); const r=JSON.parse(fs.readFileSync('/tmp/eslint.json','utf8'));
-          let e=0,w=0; const rules={};
-          for(const f of r){ for(const m of f.messages){ if(m.severity===2)e++; else if(m.severity===1)w++; if(m.severity){const k=m.ruleId||'<parser>';rules[k]=(rules[k]||0)+1;} }}
-          console.log(`ESLINT_ERRORS=${e}`); console.log(`ESLINT_WARNINGS=${w}`); console.log(JSON.stringify(rules,null,2));
-          NODE
-          echo "ESLINT_EXIT=$rc"
-          exit 0
-      - name: Type escape audit diagnostics
-        shell: bash
-        run: |
-          set +e
-          npm run audit:type-escapes > /tmp/type-escapes.log 2>&1
-          rc=$?
-          tail -n 80 /tmp/type-escapes.log
-          echo "TYPE_ESCAPE_EXIT=$rc"
-          exit 0
-      - name: Upload diagnostic bundle
+          tar -czf /tmp/recovered-source.tgz client/src server shared scripts config package.json package-lock.json tsconfig.json eslint.config.js 2>/dev/null || tar -czf /tmp/recovered-source.tgz client/src server shared scripts config package.json package-lock.json tsconfig.json
+          ls -lh /tmp/recovered-source.tgz
+      - name: Upload recovery bundle
         uses: actions/upload-artifact@v4
         with:
-          name: phase18-three-pass-rollback-probe
+          name: phase18-recovered-source
           path: |
+            /tmp/recovered-source.tgz
+            /tmp/any-inventory.json
             /tmp/ts.log
-            /tmp/eslint.json
-            /tmp/eslint.txt
-            /tmp/type-escapes.log
             /tmp/revert-conflicts.txt
             /tmp/merge-conflicts.txt
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 1
