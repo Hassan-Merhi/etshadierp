@@ -1,4 +1,4 @@
-name: Lint phases 12-15 semantic exhaustion
+name: Lint phases 16-17 exhaustion
 
 on:
   push:
@@ -9,12 +9,12 @@ permissions:
   contents: write
 
 concurrency:
-  group: lint-phases-12-15-${{ github.ref }}
+  group: lint-phases-16-17-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  semantic-exhaustion:
-    if: ${{ !contains(github.event.head_commit.message, '[phase12-15-worker]') }}
+  phase16-17-exhaustion:
+    if: ${{ !contains(github.event.head_commit.message, '[phase16-17-worker]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -26,16 +26,16 @@ jobs:
           node-version: '22.14.0'
           cache: npm
       - run: npm ci
-      - name: Exhaust phases 12-15 implementation families
-        run: node scripts/lint-phases-12-15-worker.mjs
-      - name: Persist phases 12-15 implementation
+      - name: Exhaust phases 16-17 implementation families
+        run: node scripts/lint-phases-16-17-worker.mjs
+      - name: Persist phases 16-17 implementation
         run: |
-          if git diff --quiet -- client/src server shared tests; then
-            echo "No Phase 12-15 implementation changes found."
+          if git diff --quiet -- client/src server shared eslint.config.js config/lint-warning-ratchet.json config/type-escape-boundaries.json; then
+            echo "No Phase 16-17 implementation changes found."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add client/src server shared tests
-          git commit -m "refactor: exhaust phases 12-15 lint debt [phase12-15-worker] [skip ci]"
+          git add client/src server shared eslint.config.js config/lint-warning-ratchet.json config/type-escape-boundaries.json
+          git commit -m "refactor: complete phases 16-17 lint cleanup [phase16-17-worker] [skip ci]"
           SKIP_TSC_CHECK=1 git push origin HEAD:${GITHUB_REF_NAME}
