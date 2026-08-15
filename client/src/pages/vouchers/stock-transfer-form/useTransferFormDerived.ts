@@ -76,6 +76,6 @@ export function useTransferRateAutofill(
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [signature]);
 }

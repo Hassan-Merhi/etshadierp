@@ -34,7 +34,7 @@ export default function FactoryLoadingsHub() {
     } else {
       setActiveTab("loadings");
     }
-  }, [settingsLoaded, accessLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [settingsLoaded, accessLoaded]); 
 
   // If showPending turns false while the pending tab is active, fall back
   useEffect(() => {

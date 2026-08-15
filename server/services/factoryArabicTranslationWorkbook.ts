@@ -84,7 +84,7 @@ export const ARABIC_TRANSLATION_TEMPLATE_HEADERS = [
 
 const MAX_WORKBOOK_ROWS = 50_000;
 const MAX_TRANSLATION_LENGTH = 2_000;
-// eslint-disable-next-line no-control-regex -- the pattern exists to find control characters — Excel rejects a workbook containing them, so a translation carrying C0/DEL must be caught before the sheet is written
+
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
 const RTL_FROZEN_VIEW: ExcelJS.WorksheetView = {
   state: "frozen",

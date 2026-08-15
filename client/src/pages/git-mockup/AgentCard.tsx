@@ -340,7 +340,7 @@ export function AgentCard({
     if (staleIds.length === 0) return;
     setPendingGraduationIds((prev) => [...new Set([...prev, ...staleIds])]);
     setAllPrepaidMutation.mutate(dbPrepaidIds.filter((id) => validTransitIdSet.has(id)));
-  }, [validTransitIdSet]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [validTransitIdSet]); 
   useEffect(() => {
     if (pendingGraduationIds.length === 0) return;
     const openPartialIdSet = new Set(allOpenPartial.map((r) => r.id));
@@ -349,7 +349,7 @@ export function AgentCard({
     setPendingGraduationIds((prev) => prev.filter((id) => !openPartialIdSet.has(id)));
     const existing = customOrder ?? allOpenPartial.map((r) => r.id);
     saveOrder([...toPromote, ...existing.filter((id) => !toPromote.includes(id))]);
-  }, [allOpenPartial, pendingGraduationIds]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [allOpenPartial, pendingGraduationIds]); 
 
   const confidenceBadge = {
     exact: { label: "Exact match", cls: "bg-green-700 text-white" },

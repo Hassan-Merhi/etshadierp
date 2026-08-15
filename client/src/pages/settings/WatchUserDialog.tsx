@@ -359,7 +359,7 @@ export function WatchUserDialog({
     if (!hasScreen || frameAgeMs < 15000 || refreshing) return;
     void requestFreshFrame();
     // The age threshold prevents repeated reconnect loops.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [Math.floor(frameAgeMs / 15000), hasScreen]);
 
   const frameMetadata = useMemo(() => {

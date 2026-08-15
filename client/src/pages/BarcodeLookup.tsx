@@ -446,7 +446,7 @@ export default function BarcodeLookup() {
       setSearchValue(ref);
       setTimeout(() => referenceLookup.mutate(ref), 0);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); 
 
   const handleSearch = () => {
     if (!searchValue.trim()) return;

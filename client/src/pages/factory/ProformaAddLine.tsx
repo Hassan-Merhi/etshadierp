@@ -221,7 +221,7 @@ export default function ProformaAddLine() {
     }, AUTOSAVE_DELAY_MS);
 
     return clearAutoSaveTimers;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [autoSave, selectedItem?.id, qty, price]);
 
   const handleSelectItem = (item: StockItem) => {

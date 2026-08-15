@@ -94,7 +94,7 @@ export function VoucherEntriesTable({
       setMobileSearch("");
       setSidebarSearchValue("");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [mobileEditOpen, mobileEditIndex]);
 
   const openMobileEdit = (index: number) => {

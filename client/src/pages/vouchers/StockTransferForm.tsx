@@ -220,7 +220,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       });
       setTransferInventorySource(posSelectedSourceId);
     }
-  }, [isPOS, posSelectedSourceId, posSelectedSourceName]); // eslint-disable-line
+  }, [isPOS, posSelectedSourceId, posSelectedSourceName]); 
 
   const filteredTransferInventory = useFilteredTransferInventory(transferInventory, transferSearchTerm);
 
@@ -270,7 +270,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       });
       hydratedVoucherIdRef.current = voucherIdToEdit;
     }
-  }, [stockTransferToEdit, voucherToEdit, locations, stockItems, stockTransferForm]); // eslint-disable-line
+  }, [stockTransferToEdit, voucherToEdit, locations, stockItems, stockTransferForm]); 
 
   useEffect(() => {
     if (showItemSidebar && transferSidebarRef.current) {

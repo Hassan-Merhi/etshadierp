@@ -120,7 +120,7 @@ export default function Login() {
         /* biometrics not available */
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [isNative]);
 
   const [, navigate] = useLocation();

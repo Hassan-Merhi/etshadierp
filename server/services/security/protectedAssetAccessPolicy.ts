@@ -78,7 +78,7 @@ export function sanitizeDownloadFileName(value: unknown): string | null {
 
   const normalized = value
     .normalize("NFKC")
-    // eslint-disable-next-line no-control-regex -- stripping control characters is the first step of asset-path normalisation — matching them is exactly what this replace is for
+    
     .replace(/[\u0000-\u001f\u007f]/g, "")
     .replace(/[\\/]+/g, "-")
     .replace(/\.\.+/g, ".")

@@ -334,7 +334,7 @@ export default function StockTransferOrder() {
     } catch {
       // Storage is unavailable in private mode and can throw on quota; the value is a convenience, not state we need.
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, []);
 
   // Autosave debounce effect (new transfers only)

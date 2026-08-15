@@ -51,7 +51,7 @@ export function useHubQueryState<T extends string>(options: HubQueryStateOptions
     syncFromLocation();
     window.addEventListener("popstate", syncFromLocation);
     return () => window.removeEventListener("popstate", syncFromLocation);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [options.key, options.defaultValue, allowedValuesKey, options.omitDefault]);
 
   const clearKeysKey = (options.clearKeys ?? []).join(",");
@@ -75,7 +75,7 @@ export function useHubQueryState<T extends string>(options: HubQueryStateOptions
       // Replacing keeps browser Back focused on meaningful page transitions.
       window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
     [options.key, options.defaultValue, clearKeysKey, options.omitDefault],
   );
 

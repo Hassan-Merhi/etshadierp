@@ -433,7 +433,7 @@ export default function FactoryStockAllocationV5() {
     setTimeout(() => {
       firstMatchRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 120);
-  }, [focusProformaId, rows.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [focusProformaId, rows.length]); 
 
   // Auto-open edit drawer when navigated here with openEdit=true
   const editOpenedRef = useRef(false);

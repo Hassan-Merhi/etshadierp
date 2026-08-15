@@ -895,7 +895,7 @@ export default function FactoryLocationInventory() {
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [proformaAutoSave, proformaMode, editingProformaId, selections, editModeInitialized]);
 
   const handleExportExcel = () => {

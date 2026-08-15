@@ -441,7 +441,7 @@ export default function SupplierProfitCheck() {
         setTimeout(() => setAutosaveStatus("idle"), 3000);
       }
     }, 1200);
-  }, [qtyVersion]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [qtyVersion]); 
   const loaded = queryEnabled && !isLoading && rows.length >= 0;
   // ─── Charge math ─────────────────────────────────────────────────────────
   const totalBales = useMemo(() => {
