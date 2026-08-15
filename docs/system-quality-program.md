@@ -17,14 +17,14 @@ audit fails instead of allowing the reference to drift.
 
 | Signal | Now | Command |
 |---|---|---|
-| Type escapes (AST) | 8,658 total | `npm run audit:type-escapes` |
-| ESLint warnings | 9,282 total | `npm run lint` |
+| Type escapes (AST) | 8,646 total | `npm run audit:type-escapes` |
+| ESLint warnings | 9,270 total | `npm run lint` |
 | Startup migration failures | 0 on a fresh database | `npm run verify:startup-migrations` |
-| Backend coverage floor (lines) | 18% | `config/coverage-thresholds.json` |
+| Backend coverage floor (lines) | 29% | `config/coverage-thresholds.json` |
 | Write routes with no test at all | 0 of 328 | `npm run audit:write-routes` |
 | Write routes covered only by the guard sweep | 0 of 328 | `npm run audit:write-routes` |
-| Registered routes | 1,904 | `config/route-manifest.json` |
-| God-file backlog | 49 files, 25,436 excess lines | `npm run audit:god-files` |
+| Registered routes | 1,906 | `config/route-manifest.json` |
+| God-file backlog | 49 files, 25,437 excess lines | `npm run audit:god-files` |
 
 The schema layer remains the type source of truth. New code is not allowed to
 increase the type-escape ceiling, and sensitive write routes are not allowed to
@@ -95,12 +95,12 @@ The ceiling now lives in `config/lint-warning-ratchet.json`, alongside the
 coverage floors and type-escape baselines. `scripts/run-lint.mjs` reads it, so
 `npm run lint` has no number of its own, and the ratchet is a two-part gate:
 
-- **`totals.warningCeiling`** is the repository total, currently 9,457, and may
+- **`totals.warningCeiling`** is the repository total, currently 9,441, and may
   only fall. `totals.errorCeiling` is 0 and permanent — errors are not part of
   the drawdown.
 - **`perRule`** freezes each rule at its own count, checked by
-  `npm run audit:lint-ratchet`. This is the part that matters: 8,834 of the
-  9,457 warnings are `no-explicit-any`, so a total-only gate is a count of
+  `npm run audit:lint-ratchet`. This is the part that matters: 8,815 of the
+  9,441 warnings are `no-explicit-any`, so a total-only gate is a count of
   `any` wearing a lint badge. Under one, deleting 500 `any` annotations pays for
   500 new `react-hooks/exhaustive-deps` warnings — stale-closure bugs — and the
   total reports the trade as flat. Per-rule ceilings make it fail.
@@ -114,7 +114,7 @@ same change that removes the warnings, never after.
 stronger than any repository total. Its `perRule` entry exists so the two cannot
 drift apart, and the audit fails if they disagree — the ESLint count must always
 equal the type-escape ceiling minus its ts-comment suppressions, which are not a
-rule (8,984 = 8,986 − 2).
+rule (8,815 = 8,817 − 2).
 
 ---
 

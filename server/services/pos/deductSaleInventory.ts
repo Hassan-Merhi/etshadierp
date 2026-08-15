@@ -6,8 +6,12 @@
  */
 import { sql } from "drizzle-orm";
 import { adjustInventory } from "../../inventoryHelper";
-import { toInventoryDecimal } from "../../lib/inventoryMath";
+import { inventoryQuantity, inventoryUnitCost, toInventoryDecimal } from "../../lib/inventoryMath";
+import { createDatabaseStockMovementAdapter } from "../inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../inventory/stockMovementIntegrityService";
 import type { ValidatedInventoryItem } from "./posSaleTypes";
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 export interface LockedInventoryResult {
   lockedQty: number;
@@ -20,7 +24,8 @@ export async function lockAndDeductInventoryForSaleItem(
   locationId: any,
   validatedItem: ValidatedInventoryItem,
   canSellNegativeStock: boolean,
-  companyId: number
+  companyId: number,
+  canonicalSource?: { sourceId: string; idempotencyKey: string }
 ): Promise<LockedInventoryResult> {
   const { item, currentRate, inventoryRecord, saleQty } = validatedItem;
 
@@ -44,6 +49,34 @@ export async function lockAndDeductInventoryForSaleItem(
   await adjustInventory(tx, locationId, item.stockItemId, requestedQuantity.negated().toNumber(), companyId);
 
   const costPrice = toInventoryDecimal(lockedRow?.average_rate ?? currentRate);
+
+  // Canonical evidence for the stock this sale issued, on the same transaction
+  // that deducted it. The unit cost is the locked average rate the sale was
+  // costed at, which is what the sale line records too.
+  if (canonicalSource) {
+    await postStockMovementTx(
+      tx,
+      {
+        companyId,
+        stockItemId: item.stockItemId,
+        kind: "issue",
+        quantity: inventoryQuantity(requestedQuantity),
+        unitCost: inventoryUnitCost(costPrice),
+        fromLocationId: parsedLocationId,
+        occurredAt: new Date().toISOString(),
+        source: {
+          sourceType: "pos-sale",
+          sourceId: canonicalSource.sourceId,
+          idempotencyKey: canonicalSource.idempotencyKey,
+        },
+        // A POS sale may be permitted to go negative by configuration; the
+        // journal records what happened rather than re-deciding it.
+        allowNegativeStock: true,
+      },
+      canonicalStockMovementAdapter
+    );
+  }
+
   return {
     lockedQty: lockedQuantity.toNumber(),
     costPrice: costPrice.toNumber(),

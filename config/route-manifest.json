@@ -1,8 +1,8 @@
 {
   "formatVersion": 1,
   "description": "Ordered snapshot of every registered Express route (method, path, guard chain) and middleware mount. Regenerate with UPDATE_ROUTE_MANIFEST=1 only when a route change is intended; during a file split the manifest must not change at all.",
-  "routeCount": 1904,
-  "middlewareMountCount": 90,
+  "routeCount": 1906,
+  "middlewareMountCount": 91,
   "routes": [
     "GET /api/admin/operational-monitoring [requireAuth > <anonymous> > <anonymous>]",
     "POST /api/vouchers [<anonymous>]",
@@ -1314,6 +1314,7 @@
     "POST /api/vouchers [requireAuth > <anonymous>]",
     "POST /api/vouchers/with-entries [requireAuth > requireNonPOS > <anonymous>]",
     "POST /api/vouchers/payment-receipt [requireAuth > requireNonPOS > <anonymous>]",
+    "POST /api/vouchers/:voucherId/exact-reversal [requireAuth > <anonymous> > <anonymous>]",
     "PATCH /api/vouchers/:id/payment-receipt [requireAuth > requireNonPOS > <anonymous>]",
     "DELETE /api/vouchers/:id [requireAuth > <anonymous> > <anonymous>]",
     "POST /api/vouchers/payment-receipt [requireAuth > requireNonPOS > <anonymous>]",
@@ -1625,6 +1626,7 @@
     "PUT /api/admin/users/:userId/security-permissions [requireAuth > <anonymous> > requirePermissionAdministrator > <anonymous>]",
     "GET /api/admin/schema-check [requireAuth > <anonymous>]",
     "POST /api/admin/schema-fix [requireAuth > <anonymous>]",
+    "GET /api/admin/convergence-reconciliation [requireAuth > <anonymous> > <anonymous>]",
     "GET /api/admin/repair-balances/scan [requireAuth > <anonymous> > <anonymous>]",
     "POST /api/admin/repair-balances/apply [requireAuth > <anonymous> > <anonymous>]",
     "POST /api/admin/repair-balances/undo [requireAuth > <anonymous> > <anonymous>]",
@@ -1910,6 +1912,7 @@
     "GET /api/transporter-statement/:accountId/statement [requireAuth > requireNonPOS > <anonymous>]"
   ],
   "middlewareMounts": [
+    "USE / [tenantIsolationBoundary]",
     "USE / [explicitCompanyWriteGuard]",
     "USE / [phase4WriteGuard]",
     "USE / [cutoverWriteGuard]",

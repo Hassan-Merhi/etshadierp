@@ -3194,11 +3194,6 @@
         0,
         0
       ],
-      "server/routes/auth/companyAccessRoutes.ts": [
-        0,
-        4,
-        0
-      ],
       "server/routes/auth/coreAuthRoutes.ts": [
         2,
         9,
@@ -5550,8 +5545,8 @@
         0
       ],
       "server/routes/vouchers/centralPaymentReceiptCreateRoute.ts": [
-        5,
-        2,
+        6,
+        0,
         0
       ],
       "server/routes/vouchers/centralPaymentReceiptDeleteRoute.ts": [
@@ -6014,11 +6009,6 @@
         0,
         0
       ],
-      "server/services/inventory/stockMovementIntegrityService.ts": [
-        7,
-        0,
-        0
-      ],
       "server/services/jsonCargoTrackingService.ts": [
         2,
         0,
@@ -6377,6 +6367,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 8658
+    "typeEscapeCeiling": 8646
   }
 }

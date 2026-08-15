@@ -125,6 +125,11 @@ export function classifyCategory(name: string): string {
   if (/ABO\s*SAMAR/.test(u)) return "__skip__";
   if (/SUMMER/.test(u)) return "Summer";
   if (/WINTER/.test(u)) return "Winter";
+  // Wipers and garbage are tested before bags because "GARBAGE" contains "BAG":
+  // in the other order every garbage line was charted as a bag, and the
+  // "Wipers & Garbage" group this function is supposed to produce — the one
+  // GROUP_ORDER below lists — was never returned at all.
+  if (/WIPER|GARBAGE|RAG/.test(u)) return "Wipers & Garbage";
   if (/BAG/.test(u)) return "Bags";
   if (/SHOE/.test(u)) return "Shoes";
   if (/TOY/.test(u)) return "Toys";
@@ -221,11 +226,14 @@ export function classifyDetailed(name: string): string {
   let cat: string;
   if (/SUMMER/.test(u)) cat = "Summer";
   else if (/WINTER/.test(u)) cat = "Winter";
+  // Before bags, for the same reason as classifyCategory above: "GARBAGE"
+  // contains "BAG", and classifyByGrade already orders it this way, so the two
+  // charts disagreed about the same line.
+  else if (/WIPER/.test(u)) cat = "Wipers";
+  else if (/GARBAGE|RAG/.test(u)) cat = "Garbage";
   else if (/BAG/.test(u)) cat = "Bags";
   else if (/TOY/.test(u)) cat = "Toys";
   else if (/SHOE/.test(u)) cat = "Shoes";
-  else if (/WIPER/.test(u)) cat = "Wipers";
-  else if (/GARBAGE|RAG/.test(u)) cat = "Garbage";
   else return "Other";
 
   if (/CREME|CRÈME|BIG\s*SIZE/.test(u)) return `${cat} Crème`;

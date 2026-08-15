@@ -5,6 +5,7 @@ import { storage } from "../storage";
 import { logger } from "../lib/logger";
 import { getErrorMessage } from "../lib/httpHandlers";
 import { companies, locations, stockAdjustmentVouchers, vouchers } from "@shared/schema";
+import { DuplicateStockAdjustmentError } from "../storage/stock-ops/transfers-create";
 
 type AdjustmentType = "Production" | "Consumption" | "Mixed";
 
@@ -226,6 +227,12 @@ export async function stockAdjustmentCreateHandler(req: Request, res: Response) 
       durationMs: Date.now() - startedAt,
       error: getErrorMessage(error),
     });
+
+    if (error instanceof DuplicateStockAdjustmentError) {
+      // The loser of a race gets the same answer as a caller who submits twice
+      // in sequence, because from the outside they are the same request.
+      return res.status(409).json({ code: error.code, message: "This voucher already has a stock adjustment" });
+    }
 
     const message = getErrorMessage(error);
     const isValidationError =

@@ -21,7 +21,7 @@ import { resolveDatabaseSsl } from "./lib/databaseSsl.mjs";
 import { requestLogger } from "./middleware/requestLogger";
 import { bandwidthDebugMiddleware } from "./middleware/bandwidthDebug";
 import { logger } from "./lib/logger";
-import { startupMigrations } from "./startup-schema";
+import { startupMigrations, ensureCanonicalStockMovementJournal } from "./startup-schema";
 
 // Global error handlers
 // In production: log and exit so the process manager (Render/Replit) restarts cleanly.
@@ -1696,6 +1696,7 @@ END $mig$`;
         // if the columns are genuinely absent.
       }
 
+      await ensureCanonicalStockMovementJournal(pool);
       if (migrationsEnabled) {
         try {
           await runMigrations();

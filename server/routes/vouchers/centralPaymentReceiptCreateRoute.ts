@@ -13,8 +13,8 @@ import {
   type CentralPostingResult,
 } from "../../services/accounting/centralPostingEngine";
 import { createDatabasePostingDependencies } from "../../services/accounting/databasePostingDependencies";
+import { buildFactoryDaybookPosting } from "../../services/accounting/daybookConvergence";
 import { applyEmployeeBalanceDeltasTx } from "../../services/accounting/employeeBalancePosting";
-import { erpRateToDaybookFxRateToUsd } from "../../services/accounting/currencyAmounts";
 import { buildPaymentReceiptPostingRequest } from "../../services/accounting/paymentReceiptPosting";
 import { triggerIntercompanyNotifications } from "../intercompanyNotificationRoutes";
 import { buildVoucherChangesForCreate, logAudit, snapshotVoucherEntries } from "../_helpers";
@@ -105,33 +105,19 @@ async function resolvePaymentReceiptTargetTx(input: {
   return { [field]: accountId } as VoucherEntryInsertFields;
 }
 
-async function writeFactoryDaybookCompatibility(input: { companyId: number; voucher: any }): Promise<void> {
-  const [settings] = await db
+async function writeFactoryDaybookCompatibilityTx(input: { tx: any; companyId: number; voucher: any }): Promise<void> {
+  const [settings] = await input.tx
     .select({ id: factorySettings.id })
     .from(factorySettings)
     .where(eq(factorySettings.companyId, input.companyId))
     .limit(1);
   if (!settings) return;
 
-  const currency = input.voucher.currency || "USD";
-  const baseTotal = Number(input.voucher.totalAmount || 0);
-  const storedRate = input.voucher.exchangeRate ? Number(input.voucher.exchangeRate) : 1;
-  const amountCurrency = currency !== "USD" && storedRate > 0 ? baseTotal * storedRate : baseTotal;
-
-  await db.insert(factoryDaybookEntries).values({
+  const values = buildFactoryDaybookPosting({
     companyId: input.companyId,
-    txDate: input.voucher.voucherDate,
-    txType: input.voucher.voucherType === "Payment" ? "PAYMENT" : "RECEIPT",
-    referenceId: input.voucher.id,
-    referenceTable: "vouchers",
-    description: input.voucher.description || `${input.voucher.voucherType} voucher #${input.voucher.voucherNumber}`,
-    currencyCode: currency,
-    amountCurrency: String(amountCurrency),
-    fxRateToUsd: erpRateToDaybookFxRateToUsd(currency, "USD", input.voucher.exchangeRate),
-    amountUsd: String(baseTotal),
-    createdBy: null,
-    effectiveDate: input.voucher.effectiveDate || null,
+    voucher: input.voucher,
   });
+  await input.tx.insert(factoryDaybookEntries).values(values);
 }
 
 async function createCentralPaymentReceipt(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -166,7 +152,7 @@ async function createCentralPaymentReceipt(req: Request, res: Response, next: Ne
         clientRequestId: body.clientRequestId,
         actor: {
           userId: userId ?? null,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           reason: `${body.voucherType} voucher creation`,
         },
         resolveTarget: (accountType, accountId) =>
@@ -180,6 +166,11 @@ async function createCentralPaymentReceipt(req: Request, res: Response, next: Ne
           tx,
           companyId,
           entries: posted.entries,
+        });
+        await writeFactoryDaybookCompatibilityTx({
+          tx,
+          companyId,
+          voucher: posted.voucher,
         });
       }
 
@@ -195,16 +186,6 @@ async function createCentralPaymentReceipt(req: Request, res: Response, next: Ne
     } = { prompt: false };
 
     if (!posted.replayed) {
-      try {
-        await writeFactoryDaybookCompatibility({ companyId, voucher: posted.voucher });
-      } catch (error: unknown) {
-        logger.error("Central Payment/Receipt factory daybook write failed (non-fatal)", {
-          companyId,
-          voucherId: posted.voucher.id,
-          error,
-        });
-      }
-
       try {
         whatsapp = await checkAccountWhatsAppRule({
           companyId,
@@ -225,7 +206,7 @@ async function createCentralPaymentReceipt(req: Request, res: Response, next: Ne
         const entrySnapshot = await snapshotVoucherEntries(posted.entries);
         await logAudit({
           userId: userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId,
           action: "create",
           tableName: "vouchers",

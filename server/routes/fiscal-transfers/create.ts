@@ -16,6 +16,18 @@ import { eq, and } from "drizzle-orm";
 import { adjustInventory } from "../../inventoryHelper";
 import { sendTransferWhatsApp } from "../../helpers/sendTransferWhatsApp";
 import { getActiveCompanyPermissionContext } from "../../services/security/activeCompanyPermissionContext";
+import { createDatabaseStockMovementAdapter } from "../../services/inventory/databaseStockMovementAdapter";
+import { postStockMovementTx } from "../../services/inventory/stockMovementIntegrityService";
+import { DuplicateStockTransferError } from "../../storage/stock-ops/transfers-create";
+import {
+  findExistingStockDocumentTx,
+  recordStockDocumentTx,
+  resolveStockDocumentRequestId,
+  stockDocumentIdempotencyKey,
+  StockDocumentIdempotencyError,
+} from "../../services/inventory/stockDocumentIdempotency";
+
+const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
 async function resolvePosTransferRecipientLocationId(req: Request): Promise<number | null> {
   const context = await getActiveCompanyPermissionContext(req);
@@ -47,7 +59,9 @@ export function registerStockTransferCreateRoutes(app: Express) {
         allowNegativeInventory,
         voucherDate,
         optional,
+        clientRequestId,
       } = req.body;
+      const requestId = resolveStockDocumentRequestId(clientRequestId);
 
       // Log if user confirmed negative inventory override
       if (allowNegativeInventory) {
@@ -122,7 +136,48 @@ export function registerStockTransferCreateRoutes(app: Express) {
         const voucherNumber = `ST-${Date.now()}`;
         const effectiveDate = voucherDate || getClientDate(req);
 
+        // A transfer moves stock the moment it commits, so a double click or a
+        // retried request must not move it twice. The key is the caller's own
+        // request id; a caller that sends none is served exactly as before.
+        const idempotencyKey = requestId
+          ? stockDocumentIdempotencyKey({ sourceType: "stock-transfer", companyId, clientRequestId: requestId })
+          : null;
+
         const txResult = await db.transaction(async (tx) => {
+          if (idempotencyKey) {
+            const existingTransferId = await findExistingStockDocumentTx({ tx, companyId, idempotencyKey });
+            if (existingTransferId) {
+              const [existingTransfer] = await tx
+                .select()
+                .from(stockTransferVouchers)
+                .where(eq(stockTransferVouchers.id, existingTransferId))
+                .limit(1);
+              const [existingVoucher] = existingTransfer
+                ? await tx
+                    .select()
+                    .from(vouchers)
+                    .where(and(eq(vouchers.id, existingTransfer.voucherId), eq(vouchers.companyId, companyId)))
+                    .limit(1)
+                : [];
+              if (existingTransfer && existingVoucher) {
+                const existingItems = await tx
+                  .select()
+                  .from(stockTransferItems)
+                  .where(eq(stockTransferItems.transferId, existingTransfer.id));
+                return {
+                  transfer: existingTransfer,
+                  transferItems: existingItems,
+                  newVoucher: existingVoucher,
+                  replayed: true,
+                };
+              }
+              throw new StockDocumentIdempotencyError(
+                "STOCK_DOCUMENT_IDEMPOTENCY_CORRUPT",
+                `Stock transfer idempotency marker ${idempotencyKey} references a missing transfer`
+              );
+            }
+          }
+
           const [newVoucher] = await tx
             .insert(vouchers)
             .values({
@@ -195,6 +250,33 @@ export function registerStockTransferCreateRoutes(app: Express) {
 
               // Add to destination location (transfer in = positive delta with rate)
               await adjustInventory(tx, destinationLocationId, item.stockItemId, quantity, companyId!, rate);
+
+              // Canonical evidence for this leg, written inside the same
+              // transaction that just applied the inventory above, so evidence
+              // and effect commit or roll back together. Reconciliation reads
+              // these rows; without them an applied transfer looks unevidenced.
+              await postStockMovementTx(
+                tx,
+                {
+                  companyId: companyId!,
+                  stockItemId: item.stockItemId,
+                  kind: "transfer",
+                  quantity: quantity.toString(),
+                  unitCost: rate.toFixed(2),
+                  fromLocationId: item.sourceLocationId || sourceLocationId,
+                  toLocationId: destinationLocationId,
+                  occurredAt: new Date().toISOString(),
+                  source: {
+                    sourceType: "stock-transfer",
+                    sourceId: String(transfer.id),
+                    idempotencyKey: `stock-transfer:${transfer.id}:${item.stockItemId}`,
+                  },
+                  // The journal records what the transfer did; it does not add
+                  // a negative-stock rule the transfer does not itself enforce.
+                  allowNegativeStock: true,
+                },
+                canonicalStockMovementAdapter
+              );
             }
           }
 
@@ -203,18 +285,32 @@ export function registerStockTransferCreateRoutes(app: Express) {
             .set({ totalAmount: totalAmount.toFixed(2) })
             .where(eq(vouchers.id, newVoucher.id));
 
-          return { transfer, transferItems, newVoucher };
+          if (idempotencyKey) {
+            await recordStockDocumentTx({
+              tx,
+              companyId,
+              idempotencyKey,
+              documentId: transfer.id,
+              sourceType: "stock-transfer",
+              actorUserId: _uid,
+            });
+          }
+
+          return { transfer, transferItems, newVoucher, replayed: false };
         });
 
         res.status(201).json({
           transfer: txResult.transfer,
           items: txResult.transferItems,
           voucher: txResult.newVoucher,
+          replayed: txResult.replayed,
         });
 
         // Fire-and-forget: POS notifications go to the group configured for
-        // the POS user's assigned location, not the transfer destination.
-        if (req.user?.role === "POS")
+        // the POS user's assigned location, not the transfer destination. A
+        // replay already sent it; sending again would notify the branch twice
+        // about one delivery.
+        if (req.user?.role === "POS" && !txResult.replayed)
           setImmediate(async () => {
             try {
               const recipientLocationId = await resolvePosTransferRecipientLocationId(req);
@@ -396,6 +492,30 @@ export function registerStockTransferCreateRoutes(app: Express) {
           }
         });
     } catch (error: unknown) {
+      if (error instanceof DuplicateStockTransferError) {
+        // The voucher already carries a transfer. Building a second one would
+        // move the same stock twice under one document number.
+        logger.warn("stock transfer create refused a duplicate document", {
+          module: "stockTransfer",
+          action: "create",
+          userId: _uid,
+          companyId: _cid,
+        });
+        return res.status(409).json({ code: error.code, message: error.message });
+      }
+      if (error instanceof StockDocumentIdempotencyError) {
+        // A malformed request id is the caller's to fix; a corrupt marker is
+        // evidence nobody should paper over by creating a second transfer.
+        logger.warn("stock transfer create rejected the request id", {
+          module: "stockTransfer",
+          action: "create",
+          userId: _uid,
+          companyId: _cid,
+          code: error.code,
+        });
+        const status = error.code === "STOCK_DOCUMENT_REQUEST_ID_INVALID" ? 400 : 409;
+        return res.status(status).json({ code: error.code, message: error.message });
+      }
       logger.error("stock transfer create failed", {
         module: "stockTransfer",
         action: "create",

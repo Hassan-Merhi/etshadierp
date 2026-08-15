@@ -30,6 +30,7 @@ import { locationWhatsAppStockSchedules } from "./017-location-whatsapp-stock-sc
 import { locationWhatsAppDeliveryHistory } from "./018-location-whatsapp-delivery-history";
 import { stockMergeAuditUserId } from "./019-stock-merge-audit-user-id";
 import { v3LoadUserId } from "./020-v3-load-user-id";
+import { canonicalStockMovementJournal } from "./021-canonical-stock-movement-journal";
 
 export const startupMigrations: string[] = [
   ...coreTablesAndColumns,
@@ -53,4 +54,12 @@ export const startupMigrations: string[] = [
   // Last: an ALTER on a table created in 007, so it must run after it.
   ...stockMergeAuditUserId,
   ...v3LoadUserId,
+  // References companies, stock_items and locations, so it runs after the core
+  // tables that create them.
+  ...canonicalStockMovementJournal,
 ];
+
+// Re-exported so server/index.ts can bootstrap the journal from the module it
+// already imports for the ordered pass: the journal has to exist in every
+// migration mode, including the production one that skips that pass.
+export { ensureCanonicalStockMovementJournal } from "../services/inventory/ensureCanonicalStockMovementJournal";

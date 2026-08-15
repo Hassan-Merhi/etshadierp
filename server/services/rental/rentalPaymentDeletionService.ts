@@ -8,6 +8,7 @@ import {
   voucherEntries,
   vouchers,
 } from "@shared/schema";
+import { removeFactoryDaybookMirrorTx } from "../accounting/factoryDaybookMirrorRemoval";
 
 export type RentalModule = "PROPERTIES" | "ERP" | "FACTORY";
 
@@ -38,9 +39,7 @@ function recognitionVoucherNumber(paymentDate: string, paymentGroupId: string): 
   return `ADV-REC-${paymentDate.replace(/-/g, "")}-${paymentGroupId.slice(-6)}`;
 }
 
-export async function deleteRentalPaymentGroup(
-  input: DeleteRentalPaymentInput
-): Promise<DeleteRentalPaymentResult> {
+export async function deleteRentalPaymentGroup(input: DeleteRentalPaymentInput): Promise<DeleteRentalPaymentResult> {
   return db.transaction(async (tx) => {
     const [initialSeed] = await tx
       .select()
@@ -63,8 +62,7 @@ export async function deleteRentalPaymentGroup(
     }
 
     const lifecycleKey =
-      initialSeed.paymentGroupId ??
-      `legacy-rental-payment:${input.companyId}:${input.module}:${input.paymentId}`;
+      initialSeed.paymentGroupId ?? `legacy-rental-payment:${input.companyId}:${input.module}:${input.paymentId}`;
     await tx.execute(sql`SELECT pg_advisory_xact_lock(${hashPaymentGroupId(lifecycleKey)})`);
 
     const [seed] = await tx
@@ -116,13 +114,18 @@ export async function deleteRentalPaymentGroup(
       const fromVoucherId = transfer.fromVoucherId;
       const toVoucherId = transfer.toVoucherId;
       await tx.delete(interCompanyTransfers).where(eq(interCompanyTransfers.id, transfer.id));
+      // Each leg of an intercompany transfer is removed outright, so a Daybook
+      // mirror left behind would reference a voucher that no longer exists in
+      // any company.
       if (fromVoucherId) {
         await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, fromVoucherId));
         await tx.delete(vouchers).where(eq(vouchers.id, fromVoucherId));
+        await removeFactoryDaybookMirrorTx({ tx, voucherId: fromVoucherId });
       }
       if (toVoucherId) {
         await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, toVoucherId));
         await tx.delete(vouchers).where(eq(vouchers.id, toVoucherId));
+        await removeFactoryDaybookMirrorTx({ tx, voucherId: toVoucherId });
       }
     }
 
@@ -135,6 +138,9 @@ export async function deleteRentalPaymentGroup(
 
       if (!outsideReference) {
         await tx.update(vouchers).set({ deletedAt: new Date() }).where(eq(vouchers.id, voucherId));
+        // Cancelling the rent payment withdraws its Daybook mirror with it, the
+        // same way the central Payment/Receipt cancellation does.
+        await removeFactoryDaybookMirrorTx({ tx, companyId: input.companyId, voucherId });
         await tx
           .update(vouchers)
           .set({ deletedAt: new Date() })

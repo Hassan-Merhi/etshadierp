@@ -13,7 +13,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import { seedTestData, cleanupTestData, closeTestServer, type TestContext } from "./setup";
-import { db } from "../server/db";
+import { db, pool } from "../server/db";
 import { eq, and } from "drizzle-orm";
 import * as schema from "../shared/schema";
 import { generateInvoicePdfMeta, generateInvoicePdf } from "../server/helpers/generateInvoicePdf";
@@ -174,6 +174,12 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await cleanupSales();
+  // The canonical stock journal holds a restricting foreign key to stock_items,
+  // so the POS sales these tests post keep their items alive. The journal has no
+  // delete path in the application, which is why the fixture clears it here.
+  await pool.query(`DELETE FROM canonical_stock_movement_audit WHERE company_id = $1`, [ctx.companyId]);
+  await pool.query(`DELETE FROM canonical_stock_movement_requests WHERE company_id = $1`, [ctx.companyId]);
+  await pool.query(`DELETE FROM canonical_stock_movements WHERE company_id = $1`, [ctx.companyId]);
   // Remove extra stock items created for large-sale tests
   for (const id of extraStockItemIds) {
     await db

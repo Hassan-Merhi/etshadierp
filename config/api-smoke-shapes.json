@@ -370,8 +370,8 @@
       "shape": "{code:scalar,message:scalar}"
     },
     "/api/factory/bale-ledger/details": {
-      "status": 400,
-      "shape": "{message:scalar}"
+      "status": 403,
+      "shape": "{code:scalar,message:scalar}"
     },
     "/api/factory/bale-lookup": {
       "status": 403,
@@ -790,8 +790,8 @@
       "shape": "{code:scalar,message:scalar}"
     },
     "/api/factory/users": {
-      "status": 200,
-      "shape": "[{active:scalar,createdAt:scalar,displayName:scalar,hasErpAccess:scalar,hasFactoryAccess:scalar,hiddenCostFields:[],hideAllCosts:scalar,id:scalar,pageAccess:[],username:scalar}]"
+      "status": 403,
+      "shape": "{code:scalar,message:scalar}"
     },
     "/api/factory/v2/stock-allocation": {
       "status": 403,

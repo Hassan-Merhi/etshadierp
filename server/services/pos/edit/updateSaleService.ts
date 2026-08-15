@@ -26,6 +26,7 @@ import {
 } from "./validateEditSaleRequest";
 import { reverseOriginalSaleInventory, clearOldSaleRecords } from "./reverseOriginalSaleInventory";
 import { rebuildSaleItems } from "./rebuildSaleItems";
+import { nextCanonicalSourceRevision } from "../../inventory/canonicalSourceRevision";
 import { updateVoucherRecord } from "./updateSaleVoucher";
 import { rebuildSaleAccountingEntries } from "./rebuildSaleAccounting";
 
@@ -117,31 +118,29 @@ export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ stat
       if ("error" in newLocationResult) return newLocationResult;
     }
 
-    const editSpDeductionPerQty = await fetchSpEditDeductionPerQty(
-      isSpCompanyEdit,
-      targetLocationId,
-      tx
-    );
+    const editSpDeductionPerQty = await fetchSpEditDeductionPerQty(isSpCompanyEdit, targetLocationId, tx);
 
     // Voucher entries are loaded after the voucher lock, so account preservation
     // and historical currency reconstruction use the latest committed edit.
-    const oldEntries = await tx
-      .select()
-      .from(voucherEntries)
-      .where(eq(voucherEntries.voucherId, voucherId));
+    const oldEntries = await tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
 
     // Lock the current sales items in the same transaction. A second edit waits,
     // then sees the first edit's committed voucher, entries, location, and items.
-    const oldSalesItems = await tx
-      .select()
-      .from(salesItems)
-      .where(eq(salesItems.voucherId, voucherId))
-      .for("update");
+    const oldSalesItems = await tx.select().from(salesItems).where(eq(salesItems.voucherId, voucherId)).for("update");
     oldSalesItems.sort((a, b) => a.stockItemId - b.stockItemId);
 
     const oldItemsMap = new Map(oldSalesItems.map((item) => [item.id, item]));
 
-    await reverseOriginalSaleInventory(tx, lockedVoucher, oldSalesItems);
+    // Each edit appends its own reversal and reissue to the append-only
+    // journal, so it needs an idempotency key of its own.
+    const canonicalRevision = await nextCanonicalSourceRevision(
+      tx,
+      lockedVoucher.companyId,
+      "pos-sale",
+      String(voucherId)
+    );
+
+    await reverseOriginalSaleInventory(tx, lockedVoucher, oldSalesItems, canonicalRevision);
     await clearOldSaleRecords(tx, voucherId);
 
     const rebuildResult = await rebuildSaleItems(tx, {
@@ -151,6 +150,7 @@ export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ stat
       oldItemsMap,
       canSellNegativeStock,
       companyId: lockedVoucher.companyId,
+      canonicalRevision,
     });
 
     await updateVoucherRecord(tx, {

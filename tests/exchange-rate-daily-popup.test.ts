@@ -134,14 +134,26 @@ describe("Exchange rate is a shared company-wide record, not per-user", () => {
         role: "Admin",
       });
 
+      // Membership alone no longer lets a request name another company: the
+      // tenant boundary requires the active company to be switched first, so a
+      // primary companyId that disagrees with the session fails closed even for
+      // an Admin who genuinely belongs to the target company.
+      const foreign = await agentA.get(`/api/exchange-rates/check-today?companyId=${otherCompany.id}`);
+      expect(foreign.status).toBe(403);
+
+      // Switching the active company is the supported route, and it gives the
+      // other company its own popup rather than MALI's answer.
+      await agentA.post("/api/auth/set-company").send({ companyId: otherCompany.id });
       const res = await agentA.get(`/api/exchange-rates/check-today?companyId=${otherCompany.id}`);
       expect(res.status).toBe(200);
       expect(res.body.hasRate).toBe(false);
 
-      // MALI's own rate must be unaffected.
+      // MALI's own rate must be unaffected once the session switches back.
+      await agentA.post("/api/auth/set-company").send({ companyId: ctx.companyId });
       const maliRes = await agentA.get(`/api/exchange-rates/check-today?companyId=${ctx.companyId}`);
       expect(maliRes.body.hasRate).toBe(true);
     } finally {
+      await agentA.post("/api/auth/set-company").send({ companyId: ctx.companyId });
       await cleanupExchangeRates([otherCompany.id]);
       await db.delete(schema.userCompanyRoles).where(eq(schema.userCompanyRoles.companyId, otherCompany.id));
       await db.delete(schema.companies).where(eq(schema.companies.id, otherCompany.id));
@@ -195,14 +207,15 @@ describe("Exchange rate is a shared company-wide record, not per-user", () => {
     const today = (await agentA.get(`/api/exchange-rates/check-today?companyId=${ctx.companyId}`)).body.today;
 
     await Promise.all([
-      agentA.post("/api/exchange-rates").send({ fromCurrency: "USD", toCurrency: "CFA", rate: "600", effectiveDate: today }),
-      agentB.post("/api/exchange-rates").send({ fromCurrency: "USD", toCurrency: "CFA", rate: "610", effectiveDate: today }),
+      agentA
+        .post("/api/exchange-rates")
+        .send({ fromCurrency: "USD", toCurrency: "CFA", rate: "600", effectiveDate: today }),
+      agentB
+        .post("/api/exchange-rates")
+        .send({ fromCurrency: "USD", toCurrency: "CFA", rate: "610", effectiveDate: today }),
     ]);
 
-    const rows = await db
-      .select()
-      .from(schema.exchangeRates)
-      .where(eq(schema.exchangeRates.companyId, ctx.companyId));
+    const rows = await db.select().from(schema.exchangeRates).where(eq(schema.exchangeRates.companyId, ctx.companyId));
     const todaysRows = rows.filter((r) => r.effectiveDate === today);
     expect(todaysRows.length).toBe(1);
     expect(["600.000000", "610.000000"]).toContain(parseFloat(todaysRows[0].rate).toFixed(6));

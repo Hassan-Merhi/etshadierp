@@ -7,6 +7,7 @@ import { registerVoucherCreateRoutes } from "./vouchers/voucherCreateRoutes";
 import { registerVoucherPaymentRoutes } from "./vouchers/voucherPaymentRoutes";
 import { registerCentralGenericVoucherCreateRoute } from "./vouchers/centralGenericVoucherCreateRoute";
 import { registerCentralPaymentReceiptCreateRoute } from "./vouchers/centralPaymentReceiptCreateRoute";
+import { registerVoucherExactReversalRoute } from "./vouchers/voucherExactReversalRoute";
 import { registerCentralPaymentReceiptLifecycleRoutes } from "./vouchers/centralPaymentReceiptLifecycleRoute";
 import { registerCentralPaymentReceiptDeleteRoute } from "./vouchers/centralPaymentReceiptDeleteRoute";
 import { registerCentralJournalCreateRoute } from "./vouchers/centralJournalCreateRoute";
@@ -70,6 +71,7 @@ export function registerVoucherRoutes(app: Express) {
   registerVoucherCreateRoutes(app);
 
   registerCentralPaymentReceiptCreateRoute(app);
+  registerVoucherExactReversalRoute(app);
   registerCentralPaymentReceiptLifecycleRoutes(app);
   registerCentralPaymentReceiptDeleteRoute(app);
   registerVoucherPaymentRoutes(app);

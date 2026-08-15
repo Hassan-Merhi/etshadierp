@@ -13,6 +13,13 @@ function toHeader(key: string): string {
 // Guess if a column key looks like a numeric/money/qty field
 function guessNumFmt(key: string): string | null {
   const k = key.toLowerCase();
+  // Exchange rates are tested first because their column names contain "rate",
+  // which the money pattern below also matches: tested in the other order, a
+  // rate stored to six decimals was displayed rounded to two, and the branch
+  // written to prevent that never ran.
+  if (/fx_rate|exchange_rate/.test(k)) {
+    return "#,##0.000000";
+  }
   if (
     /amount|total|balance|salary|rate|price|value|cost|revenue|profit|commission|fee|tax|discount|advance|bonus|deposit|withdrawal|payment|freight|duty|margin/.test(
       k
@@ -22,9 +29,6 @@ function guessNumFmt(key: string): string | null {
   }
   if (/qty|quantity|weight|kg|count|bales|units|percentage|pct/.test(k)) {
     return "#,##0.###";
-  }
-  if (/fx_rate|exchange_rate/.test(k)) {
-    return "#,##0.000000";
   }
   return null;
 }

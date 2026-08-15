@@ -2,10 +2,10 @@
   "description": "Coverage floors for the backend and frontend suites. Read by vitest.config.ts, vitest.config.frontend.ts, and scripts/audit-coverage-ratchet.mjs. Global floors sit just below measured coverage (10% of the measured value, capped at 2 points globally and 3 per file), so ordinary churn does not fail CI but deleting tests does. Raise a floor when the ratchet audit reports headroom; never lower one without saying why in the commit message.",
   "backend": {
     "global": {
-      "lines": 18,
-      "statements": 18,
-      "functions": 24,
-      "branches": 12
+      "lines": 29,
+      "statements": 28,
+      "functions": 33,
+      "branches": 19
     },
     "perFile": {
       "server/services/accounting/centralPostingEngine.ts": {
@@ -15,16 +15,16 @@
         "branches": 77
       },
       "server/services/accounting/voucherPostingService.ts": {
-        "lines": 68,
-        "statements": 63,
-        "functions": 63,
-        "branches": 88
+        "lines": 99,
+        "statements": 99,
+        "functions": 99,
+        "branches": 95
       },
       "server/services/accounting/genericVoucherPosting.ts": {
-        "lines": 81,
-        "statements": 79,
+        "lines": 90,
+        "statements": 89,
         "functions": 97,
-        "branches": 80
+        "branches": 87
       },
       "server/services/accounting/manualJournalPosting.ts": {
         "lines": 82,
@@ -33,16 +33,16 @@
         "branches": 75
       },
       "server/services/accounting/paymentReceiptPosting.ts": {
-        "lines": 67,
-        "statements": 65,
+        "lines": 93,
+        "statements": 93,
         "functions": 97,
-        "branches": 68
+        "branches": 85
       },
       "server/services/accounting/currencyAmounts.ts": {
-        "lines": 74,
-        "statements": 74,
-        "functions": 85,
-        "branches": 65
+        "lines": 97,
+        "statements": 97,
+        "functions": 99,
+        "branches": 90
       },
       "server/services/accounting/periodLockService.ts": {
         "lines": 88,
@@ -51,10 +51,10 @@
         "branches": 75
       },
       "server/services/accounting/financialCloseService.ts": {
-        "lines": 25,
-        "statements": 25,
-        "functions": 47,
-        "branches": 25
+        "lines": 99,
+        "statements": 99,
+        "functions": 99,
+        "branches": 77
       },
       "server/inventoryHelper.ts": {
         "lines": 95,
@@ -75,10 +75,10 @@
         "branches": 87
       },
       "server/services/security/companyIsolationPolicy.ts": {
-        "lines": 88,
-        "statements": 88,
+        "lines": 94,
+        "statements": 94,
         "functions": 97,
-        "branches": 82
+        "branches": 87
       },
       "server/services/security/companyRequestScopePolicy.ts": {
         "lines": 97,
@@ -111,25 +111,25 @@
         "branches": 79
       },
       "server/services/security/credentialVersionService.ts": {
-        "lines": 75,
-        "statements": 72,
-        "functions": 52,
-        "branches": 78
+        "lines": 93,
+        "statements": 94,
+        "functions": 87,
+        "branches": 89
       },
       "server/services/security/namedPermissionService.ts": {
-        "lines": 64,
-        "statements": 63,
-        "functions": 66,
-        "branches": 50
+        "lines": 99,
+        "statements": 99,
+        "functions": 99,
+        "branches": 91
       }
     }
   },
   "frontend": {
     "global": {
-      "lines": 6,
-      "statements": 6,
-      "functions": 3,
-      "branches": 4
+      "lines": 12,
+      "statements": 11,
+      "functions": 8,
+      "branches": 8
     },
     "perFile": {
       "client/src/pages/StockHub.tsx": {
@@ -193,8 +193,8 @@
         "branches": 61
       },
       "client/src/pages/StockInSalesReport.tsx": {
-        "lines": 41,
-        "statements": 36,
+        "lines": 45,
+        "statements": 40,
         "functions": 30,
         "branches": 26
       }

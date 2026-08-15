@@ -1,4 +1,5 @@
 import Decimal from "decimal.js";
+import { assertTransactionCompanyScope, type CompanyScopedTransaction } from "../security/transactionCompanyScope";
 
 export type StockMovementKind = "receipt" | "issue" | "transfer" | "adjustment" | "reversal";
 
@@ -49,41 +50,42 @@ export interface StockMovementResult {
   idempotent: boolean;
 }
 
-export interface StockMovementAdapter {
+/**
+ * Generic over the transaction handle so a PostgreSQL adapter can be written
+ * against the concrete drizzle transaction — and keep drizzle's own row typing —
+ * while the boundary below only requires a tenant-scoped handle.
+ */
+export interface StockMovementAdapter<TTransaction = CompanyScopedTransaction> {
   findExisting(input: {
-    tx: any;
+    tx: TTransaction;
     companyId: number;
     source: StockMovementSourceIdentity;
   }): Promise<StockMovementResult | null>;
   validateOwnership(input: {
-    tx: any;
+    tx: TTransaction;
     companyId: number;
     stockItemId: number;
     locationIds: number[];
   }): Promise<void>;
   lockBalances(input: {
-    tx: any;
+    tx: TTransaction;
     companyId: number;
     stockItemId: number;
     locationIds: number[];
   }): Promise<Record<number, string>>;
   appendMovements(input: {
-    tx: any;
+    tx: TTransaction;
     request: StockMovementRequest;
-    rows: Array<{
-      locationId: number;
-      quantityDelta: string;
-      unitCost: string;
-    }>;
+    rows: Array<{ locationId: number; quantityDelta: string; unitCost: string }>;
   }): Promise<StockMovementRecord[]>;
   recordIdempotency(input: {
-    tx: any;
+    tx: TTransaction;
     companyId: number;
     source: StockMovementSourceIdentity;
     movementIds: number[];
   }): Promise<void>;
   recordAudit(input: {
-    tx: any;
+    tx: TTransaction;
     request: StockMovementRequest;
     movementIds: number[];
     quantity: string;
@@ -93,7 +95,6 @@ export interface StockMovementAdapter {
 
 export class StockMovementValidationError extends Error {
   readonly code: string;
-
   constructor(code: string, message: string) {
     super(message);
     this.name = "StockMovementValidationError";
@@ -103,16 +104,13 @@ export class StockMovementValidationError extends Error {
 
 function requiredText(value: unknown, field: string): string {
   const normalized = String(value ?? "").trim();
-  if (!normalized) {
-    throw new StockMovementValidationError("STOCK_MOVEMENT_FIELD_REQUIRED", `${field} is required`);
-  }
+  if (!normalized) throw new StockMovementValidationError("STOCK_MOVEMENT_FIELD_REQUIRED", `${field} is required`);
   return normalized;
 }
 
 function positiveId(value: unknown, field: string): number {
-  if (!Number.isInteger(value) || Number(value) <= 0) {
+  if (!Number.isInteger(value) || Number(value) <= 0)
     throw new StockMovementValidationError("STOCK_MOVEMENT_ID_INVALID", `${field} must be a positive integer`);
-  }
   return Number(value);
 }
 
@@ -151,28 +149,33 @@ export function validateStockMovementRequest(request: StockMovementRequest): Val
   const quantity = decimal(request.quantity, "quantity", false);
   const unitCost = decimal(request.unitCost, "unitCost", true);
   const rows: ValidatedStockMovement["rows"] = [];
-
   const from = request.fromLocationId == null ? null : positiveId(request.fromLocationId, "fromLocationId");
   const to = request.toLocationId == null ? null : positiveId(request.toLocationId, "toLocationId");
 
   if (request.kind === "receipt") {
-    if (!to || from) throw new StockMovementValidationError("STOCK_MOVEMENT_LOCATIONS_INVALID", "Receipt requires only toLocationId");
+    if (!to || from)
+      throw new StockMovementValidationError("STOCK_MOVEMENT_LOCATIONS_INVALID", "Receipt requires only toLocationId");
     rows.push({ locationId: to, quantityDelta: quantity.toFixed(), unitCost: unitCost.toFixed() });
   } else if (request.kind === "issue") {
-    if (!from || to) throw new StockMovementValidationError("STOCK_MOVEMENT_LOCATIONS_INVALID", "Issue requires only fromLocationId");
+    if (!from || to)
+      throw new StockMovementValidationError("STOCK_MOVEMENT_LOCATIONS_INVALID", "Issue requires only fromLocationId");
     rows.push({ locationId: from, quantityDelta: quantity.negated().toFixed(), unitCost: unitCost.toFixed() });
   } else if (request.kind === "transfer") {
-    if (!from || !to || from === to) {
-      throw new StockMovementValidationError("STOCK_MOVEMENT_LOCATIONS_INVALID", "Transfer requires distinct from and to locations");
-    }
+    if (!from || !to || from === to)
+      throw new StockMovementValidationError(
+        "STOCK_MOVEMENT_LOCATIONS_INVALID",
+        "Transfer requires distinct from and to locations"
+      );
     rows.push(
       { locationId: from, quantityDelta: quantity.negated().toFixed(), unitCost: unitCost.toFixed() },
       { locationId: to, quantityDelta: quantity.toFixed(), unitCost: unitCost.toFixed() }
     );
   } else if (request.kind === "adjustment") {
-    if ((from == null) === (to == null)) {
-      throw new StockMovementValidationError("STOCK_MOVEMENT_LOCATIONS_INVALID", "Adjustment requires exactly one location side");
-    }
+    if ((from == null) === (to == null))
+      throw new StockMovementValidationError(
+        "STOCK_MOVEMENT_LOCATIONS_INVALID",
+        "Adjustment requires exactly one location side"
+      );
     const locationId = from ?? to!;
     rows.push({
       locationId,
@@ -180,12 +183,16 @@ export function validateStockMovementRequest(request: StockMovementRequest): Val
       unitCost: unitCost.toFixed(),
     });
   } else {
-    if (!request.reversalOfMovementId) {
-      throw new StockMovementValidationError("STOCK_MOVEMENT_REVERSAL_REQUIRED", "Reversal requires reversalOfMovementId");
-    }
-    if ((from == null) === (to == null)) {
-      throw new StockMovementValidationError("STOCK_MOVEMENT_LOCATIONS_INVALID", "Reversal requires exactly one location side");
-    }
+    if (!request.reversalOfMovementId)
+      throw new StockMovementValidationError(
+        "STOCK_MOVEMENT_REVERSAL_REQUIRED",
+        "Reversal requires reversalOfMovementId"
+      );
+    if ((from == null) === (to == null))
+      throw new StockMovementValidationError(
+        "STOCK_MOVEMENT_LOCATIONS_INVALID",
+        "Reversal requires exactly one location side"
+      );
     const locationId = from ?? to!;
     rows.push({
       locationId,
@@ -203,38 +210,26 @@ export function validateStockMovementRequest(request: StockMovementRequest): Val
   };
 }
 
-/**
- * Canonical append-only stock movement boundary.
- *
- * The caller owns the surrounding transaction so source documents, accounting,
- * stock movements, and audit records commit or roll back together. Existing
- * movements are never edited or deleted; corrections are represented by new,
- * explicitly linked reversal movements.
- */
 export async function postStockMovementTx(
-  tx: any,
+  tx: CompanyScopedTransaction,
   request: StockMovementRequest,
   adapter: StockMovementAdapter
 ): Promise<StockMovementResult> {
   const validated = validateStockMovementRequest(request);
+  const companyId = await assertTransactionCompanyScope(tx, request.companyId);
 
-  const existing = await adapter.findExisting({
-    tx,
-    companyId: request.companyId,
-    source: request.source,
-  });
+  const existing = await adapter.findExisting({ tx, companyId, source: request.source });
   if (existing) return { ...existing, idempotent: true };
 
   await adapter.validateOwnership({
     tx,
-    companyId: request.companyId,
+    companyId,
     stockItemId: request.stockItemId,
     locationIds: validated.locationIds,
   });
-
   const balances = await adapter.lockBalances({
     tx,
-    companyId: request.companyId,
+    companyId,
     stockItemId: request.stockItemId,
     locationIds: validated.locationIds,
   });
@@ -264,7 +259,7 @@ export async function postStockMovementTx(
 
   await adapter.recordIdempotency({
     tx,
-    companyId: request.companyId,
+    companyId,
     source: request.source,
     movementIds: movements.map((movement) => movement.id),
   });
@@ -276,10 +271,5 @@ export async function postStockMovementTx(
     value: validated.value,
   });
 
-  return {
-    movements,
-    quantity: validated.quantity,
-    value: validated.value,
-    idempotent: false,
-  };
+  return { movements, quantity: validated.quantity, value: validated.value, idempotent: false };
 }

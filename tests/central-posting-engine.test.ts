@@ -96,6 +96,9 @@ describe("validateCentralPostingRequest", () => {
 describe("postBalancedVoucherTx", () => {
   it("returns an existing posting as a replay without inserting or auditing again", async () => {
     const existing = { voucher: { id: 77 }, entries: [{ id: 88 }] };
+    // The engine asserts the transaction-local company scope before it looks
+    // for an existing posting, so the stub transaction has to run statements.
+    const tx = { execute: vi.fn(async () => ({ rows: [] })) };
     const dependencies = {
       ownership: { validateVoucherOwnership: vi.fn() },
       idempotency: {
@@ -105,10 +108,11 @@ describe("postBalancedVoucherTx", () => {
       audit: { recordPosting: vi.fn() },
     };
 
-    await expect(postBalancedVoucherTx({}, request(), dependencies)).resolves.toEqual({
+    await expect(postBalancedVoucherTx(tx, request(), dependencies)).resolves.toEqual({
       ...existing,
       replayed: true,
     });
+    expect(tx.execute).toHaveBeenCalledTimes(1);
     expect(dependencies.ownership.validateVoucherOwnership).not.toHaveBeenCalled();
     expect(dependencies.idempotency.record).not.toHaveBeenCalled();
     expect(dependencies.audit.recordPosting).not.toHaveBeenCalled();

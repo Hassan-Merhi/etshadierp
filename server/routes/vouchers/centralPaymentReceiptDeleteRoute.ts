@@ -12,21 +12,15 @@ import { requireAuth, requireRole } from "../../auth";
 import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
-import {
-  isReadonlyMigratedVoucher,
-  READONLY_MIGRATED_VOUCHER_MESSAGE,
-} from "../../lib/migratedVoucherGuard";
+import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../../lib/migratedVoucherGuard";
 import { storage } from "../../storage";
 import { applyEmployeeBalanceDeltasTx } from "../../services/accounting/employeeBalancePosting";
+import { removeFactoryDaybookMirrorTx } from "../../services/accounting/factoryDaybookMirrorRemoval";
 import {
   isPaymentReceiptVoucherType,
   shouldUseCentralPaymentReceiptDeletion,
 } from "../../services/accounting/paymentReceiptDeletionPolicy";
-import {
-  buildVoucherChangesForDelete,
-  logAudit,
-  snapshotVoucherEntries,
-} from "../_helpers";
+import { buildVoucherChangesForDelete, logAudit, snapshotVoucherEntries } from "../_helpers";
 
 class LegacyPaymentReceiptDeleteRequired extends Error {}
 
@@ -39,11 +33,7 @@ async function countSalesItems(connection: any, voucherId: number): Promise<numb
   return rows.length;
 }
 
-async function deleteActivePaymentReceipt(
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> {
+async function deleteActivePaymentReceipt(req: Request, res: Response, next: NextFunction): Promise<void> {
   const startedAt = Date.now();
   const voucherId = Number(req.params.id);
   const companyId = req.session.currentCompanyId;
@@ -73,9 +63,7 @@ async function deleteActivePaymentReceipt(
       return;
     }
 
-    const salesItemCount = voucher.voucherType === "Receipt"
-      ? await countSalesItems(db, voucherId)
-      : 0;
+    const salesItemCount = voucher.voucherType === "Receipt" ? await countSalesItems(db, voucherId) : 0;
     if (
       !shouldUseCentralPaymentReceiptDeletion({
         voucherType: voucher.voucherType,
@@ -110,9 +98,7 @@ async function deleteActivePaymentReceipt(
         };
       }
 
-      const lockedSalesItemCount = lockedVoucher.voucherType === "Receipt"
-        ? await countSalesItems(tx, voucherId)
-        : 0;
+      const lockedSalesItemCount = lockedVoucher.voucherType === "Receipt" ? await countSalesItems(tx, voucherId) : 0;
       if (
         !shouldUseCentralPaymentReceiptDeletion({
           voucherType: lockedVoucher.voucherType,
@@ -128,10 +114,7 @@ async function deleteActivePaymentReceipt(
         throw new LegacyPaymentReceiptDeleteRequired();
       }
 
-      const entries = await tx
-        .select()
-        .from(voucherEntries)
-        .where(eq(voucherEntries.voucherId, voucherId));
+      const entries = await tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
 
       await applyEmployeeBalanceDeltasTx({
         tx,
@@ -143,10 +126,7 @@ async function deleteActivePaymentReceipt(
 
       // Preserve the existing rental/property cleanup for any Payment/Receipt
       // voucher linked to a property payment row.
-      const linkedPayments = await tx
-        .select()
-        .from(propertyPayments)
-        .where(eq(propertyPayments.voucherId, voucherId));
+      const linkedPayments = await tx.select().from(propertyPayments).where(eq(propertyPayments.voucherId, voucherId));
       for (const payment of linkedPayments) {
         if (payment.ledgerRowId) {
           await tx.execute(sql`
@@ -164,20 +144,17 @@ async function deleteActivePaymentReceipt(
         .select()
         .from(interCompanyTransfers)
         .where(
-          or(
-            eq(interCompanyTransfers.fromVoucherId, voucherId),
-            eq(interCompanyTransfers.toVoucherId, voucherId)
-          )
+          or(eq(interCompanyTransfers.fromVoucherId, voucherId), eq(interCompanyTransfers.toVoucherId, voucherId))
         );
       for (const transfer of linkedTransfers) {
-        const otherVoucherId =
-          transfer.fromVoucherId === voucherId
-            ? transfer.toVoucherId
-            : transfer.fromVoucherId;
+        const otherVoucherId = transfer.fromVoucherId === voucherId ? transfer.toVoucherId : transfer.fromVoucherId;
         await tx.delete(interCompanyTransfers).where(eq(interCompanyTransfers.id, transfer.id));
         if (otherVoucherId && otherVoucherId !== voucherId) {
           await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, otherVoucherId));
           await tx.delete(vouchers).where(eq(vouchers.id, otherVoucherId));
+          // The counterpart voucher is gone entirely, so its mirror would
+          // reference nothing at all.
+          await removeFactoryDaybookMirrorTx({ tx, voucherId: otherVoucherId });
         }
       }
 
@@ -189,6 +166,11 @@ async function deleteActivePaymentReceipt(
             eq(intercompanyPaymentRequests.status, "pending")
           )
         );
+
+      // The Daybook mirror is written inside the posting transaction; it is
+      // withdrawn inside the cancelling one, or the Daybook keeps reporting the
+      // cash movement of a voucher that no longer stands.
+      await removeFactoryDaybookMirrorTx({ tx, companyId, voucherId });
 
       await tx
         .update(vouchers)

@@ -66,16 +66,17 @@ describe("Phase 7 company access boundary", () => {
     expect(offloads).toContain("COMPANY_ACCESS_DENIED");
   });
 
-  it("resolves Developer scope from the account role, not only company role rows", () => {
+  it("resolves Developer scope from the account role without giving Admin a synthetic bypass", () => {
     const boundary = source("server/security/companyAccessBoundary.ts");
 
     // set-company accepts req.user.role === "Developer" and fabricates a company
-    // role that is never written to user_company_roles. A boundary that only reads
-    // user_company_roles therefore denies the company the user just selected, and
-    // company-scoped reads such as /api/vouchers come back empty.
+    // role that is never written to user_company_roles. The boundary mirrors that
+    // explicit exception, while Admin remains tied to real company membership.
     expect(boundary).toContain("await storage.getUser(userId)");
     expect(boundary).toContain('?.role === "Developer"');
-    expect(boundary).toContain('if (context.role === "Developer" || context.role === "Admin")');
+    expect(boundary).toContain('if (context.role === "Developer")');
+    expect(boundary).not.toContain('if (context.role === "Developer" || context.role === "Admin")');
+    expect(boundary).toContain("await assertCompanyAccess(context.userId, context.activeCompanyId)");
   });
 
   it("routes remaining cross-company page scopes through the central boundary", () => {
