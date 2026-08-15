@@ -38,13 +38,13 @@ export function registerSpMigrationSetupRoutes(app: Express) {
         const existing = (await db.execute(sql`SELECT id FROM companies WHERE code = ${code} LIMIT 1`)).rows[0];
         if (existing) return res.status(409).json({ message: `Company code "${code}" already exists` });
 
-        const [row] = (
+        const [row] = ((
           await db.execute(sql`
         INSERT INTO companies (code, name, company_type, base_currency, active)
         VALUES (${code}, ${name}, 'supplier_partner', 'USD', true)
         RETURNING id, code, name, company_type
       `)
-        ).rows as any[];
+        ).rows);
 
         return res.json({ success: true, company: row });
       } catch (err: unknown) {
@@ -109,13 +109,13 @@ export function registerSpMigrationSetupRoutes(app: Express) {
         const targetId = parseInt(String(req.query.targetCompanyId ?? ""), 10);
         if (!targetId) return res.status(400).json({ message: "targetCompanyId is required" });
 
-        const existingRows = (
+        const existingRows = ((
           await db.execute(sql`
         SELECT sub_type, code, name FROM ledger_accounts
         WHERE company_id = ${targetId} AND deleted_at IS NULL
           AND sub_type = ANY(${sqlArray(ALL_ACCOUNT_DEFS.map((a) => a.subType))})
       `)
-        ).rows as any[];
+        ).rows);
         const existingBySubType = new Map(existingRows.map((r) => [r.sub_type, r]));
 
         const accounts = ALL_ACCOUNT_DEFS.map((a) => {
@@ -226,14 +226,14 @@ export function registerSpMigrationSetupRoutes(app: Express) {
       try {
         const targetId = parseInt(String(req.query.targetCompanyId ?? ""), 10);
         if (!targetId) return res.status(400).json({ message: "targetCompanyId is required" });
-        const rows = (
+        const rows = ((
           await db.execute(sql`
         SELECT id, code, name, account_type
         FROM ledger_accounts
         WHERE company_id = ${targetId} AND account_type IN ('Cash', 'Bank') AND deleted_at IS NULL
         ORDER BY account_type, name
       `)
-        ).rows as any[];
+        ).rows);
         return res.json({ accounts: rows });
       } catch (err: unknown) {
         return res.status(500).json({ message: "Internal server error" });
@@ -283,12 +283,12 @@ export function registerSpMigrationSetupRoutes(app: Express) {
         }
 
         // Find SP-OPNBAL account
-        const opnBalRows = (
+        const opnBalRows = ((
           await db.execute(sql`
         SELECT id FROM ledger_accounts
         WHERE company_id = ${targetId} AND sub_type = 'sp_opnbal' AND deleted_at IS NULL LIMIT 1
       `)
-        ).rows as any[];
+        ).rows);
         if (!opnBalRows.length) {
           return res
             .status(400)
@@ -299,14 +299,14 @@ export function registerSpMigrationSetupRoutes(app: Express) {
         const amtStr = parseFloat(amount).toFixed(2);
         const voucherNumber = `OB-${targetId}-${Date.now()}`;
 
-        const [vRow] = (
+        const [vRow] = ((
           await db.execute(sql`
         INSERT INTO vouchers (company_id, voucher_number, voucher_type, voucher_date, description, total_amount, currency, source_module)
         VALUES (${targetId}, ${voucherNumber}, 'Journal', ${date},
                 ${narration ?? "GC Opening Cash Balance"}, ${amtStr}, 'USD', 'ERP')
         RETURNING id
       `)
-        ).rows as any[];
+        ).rows);
         const voucherId = pn(vRow.id);
 
         // Dr selected Cash/Bank account

@@ -57,7 +57,7 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
       const inStockCountsRaw = await db.execute(
         sql`SELECT article_code as "articleCode", COUNT(*)::int as count FROM factory_bales WHERE company_id = ${companyId} AND status = 'IN_STOCK' GROUP BY article_code`
       );
-      const inStockCounts = (inStockCountsRaw.rows || (inStockCountsRaw as unknown as any[])).map((r: any) => ({
+      const inStockCounts = (inStockCountsRaw.rows || ((inStockCountsRaw as unknown))).map((r: any) => ({
         articleCode: r.articleCode,
         count: Number(r.count),
       }));
@@ -77,7 +77,7 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
       const activeOrdersRaw = await db.execute(
         sql`SELECT id, proforma_id_used as "proformaIdUsed", status FROM customer_orders WHERE company_id = ${companyId} AND status IN ('LOADING','PENDING_VERIFICATION','VERIFIED')`
       );
-      const activeOrders = (activeOrdersRaw.rows || (activeOrdersRaw as unknown as any[])).map((o: any) => ({
+      const activeOrders = (activeOrdersRaw.rows || ((activeOrdersRaw as unknown))).map((o: any) => ({
         id: o.id,
         proformaIdUsed: o.proformaIdUsed,
         status: o.status,
@@ -90,7 +90,7 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
         const activeOrderBalesRaw = await db.execute(
           sql`SELECT order_id as "orderId", article_code as "articleCode", COUNT(*)::int as count FROM customer_order_bales WHERE order_id = ANY(${sqlArray(orderIds)}) GROUP BY order_id, article_code`
         );
-        activeOrderBales = (activeOrderBalesRaw.rows || (activeOrderBalesRaw as unknown as any[])).map((b: any) => ({
+        activeOrderBales = (activeOrderBalesRaw.rows || ((activeOrderBalesRaw as unknown))).map((b: any) => ({
           orderId: b.orderId,
           articleCode: b.articleCode,
           count: Number(b.count),
@@ -123,7 +123,7 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
                 AND article_code = ANY(${sqlArray(allArticleCodes)})
               ORDER BY article_code`
         );
-        (prodRaw.rows || (prodRaw as unknown as any[])).forEach((r: any) => {
+        (prodRaw.rows || ((prodRaw as unknown))).forEach((r: any) => {
           if (r.name) productNamesMap[r.articleCode] = r.name;
         });
       }
@@ -171,7 +171,7 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
             GROUP BY article_code`
       );
       const freeStockCounts: { articleCode: string; count: number }[] = (
-        freeStockRaw.rows || (freeStockRaw as unknown as any[])
+        freeStockRaw.rows || ((freeStockRaw as unknown))
       ).map((r: any) => ({
         articleCode: r.articleCode,
         count: Number(r.count),
@@ -192,7 +192,7 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
         containerNumber: string | null;
         status: string;
         proformaIdUsed: number | null;
-      }[] = (loadingsRaw.rows || (loadingsRaw as unknown as any[])).map((r: any) => ({
+      }[] = (loadingsRaw.rows || ((loadingsRaw as unknown))).map((r: any) => ({
         id: r.id,
         customerId: r.customerId,
         containerNumber: r.containerNumber || null,
@@ -211,7 +211,7 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
               WHERE cob.order_id = ANY(${sqlArray(ids)})
               GROUP BY cob.order_id, fb.article_code`
         );
-        loadingBales = (balesRaw.rows || (balesRaw as unknown as any[])).map((r: any) => ({
+        loadingBales = (balesRaw.rows || ((balesRaw as unknown))).map((r: any) => ({
           orderId: r.orderId,
           articleCode: r.articleCode,
           count: Number(r.count),
@@ -278,7 +278,7 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
                 AND fbp.article_code = ANY(${sqlArray(codes)})
               ORDER BY fbp.article_code`
         );
-        (prodRaw.rows || (prodRaw as unknown as any[])).forEach((r: any) => {
+        (prodRaw.rows || ((prodRaw as unknown))).forEach((r: any) => {
           if (r.name) productNameByCode.set(r.articleCode, r.name);
         });
       }

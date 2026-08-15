@@ -283,7 +283,7 @@ async function sendInvoicePdf(req: Request, res: Response, data: NonNullable<Awa
   let totalQty = 0;
   let totalWeight = 0;
   let totalAmount = 0;
-  for (const line of data.lines as any[]) {
+  for (const line of (data.lines)) {
     if (doc.y > 730) doc.addPage();
     const y = doc.y;
     const qty = safeNumber(line.qty);

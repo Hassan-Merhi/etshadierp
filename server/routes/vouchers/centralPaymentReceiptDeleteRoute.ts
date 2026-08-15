@@ -94,7 +94,7 @@ async function deleteActivePaymentReceipt(req: Request, res: Response, next: Nex
         return {
           replayed: true,
           voucher: lockedVoucher,
-          entries: [] as any[],
+          entries: ([]),
         };
       }
 

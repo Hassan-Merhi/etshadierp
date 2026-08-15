@@ -246,10 +246,10 @@ export async function refreshMultipleFactoryContainerEtas(
   if (containerIds && containerIds.length > 0) {
     ids = Array.from(new Set(containerIds)).slice(0, BULK_MAX_BATCH);
   } else {
-    const whereClauses = [
+    const whereClauses = ([
       eq(factoryContainers.trackingEnabled, true),
       opts.companyId ? eq(factoryContainers.companyId, opts.companyId) : undefined,
-    ].filter(Boolean) as any[];
+    ].filter(Boolean));
 
     const rows = await db
       .select({
@@ -320,7 +320,7 @@ export interface JsonCargoEtaSummary {
 
 /** Lightweight dashboard summary — no per-container detail, no secrets. */
 export async function getFactoryEtaTrackingSummary(companyId?: number): Promise<JsonCargoEtaSummary> {
-  const whereClauses = [companyId ? eq(factoryContainers.companyId, companyId) : undefined].filter(Boolean) as any[];
+  const whereClauses = ([companyId ? eq(factoryContainers.companyId, companyId) : undefined].filter(Boolean));
 
   const rows = await db
     .select({

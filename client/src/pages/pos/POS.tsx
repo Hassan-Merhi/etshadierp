@@ -730,7 +730,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         stockInventoryLoading={stockInventoryLoading}
         handleStockPrint={handleStockPrint}
         handleSendWhatsAppReport={handleSendWhatsAppReport}
-        stockInventory={(stockInventory as any[]).map((item: any) => ({
+        stockInventory={((stockInventory)).map((item: any) => ({
           stockItemName: item.stockItemName,
           stockItemCode: item.stockItemCode,
           stock: parseFloat(item.quantity),

@@ -99,7 +99,7 @@ async function deriveBaleStockEntryAmounts(rows: any[], companyId: number): Prom
 
   const priceByProductId = new Map<number, number>();
   const priceByArticleCode = new Map<string, number>();
-  for (const product of products as any[]) {
+  for (const product of (products)) {
     const price = Number.parseFloat(product.productionPrice || "0") || 0;
     priceByProductId.set(product.id, price);
     if (product.articleCode) priceByArticleCode.set(product.articleCode, price);

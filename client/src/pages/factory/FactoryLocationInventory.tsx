@@ -540,7 +540,7 @@ export default function FactoryLocationInventory() {
     )
       return;
     const productByArticleCode = new Map<string, any>();
-    (inventoryData as any[]).forEach((prod: any) => {
+    ((inventoryData)).forEach((prod: any) => {
       productByArticleCode.set((prod.articleCode || "").toLowerCase(), prod);
     });
     const newSelections = new Map<number, ProformaSelection>();

@@ -474,7 +474,7 @@ async function deleteActiveJournal(req: Request, res: Response, next: NextFuncti
         .limit(1);
       if (!lockedVoucher) throw new Error("Voucher not found");
       if (lockedVoucher.deletedAt) {
-        return { replayed: true, voucher: lockedVoucher, entries: [] as any[] };
+        return { replayed: true, voucher: lockedVoucher, entries: ([]) };
       }
 
       const entries = await tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));

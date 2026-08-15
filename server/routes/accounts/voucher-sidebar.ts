@@ -58,20 +58,20 @@ export function registerAccountVoucherSidebarRoutes(app: Express) {
         storage.getAllBankAccounts(companyId),
         storage.getAllFixedAssets(companyId),
         storage.getAllEmployees(companyId),
-        isFactoryCompany || isPropertiesCompany ? Promise.resolve([] as any[]) : storage.getAllSuppliers(),
+        isFactoryCompany || isPropertiesCompany ? Promise.resolve(([])) : storage.getAllSuppliers(),
         isFactoryCompany
           ? db
               .select()
               .from(factorySuppliers)
               .where(eq(factorySuppliers.companyId, companyId))
               .orderBy(factorySuppliers.name)
-          : Promise.resolve([] as any[]),
+          : Promise.resolve(([])),
         isFactoryCompany
           ? db.select().from(factoryContainers).where(eq(factoryContainers.companyId, companyId))
-          : Promise.resolve([] as any[]),
+          : Promise.resolve(([])),
         isFactoryCompany
           ? db.select().from(factorySupplierPayments).where(eq(factorySupplierPayments.companyId, companyId))
-          : Promise.resolve([] as any[]),
+          : Promise.resolve(([])),
         db
           .select({
             id: vouchers.id,
@@ -98,11 +98,11 @@ export function registerAccountVoucherSidebarRoutes(app: Express) {
       // FACTORY-PAY-* voucher IDs — excluded when computing factory supplier voucher-paid amounts
       // to prevent double-counting with fPayments (factorySupplierPayments).
       const factoryPayVoucherIds = new Set(
-        (companyVouchers as any[]).filter((v) => (v.voucherNumber || "").startsWith("FACTORY-PAY-")).map((v) => v.id)
+        ((companyVouchers)).filter((v) => (v.voucherNumber || "").startsWith("FACTORY-PAY-")).map((v) => v.id)
       );
       // Map from voucherId -> {currency, exchangeRate} for USD conversion of factory supplier entries
       const voucherCurrencyMap = new Map<number, { currency: string; exchangeRate: string }>(
-        (companyVouchers as any[]).map((v) => [
+        ((companyVouchers)).map((v) => [
           v.id,
           { currency: v.currency || "USD", exchangeRate: v.exchangeRate || "1" },
         ])

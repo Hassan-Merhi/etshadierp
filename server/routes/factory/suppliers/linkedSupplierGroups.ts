@@ -104,11 +104,11 @@ export async function buildLinkedSupplierGroups(
     }
 
     const linkedPaidByCurrency: Record<string, number> = {};
-    for (const p of linkedPayments as any[]) {
+    for (const p of (linkedPayments)) {
       const cc = p.currencyCode || "USD";
       linkedPaidByCurrency[cc] = (linkedPaidByCurrency[cc] || 0) + parseFloat(p.amount || "0");
     }
-    for (const t of linkedFxTransfers as any[]) {
+    for (const t of (linkedFxTransfers)) {
       if (t.fromSupplierId === linked.id) {
         // Linked supplier sent funds out (FX Out) — counts as settled against their balance
         const cc = t.fromCurrencyCode || "USD";

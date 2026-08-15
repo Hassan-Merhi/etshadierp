@@ -250,10 +250,10 @@ export async function refreshMultipleContainerEtas(
   if (containerIds && containerIds.length > 0) {
     ids = Array.from(new Set(containerIds)).slice(0, BULK_MAX_BATCH);
   } else {
-    const whereClauses = [
+    const whereClauses = ([
       eq(containers.trackingEnabled, true),
       opts.companyId ? eq(containers.companyId, opts.companyId) : undefined,
-    ].filter(Boolean) as any[];
+    ].filter(Boolean));
 
     const rows = await db
       .select({ id: containers.id, status: containers.status, trackingCarrierHint: containers.trackingCarrierHint })
@@ -320,7 +320,7 @@ export interface JsonCargoEtaSummary {
 
 /** Lightweight dashboard summary — no per-container detail, no secrets. */
 export async function getEtaTrackingSummary(companyId?: number): Promise<JsonCargoEtaSummary> {
-  const whereClauses = [companyId ? eq(containers.companyId, companyId) : undefined].filter(Boolean) as any[];
+  const whereClauses = ([companyId ? eq(containers.companyId, companyId) : undefined].filter(Boolean));
 
   const rows = await db
     .select({

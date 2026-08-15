@@ -534,7 +534,7 @@ export function registerWhatsAppRoutes(app: Express) {
       });
       const { recipientId: reqRecipientId } = req.body as Record<string, any>;
 
-      const allCompanies = (await storage.getAllCompanies()) as any[];
+      const allCompanies = ((await storage.getAllCompanies()));
       if (!allCompanies.length) return res.status(400).json({ message: "No companies found" });
 
       const today = getClientDate(req);

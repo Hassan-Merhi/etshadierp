@@ -156,14 +156,14 @@ function fortuneToXlsx(sheets: FortuneSheet[]): any {
       maxC = Math.max(maxC, c);
     };
 
-    const sheetData = sheet.data as any[][] | undefined;
+    const sheetData = (sheet.data);
     if (sheetData && Array.isArray(sheetData) && sheetData.length > 0) {
       for (let r = 0; r < sheetData.length; r++) {
         if (!sheetData[r]) continue;
         for (let c = 0; c < sheetData[r].length; c++) writeCell(r, c, sheetData[r][c]);
       }
     } else {
-      for (const cell of (sheet.celldata || []) as any[]) writeCell(cell.r, cell.c, cell.v);
+      for (const cell of ((sheet.celldata || []))) writeCell(cell.r, cell.c, cell.v);
     }
 
     ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: maxR, c: maxC } });

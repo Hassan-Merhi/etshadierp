@@ -164,7 +164,7 @@ function compareLines(suggested: CompactFeedbackLine[], finalLines: CompactFeedb
 }
 
 function jsonObject(value: unknown): Record<string, any> {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, any>) : {};
+  return value && typeof value === "object" && !Array.isArray(value) ? ((value)) : {};
 }
 
 export async function createSmartTransferPreviewFeedback(params: {

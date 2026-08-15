@@ -454,7 +454,7 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
       type SupDay = { date: string; supplierName: string; totalKg: number; totalCost: number };
       const supDayMap = new Map<string, SupDay>();
 
-      for (const batch of mixBatchRows as any[]) {
+      for (const batch of (mixBatchRows)) {
         const batchDate: string = batch.batchDate
           ? String(batch.batchDate).slice(0, 10)
           : String(batch.createdAt).slice(0, 10);

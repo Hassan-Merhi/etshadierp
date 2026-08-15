@@ -80,7 +80,7 @@ export function ActiveUsersSection() {
         acc[companyId].push(presence);
         return acc;
       },
-      {} as Record<string, any[]>
+      ({})
     ) || {};
 
   return (

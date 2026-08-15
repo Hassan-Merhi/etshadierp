@@ -49,7 +49,7 @@ export function UserRolesCard({ userId, companies }: UserRolesCardProps) {
       const results = await Promise.all(
         posCompanyIds.map(async (cid) => {
           const res = await fetch(`/api/locations?companyId=${cid}`, { credentials: "include" });
-          if (!res.ok) return [] as any[];
+          if (!res.ok) return ([]);
           return res.json() as Promise<any[]>;
         })
       );

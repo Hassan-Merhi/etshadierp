@@ -193,7 +193,7 @@ export async function loadReplayAuthoritativeInputDigest(
 
   const results = await Promise.all(
     queries.map(async (query) => {
-      const result = await executor.query<TableDigestRow>(query.sql, query.params as any[]);
+      const result = await executor.query<TableDigestRow>(query.sql, (query.params));
       const row = result.rows[0];
       return {
         key: query.key,

@@ -673,7 +673,7 @@ export function registerBankAssetRoutes(app: Express) {
 
           return acc;
         },
-        {} as Record<string, any>
+        ({})
       );
 
       // Calculate container totals
