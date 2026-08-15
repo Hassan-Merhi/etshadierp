@@ -5,7 +5,16 @@
  * error flash centre-screen, while the two "scan again to bypass" prompts pin
  * below the header so the scanner stays visible.
  */
-import type { FactoryContainerLoadingScanModel } from "./useFactoryContainerLoadingScanModel";
+/**
+ * Only the four scan-state flags are needed, so both loading scanners (factory
+ * and ERP) can share these overlays without sharing a model type.
+ */
+export interface ScanOverlayState {
+  showScanSuccessPopup: boolean;
+  showScanErrorPopup: boolean;
+  pendingBypassOverloadRef: string | null;
+  pendingBypassBaleRef: string | null;
+}
 
 function CenterBanner({ className, lines }: { className: string; lines: [string, string] }) {
   return (
@@ -32,7 +41,7 @@ function BypassBanner({ className, title, subtitle }: { className: string; title
   );
 }
 
-export function ScanOverlays({ model }: { model: FactoryContainerLoadingScanModel }) {
+export function ScanOverlays({ model }: { model: ScanOverlayState }) {
   return (
     <>
       {model.showScanSuccessPopup && (
