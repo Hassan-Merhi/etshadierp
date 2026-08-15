@@ -113,7 +113,7 @@ export default function ProformaAddLine() {
 
   const { data: proforma } = useQuery<Proforma>({
     queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
-    select: (data: any) => {
+    select: (data: unknown) => {
       if (Array.isArray(data)) return data.find((p: Proforma) => p.id === numericProformaId) ?? null;
       return null;
     },
@@ -170,7 +170,7 @@ export default function ProformaAddLine() {
       setQty("1");
       setPrice("");
     },
-    onError: (e: any) => {
+    onError: (e: import("react").SyntheticEvent) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },

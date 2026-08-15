@@ -104,16 +104,16 @@ export function ImportDialog({
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex gap-2 text-xs">
                   <span className="text-emerald-600 dark:text-emerald-400 font-medium">
-                    {importPreview.filter((r: any) => r.status === "ok" || r.status === "new_item").length} to update
+                    {importPreview.filter((r: unknown) => r.status === "ok" || r.status === "new_item").length} to update
                   </span>
-                  {importPreview.filter((r: any) => r.status === "remove").length > 0 && (
+                  {importPreview.filter((r: unknown) => r.status === "remove").length > 0 && (
                     <span className="text-destructive font-medium">
-                      {importPreview.filter((r: any) => r.status === "remove").length} to remove
+                      {importPreview.filter((r: unknown) => r.status === "remove").length} to remove
                     </span>
                   )}
-                  {importPreview.filter((r: any) => r.status === "not_found").length > 0 && (
+                  {importPreview.filter((r: unknown) => r.status === "not_found").length > 0 && (
                     <span className="text-muted-foreground">
-                      {importPreview.filter((r: any) => r.status === "not_found").length} unmatched
+                      {importPreview.filter((r: unknown) => r.status === "not_found").length} unmatched
                     </span>
                   )}
                 </div>
@@ -163,7 +163,7 @@ export function ImportDialog({
                       </tr>
                     </thead>
                     <tbody>
-                      {importPreview.map((row: any, idx: any) => (
+                      {importPreview.map((row: unknown, idx: unknown) => (
                         <tr key={idx} className={cn("border-t", row.status === "not_found" && "opacity-50")}>
                           <td className="p-2">
                             <p className="font-medium truncate max-w-[220px]">{row.stockItemName}</p>
@@ -237,7 +237,7 @@ export function ImportDialog({
           {importPreview.length > 0 && (
             <Button
               onClick={applyImport}
-              disabled={importPreview.every((r: any) => r.status === "not_found")}
+              disabled={importPreview.every((r: unknown) => r.status === "not_found")}
               data-testid="button-apply-import"
             >
               Apply to Order

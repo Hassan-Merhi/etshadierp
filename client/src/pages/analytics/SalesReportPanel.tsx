@@ -117,7 +117,7 @@ export function SalesReportPanel({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {factorySalesByCustomer.map((row: any) => (
+                  {factorySalesByCustomer.map((row: unknown) => (
                     <TableRow key={row.customerId ?? "null"}>
                       <TableCell className="font-medium">{row.customerName || `Customer #${row.customerId}`}</TableCell>
                       <TableCell className="text-right hidden sm:table-cell">{row.containers}</TableCell>
@@ -137,22 +137,22 @@ export function SalesReportPanel({
                   <TableRow>
                     <TableCell>Total</TableCell>
                     <TableCell className="text-right hidden sm:table-cell">
-                      {factorySalesByCustomer.reduce((s: number, r: any) => s + Number(r.containers), 0)}
+                      {factorySalesByCustomer.reduce((s: number, r: unknown) => s + Number(r.containers), 0)}
                     </TableCell>
                     <TableCell className="text-right font-mono hidden sm:table-cell">
                       {formatAmount(
-                        factorySalesByCustomer.reduce((s: number, r: any) => s + parseFloat(r.totalAmount), 0)
+                        factorySalesByCustomer.reduce((s: number, r: unknown) => s + parseFloat(r.totalAmount), 0)
                       )}
                     </TableCell>
                     <TableCell className="text-right font-mono hidden sm:table-cell">
                       {formatAmount(
-                        factorySalesByCustomer.reduce((s: number, r: any) => s + parseFloat(r.paidAmount), 0)
+                        factorySalesByCustomer.reduce((s: number, r: unknown) => s + parseFloat(r.paidAmount), 0)
                       )}
                     </TableCell>
                     <TableCell className="text-right font-mono">
                       {formatAmount(
                         factorySalesByCustomer.reduce(
-                          (s: number, r: any) => s + parseFloat(r.totalAmount) - parseFloat(r.paidAmount),
+                          (s: number, r: unknown) => s + parseFloat(r.totalAmount) - parseFloat(r.paidAmount),
                           0
                         )
                       )}
@@ -191,7 +191,7 @@ export function SalesReportPanel({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(factoryPosSummary.byCustomer ?? []).map((row: any, idx: number) => (
+                  {(factoryPosSummary.byCustomer ?? []).map((row: unknown, idx: number) => (
                     <TableRow key={row.customerId ?? idx}>
                       <TableCell className="font-medium">{row.customerName}</TableCell>
                       <TableCell className="text-right hidden sm:table-cell">{row.sales}</TableCell>

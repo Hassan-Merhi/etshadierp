@@ -56,7 +56,7 @@ export function ConfirmRepaymentDialog({
           <div className="flex justify-between items-center py-2 px-3 rounded-md bg-muted/40 font-medium">
             <span>Cash account</span>
             <span>
-              {(cashAccounts || []).find((a: any) => String(a.id) === repayByMonthForm.cashAccountId)?.name ?? "—"}
+              {(cashAccounts || []).find((a: unknown) => String(a.id) === repayByMonthForm.cashAccountId)?.name ?? "—"}
             </span>
           </div>
         </div>
@@ -69,7 +69,7 @@ export function ConfirmRepaymentDialog({
             <span className="text-right">Will repay</span>
           </div>
           <div className="divide-y">
-            {(confirmRepay?.items || []).map((adv: any) => (
+            {(confirmRepay?.items || []).map((adv: unknown) => (
               <div key={adv.id} className="grid grid-cols-[1fr_auto_auto] gap-x-4 px-4 py-2 text-sm">
                 <span className="font-medium">{adv.workerName}</span>
                 <span className="font-mono text-right text-muted-foreground">{fmt(adv.amount)}</span>

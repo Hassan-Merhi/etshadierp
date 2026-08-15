@@ -41,7 +41,7 @@ export function ModuleAccessSection() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/role-permissions", selectedCompany?.id] });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({ title: "Error", description: error.message || "Failed to update permission", variant: "destructive" });
     },
   });

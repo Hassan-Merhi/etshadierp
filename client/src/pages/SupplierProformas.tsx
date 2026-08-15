@@ -112,7 +112,7 @@ export default function SupplierProformas() {
       setSelectedProformaId(p.id);
       toast({ title: "Proforma created" });
     },
-    onError: (e: any) => {
+    onError: (e: import("react").SyntheticEvent) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
@@ -127,14 +127,14 @@ export default function SupplierProformas() {
       if (selectedProformaId) setSelectedProformaId(null);
       toast({ title: "Proforma deleted" });
     },
-    onError: (e: any) => {
+    onError: (e: import("react").SyntheticEvent) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
   });
 
   const addLineMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: unknown) => {
       const res = await apiRequest("POST", `/api/suppliers/${supplierId}/proformas/${selectedProformaId}/lines`, data);
       return res.json();
     },
@@ -143,7 +143,7 @@ export default function SupplierProformas() {
       setAddingLine(false);
       setNewLine({ barcode: "", itemName: "", qty: "0", weightPerBale: "0", pricePerBale: "0" });
     },
-    onError: (e: any) => {
+    onError: (e: import("react").SyntheticEvent) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
@@ -158,7 +158,7 @@ export default function SupplierProformas() {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers", supplierId, "proformas", selectedProformaId] });
       setEditingLineId(null);
     },
-    onError: (e: any) => {
+    onError: (e: import("react").SyntheticEvent) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
@@ -171,7 +171,7 @@ export default function SupplierProformas() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers", supplierId, "proformas", selectedProformaId] });
     },
-    onError: (e: any) => {
+    onError: (e: import("react").SyntheticEvent) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
@@ -188,7 +188,7 @@ export default function SupplierProformas() {
       setRenamingId(null);
       toast({ title: "Proforma renamed" });
     },
-    onError: (e: any) => {
+    onError: (e: import("react").SyntheticEvent) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
@@ -221,7 +221,7 @@ export default function SupplierProformas() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers", supplierId, "proformas"] });
     },
-    onError: (e: any) => {
+    onError: (e: import("react").SyntheticEvent) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
@@ -234,11 +234,11 @@ export default function SupplierProformas() {
       });
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: unknown) => {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers", supplierId, "proformas", selectedProformaId] });
       toast({ title: "Import complete", description: `${data.imported} lines imported` });
     },
-    onError: (e: any) => {
+    onError: (e: import("react").SyntheticEvent) => {
       if (e?._handledGlobally) return;
       toast({ title: "Import error", description: e.message, variant: "destructive" });
     },
@@ -255,7 +255,7 @@ export default function SupplierProformas() {
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws);
         /** Parse a human-entered decimal from Excel into a plain number, 0 on failure. */
-        const parseExcelNum = (v: any): number => {
+        const parseExcelNum = (v: unknown): number => {
           const raw = String(v ?? "").trim();
           const stripped = raw.replace(/^[^0-9\-(]+/, "").replace(/[^0-9.]+$/, "");
           const noCommas = stripped.replace(/,(?=\d{3}(?:[,.]|$))/g, "");

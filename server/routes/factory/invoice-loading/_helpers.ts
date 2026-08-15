@@ -16,7 +16,7 @@ import { resultRows } from "../../../lib/queryResult";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-export function getCompanyId(req: any): number | null {
+export function getCompanyId(req: import("express").Request): number | null {
   return req.session.factoryCompanyId || req.session.currentCompanyId || null;
 }
 

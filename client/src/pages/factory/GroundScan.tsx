@@ -314,31 +314,31 @@ export default function GroundScan() {
       const thinBorder = { style: "thin" as const, color: { argb: "FFD0D7E0" } };
       const allBorders = { top: thinBorder, left: thinBorder, bottom: thinBorder, right: thinBorder };
 
-      const styleHeader = (row: any, bgArgb: string) => {
+      const styleHeader = (row: unknown, bgArgb: string) => {
         row.font = { bold: true, color: { argb: WHITE }, size: 10, name: "Calibri" };
         row.fill = solidFill(bgArgb);
         row.alignment = { vertical: "middle" as const, horizontal: "center" as const, wrapText: false };
         row.height = 22;
-        row.eachCell((cell: any) => {
+        row.eachCell((cell: unknown) => {
           cell.border = allBorders;
         });
       };
 
-      const styleDataRow = (row: any, even: boolean, highlight?: { argb: string }) => {
+      const styleDataRow = (row: unknown, even: boolean, highlight?: { argb: string }) => {
         const bg = highlight ? highlight.argb : even ? LGRAY : WHITE;
         row.fill = solidFill(bg);
         row.font = { size: 10, name: "Calibri", color: { argb: BLACK } };
         row.height = 18;
-        row.eachCell({ includeEmpty: true }, (cell: any) => {
+        row.eachCell({ includeEmpty: true }, (cell: unknown) => {
           cell.border = allBorders;
         });
       };
 
-      const styleTotals = (row: any) => {
+      const styleTotals = (row: unknown) => {
         row.fill = solidFill(TOTALBG);
         row.font = { bold: true, size: 10, name: "Calibri", color: { argb: NAVY } };
         row.height = 20;
-        row.eachCell({ includeEmpty: true }, (cell: any) => {
+        row.eachCell({ includeEmpty: true }, (cell: unknown) => {
           cell.border = {
             ...allBorders,
             top: { style: "medium" as const, color: { argb: NAVY } },

@@ -44,7 +44,7 @@ function cachedBarcode(key: string): BarcodeImage | undefined {
   return image;
 }
 
-function sendBarcode(req: any, res: any, image: BarcodeImage) {
+function sendBarcode(req: import("express").Request, res: import("express").Response, image: BarcodeImage) {
   res.setHeader("Content-Type", image.contentType);
   res.setHeader("Cache-Control", "private, max-age=31536000, immutable");
   res.setHeader("Vary", "Accept");
@@ -66,7 +66,7 @@ function sendBarcode(req: any, res: any, image: BarcodeImage) {
  * rendering the same label during reprints/previews.
  */
 export function registerBarcodeImageBandwidthMiddleware(app: Express): void {
-  app.use("/api/barcode/:code", requireAuth, async (req: any, res: any, next: any) => {
+  app.use("/api/barcode/:code", requireAuth, async (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => {
     if (req.method !== "GET" && req.method !== "HEAD") return next();
 
     try {

@@ -165,7 +165,7 @@ export default function FactoryEmployeePayrollTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employees"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employee-advances"] });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const grouped = useMemo(() => {

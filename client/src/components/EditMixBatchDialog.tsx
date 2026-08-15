@@ -213,7 +213,7 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
       onOpenChange(false);
       toast({ title: "Batch updated", description: "Sources and totals have been recalculated." });
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });

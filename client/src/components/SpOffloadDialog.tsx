@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
 
-function fmt2(v: any) {
+function fmt2(v: unknown) {
   const n = parseFloat(String(v ?? "0"));
   return isNaN(n) ? "$0.00" : `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
@@ -97,28 +97,28 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
       setSelectedLocationId("");
       onSuccess?.();
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   if (!container) return null;
 
   const discountFactor = 1 - parseFloat(container.discountPct || "0") / 100;
-  const totalQty = (container.lines || []).reduce((s: number, l: any) => s + parseFloat(l.qty || "0"), 0);
+  const totalQty = (container.lines || []).reduce((s: number, l: unknown) => s + parseFloat(l.qty || "0"), 0);
   const totalBaseCost = (container.lines || []).reduce(
-    (s: number, l: any) => s + parseFloat(l.qty || "0") * parseFloat(l.unitRateUsd || "0") * discountFactor,
+    (s: number, l: unknown) => s + parseFloat(l.qty || "0") * parseFloat(l.unitRateUsd || "0") * discountFactor,
     0
   );
   const totalLandedCost = chargeLines.reduce((s, c) => s + parseFloat(c.amountUsd || "0"), 0);
   const totalFinalCost = totalBaseCost + totalLandedCost;
   const invoiceTotal = parseFloat(container.invoiceTotalUsd || "0");
 
-  const otwAcct = (statusData?.spAccounts || []).find((a: any) => a.subType === "sp_goods_otw");
-  const otwClrAcct = (statusData?.spAccounts || []).find((a: any) => a.subType === "sp_otw_clearing");
-  const stockAcct = (statusData?.spAccounts || []).find((a: any) => a.subType === "sp_stock");
-  const costClrAcct = (statusData?.spAccounts || []).find((a: any) => a.subType === "sp_cost_clearing");
-  const prepaidAcct = (statusData?.spAccounts || []).find((a: any) => a.subType === "sp_prepaid");
-  const prepaidExpAcct = (statusData?.spAccounts || []).find((a: any) => a.subType === "sp_prepaid_expenses");
-  const hadiIcAcct = (statusData?.spAccounts || []).find((a: any) => a.subType === "sp_hadi_intercompany");
+  const otwAcct = (statusData?.spAccounts || []).find((a: unknown) => a.subType === "sp_goods_otw");
+  const otwClrAcct = (statusData?.spAccounts || []).find((a: unknown) => a.subType === "sp_otw_clearing");
+  const stockAcct = (statusData?.spAccounts || []).find((a: unknown) => a.subType === "sp_stock");
+  const costClrAcct = (statusData?.spAccounts || []).find((a: unknown) => a.subType === "sp_cost_clearing");
+  const prepaidAcct = (statusData?.spAccounts || []).find((a: unknown) => a.subType === "sp_prepaid");
+  const prepaidExpAcct = (statusData?.spAccounts || []).find((a: unknown) => a.subType === "sp_prepaid_expenses");
+  const hadiIcAcct = (statusData?.spAccounts || []).find((a: unknown) => a.subType === "sp_hadi_intercompany");
 
   const activeCharges = chargeLines.filter((c) => parseFloat(c.amountUsd || "0") > 0);
   const agentCharges = activeCharges.filter((c) => c.chargeType === "parent_agent");
@@ -172,7 +172,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                 <SelectValue placeholder="Select a location…" />
               </SelectTrigger>
               <SelectContent>
-                {(locationsList as unknown[]).map((l: any) => (
+                {(locationsList as unknown[]).map((l: unknown) => (
                   <SelectItem key={l.id} value={String(l.id)}>
                     {l.name}
                   </SelectItem>
@@ -282,7 +282,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                           <SelectValue placeholder="Select prepaid" />
                         </SelectTrigger>
                         <SelectContent>
-                          {(container.prepaid || []).map((p: any) => (
+                          {(container.prepaid || []).map((p: unknown) => (
                             <SelectItem key={p.id} value={String(p.id)}>
                               {p.chargeType} — {fmt2(p.amountPaidUsd)}
                             </SelectItem>
@@ -298,7 +298,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                           <SelectValue placeholder="Select bank" />
                         </SelectTrigger>
                         <SelectContent>
-                          {(statusData?.bankAccounts || []).map((b: any) => (
+                          {(statusData?.bankAccounts || []).map((b: unknown) => (
                             <SelectItem key={b.id} value={String(b.id)}>
                               {b.bankName}
                             </SelectItem>
@@ -314,7 +314,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                           <SelectValue placeholder="Select account" />
                         </SelectTrigger>
                         <SelectContent>
-                          {(ledgerAccounts as unknown[]).map((a: any) => (
+                          {(ledgerAccounts as unknown[]).map((a: unknown) => (
                             <SelectItem key={a.id} value={String(a.id)}>
                               {a.code} — {a.name}
                             </SelectItem>
@@ -330,7 +330,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                           <SelectValue placeholder="Select agent" />
                         </SelectTrigger>
                         <SelectContent>
-                          {(parentAgents as unknown[]).map((a: any) => (
+                          {(parentAgents as unknown[]).map((a: unknown) => (
                             <SelectItem key={a.ledger_account_id} value={String(a.ledger_account_id)}>
                               {a.account_name}
                             </SelectItem>
@@ -460,19 +460,19 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                   const amt = parseFloat(c.amountUsd || "0");
                   let creditLabel: string;
                   if (c.chargeType === "prepaid_used") {
-                    const p = (container.prepaid || []).find((x: any) => String(x.id) === c.prepaidChargeId);
+                    const p = (container.prepaid || []).find((x: unknown) => String(x.id) === c.prepaidChargeId);
                     creditLabel = prepaidAcct?.name ?? "SP Prepaid Charges";
                     if (p) creditLabel += ` — ${p.chargeType}`;
                   } else if (c.chargeType === "paid_now") {
-                    const b = (statusData?.bankAccounts || []).find((x: any) => String(x.id) === c.creditBankAccountId);
+                    const b = (statusData?.bankAccounts || []).find((x: unknown) => String(x.id) === c.creditBankAccountId);
                     creditLabel = b ? b.bankName : "Bank Account";
                   } else if (c.chargeType === "unpaid_payable" || c.chargeType === "other") {
-                    const a = (ledgerAccounts as unknown[]).find((x: any) => String(x.id) === c.creditLedgerAccountId);
+                    const a = (ledgerAccounts as unknown[]).find((x: unknown) => String(x.id) === c.creditLedgerAccountId);
                     creditLabel = a ? `${a.name}` : "Ledger Account";
                   } else if (c.chargeType === "parent_agent") {
                     creditLabel = prepaidExpAcct?.name ?? "Prepaid Expenses";
                     const agent = (parentAgents as unknown[]).find(
-                      (x: any) => String(x.ledger_account_id) === c.parentAgentAccountId
+                      (x: unknown) => String(x.ledger_account_id) === c.parentAgentAccountId
                     );
                     if (agent) creditLabel += ` (via ${agent.account_name})`;
                   } else {
@@ -512,7 +512,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                   </div>
                   {agentCharges.map((c, idx) => {
                     const agent = (parentAgents as unknown[]).find(
-                      (x: any) => String(x.ledger_account_id) === c.parentAgentAccountId
+                      (x: unknown) => String(x.ledger_account_id) === c.parentAgentAccountId
                     );
                     return (
                       <div key={idx} className="grid grid-cols-3 text-xs py-0.5">

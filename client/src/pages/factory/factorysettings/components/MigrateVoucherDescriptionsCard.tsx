@@ -19,14 +19,14 @@ export function MigrateVoucherDescriptionsCard() {
       const res = await apiRequest("POST", "/api/factory/migrate-voucher-descriptions");
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: unknown) => {
       setResult(data);
       toast({
         title: "Update complete",
         description: `Fixed ${data.chargesFixed} charge entries and ${data.narrationFixed} narrations.`,
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({ title: "Update failed", description: error.message, variant: "destructive" });
     },
   });

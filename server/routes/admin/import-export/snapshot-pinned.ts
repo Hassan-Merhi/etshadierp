@@ -15,7 +15,7 @@ export function registerSnapshotPinnedAccountRoutes(app: Express) {
   // ── SNAPSHOT PINNED ACCOUNTS (supplier / customer / advance + future cards) ─
   const ALLOWED_CARD_KEYS = new Set(["supplier", "customer", "advance"]);
 
-  app.get("/api/snapshot-pinned-accounts/:cardKey", requireAuth, async (req: any, res: any) => {
+  app.get("/api/snapshot-pinned-accounts/:cardKey", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -31,7 +31,7 @@ export function registerSnapshotPinnedAccountRoutes(app: Express) {
     }
   });
 
-  app.post("/api/snapshot-pinned-accounts/:cardKey", requireAuth, async (req: any, res: any) => {
+  app.post("/api/snapshot-pinned-accounts/:cardKey", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -54,7 +54,7 @@ export function registerSnapshotPinnedAccountRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/snapshot-pinned-accounts/:cardKey/:accountId", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/snapshot-pinned-accounts/:cardKey/:accountId", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

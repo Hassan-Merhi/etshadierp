@@ -15,7 +15,7 @@ import { Loader2, BarChart3, CreditCard, CheckCircle2, FileSpreadsheet } from "l
 const REPORT_TABS = ["payable", "profit", "sales-form"] as const;
 type ReportTab = (typeof REPORT_TABS)[number];
 
-function fmt(v: any, dec = 2) {
+function fmt(v: unknown, dec = 2) {
   const n = parseFloat(String(v ?? "0"));
   return isNaN(n)
     ? `$0.${"0".repeat(dec)}`
@@ -63,12 +63,12 @@ export default function SpReports() {
   const { data: accounts = [] } = useQuery<unknown[]>({ queryKey: ["/api/accounts/all", selectedCompany?.id] });
 
   const finalizeMutation = useMutation({
-    mutationFn: (body: any) => apiRequest("POST", "/api/sp/profit-splits", body),
+    mutationFn: (body: unknown) => apiRequest("POST", "/api/sp/profit-splits", body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [splitsUrl] });
       toast({ title: "Profit split finalized" });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const handleFinalize = () => {
@@ -199,7 +199,7 @@ export default function SpReports() {
                       <span className="text-right">Credit</span>
                       <span className="text-right">Balance</span>
                     </div>
-                    {(payable?.movements || []).map((m: any, idx: number) => (
+                    {(payable?.movements || []).map((m: unknown, idx: number) => (
                       <div
                         key={idx}
                         className="grid grid-cols-5 text-xs py-1 border-b border-border/30 last:border-0"
@@ -349,7 +349,7 @@ export default function SpReports() {
           {!splitsLoading && splits.length > 0 && (
             <div className="space-y-1">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Finalized Splits</h3>
-              {splits.map((s: any) => (
+              {splits.map((s: unknown) => (
                 <div
                   key={s.id}
                   className="flex items-center justify-between text-xs py-1.5 border-b border-border/30"
@@ -408,7 +408,7 @@ export default function SpReports() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All locations</SelectItem>
-                      {locations.map((l: any) => (
+                      {locations.map((l: unknown) => (
                         <SelectItem key={l.id} value={String(l.id)} data-testid={`option-location-${l.id}`}>
                           {l.name}
                         </SelectItem>
@@ -428,7 +428,7 @@ export default function SpReports() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">No account (manual entry)</SelectItem>
-                      {accounts.map((a: any) => (
+                      {accounts.map((a: unknown) => (
                         <SelectItem key={a.id} value={String(a.id)} data-testid={`option-cash-account-${a.id}`}>
                           {a.name}
                         </SelectItem>

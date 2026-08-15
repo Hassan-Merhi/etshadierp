@@ -70,7 +70,7 @@ export function ContainerListView({
     });
   };
 
-  const renderCharges = (c: any) => {
+  const renderCharges = (c: unknown) => {
     const ccy = c.currencyCode || "USD";
     const freightAmt = parseFloat(c.freight || "0");
     const freightCcy = c.freightCurrencyCode || ccy;

@@ -43,7 +43,7 @@ function EntityFormWrapper({
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: unknown) => {
       // Only add companyId if not already provided by the form
       const payload = data.companyId
         ? data
@@ -58,7 +58,7 @@ function EntityFormWrapper({
       const res = await modeApiRequest("POST", config.endpoint, payload);
       return await res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: unknown) => {
       toast({
         title: "Success",
         description: `${config.label} "${data.name || data.legalName || data.code}" created successfully`,
@@ -79,7 +79,7 @@ function EntityFormWrapper({
       form.reset(getDefaultValues(entityType) as any);
       onCreated?.();
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Error",
@@ -89,7 +89,7 @@ function EntityFormWrapper({
     },
   });
 
-  const onSubmit = (data: any) => {
+  const onSubmit = (data: unknown) => {
     createMutation.mutate(data);
   };
 

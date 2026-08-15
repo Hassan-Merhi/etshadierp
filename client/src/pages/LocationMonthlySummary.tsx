@@ -695,8 +695,8 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: unknown 
                   );
                 }
 
-                const totalQty = rows.reduce((s: number, r: any) => s + (r.qty || 0), 0);
-                const totalValue = rows.reduce((s: number, r: any) => s + (r.value || 0), 0);
+                const totalQty = rows.reduce((s: number, r: unknown) => s + (r.qty || 0), 0);
+                const totalValue = rows.reduce((s: number, r: unknown) => s + (r.value || 0), 0);
                 const avgRate = totalQty > 0 ? totalValue / totalQty : 0;
 
                 return (

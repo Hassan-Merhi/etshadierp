@@ -13,7 +13,7 @@ import {} from "drizzle-orm";
 
 export function registerSpreadsheetRoutes(app: Express) {
   // ── Spreadsheets ───────────────────────────────────────────────────────────
-  app.get("/api/spreadsheets", requireAuth, requireNonPOS, async (req: any, res) => {
+  app.get("/api/spreadsheets", requireAuth, requireNonPOS, async (req: import("express").Request, res) => {
     try {
       const companyId = req.session?.currentCompanyId;
       const list = await storage.listSpreadsheets(companyId);
@@ -23,7 +23,7 @@ export function registerSpreadsheetRoutes(app: Express) {
     }
   });
 
-  app.get("/api/spreadsheets/:id", requireAuth, requireNonPOS, async (req: any, res) => {
+  app.get("/api/spreadsheets/:id", requireAuth, requireNonPOS, async (req: import("express").Request, res) => {
     try {
       const companyId = req.session?.currentCompanyId;
       const id = parseInt(req.params.id);
@@ -35,7 +35,7 @@ export function registerSpreadsheetRoutes(app: Express) {
     }
   });
 
-  app.post("/api/spreadsheets", requireAuth, requireNonPOS, async (req: any, res) => {
+  app.post("/api/spreadsheets", requireAuth, requireNonPOS, async (req: import("express").Request, res) => {
     try {
       const companyId = req.session?.currentCompanyId;
       const username = req.session?.username ?? req.session?.userId ?? "Unknown";
@@ -47,7 +47,7 @@ export function registerSpreadsheetRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/spreadsheets/:id", requireAuth, requireNonPOS, async (req: any, res) => {
+  app.patch("/api/spreadsheets/:id", requireAuth, requireNonPOS, async (req: import("express").Request, res) => {
     try {
       const companyId = req.session?.currentCompanyId;
       const id = parseInt(req.params.id);
@@ -63,7 +63,7 @@ export function registerSpreadsheetRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/spreadsheets/:id", requireAuth, requireNonPOS, async (req: any, res) => {
+  app.delete("/api/spreadsheets/:id", requireAuth, requireNonPOS, async (req: import("express").Request, res) => {
     try {
       const companyId = req.session?.currentCompanyId;
       const id = parseInt(req.params.id);
@@ -76,7 +76,7 @@ export function registerSpreadsheetRoutes(app: Express) {
 
   // ─── Live Spreadsheet Links ───
 
-  app.get("/api/live-spreadsheets", requireAuth, requireNonPOS, async (req: any, res) => {
+  app.get("/api/live-spreadsheets", requireAuth, requireNonPOS, async (req: import("express").Request, res) => {
     try {
       const companyId = req.session?.currentCompanyId;
       const isAdmin =
@@ -90,7 +90,7 @@ export function registerSpreadsheetRoutes(app: Express) {
     }
   });
 
-  app.post("/api/live-spreadsheets", requireAuth, requireNonPOS, async (req: any, res) => {
+  app.post("/api/live-spreadsheets", requireAuth, requireNonPOS, async (req: import("express").Request, res) => {
     try {
       const role = req.session?.currentRole;
       if (role !== "Admin" && role !== "Owner" && role !== "Developer") {
@@ -105,7 +105,7 @@ export function registerSpreadsheetRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/live-spreadsheets/:id", requireAuth, requireNonPOS, async (req: any, res) => {
+  app.patch("/api/live-spreadsheets/:id", requireAuth, requireNonPOS, async (req: import("express").Request, res) => {
     try {
       const role = req.session?.currentRole;
       if (role !== "Admin" && role !== "Owner" && role !== "Developer") {
@@ -122,7 +122,7 @@ export function registerSpreadsheetRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/live-spreadsheets/:id", requireAuth, requireNonPOS, async (req: any, res) => {
+  app.delete("/api/live-spreadsheets/:id", requireAuth, requireNonPOS, async (req: import("express").Request, res) => {
     try {
       const role = req.session?.currentRole;
       if (role !== "Admin" && role !== "Owner" && role !== "Developer") {

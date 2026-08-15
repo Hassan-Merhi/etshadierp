@@ -65,7 +65,7 @@ export function BulkPaymentDialog({
         </div>
 
         <Form {...form}>
-          <form noValidate onSubmit={form.handleSubmit((data: any) => mutation.mutate(data))} className="space-y-4">
+          <form noValidate onSubmit={form.handleSubmit((data: unknown) => mutation.mutate(data))} className="space-y-4">
             <FormField
               control={form.control}
               name="paymentAccountType"

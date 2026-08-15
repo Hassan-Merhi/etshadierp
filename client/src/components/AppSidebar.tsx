@@ -133,7 +133,7 @@ const utilityItems: NavItem[] = [
 export const ERP_PINNED_ITEMS = defaultPinnedItems;
 export const ERP_UTILITY_ITEMS = utilityItems;
 
-export function useErpVisibleSections(user?: any): {
+export function useErpVisibleSections(user?: unknown): {
   sections: NavSection[];
   isItemVisible: (item: NavItem) => boolean;
   visibleUtilityItems: NavItem[];

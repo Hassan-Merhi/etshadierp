@@ -11,7 +11,7 @@ function readAfterId(value: unknown): number | null {
 }
 
 export function registerFactoryDailyScanRoutes(app: Express) {
-  app.get("/api/factory/daily-bale-scans/produced", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/daily-bale-scans/produced", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -62,7 +62,7 @@ export function registerFactoryDailyScanRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/daily-bale-scans/dates", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/daily-bale-scans/dates", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -101,7 +101,7 @@ export function registerFactoryDailyScanRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/daily-bale-scans", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/daily-bale-scans", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -179,7 +179,7 @@ export function registerFactoryDailyScanRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/daily-bale-scans", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/daily-bale-scans", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     const startedAt = Date.now();
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
@@ -249,7 +249,7 @@ export function registerFactoryDailyScanRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/factory/daily-bale-scans/:id", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/daily-bale-scans/:id", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

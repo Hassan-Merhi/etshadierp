@@ -29,7 +29,7 @@ export function TransferEditForm({
 }: {
   form: UseFormReturn<unknown>;
   voucher: unknown;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: unknown) => void;
   onCancel: () => void;
   onToggleOptional: (optional: boolean) => void;
   isPending: boolean;
@@ -389,7 +389,7 @@ export function TransferEditForm({
                       {formatNumber(
                         form
                           .watch("items")
-                          .reduce((sum: number, item: any) => sum + (parseFloat(item.quantity) || 0), 0)
+                          .reduce((sum: number, item: unknown) => sum + (parseFloat(item.quantity) || 0), 0)
                       )}
                     </td>
                     <td colSpan={3}></td>

@@ -205,8 +205,8 @@ function installPhase4WriteGuard(app: Express): void {
 
 async function invokeMigrationHandler(
   handler: (req: Request, res: Response) => Promise<unknown>,
-  req: any,
-  body: any
+  req: import("express").Request,
+  body: unknown
 ): Promise<unknown> {
   let statusCode = 200;
   let payload: any = null;

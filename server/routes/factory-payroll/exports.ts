@@ -16,7 +16,7 @@ function money(value: string | number | null | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-async function auditExport(req: any, companyId: number, type: "PDF" | "Excel", startDate: string, endDate: string) {
+async function auditExport(req: import("express").Request, companyId: number, type: "PDF" | "Excel", startDate: string, endDate: string) {
   try {
     await logAudit({
       userId: req.session.userId!,

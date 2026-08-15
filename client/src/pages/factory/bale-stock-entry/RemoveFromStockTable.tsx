@@ -10,8 +10,8 @@ interface RemoveFromStockTableProps {
   selectedBaleIds: Set<number>;
   onToggleBale: (id: number) => void;
   onToggleCondensedRow: (ids: number[]) => void;
-  formatDisplayDate: (date: any) => string;
-  onPrintBale: (bale: any) => void;
+  formatDisplayDate: (date: unknown) => string;
+  onPrintBale: (bale: unknown) => void;
 }
 
 export function RemoveFromStockTable({

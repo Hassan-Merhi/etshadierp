@@ -18,7 +18,7 @@ interface SupplierPaymentFxDialogsProps {
   paymentDialogSupplier: SupplierWithBalance | null;
   setPaymentDialogSupplier: (val: SupplierWithBalance | null) => void;
   paymentForm: unknown;
-  setPaymentForm: (val: any) => void;
+  setPaymentForm: (val: unknown) => void;
   allSuppliers: SupplierWithBalance[];
   ledgerAccounts: unknown[] | undefined;
   paymentMutation: UseMutationResult<unknown, unknown, unknown>;
@@ -31,7 +31,7 @@ interface SupplierPaymentFxDialogsProps {
   fxConversionOpen: boolean;
   setFxConversionOpen: (val: boolean) => void;
   fxConversionForm: unknown;
-  setFxConversionForm: (val: any) => void;
+  setFxConversionForm: (val: unknown) => void;
   fxSourceType: "supplier" | "commission" | "both";
   setFxSourceType: (val: "supplier" | "commission" | "both") => void;
   fxConversionMutation: UseMutationResult<unknown, unknown, unknown>;
@@ -87,7 +87,7 @@ export function SupplierPaymentFxDialogs({
                     <Label>Pay to (account)</Label>
                     <Select
                       value={String(paymentForm.supplierId)}
-                      onValueChange={(v) => setPaymentForm((prev: any) => ({ ...prev, supplierId: parseInt(v) }))}
+                      onValueChange={(v) => setPaymentForm((prev: unknown) => ({ ...prev, supplierId: parseInt(v) }))}
                     >
                       <SelectTrigger data-testid="select-payment-target">
                         <SelectValue placeholder="Select account" />
@@ -113,7 +113,7 @@ export function SupplierPaymentFxDialogs({
                 <Input
                   type="date"
                   value={paymentForm.date}
-                  onChange={(e) => setPaymentForm((prev: any) => ({ ...prev, date: e.target.value }))}
+                  onChange={(e) => setPaymentForm((prev: unknown) => ({ ...prev, date: e.target.value }))}
                   data-testid="input-payment-date"
                 />
               </div>
@@ -124,7 +124,7 @@ export function SupplierPaymentFxDialogs({
                 <Input
                   type="date"
                   value={paymentForm.effectiveDate}
-                  onChange={(e) => setPaymentForm((prev: any) => ({ ...prev, effectiveDate: e.target.value }))}
+                  onChange={(e) => setPaymentForm((prev: unknown) => ({ ...prev, effectiveDate: e.target.value }))}
                 />
               </div>
             </div>
@@ -135,7 +135,7 @@ export function SupplierPaymentFxDialogs({
                 <Select
                   value={paymentForm.currencyCode}
                   onValueChange={(v) =>
-                    setPaymentForm((prev: any) => ({
+                    setPaymentForm((prev: unknown) => ({
                       ...prev,
                       currencyCode: v,
                       fxRateToUsd: v === "USD" ? "1" : prev.fxRateToUsd,
@@ -158,7 +158,7 @@ export function SupplierPaymentFxDialogs({
                   type="number"
                   step="any"
                   value={paymentForm.amount}
-                  onChange={(e) => setPaymentForm((prev: any) => ({ ...prev, amount: e.target.value }))}
+                  onChange={(e) => setPaymentForm((prev: unknown) => ({ ...prev, amount: e.target.value }))}
                   data-testid="input-payment-amount"
                 />
               </div>
@@ -171,7 +171,7 @@ export function SupplierPaymentFxDialogs({
                   type="number"
                   step="any"
                   value={paymentForm.fxRateToUsd}
-                  onChange={(e) => setPaymentForm((prev: any) => ({ ...prev, fxRateToUsd: e.target.value }))}
+                  onChange={(e) => setPaymentForm((prev: unknown) => ({ ...prev, fxRateToUsd: e.target.value }))}
                   data-testid="input-payment-fx-rate"
                 />
                 {paymentForm.amount && paymentForm.fxRateToUsd && parseFloat(paymentForm.fxRateToUsd) > 0 && (
@@ -206,7 +206,7 @@ export function SupplierPaymentFxDialogs({
               <Label>Paid From Account</Label>
               <Select
                 value={paymentForm.paidFromAccountId}
-                onValueChange={(v) => setPaymentForm((prev: any) => ({ ...prev, paidFromAccountId: v }))}
+                onValueChange={(v) => setPaymentForm((prev: unknown) => ({ ...prev, paidFromAccountId: v }))}
               >
                 <SelectTrigger data-testid="select-payment-account">
                   <SelectValue placeholder="Select account" />
@@ -225,7 +225,7 @@ export function SupplierPaymentFxDialogs({
               <Label>Notes</Label>
               <Input
                 value={paymentForm.notes}
-                onChange={(e) => setPaymentForm((prev: any) => ({ ...prev, notes: e.target.value }))}
+                onChange={(e) => setPaymentForm((prev: unknown) => ({ ...prev, notes: e.target.value }))}
                 data-testid="input-payment-notes"
               />
             </div>
@@ -312,7 +312,7 @@ export function SupplierPaymentFxDialogs({
                       onClick={() => {
                         setFxSourceType(t);
                         const newAvail = getAvail(t);
-                        setFxConversionForm((prev: any) => ({ ...prev, availableBalance: newAvail, amount: newAvail }));
+                        setFxConversionForm((prev: unknown) => ({ ...prev, availableBalance: newAvail, amount: newAvail }));
                       }}
                       data-testid={`fx-source-${t}`}
                     >
@@ -335,7 +335,7 @@ export function SupplierPaymentFxDialogs({
                 min="0"
                 placeholder="0.00"
                 value={fxConversionForm.amount}
-                onChange={(e) => setFxConversionForm((prev: any) => ({ ...prev, amount: e.target.value }))}
+                onChange={(e) => setFxConversionForm((prev: unknown) => ({ ...prev, amount: e.target.value }))}
                 data-testid="input-fx-amount"
               />
             </div>
@@ -356,7 +356,7 @@ export function SupplierPaymentFxDialogs({
                   min="0"
                   placeholder={`e.g. 1.10 (USD per 1 ${fxConversionForm.selectedCurrency})`}
                   value={fxConversionForm.fxRateToUsd}
-                  onChange={(e) => setFxConversionForm((prev: any) => ({ ...prev, fxRateToUsd: e.target.value }))}
+                  onChange={(e) => setFxConversionForm((prev: unknown) => ({ ...prev, fxRateToUsd: e.target.value }))}
                   data-testid="input-fx-rate"
                 />
               </div>
@@ -368,7 +368,7 @@ export function SupplierPaymentFxDialogs({
                 <Input
                   type="date"
                   value={fxConversionForm.date}
-                  onChange={(e) => setFxConversionForm((prev: any) => ({ ...prev, date: e.target.value }))}
+                  onChange={(e) => setFxConversionForm((prev: unknown) => ({ ...prev, date: e.target.value }))}
                   data-testid="input-fx-date"
                 />
               </div>
@@ -379,7 +379,7 @@ export function SupplierPaymentFxDialogs({
               <Input
                 placeholder="Conversion note"
                 value={fxConversionForm.notes}
-                onChange={(e) => setFxConversionForm((prev: any) => ({ ...prev, notes: e.target.value }))}
+                onChange={(e) => setFxConversionForm((prev: unknown) => ({ ...prev, notes: e.target.value }))}
                 data-testid="input-fx-notes"
               />
             </div>

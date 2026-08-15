@@ -178,7 +178,7 @@ export default function FactoryContainers() {
     const wb = await XLSX.read(data, { type: "array" });
     const ws = wb.Sheets[wb.SheetNames[0]];
     const jsonRows = XLSX.utils.sheet_to_json(ws, { defval: "" });
-    const get = (row: any, keys: string[]) => {
+    const get = (row: unknown, keys: string[]) => {
       for (const k of keys) {
         const val = row[k] ?? row[k.toLowerCase()] ?? row[k.toUpperCase()];
         if (val !== undefined && val !== "") return String(val).trim();

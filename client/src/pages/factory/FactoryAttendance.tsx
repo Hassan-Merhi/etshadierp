@@ -103,7 +103,7 @@ export default function FactoryAttendance() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/attendance", selectedDate] });
       toast({ title: "Attendance saved", description: `Saved for ${selectedDate}` });
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       if (err?._handledGlobally) return;
       toast({ title: "Save failed", description: err.message, variant: "destructive" });
     },

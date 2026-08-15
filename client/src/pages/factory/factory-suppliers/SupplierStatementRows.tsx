@@ -21,7 +21,7 @@ interface SupplierStatementRowsProps {
   typeBadge: (type: string) => React.ReactNode;
   statusColor: (status: string) => unknown;
   statusDisplayLabel: (status: string) => string;
-  onEditPayment: (p: any) => void;
+  onEditPayment: (p: unknown) => void;
   onDeletePayment: (id: number) => void;
 }
 

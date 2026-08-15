@@ -55,7 +55,7 @@ export function AgentDutyWhatsAppSection() {
       queryClient.invalidateQueries({ queryKey: ["/api/git/agent-duty-wa-settings"] });
       toast({ title: "Agent Duty WhatsApp settings saved." });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   async function loadChats() {

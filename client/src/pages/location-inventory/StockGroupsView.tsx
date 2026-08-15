@@ -41,8 +41,8 @@ interface StockGroupsViewProps {
   selectedLocationLocal: Location;
   posUser?: unknown;
   canManageWhatsapp: boolean;
-  openRenameDialog: (loc: Location, e?: any) => void;
-  openWaGroupDialog: (loc: Location, e?: any) => void;
+  openRenameDialog: (loc: Location, e?: import("react").SyntheticEvent) => void;
+  openWaGroupDialog: (loc: Location, e?: import("react").SyntheticEvent) => void;
   activeInventoryLoading: boolean;
   stockGroups: StockGroupSummary[];
   totalItems: number;

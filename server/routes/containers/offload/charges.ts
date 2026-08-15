@@ -15,7 +15,7 @@ import { eq, and, or, sql, like, ilike } from "drizzle-orm";
 
 export function registerContainerOffloadChargeRoutes(app: Express) {
   // ── Offload charges summary (duties + transport + office) with account names ──
-  app.get("/api/containers/:id/offload-charges", requireAuth, requireNonPOS, async (req: any, res: any) => {
+  app.get("/api/containers/:id/offload-charges", requireAuth, requireNonPOS, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const containerId = parseId(req.params.id);
       if (containerId === null) return res.status(400).json({ message: "Invalid id" });

@@ -96,7 +96,7 @@ function EditableTransferDetail({
       setNote("");
       onBack();
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });

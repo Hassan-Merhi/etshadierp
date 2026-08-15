@@ -18,7 +18,7 @@ import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import { resultRows } from "../../../lib/queryResult";
 
 export function registerEmployeeLedgerWasteRoutes(app: Express) {
-  app.get("/api/factory/bale-ledger", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/bale-ledger", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -278,7 +278,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
 
   // Lazy-loaded bale-level detail for a single section + product row of the Bale Ledger.
   // Keeps the main /api/factory/bale-ledger response small by not returning baleDetails there.
-  app.get("/api/factory/bale-ledger/details", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/bale-ledger/details", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -407,7 +407,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
   // WASTE DISPATCH ROUTES — factory bale waste disposal
   // ============================================================
 
-  app.get("/api/factory/waste-dispatch/bales", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/waste-dispatch/bales", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -512,7 +512,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/waste-dispatch/history", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/waste-dispatch/history", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -561,7 +561,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
 
   // ── DELETE /api/factory/waste-dispatch/:id ─────────────────────────────────
   // Reverses a waste dispatch: restores bales to IN_STOCK, reverses ERP stock, deletes daybook entry.
-  app.delete("/api/factory/waste-dispatch/:id", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/waste-dispatch/:id", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -626,7 +626,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/waste-dispatch/submit", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/waste-dispatch/submit", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

@@ -148,7 +148,7 @@ export function IntercompanyPosTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/intercompany-pos-config"] });
       toast({ title: "Saved", description: "Intercompany POS transfer config saved." });
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });

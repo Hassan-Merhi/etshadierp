@@ -55,7 +55,7 @@ export function PaymentForm({
         exchangeRate: form.exchangeRate,
         scheduleFuturePayment,
       }),
-    onSuccess: (data: any) => {
+    onSuccess: (data: unknown) => {
       if (data?.scheduled) {
         toast({
           title: "Payment scheduled",
@@ -69,7 +69,7 @@ export function PaymentForm({
       queryClient.invalidateQueries({ queryKey: [apiBase + "/payments/scheduled"] });
       setForm((f) => ({ ...f, amount: "", notes: "" }));
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const allocations = useMemo(() => {

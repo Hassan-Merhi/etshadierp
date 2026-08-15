@@ -65,7 +65,7 @@ export default function MixBatches() {
   const selectedKg =
     unlinkedBales
       ?.filter((b) => selectedBaleIds.has(b.id))
-      .reduce((sum: number, b: any) => sum + parseFloat(b.weightKg || "0"), 0) ?? 0;
+      .reduce((sum: number, b: unknown) => sum + parseFloat(b.weightKg || "0"), 0) ?? 0;
 
   const overLimit = selectedKg > availableKg + 0.001;
 
@@ -88,7 +88,7 @@ export default function MixBatches() {
       setSelectedBaleIds(new Set());
       toast({ title: "Success", description: `${data.balesUpdated} bale(s) assigned to batch` });
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
@@ -109,7 +109,7 @@ export default function MixBatches() {
       setDeleteId(null);
       toast({ title: "Deleted", description: "Batch deleted. Bales have been unlinked and are preserved." });
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },

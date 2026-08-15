@@ -172,7 +172,7 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
         code: f.code,
         openingBalance: f.openingBalance,
       })),
-      ...customers.map((c: any) => ({
+      ...customers.map((c: unknown) => ({
         type: "customer" as const,
         id: c.id,
         name: c.legalName,
@@ -180,8 +180,8 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
         openingBalance: c.openingBalance,
       })),
       ...customerSearchResults
-        .filter((c: any) => !customers.find((p: any) => p.id === c.id))
-        .map((c: any) => ({ type: "customer" as const, id: c.id, name: c.legalName, code: c.code })),
+        .filter((c: unknown) => !customers.find((p: unknown) => p.id === c.id))
+        .map((c: unknown) => ({ type: "customer" as const, id: c.id, name: c.legalName, code: c.code })),
       ...factorySuppliersList.map((s) => ({
         type: "factorySupplier" as const,
         id: s.id,
@@ -329,14 +329,14 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
     // Without this the effect fires as soon as any fast list (employees, fixedAssets)
     // arrives, ledgerAccounts.find() returns undefined, and names are locked blank.
     if (!ledgerAccountsFetched || !bankAccountsFetched) return;
-    const needsFactorySuppliers = voucherToEdit.entries.some((e: any) => e.factorySupplierId);
+    const needsFactorySuppliers = voucherToEdit.entries.some((e: import("react").SyntheticEvent) => e.factorySupplierId);
     if (needsFactorySuppliers && factorySuppliersList.length === 0) return;
-    const needsSuppliers = voucherToEdit.entries.some((e: any) => e.supplierId);
+    const needsSuppliers = voucherToEdit.entries.some((e: import("react").SyntheticEvent) => e.supplierId);
     if (needsSuppliers && !suppliersFetched) return;
-    const needsCustomers = voucherToEdit.entries.some((e: any) => e.customerId);
+    const needsCustomers = voucherToEdit.entries.some((e: import("react").SyntheticEvent) => e.customerId);
     if (needsCustomers && !customersFetched) return;
 
-    const formEntries = voucherToEdit.entries.map((entry: any) => {
+    const formEntries = voucherToEdit.entries.map((entry: unknown) => {
       let accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" | "customer" | "factorySupplier" =
         "ledger";
       let accountId = 0;
@@ -369,7 +369,7 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
       } else if (entry.customerId) {
         accountType = "customer";
         accountId = entry.customerId;
-        accountName = customers.find((c: any) => c.id === accountId)?.legalName || "";
+        accountName = customers.find((c: unknown) => c.id === accountId)?.legalName || "";
       }
       const debitAmt = parseFloat(entry.debitAmount || "0");
       const creditAmt = parseFloat(entry.creditAmount || "0");
@@ -436,7 +436,7 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
         return await res.json();
       }
     },
-    onSuccess: async (data: any) => {
+    onSuccess: async (data: unknown) => {
       const isEditMode = !!voucherIdToEdit;
       toast({ title: "Success", description: `Journal voucher ${isEditMode ? "updated" : "created"} successfully` });
       const waPrompt = resolveWhatsAppPrompt(data);
@@ -465,7 +465,7 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
         });
       }
     },
-    onError: (error: any, formData: JournalFormData) => {
+    onError: (error: unknown, formData: JournalFormData) => {
       if (error.name === "OfflineQueued") {
         const syntheticVoucher = {
           id: -Date.now(),
@@ -474,13 +474,13 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
           voucherDate: format(formData.voucherDate, "yyyy-MM-dd"),
           description: formData.notes || "Journal (pending sync)",
           totalAmount: formData.entries
-            .filter((e: any) => e.type === "DR" && parseFloat(e.amount || "0") > 0)
-            .reduce((sum: number, e: any) => sum + parseFloat(e.amount || "0"), 0)
+            .filter((e: import("react").SyntheticEvent) => e.type === "DR" && parseFloat(e.amount || "0") > 0)
+            .reduce((sum: number, e: import("react").SyntheticEvent) => sum + parseFloat(e.amount || "0"), 0)
             .toFixed(2),
           optional: formData.optional || false,
           createdAt: new Date().toISOString(),
         };
-        queryClient.setQueriesData({ queryKey: ["/api/vouchers"] }, (old: any) =>
+        queryClient.setQueriesData({ queryKey: ["/api/vouchers"] }, (old: unknown) =>
           Array.isArray(old) ? [syntheticVoucher, ...old] : old
         );
         discardJournalDraft();
@@ -516,7 +516,7 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
       toast({ title: "Statement sent to WhatsApp" });
       setWaPendingPrompt(null);
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if (error?._handledGlobally) return;
       toast({ title: "WhatsApp send failed", description: error.message, variant: "destructive" });
       setWaPendingPrompt(null);
@@ -528,7 +528,7 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
     const voucherDate = formData.voucherDate
       ? format(formData.voucherDate, "yyyy-MM-dd")
       : format(new Date(), "yyyy-MM-dd");
-    const validEntries = formData.entries.filter((e: any) => e.accountId > 0 && parseFloat(e.amount) > 0);
+    const validEntries = formData.entries.filter((e: import("react").SyntheticEvent) => e.accountId > 0 && parseFloat(e.amount) > 0);
     if (validEntries.length === 0) {
       toast({
         title: "No data to export",
@@ -538,7 +538,7 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
       return;
     }
     if (detailed) {
-      const exportData = validEntries.map((entry: any) => ({
+      const exportData = validEntries.map((entry: unknown) => ({
         "Voucher Type": "Journal",
         Date: voucherDate,
         "DR/CR": entry.type,
@@ -556,11 +556,11 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
       toast({ title: "Export successful", description: `Downloaded ${fileName} with ${validEntries.length} entries.` });
     } else {
       const totalDr = validEntries
-        .filter((e: any) => e.type === "DR")
-        .reduce((sum: number, e: any) => sum + (parseFloat(e.amount) || 0), 0);
+        .filter((e: import("react").SyntheticEvent) => e.type === "DR")
+        .reduce((sum: number, e: import("react").SyntheticEvent) => sum + (parseFloat(e.amount) || 0), 0);
       const totalCr = validEntries
-        .filter((e: any) => e.type === "CR")
-        .reduce((sum: number, e: any) => sum + (parseFloat(e.amount) || 0), 0);
+        .filter((e: import("react").SyntheticEvent) => e.type === "CR")
+        .reduce((sum: number, e: import("react").SyntheticEvent) => sum + (parseFloat(e.amount) || 0), 0);
       const exportData = [
         {
           "Voucher Type": "Journal",
@@ -893,7 +893,7 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
                             />
                             {activeJournalRow === index && filteredJournalAccounts.length > 0 && (
                               <div className="mt-1 border rounded-md bg-popover shadow-md max-h-44 overflow-y-auto z-20 relative">
-                                {filteredJournalAccounts.slice(0, 10).map((account: any) => (
+                                {filteredJournalAccounts.slice(0, 10).map((account: unknown) => (
                                   <button
                                     key={`${account.type}-${account.id}`}
                                     type="button"

@@ -145,7 +145,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
   // Calculate today's sales from vouchers
   const todaySales = (() => {
     const salesVouchers = todayVouchers?.filter((v) => v.voucherType === "Sales") || [];
-    const totalRaw = salesVouchers.reduce((sum: number, v: any) => sum + parseFloat(v.totalAmount || "0"), 0);
+    const totalRaw = salesVouchers.reduce((sum: number, v: unknown) => sum + parseFloat(v.totalAmount || "0"), 0);
     return {
       count: salesVouchers.length,
       total: totalRaw,
@@ -179,7 +179,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
         description: "Your shift has been opened successfully.",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Error",
@@ -213,7 +213,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
         variant: variance !== 0 ? "destructive" : "default",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Error",

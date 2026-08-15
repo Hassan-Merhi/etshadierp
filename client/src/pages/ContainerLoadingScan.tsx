@@ -144,7 +144,7 @@ export default function ContainerLoadingScan() {
       const res = await modeApiRequest("POST", "/api/factory/customer-orders-loading", data);
       return await res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: unknown) => {
       setOrderId(data.id);
       toast({ title: "Loading order created", description: "You can now start scanning bales" });
       setTimeout(() => scannerRef.current?.focus(), 100);
@@ -166,7 +166,7 @@ export default function ContainerLoadingScan() {
       return await res.json();
     },
     onSuccess: (
-      data: any,
+      data: unknown,
       variables: { scanCode: string; locationId: number; allowBypassProforma?: boolean; allowBypassOverload?: boolean }
     ) => {
       setPendingBypassBaleRef(null);
@@ -202,7 +202,7 @@ export default function ContainerLoadingScan() {
       }, 500);
       if (orderId) {
         const scanned = variables.scanCode;
-        const newestForRef = [...(data?.bales || [])].sort((a: any, b: any) => b.id - a.id)[0];
+        const newestForRef = [...(data?.bales || [])].sort((a: unknown, b: unknown) => b.id - a.id)[0];
         const lastScanned = {
           baleReference: newestForRef?.baleReference || scanned,
           baleName: newestForRef?.baleName || "",
@@ -211,7 +211,7 @@ export default function ContainerLoadingScan() {
         localStorage.setItem(`lastScannedBale_${orderId}`, JSON.stringify(lastScanned));
         setLastScannedRef(lastScanned);
       }
-      const newest = [...(data?.bales || [])].sort((a: any, b: any) => b.id - a.id)[0];
+      const newest = [...(data?.bales || [])].sort((a: unknown, b: unknown) => b.id - a.id)[0];
       if (newest?.articleCode) {
         setExpandedGroups((prev) => {
           const next = new Set(prev);
@@ -223,7 +223,7 @@ export default function ContainerLoadingScan() {
       setScanCode("");
       scannerRef.current?.focus();
     },
-    onError: (error: Error, variables: any) => {
+    onError: (error: Error, variables: unknown) => {
       if ((error as unknown as Error & { overloaded: unknown }).overloaded) {
         setPendingBypassOverloadRef(variables.scanCode);
         setPendingBypassBaleRef(null);

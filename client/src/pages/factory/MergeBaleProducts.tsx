@@ -70,7 +70,7 @@ export default function MergeBaleProducts() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products/merge-stats"] });
     },
-    onError: (e: any) => {
+    onError: (e: import("react").SyntheticEvent) => {
       toast({ title: "Merge failed", description: e.message, variant: "destructive" });
     },
   });

@@ -144,8 +144,8 @@ export default function CombinedInventory() {
     containerDetailsQueries.forEach((q) => {
       if (!q.data) return;
       const containerData = q.data as unknown as { pos: { forEach: (...args: unknown[]) => unknown } };
-      containerData?.pos?.forEach((po: any) => {
-        po.items?.forEach((item: any) => {
+      containerData?.pos?.forEach((po: unknown) => {
+        po.items?.forEach((item: unknown) => {
           const qty = parseFloat(item.quantity || "0");
           const rate = parseFloat(item.rate || "0");
           const itemName = item.stockItemName || item.itemName || "";

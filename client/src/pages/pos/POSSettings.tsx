@@ -35,7 +35,7 @@ export default function POSSettings() {
       setNewPassword("");
       setConfirmPassword("");
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       toast({ title: "Error", description: err.message || "Failed to change password", variant: "destructive" });
     },
   });

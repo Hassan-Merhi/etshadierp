@@ -276,7 +276,7 @@ export function SupplierCategoriesDialog({ open, onClose }: { open: boolean; onC
       setNewCatName("");
       queryClient.invalidateQueries({ queryKey: ["/api/factory/supplier-categories"] });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const renameMutation = useMutation({
@@ -295,7 +295,7 @@ export function SupplierCategoriesDialog({ open, onClose }: { open: boolean; onC
       queryClient.invalidateQueries({ queryKey: ["/api/factory/supplier-categories"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -313,7 +313,7 @@ export function SupplierCategoriesDialog({ open, onClose }: { open: boolean; onC
       queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const assignMutation = useMutation({
@@ -331,7 +331,7 @@ export function SupplierCategoriesDialog({ open, onClose }: { open: boolean; onC
       queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const catToDelete = deletingId ? categories.find((c) => c.id === deletingId) : null;

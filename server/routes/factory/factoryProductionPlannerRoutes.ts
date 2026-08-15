@@ -9,7 +9,7 @@ import { sqlArray } from "../../lib/sqlArray";
 import { resultRows } from "../../lib/queryResult";
 
 export function registerProductionPlannerRoutes(app: Express) {
-  const getCompanyId = (req: any): number | null =>
+  const getCompanyId = (req: import("express").Request): number | null =>
     req.session.factoryCompanyId || req.session.currentCompanyId || null;
 
   // ── GET plan for a date ──────────────────────────────────────────────────────

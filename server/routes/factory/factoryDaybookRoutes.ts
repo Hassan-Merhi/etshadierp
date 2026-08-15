@@ -15,7 +15,7 @@ import {
 import { eq, and, or, desc, sql, inArray, isNull } from "drizzle-orm";
 
 export function registerFactoryDaybookRoutes(app: Express) {
-  app.get("/api/factory/daybook", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/daybook", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

@@ -30,7 +30,7 @@ export function PurchaseEditForm({
   toggleOptionalMutation,
 }: {
   form: UseFormReturn<unknown>;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: unknown) => void;
   onCancel: () => void;
   isPending: boolean;
   voucher: unknown;
@@ -248,7 +248,7 @@ export function PurchaseEditForm({
                   <span className="text-sm font-medium">Total Quantity:</span>
                   <span className="font-mono font-medium">
                     {formatNumber(
-                      form.watch("items").reduce((sum: number, item: any) => sum + (parseFloat(item.quantity) || 0), 0)
+                      form.watch("items").reduce((sum: number, item: unknown) => sum + (parseFloat(item.quantity) || 0), 0)
                     )}
                   </span>
                 </div>
@@ -306,7 +306,7 @@ export function AdjustmentEditForm({
 }: {
   form: UseFormReturn<unknown>;
   voucherType: string;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: unknown) => void;
   onCancel: () => void;
   isPending: boolean;
   voucher: unknown;

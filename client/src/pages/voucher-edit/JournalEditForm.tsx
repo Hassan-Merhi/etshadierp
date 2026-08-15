@@ -25,7 +25,7 @@ export function JournalEditForm({
   focusByTestId,
 }: {
   form: UseFormReturn<unknown>;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: unknown) => void;
   onCancel: () => void;
   isPending: boolean;
   allAccountsWithBalances: CombinedAccount[];

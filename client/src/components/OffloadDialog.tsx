@@ -235,13 +235,13 @@ export function OffloadDialog({ open, onOpenChange, containerId, containerNumber
   });
 
   // ── Derived SP accounts ───────────────────────────────────────────────────
-  const spPrepaidExpAcct = (spStatusData?.spAccounts || []).find((a: any) => a.subType === "sp_prepaid_expenses");
-  const spHadiIcAcct = (spStatusData?.spAccounts || []).find((a: any) => a.subType === "sp_hadi_intercompany");
+  const spPrepaidExpAcct = (spStatusData?.spAccounts || []).find((a: unknown) => a.subType === "sp_prepaid_expenses");
+  const spHadiIcAcct = (spStatusData?.spAccounts || []).find((a: unknown) => a.subType === "sp_hadi_intercompany");
 
   // ── Charge calculations ───────────────────────────────────────────────────
   let poChargesTotal = 0;
   if (containerData?.charges && Array.isArray(containerData.charges)) {
-    containerData.charges.forEach((charge: any) => {
+    containerData.charges.forEach((charge: unknown) => {
       const amount = parseFloat(charge.amount || "0");
       if (amount > 0) poChargesTotal += amount;
     });
@@ -474,7 +474,7 @@ export function OffloadDialog({ open, onOpenChange, containerId, containerNumber
                             <SelectValue placeholder="Select agent" />
                           </SelectTrigger>
                           <SelectContent>
-                            {(parentAgents as unknown[]).map((a: any) => (
+                            {(parentAgents as unknown[]).map((a: unknown) => (
                               <SelectItem key={a.ledger_account_id} value={String(a.ledger_account_id)}>
                                 {a.account_name}
                               </SelectItem>
@@ -529,7 +529,7 @@ export function OffloadDialog({ open, onOpenChange, containerId, containerNumber
                             <SelectValue placeholder="Select agent" />
                           </SelectTrigger>
                           <SelectContent>
-                            {(parentAgents as unknown[]).map((a: any) => (
+                            {(parentAgents as unknown[]).map((a: unknown) => (
                               <SelectItem key={a.ledger_account_id} value={String(a.ledger_account_id)}>
                                 {a.account_name}
                               </SelectItem>

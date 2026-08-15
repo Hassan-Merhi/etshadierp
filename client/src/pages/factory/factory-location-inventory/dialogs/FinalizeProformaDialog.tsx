@@ -154,7 +154,7 @@ export function FinalizeProformaDialog({
                     {filteredCustomers.length === 0 ? (
                       <div className="text-center text-muted-foreground text-sm py-3">No customers found</div>
                     ) : (
-                      filteredCustomers.map((c: any) => (
+                      filteredCustomers.map((c: unknown) => (
                         <div
                           key={c.id}
                           className={`px-3 py-2 cursor-pointer text-sm hover-elevate ${selectedCustomerId === String(c.id) ? "bg-primary/10 font-medium" : ""}`}
@@ -187,7 +187,7 @@ export function FinalizeProformaDialog({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {selectedItems.map((item: any) => {
+                    {selectedItems.map((item: unknown) => {
                       const lineTotal = item.selectedQty * parseFloat(item.pricePerBale || "0");
                       return (
                         <TableRow key={item.productId} data-testid={`row-finalize-item-${item.productId}`}>

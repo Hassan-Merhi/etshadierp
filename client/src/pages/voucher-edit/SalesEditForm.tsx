@@ -28,7 +28,7 @@ export function SalesEditForm({
 }: {
   form: UseFormReturn<unknown>;
   voucher: unknown;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: unknown) => void;
   onCancel: () => void;
   onToggleOptional: (optional: boolean) => void;
   isPending: boolean;

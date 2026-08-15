@@ -118,7 +118,7 @@ export async function assertNoLaterSupplierCostEvents(tx: any, companyId: number
 }
 
 /** Update container landed totals (never touches purchase rate). */
-export async function updateContainerCost(tx: any, containerId: number, next: any) {
+export async function updateContainerCost(tx: unknown, containerId: number, next: import("express").NextFunction) {
   await tx
     .update(factoryContainers)
     .set({

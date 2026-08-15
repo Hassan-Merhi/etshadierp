@@ -11,9 +11,9 @@ import { Loader2 } from "lucide-react";
 
 interface ApproveRevisionDialogProps {
   approveRevisionTarget: unknown;
-  setApproveRevisionTarget: (target: any) => void;
+  setApproveRevisionTarget: (target: unknown) => void;
   approveRevisionMutation: unknown;
-  formatNumber: (num: any, decimals?: number) => string;
+  formatNumber: (num: unknown, decimals?: number) => string;
 }
 
 export function ApproveRevisionDialog({
@@ -49,8 +49,8 @@ export function ApproveRevisionDialog({
               </thead>
               <tbody>
                 {(approveRevisionTarget.items ?? [])
-                  .filter((item: any) => parseFloat(item.delta) !== 0)
-                  .map((item: any, idx: number) => {
+                  .filter((item: unknown) => parseFloat(item.delta) !== 0)
+                  .map((item: unknown, idx: number) => {
                     const delta = parseFloat(item.delta);
                     return (
                       <tr key={idx} className="border-t">

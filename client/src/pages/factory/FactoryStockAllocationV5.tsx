@@ -127,7 +127,7 @@ export default function FactoryStockAllocationV5() {
       setAddCtDialog(null);
       queryClient.invalidateQueries({ queryKey: ["/api/factory/v5/stock-allocation"] });
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       toast({ title: "Error adding containers", description: err.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -160,7 +160,7 @@ export default function FactoryStockAllocationV5() {
       setCloseDialog(null);
       queryClient.invalidateQueries({ queryKey: ["/api/factory/v5/stock-allocation"] });
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       toast({ title: "Error closing proforma", description: err.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -209,12 +209,12 @@ export default function FactoryStockAllocationV5() {
       proformaId: number;
       updates: { articleCode: string; expectedQty: number }[];
     }) => apiRequest("PATCH", `/api/factory/v5/proforma/${proformaId}/draft-expected-lines`, { updates }),
-    onSuccess: (data: any) => {
+    onSuccess: (data: unknown) => {
       toast({ title: `Draft quantities updated (${data?.updated ?? 0} lines changed).` });
       setEditDraftDialog(null);
       queryClient.invalidateQueries({ queryKey: ["/api/factory/v5/stock-allocation"] });
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       toast({
         title: "Error updating quantities",
         description: err.message ?? "Unknown error",
@@ -287,7 +287,7 @@ export default function FactoryStockAllocationV5() {
       setLinkSelected(new Set());
       queryClient.invalidateQueries({ queryKey: ["/api/factory/v5/stock-allocation"] });
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       toast({ title: "Linking failed", description: err.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -320,12 +320,12 @@ export default function FactoryStockAllocationV5() {
 
   const restoreContainerMut = useMutation({
     mutationFn: (orderId: number) => apiRequest("POST", `/api/factory/v5/containers/${orderId}/restore`, {}),
-    onSuccess: (data: any) => {
+    onSuccess: (data: unknown) => {
       toast({ title: `Container restored to ${data?.restoredTo === "LOADING" ? "Loading" : "Draft"}.` });
       cancelledContainersQuery.refetch();
       queryClient.invalidateQueries({ queryKey: ["/api/factory/v5/stock-allocation"] });
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       toast({ title: "Restore failed", description: err.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -359,7 +359,7 @@ export default function FactoryStockAllocationV5() {
       setCancelSuperPass("");
       queryClient.invalidateQueries({ queryKey: ["/api/factory/v5/stock-allocation"] });
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       toast({ title: "Cancel failed", description: err.message ?? "Unknown error", variant: "destructive" });
     },
   });

@@ -18,7 +18,7 @@ interface VoucherEditDialogProps {
   entriesLoading: boolean;
   editForm: UseFormReturn<EditVoucherForm>;
   editFields: FieldArrayWithId<EditVoucherForm, "entries", "id">[];
-  editAppend: (v: any) => void;
+  editAppend: (v: unknown) => void;
   editRemove: (index: number) => void;
   handleSaveEdit: (data: EditVoucherForm) => void;
   editMutationPending: boolean;
@@ -27,7 +27,7 @@ interface VoucherEditDialogProps {
   suppliers: Supplier[];
   employees: Employee[];
   fixedAssets: FixedAsset[];
-  formatAmount: (amt: any) => string;
+  formatAmount: (amt: unknown) => string;
 }
 
 export function VoucherEditDialog({

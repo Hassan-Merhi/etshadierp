@@ -185,7 +185,7 @@ export default function CustomerInvoiceDetail() {
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
       navigate("/factory/invoicing?tab=invoices");
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },

@@ -183,7 +183,7 @@ export default function DeletedItems() {
       });
       setConfirmDialog({ open: false, action: "restore", item: null });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Error",
@@ -206,7 +206,7 @@ export default function DeletedItems() {
       });
       setConfirmDialog({ open: false, action: "delete", item: null });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Error",
@@ -232,7 +232,7 @@ export default function DeletedItems() {
         variant: "destructive",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Error",
@@ -817,13 +817,13 @@ export default function DeletedItems() {
                               <td className="px-3 py-2 text-right font-mono text-xs">
                                 $
                                 {voucherEntries
-                                  .reduce((s: number, e: any) => s + parseFloat(e.debitAmount || "0"), 0)
+                                  .reduce((s: number, e: import("react").SyntheticEvent) => s + parseFloat(e.debitAmount || "0"), 0)
                                   .toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
                               <td className="px-3 py-2 text-right font-mono text-xs">
                                 $
                                 {voucherEntries
-                                  .reduce((s: number, e: any) => s + parseFloat(e.creditAmount || "0"), 0)
+                                  .reduce((s: number, e: import("react").SyntheticEvent) => s + parseFloat(e.creditAmount || "0"), 0)
                                   .toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
                             </tr>

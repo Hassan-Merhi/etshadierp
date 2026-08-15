@@ -75,7 +75,7 @@ export function CompaniesTab() {
         displayCurrency: "none",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({ title: "Error", description: error.message || "Failed to save company.", variant: "destructive" });
     },
   });
@@ -90,12 +90,12 @@ export function CompaniesTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/companies"] });
       setCompanyToDelete(null);
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({ title: "Error", description: error.message || "Failed to delete company.", variant: "destructive" });
     },
   });
 
-  function handleEditCompany(company: any) {
+  function handleEditCompany(company: unknown) {
     setEditingCompany(company);
     companyForm.reset({
       name: company.name,
@@ -343,7 +343,7 @@ export function CompaniesTab() {
         (() => {
           const q = companySearch.toLowerCase();
           const filtered = companies.filter(
-            (c: any) => !q || c.name?.toLowerCase().includes(q) || c.code?.toLowerCase().includes(q)
+            (c: unknown) => !q || c.name?.toLowerCase().includes(q) || c.code?.toLowerCase().includes(q)
           );
 
           if (filtered.length === 0) {

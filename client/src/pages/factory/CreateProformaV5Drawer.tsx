@@ -210,7 +210,7 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
       onClose();
       onSuccess();
     },
-    onError: (e: any) => {
+    onError: (e: import("react").SyntheticEvent) => {
       toast({ title: "Failed to create proforma", description: e.message, variant: "destructive" });
     },
   });

@@ -297,7 +297,7 @@ export default function FactoryProformas() {
     mutationFn: async ({ id, targetCustomerId }: { id: number; targetCustomerId: number }) => {
       return await modeApiRequest("PATCH", `/api/factory/customer-proformas/${id}/transfer`, { targetCustomerId });
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: unknown) => {
       toast({ title: "Proforma transferred", description: `Proforma moved to ${data.targetCustomerName}` });
       invalidateCustomerProformas();
       setTransferProforma(null);

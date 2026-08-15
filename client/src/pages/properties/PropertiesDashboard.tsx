@@ -91,7 +91,7 @@ export default function PropertiesDashboard() {
       const response = await apiRequest("GET", "/api/accounts/all");
       if (!response.ok) throw new Error("Failed to fetch accounts");
       const accounts = await response.json();
-      return accounts.filter((acc: any) => acc.type && acc.type.toLowerCase() === "ledger");
+      return accounts.filter((acc: unknown) => acc.type && acc.type.toLowerCase() === "ledger");
     },
     enabled: !!selectedCompany,
   });
@@ -115,7 +115,7 @@ export default function PropertiesDashboard() {
       setSelectedAccountId(0);
       toast({ title: "Success", description: "Account added to dashboard" });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to add account", variant: "destructive" });
     },
@@ -130,7 +130,7 @@ export default function PropertiesDashboard() {
       queryClient.refetchQueries({ queryKey: ["/api/dashboard-cash-accounts", selectedCompany?.id] });
       toast({ title: "Success", description: "Account removed from dashboard" });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to remove account", variant: "destructive" });
     },
@@ -147,7 +147,7 @@ export default function PropertiesDashboard() {
       setSelectedPayableAccountId(0);
       toast({ title: "Success", description: "Payable account added to dashboard" });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to add payable account", variant: "destructive" });
     },
@@ -162,7 +162,7 @@ export default function PropertiesDashboard() {
       queryClient.refetchQueries({ queryKey: ["/api/dashboard-payable-accounts", selectedCompany?.id] });
       toast({ title: "Success", description: "Payable account removed from dashboard" });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Error",

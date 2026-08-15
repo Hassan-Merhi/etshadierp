@@ -28,7 +28,7 @@ import {
 import { eq, and, inArray } from "drizzle-orm";
 
 export function registerStockItemMergeRoutes(app: Express) {
-  app.get("/api/stock-items/:id/merge-preview", requireAuth, requireNonPOS, async (req: any, res: any) => {
+  app.get("/api/stock-items/:id/merge-preview", requireAuth, requireNonPOS, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -167,7 +167,7 @@ export function registerStockItemMergeRoutes(app: Express) {
     }
   });
 
-  app.post("/api/stock-items/:id/merge", requireAuth, requireNonPOS, async (req: any, res: any) => {
+  app.post("/api/stock-items/:id/merge", requireAuth, requireNonPOS, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

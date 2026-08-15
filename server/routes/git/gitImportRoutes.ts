@@ -23,7 +23,7 @@ export function registerGitImportRoutes(app: Express) {
     "/api/git/containers/eta-template.xlsx",
     requireAuth,
     requireRole("Admin", "Owner", "Developer"),
-    async (req: any, res: any) => {
+    async (req: import("express").Request, res: import("express").Response) => {
       try {
         // Fetch all active containers for this company
         const rows = await db
@@ -99,7 +99,7 @@ export function registerGitImportRoutes(app: Express) {
     "/api/git/containers/import-template.xlsx",
     requireAuth,
     requireRole("Admin", "Owner", "Developer"),
-    async (req: any, res: any) => {
+    async (req: import("express").Request, res: import("express").Response) => {
       try {
         const wb = new ExcelJS.Workbook();
         const ws = wb.addWorksheet("Containers");
@@ -254,7 +254,7 @@ export function registerGitImportRoutes(app: Express) {
         return res.status(400).json({ message: err.message || "Invalid file upload." });
       });
     },
-    async (req: any, res: any) => {
+    async (req: import("express").Request, res: import("express").Response) => {
       try {
         if (!req.file) return res.status(400).json({ message: "No file uploaded" });
         if (!req.session.currentCompanyId) {
@@ -644,7 +644,7 @@ export function registerGitImportRoutes(app: Express) {
     "/api/git/containers/import-excel/undo",
     requireAuth,
     requireRole("Admin", "Owner", "Developer"),
-    async (req: any, res: any) => {
+    async (req: import("express").Request, res: import("express").Response) => {
       try {
         const { importId } = req.body ?? {};
         if (!importId || typeof importId !== "string") {

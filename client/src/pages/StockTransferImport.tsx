@@ -63,7 +63,7 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
         description: `Found ${data.items.length} item(s). Click Validate to check the data.`,
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Parse error",
@@ -74,7 +74,7 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
   });
 
   const validateMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: unknown) => {
       const res = await apiRequest("POST", "/api/stock-transfer-import/validate", data);
       return await res.json();
     },
@@ -94,7 +94,7 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
         });
       }
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Validation error",
@@ -105,7 +105,7 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
   });
 
   const importMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: unknown) => {
       const res = await apiRequest("POST", "/api/stock-transfer-import/import", data);
       return await res.json();
     },
@@ -118,7 +118,7 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
       queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
       navigate("/stock-transfers");
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Import error",
@@ -256,7 +256,7 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
     }
 
     // No errors - proceed directly with valid items
-    const itemsToImport = validationResult.validatedItems.filter((item: any) => !item.error);
+    const itemsToImport = validationResult.validatedItems.filter((item: unknown) => !item.error);
     importMutation.mutate({
       sourceLocationId: parseInt(selectedSourceLocation),
       destinationLocationId: parseInt(selectedDestLocation),
@@ -268,7 +268,7 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
 
   const handleConfirmedImport = () => {
     // Filter valid items and proceed with import
-    const itemsToImport = validationResult?.validatedItems?.filter((item: any) => !item.error) || [];
+    const itemsToImport = validationResult?.validatedItems?.filter((item: unknown) => !item.error) || [];
 
     // Close confirmation dialog first
     setConfirmDialogOpen(false);
@@ -307,7 +307,7 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
   const hasValidationErrors = validationResult?.errors && validationResult.errors.length > 0;
 
   // Calculate valid items (items without errors)
-  const validItems = validationResult?.validatedItems?.filter((item: any) => !item.error) || [];
+  const validItems = validationResult?.validatedItems?.filter((item: unknown) => !item.error) || [];
   const validItemsCount = validItems.length;
   const totalItemsCount = validationResult?.validatedItems?.length || 0;
 
@@ -480,7 +480,7 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {preview.items.map((item: any, index: number) => {
+                  {preview.items.map((item: unknown, index: number) => {
                     const validation = validationResult?.validatedItems?.[index];
                     const hasError = validation?.error;
 

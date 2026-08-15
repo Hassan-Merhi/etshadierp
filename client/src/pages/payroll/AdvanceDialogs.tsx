@@ -76,7 +76,7 @@ export function AdvanceDialogs({
           <Form {...advanceForm}>
             <form
               noValidate
-              onSubmit={advanceForm.handleSubmit((data: any) => advanceMutation.mutate(data))}
+              onSubmit={advanceForm.handleSubmit((data: unknown) => advanceMutation.mutate(data))}
               className="space-y-4"
             >
               <FormField
@@ -313,7 +313,7 @@ export function AdvanceDialogs({
           <Form {...deductionForm}>
             <form
               noValidate
-              onSubmit={deductionForm.handleSubmit((data: any) => deductionMutation.mutate(data))}
+              onSubmit={deductionForm.handleSubmit((data: unknown) => deductionMutation.mutate(data))}
               className="space-y-4"
             >
               <FormField

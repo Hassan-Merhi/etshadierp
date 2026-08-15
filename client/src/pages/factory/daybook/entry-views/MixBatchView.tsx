@@ -29,7 +29,7 @@ export function MixBatchView({
   const totalKg = mb ? parseFloat(mb.totalWeightKg || "0") : 0;
   const totalCost = mb ? parseFloat(mb.totalCost || "0") : 0;
   const costPerKg = mb ? parseFloat(mb.costPerKg || "0") : 0;
-  const sourcesTotalKg = mixBatchSources.reduce((s: number, src: any) => s + parseFloat(src.weightKg || "0"), 0);
+  const sourcesTotalKg = mixBatchSources.reduce((s: number, src: unknown) => s + parseFloat(src.weightKg || "0"), 0);
 
   return (
     <>
@@ -122,7 +122,7 @@ export function MixBatchView({
                   </tr>
                 </thead>
                 <tbody>
-                  {mixBatchSources.map((src: any, i: number) => {
+                  {mixBatchSources.map((src: unknown, i: number) => {
                     const srcKg = parseFloat(src.weightKg || "0");
                     const srcCpk = parseFloat(src.costPerKg || "0");
                     const srcTotal = parseFloat(src.totalCost || "0");
@@ -167,7 +167,7 @@ export function MixBatchView({
                       <td className="px-3 py-2 text-right font-mono font-medium">
                         $
                         {formatNumber(
-                          mixBatchSources.reduce((s: number, src: any) => s + parseFloat(src.totalCost || "0"), 0)
+                          mixBatchSources.reduce((s: number, src: unknown) => s + parseFloat(src.totalCost || "0"), 0)
                         )}
                       </td>
                     </tr>

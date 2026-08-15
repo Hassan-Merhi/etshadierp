@@ -68,7 +68,7 @@ export function ParentCreditAccountSelect({ company }: { company: unknown }) {
   });
 
   const liabilityAccounts = ledgerAccounts.filter(
-    (acc: any) => acc.accountType === "Liability" && acc.active && !acc.deletedAt
+    (acc: unknown) => acc.accountType === "Liability" && acc.active && !acc.deletedAt
   );
 
   const updateSettingsMutation = useMutation({
@@ -84,7 +84,7 @@ export function ParentCreditAccountSelect({ company }: { company: unknown }) {
       queryClient.invalidateQueries({ queryKey: ["/api/companies"] });
       toast({ title: "Saved", description: "Parent credit account updated" });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
@@ -106,7 +106,7 @@ export function ParentCreditAccountSelect({ company }: { company: unknown }) {
       setIsCreating(false);
       setNewAccountName("");
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error creating account", description: error.message, variant: "destructive" });
     },

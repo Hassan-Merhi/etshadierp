@@ -76,7 +76,7 @@ export default function FactoryPriceList() {
       setEditingCell(null);
       toast({ title: "Price Updated", description: "Price has been saved and will take effect everywhere." });
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },

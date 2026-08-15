@@ -133,7 +133,7 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
     if (!stockItems.length) return [];
     return stockItems
       .map((item) => {
-        const inv = locationInventory.find((i: any) => i.stockItemId === item.id);
+        const inv = locationInventory.find((i: unknown) => i.stockItemId === item.id);
         return {
           stockItemId: item.id,
           stockItemCode: item.code,
@@ -164,7 +164,7 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
   useEffect(() => {
     if (stockAdjustmentToEdit && stockAdjustmentToEdit.items && voucherToEdit && stockItems.length > 0) {
       if (hydratedVoucherIdRef.current === voucherIdToEdit) return;
-      const formEntries = stockAdjustmentToEdit.items.map((item: any) => {
+      const formEntries = stockAdjustmentToEdit.items.map((item: unknown) => {
         const stockItem = stockItems.find((s) => s.id === item.stockItemId);
         const quantity = parseFloat(item.quantity || "0");
         const type = quantity < 0 ? "CONSUME" : "PRODUCE";
@@ -284,7 +284,7 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
         });
       }
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Error",
@@ -299,7 +299,7 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
     const voucherDate = formData.voucherDate
       ? format(formData.voucherDate, "yyyy-MM-dd")
       : format(new Date(), "yyyy-MM-dd");
-    const validEntries = formData.entries.filter((e: any) => e.stockItemId > 0 && parseFloat(e.quantity) > 0);
+    const validEntries = formData.entries.filter((e: import("react").SyntheticEvent) => e.stockItemId > 0 && parseFloat(e.quantity) > 0);
     if (validEntries.length === 0) {
       toast({
         title: "No data to export",
@@ -308,9 +308,9 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
       });
       return;
     }
-    const locationName = locations.find((l: any) => l.id === formData.locationId)?.name || "";
+    const locationName = locations.find((l: unknown) => l.id === formData.locationId)?.name || "";
     if (detailed) {
-      const exportData = validEntries.map((entry: any) => ({
+      const exportData = validEntries.map((entry: unknown) => ({
         "Entry Type": entry.type?.toUpperCase() === "CONSUME" ? "Consumption" : "Production",
         Date: voucherDate,
         Location: locationName,
@@ -330,11 +330,11 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
       toast({ title: "Export successful", description: `Downloaded ${fileName} with ${validEntries.length} items.` });
     } else {
       const consumeTotal = validEntries
-        .filter((e: any) => e.type?.toUpperCase() === "CONSUME")
-        .reduce((sum: number, e: any) => sum + parseFloat(e.quantity) * parseFloat(e.rate || "0"), 0);
+        .filter((e: import("react").SyntheticEvent) => e.type?.toUpperCase() === "CONSUME")
+        .reduce((sum: number, e: import("react").SyntheticEvent) => sum + parseFloat(e.quantity) * parseFloat(e.rate || "0"), 0);
       const produceTotal = validEntries
-        .filter((e: any) => e.type?.toUpperCase() === "PRODUCE")
-        .reduce((sum: number, e: any) => sum + parseFloat(e.quantity) * parseFloat(e.rate || "0"), 0);
+        .filter((e: import("react").SyntheticEvent) => e.type?.toUpperCase() === "PRODUCE")
+        .reduce((sum: number, e: import("react").SyntheticEvent) => sum + parseFloat(e.quantity) * parseFloat(e.rate || "0"), 0);
       const exportData = [
         {
           "Voucher Type": "Production/Consumption",
@@ -537,7 +537,7 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
                             />
                             {mobileAdjItems.length > 0 && (
                               <div className="border rounded-md bg-popover shadow-md max-h-40 overflow-y-auto z-20 relative">
-                                {mobileAdjItems.map((item: any) => (
+                                {mobileAdjItems.map((item: unknown) => (
                                   <button
                                     key={item.stockItemId}
                                     type="button"
@@ -1156,7 +1156,7 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
                       type="button"
                       variant="outline"
                       disabled={
-                        adjustmentEntries.filter((e: any) => e.stockItemId > 0 && parseFloat(e.quantity) > 0).length ===
+                        adjustmentEntries.filter((e: import("react").SyntheticEvent) => e.stockItemId > 0 && parseFloat(e.quantity) > 0).length ===
                         0
                       }
                       data-testid="button-export-production-consumption"

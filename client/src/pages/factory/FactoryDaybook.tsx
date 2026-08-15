@@ -552,7 +552,7 @@ export default function FactoryDaybook() {
       setEditReason("");
       toast({ title: "Entry updated", description: "Description synced to source record." });
     },
-    onError: (e: any) => {
+    onError: (e: import("react").SyntheticEvent) => {
       if (e?._handledGlobally) return;
       toast({ title: "Update failed", description: e.message, variant: "destructive" });
     },
@@ -573,7 +573,7 @@ export default function FactoryDaybook() {
       setVoidEntry(null);
       toast({ title: "Voucher voided", description: "All accounting entries have been reversed." });
     },
-    onError: (e: any) => {
+    onError: (e: import("react").SyntheticEvent) => {
       if (e?._handledGlobally) return;
       toast({ title: "Void failed", description: e.message, variant: "destructive" });
     },
@@ -589,7 +589,7 @@ export default function FactoryDaybook() {
       setDeleteEntry(null);
       toast({ title: "Entry deleted", description: "The daybook entry has been permanently removed." });
     },
-    onError: (e: any) => {
+    onError: (e: import("react").SyntheticEvent) => {
       if (e?._handledGlobally) return;
       toast({ title: "Delete failed", description: e.message, variant: "destructive" });
     },
@@ -624,7 +624,7 @@ export default function FactoryDaybook() {
       setCostEditReason("");
       toast({ title: "Cost updated", description: data.message || "Container costs recalculated and cascaded." });
     },
-    onError: (e: any) => {
+    onError: (e: import("react").SyntheticEvent) => {
       if (e?._handledGlobally) return;
       toast({ title: "Cost edit failed", description: e.message, variant: "destructive" });
     },

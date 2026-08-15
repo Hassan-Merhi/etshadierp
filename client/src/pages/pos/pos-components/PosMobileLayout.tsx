@@ -37,10 +37,10 @@ interface PosMobileLayoutProps {
   setSearchTerm: (v: string) => void;
   mobileSearchInputRef: React.RefObject<HTMLInputElement>;
   inventory: InventoryItem[];
-  selectItem: (item: any) => void;
+  selectItem: (item: unknown) => void;
   rows: SaleRow[];
   setRows: React.Dispatch<React.SetStateAction<SaleRow[]>>;
-  updateRow: (index: number, field: keyof SaleRow, value: any) => void;
+  updateRow: (index: number, field: keyof SaleRow, value: unknown) => void;
   notes: string;
   setNotes: (v: string) => void;
   saveMutation: unknown;

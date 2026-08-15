@@ -99,7 +99,7 @@ export function StockItemCreateDialog({ open, onOpenChange }: StockItemCreateDia
       form.reset();
       onOpenChange(false);
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Creation Failed",
@@ -125,9 +125,9 @@ export function StockItemCreateDialog({ open, onOpenChange }: StockItemCreateDia
     } as InsertStockItem);
   };
 
-  const onInvalid = (errors: any) => {
+  const onInvalid = (errors: unknown) => {
     const errorMessages = Object.values(errors)
-      .map((err: any) => err.message)
+      .map((err: unknown) => err.message)
       .filter(Boolean);
 
     if (errorMessages.length > 0) {

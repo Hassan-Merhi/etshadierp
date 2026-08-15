@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 type RevisionStatus = "pending" | "approved" | "rejected" | "cancelled" | "superseded";
 
-function revisionStatus(revision: any): RevisionStatus {
+function revisionStatus(revision: unknown): RevisionStatus {
   return revision.status ?? (revision.optional ? "pending" : "approved");
 }
 
@@ -37,11 +37,11 @@ interface StockTransferRevisionHistoryProps {
   transferRevisions: unknown[];
   transferRevisionsExpanded: boolean;
   setTransferRevisionsExpanded: (val: boolean | ((v: boolean) => boolean)) => void;
-  setApproveRevisionTarget: (rev: any) => void;
+  setApproveRevisionTarget: (rev: unknown) => void;
   modeApiRequest: unknown;
   queryClient: unknown;
   lastKnownTransferIdRef: unknown;
-  formatNumber: (num: any, decimals?: number) => string;
+  formatNumber: (num: unknown, decimals?: number) => string;
 }
 
 export function StockTransferRevisionHistory({
@@ -89,7 +89,7 @@ export function StockTransferRevisionHistory({
               description='Use "Save as Revision" to record tracked changes to this transfer.'
             />
           ) : (
-            transferRevisions.map((rev: any) => (
+            transferRevisions.map((rev: unknown) => (
               <div key={rev.id} className="border rounded-md overflow-hidden">
                 {revisionStatus(rev) === "pending" && (
                   <div className="flex items-center justify-between gap-3 px-3 py-2 status-warning border-b">
@@ -143,8 +143,8 @@ export function StockTransferRevisionHistory({
                       </thead>
                       <tbody>
                         {rev.items
-                          .filter((item: any) => parseFloat(item.delta) !== 0)
-                          .map((item: any, idx: number) => {
+                          .filter((item: unknown) => parseFloat(item.delta) !== 0)
+                          .map((item: unknown, idx: number) => {
                             const delta = parseFloat(item.delta);
                             return (
                               <tr key={idx} className="border-t">

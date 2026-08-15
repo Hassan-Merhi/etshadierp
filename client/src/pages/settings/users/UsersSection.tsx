@@ -22,7 +22,7 @@ export function UsersSection() {
     queryKey: ["/api/companies"],
   });
 
-  const openDrawer = (user: any) => {
+  const openDrawer = (user: unknown) => {
     setSelectedUser(user);
     setDrawerOpen(true);
   };

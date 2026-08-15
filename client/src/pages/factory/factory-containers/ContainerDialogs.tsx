@@ -505,7 +505,7 @@ export function FullImportDialog({ open, onClose }: FullImportDialogProps) {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importPreview, setImportPreview] = [[] as unknown[], (_v: unknown[]) => {}];
-  const [importResult, setImportResult] = [null, (_v: any) => {}];
+  const [importResult, setImportResult] = [null, (_v: unknown) => {}];
 
   // This component is intentionally kept simple since the import state
   // lives in the parent (FactoryContainers) for now.

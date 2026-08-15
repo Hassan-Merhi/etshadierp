@@ -54,7 +54,7 @@ interface SupplierStatementProps {
   fxConversionOpen: boolean;
   setFxConversionOpen: (val: boolean) => void;
   fxConversionForm: unknown;
-  setFxConversionForm: (val: any) => void;
+  setFxConversionForm: (val: unknown) => void;
   fxSourceType: "supplier" | "commission" | "both";
   setFxSourceType: (val: "supplier" | "commission" | "both") => void;
   allSuppliers: SupplierWithBalance[];
@@ -63,9 +63,9 @@ interface SupplierStatementProps {
   deleteFxTransferMutation: unknown;
   statDateFilter: "all" | "today" | "yesterday" | "this_month" | "this_year";
   setStatDateFilter: (val: "all" | "today" | "yesterday" | "this_month" | "this_year") => void;
-  onEditPayment: (p: any) => void;
+  onEditPayment: (p: unknown) => void;
   onDeletePayment: (id: number) => void;
-  setEditObComm: (val: any) => void;
+  setEditObComm: (val: unknown) => void;
   statusColor: (status: string) => unknown;
   statusDisplayLabel: (status: string) => string;
   typeBadge: (type: string) => React.ReactNode;
@@ -159,7 +159,7 @@ export function SupplierStatement({
   const activeSt = (statementData.statement || []).filter((c) => c.status !== "OFFLOADED");
   const activeContainerCount = activeSt.length;
   const activeKg = activeSt.reduce(
-    (sum: number, c: any) => sum + parseFloat(c.actualReceivedKg || c.totalKg || "0"),
+    (sum: number, c: unknown) => sum + parseFloat(c.actualReceivedKg || c.totalKg || "0"),
     0
   );
   const currencyGroups = statementData.currencyGroups || [];

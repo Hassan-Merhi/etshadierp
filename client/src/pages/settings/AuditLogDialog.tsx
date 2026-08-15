@@ -73,7 +73,7 @@ const ACTION_VERBS: Record<string, string> = {
   settings_change: "changed settings for",
 };
 
-function getHeaderSentence(log: any): string {
+function getHeaderSentence(log: unknown): string {
   const user =
     log.username && log.username !== "unknown"
       ? log.username
@@ -102,7 +102,7 @@ function getHeaderSentence(log: any): string {
   return `${user} ${verb} ${subject}${recordPart} on ${fmtDate(log.createdAt)}.`;
 }
 
-function isChangePair(value: any): boolean {
+function isChangePair(value: unknown): boolean {
   return Boolean(
     value &&
     typeof value === "object" &&
@@ -111,7 +111,7 @@ function isChangePair(value: any): boolean {
   );
 }
 
-function valuesEqual(a: any, b: any): boolean {
+function valuesEqual(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
@@ -240,7 +240,7 @@ export function AuditLogDialog({ log, onClose }: { log: unknown; onClose: () => 
     return ai - bi;
   });
 
-  const renderRow = (field: string, rawPair: any) => {
+  const renderRow = (field: string, rawPair: unknown) => {
     if (isItemDiffKey(field)) {
       const isAdded = field.startsWith("item_added_");
       const isRemoved = field.startsWith("item_removed_");

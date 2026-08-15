@@ -115,7 +115,7 @@ export function AddPriceLineDialog({
                         const q = catalogSearch.toLowerCase().trim();
                         const filtered = q
                           ? allStockItems.filter(
-                              (item: any) =>
+                              (item: unknown) =>
                                 item.name?.toLowerCase().includes(q) || item.code?.toLowerCase().includes(q)
                             )
                           : allStockItems;
@@ -125,13 +125,13 @@ export function AddPriceLineDialog({
                               No items match "{catalogSearch}"
                             </p>
                           );
-                        return filtered.map((item: any) => (
+                        return filtered.map((item: unknown) => (
                           <button
                             key={item.id}
                             className="w-full flex items-center justify-between px-3 py-2.5 text-left hover-elevate border-b last:border-b-0"
                             onClick={() => {
                               setCatalogSelectedItem(item);
-                              setNewLine((prev: any) => ({
+                              setNewLine((prev: unknown) => ({
                                 ...prev,
                                 articleCode: item.code || "",
                                 productName: item.name || "",
@@ -177,7 +177,7 @@ export function AddPriceLineDialog({
                       onClick={() => {
                         setCatalogSelectedItem(null);
                         setCatalogSearch("");
-                        setNewLine((prev: any) => ({
+                        setNewLine((prev: unknown) => ({
                           ...prev,
                           articleCode: "",
                           productName: "",

@@ -72,9 +72,9 @@ export function RepaymentAuditDialog({
         ) : !auditData ? null : (
           (() => {
             const { summary, advances: auditAdvances } = auditData;
-            const missingTotal = auditAdvances.reduce((s: any, a: any) => {
+            const missingTotal = auditAdvances.reduce((s: unknown, a: unknown) => {
               if (a.caseType === "missing_voucher") {
-                return s + a.missingVoucherRepayments.reduce((ss: any, r: any) => ss + parseFloat(r.amount || "0"), 0);
+                return s + a.missingVoucherRepayments.reduce((ss: unknown, r: unknown) => ss + parseFloat(r.amount || "0"), 0);
               }
               return s + parseFloat(a.amount || "0");
             }, 0);
@@ -124,13 +124,13 @@ export function RepaymentAuditDialog({
                         </Label>
                         <Select
                           value={repayAuditForm.cashAccountId}
-                          onValueChange={(v) => setRepayAuditForm((p: any) => ({ ...p, cashAccountId: v }))}
+                          onValueChange={(v) => setRepayAuditForm((p: unknown) => ({ ...p, cashAccountId: v }))}
                         >
                           <SelectTrigger data-testid="select-audit-cash-account">
                             <SelectValue placeholder="Select cash account" />
                           </SelectTrigger>
                           <SelectContent>
-                            {(cashAccounts || []).map((a: any) => (
+                            {(cashAccounts || []).map((a: unknown) => (
                               <SelectItem key={a.id} value={String(a.id)}>
                                 {a.name} ({a.code})
                               </SelectItem>
@@ -145,7 +145,7 @@ export function RepaymentAuditDialog({
                         <Input
                           type="date"
                           value={repayAuditForm.repaymentDate}
-                          onChange={(e) => setRepayAuditForm((p: any) => ({ ...p, repaymentDate: e.target.value }))}
+                          onChange={(e) => setRepayAuditForm((p: unknown) => ({ ...p, repaymentDate: e.target.value }))}
                           data-testid="input-audit-date"
                         />
                       </div>
@@ -206,7 +206,7 @@ export function RepaymentAuditDialog({
                               const missingAmt =
                                 a.caseType === "missing_voucher"
                                   ? a.missingVoucherRepayments.reduce(
-                                      (s: any, r: any) => s + parseFloat(r.amount || "0"),
+                                      (s: unknown, r: unknown) => s + parseFloat(r.amount || "0"),
                                       0
                                     )
                                   : parseFloat(a.amount || "0");
@@ -286,7 +286,7 @@ export function RepaymentAuditDialog({
                 Posting…
               </>
             ) : (
-              `Post Missing Entries — ${fmt(auditData?.advances.reduce((s: any, a: any) => s + (a.caseType === "missing_voucher" ? a.missingVoucherRepayments.reduce((ss: any, r: any) => ss + parseFloat(r.amount || "0"), 0) : parseFloat(a.amount || "0")), 0) ?? 0)}`
+              `Post Missing Entries — ${fmt(auditData?.advances.reduce((s: unknown, a: unknown) => s + (a.caseType === "missing_voucher" ? a.missingVoucherRepayments.reduce((ss: unknown, r: unknown) => ss + parseFloat(r.amount || "0"), 0) : parseFloat(a.amount || "0")), 0) ?? 0)}`
             )}
           </Button>
         </DialogFooter>

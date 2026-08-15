@@ -173,7 +173,7 @@ export async function assertPeriodOpenTx(
 }
 
 export async function lockThroughTx(
-  tx: any,
+  tx: unknown,
   request: {
     companyId: number;
     domain: ProtectedDomain;

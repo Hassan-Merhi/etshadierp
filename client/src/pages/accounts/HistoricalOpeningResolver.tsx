@@ -66,7 +66,7 @@ export function HistoricalOpeningResolver() {
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: "Could not resolve historical value",
         description: error?.message || "Check the currency and historical rate.",

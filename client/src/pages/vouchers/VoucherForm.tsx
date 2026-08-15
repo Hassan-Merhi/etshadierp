@@ -8,7 +8,7 @@ import { Loader2 } from "lucide-react";
 
 interface VoucherFormProps {
   form: UseFormReturn<unknown>;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: unknown) => void;
   isPending: boolean;
   voucherNumber?: string;
   title: string;

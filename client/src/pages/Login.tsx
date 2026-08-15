@@ -175,7 +175,7 @@ export default function Login() {
         window.location.href = "/";
       }
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       setPassword("");
       requestAnimationFrame(() => passwordInputRef.current?.focus());
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;

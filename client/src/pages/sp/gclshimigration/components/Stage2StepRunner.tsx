@@ -49,7 +49,7 @@ export function Stage2StepRunner({
       });
       return res;
     },
-    onSuccess: async (data: any) => {
+    onSuccess: async (data: unknown) => {
       const r = await data.json();
       setResult(r);
       setRunError(null);
@@ -58,7 +58,7 @@ export function Stage2StepRunner({
       toast({ title: `${label} complete`, description: `${r.rowsCreated} row(s) created.` });
       onDone();
     },
-    onError: (e: any) => {
+    onError: (e: import("react").SyntheticEvent) => {
       setRunError(e.message);
       toast({ title: `${label} failed`, description: e.message, variant: "destructive" });
     },

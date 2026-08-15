@@ -23,7 +23,7 @@ export function PayrollPaymentView({
   badgeClass: unknown;
 }) {
   const p = payrollSummary;
-  const n = (v: any) => parseFloat(v || "0");
+  const n = (v: unknown) => parseFloat(v || "0");
 
   const grossEarnings = p
     ? n(p.baseSalary) + n(p.baleEarnings) + n(p.kgEarnings) + n(p.overtimePay) + n(p.bonuses) + n(p.transport)

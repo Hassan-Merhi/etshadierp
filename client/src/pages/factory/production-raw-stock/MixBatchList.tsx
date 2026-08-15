@@ -130,7 +130,7 @@ export function MixBatchList({
             <div style={{ fontSize: "18px", fontWeight: 700, color: "#f9fafb" }}>Mix Batch Details</div>
           </div>
 
-          {mixBatchesByDate.map((batch: any) => (
+          {mixBatchesByDate.map((batch: unknown) => (
             <div key={batch.id} style={{ marginBottom: "20px" }}>
               <div
                 style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}
@@ -201,7 +201,7 @@ export function MixBatchList({
                     </tr>
                   </thead>
                   <tbody>
-                    {batch.sources.map((src: any, idx: number) => (
+                    {batch.sources.map((src: unknown, idx: number) => (
                       <tr key={src.id} style={{ backgroundColor: idx % 2 === 0 ? "transparent" : "#1a2332" }}>
                         <td style={{ padding: "7px 10px", color: "#f9fafb", fontWeight: 500 }}>{src.sourceName}</td>
                         <td

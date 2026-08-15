@@ -112,7 +112,7 @@ export function CreateAccountModal({
       form.reset();
       onClose();
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Error",

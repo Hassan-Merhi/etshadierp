@@ -18,7 +18,7 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
   // Factory User Management
   // ───────────────────────────────────────────────
 
-  app.get("/api/factory/users", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/users", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       const currentRole = req.session.currentRole;
@@ -83,7 +83,7 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/users", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/users", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       const currentRole = req.session.currentRole;
@@ -156,7 +156,7 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
     }
   });
 
-  app.put("/api/factory/users/:userId", requireAuth, async (req: any, res: any) => {
+  app.put("/api/factory/users/:userId", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       const currentRole = req.session.currentRole;
@@ -249,7 +249,7 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/factory/users/:userId", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/users/:userId", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       const currentRole = req.session.currentRole;
@@ -275,7 +275,7 @@ export function registerFactoryUsersAccessRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/my-access", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/my-access", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const userId = req.session.userId;
       const currentCompanyId = req.session.currentCompanyId;

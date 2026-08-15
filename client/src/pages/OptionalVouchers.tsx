@@ -62,7 +62,7 @@ export default function OptionalVouchers() {
       toast({ title: "Voucher Finalized", description: "The voucher has been posted successfully." });
       setFinalizeVoucherId(null);
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
@@ -79,7 +79,7 @@ export default function OptionalVouchers() {
       toast({ title: "Voucher Deleted", description: "The voucher has been deleted." });
       setDeleteVoucherId(null);
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
@@ -119,9 +119,9 @@ export default function OptionalVouchers() {
     }
   };
 
-  const grandTotal = vouchers.reduce((sum, v: any) => sum + parseFloat(v.totalAmount || "0"), 0);
+  const grandTotal = vouchers.reduce((sum, v: unknown) => sum + parseFloat(v.totalAmount || "0"), 0);
 
-  const handleEdit = (v: any) => {
+  const handleEdit = (v: unknown) => {
     const voucherTypeMap: Record<string, string> = {
       Payment: "payment",
       Receipt: "receipt",

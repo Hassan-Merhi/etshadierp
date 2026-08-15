@@ -11,11 +11,11 @@ interface StockMovementDialogProps {
   stockMovementOpen: boolean;
   setStockMovementOpen: (o: boolean) => void;
   stockMovementItem: unknown;
-  setStockMovementItem: (item: any) => void;
+  setStockMovementItem: (item: unknown) => void;
   stockMovementPeriod: unknown;
-  setStockMovementPeriod: (p: any) => void;
+  setStockMovementPeriod: (p: unknown) => void;
   drillMonth: unknown;
-  setDrillMonth: (m: any) => void;
+  setDrillMonth: (m: unknown) => void;
   formatAmount: (amt: number) => string;
   navigate: (path: string) => void;
 }
@@ -179,7 +179,7 @@ export function StockMovementDialog({
                       </td>
                     </tr>
                   )}
-                  {smDrillData?.transactions?.map((txn: any, idx: number) => {
+                  {smDrillData?.transactions?.map((txn: unknown, idx: number) => {
                     const editUrl = (() => {
                       if (txn.isOpeningBalance) return null;
                       const vt = (txn.vchType || "").toLowerCase();
@@ -364,7 +364,7 @@ export function StockMovementDialog({
                     </td>
                   </tr>
                 )}
-                {smRowsWithYear.map((m: any, idx: number) => {
+                {smRowsWithYear.map((m: unknown, idx: number) => {
                   const hasActivity = m.inwardQty > 0 || m.outwardQty > 0 || m.openingQty !== 0 || m.closingQty !== 0;
                   const fmtQ = (n: number) =>
                     n === 0 ? (

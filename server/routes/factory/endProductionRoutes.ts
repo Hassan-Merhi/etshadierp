@@ -16,7 +16,7 @@ import { getClientDate } from "../../lib/dateUtils";
 import { generateBilingualWorkerBalesPdf } from "../../lib/workerBalesBilingualPdfGenerator";
 import { sendWhatsAppFileByUploadPos } from "../../services/whatsappService";
 
-function requestedLanguage(req: any): FactoryCatalogLanguage {
+function requestedLanguage(req: import("express").Request): FactoryCatalogLanguage {
   return parseFactoryCatalogLanguage(req.body?.lang ?? req.query?.lang, "en");
 }
 
@@ -81,7 +81,7 @@ function caption(companyName: string, date: string, language: FactoryCatalogLang
 }
 
 export function registerEndProductionRoutes(app: Express, requireAuth: any) {
-  app.get("/api/factory/stock-entry/production-session", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/stock-entry/production-session", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session?.factoryCompanyId || req.session?.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -97,7 +97,7 @@ export function registerEndProductionRoutes(app: Express, requireAuth: any) {
     }
   });
 
-  app.post("/api/factory/stock-entry/end-production", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/stock-entry/end-production", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session?.factoryCompanyId || req.session?.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -163,7 +163,7 @@ export function registerEndProductionRoutes(app: Express, requireAuth: any) {
     }
   });
 
-  app.post("/api/factory/bales/send-worker-pdf-whatsapp", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/bales/send-worker-pdf-whatsapp", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session?.factoryCompanyId || req.session?.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

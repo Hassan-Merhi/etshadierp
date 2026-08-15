@@ -188,7 +188,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: unknown; edi
     if (currentDraftId !== null) return;
     if (!Array.isArray(drafts) || drafts.length === 0) return;
     const todayUTC = new Date().toISOString().slice(0, 10);
-    const todayDraft = drafts.find((d: any) => {
+    const todayDraft = drafts.find((d: unknown) => {
       const rawDate = d.updatedAt || d.createdAt;
       if (!rawDate) return false;
       const dateObj = new Date(rawDate);
@@ -225,8 +225,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: unknown; edi
       Array.isArray(editVoucher?.salesItems) && editVoucher.salesItems.length > 0
         ? editVoucher.salesItems
         : (editVoucherViewEntries ?? [])
-            .filter((e: any) => e.isStockItem || e.stockItemId)
-            .map((e: any) => ({
+            .filter((e: import("react").SyntheticEvent) => e.isStockItem || e.stockItemId)
+            .map((e: import("react").SyntheticEvent) => ({
               id: e.id,
               stockItemId: e.stockItemId,
               stockItemName: e.stockItemName || e.accountName || "",
@@ -240,7 +240,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: unknown; edi
 
     if (!editVoucher || resolvedItems.length === 0) return;
 
-    const newRows = resolvedItems.map((item: any, index: number) => ({
+    const newRows = resolvedItems.map((item: unknown, index: number) => ({
       id: String(index + 1),
       itemName: item.stockItemName || "",
       stockItemCode: item.stockItemCode || "",
@@ -278,7 +278,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: unknown; edi
   useEffect(() => {
     if (!editVoucher || !editVoucher.entries || editVoucher.entries.length === 0) return;
 
-    const debitEntry = editVoucher.entries.find((e: any) => parseFloat(e.debitAmount || "0") > 0);
+    const debitEntry = editVoucher.entries.find((e: import("react").SyntheticEvent) => parseFloat(e.debitAmount || "0") > 0);
     if (!debitEntry) return;
 
     if (debitEntry.bankAccountId) {
@@ -286,7 +286,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: unknown; edi
       setPaymentAccountId(String(debitEntry.bankAccountId));
       setIsCreditSale(false);
     } else if (debitEntry.ledgerAccountId) {
-      const ledgerAccount = allLedgerAccounts.find((acc: any) => acc.id === debitEntry.ledgerAccountId);
+      const ledgerAccount = allLedgerAccounts.find((acc: unknown) => acc.id === debitEntry.ledgerAccountId);
       if (ledgerAccount) {
         if (ledgerAccount.accountType === "Cash") {
           setPaymentAccountType("cash");
@@ -730,7 +730,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: unknown; edi
         stockInventoryLoading={stockInventoryLoading}
         handleStockPrint={handleStockPrint}
         handleSendWhatsAppReport={handleSendWhatsAppReport}
-        stockInventory={(stockInventory as unknown[]).map((item: any) => ({
+        stockInventory={(stockInventory as unknown[]).map((item: unknown) => ({
           stockItemName: item.stockItemName,
           stockItemCode: item.stockItemCode,
           stock: parseFloat(item.quantity),

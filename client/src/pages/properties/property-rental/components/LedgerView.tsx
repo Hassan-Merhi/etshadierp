@@ -58,7 +58,7 @@ function LedgerView({
 
   const fixAllocation = useMutation({
     mutationFn: () => apiRequest("POST", `/api/properties/repair/reallocate-payments/${contract.id}`, {}),
-    onSuccess: (data: any) => {
+    onSuccess: (data: unknown) => {
       toast({
         title: "Allocation fixed",
         description: data?.message ?? `${data?.fixed ?? 0} payment(s) reallocated to the correct months.`,
@@ -66,7 +66,7 @@ function LedgerView({
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
       onNoteUpdated?.();
     },
-    onError: (err: any) =>
+    onError: (err: unknown) =>
       toast({
         title: "Fix failed",
         description: err?.message ?? "Could not reallocate payments.",
@@ -84,7 +84,7 @@ function LedgerView({
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
       onNoteUpdated?.();
     },
-    onError: (e: any) => toast({ title: "Reversal failed", description: e.message, variant: "destructive" }),
+    onError: (e: import("react").SyntheticEvent) => toast({ title: "Reversal failed", description: e.message, variant: "destructive" }),
   });
 
   // FIX #7: use backend-calculated fields when available; fall back to frontend calculation.

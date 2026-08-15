@@ -23,7 +23,7 @@ interface SupplierDialogsProps {
   editingSupplier: FactorySupplier | null;
   setEditingSupplier: (val: FactorySupplier | null) => void;
   formData: unknown;
-  setFormData: (val: any) => void;
+  setFormData: (val: unknown) => void;
   formRole: "broker" | "standalone" | "linked";
   setFormRole: (val: "broker" | "standalone" | "linked") => void;
   allSuppliers: SupplierWithBalance[];
@@ -36,7 +36,7 @@ interface SupplierDialogsProps {
   paymentDialogSupplier: SupplierWithBalance | null;
   setPaymentDialogSupplier: (val: SupplierWithBalance | null) => void;
   paymentForm: unknown;
-  setPaymentForm: (val: any) => void;
+  setPaymentForm: (val: unknown) => void;
   ledgerAccounts: unknown[] | undefined;
   paymentMutation: UseMutationResult<unknown, unknown, unknown>;
   paymentAmtUsd: number;
@@ -47,7 +47,7 @@ interface SupplierDialogsProps {
   fxConversionOpen: boolean;
   setFxConversionOpen: (val: boolean) => void;
   fxConversionForm: unknown;
-  setFxConversionForm: (val: any) => void;
+  setFxConversionForm: (val: unknown) => void;
   fxSourceType: "supplier" | "commission" | "both";
   setFxSourceType: (val: "supplier" | "commission" | "both") => void;
   fxConversionMutation: UseMutationResult<unknown, unknown, unknown>;
@@ -58,25 +58,25 @@ interface SupplierDialogsProps {
   bulkFxBrokerId: number | null;
   bulkFxBrokerName: string;
   bulkFxForm: unknown;
-  setBulkFxForm: (val: any) => void;
+  setBulkFxForm: (val: unknown) => void;
   bulkFxPreview: BulkFxPreview | null;
   setBulkFxPreview: (val: BulkFxPreview | null) => void;
   bulkFxPreviewMutation: UseMutationResult<unknown, unknown, unknown>;
   bulkFxMutation: UseMutationResult<unknown, unknown, unknown>;
 
   obEditSupplier: { id: number; name: string; currentBalance: string } | null;
-  setObEditSupplier: (val: any) => void;
+  setObEditSupplier: (val: unknown) => void;
   obEditValue: string;
   setObEditValue: (val: string) => void;
   obEditMutation: UseMutationResult<unknown, unknown, unknown>;
 
   dueDialogSupplier: { name: string; containers: unknown[] } | null;
-  setDueDialogSupplier: (val: any) => void;
+  setDueDialogSupplier: (val: unknown) => void;
   formatDate: (val: string) => string;
   formatNum: (val: string) => string;
 
   editObComm: null | { rawStockId: number; amount: string; currencyCode: string; personName: string; notes: string };
-  setEditObComm: (val: any) => void;
+  setEditObComm: (val: unknown) => void;
   updateObCommissionMutation: UseMutationResult<unknown, unknown, unknown>;
 }
 
@@ -296,7 +296,7 @@ export function SupplierDialogs({
                   <Input
                     value={bulkFxForm.fromCurrencyCode}
                     onChange={(e) =>
-                      setBulkFxForm((f: any) => ({ ...f, fromCurrencyCode: e.target.value.toUpperCase() }))
+                      setBulkFxForm((f: unknown) => ({ ...f, fromCurrencyCode: e.target.value.toUpperCase() }))
                     }
                     maxLength={10}
                     placeholder="EUR"
@@ -308,7 +308,7 @@ export function SupplierDialogs({
                     type="number"
                     step="0.01"
                     value={bulkFxForm.totalAmount}
-                    onChange={(e) => setBulkFxForm((f: any) => ({ ...f, totalAmount: e.target.value }))}
+                    onChange={(e) => setBulkFxForm((f: unknown) => ({ ...f, totalAmount: e.target.value }))}
                     placeholder="e.g. 50000"
                   />
                 </div>
@@ -320,7 +320,7 @@ export function SupplierDialogs({
                     type="number"
                     step="0.0001"
                     value={bulkFxForm.fxRateToUsd}
-                    onChange={(e) => setBulkFxForm((f: any) => ({ ...f, fxRateToUsd: e.target.value }))}
+                    onChange={(e) => setBulkFxForm((f: unknown) => ({ ...f, fxRateToUsd: e.target.value }))}
                     placeholder="e.g. 1.08"
                   />
                 </div>
@@ -329,7 +329,7 @@ export function SupplierDialogs({
                   <Input
                     type="date"
                     value={bulkFxForm.date}
-                    onChange={(e) => setBulkFxForm((f: any) => ({ ...f, date: e.target.value }))}
+                    onChange={(e) => setBulkFxForm((f: unknown) => ({ ...f, date: e.target.value }))}
                   />
                 </div>
               </div>

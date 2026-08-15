@@ -74,7 +74,7 @@ export function NetPositionTab({
   const npSendNow = useMutation({
     mutationFn: () => apiRequest("POST", "/api/whatsapp/send-net-position", {}),
     onSuccess: () => toast({ title: "Sent Now", description: "The ZIP has been queued for WhatsApp delivery." }),
-    onError: (e: any) => toast({ variant: "destructive", title: "Send failed", description: e.message }),
+    onError: (e: import("react").SyntheticEvent) => toast({ variant: "destructive", title: "Send failed", description: e.message }),
   });
 
   const npSaveSettings = useMutation({
@@ -91,7 +91,7 @@ export function NetPositionTab({
       qc.invalidateQueries({ queryKey: ["/api/whatsapp/np-settings"] });
       toast({ title: "Settings saved" });
     },
-    onError: (e: any) => toast({ variant: "destructive", title: "Error", description: e.message }),
+    onError: (e: import("react").SyntheticEvent) => toast({ variant: "destructive", title: "Error", description: e.message }),
   });
 
   const npToggleEnabled = useMutation({

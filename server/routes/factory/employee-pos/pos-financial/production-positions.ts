@@ -14,8 +14,8 @@ import { checkFactoryAdmin } from "../../_helpers";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const todayIso = () => new Date().toISOString().slice(0, 10);
-const actor = (req: any) => String(req.session?.userId ?? req.session?.username ?? "unknown").slice(0, 100);
-const companyIdFor = (req: any) => req.session?.factoryCompanyId || req.session?.currentCompanyId;
+const actor = (req: import("express").Request) => String(req.session?.userId ?? req.session?.username ?? "unknown").slice(0, 100);
+const companyIdFor = (req: import("express").Request) => req.session?.factoryCompanyId || req.session?.currentCompanyId;
 
 const createSchema = z.object({
   name: z.string().trim().min(1).max(160),

@@ -77,7 +77,7 @@ export function ContainersSectionPanel({ analytics }: { analytics: AnalyticsLega
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Customers</SelectItem>
-                  {factorySalesByCustomer.map((r: any) => (
+                  {factorySalesByCustomer.map((r: unknown) => (
                     <SelectItem key={r.customerId} value={r.customerId.toString()}>
                       {r.customerName || `Customer #${r.customerId}`}
                     </SelectItem>
@@ -145,7 +145,7 @@ export function ContainersSectionPanel({ analytics }: { analytics: AnalyticsLega
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {factoryContainerSales.rows.map((row: any) => (
+                    {factoryContainerSales.rows.map((row: unknown) => (
                       <TableRow key={row.id}>
                         <TableCell className="font-mono">{row.containerNumber || "-"}</TableCell>
                         <TableCell className="font-medium">{row.customerName || `#${row.customerId}`}</TableCell>
@@ -180,7 +180,7 @@ export function ContainersSectionPanel({ analytics }: { analytics: AnalyticsLega
                 </Table>
               </div>
               <div className="md:hidden space-y-3">
-                {factoryContainerSales.rows.map((row: any) => (
+                {factoryContainerSales.rows.map((row: unknown) => (
                   <Card key={row.id}>
                     <CardContent className="p-4 space-y-2">
                       <div className="flex items-center justify-between gap-2">
@@ -328,7 +328,7 @@ export function ContainersSectionPanel({ analytics }: { analytics: AnalyticsLega
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Companies</SelectItem>
-                  {userCompanies.map((c: any) => (
+                  {userCompanies.map((c: unknown) => (
                     <SelectItem key={c.companyId} value={String(c.companyId)}>
                       {c.companyName}
                     </SelectItem>

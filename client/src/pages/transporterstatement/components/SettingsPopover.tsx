@@ -34,7 +34,7 @@ export function SettingsPopover({
       setOpen(false);
       onSaved();
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       toast({ title: "Failed", description: err?.message, variant: "destructive" });
     },
   });

@@ -13,7 +13,7 @@ interface SaveRevisionDialogProps {
   setRevisionNote: (note: string) => void;
   isSaving: boolean;
   onConfirm: () => void;
-  formatNumber: (num: any, decimals?: number) => string;
+  formatNumber: (num: unknown, decimals?: number) => string;
 }
 
 export function SaveRevisionDialog({

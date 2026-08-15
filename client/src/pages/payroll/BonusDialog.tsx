@@ -27,7 +27,7 @@ interface BonusDialogProps {
   bonusTab: "sales" | "bales";
   setBonusTab: (v: "sales" | "bales") => void;
   bonusSalesPreview: unknown;
-  setBonusSalesPreview: (v: any) => void;
+  setBonusSalesPreview: (v: unknown) => void;
   bonusSalesCustomPct: string;
   setBonusSalesCustomPct: (v: string) => void;
   bonusSalesLocationId: string;

@@ -227,7 +227,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
       patchCacheContainer(variables.id, { arrivalDate: variables.arrivalDate });
       tqClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       toast({ title: "Failed to update ETA", description: err?.message, variant: "destructive" });
     },
   });
@@ -265,7 +265,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
         }
       }, POLL_MS);
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       setTrackingNowId(null);
       toast({ title: "Tracking failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },

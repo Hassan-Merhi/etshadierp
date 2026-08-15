@@ -303,11 +303,11 @@ export default function NetProfitDetails() {
       const end = toDate || toInput || today;
       return apiRequest("POST", "/api/whatsapp/send-net-position", { startDate: start, endDate: end });
     },
-    onSuccess: async (res: any) => {
+    onSuccess: async (res: unknown) => {
       const body = await res.json();
       toast({ title: "Sent via WhatsApp", description: body.message });
     },
-    onError: async (err: any) => {
+    onError: async (err: unknown) => {
       const msg = err?.message || "WhatsApp send failed";
       toast({ title: "WhatsApp Error", description: msg, variant: "destructive" });
     },

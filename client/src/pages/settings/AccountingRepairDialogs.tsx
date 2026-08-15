@@ -53,7 +53,7 @@ export function ZeroBalancesDialog({ open, onOpenChange, companyId }: ZeroBalanc
       onOpenChange(false);
       setSelected([]);
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: "Error",
         description: error.message || "Failed to zero balances",
@@ -63,7 +63,7 @@ export function ZeroBalancesDialog({ open, onOpenChange, companyId }: ZeroBalanc
   });
 
   const nonZeroAccounts = accounts.filter(
-    (a: any) => !a.deletedAt && a.active && parseFloat(a.openingBalance || "0") !== 0
+    (a: unknown) => !a.deletedAt && a.active && parseFloat(a.openingBalance || "0") !== 0
   );
 
   return (
@@ -86,7 +86,7 @@ export function ZeroBalancesDialog({ open, onOpenChange, companyId }: ZeroBalanc
                   <Checkbox
                     checked={nonZeroAccounts.length > 0 && selected.length === nonZeroAccounts.length}
                     onCheckedChange={(checked) => {
-                      if (checked) setSelected(nonZeroAccounts.map((a: any) => a.id));
+                      if (checked) setSelected(nonZeroAccounts.map((a: unknown) => a.id));
                       else setSelected([]);
                     }}
                   />
@@ -107,11 +107,11 @@ export function ZeroBalancesDialog({ open, onOpenChange, companyId }: ZeroBalanc
                   </TableHeader>
                   <TableBody>
                     {accounts
-                      .filter((account: any) => !account.deletedAt && account.active)
+                      .filter((account: unknown) => !account.deletedAt && account.active)
                       .sort(
-                        (a: any, b: any) => a.accountType.localeCompare(b.accountType) || a.name.localeCompare(b.name)
+                        (a: unknown, b: unknown) => a.accountType.localeCompare(b.accountType) || a.name.localeCompare(b.name)
                       )
-                      .map((account: any) => {
+                      .map((account: unknown) => {
                         const balance = parseFloat(account.openingBalance || "0");
                         const hasBalance = balance !== 0;
                         return (
@@ -179,7 +179,7 @@ export function InitializeBalancesDialog({ open, onOpenChange }: InitializeBalan
       toast({ title: "Success", description: data.message });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -205,7 +205,7 @@ export function InitializeBalancesDialog({ open, onOpenChange }: InitializeBalan
               ) : (
                 <div className="space-y-4 mt-4">
                   <div className="font-medium">{result.message}</div>
-                  {result.results?.map((r: any) => (
+                  {result.results?.map((r: unknown) => (
                     <div key={r.companyId} className="p-3 border rounded-md space-y-2">
                       <div className="font-medium">{r.companyName}</div>
                       <div className="text-sm">Imbalance: ${formatNumber(r.imbalance || 0)}</div>
@@ -233,7 +233,7 @@ export function InitializeBalancesDialog({ open, onOpenChange }: InitializeBalan
                                 <div className="font-medium text-green-600 dark:text-green-400 mb-1">
                                   Assets (Debit)
                                 </div>
-                                {r.components.assets?.map((c: any, i: number) => (
+                                {r.components.assets?.map((c: unknown, i: number) => (
                                   <div key={i} className="flex justify-between text-xs">
                                     <span>{c.name}</span>
                                     <span>${formatNumber(c.value)}</span>
@@ -244,7 +244,7 @@ export function InitializeBalancesDialog({ open, onOpenChange }: InitializeBalan
                                 <div className="font-medium text-red-600 dark:text-red-400 mb-1">
                                   Liabilities (Credit)
                                 </div>
-                                {r.components.liabilities?.map((c: any, i: number) => (
+                                {r.components.liabilities?.map((c: unknown, i: number) => (
                                   <div key={i} className="flex justify-between text-xs">
                                     <span>{c.name}</span>
                                     <span>${formatNumber(c.value)}</span>

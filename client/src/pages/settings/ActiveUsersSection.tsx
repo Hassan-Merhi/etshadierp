@@ -64,7 +64,7 @@ export function ActiveUsersSection() {
 
   const getCompanyName = (companyId: number | null) => {
     if (!companyId || !companies) return "—";
-    const company = companies.find((c: any) => c.id === companyId);
+    const company = companies.find((c: unknown) => c.id === companyId);
     return company?.name || "Unknown";
   };
 
@@ -72,7 +72,7 @@ export function ActiveUsersSection() {
   const safePresenceData = Array.isArray(presenceData) ? presenceData : [];
   const groupedUsers =
     safePresenceData.reduce(
-      (acc: any, presence: any) => {
+      (acc: unknown, presence: unknown) => {
         const companyId = presence.companyId || "unassigned";
         if (!acc[companyId]) {
           acc[companyId] = [];
@@ -130,7 +130,7 @@ export function ActiveUsersSection() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {users.map((presence: any) => (
+                    {users.map((presence: unknown) => (
                       <TableRow key={presence.id} data-testid={`row-presence-${presence.id}`}>
                         <TableCell className="font-medium">{presence.username}</TableCell>
                         <TableCell>
@@ -162,7 +162,7 @@ export function ActiveUsersSection() {
               </div>
               {/* Mobile card list */}
               <div className="sm:hidden divide-y">
-                {users.map((presence: any) => (
+                {users.map((presence: unknown) => (
                   <div key={presence.id} data-testid={`row-presence-${presence.id}`} className="p-3 space-y-1">
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                       <span className="font-medium text-sm">{presence.username}</span>

@@ -121,7 +121,7 @@ export default function FactoryBrokerVisualStatement() {
   }, [containerTotals, paymentTotals]);
 
   // Per-container grand total by currency
-  function containerGrandTotal(c: any): Partial<Record<string, number>> {
+  function containerGrandTotal(c: unknown): Partial<Record<string, number>> {
     const out: Record<string, number> = {};
     const add = (cc: string, amt: number) => {
       out[cc] = (out[cc] || 0) + amt;
@@ -476,7 +476,7 @@ export default function FactoryBrokerVisualStatement() {
                           ))}
                       </TableCell>
                       <TableCell className="py-2 text-right tabular-nums font-bold">
-                        {fmt((statement.payments as unknown[]).reduce((s: number, p: any) => s + p.usdAmount, 0))}
+                        {fmt((statement.payments as unknown[]).reduce((s: number, p: unknown) => s + p.usdAmount, 0))}
                       </TableCell>
                       <TableCell />
                     </TableRow>

@@ -170,7 +170,7 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
     // cross-origin iframes, so we need to catch responses from all sources.
     let capturedJson: unknown = null;
     const capturedResponses: Array<{ url: string; data: unknown }> = [];
-    page.on("response", async (response: any) => {
+    page.on("response", async (response: import("express").Response) => {
       try {
         const url: string = response.url();
         // Skip noise: images, fonts, analytics, ads

@@ -125,7 +125,7 @@ export function LocationWhatsappDeliveryHistoryDialog({ location, companyId, can
       );
       return response.json();
     },
-    onSuccess: (result: any) => {
+    onSuccess: (result: unknown) => {
       toast({
         title: result.duplicate ? "Retry already processed" : "Stock report resent",
         description: `${result.itemCount ?? 0} items sent to ${result.destinationGroupName || "the linked WhatsApp group"}.`,

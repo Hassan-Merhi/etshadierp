@@ -28,7 +28,7 @@ export function registerBalesImportRoutes(app: Express) {
   // Factory Import API Endpoints
   // ───────────────────────────────────────────────
 
-  app.post("/api/factory/import/suppliers", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/import/suppliers", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -90,7 +90,7 @@ export function registerBalesImportRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/import/raw-stock", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/import/raw-stock", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -179,7 +179,7 @@ export function registerBalesImportRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/import/bales", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/import/bales", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -292,7 +292,7 @@ export function registerBalesImportRoutes(app: Express) {
   });
 
   // ── Bale Import Batches – list ─────────────────────────────────────────────
-  app.get("/api/factory/bale-import-batches", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/bale-import-batches", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -311,7 +311,7 @@ export function registerBalesImportRoutes(app: Express) {
   });
 
   // ── Bale Import Batches – bales in a batch ────────────────────────────────
-  app.get("/api/factory/bale-import-batches/:id/bales", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/bale-import-batches/:id/bales", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -411,7 +411,7 @@ export function registerBalesImportRoutes(app: Express) {
     return { suppliersProcessed, totalAllocatedKg, unmatchedKg };
   }
 
-  app.post("/api/factory/raw-stock/recalc-opening", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/raw-stock/recalc-opening", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -423,7 +423,7 @@ export function registerBalesImportRoutes(app: Express) {
     }
   });
 
-  app.post("/api/factory/import/opening-raw-stock", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/import/opening-raw-stock", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -550,7 +550,7 @@ export function registerBalesImportRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/import/template/:type", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/import/template/:type", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const type = req.params.type;
       let csv = "";

@@ -16,7 +16,7 @@ export function POSReceiptSettings() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (newSettings: any) => {
+    mutationFn: async (newSettings: unknown) => {
       const res = await apiRequest("POST", `/api/settings/pos-receipt/${selectedCompany?.id}`, newSettings);
       return res.json();
     },
@@ -24,7 +24,7 @@ export function POSReceiptSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/pos-receipt", selectedCompany?.id] });
       toast({ title: "Success", description: "Receipt settings updated" });
     },
-    onError: (e: any) => {
+    onError: (e: import("react").SyntheticEvent) => {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
   });

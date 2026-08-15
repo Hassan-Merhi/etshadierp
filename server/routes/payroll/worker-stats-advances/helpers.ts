@@ -7,7 +7,7 @@ import fs from "fs";
 import { factoryDaybookEntries, ledgerAccounts } from "@shared/schema";
 
 /** Prefer the factory-pinned company ID so cross-tab ERP company switches don't corrupt factory writes. */
-export function getFactoryCompanyId(req: any): number | undefined {
+export function getFactoryCompanyId(req: import("express").Request): number | undefined {
   return req.session.factoryCompanyId || req.session.currentCompanyId;
 }
 
@@ -160,7 +160,7 @@ export function computeMonthlyPayFromAttendance(
 
 /** ERP-mode company resolution: the ERP payroll page posts companyId explicitly, and
  *  these endpoints sit outside the factory middleware, so the factory pin is the fallback. */
-export function getErpCompanyId(req: any): number | undefined {
+export function getErpCompanyId(req: import("express").Request): number | undefined {
   return req.body?.companyId
     ? parseInt(req.body.companyId)
     : req.query?.companyId

@@ -10,7 +10,7 @@ interface ImportResultBannerProps {
     errors: string[];
     importId: string | null;
   } | null;
-  setImportResult: (v: any) => void;
+  setImportResult: (v: unknown) => void;
   undoImportMutation: {
     mutate: (id: string) => void;
     isPending: boolean;

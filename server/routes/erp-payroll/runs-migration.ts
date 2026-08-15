@@ -21,7 +21,7 @@ import {
 
 export function registerPayrollRunMigrationRoutes(app: Express) {
   // ── Migrate old PAID runs to per-group Salary Expense - {Group} accounts ──
-  app.post("/api/payroll/runs/migrate-group-expenses", requireAuth, requireNonPOS, async (req: any, res: any) => {
+  app.post("/api/payroll/runs/migrate-group-expenses", requireAuth, requireNonPOS, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

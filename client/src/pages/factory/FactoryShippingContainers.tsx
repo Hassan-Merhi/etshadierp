@@ -159,7 +159,7 @@ export default function FactoryShippingContainers() {
 
   const trackAllMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/factory/shipping-containers/track-now"),
-    onSuccess: (data: any) => {
+    onSuccess: (data: unknown) => {
       toast({ title: "Tracking started", description: data?.message ?? "ETA updates will appear shortly." });
       if (trackingRefreshTimerRef.current) clearTimeout(trackingRefreshTimerRef.current);
       trackingRefreshTimerRef.current = setTimeout(() => {
@@ -171,7 +171,7 @@ export default function FactoryShippingContainers() {
         );
       }, 8000);
     },
-    onError: (err: any) => toast({ title: "Tracking failed", description: err.message, variant: "destructive" }),
+    onError: (err: unknown) => toast({ title: "Tracking failed", description: err.message, variant: "destructive" }),
   });
 
   useEffect(
@@ -191,14 +191,14 @@ export default function FactoryShippingContainers() {
   const patchRowMutation = useMutation({
     mutationFn: ({ id, patch }: { id: number; patch: object }) => apiRequest("PATCH", `${LIST_KEY}/${id}`, patch),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [LIST_KEY] }),
-    onError: (e: any) => toast({ title: "Update failed", description: e.message, variant: "destructive" }),
+    onError: (e: import("react").SyntheticEvent) => toast({ title: "Update failed", description: e.message, variant: "destructive" }),
   });
 
   const syncOrderMutation = useMutation({
     mutationFn: ({ id, patch }: { id: number; patch: object }) =>
       apiRequest("PATCH", `${LIST_KEY}/${id}/sync-order`, patch),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [LIST_KEY] }),
-    onError: (e: any) => toast({ title: "Update failed", description: e.message, variant: "destructive" }),
+    onError: (e: import("react").SyntheticEvent) => toast({ title: "Update failed", description: e.message, variant: "destructive" }),
   });
 
   const doneMutation = useMutation({
@@ -208,7 +208,7 @@ export default function FactoryShippingContainers() {
       queryClient.invalidateQueries({ queryKey: [LIST_KEY] });
       toast({ title: "Marked as done" });
     },
-    onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
+    onError: (e: import("react").SyntheticEvent) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
   });
 
   const restoreMutation = useMutation({
@@ -217,7 +217,7 @@ export default function FactoryShippingContainers() {
       queryClient.invalidateQueries({ queryKey: [LIST_KEY] });
       toast({ title: "Restored to active" });
     },
-    onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
+    onError: (e: import("react").SyntheticEvent) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
   });
 
   const deleteRowMutation = useMutation({
@@ -226,7 +226,7 @@ export default function FactoryShippingContainers() {
       queryClient.invalidateQueries({ queryKey: [LIST_KEY] });
       toast({ title: "Container record deleted" });
     },
-    onError: (e: any) => toast({ title: "Delete failed", description: e.message, variant: "destructive" }),
+    onError: (e: import("react").SyntheticEvent) => toast({ title: "Delete failed", description: e.message, variant: "destructive" }),
   });
 
   const uploadShippingInvoiceMutation = useMutation({
@@ -249,7 +249,7 @@ export default function FactoryShippingContainers() {
       toast({ title: "Shipping invoice uploaded" });
       setShippingInvoiceUploadingId(null);
     },
-    onError: (e: any) => {
+    onError: (e: import("react").SyntheticEvent) => {
       toast({ title: "Upload failed", description: e.message, variant: "destructive" });
       setShippingInvoiceUploadingId(null);
     },
@@ -261,7 +261,7 @@ export default function FactoryShippingContainers() {
       queryClient.invalidateQueries({ queryKey: [LIST_KEY] });
       toast({ title: "Shipping invoice removed" });
     },
-    onError: (e: any) => toast({ title: "Remove failed", description: e.message, variant: "destructive" }),
+    onError: (e: import("react").SyntheticEvent) => toast({ title: "Remove failed", description: e.message, variant: "destructive" }),
   });
 
   function handleShippingInvoiceFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -398,7 +398,7 @@ export default function FactoryShippingContainers() {
           <div className="flex flex-wrap gap-3 items-center p-3 rounded-md border bg-muted/30">
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Documents</p>
-              <Select value={filterDocs} onValueChange={(v: any) => setFilterDocs(v)}>
+              <Select value={filterDocs} onValueChange={(v: unknown) => setFilterDocs(v)}>
                 <SelectTrigger className="h-8 text-xs w-36" data-testid="select-filter-docs">
                   <SelectValue />
                 </SelectTrigger>

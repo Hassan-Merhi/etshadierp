@@ -263,7 +263,7 @@ export default function AICommandCenter() {
   // ── Mutations ────────────────────────────────────────────────────────────
   const createTask = useMutation({
     mutationFn: (data: { instruction: string }) => apiRequest("POST", "/api/ai-agent/tasks", data),
-    onSuccess: (task: any) => {
+    onSuccess: (task: unknown) => {
       setActiveTaskId(task.id);
       setInstruction("");
       setUploadedFile(null);
@@ -271,7 +271,7 @@ export default function AICommandCenter() {
       queryClient.invalidateQueries({ queryKey: ["/api/ai-agent/tasks"] });
       toast({ title: "Task created", description: `Plan ready — ${task.plan?.steps?.length ?? 0} step(s) generated` });
     },
-    onError: (e: any) => toast({ title: "Failed to create task", description: e.message, variant: "destructive" }),
+    onError: (e: import("react").SyntheticEvent) => toast({ title: "Failed to create task", description: e.message, variant: "destructive" }),
   });
 
   const runTask = useMutation({
@@ -280,7 +280,7 @@ export default function AICommandCenter() {
       queryClient.invalidateQueries({ queryKey: ["/api/ai-agent/tasks", activeTaskId] });
       queryClient.invalidateQueries({ queryKey: ["/api/ai-agent/tasks"] });
     },
-    onError: (e: any) => toast({ title: "Run failed", description: e.message, variant: "destructive" }),
+    onError: (e: import("react").SyntheticEvent) => toast({ title: "Run failed", description: e.message, variant: "destructive" }),
   });
 
   const cancelTask = useMutation({
@@ -298,7 +298,7 @@ export default function AICommandCenter() {
       queryClient.invalidateQueries({ queryKey: ["/api/ai-agent/tasks"] });
       toast({ title: "Approved", description: "Action approved and continuing task" });
     },
-    onError: (e: any) => toast({ title: "Approval failed", description: e.message, variant: "destructive" }),
+    onError: (e: import("react").SyntheticEvent) => toast({ title: "Approval failed", description: e.message, variant: "destructive" }),
   });
 
   const rejectAction = useMutation({

@@ -83,7 +83,7 @@ export function StockMovementDialog({
               ))}
             </div>
           ) : !historyData?.monthlyData?.some(
-              (m: any) => m.inwardQty > 0 || m.outwardQty > 0 || m.openingQty !== 0 || m.closingQty !== 0
+              (m: unknown) => m.inwardQty > 0 || m.outwardQty > 0 || m.openingQty !== 0 || m.closingQty !== 0
             ) ? (
             <div className="text-center py-12 text-muted-foreground text-sm">No stock movement for this period</div>
           ) : (
@@ -134,7 +134,7 @@ export function StockMovementDialog({
                 </tr>
               </thead>
               <tbody>
-                {(historyData?.monthlyData ?? []).map((month: any) => {
+                {(historyData?.monthlyData ?? []).map((month: unknown) => {
                   const isActive =
                     month.inwardQty > 0 || month.outwardQty > 0 || month.openingQty !== 0 || month.closingQty !== 0;
                   const fmtQty = (n: number) =>

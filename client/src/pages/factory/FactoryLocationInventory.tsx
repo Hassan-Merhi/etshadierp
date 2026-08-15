@@ -217,7 +217,7 @@ export default function FactoryLocationInventory() {
 
   const handleDoPrint = async () => {
     if (reprintBales.length === 0) return;
-    const labels: LabelData[] = reprintBales.map((row: any) => ({
+    const labels: LabelData[] = reprintBales.map((row: unknown) => ({
       referenceNumber: row.bale.referenceNumber || row.bale.baleCode,
       articleCode: row.product?.articleCode || row.bale.articleCode || row.bale.category || "",
       pieces: row.bale.quantity || 1,
@@ -386,7 +386,7 @@ export default function FactoryLocationInventory() {
     mutationFn: async (data: { legalName: string }) => {
       return await modeApiRequest("POST", "/api/factory/customers", data);
     },
-    onSuccess: (newCustomer: any) => {
+    onSuccess: (newCustomer: unknown) => {
       toast({ title: "Customer created" });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
@@ -405,7 +405,7 @@ export default function FactoryLocationInventory() {
       const res = await modeApiRequest("POST", "/api/factory/customer-proformas/bulk", data);
       return await res.json();
     },
-    onSuccess: (result: any) => {
+    onSuccess: (result: unknown) => {
       setSavedProformaId(result.id);
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-proformas") });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/location-inventory"] });
@@ -423,7 +423,7 @@ export default function FactoryLocationInventory() {
       });
       return await res.json();
     },
-    onSuccess: (result: any) => {
+    onSuccess: (result: unknown) => {
       const silent = isSilentAutoSaveRef.current;
       isSilentAutoSaveRef.current = false;
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-proformas") });
@@ -457,7 +457,7 @@ export default function FactoryLocationInventory() {
       if (!res.ok) throw new Error(json.message || "Failed to remove bales");
       return json;
     },
-    onSuccess: (result: any) => {
+    onSuccess: (result: unknown) => {
       toast({ title: "Removed", description: `${result.removed} bale(s) removed from stock.` });
       queryClient.invalidateQueries({ queryKey: [`/api/factory/location-inventory/${selectedLocation?.id}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"], refetchType: "active" });
@@ -515,10 +515,10 @@ export default function FactoryLocationInventory() {
       fetch(`/api/factory/customer-proformas?customerId=${editCustId}`, { credentials: "include" })
         .then((r) => r.json())
         .then((proformas: unknown[]) => {
-          const found = proformas.find((p: any) => p.id === proformaId);
+          const found = proformas.find((p: unknown) => p.id === proformaId);
           if (found?.lines?.length) {
             setEditProformaLines(
-              found.lines.map((l: any) => ({
+              found.lines.map((l: unknown) => ({
                 articleCode: l.articleCode,
                 quantity: l.quantity,
                 pricePerBale: l.pricePerBale,
@@ -540,11 +540,11 @@ export default function FactoryLocationInventory() {
     )
       return;
     const productByArticleCode = new Map<string, any>();
-    (inventoryData as unknown[]).forEach((prod: any) => {
+    (inventoryData as unknown[]).forEach((prod: unknown) => {
       productByArticleCode.set((prod.articleCode || "").toLowerCase(), prod);
     });
     const newSelections = new Map<number, ProformaSelection>();
-    editProformaLines.forEach((line: any, index: number) => {
+    editProformaLines.forEach((line: unknown, index: number) => {
       const prod = productByArticleCode.get((line.articleCode || "").toLowerCase());
       if (prod) {
         newSelections.set(prod.productId, {

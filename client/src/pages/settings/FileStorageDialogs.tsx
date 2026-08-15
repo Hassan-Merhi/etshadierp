@@ -53,7 +53,7 @@ export function FileStorageDialogs({
   setDeleteFileId,
   deleteFileName,
   deleteFileMutation,
-}: any) {
+}: Record<string, unknown>) {
   return (
     <>
       {/* ── New Folder Dialog ────────────────────────────────────────────────── */}

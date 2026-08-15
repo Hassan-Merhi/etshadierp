@@ -7,8 +7,8 @@ import { Edit, Trash2, Search } from "lucide-react";
 
 interface CompaniesTableProps {
   companies: unknown[];
-  onEdit: (company: any) => void;
-  onDelete: (company: any) => void;
+  onEdit: (company: unknown) => void;
+  onDelete: (company: unknown) => void;
 }
 
 export function CompaniesTable({ companies, onEdit, onDelete }: CompaniesTableProps) {

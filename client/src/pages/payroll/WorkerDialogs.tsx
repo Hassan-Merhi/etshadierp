@@ -28,7 +28,7 @@ interface WorkerDialogsProps {
   editWorkerForm: unknown;
   updateWorkerMutation: unknown;
   deleteWorkerConflict: unknown;
-  setDeleteWorkerConflict: (v: any) => void;
+  setDeleteWorkerConflict: (v: unknown) => void;
   handleForceDeleteWorker: () => void;
   workerGroupMembersDialogOpen: boolean;
   setWorkerGroupMembersDialogOpen: (open: boolean) => void;
@@ -75,7 +75,7 @@ export function WorkerDialogs({
           <Form {...newWorkerForm}>
             <form
               noValidate
-              onSubmit={newWorkerForm.handleSubmit((data: any) => createWorkerMutation.mutate(data))}
+              onSubmit={newWorkerForm.handleSubmit((data: unknown) => createWorkerMutation.mutate(data))}
               className="space-y-4"
             >
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -202,7 +202,7 @@ export function WorkerDialogs({
           <Form {...editWorkerForm}>
             <form
               noValidate
-              onSubmit={editWorkerForm.handleSubmit((data: any) => {
+              onSubmit={editWorkerForm.handleSubmit((data: unknown) => {
                 if (selectedWorkerForEdit) {
                   updateWorkerMutation.mutate({ ...data, id: selectedWorkerForEdit.id });
                 }
@@ -336,8 +336,8 @@ export function WorkerDialogs({
               </TableHeader>
               <TableBody>
                 {allWorkers.map((worker) => {
-                  const liveGroup = allWorkerGroups.find((g: any) => g.id === selectedWorkerGroupForMembers?.id);
-                  const isMember = liveGroup?.members?.some((m: any) => m.id === worker.id);
+                  const liveGroup = allWorkerGroups.find((g: unknown) => g.id === selectedWorkerGroupForMembers?.id);
+                  const isMember = liveGroup?.members?.some((m: unknown) => m.id === worker.id);
                   return (
                     <TableRow key={worker.id}>
                       <TableCell>

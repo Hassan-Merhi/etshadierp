@@ -69,7 +69,7 @@ export function RecipientsTab({
       qc.invalidateQueries({ queryKey: ["/api/export/recipients"] });
       toast({ title: "Recipient added" });
     },
-    onError: (e: any) => toast({ variant: "destructive", title: "Error", description: e.message }),
+    onError: (e: import("react").SyntheticEvent) => toast({ variant: "destructive", title: "Error", description: e.message }),
   });
 
   const removeEmailRecipient = useMutation({

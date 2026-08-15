@@ -115,7 +115,7 @@ export default function PropertyRentalPage({
       });
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
     },
-    onError: (e: any) => toast({ title: "Accrual failed", description: e.message, variant: "destructive" }),
+    onError: (e: import("react").SyntheticEvent) => toast({ title: "Accrual failed", description: e.message, variant: "destructive" }),
   });
 
   const resetAccrual = useMutation({
@@ -135,7 +135,7 @@ export default function PropertyRentalPage({
       });
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
     },
-    onError: (e: any) => toast({ title: "Re-accrual failed", description: e.message, variant: "destructive" }),
+    onError: (e: import("react").SyntheticEvent) => toast({ title: "Re-accrual failed", description: e.message, variant: "destructive" }),
   });
 
   const deleteUnit = useMutation({
@@ -145,7 +145,7 @@ export default function PropertyRentalPage({
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
       setConfirmDeleteUnitId(null);
     },
-    onError: (e: any) => {
+    onError: (e: import("react").SyntheticEvent) => {
       toast({ title: "Cannot delete", description: e.message, variant: "destructive" });
       setConfirmDeleteUnitId(null);
     },

@@ -36,7 +36,7 @@ export function SupplierImport() {
       setResult(data);
       toast({ title: "Import complete", description: `${data.imported} created, ${data.updated} updated` });
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       if (err?._handledGlobally) return;
       toast({ title: "Import failed", description: err.message, variant: "destructive" });
     },
@@ -54,7 +54,7 @@ export function SupplierImport() {
         skipEmptyLines: true,
         complete: (results) => {
           const parsed: SupplierRow[] = results.data
-            .map((row: any) => ({
+            .map((row: unknown) => ({
               name: (row.name || "").trim(),
               openingBalance: (row.openingBalance || row.opening_balance || "0").trim(),
               contactPerson: (row.contactPerson || row.contact_person || "").trim(),

@@ -44,11 +44,11 @@ export interface ApplyRawStockRecalcOptions {
  * needs to be written.
  */
 async function isFullyCorrect(
-  tx: any,
+  tx: unknown,
   containerId: number,
   next: ReturnType<typeof computeCorrectContainerCost>,
-  container: any,
-  rawStockRow: any
+  container: unknown,
+  rawStockRow: unknown
 ): Promise<boolean> {
   // A. Container snapshot
   if (

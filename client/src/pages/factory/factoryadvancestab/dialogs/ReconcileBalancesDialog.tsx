@@ -49,8 +49,8 @@ export function ReconcileBalancesDialog({
           </div>
         ) : !reconcilePreview ? null : (
           (() => {
-            const dirty = reconcilePreview.changes.filter((c: any) => c.changed);
-            const clean = reconcilePreview.changes.filter((c: any) => !c.changed);
+            const dirty = reconcilePreview.changes.filter((c: unknown) => c.changed);
+            const clean = reconcilePreview.changes.filter((c: unknown) => !c.changed);
             return (
               <div className="space-y-4">
                 {/* Summary */}
@@ -83,7 +83,7 @@ export function ReconcileBalancesDialog({
                       <span className="text-right">New Balance</span>
                     </div>
                     <div className="divide-y">
-                      {dirty.map((c: any) => (
+                      {dirty.map((c: unknown) => (
                         <div
                           key={c.advanceId}
                           className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-4 px-4 py-2 text-sm items-center"
@@ -124,7 +124,7 @@ export function ReconcileBalancesDialog({
             disabled={
               reconcileMutation.isPending ||
               reconcilePreviewLoading ||
-              reconcilePreview?.changes.filter((c: any) => c.changed).length === 0
+              reconcilePreview?.changes.filter((c: unknown) => c.changed).length === 0
             }
             data-testid="button-confirm-reconcile"
           >
@@ -133,10 +133,10 @@ export function ReconcileBalancesDialog({
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 Reconciling…
               </>
-            ) : reconcilePreview?.changes.filter((c: any) => c.changed).length === 0 ? (
+            ) : reconcilePreview?.changes.filter((c: unknown) => c.changed).length === 0 ? (
               "Nothing to Change"
             ) : (
-              `Confirm — Update ${reconcilePreview?.changes.filter((c: any) => c.changed).length ?? "…"} Record(s)`
+              `Confirm — Update ${reconcilePreview?.changes.filter((c: unknown) => c.changed).length ?? "…"} Record(s)`
             )}
           </Button>
         </DialogFooter>

@@ -194,7 +194,7 @@ export default function FactoryDispatchBatches() {
       resetForm();
       if (data.batch?.id) navigate(`/factory/dispatch-batches/${data.batch.id}`);
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });

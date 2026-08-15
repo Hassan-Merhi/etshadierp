@@ -80,7 +80,7 @@ export function NetPositionAdjustmentCard() {
       queryClient.invalidateQueries({ queryKey: ["/api/stats/profit"] });
       setIsEditing(false);
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Error",

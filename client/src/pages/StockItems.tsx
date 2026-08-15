@@ -189,7 +189,7 @@ export default function StockItems() {
   // ─── Mutations: stock items ───────────────────────────────────────────────
   const deleteMutation = useMutation({
     mutationFn: async (ids: number[]) => apiRequest("POST", "/api/stock-items/bulk-delete", { ids }),
-    onSuccess: (data: any) => {
+    onSuccess: (data: unknown) => {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
       setSelectedIds([]);
@@ -204,7 +204,7 @@ export default function StockItems() {
   const adjustStockMutation = useMutation({
     mutationFn: async (data: { stockItemId: number; locationId: number; quantity: number; type: "add" | "subtract" }) =>
       apiRequest("POST", "/api/inventory/quick-adjust", data),
-    onSuccess: (data: any) => {
+    onSuccess: (data: unknown) => {
       queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
@@ -224,7 +224,7 @@ export default function StockItems() {
   const assignCategoryMutation = useMutation({
     mutationFn: async ({ ids, categoryId }: { ids: number[]; categoryId: number | null }) =>
       apiRequest("POST", "/api/stock-items/bulk-assign-category", { ids, categoryId }),
-    onSuccess: (data: any) => {
+    onSuccess: (data: unknown) => {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
       setSelectedIds([]);

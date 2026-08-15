@@ -50,7 +50,7 @@ function round2(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
-async function readCurrentNetPosition(req: any): Promise<number | null> {
+async function readCurrentNetPosition(req: import("express").Request): Promise<number | null> {
   try {
     const port = Number(process.env.PORT || 5000);
     if (!Number.isInteger(port) || port <= 0 || port > 65535 || typeof fetch !== "function") {
@@ -194,7 +194,7 @@ function scopeFinancialImpact(
  * - Historical adjustment valuation is explicitly classifiable with an audit row.
  */
 export function registerHistoricalReplayPhase6GuardRoutes(app: Express): void {
-  app.get(PREVIEW_PATH, requireAuth, requireRole(...ADMIN_ROLES), async (req: any, res: any) => {
+  app.get(PREVIEW_PATH, requireAuth, requireRole(...ADMIN_ROLES), async (req: import("express").Request, res: import("express").Response) => {
     const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
     if (!companyId) return res.status(400).json({ message: "No company selected" });
     try {
@@ -221,7 +221,7 @@ export function registerHistoricalReplayPhase6GuardRoutes(app: Express): void {
     }
   });
 
-  app.patch(ADJUSTMENT_CLASSIFICATION_PATH, requireAuth, requireRole(...ADMIN_ROLES), async (req: any, res: any) => {
+  app.patch(ADJUSTMENT_CLASSIFICATION_PATH, requireAuth, requireRole(...ADMIN_ROLES), async (req: import("express").Request, res: import("express").Response) => {
     const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
     if (!companyId) return res.status(400).json({ message: "No company selected" });
     const adjustmentId = Number(req.params.id);
@@ -317,7 +317,7 @@ export function registerHistoricalReplayPhase6GuardRoutes(app: Express): void {
     }
   });
 
-  app.post(APPLY_PATH, requireAuth, requireRole(...ADMIN_ROLES), async (req: any, res: any, next: any) => {
+  app.post(APPLY_PATH, requireAuth, requireRole(...ADMIN_ROLES), async (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => {
     const hasToken = typeof req.body?.confirmationToken === "string" && req.body.confirmationToken.length > 0;
 
     if (req.body?.includeFinalizedBales === true) {

@@ -230,7 +230,7 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
       onClose();
       onSuccess();
     },
-    onError: (e: any) => {
+    onError: (e: import("react").SyntheticEvent) => {
       toast({ title: "Failed to save", description: e.message, variant: "destructive" });
     },
   });

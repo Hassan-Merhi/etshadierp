@@ -502,7 +502,7 @@ export default function LocationVouchers({ posUser }: { posUser?: unknown } = {}
               </tr>
             </thead>
             <tbody>
-              {displayRows.map((txn: any, idx: number) => {
+              {displayRows.map((txn: unknown, idx: number) => {
                 // Month separator row
                 if (txn._isSeparator) {
                   return (
@@ -592,7 +592,7 @@ export default function LocationVouchers({ posUser }: { posUser?: unknown } = {}
                 );
               })}
 
-              {displayRows.filter((r: any) => !r._isSeparator).length === 0 && (
+              {displayRows.filter((r: unknown) => !r._isSeparator).length === 0 && (
                 <tr>
                   <td colSpan={colSpanFull} className="text-center text-muted-foreground py-8">
                     No transactions found

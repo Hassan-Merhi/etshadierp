@@ -122,27 +122,27 @@ export function NetPositionExportSection() {
       queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/np-settings"] });
       toast({ title: "Settings saved" });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const toggleEnabled = useMutation({
     mutationFn: (value: boolean) => apiRequest("PUT", "/api/whatsapp/np-settings", buildPayload({ enabled: value })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/np-settings"] }),
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const toggleAutoSend = useMutation({
     mutationFn: (value: boolean) => apiRequest("PUT", "/api/whatsapp/np-settings", buildPayload({ autoSend: value })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/np-settings"] }),
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const sendNow = useMutation({
     mutationFn: () => apiRequest("POST", "/api/whatsapp/send-np-all-now", { recipientId: eff.recipientId }),
-    onSuccess: (data: any) => {
+    onSuccess: (data: unknown) => {
       toast({ title: "Net Position Export Sent", description: data?.message || "Done" });
     },
-    onError: (e: any) => toast({ title: "Send failed", description: e.message, variant: "destructive" }),
+    onError: (e: import("react").SyntheticEvent) => toast({ title: "Send failed", description: e.message, variant: "destructive" }),
   });
 
   const label = scheduleLabel(cfg);

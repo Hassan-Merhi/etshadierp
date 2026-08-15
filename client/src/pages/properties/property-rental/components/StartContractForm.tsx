@@ -51,7 +51,7 @@ export function StartContractForm({
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
       onClose();
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: import("react").SyntheticEvent) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   return (

@@ -75,7 +75,7 @@ export function UserRolesCard({ userId, companies }: UserRolesCardProps) {
       const posRoles = companyRoles.filter((r) => r.role === "POS");
       const result: Record<number, number[]> = {};
       await Promise.all(
-        posRoles.map(async (r: any) => {
+        posRoles.map(async (r: unknown) => {
           const res = await fetch(`/api/user-locations/${userId}/${r.companyId}`, { credentials: "include" });
           if (res.ok) {
             const locs = await res.json();
@@ -111,7 +111,7 @@ export function UserRolesCard({ userId, companies }: UserRolesCardProps) {
 
   const showEditor = activeEditorRoleId !== null;
 
-  const getLocationNames = (role: any): string[] => {
+  const getLocationNames = (role: unknown): string[] => {
     if (role.role !== "POS") return [];
     const assignedIds = userLocationsMap[role.id] ?? [];
     if (assignedIds.length > 0) {

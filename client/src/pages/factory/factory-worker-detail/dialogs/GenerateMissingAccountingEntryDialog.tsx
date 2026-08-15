@@ -68,7 +68,7 @@ export function GenerateMissingAccountingEntryDialog({
                 <SelectValue placeholder="Select account" />
               </SelectTrigger>
               <SelectContent>
-                {cashAccounts?.map((a: any) => (
+                {cashAccounts?.map((a: unknown) => (
                   <SelectItem key={a.id} value={String(a.id)}>
                     {a.name} ({a.code})
                   </SelectItem>

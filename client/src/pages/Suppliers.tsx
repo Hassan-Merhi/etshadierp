@@ -84,14 +84,14 @@ export default function Suppliers() {
       toast({ title: "Supplier deleted" });
       setSupplierToDelete(null);
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
       setSupplierToDelete(null);
     },
   });
 
-  const handleTransactionClick = async (txn: any) => {
+  const handleTransactionClick = async (txn: unknown) => {
     const targetCompany = companies.find((c) => c.id === txn.companyId);
     if (targetCompany && (!selectedCompany || selectedCompany.id !== txn.companyId)) {
       await apiRequest("POST", "/api/auth/set-company", { companyId: txn.companyId });
@@ -169,7 +169,7 @@ export default function Suppliers() {
     setDateFilter("all");
   };
 
-  const handlePOClick = async (po: any) => {
+  const handlePOClick = async (po: unknown) => {
     const targetCompany = companies.find((c) => c.id === po.companyId);
     if (targetCompany && (!selectedCompany || selectedCompany.id !== po.companyId)) {
       await apiRequest("POST", "/api/auth/set-company", { companyId: po.companyId });
@@ -179,7 +179,7 @@ export default function Suppliers() {
     navigate(`/purchase-orders/${po.id}/edit`);
   };
 
-  const handleContainerClick = async (po: any) => {
+  const handleContainerClick = async (po: unknown) => {
     if (!po.containerId) return;
     const targetCompany = companies.find((c) => c.id === po.companyId);
     if (targetCompany && (!selectedCompany || selectedCompany.id !== po.companyId)) {
@@ -233,15 +233,15 @@ export default function Suppliers() {
               });
 
   const txCount = filteredLedgerRows.length;
-  const totalPurchases = filteredLedgerRows.reduce((s: number, t: any) => s + (parseFloat(t.credit) || 0), 0);
-  const totalPayments = filteredLedgerRows.reduce((s: number, t: any) => s + (parseFloat(t.debit) || 0), 0);
+  const totalPurchases = filteredLedgerRows.reduce((s: number, t: unknown) => s + (parseFloat(t.credit) || 0), 0);
+  const totalPayments = filteredLedgerRows.reduce((s: number, t: unknown) => s + (parseFloat(t.debit) || 0), 0);
   const totalPurchasesQty = filteredLedgerRows.filter(
-    (t: any) => t.voucherType === "Purchase" || (t.voucherType === "Journal" && (parseFloat(t.credit) || 0) > 0)
+    (t: unknown) => t.voucherType === "Purchase" || (t.voucherType === "Journal" && (parseFloat(t.credit) || 0) > 0)
   ).length;
   const currentBalance = unifiedLedger.length > 0 ? (unifiedLedger[unifiedLedger.length - 1]?.balance ?? 0) : 0;
 
   // Display rows — optionally hide payment/debit rows from the table (KPIs are always full)
-  const isPaymentRow = (t: any) => t.debit > 0 || t.voucherType === "Payment" || t.voucherType === "Receipt";
+  const isPaymentRow = (t: unknown) => t.debit > 0 || t.voucherType === "Payment" || t.voucherType === "Receipt";
   const displayedLedgerRows = hidePayments ? filteredLedgerRows.filter((t) => !isPaymentRow(t)) : filteredLedgerRows;
   const hiddenPaymentsCount = hidePayments ? filteredLedgerRows.filter((t) => isPaymentRow(t)).length : 0;
 
@@ -771,7 +771,7 @@ export default function Suppliers() {
                 (() => {
                   const sortedPOs = [...purchaseOrders]
                     .sort(
-                      (a: any, b: any) =>
+                      (a: unknown, b: unknown) =>
                         new Date(b.importDate || b.createdAt).getTime() -
                         new Date(a.importDate || a.createdAt).getTime()
                     )
@@ -787,7 +787,7 @@ export default function Suppliers() {
                         itemsTotal + freight + surcharge + fumigation + documentCharges - discount + otherCharges;
                       return { ...po, totalAmount };
                     });
-                  const grandTotal = sortedPOs.reduce((sum: number, po: any) => sum + po.totalAmount, 0);
+                  const grandTotal = sortedPOs.reduce((sum: number, po: unknown) => sum + po.totalAmount, 0);
 
                   return (
                     <div className="space-y-2">

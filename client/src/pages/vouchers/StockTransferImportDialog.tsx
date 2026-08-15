@@ -32,7 +32,7 @@ interface StockTransferImportDialogProps {
   importValidItemsCount: number;
   importPreview: unknown;
   importValidationResult: unknown;
-  formatNumber: (num: any, decimals?: number) => string;
+  formatNumber: (num: unknown, decimals?: number) => string;
 }
 
 export function StockTransferImportDialog({
@@ -217,7 +217,7 @@ export function StockTransferImportDialog({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {importPreview.items.map((item: any, index: number) => {
+                    {importPreview.items.map((item: unknown, index: number) => {
                       const validation = importValidationResult?.validatedItems?.[index];
                       const hasError = validation?.error;
 
@@ -262,7 +262,7 @@ export function StockTransferImportDialog({
                 </Table>
               </div>
               <div className="sm:hidden max-h-60 overflow-y-auto p-2 space-y-2">
-                {importPreview.items.map((item: any, index: number) => {
+                {importPreview.items.map((item: unknown, index: number) => {
                   const validation = importValidationResult?.validatedItems?.[index];
                   const hasError = validation?.error;
 

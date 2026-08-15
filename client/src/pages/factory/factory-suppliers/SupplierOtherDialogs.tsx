@@ -14,17 +14,17 @@ import { Package } from "lucide-react";
 
 interface SupplierOtherDialogsProps {
   obEditSupplier: { id: number; name: string; currentBalance: string } | null;
-  setObEditSupplier: (val: any) => void;
+  setObEditSupplier: (val: unknown) => void;
   obEditValue: string;
   setObEditValue: (val: string) => void;
   obEditMutation: UseMutationResult<unknown, unknown, unknown>;
 
   dueDialogSupplier: { name: string; containers: unknown[] } | null;
-  setDueDialogSupplier: (val: any) => void;
+  setDueDialogSupplier: (val: unknown) => void;
   formatDate: (val: string) => string;
 
   editObComm: null | { rawStockId: number; amount: string; currencyCode: string; personName: string; notes: string };
-  setEditObComm: (val: any) => void;
+  setEditObComm: (val: unknown) => void;
   updateObCommissionMutation: UseMutationResult<unknown, unknown, unknown>;
   wrapAdminAction: (fn: () => void, title: string) => void;
 }
@@ -67,7 +67,7 @@ export function SupplierOtherDialogs({
                     type="number"
                     step="0.01"
                     value={editObComm.amount}
-                    onChange={(e) => setEditObComm((p: any) => (p ? { ...p, amount: e.target.value } : null))}
+                    onChange={(e) => setEditObComm((p: unknown) => (p ? { ...p, amount: e.target.value } : null))}
                   />
                 </div>
                 <div className="space-y-1">
@@ -75,7 +75,7 @@ export function SupplierOtherDialogs({
                   <Input
                     value={editObComm.currencyCode}
                     onChange={(e) =>
-                      setEditObComm((p: any) => (p ? { ...p, currencyCode: e.target.value.toUpperCase() } : null))
+                      setEditObComm((p: unknown) => (p ? { ...p, currencyCode: e.target.value.toUpperCase() } : null))
                     }
                     maxLength={10}
                   />
@@ -85,7 +85,7 @@ export function SupplierOtherDialogs({
                 <Label>Person / Broker</Label>
                 <Input
                   value={editObComm.personName}
-                  onChange={(e) => setEditObComm((p: any) => (p ? { ...p, personName: e.target.value } : null))}
+                  onChange={(e) => setEditObComm((p: unknown) => (p ? { ...p, personName: e.target.value } : null))}
                   placeholder="Name (optional)"
                 />
               </div>
@@ -93,7 +93,7 @@ export function SupplierOtherDialogs({
                 <Label>Notes</Label>
                 <Input
                   value={editObComm.notes}
-                  onChange={(e) => setEditObComm((p: any) => (p ? { ...p, notes: e.target.value } : null))}
+                  onChange={(e) => setEditObComm((p: unknown) => (p ? { ...p, notes: e.target.value } : null))}
                   placeholder="Notes (optional)"
                 />
               </div>
@@ -198,7 +198,7 @@ export function SupplierOtherDialogs({
               <div className="rounded-md border divide-y text-sm">
                 {(dueDialogSupplier?.containers || [])
                   .slice()
-                  .sort((a: any, b: any) => new Date(a.offloadDate).getTime() - new Date(b.offloadDate).getTime())
+                  .sort((a: unknown, b: unknown) => new Date(a.offloadDate).getTime() - new Date(b.offloadDate).getTime())
                   .map((c) => (
                     <div key={c.id} className="flex items-center justify-between px-3 py-2.5 gap-3">
                       <div>

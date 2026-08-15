@@ -386,7 +386,7 @@ async function sendLoadingExcel(req: Request, res: Response, data: NonNullable<A
 }
 
 export function registerFactoryBilingualDocumentRoutes(app: Express): void {
-  const invoiceHandler = (format: "pdf" | "excel") => async (req: Request, res: Response, next: any) => {
+  const invoiceHandler = (format: "pdf" | "excel") => async (req: Request, res: Response, next: import("express").NextFunction) => {
     if (!hasExplicitLanguage(req)) return next();
     try {
       const companyId = companyIdFrom(req);
@@ -404,7 +404,7 @@ export function registerFactoryBilingualDocumentRoutes(app: Express): void {
     }
   };
 
-  const loadingHandler = async (req: Request, res: Response, next: any) => {
+  const loadingHandler = async (req: Request, res: Response, next: import("express").NextFunction) => {
     if (!hasExplicitLanguage(req)) return next();
     try {
       const companyId = companyIdFrom(req);

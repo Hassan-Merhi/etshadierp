@@ -123,7 +123,7 @@ export async function adjustSpInventoryAtomic(
   }
 }
 
-export function respondToSpInventoryIntegrityError(res: any, error: unknown): boolean {
+export function respondToSpInventoryIntegrityError(res: import("express").Response, error: unknown): boolean {
   if (!(error instanceof SpInventoryIntegrityError)) return false;
   res.status(error.statusCode).json({ code: error.code, message: error.message });
   return true;

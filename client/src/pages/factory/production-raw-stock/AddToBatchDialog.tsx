@@ -10,7 +10,7 @@ interface AddToBatchDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   addToBatchSource: unknown;
-  setAddToBatchSource: (source: any) => void;
+  setAddToBatchSource: (source: unknown) => void;
   mixBatches: unknown[];
   rawStock: unknown[];
   addToBatchMutation: unknown;

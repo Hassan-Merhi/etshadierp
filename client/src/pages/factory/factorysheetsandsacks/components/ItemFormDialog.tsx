@@ -43,7 +43,7 @@ function ItemFormDialog({
   const totalValue = useMemo(() => totalPcs * (parseFloat(unitPrice) || 0), [totalPcs, unitPrice]);
 
   const saveMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: unknown) => {
       if (existing) return apiRequest("PATCH", `/api/factory/sheets-sacks/${existing.id}`, data);
       return apiRequest("POST", "/api/factory/sheets-sacks", data);
     },
@@ -52,7 +52,7 @@ function ItemFormDialog({
       toast({ title: existing ? "Item updated" : "Item added" });
       onClose();
     },
-    onError: (e: any) => toast({ title: "Save failed", description: e.message, variant: "destructive" }),
+    onError: (e: import("react").SyntheticEvent) => toast({ title: "Save failed", description: e.message, variant: "destructive" }),
   });
 
   const handleSubmit = () => {

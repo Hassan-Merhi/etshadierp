@@ -99,7 +99,7 @@ export default function ChatbotSettings() {
       setGithubToken("");
       toast({ title: "GitHub settings saved", description: "Repository settings have been updated." });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to save GitHub settings", variant: "destructive" });
     },
@@ -151,7 +151,7 @@ export default function ChatbotSettings() {
       refetchPatchHistory();
       toast({ title: "Reverted", description: `${data.filePath} has been restored to its previous content.` });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Revert failed", description: error.message || "Could not revert patch", variant: "destructive" });
     },
@@ -169,7 +169,7 @@ export default function ChatbotSettings() {
         description: `User chatbot access has been ${variables.enabled ? "enabled" : "disabled"}.`,
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Error",
@@ -191,7 +191,7 @@ export default function ChatbotSettings() {
         description: `Switched to ${provider === "chatgpt" ? "ChatGPT (OpenAI)" : provider === "grok" ? "Grok (xAI)" : "Gemini (Google)"}.`,
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Error",
@@ -247,7 +247,7 @@ export default function ChatbotSettings() {
       if (selectedSession === sessionId) setSelectedSession(null);
       toast({ title: "Deleted", description: "The conversation has been deleted." });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to delete conversation", variant: "destructive" });
     },

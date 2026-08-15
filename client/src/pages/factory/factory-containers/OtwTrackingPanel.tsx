@@ -66,7 +66,7 @@ export function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrac
         variant: data.success ? "default" : "destructive",
       });
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       setTrackingNowId(null);
       toast({ title: "Tracking failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },

@@ -143,7 +143,7 @@ export default function FactoryDispatchBatchDetail() {
       setRideForm({ truckPlate: "", driverName: "", destination: "", notes: "" });
       if (d.id) navigate(`/factory/dispatch-batches/${batchId}/rides/${d.id}/scan`);
     },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: unknown) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const cancelMutation = useMutation({
@@ -158,7 +158,7 @@ export default function FactoryDispatchBatchDetail() {
       toast({ title: "Batch cancelled", description: "All bales have been returned to stock." });
       setCancelOpen(false);
     },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: unknown) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const generateMutation = useMutation({
@@ -180,7 +180,7 @@ export default function FactoryDispatchBatchDetail() {
       setPreviewOpen(false);
       refetch();
     },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: unknown) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const reopenRideMutation = useMutation({
@@ -195,7 +195,7 @@ export default function FactoryDispatchBatchDetail() {
       setReopenRideId(null);
       setReopenReason("");
     },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: unknown) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   if (!batchId) return null;

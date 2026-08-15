@@ -4,11 +4,11 @@ import { logger } from "../../lib/logger";
 import { pool } from "../../db";
 import { requireAuth } from "../../auth";
 
-function getFactoryCompanyId(req: any): number | undefined {
+function getFactoryCompanyId(req: import("express").Request): number | undefined {
   return req.session.factoryCompanyId || req.session.currentCompanyId;
 }
 
-async function hasWriteAccess(req: any, companyId: number): Promise<boolean> {
+async function hasWriteAccess(req: import("express").Request, companyId: number): Promise<boolean> {
   const role = req.user?.role;
   if (role === "Admin" || role === "Owner" || role === "Developer") return true;
   const userId = req.user?.id;

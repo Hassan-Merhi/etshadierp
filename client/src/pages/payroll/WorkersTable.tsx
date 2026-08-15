@@ -24,7 +24,7 @@ interface WorkersTableProps {
   handleUpdateAmount: (id: number, val: string) => void;
   handleDeleteWorker: (worker: Employee) => void;
   setStatementEmployee: (val: Employee | null) => void;
-  setWorkerOverrides: (val: any) => void;
+  setWorkerOverrides: (val: unknown) => void;
   formatAmount: (amt: number) => string;
   addWorkerToWorkerGroupMutation?: unknown;
   groupId?: number;
