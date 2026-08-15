@@ -1,5 +1,5 @@
 import { getErrorDetails } from "@shared/errorUtils";
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -124,8 +124,8 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
     enabled: isAllMode,
   });
 
-  const masters = mastersData?.masters ?? [];
-  const masterItems = mastersData?.items ?? [];
+  const masters = useMemo(() => (mastersData?.masters ?? []), [mastersData?.masters]);
+  const masterItems = useMemo(() => (mastersData?.items ?? []), [mastersData?.items]);
 
   // ── Merged state ────────────────────────────────────────────────────────────
   const isLoading = isAllMode ? mastersLoading : priceListLoading;
@@ -153,7 +153,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
     return Array.from(groups).sort();
   }, [locationPricedList]);
 
-  const isItemUnpriced = (item: unknown): boolean => {
+  const isItemUnpriced = useCallback((item: unknown): boolean => {
     if (isAllMode) {
       const hasBase = item.baseSellingPrice && parseFloat(item.baseSellingPrice) > 0;
       if (hasBase) return false; // base price covers all locations
@@ -163,7 +163,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       return !allHavePrice; // unpriced until every location has a price
     }
     return !item.sellingPrice || parseFloat(item.sellingPrice) === 0;
-  };
+  }, [isAllMode]);
 
   const unpricedCount = useMemo(
     () => locationPricedList.filter(isItemUnpriced).length,

@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment, useRef } from "react";
+import { useState, useEffect, Fragment, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { hasAnyOpenDialog } from "@/hooks/use-escape-back";
@@ -178,7 +178,7 @@ export default function LocationSummary() {
   const buildRowKey = (groupId: number | string, itemId?: number | string) =>
     itemId ? `${groupId}-item-${itemId}` : `group-${groupId}`;
 
-  const getAllRows = () => {
+  const getAllRows = useCallback(() => {
     if (!summaryData?.stockGroups?.length) return [];
     const rows: Array<{ key: string; groupId: number; itemId?: number; groupIndex: number; itemIndex?: number }> = [];
 
@@ -202,7 +202,7 @@ export default function LocationSummary() {
     });
 
     return rows;
-  };
+  }, [expandedGroups, hiddenRows, summaryData.stockGroups]);
 
   // Immediate scroll function - called directly from keydown handler for faster response
   const scrollToRowImmediate = (rowKey: string) => {
@@ -226,7 +226,7 @@ export default function LocationSummary() {
     }
   };
 
-  const handleTableKeyDown = (e: KeyboardEvent) => {
+  const handleTableKeyDown = useCallback((e: KeyboardEvent) => {
     if (locationDialogOpen || !summaryData?.stockGroups?.length) return;
 
     const allRows = getAllRows();
@@ -303,7 +303,7 @@ export default function LocationSummary() {
       e.preventDefault();
       window.history.back();
     }
-  };
+  }, [getAllRows, locationDialogOpen, navigate, selectedLocationIndex, selectedLocations, selectedRowKey, summaryData, toast]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => handleTableKeyDown(e);

@@ -320,7 +320,7 @@ function CustomNetPositionView({
     staleTime: 30_000,
   });
 
-  const payrollEmployees = payrollData?.employees ?? [];
+  const payrollEmployees = useMemo(() => (payrollData?.employees ?? []), [payrollData?.employees]);
 
   const toggleKey = useCallback((key: string) => {
     setHiddenKeys((prev) => {

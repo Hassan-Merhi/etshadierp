@@ -91,14 +91,14 @@ export function useContainerTracking(filteredOtwContainers: Container[]) {
 
   const hasChanges = useCallback((containerId: number) => {
     return trackingEdits[containerId] && Object.keys(trackingEdits[containerId]).length > 0;
-  });
+  }, [trackingEdits]);
 
   const saveTracking = useCallback(async (containerId: number) => {
     const data = trackingEdits[containerId];
     if (!data) return;
     setSavingIds((prev) => new Set(prev).add(containerId));
     updateTrackingMutation.mutate({ id: containerId, data });
-  });
+  }, [trackingEdits, updateTrackingMutation]);
 
   const hasAnyChanges = Object.keys(trackingEdits).length > 0;
 

@@ -33,7 +33,7 @@ export function HistoricalOpeningResolver() {
     staleTime: 30_000,
   });
 
-  const rows = query.data || [];
+  const rows = useMemo(() => (query.data || []), [query.data]);
   const rowKeys = useMemo(() => new Set(rows.map((row) => `${row.entity_type}:${row.id}`)), [rows]);
 
   const mutation = useMutation({

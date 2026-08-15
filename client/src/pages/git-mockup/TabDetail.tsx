@@ -23,7 +23,7 @@ export function TabDetail() {
     retry: 1,
   });
 
-  const allContainers: EnrichedContainerApi[] = data?.containers ?? [];
+  const allContainers: EnrichedContainerApi[] = useMemo(() => (data?.containers ?? []), [data?.containers]);
 
   const filtered = useMemo(() => {
     if (!search) return allContainers;

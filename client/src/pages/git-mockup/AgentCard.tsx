@@ -81,11 +81,11 @@ export function AgentCard({
       return null;
     }
   });
-  const saveOrder = (order: number[] | null) => {
+  const saveOrder = useCallback((order: number[] | null) => {
     if (order === null) localStorage.removeItem(storageKey);
     else localStorage.setItem(storageKey, JSON.stringify(order));
     setCustomOrder(order);
-  };
+  }, [storageKey]);
   const resetOrder = () => saveOrder(null);
 
   // ── Prepaid designations ──────────────────────────────────────────────────
@@ -157,7 +157,7 @@ export function AgentCard({
   // ── Adjustments ──────────────────────────────────────────────────────────
   const adjQKey = [`/api/git/agent-adjustments/${companyId}/${encodeURIComponent(agent.agentName)}`];
   const { data: adjData } = useQuery<AdjEntry[]>({ queryKey: adjQKey, initialData: [], staleTime: 120_000 });
-  const adjustments: AdjEntry[] = adjData ?? [];
+  const adjustments: AdjEntry[] = useMemo(() => (adjData ?? []), [adjData]);
   const createAdjMutation = useMutation({
     mutationFn: (body: { description: string; amount: number; type: "debit" | "credit" }) =>
       apiRequest("POST", `/api/git/agent-adjustments/${companyId}/${encodeURIComponent(agent.agentName)}`, body),

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { Play, DollarSign, Users, Loader2, ChevronDown, ChevronRight, Minus, RefreshCw } from "lucide-react";
@@ -120,11 +120,11 @@ export default function FactoryEmployeePayrollTab() {
     setPayrollOpen(true);
   };
 
-  const getNet = (empId: number) => {
+  const getNet = useCallback((empId: number) => {
     const sal = parseFloat(amounts[empId] || "0") || 0;
     const ded = parseFloat(deductions[empId] || "0") || 0;
     return Math.max(0, sal - ded);
-  };
+  }, [amounts, deductions]);
 
   const totalNet = useMemo(() => employees.reduce((s, e) => s + getNet(e.id), 0), [employees, getNet]);
 

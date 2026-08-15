@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -329,7 +329,7 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
     setEditingVoucherId(null);
   };
 
-  const addItemToCart = (item: (typeof itemsWithStock)[0]) => {
+  const addItemToCart = useCallback((item: (typeof itemsWithStock)[0]) => {
     if (!selectedLocationId) {
       toast({
         title: "No location selected",
@@ -371,7 +371,7 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
     setItemQuantity("1");
     setRefundRate("");
     searchInputRef.current?.focus();
-  };
+  }, [itemQuantity, locations, refundRate, selectedLocationId, toast]);
 
   const removeItem = (index: number) => {
     setItems((prev) => prev.filter((_, i) => i !== index));

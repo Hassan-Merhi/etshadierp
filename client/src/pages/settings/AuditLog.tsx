@@ -174,7 +174,7 @@ export function AuditLog({
   });
 
   const activityLoading = isCompanyLoading || activeCompanyId === null || isLoading;
-  const rawAuditLogs: unknown[] = data?.logs || [];
+  const rawAuditLogs: unknown[] = useMemo(() => (data?.logs || []), [data?.logs]);
 
   // Defence in depth: the API is company-scoped, but the browser also rejects
   // any unexpected row so a stale cache or future backend regression cannot

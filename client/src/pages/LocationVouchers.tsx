@@ -12,7 +12,7 @@ import { useDateJump } from "@/hooks/use-date-jump";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCursorNav } from "@/contexts/CursorNavContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { PageHeader } from "@/components/PageHeader";
 
 interface Transaction {
@@ -147,7 +147,7 @@ export default function LocationVouchers({ posUser }: { posUser?: unknown } = {}
     return t === "stock transfer" || t === "stocktransfer" || t === "st";
   };
 
-  const allTransactions: Transaction[] = data?.transactions || [];
+  const allTransactions: Transaction[] = useMemo(() => (data?.transactions || []), [data?.transactions]);
 
   const filteredTransactions = useMemo(() => {
     return allTransactions.filter((txn) => {
@@ -228,7 +228,7 @@ export default function LocationVouchers({ posUser }: { posUser?: unknown } = {}
 
   const navigableRows = useMemo(() => filteredTransactions.filter((t) => !t.isOpeningBalance), [filteredTransactions]);
 
-  const handleTableKeyDown = (e: KeyboardEvent) => {
+  const handleTableKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === "Escape") {
       if (hasAnyOpenDialog()) return;
       e.preventDefault();
@@ -251,7 +251,7 @@ export default function LocationVouchers({ posUser }: { posUser?: unknown } = {}
         if (url) navigate(url);
       }
     }
-  };
+  }, [locationId, navigableRows, navigate, selectedRowIndex, stockItemId]);
 
   useEffect(() => {
     window.addEventListener("keydown", handleTableKeyDown, { capture: true });

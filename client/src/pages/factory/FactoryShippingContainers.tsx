@@ -128,7 +128,7 @@ export default function FactoryShippingContainers() {
     enabled: doneExpanded,
     placeholderData: (previous) => previous,
   });
-  const done = donePageData?.rows ?? [];
+  const done = useMemo(() => (donePageData?.rows ?? []), [donePageData?.rows]);
   const doneTotal = donePageData?.total ?? 0;
   const doneTotalPages = donePageData?.totalPages ?? 0;
 

@@ -208,21 +208,29 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
     }
   }
 
+  const containerFiltersKey = containerFilters.join(",");
+  const supplierFiltersKey = supplierFilters.join(",");
+  const transporterFiltersKey = transporterFilters.join(",");
+  const agentFiltersKey = agentFilters.join(",");
+  const truckFiltersKey = truckFilters.join(",");
+  const locationFiltersKey = locationFilters.join(",");
+  const etaFilterKey = etaFilter === "ALL" ? "ALL" : JSON.stringify(etaFilter);
+
   useEffect(() => {
     setPage(1);
   }, [
     allCompanies,
     companyFilter,
-    containerFilters.join(","),
-    supplierFilters.join(","),
-    transporterFilters.join(","),
-    agentFilters.join(","),
-    truckFilters.join(","),
-    locationFilters.join(","),
+    containerFiltersKey,
+    supplierFiltersKey,
+    transporterFiltersKey,
+    agentFiltersKey,
+    truckFiltersKey,
+    locationFiltersKey,
     docsFilter,
     delayedFilter,
     freightFilter,
-    etaFilter === "ALL" ? "ALL" : JSON.stringify(etaFilter),
+    etaFilterKey,
     notesFilter,
     sortOrder,
     search,

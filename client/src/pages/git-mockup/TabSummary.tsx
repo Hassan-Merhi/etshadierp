@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -102,7 +102,7 @@ export function TabSummary() {
     retry: 1,
   });
 
-  const allContainers: EnrichedContainerApi[] = data?.containers ?? [];
+  const allContainers: EnrichedContainerApi[] = useMemo(() => (data?.containers ?? []), [data?.containers]);
 
   const stats = useMemo(() => {
     const byStatus: Record<string, number> = {};
@@ -122,7 +122,7 @@ export function TabSummary() {
     };
   }, [allContainers]);
 
-  const makeBreakdown = (keyFn: (r: EnrichedContainerApi) => string) => {
+  const makeBreakdown = useCallback((keyFn: (r: EnrichedContainerApi) => string) => {
     const map = new Map<string, { label: string; count: number; cost: number; fee: number; duty: number }>();
     for (const r of allContainers) {
       const k = keyFn(r);
@@ -134,7 +134,7 @@ export function TabSummary() {
       e.duty += parseNum(r.dutyFee);
     }
     return [...map.values()];
-  };
+  }, [allContainers]);
 
   const byCompany = useMemo(() => makeBreakdown((r) => r.companyName), [makeBreakdown]);
   const byTransport = useMemo(() => makeBreakdown((r) => r.transporter ?? "—"), [makeBreakdown]);

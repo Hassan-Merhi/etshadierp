@@ -113,7 +113,7 @@ export default function CombinedInventory() {
     retry: false,
   });
 
-  const inventoryRows = inventoryPage?.data ?? [];
+  const inventoryRows = useMemo(() => (inventoryPage?.data ?? []), [inventoryPage?.data]);
   const inventoryTotal = inventoryPage?.total ?? 0;
   const inventoryTotalPages = inventoryPage?.totalPages ?? 1;
 

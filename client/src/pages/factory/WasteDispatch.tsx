@@ -71,7 +71,7 @@ export default function WasteDispatch() {
   });
 
   // ── Dispatch helpers ───────────────────────────────────────────
-  const bales: Bale[] = data?.bales || [];
+  const bales: Bale[] = useMemo(() => (data?.bales || []), [data?.bales]);
 
   const productGroups: ProductGroup[] = useMemo(() => {
     const map = new Map<string, ProductGroup>();

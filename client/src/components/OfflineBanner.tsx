@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { OFFLINE_MODE_ENABLED } from "@/lib/featureFlags";
 import { WifiOff, RefreshCw, Trash2, RotateCcw, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -79,7 +79,7 @@ function OfflineBannerInner() {
     return unsubWarn;
   }, [toast]);
 
-  const replayQueue = async () => {
+  const replayQueue = useCallback(async () => {
     if (syncingRef.current) return;
     const pending = getQueue().filter((i) => i.status === "pending");
     if (pending.length === 0) {
@@ -155,7 +155,7 @@ function OfflineBannerInner() {
         variant: "destructive",
       });
     }
-  };
+  }, [refreshCounts, toast]);
 
   // Auto-sync when coming back online
   useEffect(() => {
