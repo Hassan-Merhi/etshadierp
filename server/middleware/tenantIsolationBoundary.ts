@@ -100,6 +100,14 @@ async function ensurePinnedFactoryCompany(req: Request): Promise<void> {
   });
 
   if (!factoryCompanyId) {
+    // Developer company selection can be synthetic and may not have an
+    // explicit userCompanyRoles row for the selected company. Let the
+    // canonical Developer fallback below enforce the server-owned active
+    // company boundary instead of rejecting the request prematurely.
+    if (session.currentRole === "Developer" && developerCurrentCompanyId) {
+      return;
+    }
+
     throw new ActiveCompanyPermissionContextError(
       "You do not have access to a Factory company.",
       403,
