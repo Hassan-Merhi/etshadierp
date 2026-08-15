@@ -548,8 +548,14 @@ export default function StockInSalesReportDetail() {
                       groupedStockIn.map((row) => (
                         <TableRow key={row.key}>
                           <TableCell
-                            title={row.dates.length > 1 ? `Offloaded on:\n${row.dates.map(displayDate).join("\n")}` : undefined}
-                            className={row.dates.length > 1 ? "cursor-help underline decoration-dotted underline-offset-4" : ""}
+                            title={
+                              row.dates.length > 1
+                                ? `Offloaded on:\n${row.dates.map(displayDate).join("\n")}`
+                                : undefined
+                            }
+                            className={
+                              row.dates.length > 1 ? "cursor-help underline decoration-dotted underline-offset-4" : ""
+                            }
                           >
                             {row.dates.length === 1 ? displayDate(row.dates[0]) : `${row.dates.length} dates`}
                           </TableCell>
@@ -557,11 +563,18 @@ export default function StockInSalesReportDetail() {
                             className="cursor-help font-mono underline decoration-dotted underline-offset-4"
                             title={breakdownTitle("Containers / Qty", row.containers)}
                           >
-                            {formatNumber(row.containers.length, 0)} {row.containers.length === 1 ? "container" : "containers"}
+                            {formatNumber(row.containers.length, 0)}{" "}
+                            {row.containers.length === 1 ? "container" : "containers"}
                           </TableCell>
                           <TableCell
-                            className={row.locations.length > 1 ? "cursor-help underline decoration-dotted underline-offset-4" : ""}
-                            title={row.locations.length > 1 ? breakdownTitle("Locations / Qty", row.locations) : undefined}
+                            className={
+                              row.locations.length > 1
+                                ? "cursor-help underline decoration-dotted underline-offset-4"
+                                : ""
+                            }
+                            title={
+                              row.locations.length > 1 ? breakdownTitle("Locations / Qty", row.locations) : undefined
+                            }
                           >
                             {row.locations.length === 1
                               ? row.locations[0].name
@@ -621,8 +634,16 @@ export default function StockInSalesReportDetail() {
                         <TableRow key={row.key}>
                           <TableCell>{displayDate(row.activityDate)}</TableCell>
                           <TableCell
-                            className={row.locations.length > 1 ? "cursor-help underline decoration-dotted underline-offset-4" : ""}
-                            title={row.locations.length > 1 ? breakdownTitle("Locations / Qty Sold", row.locations) : undefined}
+                            className={
+                              row.locations.length > 1
+                                ? "cursor-help underline decoration-dotted underline-offset-4"
+                                : ""
+                            }
+                            title={
+                              row.locations.length > 1
+                                ? breakdownTitle("Locations / Qty Sold", row.locations)
+                                : undefined
+                            }
                           >
                             {row.locations.length === 1
                               ? row.locations[0].name
