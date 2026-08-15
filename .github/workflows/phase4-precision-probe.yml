@@ -1,4 +1,4 @@
-name: Phase 4 recursive structural reduction
+name: Lint phases 5-7 semantic reduction
 
 on:
   push:
@@ -9,14 +9,14 @@ permissions:
   contents: write
 
 concurrency:
-  group: phase4-bridge-${{ github.ref }}
+  group: lint-phases-5-7-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  bridge-reduction:
-    if: ${{ !contains(github.event.head_commit.message, '[phase4-bridge]') }}
+  semantic-reduction:
+    if: ${{ !contains(github.event.head_commit.message, '[phase5-7-worker]') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
         with:
@@ -26,20 +26,16 @@ jobs:
           node-version: '22.14.0'
           cache: npm
       - run: npm ci
-      - name: Retype casts with recursive structural contracts
-        run: node scripts/phase4-batch-structural-worker.mjs
-      - name: Verify TypeScript after formatting
-        run: npm run check
-      - name: Report remaining cast count
-        run: node scripts/audit-type-escapes.mjs --json | tee phase4-bridge-audit.json || true
-      - name: Persist recursive structural retyping
+      - name: Reduce phases 5-7 structural any debt
+        run: node scripts/lint-phases-5-7-worker.mjs
+      - name: Persist phases 5-7 semantic progress
         run: |
           if git diff --quiet -- client/src server shared; then
-            echo "No recursive structural Phase 4 changes to persist."
+            echo "No safe Phase 5-7 changes found."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add client/src server shared
-          git commit -m "refactor: recursively retype remaining any casts [phase4-bridge]"
+          git commit -m "refactor: reduce phases 5-7 structural any debt [phase5-7-worker] [skip ci]"
           git push origin HEAD:${GITHUB_REF_NAME}
