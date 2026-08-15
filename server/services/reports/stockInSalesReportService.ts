@@ -532,10 +532,15 @@ export async function getStockInSalesReport(filters: StockInSalesReportFilters):
   ]);
   const buckets = new Map<string, MutableMetrics>();
   mergeAggregateRows(buckets, stockInRows, ["stockInQty", "stockInValue"]);
-  mergeAggregateRows(buckets, transferInRows, ["stockInQty", "stockInValue"]);
+
+  // Internal location transfers are inventory movements, not new stock in or stock out.
+  // Keep the queries available for transfer-specific reporting, but intentionally exclude
+  // them from the Stock In & Sales movement totals shown in this report.
+  void transferInRows;
+  void transferOutRows;
+
   mergeAggregateRows(buckets, adjustmentRows, ["stockAdjustmentQty", "stockAdjustmentValue"]);
   mergeAggregateRows(buckets, salesRows, ["stockOutQty", "stockOutValue", "totalSales", "costOfSales", "costProfit"]);
-  mergeAggregateRows(buckets, transferOutRows, ["stockOutQty", "stockOutValue"]);
   mergeAggregateRows(buckets, noteRows, ["stockOutQty", "stockOutValue", "totalSales", "costOfSales", "costProfit"]);
 
   const observedKeys = Array.from(buckets.keys()).sort();

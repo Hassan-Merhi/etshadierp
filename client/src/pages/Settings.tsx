@@ -46,7 +46,8 @@ import {
 
 export default function Settings() {
   const { toast } = useToast();
-  const { selectedCompany } = useCompany();
+  const companyContext = useCompany();
+  const selectedCompany = companyContext?.selectedCompany ?? null;
   const { dateFormat, setDateFormat, isPending: isDateFormatPending } = useDateFormat();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
