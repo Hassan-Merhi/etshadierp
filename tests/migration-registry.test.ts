@@ -46,4 +46,16 @@ describe("versioned migration registry", () => {
     expect(runner).toContain("--apply");
     expect(packageJson.scripts.start).not.toContain("run-versioned-migrations");
   });
+
+  it("provides the verification command its own refusal message tells operators to run", () => {
+    const runner = read("scripts/run-versioned-migrations.mjs");
+    const packageJson = JSON.parse(read("package.json"));
+
+    // The refusal is the first thing anyone applying migrations sees, and it
+    // named a script that did not exist — so the documented safe sequence began
+    // with "Missing script: verify:migrations" and invited people to skip
+    // straight to --apply.
+    expect(runner).toContain("npm run verify:migrations");
+    expect(packageJson.scripts["verify:migrations"]).toContain("verify-migration-registry.mjs");
+  });
 });
