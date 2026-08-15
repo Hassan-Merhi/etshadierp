@@ -20,34 +20,52 @@ jobs:
         with:
           node-version: '22.14.0'
           cache: npm
-      - name: Merge current main in probe workspace
+      - name: Roll back unsafe Phase 15 pass in probe workspace
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          set +e
+          git revert --no-commit a4ec34ab3b22cfd9dc6aae8e1be7f0c0e9fc42f2
+          rc=$?
+          set -e
+          echo "REVERT_EXIT=$rc"
+          git diff --name-only --diff-filter=U | tee /tmp/revert-conflicts.txt
+          if [ $rc -ne 0 ]; then
+            while IFS= read -r f; do
+              [ -z "$f" ] && continue
+              git show 567e8d9143f5496591f30390e7ec67ff90b98736:"$f" > "$f"
+              git add -- "$f"
+            done < /tmp/revert-conflicts.txt
+          fi
+          git add -A
+          git commit -m "probe: roll back unsafe phase 15 exhaustion" || true
+          echo "POST_REVERT_HEAD=$(git rev-parse HEAD)"
+      - name: Merge current main in probe workspace
+        shell: bash
+        run: |
+          set -euo pipefail
           git fetch origin main
           set +e
           git merge --no-edit origin/main
           rc=$?
           set -e
           if [ $rc -ne 0 ]; then
-            echo '=== CONFLICTS ==='
-            git diff --name-only --diff-filter=U
+            echo '=== MERGE CONFLICTS ==='
+            git diff --name-only --diff-filter=U | tee /tmp/merge-conflicts.txt
             while IFS= read -r f; do
               [ -z "$f" ] && continue
               case "$f" in
                 config/*lint*|config/*type-escape*|*lint*ratchet*|*type-escape*) git checkout --ours -- "$f" ;;
                 server/*) git checkout --theirs -- "$f" ;;
-                *) echo "UNHANDLED_CONFLICT=$f"; exit 2 ;;
+                *) git checkout --ours -- "$f" ;;
               esac
               git add -- "$f"
-            done < <(git diff --name-only --diff-filter=U)
+            done < /tmp/merge-conflicts.txt
             git commit --no-edit
           fi
           echo "PROBE_HEAD=$(git rev-parse HEAD)"
-          echo '=== ANY IN MERGED CONFLICT SERVER CHANGES ==='
-          git diff --name-only HEAD^1..HEAD -- server | while read -r f; do [ -f "$f" ] && grep -nE '(:|<|,|\[|\|)[[:space:]]*any\b|\bas any\b|Promise<any>|Record<[^>]*any' "$f" || true; done
       - run: npm ci
       - name: TypeScript diagnostics
         shell: bash
@@ -56,15 +74,8 @@ jobs:
           npm run check > /tmp/ts.log 2>&1
           rc=$?
           echo "TSC_EXIT=$rc"
-          cat /tmp/ts.log
-          {
-            echo '## TypeScript diagnostics'
-            echo
-            echo "Exit: $rc"
-            echo '```text'
-            tail -n 200 /tmp/ts.log
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          grep -c 'error TS' /tmp/ts.log | xargs -I{} echo "TSC_ERROR_LINES={}" || true
+          tail -n 120 /tmp/ts.log
           exit 0
       - name: ESLint exact diagnostics
         shell: bash
@@ -74,19 +85,11 @@ jobs:
           rc=$?
           node - <<'NODE' | tee /tmp/eslint.txt
           const fs=require('fs'); const r=JSON.parse(fs.readFileSync('/tmp/eslint.json','utf8'));
-          let e=0,w=0;
-          for(const f of r){ for(const m of f.messages){ if(m.severity===2)e++; else if(m.severity===1)w++; if(m.severity) console.log(`${f.filePath}:${m.line}:${m.column} ${m.ruleId} ${m.message}`); }}
-          console.log(`ESLINT_ERRORS=${e}`); console.log(`ESLINT_WARNINGS=${w}`);
+          let e=0,w=0; const rules={};
+          for(const f of r){ for(const m of f.messages){ if(m.severity===2)e++; else if(m.severity===1)w++; if(m.severity){const k=m.ruleId||'<parser>';rules[k]=(rules[k]||0)+1;} }}
+          console.log(`ESLINT_ERRORS=${e}`); console.log(`ESLINT_WARNINGS=${w}`); console.log(JSON.stringify(rules,null,2));
           NODE
           echo "ESLINT_EXIT=$rc"
-          {
-            echo '## ESLint diagnostics'
-            echo
-            echo "Exit: $rc"
-            echo '```text'
-            cat /tmp/eslint.txt
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
           exit 0
       - name: Type escape audit diagnostics
         shell: bash
@@ -96,23 +99,17 @@ jobs:
           rc=$?
           cat /tmp/type-escapes.log
           echo "TYPE_ESCAPE_EXIT=$rc"
-          {
-            echo '## Type escape audit'
-            echo
-            echo "Exit: $rc"
-            echo '```text'
-            cat /tmp/type-escapes.log
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
           exit 0
       - name: Upload diagnostic bundle
         uses: actions/upload-artifact@v4
         with:
-          name: phase18-diagnostics
+          name: phase18-rollback-probe
           path: |
             /tmp/ts.log
             /tmp/eslint.json
             /tmp/eslint.txt
             /tmp/type-escapes.log
-          if-no-files-found: error
+            /tmp/revert-conflicts.txt
+            /tmp/merge-conflicts.txt
+          if-no-files-found: warn
           retention-days: 1
