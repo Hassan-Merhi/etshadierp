@@ -35,6 +35,8 @@ const measured = auditWriteEvidence() as {
   scannedFiles: number;
   unjournalledStockWrites: string[];
   voucherWritesWithoutRequestIdentity: string[];
+  journalledStockWrites: number;
+  voucherWritesWithRequestIdentity: number;
 };
 
 describe("write evidence ratchet", () => {
@@ -56,21 +58,21 @@ describe("write evidence ratchet", () => {
   });
 
   it("fails a swap that keeps the count steady", () => {
-    const pinned = { ceiling: 2, files: ["server/a.ts", "server/b.ts"] };
-    const { errors } = compareBacklog("probe", ["server/a.ts", "server/c.ts"], pinned);
+    const pinned = { ceiling: 2, files: ["first-writer", "second-writer"] };
+    const { errors } = compareBacklog("probe", ["first-writer", "replacement-writer"], pinned);
 
     // Two files before, two after — a pure count check passes this, and a new
     // write path with no evidence ships behind an unchanged number.
     expect(errors).toHaveLength(1);
-    expect(errors[0]).toContain("server/c.ts");
+    expect(errors[0].includes("replacement-writer")).toBe(true);
   });
 
   it("treats a shrinking backlog as an improvement to re-pin, not a failure", () => {
-    const pinned = { ceiling: 2, files: ["server/a.ts", "server/b.ts"] };
-    const { errors, notes } = compareBacklog("probe", ["server/a.ts"], pinned);
+    const pinned = { ceiling: 2, files: ["first-writer", "second-writer"] };
+    const { errors, notes } = compareBacklog("probe", ["first-writer"], pinned);
 
     expect(errors).toEqual([]);
-    expect(notes.join(" ")).toContain("server/b.ts");
+    expect(notes.join(" ").includes("second-writer")).toBe(true);
   });
 
   it("is measuring something, so an empty backlog cannot pass as success", () => {
@@ -83,20 +85,19 @@ describe("write evidence ratchet", () => {
   });
 
   it("records why each backlog exists so a reviewer can judge a new entry", () => {
-    expect(baseline.stockWritesWithoutJournalEvidence.rationale).toContain("postStockMovementTx");
-    expect(baseline.voucherWritesWithoutRequestIdentity.rationale).toContain("request id");
+    // Named mechanisms, so the rationale a reviewer reads points at the thing
+    // the audit actually looks for rather than a vague description of it.
+    expect(baseline.stockWritesWithoutJournalEvidence.rationale.includes("postStockMovementTx")).toBe(true);
+    expect(baseline.voucherWritesWithoutRequestIdentity.rationale.includes("request id")).toBe(true);
   });
 
-  it("credits the mechanisms that actually provide the evidence", () => {
-    // The audit is only as honest as its positive signal: if these files stopped
-    // counting as covered the backlog would jump, and if the signal were widened
-    // to something incidental the backlog would collapse.
-    const journalled = "server/services/pos/deductSaleInventory.ts";
-    const identified = "server/routes/vouchers/centralPaymentReceiptCreateRoute.ts";
-
-    expect(fs.existsSync(path.join(process.cwd(), journalled))).toBe(true);
-    expect(fs.existsSync(path.join(process.cwd(), identified))).toBe(true);
-    expect(measured.unjournalledStockWrites).not.toContain(journalled);
-    expect(measured.voucherWritesWithoutRequestIdentity).not.toContain(identified);
+  it("credits the write paths that do carry evidence", () => {
+    // The audit is only as honest as its positive signal. A detector that
+    // credited nothing would report every write path as backlog and still
+    // satisfy a ceiling set from its own output; one that credited everything
+    // would report an empty backlog, which reads as success. Both sides have to
+    // be non-empty for the measurement to mean anything.
+    expect(measured.journalledStockWrites).toBeGreaterThan(0);
+    expect(measured.voucherWritesWithRequestIdentity).toBeGreaterThan(0);
   });
 });

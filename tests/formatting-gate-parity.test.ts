@@ -87,6 +87,8 @@ describe("formatting gate parity", () => {
   it("exposes the local check as an npm script", () => {
     const packageJson = JSON.parse(read("package.json")) as { scripts: Record<string, string> };
 
-    expect(packageJson.scripts["format:check:changed"]).toContain("check-changed-file-formatting.mjs");
+    // Exact, not a substring: the point is that `npm run format:check:changed`
+    // invokes the one script the tests above pin, and an exact match says which.
+    expect(packageJson.scripts["format:check:changed"]).toBe(`node ${LOCAL_SCRIPT}`);
   });
 });

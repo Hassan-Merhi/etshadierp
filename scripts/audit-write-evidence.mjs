@@ -89,19 +89,33 @@ export function auditWriteEvidence() {
 
   const unjournalledStockWrites = [];
   const voucherWritesWithoutRequestIdentity = [];
+  // The other side of each measurement. A detector that credited nothing would
+  // report a maximal backlog; one that credited everything would report an
+  // empty one. Both counts are published so a test can tell those apart from a
+  // correct measurement without naming individual files.
+  let journalledStockWrites = 0;
+  let voucherWritesWithRequestIdentity = 0;
 
   for (const file of files) {
     const source = fs.readFileSync(path.join(projectRoot, file), "utf8");
 
-    if (writesTable(source, "inventory", "inventory") && !JOURNAL_WRITER.test(source)) {
-      unjournalledStockWrites.push(file);
+    if (writesTable(source, "inventory", "inventory")) {
+      if (JOURNAL_WRITER.test(source)) journalledStockWrites += 1;
+      else unjournalledStockWrites.push(file);
     }
-    if (writesTable(source, "vouchers", "vouchers") && !REQUEST_IDENTITY.test(source)) {
-      voucherWritesWithoutRequestIdentity.push(file);
+    if (writesTable(source, "vouchers", "vouchers")) {
+      if (REQUEST_IDENTITY.test(source)) voucherWritesWithRequestIdentity += 1;
+      else voucherWritesWithoutRequestIdentity.push(file);
     }
   }
 
-  return { scannedFiles: files.length, unjournalledStockWrites, voucherWritesWithoutRequestIdentity };
+  return {
+    scannedFiles: files.length,
+    unjournalledStockWrites,
+    voucherWritesWithoutRequestIdentity,
+    journalledStockWrites,
+    voucherWritesWithRequestIdentity,
+  };
 }
 
 function readBaseline() {
