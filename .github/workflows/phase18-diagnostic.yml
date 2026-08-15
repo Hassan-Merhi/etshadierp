@@ -57,6 +57,14 @@ jobs:
           rc=$?
           echo "TSC_EXIT=$rc"
           cat /tmp/ts.log
+          {
+            echo '## TypeScript diagnostics'
+            echo
+            echo "Exit: $rc"
+            echo '```text'
+            tail -n 200 /tmp/ts.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
           exit 0
       - name: ESLint exact diagnostics
         shell: bash
@@ -64,18 +72,47 @@ jobs:
           set +e
           npx eslint . -f json -o /tmp/eslint.json
           rc=$?
-          node - <<'NODE'
+          node - <<'NODE' | tee /tmp/eslint.txt
           const fs=require('fs'); const r=JSON.parse(fs.readFileSync('/tmp/eslint.json','utf8'));
           let e=0,w=0;
           for(const f of r){ for(const m of f.messages){ if(m.severity===2)e++; else if(m.severity===1)w++; if(m.severity) console.log(`${f.filePath}:${m.line}:${m.column} ${m.ruleId} ${m.message}`); }}
           console.log(`ESLINT_ERRORS=${e}`); console.log(`ESLINT_WARNINGS=${w}`);
           NODE
           echo "ESLINT_EXIT=$rc"
+          {
+            echo '## ESLint diagnostics'
+            echo
+            echo "Exit: $rc"
+            echo '```text'
+            cat /tmp/eslint.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
           exit 0
       - name: Type escape audit diagnostics
         shell: bash
         run: |
           set +e
-          npm run audit:type-escapes
-          echo "TYPE_ESCAPE_EXIT=$?"
+          npm run audit:type-escapes > /tmp/type-escapes.log 2>&1
+          rc=$?
+          cat /tmp/type-escapes.log
+          echo "TYPE_ESCAPE_EXIT=$rc"
+          {
+            echo '## Type escape audit'
+            echo
+            echo "Exit: $rc"
+            echo '```text'
+            cat /tmp/type-escapes.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
           exit 0
+      - name: Upload diagnostic bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase18-diagnostics
+          path: |
+            /tmp/ts.log
+            /tmp/eslint.json
+            /tmp/eslint.txt
+            /tmp/type-escapes.log
+          if-no-files-found: error
+          retention-days: 1
