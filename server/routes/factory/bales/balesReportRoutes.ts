@@ -386,7 +386,7 @@ export function registerBalesReportRoutes(app: Express) {
       doc.fillColor("#000000");
       let y = tableTop + 16;
 
-      const rowIdx = 0;
+      const _rowIdx = 0;
       for (const g of groups) {
         // page break check — need room for group row + at least one bale row
         if (y > 780) {

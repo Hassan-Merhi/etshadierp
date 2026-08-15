@@ -271,7 +271,7 @@ export function registerCreditSalesImportRoutes(app: Express) {
             .limit(1);
 
           let costPrice = 0;
-          const currentQty = 0;
+          const _currentQty = 0;
 
           if (inventoryRecord) {
             costPrice = parseFloat(inventoryRecord.averageRate || "0");

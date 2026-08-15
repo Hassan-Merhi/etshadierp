@@ -717,7 +717,7 @@ export function registerRawStockReceiptRoutes(app: Express) {
         }
 
         // 2. REMOVE adjustment for any overflow (from adjustment-sourced free)
-        const insertedAdj = null;
+        const _insertedAdj = null;
         if (adjDeductKg > 0) {
           [_insertedAdj] = await tx
             .insert(factoryRawMaterialAdjustments)

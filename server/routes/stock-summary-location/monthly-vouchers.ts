@@ -597,7 +597,7 @@ export function registerLocationMonthlyVoucherRoutes(app: Express) {
 
         // Calculate in-month net movements from transactions
         let inMonthInwardQty = 0;
-        const inMonthInwardValue = 0;
+        const _inMonthInwardValue = 0;
         let inMonthOutwardQty = 0;
 
         for (const t of transactions) {

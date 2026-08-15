@@ -102,7 +102,7 @@ export function registerOrphanedVoucherRepairRoutes(app: Express) {
         // ── REPAY-SAL-{repaymentId}-{ts} and RECEIPT-REPAY-{repaymentId}-{ts} ──
         // Orphaned when the repayment record was deleted (e.g. via Reverse Advance)
         // but the voucher was not removed. Clean them up now.
-        const deletedRepayVouchers = 0;
+        const _deletedRepayVouchers = 0;
         const repayVouchers = await tx
           .select({ id: vouchers.id, voucherNumber: vouchers.voucherNumber })
           .from(vouchers)
@@ -172,7 +172,7 @@ export function registerOrphanedVoucherRepairRoutes(app: Express) {
           }
         }
 
-        const deletedGenVouchers = 0;
+        const _deletedGenVouchers = 0;
         if (orphanedGenVoucherIds.length > 0) {
           await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, orphanedGenVoucherIds));
           await tx.delete(vouchers).where(inArray(vouchers.id, orphanedGenVoucherIds));

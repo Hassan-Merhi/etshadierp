@@ -646,7 +646,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
       </tr>
     </tbody>
   </table>
-  <script>window.onload = function(){ window.print(); };<\/script>
+  <script>window.onload = function(){ window.print(); };</script>
 </body>
 </html>`;
 
@@ -824,7 +824,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     </tbody>
   </table>
 
-  <script>window.onload = function(){ window.print(); };<\/script>
+  <script>window.onload = function(){ window.print(); };</script>
 </body>
 </html>`;
 

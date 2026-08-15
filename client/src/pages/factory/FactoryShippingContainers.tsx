@@ -86,14 +86,14 @@ export default function FactoryShippingContainers() {
     try {
       const saved = localStorage.getItem(`fsc_col_vis_${me.id}`);
       if (saved) setColVis({ ...DEFAULT_COL_VIS, ...JSON.parse(saved) });
-    } catch {}
+    } catch { /* intentionally empty */ }
   }, [me?.id]);
   function toggleCol(id: ShippingColId) {
     setColVis((prev) => {
       const next = { ...prev, [id]: !prev[id] };
       try {
         if (me?.id) localStorage.setItem(`fsc_col_vis_${me.id}`, JSON.stringify(next));
-      } catch {}
+      } catch { /* intentionally empty */ }
       return next;
     });
   }
