@@ -1,6 +1,6 @@
 {
-  "version": 24,
-  "description": "Repository-wide god-file architecture boundaries plus a one-way size ratchet. Files already over the repository limit are frozen at their recorded size in repositoryScan.grandfathered: they may shrink but never grow, and any new file crossing the limit fails until it is split or explicitly baselined. Version 24 permanently retires JournalForm.tsx after its behavior-preserving Wave 6 split into a stable named-export shell, typed form/data controller, entry editor, account sidebar and dialogs, completing all four Wave 6 targets with every authored replacement file below the 900-line repository limit.",
+  "version": 28,
+  "description": "Repository-wide god-file architecture boundaries plus a one-way size ratchet. Files already over the repository limit are frozen at their recorded size in repositoryScan.grandfathered: they may shrink but never grow, and any new file crossing the limit fails until it is split or explicitly baselined. Versions 25-28 permanently retire the four Wave 13 targets: BarcodeLookup.tsx, FactorySuppliers.tsx, SupplierProfitCheck.tsx, and GcLshiMigration.tsx, after behavior-preserving splits into stable original-path shells and focused typed modules, with every authored replacement file below the 900-line repository limit.",
   "retiredFiles": [
     "server/routesLegacy.ts",
     "server/routes/reportsRoutesLegacy.ts",
@@ -139,7 +139,6 @@
     "grandfathered": {
       "client/src/pages/AccountsLegacy.tsx": 1325,
       "client/src/pages/BaleProducts.tsx": 2100,
-      "client/src/pages/BarcodeLookup.tsx": 1625,
       "client/src/pages/ContainerDetail.tsx": 1950,
       "client/src/pages/ContainerLoadingScan.tsx": 1133,
       "client/src/pages/ContainerVerification.tsx": 1125,
@@ -159,7 +158,6 @@
       "client/src/pages/factory/FactoryShippingContainers.tsx": 925,
       "client/src/pages/factory/FactoryStatusBuilder.tsx": 975,
       "client/src/pages/factory/FactoryStockAllocationV5.tsx": 1875,
-      "client/src/pages/factory/FactorySuppliers.tsx": 1350,
       "client/src/pages/factory/WasteDispatch.tsx": 1000,
       "client/src/pages/factory/WipersReEntry.tsx": 925,
       "client/src/pages/PendingInvoiceVerify.tsx": 1050,
@@ -168,8 +166,6 @@
       "client/src/pages/SalesReportDetail.tsx": 1400,
       "client/src/pages/SalesReportLegacy.tsx": 1000,
       "client/src/pages/settings/DataToolsTab.tsx": 1825,
-      "client/src/pages/sp/GcLshiMigration.tsx": 950,
-      "client/src/pages/SupplierProfitCheck.tsx": 1975,
       "client/src/pages/TransactionJournal.tsx": 1600,
       "server/chatService.ts": 2000,
       "server/index.ts": 1725,
