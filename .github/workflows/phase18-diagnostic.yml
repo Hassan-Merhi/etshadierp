@@ -38,39 +38,12 @@ jobs:
               mapfile -t conflicts < <(git diff --name-only --diff-filter=U)
               printf '%s\n' "${conflicts[@]}"
               for f in "${conflicts[@]}"; do
-                git checkout --ours -- "$f"
-                python - "$parent" "$commit" "$f" <<'PY'
-          import subprocess, sys, pathlib, re
-          parent, commit, f = sys.argv[1:]
-          patch = subprocess.check_output(['git','diff','--unified=0',parent,commit,'--',f], text=True)
-          removed=[]; added=[]; pairs=[]
-          def flush():
-              global removed, added
-              if len(removed)==len(added) and removed:
-                  pairs.extend(zip(added, removed))
-              removed=[]; added=[]
-          for line in patch.splitlines():
-              if line.startswith('@@'):
-                  flush(); continue
-              if line.startswith('---') or line.startswith('+++') or line.startswith('diff ') or line.startswith('index '):
-                  continue
-              if line.startswith('-'): removed.append(line[1:])
-              elif line.startswith('+'): added.append(line[1:])
-              else: flush()
-          flush()
-          p=pathlib.Path(f)
-          text=p.read_text()
-          changed=0
-          for new, old in pairs:
-              needle=new+'\n'
-              if needle in text:
-                  text=text.replace(needle, old+'\n', 1); changed+=1
-              elif text.endswith(new):
-                  text=text[:-len(new)]+old; changed+=1
-          p.write_text(text)
-          print(f'{f}: semantically inverted {changed}/{len(pairs)} changed lines')
-          PY
-                git add -- "$f"
+                if git cat-file -e "$parent:$f" 2>/dev/null; then
+                  git show "$parent:$f" > "$f"
+                  git add -- "$f"
+                else
+                  git rm -f -- "$f" || true
+                fi
               done
             fi
             git add -A
