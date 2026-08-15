@@ -108,7 +108,7 @@ export function registerRawStockSupplierRateRoutes(app: Express) {
 
           const oldRate = parseFloat((existing.currentRawMaterialCostPerKgUsd as string) || "0");
           const supplierName = existing.name || `Supplier #${sid}`;
-          const { costPerKgUsd, totalReceivedKg, rows } = await db.transaction(async (tx: any) => {
+          const { costPerKgUsd, totalReceivedKg, rows } = await db.transaction(async (tx) => {
             return getStableSupplierCost(tx, companyId, sid);
           });
 

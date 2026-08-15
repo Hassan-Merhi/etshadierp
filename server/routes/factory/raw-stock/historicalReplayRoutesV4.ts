@@ -241,7 +241,7 @@ export function registerHistoricalReplayRoutesV4(app: Express): void {
     "/api/factory/raw-stock/recalc/undo",
     requireAuth,
     requireRole(...ADMIN_ROLES),
-    async (req: any, res: any, next: any) => {
+    async (req: any, res: any, next) => {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const undoLogId = Number.parseInt(String(req.body?.undoLogId ?? ""), 10);

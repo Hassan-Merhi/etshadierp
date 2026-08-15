@@ -48,7 +48,7 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
       // ── Build date range conditions ──
       // Use COALESCE(stock_entry_date, DATE(created_at)) so bales without a stock_entry_date
       // (e.g. wipers/garbage entered via stock import) are still included using their creation date.
-      const baleConditions: any[] = [
+      const baleConditions = [
         eq(factoryBales.companyId, companyId),
         // Exclude deleted/removed bales and REPACKED originals.
         // REPACKED: when a bale is repacked a new IN_STOCK bale is created with the same
@@ -73,7 +73,7 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
       // that leftover and inflate the raw-material total.
       // Also exclude soft-deleted batches (deletedAt IS NOT NULL): their bales are deleted
       // and excluded from Productions, so counting them here would widen the gap unfairly.
-      const mixBatchConditions: any[] = [
+      const mixBatchConditions = [
         eq(factoryMixBatches.companyId, companyId),
         sql`${factoryMixBatches.carryForwardFromId} IS NULL`,
         isNull(factoryMixBatches.deletedAt),
@@ -332,15 +332,15 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
       });
 
       const totalMixWeightKg = correctedBatchRows.reduce(
-        (s: number, r: any) => s + parseFloat(r.totalWeightKg || "0"),
+        (s: number, r) => s + parseFloat(r.totalWeightKg || "0"),
         0
       );
-      const totalMixCost = correctedBatchRows.reduce((s: number, r: any) => s + parseFloat(r.totalCost || "0"), 0);
+      const totalMixCost = correctedBatchRows.reduce((s: number, r) => s + parseFloat(r.totalCost || "0"), 0);
 
       // Material from period batches that is still on the pressing table (not yet turned into bales).
       // Only ACTIVE batches have meaningful on-table material; COMPLETED batches set usedKg = totalWeightKg
       // when closed, so their contribution is already 0 by definition.
-      const periodOnTableKg = mixBatchRows.reduce((s: number, r: any) => {
+      const periodOnTableKg = mixBatchRows.reduce((s: number, r) => {
         if ((r.status || "ACTIVE") !== "ACTIVE") return s;
         const remaining = Math.max(0, parseFloat(r.totalWeightKg || "0") - parseFloat(r.usedKg || "0"));
         return s + remaining;

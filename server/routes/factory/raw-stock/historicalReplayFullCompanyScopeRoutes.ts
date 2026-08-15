@@ -30,7 +30,7 @@ export function registerHistoricalReplayFullCompanyScopeRoutes(app: Express): vo
     APPLY_PATH,
     requireAuth,
     requireRole(...ADMIN_ROLES),
-    async (req: any, res: any, next: any) => {
+    async (req: any, res: any, next) => {
       const hasToken = typeof req.body?.confirmationToken === "string"
         && req.body.confirmationToken.length > 0;
       if (hasToken) return next();

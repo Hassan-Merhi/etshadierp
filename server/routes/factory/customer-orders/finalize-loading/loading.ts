@@ -123,7 +123,7 @@ export function registerOrderLoadingRoutes(app: Express) {
           .from(customers)
           .where(eq(customers.id, order.customerId));
         const txDate = req.body?.txDate || getClientDate(req);
-        const totalValue = bales.reduce((sum: number, b: any) => sum + parseFloat(b.priceUsed || "0"), 0);
+        const totalValue = bales.reduce((sum: number, b) => sum + parseFloat(b.priceUsed || "0"), 0);
 
         await writeDaybookEntry(tx, {
           companyId,

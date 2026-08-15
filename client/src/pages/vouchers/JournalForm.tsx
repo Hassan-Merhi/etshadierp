@@ -172,7 +172,7 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
         code: f.code,
         openingBalance: f.openingBalance,
       })),
-      ...customers.map((c: any) => ({
+      ...customers.map((c) => ({
         type: "customer" as const,
         id: c.id,
         name: c.legalName,
@@ -180,8 +180,8 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
         openingBalance: c.openingBalance,
       })),
       ...customerSearchResults
-        .filter((c: any) => !customers.find((p: any) => p.id === c.id))
-        .map((c: any) => ({ type: "customer" as const, id: c.id, name: c.legalName, code: c.code })),
+        .filter((c) => !customers.find((p) => p.id === c.id))
+        .map((c) => ({ type: "customer" as const, id: c.id, name: c.legalName, code: c.code })),
       ...factorySuppliersList.map((s) => ({
         type: "factorySupplier" as const,
         id: s.id,
@@ -369,7 +369,7 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
       } else if (entry.customerId) {
         accountType = "customer";
         accountId = entry.customerId;
-        accountName = customers.find((c: any) => c.id === accountId)?.legalName || "";
+        accountName = customers.find((c) => c.id === accountId)?.legalName || "";
       }
       const debitAmt = parseFloat(entry.debitAmount || "0");
       const creditAmt = parseFloat(entry.creditAmount || "0");
@@ -474,8 +474,8 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
           voucherDate: format(formData.voucherDate, "yyyy-MM-dd"),
           description: formData.notes || "Journal (pending sync)",
           totalAmount: formData.entries
-            .filter((e: any) => e.type === "DR" && parseFloat(e.amount || "0") > 0)
-            .reduce((sum: number, e: any) => sum + parseFloat(e.amount || "0"), 0)
+            .filter((e) => e.type === "DR" && parseFloat(e.amount || "0") > 0)
+            .reduce((sum: number, e) => sum + parseFloat(e.amount || "0"), 0)
             .toFixed(2),
           optional: formData.optional || false,
           createdAt: new Date().toISOString(),
@@ -528,7 +528,7 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
     const voucherDate = formData.voucherDate
       ? format(formData.voucherDate, "yyyy-MM-dd")
       : format(new Date(), "yyyy-MM-dd");
-    const validEntries = formData.entries.filter((e: any) => e.accountId > 0 && parseFloat(e.amount) > 0);
+    const validEntries = formData.entries.filter((e) => e.accountId > 0 && parseFloat(e.amount) > 0);
     if (validEntries.length === 0) {
       toast({
         title: "No data to export",
@@ -538,7 +538,7 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
       return;
     }
     if (detailed) {
-      const exportData = validEntries.map((entry: any) => ({
+      const exportData = validEntries.map((entry) => ({
         "Voucher Type": "Journal",
         Date: voucherDate,
         "DR/CR": entry.type,
@@ -556,11 +556,11 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
       toast({ title: "Export successful", description: `Downloaded ${fileName} with ${validEntries.length} entries.` });
     } else {
       const totalDr = validEntries
-        .filter((e: any) => e.type === "DR")
-        .reduce((sum: number, e: any) => sum + (parseFloat(e.amount) || 0), 0);
+        .filter((e) => e.type === "DR")
+        .reduce((sum: number, e) => sum + (parseFloat(e.amount) || 0), 0);
       const totalCr = validEntries
-        .filter((e: any) => e.type === "CR")
-        .reduce((sum: number, e: any) => sum + (parseFloat(e.amount) || 0), 0);
+        .filter((e) => e.type === "CR")
+        .reduce((sum: number, e) => sum + (parseFloat(e.amount) || 0), 0);
       const exportData = [
         {
           "Voucher Type": "Journal",
@@ -893,7 +893,7 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
                             />
                             {activeJournalRow === index && filteredJournalAccounts.length > 0 && (
                               <div className="mt-1 border rounded-md bg-popover shadow-md max-h-44 overflow-y-auto z-20 relative">
-                                {filteredJournalAccounts.slice(0, 10).map((account: any) => (
+                                {filteredJournalAccounts.slice(0, 10).map((account) => (
                                   <button
                                     key={`${account.type}-${account.id}`}
                                     type="button"

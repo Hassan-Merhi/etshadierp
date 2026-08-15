@@ -66,7 +66,7 @@ function sendBarcode(req: any, res: any, image: BarcodeImage) {
  * rendering the same label during reprints/previews.
  */
 export function registerBarcodeImageBandwidthMiddleware(app: Express): void {
-  app.use("/api/barcode/:code", requireAuth, async (req: any, res: any, next: any) => {
+  app.use("/api/barcode/:code", requireAuth, async (req: any, res: any, next) => {
     if (req.method !== "GET" && req.method !== "HEAD") return next();
 
     try {

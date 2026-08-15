@@ -56,7 +56,7 @@ function matchesEtag(header: string | string[] | undefined, etag: string): boole
 function installReconnectJitter(res: Response): void {
   const originalWrite = res.write.bind(res) as (...args: any[]) => boolean;
   let retryRewritten = false;
-  res.write = ((chunk: any, ...args: any[]) => {
+  res.write = ((chunk: any, ...args) => {
     if (!retryRewritten && typeof chunk === "string" && chunk.includes("retry: 3000")) {
       retryRewritten = true;
       chunk = chunk.replace("retry: 3000", `retry: ${reconnectDelay()}`);

@@ -50,7 +50,7 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
         return res.status(403).json({ message: "Supervisor must have Admin, Owner, or Manager role" });
       }
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         const balesToRemove = await tx
           .select()
           .from(factoryBales)
@@ -171,7 +171,7 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
         return res.status(403).json({ message: "Supervisor must have Admin, Owner, or Manager role" });
       }
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         const balesToRemove = await tx
           .select()
           .from(factoryBales)

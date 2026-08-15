@@ -105,7 +105,7 @@ export function registerPayrollMarkPaidRoutes(app: Express) {
         ? await findOrCreateLedger(companyId, "Payroll Payable", "Liability")
         : null;
 
-      const updated = await db.transaction(async (tx: any) => {
+      const updated = await db.transaction(async (tx) => {
         const [payroll] = await tx
           .update(factoryPayrolls)
           .set({ status: "PAID", paidAt: new Date(paymentDate), cashAccountId })
@@ -244,7 +244,7 @@ export function registerPayrollMarkPaidRoutes(app: Express) {
       if (!pendingGuard.ok) return res.status(pendingGuard.status).json(pendingGuard);
 
       const payableAccBulk = cashId ? await findOrCreateLedger(companyId, "Payroll Payable", "Liability") : null;
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         const payrollsToMark = await tx
           .select()
           .from(factoryPayrolls)

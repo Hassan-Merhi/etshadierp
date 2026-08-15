@@ -429,7 +429,7 @@ export function registerRawStockAdjRoutes(app: Express) {
         });
       } else {
         // For ADD / REMOVE: soft-delete + clean up linked daybook entries and vouchers
-        await db.transaction(async (tx: any) => {
+        await db.transaction(async (tx) => {
           await tx
             .update(factoryRawMaterialAdjustments)
             .set({ deletedAt: new Date() })
@@ -485,7 +485,7 @@ export function registerRawStockAdjRoutes(app: Express) {
       if (isNaN(batchId) || isNaN(supplierId))
         return res.status(400).json({ message: "batchId and supplierId are required" });
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         // Verify batch belongs to this company
         const [batch] = await tx
           .select()
@@ -576,7 +576,7 @@ export function registerRawStockAdjRoutes(app: Express) {
         });
       }
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         // Soft-delete the raw stock record
         await tx
           .update(factoryRawStock)
@@ -678,7 +678,7 @@ export function registerRawStockAdjRoutes(app: Express) {
           )
         );
 
-      const enriched = results.map((r: any) => {
+      const enriched = results.map((r) => {
         const received = parseFloat(r.receivedKg) || 0;
         const used = parseFloat(r.usedKg) || 0;
         const costPerKg = parseFloat(r.costPerKg) || 0;

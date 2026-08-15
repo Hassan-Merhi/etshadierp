@@ -102,7 +102,7 @@ export function registerRawStockContainerRoutes(app: Express) {
       // offload mutations from racing this route. All financial writes (duty fields,
       // financials, cascade, daybook) are inside one transaction — a partial failure
       // rolls everything back.
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         // 1. Lock container FOR UPDATE — authoritative source for all reads below.
         const [lockedContainer] = await tx
           .select()

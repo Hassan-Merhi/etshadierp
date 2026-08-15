@@ -50,7 +50,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
         .from(factoryBales)
         .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.referenceNumber, refCodes)));
 
-      const baleMap = new Map<string, any>(baleRows.map((b: any) => [b.referenceNumber, b]));
+      const baleMap = new Map<string, any>(baleRows.map((b) => [b.referenceNumber, b]));
 
       // detect duplicate refs in the uploaded file
       const seen = new Set<string>();
@@ -101,7 +101,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
       const validRows = rows.filter((r: any) => String(r.currentRef || "").trim());
       if (validRows.length === 0) return res.status(400).json({ message: "No valid rows to apply" });
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         // 1. Fetch bales to recode
         const refCodes = validRows.map((r: any) => String(r.currentRef).trim());
         const baleRows = await tx
@@ -237,7 +237,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
         .limit(10);
 
       // attach items counts
-      const sessionIds = sessions.map((s: any) => s.id);
+      const sessionIds = sessions.map((s) => s.id);
       const itemsBySession: Record<number, any[]> = {};
       if (sessionIds.length > 0) {
         const items = await db.select().from(baleRecodeItems).where(inArray(baleRecodeItems.sessionId, sessionIds));
@@ -247,7 +247,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
         }
       }
 
-      const enriched = sessions.map((s: any) => ({
+      const enriched = sessions.map((s) => ({
         ...s,
         items: itemsBySession[s.id] || [],
       }));

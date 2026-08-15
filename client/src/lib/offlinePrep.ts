@@ -450,7 +450,7 @@ export async function runOfflinePrep(companyId: number, onProgress: (p: PrepProg
   // Step 2b: Pre-warm lazy-loaded factory page JS chunks so they work offline
   // without needing a prior visit. Dynamic import() fetches the chunk; the
   // service worker caches it automatically via stale-while-revalidate.
-  const pageChunks: Array<{ label: string; loader: () => Promise<any> }> = [
+  const pageChunks = [
     // ── Core factory pages ───────────────────────────────────────────────
     { label: "Dashboard", loader: () => import("@/pages/factory/FactoryDashboard") },
     { label: "Daybook", loader: () => import("@/pages/factory/FactoryDaybook") },

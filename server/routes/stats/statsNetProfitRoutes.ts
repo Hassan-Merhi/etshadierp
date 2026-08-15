@@ -559,7 +559,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
         };
         const stockEntries = forUsAccounts.filter(isStockEntry);
         if (stockEntries.length > 1) {
-          const combined = round2(stockEntries.reduce((s: number, a: any) => s + (a.value || 0), 0));
+          const combined = round2(stockEntries.reduce((s: number, a) => s + (a.value || 0), 0));
           for (let i = forUsAccounts.length - 1; i >= 0; i--) {
             if (isStockEntry(forUsAccounts[i])) forUsAccounts.splice(i, 1);
           }

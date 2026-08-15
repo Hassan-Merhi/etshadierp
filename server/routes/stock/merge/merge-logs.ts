@@ -66,7 +66,7 @@ export function registerStockMergeLogRoutes(app: Express) {
         LIMIT 200
       `);
 
-      const data = (rows.rows ?? rows).map((r: any) => ({
+      const data = (rows.rows ?? rows).map((r) => ({
         ...r,
         id: null,
         source: "historical",

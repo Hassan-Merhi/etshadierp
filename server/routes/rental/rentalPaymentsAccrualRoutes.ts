@@ -405,7 +405,7 @@ export function registerRentalPaymentsAccrualRoutes(
 
         // Separate posted (effective) and scheduled
         postedPayments = rentPaymentsAll.filter(
-          (p: any) => p.postingStatus === "POSTED" && String(p.paymentDate) <= asOfDate
+          (p) => p.postingStatus === "POSTED" && String(p.paymentDate) <= asOfDate
         );
         scheduledPayments = rentPaymentsAll.filter((p) => p.postingStatus === "SCHEDULED");
 
@@ -552,7 +552,7 @@ export function registerRentalPaymentsAccrualRoutes(
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const statusFilter = req.query.status as string | undefined;
-      const conditions: any[] = [eq(propertyPayments.companyId, companyId), eq(propertyPayments.module, module)];
+      const conditions = [eq(propertyPayments.companyId, companyId), eq(propertyPayments.module, module)];
       if (statusFilter) {
         conditions.push(sql`${propertyPayments.postingStatus} = ${statusFilter}`);
       }

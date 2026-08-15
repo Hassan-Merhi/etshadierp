@@ -94,7 +94,7 @@ export function registerOrderUnfinalizeRoutes(app: Express) {
 
       if (orderId === null) return res.status(400).json({ message: "Invalid id" });
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         const [order] = await tx
           .select()
           .from(customerOrders)

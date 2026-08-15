@@ -47,7 +47,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
       }
 
       // ── 1. Query existing factory_daybook_entries ──────────────────────────
-      const conditions: any[] = [
+      const conditions = [
         eq(factoryDaybookEntries.companyId, companyId),
         // Exclude void/delete audit entries — they are internal records, not daybook events
         sql`${factoryDaybookEntries.txType} NOT LIKE '%_VOIDED'`,
@@ -211,7 +211,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
           );
         const capturedVoucherIds = new Set<number>(allCapturedRows.map((r) => r.referenceId as number));
 
-        const voucherConds: any[] = [
+        const voucherConds = [
           eq(vouchers.companyId, companyId),
           sql`${vouchers.deletedAt} IS NULL`,
           inArray(vouchers.voucherType, ["Payment", "Receipt", "Journal"]),
@@ -265,7 +265,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
       // BALE_STOCK_ENTRY is always re-derived so old entries stored as selling price
       // are corrected to production price on the fly without a DB migration.
       const baleStockAndZeroRows = filteredDaybookRows.filter(
-        (r: any) =>
+        (r) =>
           r.txType === "BALE_STOCK_ENTRY" ||
           (parseFloat(r.amountCurrency || "0") === 0 && ["LOADING_SUBMITTED", "ORDER_VERIFIED"].includes(r.txType))
       );
@@ -357,7 +357,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
         // LOADING_SUBMITTED / ORDER_VERIFIED: derive from customerOrders.grandTotal
         // (grandTotal includes bales + all charges/surcharges, not just bale prices)
         const loadingRows = zeroRows.filter(
-          (r: any) => ["LOADING_SUBMITTED", "ORDER_VERIFIED"].includes(r.txType) && r.referenceId
+          (r) => ["LOADING_SUBMITTED", "ORDER_VERIFIED"].includes(r.txType) && r.referenceId
         );
         if (loadingRows.length > 0) {
           const orderIds = [...new Set(loadingRows.map((r) => r.referenceId as number))];

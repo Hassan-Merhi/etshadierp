@@ -74,7 +74,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
               inArray(factoryBaleProducts.articleCode, articleCodes as string[])
             )
           );
-        baleProds.forEach((p: any) => {
+        baleProds.forEach((p) => {
           if (p.articleCode) weightMap.set(p.articleCode, p.weightPerBaleKg || "0");
         });
       }
@@ -225,7 +225,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
               inArray(factoryBaleProducts.articleCode, articleCodes as string[])
             )
           );
-        baleProds.forEach((p: any) => {
+        baleProds.forEach((p) => {
           if (p.articleCode) {
             weightMap.set(p.articleCode, p.weightPerBaleKg || "0");
             if (p.name) nameMap.set(p.articleCode, p.name);

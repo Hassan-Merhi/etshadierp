@@ -300,7 +300,7 @@ export async function synchronizeExactCutoverStock(
   let zeroed = 0;
   let unchanged = 0;
 
-  await db.transaction(async (tx: any) => {
+  await db.transaction(async (tx) => {
     for (const originalEntry of plan.entries) {
       if (!originalEntry.changed) {
         unchanged++;
@@ -349,7 +349,7 @@ export async function restoreExactCutoverStock(
   `);
   let restored = 0;
   let deleted = 0;
-  await db.transaction(async (tx: any) => {
+  await db.transaction(async (tx) => {
     for (const row of resultRows(result)) {
       if (row.created_target_inventory) {
         await tx.execute(

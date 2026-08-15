@@ -286,7 +286,7 @@ export function VoucherDetailsDialog({
                           purchaseOrderData &&
                           (() => {
                             const totalQty = purchaseItems.reduce(
-                              (sum: number, e: any) => sum + parseFloat(e.quantity || "0"),
+                              (sum: number, e) => sum + parseFloat(e.quantity || "0"),
                               0
                             );
                             const charges = [

@@ -250,7 +250,7 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
       const beforeJson = JSON.stringify(entry);
       const sourceType: string = meta.sourceType || entry.txType;
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         // ── 1. Update the specific source record ────────────────────────────────
         if (sourceType === "BASE_MATERIAL" || entry.txType === "OFFLOAD_RAW_STOCK") {
           // Editing base material cost: derive new ratePerKg from amount / actualKg
@@ -522,7 +522,7 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
       const txTypeVal = voucherTxTypeMap[voucher.voucherType] || "JOURNAL";
       const today = getClientDate(req);
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         // 0. Read employee-linked entries BEFORE deletion so we can reverse balances
         const empEntries = await tx
           .select()

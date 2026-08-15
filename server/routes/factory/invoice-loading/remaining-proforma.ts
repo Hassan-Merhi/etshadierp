@@ -42,7 +42,7 @@ export function registerInvoiceRemainingProformaRoutes(app: Express) {
         const today = new Date().toISOString().slice(0, 10);
         const proformaName = `Remaining - ${invoiceLabel} - ${today}`;
 
-        const result = await db.transaction(async (tx: any) => {
+        const result = await db.transaction(async (tx) => {
           const [proforma] = await tx
             .insert(customerProformas)
             .values({

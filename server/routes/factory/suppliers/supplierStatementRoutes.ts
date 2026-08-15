@@ -183,7 +183,7 @@ export function registerSupplierStatementRoutes(app: Express) {
         const value = kg * rate + (freightCc === containerCc ? freight : 0);
         const containerCommissions = commissions.filter((cm) => cm.containerId === c.id);
         const totalCommission = containerCommissions.reduce(
-          (sum: number, cm: any) => sum + parseFloat(cm.commissionTotal || "0"),
+          (sum: number, cm) => sum + parseFloat(cm.commissionTotal || "0"),
           0
         );
 
@@ -219,14 +219,14 @@ export function registerSupplierStatementRoutes(app: Express) {
         };
       });
 
-      const totalValue = statement.reduce((sum: number, s: any) => sum + parseFloat(s.value), 0);
+      const totalValue = statement.reduce((sum: number, s) => sum + parseFloat(s.value), 0);
       const totalKg = statement.reduce(
-        (sum: number, s: any) => sum + parseFloat(s.actualReceivedKg || s.totalKg || "0"),
+        (sum: number, s) => sum + parseFloat(s.actualReceivedKg || s.totalKg || "0"),
         0
       );
-      const totalCommissions = statement.reduce((sum: number, s: any) => sum + parseFloat(s.totalCommission), 0);
+      const totalCommissions = statement.reduce((sum: number, s) => sum + parseFloat(s.totalCommission), 0);
       const totalDirectCommissions = statement.reduce(
-        (sum: number, s: any) => sum + parseFloat(s.commissionAmount || "0"),
+        (sum: number, s) => sum + parseFloat(s.commissionAmount || "0"),
         0
       );
 
@@ -279,7 +279,7 @@ export function registerSupplierStatementRoutes(app: Express) {
       }, 0);
 
       const totalPayments =
-        payments.reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0) + voucherPaymentsTotal;
+        payments.reduce((sum: number, p) => sum + parseFloat(p.amountUsd || "0"), 0) + voucherPaymentsTotal;
 
       // Group by currency for multi-currency statement
       const byCurrency: Record<

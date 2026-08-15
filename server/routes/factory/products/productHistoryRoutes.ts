@@ -180,7 +180,7 @@ export function registerFactoryProductHistoryRoutes(app: Express) {
 
       // Sum per-month movements for the grand total row (except Net/KG-Net/Value which use snapshot)
       const grandTotalMovements = monthlyData.reduce(
-        (acc: any, m: any) => ({
+        (acc: any, m) => ({
           baleCount: acc.baleCount + m.balesIn,
           balesIn: acc.balesIn + m.balesIn,
           balesOut: acc.balesOut + m.balesOut,

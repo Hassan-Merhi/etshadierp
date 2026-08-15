@@ -51,7 +51,7 @@ export function registerBalesPressingRoutes(app: Express) {
       }
       if (quantity === null) return res.status(400).json({ message: QUANTITY_MESSAGE });
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         const [product] = await tx
           .select()
           .from(factoryBaleProducts)
@@ -146,7 +146,7 @@ export function registerBalesPressingRoutes(app: Express) {
       }
       const quantities = parsedQuantities as number[];
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         const totalExpected = quantities.reduce((sum: number, quantity: number) => sum + quantity, 0);
 
         const [pressingBatch] = await tx
@@ -247,7 +247,7 @@ export function registerBalesPressingRoutes(app: Express) {
       }
       if (quantity === null) return res.status(400).json({ message: QUANTITY_MESSAGE });
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         const [product] = await tx
           .select()
           .from(factoryBaleProducts)
@@ -348,7 +348,7 @@ export function registerBalesPressingRoutes(app: Express) {
         .orderBy(desc(factoryPressingBatches.createdAt));
 
       const enriched = await Promise.all(
-        batches.map(async (batch: any) => {
+        batches.map(async (batch) => {
           const balesForBatch = await db
             .select()
             .from(factoryBales)

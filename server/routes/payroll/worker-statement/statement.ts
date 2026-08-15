@@ -30,7 +30,7 @@ export function registerWorkerStatementReadRoutes(app: Express) {
 
       const { startDate, endDate } = req.query;
 
-      const advanceConditions: any[] = [
+      const advanceConditions = [
         eq(factoryWorkerAdvances.workerId, workerId),
         eq(factoryWorkerAdvances.companyId, companyId),
       ];
@@ -43,7 +43,7 @@ export function registerWorkerStatementReadRoutes(app: Express) {
         .where(and(...advanceConditions))
         .orderBy(factoryWorkerAdvances.advanceDate);
 
-      const payrollConditions: any[] = [
+      const payrollConditions = [
         eq(factoryPayrolls.workerId, workerId),
         eq(factoryPayrolls.companyId, companyId),
         eq(factoryPayrolls.status, "PAID"),
@@ -126,7 +126,7 @@ export function registerWorkerStatementReadRoutes(app: Express) {
       const workerName = worker.fullName || `Worker #${workerId}`;
 
       // Advances
-      const advConds: any[] = [
+      const advConds = [
         eq(factoryWorkerAdvances.workerId, workerId),
         eq(factoryWorkerAdvances.companyId, companyId),
       ];
@@ -139,7 +139,7 @@ export function registerWorkerStatementReadRoutes(app: Express) {
         .orderBy(factoryWorkerAdvances.advanceDate);
 
       // Payrolls
-      const payConds: any[] = [
+      const payConds = [
         eq(factoryPayrolls.workerId, workerId),
         eq(factoryPayrolls.companyId, companyId),
         eq(factoryPayrolls.status, "PAID"),

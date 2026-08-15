@@ -90,7 +90,7 @@ export async function sendAgentCardToWhatsApp(params: SendAgentDutyWaParams): Pr
     const waPrepaidSet = new Set<number>(dbPrepaidIds);
     const waPrepaidRows = activePreviewRows.filter((r) => waPrepaidSet.has(r.id));
     const waRemainingRows = activePreviewRows.filter((r) => !waPrepaidSet.has(r.id));
-    const designatedPrepaidSum = waPrepaidRows.reduce((s: number, r: any) => s + Number(r.dutyFee ?? 0), 0);
+    const designatedPrepaidSum = waPrepaidRows.reduce((s: number, r) => s + Number(r.dutyFee ?? 0), 0);
     const waPrepaidBudget = Math.max(0, ledgerBalance ?? 0);
     const minOpenRem =
       cbAllOpenPartial.length > 0
@@ -220,7 +220,7 @@ export async function sendAgentCardToWhatsApp(params: SendAgentDutyWaParams): Pr
       ? waRemainingRows.filter((r) => r.transporter === transitTransporterFilter)
       : waRemainingRows;
     if (waTransitRows.length > 0) {
-      const transitTotal = waTransitRows.reduce((s: number, r: any) => s + r.dutyFee, 0);
+      const transitTotal = waTransitRows.reduce((s: number, r) => s + r.dutyFee, 0);
       let transitRowsHtml = "";
       const sortedWaTransitRows = [...waTransitRows].sort((a: any, b: any) => {
         const tA = (a.transporter ?? "").toLowerCase(),

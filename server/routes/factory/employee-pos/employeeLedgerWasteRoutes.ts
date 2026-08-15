@@ -85,12 +85,12 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
       const allBales = Array.isArray(allBalesRaw) ? allBalesRaw : resultRows(allBalesRaw);
       const pendingOrderBaleIds = new Set<number>(
         (Array.isArray(pendingOrderBaleIdsRaw) ? pendingOrderBaleIdsRaw : resultRows(pendingOrderBaleIdsRaw)).map(
-          (r: any) => Number(r.baleId)
+          (r) => Number(r.baleId)
         )
       );
       // Bales physically gone but DB status not yet updated to SOLD/DISPATCHED
       const staleOrderBaleIds = new Set<number>(
-        (Array.isArray(staleOrderBaleIdsRaw) ? staleOrderBaleIdsRaw : resultRows(staleOrderBaleIdsRaw)).map((r: any) =>
+        (Array.isArray(staleOrderBaleIdsRaw) ? staleOrderBaleIdsRaw : resultRows(staleOrderBaleIdsRaw)).map((r) =>
           Number(r.baleId)
         )
       );
@@ -98,15 +98,15 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
       // Identify waste categories (garbage or wiper)
       const wasteCategories = new Set<number>(
         allCategories
-          .filter((c: any) => {
+          .filter((c) => {
             const n = (c.name || "").toLowerCase();
             return n.includes("garbage") || n.includes("wiper");
           })
-          .map((c: any) => c.id)
+          .map((c) => c.id)
       );
 
-      const productMap = new Map(allProducts.map((p: any) => [p.id, p]));
-      const categoryMap = new Map(allCategories.map((c: any) => [c.id, c]));
+      const productMap = new Map(allProducts.map((p) => [p.id, p]));
+      const categoryMap = new Map(allCategories.map((c) => [c.id, c]));
 
       function isWasteProduct(productId: number | null, articleCode?: string | null): boolean {
         if (articleCode?.startsWith("HMD16")) return true;
@@ -340,23 +340,23 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
       const allBales = Array.isArray(allBalesRaw) ? allBalesRaw : resultRows(allBalesRaw);
       const pendingOrderBaleIds = new Set<number>(
         (Array.isArray(pendingOrderBaleIdsRaw) ? pendingOrderBaleIdsRaw : resultRows(pendingOrderBaleIdsRaw)).map(
-          (r: any) => Number(r.baleId)
+          (r) => Number(r.baleId)
         )
       );
       const staleOrderBaleIds = new Set<number>(
-        (Array.isArray(staleOrderBaleIdsRaw) ? staleOrderBaleIdsRaw : resultRows(staleOrderBaleIdsRaw)).map((r: any) =>
+        (Array.isArray(staleOrderBaleIdsRaw) ? staleOrderBaleIdsRaw : resultRows(staleOrderBaleIdsRaw)).map((r) =>
           Number(r.baleId)
         )
       );
 
-      const productMap = new Map(allProducts.map((p: any) => [p.id, p]));
+      const productMap = new Map(allProducts.map((p) => [p.id, p]));
       const wasteCategories = new Set<number>(
         allCategories
-          .filter((c: any) => {
+          .filter((c) => {
             const n = (c.name || "").toLowerCase();
             return n.includes("garbage") || n.includes("wiper");
           })
-          .map((c: any) => c.id)
+          .map((c) => c.id)
       );
       function isWasteProduct(pid: number | null, articleCode?: string | null): boolean {
         if (articleCode?.startsWith("HMD16")) return true;
@@ -415,11 +415,11 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
       const search = (req.query.search as string) || "";
 
       const allCategories = await db.select().from(factoryCategories).where(eq(factoryCategories.companyId, companyId));
-      const wasteCategories = allCategories.filter((c: any) => {
+      const wasteCategories = allCategories.filter((c) => {
         const name = (c.name || "").toLowerCase();
         return name.includes("garbage") || name.includes("wiper");
       });
-      const wasteCategoryIds = new Set(wasteCategories.map((c: any) => c.id));
+      const wasteCategoryIds = new Set(wasteCategories.map((c) => c.id));
 
       const allProducts = await db
         .select()
@@ -427,12 +427,12 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
         .where(eq(factoryBaleProducts.companyId, companyId));
       const wasteProductIds = new Set(
         allProducts
-          .filter((p: any) => {
+          .filter((p) => {
             if (p.categoryId && wasteCategoryIds.has(p.categoryId)) return true;
             if (p.articleCode?.startsWith("HMD16")) return true;
             return false;
           })
-          .map((p: any) => p.id)
+          .map((p) => p.id)
       );
 
       if (wasteProductIds.size === 0) {
@@ -460,10 +460,10 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
         )
         .orderBy(desc(factoryBales.id));
 
-      const productMap = new Map(allProducts.map((p: any) => [p.id, p]));
-      const categoryMap = new Map(allCategories.map((c: any) => [c.id, c]));
+      const productMap = new Map(allProducts.map((p) => [p.id, p]));
+      const categoryMap = new Map(allCategories.map((c) => [c.id, c]));
 
-      const locationIds = [...new Set(baleRows.map((b: any) => b.erpLocationId).filter(Boolean))] as number[];
+      const locationIds = [...new Set(baleRows.map((b) => b.erpLocationId).filter(Boolean))] as number[];
       const locationRows =
         locationIds.length > 0
           ? await db
@@ -471,9 +471,9 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
               .from(locations)
               .where(inArray(locations.id, locationIds))
           : [];
-      const locationMap = new Map(locationRows.map((l: any) => [l.id, l.name]));
+      const locationMap = new Map(locationRows.map((l) => [l.id, l.name]));
 
-      const enriched = baleRows.map((b: any) => {
+      const enriched = baleRows.map((b) => {
         const product = productMap.get(b.productId as number);
         const cat = product?.categoryId ? categoryMap.get(product.categoryId) : null;
         return {
@@ -548,7 +548,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
       }
 
       res.json(
-        dispatches.map((d: any) => ({
+        dispatches.map((d) => ({
           ...d,
           bales: balesByDispatch.get(d.id) || [],
         }))
@@ -584,7 +584,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
       `);
       const bales = Array.isArray(linkedBales) ? linkedBales : resultRows(linkedBales);
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         const now = new Date();
 
         // 1. Restore each bale to IN_STOCK and clear waste_dispatch_id
@@ -656,7 +656,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
       }
       const dispatchNumber = `WD-${String(nextNum).padStart(4, "0")}`;
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         const balesToDispose = await tx
           .select()
           .from(factoryBales)

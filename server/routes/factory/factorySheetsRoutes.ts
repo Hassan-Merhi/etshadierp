@@ -396,7 +396,7 @@ export function registerFactorySheetsRoutes(app: Express) {
       const wb = xlsxUtils.book_new();
 
       // Sheet 1 — Production Tracking example
-      const sheet1: any[][] = [
+      const sheet1 = [
         ["Label", "Week 1", "Week 2", "Week 3", "Week 4"],
         ["Target", 150, 150, 150, 150],
         ["Actual", 120, 135, 140, 155],
@@ -407,7 +407,7 @@ export function registerFactorySheetsRoutes(app: Express) {
       xlsxUtils.book_append_sheet(wb, ws1, "Production Tracking");
 
       // Sheet 2 — Inventory example
-      const sheet2: any[][] = [
+      const sheet2 = [
         ["Label", "Mon", "Tue", "Wed", "Thu", "Fri"],
         ["Opening Stock", 500, 470, 490, 460, 480],
         ["Received", 100, 150, 80, 120, 90],

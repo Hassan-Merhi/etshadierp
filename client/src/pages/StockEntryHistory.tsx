@@ -1040,7 +1040,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
               Location
             </div>
             <MultiSelectFilter
-              options={locations.map((l: any) => ({ value: String(l.id), label: l.name }))}
+              options={locations.map((l) => ({ value: String(l.id), label: l.name }))}
               selected={locationIdFilter}
               onChange={setLocationIdFilter}
               placeholder="Locations"

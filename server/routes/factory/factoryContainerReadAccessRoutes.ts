@@ -59,7 +59,7 @@ export function registerFactoryContainerReadAccessRoutes(app: Express) {
         .where(and(eq(containerDocuments.containerId, containerId), eq(containerDocuments.companyId, companyId)));
       const docTypes = await db.select().from(containerDocumentTypes).orderBy(containerDocumentTypes.label);
       const requiredTypes = docTypes.filter(
-        (docType: any) => docType.isRequired && (docType.companyId == null || docType.companyId === companyId)
+        (docType) => docType.isRequired && (docType.companyId == null || docType.companyId === companyId)
       );
       const uploadedTypeIds = new Set(rawDocs.map((doc) => doc.docTypeId));
 

@@ -380,7 +380,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           description: formData.notes || `${voucherType} (pending sync)`,
           totalAmount: formData.entries
             .filter((e) => parseFloat(e.amount || "0") > 0)
-            .reduce((sum: number, e: any) => sum + parseFloat(e.amount || "0"), 0)
+            .reduce((sum: number, e) => sum + parseFloat(e.amount || "0"), 0)
             .toFixed(2),
           optional: formData.optional || false,
           createdAt: new Date().toISOString(),

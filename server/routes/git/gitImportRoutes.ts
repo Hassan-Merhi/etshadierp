@@ -45,7 +45,7 @@ export function registerGitImportRoutes(app: Express) {
 
         // ── Header row ──────────────────────────────────────────────────────
         const headerRow = ws.addRow(["Container #", "New ETA"]);
-        headerRow.eachCell((cell: any) => {
+        headerRow.eachCell((cell) => {
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "1F4E79" } };
           cell.font = { bold: true, color: { argb: "FFFFFF" }, size: 12 };
           cell.alignment = { vertical: "middle", horizontal: "center" };
@@ -127,7 +127,7 @@ export function registerGitImportRoutes(app: Express) {
 
         // Header row — dark blue
         const headerRow = ws.addRow(headers);
-        headerRow.eachCell((cell: any) => {
+        headerRow.eachCell((cell) => {
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "1F4E79" } };
           cell.font = { bold: true, color: { argb: "FFFFFF" }, size: 11 };
           cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
@@ -159,7 +159,7 @@ export function registerGitImportRoutes(app: Express) {
           "e.g. ABC SHOP",
         ];
         const hintRow = ws.addRow(hints);
-        hintRow.eachCell((cell: any) => {
+        hintRow.eachCell((cell) => {
           if (cell.value) {
             cell.font = { italic: true, color: { argb: "888888" }, size: 9 };
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "F5F5F5" } };
@@ -187,7 +187,7 @@ export function registerGitImportRoutes(app: Express) {
           "MAERSK",
           "ABC SHOP",
         ]);
-        ex1.eachCell((cell: any) => {
+        ex1.eachCell((cell) => {
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDE7" } };
           cell.font = { italic: true, color: { argb: "5D4037" } };
         });
@@ -213,7 +213,7 @@ export function registerGitImportRoutes(app: Express) {
           "",
           "XYZ STORE",
         ]);
-        ex2.eachCell((cell: any) => {
+        ex2.eachCell((cell) => {
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDE7" } };
           cell.font = { italic: true, color: { argb: "5D4037" } };
         });

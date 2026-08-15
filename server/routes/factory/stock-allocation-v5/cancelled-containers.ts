@@ -46,7 +46,7 @@ export function registerV5CancelledContainerRoutes(app: Express) {
             LIMIT 50`
       );
 
-      const orders = resultRows(raw).map((r: any) => ({
+      const orders = resultRows(raw).map((r) => ({
         id: Number(r.id),
         containerNumber: r.containerNumber ?? `Order #${r.id}`,
         status: r.status,

@@ -155,7 +155,7 @@ async function getCompletedActions(sourceId: number, targetId: number): Promise<
       AND target_company_id = ${targetId}
       AND status = 'completed'
   `);
-  return new Set(resultRows(result).map((row: any) => String(row.action)));
+  return new Set(resultRows(result).map((row) => String(row.action)));
 }
 
 export async function buildCutoverReadiness(sourceId: number, targetId: number): Promise<any> {
@@ -187,7 +187,7 @@ export async function buildCutoverReadiness(sourceId: number, targetId: number):
   if (missingAccounts.length) {
     blockers.push({
       code: "MISSING_TARGET_ACCOUNTS",
-      message: `Target is missing required accounts: ${missingAccounts.map((row: any) => row.sub_type).join(", ")}.`,
+      message: `Target is missing required accounts: ${missingAccounts.map((row) => row.sub_type).join(", ")}.`,
       count: missingAccounts.length,
     });
   }
@@ -469,7 +469,7 @@ export async function synchronizeCutoverStock(cutoverId: number, sourceId: numbe
   let unchanged = 0;
   const errors: string[] = [];
 
-  await db.transaction(async (tx: any) => {
+  await db.transaction(async (tx) => {
     for (const sourceRow of resultRows(sourceResult)) {
       const targetStockItemId = stockItemMap.get(pn(sourceRow.stock_item_id));
       const location = await resolveTargetLocation(
@@ -560,7 +560,7 @@ export async function restoreCutoverStock(
   `);
   let restored = 0;
   let deleted = 0;
-  await db.transaction(async (tx: any) => {
+  await db.transaction(async (tx) => {
     for (const row of resultRows(result)) {
       if (row.created_target_inventory) {
         await tx.execute(

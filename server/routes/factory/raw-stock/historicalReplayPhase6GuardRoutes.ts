@@ -317,7 +317,7 @@ export function registerHistoricalReplayPhase6GuardRoutes(app: Express): void {
     }
   });
 
-  app.post(APPLY_PATH, requireAuth, requireRole(...ADMIN_ROLES), async (req: any, res: any, next: any) => {
+  app.post(APPLY_PATH, requireAuth, requireRole(...ADMIN_ROLES), async (req: any, res: any, next) => {
     const hasToken = typeof req.body?.confirmationToken === "string" && req.body.confirmationToken.length > 0;
 
     if (req.body?.includeFinalizedBales === true) {

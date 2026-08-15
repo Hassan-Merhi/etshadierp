@@ -37,7 +37,7 @@ export function registerOffloadRoutes(app: Express) {
       const companyId = access.activeCompanyId;
 
       const { startDate, endDate } = req.query;
-      const conditions: any[] = [eq(containers.companyId, companyId)];
+      const conditions = [eq(containers.companyId, companyId)];
 
       if (startDate) {
         conditions.push(gte(containerOffloads.offloadedAt, new Date((startDate as string) + "T00:00:00")));

@@ -112,7 +112,7 @@ export function registerBalesReimportRoutes(app: Express) {
           });
         }
 
-        const result = await db.transaction(async (tx: any) => {
+        const result = await db.transaction(async (tx) => {
           const existingBarcodes = await tx
             .select({ referenceNumber: factoryBales.referenceNumber })
             .from(factoryBales)

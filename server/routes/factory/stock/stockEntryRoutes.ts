@@ -51,7 +51,7 @@ export function registerFactoryStockEntryRoutes(app: Express) {
         effectiveDateStr = entryDate;
       }
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         let mixBatch: any = null;
         if (mixBatchId) {
           const [mb] = await tx
@@ -457,7 +457,7 @@ export function registerFactoryStockEntryRoutes(app: Express) {
           .json({ message: `Duplicate ref numbers within import file: ${Array.from(payloadDupes).join(", ")}` });
       }
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         const existingBarcodes = await tx
           .select({ referenceNumber: factoryBales.referenceNumber })
           .from(factoryBales)

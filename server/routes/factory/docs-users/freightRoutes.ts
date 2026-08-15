@@ -26,12 +26,12 @@ export function registerFactoryFreightRoutes(app: Express) {
       }
       const freightRows = await db.select().from(containerFreight).where(eq(containerFreight.containerId, containerId));
       const freightWithPayments = await Promise.all(
-        freightRows.map(async (fr: any) => {
+        freightRows.map(async (fr) => {
           const payments = await db
             .select()
             .from(containerFreightPayments)
             .where(eq(containerFreightPayments.containerFreightId, fr.id));
-          const totalPaid = payments.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
+          const totalPaid = payments.reduce((sum: number, p) => sum + Number(p.amount), 0);
           const freightAmount = Number(fr.freightAmount);
           const computedStatus = totalPaid >= freightAmount ? "PAID" : totalPaid > 0 ? "PARTIAL" : "UNPAID";
           return { ...fr, payments, totalPaid, computedStatus };
@@ -162,7 +162,7 @@ export function registerFactoryFreightRoutes(app: Express) {
         .select()
         .from(containerFreightPayments)
         .where(eq(containerFreightPayments.containerFreightId, freightId));
-      const totalPaid = payments.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
+      const totalPaid = payments.reduce((sum: number, p) => sum + Number(p.amount), 0);
       const freightAmount = Number(fr.freightAmount);
       const newStatus = totalPaid >= freightAmount ? "PAID" : totalPaid > 0 ? "PARTIAL" : "UNPAID";
       await db
@@ -221,7 +221,7 @@ export function registerFactoryFreightRoutes(app: Express) {
             .select()
             .from(containerFreightPayments)
             .where(eq(containerFreightPayments.containerFreightId, freightId));
-          const totalPaid = payments.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
+          const totalPaid = payments.reduce((sum: number, p) => sum + Number(p.amount), 0);
           const freightAmount = Number(fr.freightAmount);
           const newStatus = totalPaid >= freightAmount ? "PAID" : totalPaid > 0 ? "PARTIAL" : "UNPAID";
           await db

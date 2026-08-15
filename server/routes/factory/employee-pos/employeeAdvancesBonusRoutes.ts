@@ -393,7 +393,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
       }
 
       // Mark bonus as paid and create journal entry in a transaction
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         await tx.execute(sql`
           UPDATE worker_bonuses SET status = 'paid', cash_account_id = ${cashId}, paid_date = ${payDate}
           WHERE id = ${parseInt(req.params.id)} AND company_id = ${companyId} AND status = 'pending'
@@ -451,7 +451,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
       const bonus = bonusRows.rows[0] as any;
       if (!bonus) return res.status(404).json({ message: "Bonus not found" });
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         // Paid bonuses are posted with voucherNumber `WBONUS-{id}-{ts}` (see /pay above) —
         // there's no voucher_id FK column on worker_bonuses, so look the voucher up by that
         // naming convention and reverse it along with its entries before deleting the bonus.

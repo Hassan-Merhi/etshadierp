@@ -237,7 +237,7 @@ export function registerFactoryProductReadRoutes(app: Express) {
           for (const order of allRelevantOrders) {
             const balesInOrder = orderBalesForProduct.filter((b) => b.orderId === order.id);
             const qty = balesInOrder.length;
-            const total = balesInOrder.reduce((s: number, b: any) => s + parseFloat(b.priceUsed || "0"), 0);
+            const total = balesInOrder.reduce((s: number, b) => s + parseFloat(b.priceUsed || "0"), 0);
             const pricePerBale = qty > 0 ? total / qty : 0;
 
             const [customer] = await db

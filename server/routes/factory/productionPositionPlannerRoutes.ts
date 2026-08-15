@@ -305,7 +305,7 @@ export function registerProductionPositionPlannerRoutes(app: Express) {
         }
       }
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         await tx.execute(sql`
           INSERT INTO factory_production_plans (company_id, plan_date, category_ids, notes)
           VALUES (${companyId}, ${date}::date, '[]', ${notes})

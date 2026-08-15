@@ -220,7 +220,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       let priceCol = -1;
       let headerRow = -1;
 
-      sheet.eachRow((row: any, rowNumber: number) => {
+      sheet.eachRow((row, rowNumber: number) => {
         const vals = row.values as any[];
         if (headerRow === -1) {
           vals.forEach((cell: any, colIdx: number) => {
@@ -253,7 +253,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
           "unit_price",
           "unit price",
         ];
-        sheet.eachRow((row: any) => {
+        sheet.eachRow((row) => {
           const vals = row.values as any[];
           const firstCell = String(vals[1] ?? "")
             .toLowerCase()
@@ -1023,7 +1023,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
   if (!containerData) return null;
 
   const { container, pos, charges } = containerData;
-  const supplier = suppliers.find((s: any) => s.id === container.supplierId);
+  const supplier = suppliers.find((s) => s.id === container.supplierId);
 
   // Compute totals live from the actual PO and charges data so they are
   // always accurate, even when the stored container totals are stale.

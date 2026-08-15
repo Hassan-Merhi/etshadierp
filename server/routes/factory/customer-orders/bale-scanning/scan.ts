@@ -139,7 +139,7 @@ export function registerOrderBaleScanRoutes(app: Express) {
           }
         | { ok: false; httpStatus: number; body: any };
 
-      const result: PickResult = await db.transaction(async (tx: any) => {
+      const result: PickResult = await db.transaction(async (tx) => {
         const [bale] = await tx
           .select()
           .from(factoryBales)

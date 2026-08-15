@@ -47,7 +47,7 @@ export function registerFactoryContainerDeleteRoutes(app: Express) {
             isNull(factoryContainers.deletedAt)
           )
         );
-      const ownedIds = owned.map((c: any) => c.id);
+      const ownedIds = owned.map((c) => c.id);
       if (ownedIds.length === 0) return res.status(404).json({ message: "No containers found" });
 
       // Soft-delete: hide containers from main listings while preserving all child rows
@@ -83,7 +83,7 @@ export function registerFactoryContainerDeleteRoutes(app: Express) {
       if (id === null) return res.status(400).json({ message: "Invalid id" });
 
       let updatedId: number | null = null;
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         // Soft-delete the container
         const [updated] = await tx
           .update(factoryContainers)

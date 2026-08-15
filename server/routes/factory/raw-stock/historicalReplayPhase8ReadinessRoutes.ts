@@ -161,7 +161,7 @@ export function registerHistoricalReplayPhase8ReadinessRoutes(app: Express): voi
   app.post(
     APPLY_PATH,
     requireAuth,
-    async (req: any, res: any, next: any) => {
+    async (req: any, res: any, next) => {
       const confirmationToken = typeof req.body?.confirmationToken === "string"
         ? req.body.confirmationToken
         : "";

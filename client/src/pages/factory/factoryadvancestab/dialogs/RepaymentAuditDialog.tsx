@@ -206,7 +206,7 @@ export function RepaymentAuditDialog({
                               const missingAmt =
                                 a.caseType === "missing_voucher"
                                   ? a.missingVoucherRepayments.reduce(
-                                      (s: any, r: any) => s + parseFloat(r.amount || "0"),
+                                      (s: any, r) => s + parseFloat(r.amount || "0"),
                                       0
                                     )
                                   : parseFloat(a.amount || "0");

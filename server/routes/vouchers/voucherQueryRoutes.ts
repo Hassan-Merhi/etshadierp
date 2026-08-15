@@ -282,7 +282,7 @@ export function registerVoucherQueryRoutes(app: Express) {
 
       const { type, locationId, startDate, endDate, search } = req.query;
 
-      const conditions: any[] = [
+      const conditions = [
         eq(vouchers.companyId, companyId),
         eq(vouchers.optional, true),
         isNull(vouchers.deletedAt),

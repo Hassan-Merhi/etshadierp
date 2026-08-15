@@ -457,7 +457,7 @@ export function registerSpContainerRoutes(app: Express) {
 
       const containerId = req.query.containerId ? parseInt(req.query.containerId as string) : null;
 
-      const conditions: any[] = [eq(spPrepaidCharges.companyId, companyId)];
+      const conditions = [eq(spPrepaidCharges.companyId, companyId)];
       if (containerId) conditions.push(eq(spPrepaidCharges.containerId, containerId));
 
       const rows = await db

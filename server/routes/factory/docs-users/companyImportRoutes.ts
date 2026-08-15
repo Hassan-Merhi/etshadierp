@@ -231,7 +231,7 @@ export function registerFactoryCompanyImportRoutes(app: Express) {
             return rec;
           }
 
-          await db.transaction(async (tx: any) => {
+          await db.transaction(async (tx) => {
             async function insertAndMap(
               tableName: string,
               drizzleTable: any,
