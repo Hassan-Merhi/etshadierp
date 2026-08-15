@@ -17,7 +17,18 @@ jobs:
   ci:
     name: Check / Build / Lint / Test
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    # This job does install, lint, type-check, build, every static audit, and the
+    # full backend and frontend suites in one place. Recent runs on main took
+    # 27–34 minutes against the previous 35-minute limit; the last merge finished
+    # with 67 seconds to spare. That is not a margin — it means a slow runner
+    # cancels main, and the cancellation reads as "cancelled" rather than
+    # "failed", so it looks like someone pressed a button rather than a gate
+    # firing. 50 gives real headroom while still catching a genuine hang.
+    #
+    # This changes how long the job may take, not what it checks. Every audit,
+    # ceiling and suite below is unchanged. The sibling jobs already sit at
+    # 45–60 for less work.
+    timeout-minutes: 50
 
     services:
       postgres:
