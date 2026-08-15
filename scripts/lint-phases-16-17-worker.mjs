@@ -34,12 +34,12 @@ function stripDirectiveComments(source) {
   let text = source;
   const patterns = [
     /\/\*\s*eslint-(?:disable|enable)(?:-next-line|-line)?[\s\S]*?\*\//g,
-    /^[ \t]*\/\/\s*eslint-(?:disable|enable)(?:-next-line|-line)?[^\n]*(?:\n|$)/gm,
+    /\/\/[^\n]*eslint-(?:disable|enable)(?:-next-line|-line)?[^\n]*/g,
   ];
   for (const pattern of patterns) {
-    text = text.replace(pattern, (match) => {
+    text = text.replace(pattern, () => {
       removed += 1;
-      return match.endsWith("\n") ? "\n" : "";
+      return "";
     });
   }
   return { text, removed };
@@ -79,8 +79,6 @@ console.log(`PHASE16_INLINE_REMAINING=${remainingInline}`);
 console.log(`PHASE16_CONFIG_EXEMPTIONS_REMAINING=${remainingConfigExemptions}`);
 if (remainingInline || remainingConfigExemptions) throw new Error("Phase 16 suppression inventory is not zero");
 
-// Phase 17: measure the finished implementation tree without treating this as
-// the final compile/test/build certification. The ratchets may only tighten.
 const oldLint = JSON.parse(fs.readFileSync(lintRatchetPath, "utf8"));
 const oldType = JSON.parse(fs.readFileSync(typeRatchetPath, "utf8"));
 const oldWarningCeiling = oldLint.totals.warningCeiling;
@@ -114,8 +112,6 @@ if (newType.totals.typeEscapeCeiling > oldTypeCeiling) {
   throw new Error(`Phase 17 refuses to raise type-escape ceiling: measured ${newType.totals.typeEscapeCeiling} > prior ${oldTypeCeiling}`);
 }
 
-// Rebuild lint warning ratchet from the exact report, after type escapes are
-// tightened so no-explicit-any agreement uses the final type-escape ceiling.
 const nextLint = JSON.parse(fs.readFileSync(lintRatchetPath, "utf8"));
 nextLint.perRule = Object.fromEntries(Object.entries(perRule).sort((a, b) => b[1] - a[1]));
 nextLint.totals = { ...nextLint.totals, warningCeiling: warningTotal };
