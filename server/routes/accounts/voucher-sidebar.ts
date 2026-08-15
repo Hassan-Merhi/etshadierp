@@ -305,7 +305,7 @@ export function registerAccountVoucherSidebarRoutes(app: Express) {
 
           // Container value: sum((actualReceivedKg || totalKg) * ratePerKg + freight) * fxRateToUsd
           const supplierContainers = fContainers.filter((c) => aggregateIds.includes(c.supplierId));
-          const containerValueUsd = supplierContainers.reduce((sum: number, c: any) => {
+          const containerValueUsd = supplierContainers.reduce((sum: number, c) => {
             const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
             const rate = parseFloat(c.ratePerKg || "0");
             const freight = parseFloat(c.freight || "0");
@@ -315,12 +315,12 @@ export function registerAccountVoucherSidebarRoutes(app: Express) {
 
           // Commission owed to this supplier as broker (exclude containers where they're also the main supplier)
           const brokerContainers = fContainers.filter(
-            (c: any) =>
+            (c) =>
               c.commissionSupplierId === supplier.id &&
               !aggregateIds.includes(c.supplierId) &&
               parseFloat(c.commissionAmount || "0") > 0
           );
-          const commissionValueUsd = brokerContainers.reduce((sum: number, c: any) => {
+          const commissionValueUsd = brokerContainers.reduce((sum: number, c) => {
             const commAmt = parseFloat(c.commissionAmount || "0");
             const fx = parseFloat(c.fxRateToUsd || "1");
             const commCurr = c.commissionCurrencyCode || c.currencyCode || "USD";
@@ -330,7 +330,7 @@ export function registerAccountVoucherSidebarRoutes(app: Express) {
           // Total paid via factorySupplierPayments (in USD) — aggregated across all linked IDs
           const supplierPayments = fPayments.filter((p) => aggregateIds.includes(p.supplierId));
           const totalPaidUsd = supplierPayments.reduce(
-            (sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"),
+            (sum: number, p) => sum + parseFloat(p.amountUsd || "0"),
             0
           );
 
