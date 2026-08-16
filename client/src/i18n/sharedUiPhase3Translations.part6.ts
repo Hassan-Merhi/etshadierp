@@ -242,4 +242,50 @@ export const phase3SharedUiTranslationsPart6: readonly Phase3SharedUiEntry[] = [
     ar: "تعذّر تحميل التصريف",
     fr: "Impossible de charger la sortie",
   },
+  // Convergence reconciliation screen: the read-only report that compares each
+  // document against the evidence behind it.
+  {
+    en: "Convergence Reconciliation",
+    ar: "مطابقة التقارب",
+    fr: "Rapprochement de convergence",
+  },
+  {
+    en: "Check documents against the evidence behind them",
+    ar: "مطابقة المستندات مع الأدلة التي تستند إليها",
+    fr: "Vérifier les documents par rapport aux preuves qui les sous-tendent",
+  },
+  {
+    en: "Evidence could not be trusted",
+    ar: "تعذّر الوثوق بالأدلة",
+    fr: "Les preuves n'ont pas pu être validées",
+  },
+  {
+    en: "The reconciliation stopped instead of reporting a result. Nothing below is a clean bill of health.",
+    ar: "توقفت المطابقة بدلاً من إصدار نتيجة. لا شيء أدناه يُعدّ شهادة سلامة.",
+    fr: "Le rapprochement s'est arrêté au lieu de produire un résultat. Rien ci-dessous ne constitue un satisfecit.",
+  },
+  { en: "Everything agrees", ar: "كل شيء متطابق", fr: "Tout concorde" },
+  { en: "Vouchers checked", ar: "السندات المفحوصة", fr: "Pièces vérifiées" },
+  {
+    en: "Stock documents checked",
+    ar: "مستندات المخزون المفحوصة",
+    fr: "Documents de stock vérifiés",
+  },
+  {
+    en: "Every document checked agrees with its evidence.",
+    ar: "كل مستند تم فحصه متطابق مع أدلته.",
+    fr: "Chaque document vérifié concorde avec ses preuves.",
+  },
+  { en: "Discrepancies", ar: "الفروقات", fr: "Écarts" },
+  { en: "To investigate", ar: "قيد التحقق", fr: "À examiner" },
+  {
+    en: "This report never changes data.",
+    ar: "هذا التقرير لا يغيّر البيانات أبداً.",
+    fr: "Ce rapport ne modifie jamais les données.",
+  },
+  { en: "Domain", ar: "المجال", fr: "Domaine" },
+  { en: "Record", ar: "السجل", fr: "Enregistrement" },
+  { en: "Finding", ar: "الملاحظة", fr: "Constat" },
+  { en: "Expected", ar: "المتوقع", fr: "Attendu" },
+  { en: "Recorded", ar: "المسجّل", fr: "Enregistré" },
 ];

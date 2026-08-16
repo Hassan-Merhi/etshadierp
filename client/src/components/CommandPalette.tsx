@@ -35,7 +35,9 @@ import {
   HardHat,
   Sparkles,
   Bell,
+  ShieldCheck,
 } from "lucide-react";
+import { useAppMode } from "@/contexts/AppModeContext";
 import { useErpVisibleSections } from "@/components/AppSidebar";
 import { useFactoryVisibleSections } from "@/components/FactorySidebar";
 import { PROPERTIES_NAV_SECTIONS } from "@/components/PropertiesSidebar";
@@ -57,6 +59,17 @@ interface PageEntry {
   description?: string;
   path: string;
   icon: React.ElementType;
+  /**
+   * The page is registered only in ErpRoutes, so under a factory-type company
+   * the route guard redirects this unprefixed path to the factory default
+   * before it can render — selecting it would silently navigate somewhere else.
+   *
+   * Several older admin entries share that condition and are not marked, which
+   * is a pre-existing gap rather than a decision; marking is done as entries
+   * are verified, so an unmarked entry means "not yet checked", never "checked
+   * and fine".
+   */
+  erpShellOnly?: boolean;
 }
 
 /** Optional descriptions overlaid onto items derived from sidebar nav. */
@@ -323,6 +336,13 @@ const adminPages: PageEntry[] = [
   },
   { label: "Inventory Repair", description: "Fix inventory discrepancies", path: "/inventory-repair", icon: Wrench },
   {
+    label: "Convergence Reconciliation",
+    description: "Check documents against the evidence behind them",
+    path: "/convergence-reconciliation",
+    icon: ShieldCheck,
+    erpShellOnly: true,
+  },
+  {
     label: "Balance Repair",
     description: "Fix rent ledger drift, missing voucher entries, orphaned transfers, deposit flags",
     path: "/balance-repair",
@@ -434,6 +454,7 @@ export function CommandPalette({
   user,
 }: CommandPaletteProps) {
   const [internalOpen, setInternalOpen] = useState(false);
+  const appMode = useAppMode();
   const [, setLocation] = useLocation();
 
   const isControlled = externalOpen !== undefined;
@@ -495,6 +516,13 @@ export function CommandPalette({
   // Global admin routes (e.g. /settings, /deleted-items) only work in ERP/Factory shells.
   // In properties-only mode, suppress them since the properties shell redirects away.
   const showAdmin = !isPOS && isAdminOwner && (showErp || showFactory);
+  // Entries whose page lives only in ErpRoutes are dropped outside the ERP
+  // shell: under a factory company the guard redirects the unprefixed path away,
+  // so offering them means offering a command that goes somewhere else.
+  const visibleAdminPages = useMemo(
+    () => adminPages.filter((page) => !page.erpShellOnly || appMode === "erp"),
+    [appMode]
+  );
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
@@ -542,7 +570,7 @@ export function CommandPalette({
 
         {showAdmin && (
           <CommandGroup heading="Admin & Settings">
-            {adminPages.map((p) => (
+            {visibleAdminPages.map((p) => (
               <PaletteItem key={p.path} page={p} onSelect={navigate} />
             ))}
           </CommandGroup>
