@@ -75,6 +75,9 @@ jobs:
       - name: Write-route coverage ratchet
         run: npm run audit:write-routes
 
+      - name: Write-evidence ratchet
+        run: npm run audit:write-evidence
+
       - name: Toolchain coherence
         run: npm run audit:toolchain
 

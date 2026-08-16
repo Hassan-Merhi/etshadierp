@@ -14,8 +14,18 @@ describe("Phase 3 shared interface translations", () => {
     // dodge the path-based classifier nor weakened that invariant. The same split
     // exposed 23 sales-panel findings (22 unique phrases) to the sales-pos classifier,
     // so those phrases are translated instead of raising the reviewed Phase 9 release cap.
-    expect(phase3SharedUiTranslations).toHaveLength(566);
-    expect(new Set(phase3SharedUiTranslations.map((entry) => entry.en)).size).toBe(566);
+    // +16: the Convergence Reconciliation screen. The report already existed as
+    // an endpoint with nothing rendering it; giving it a page introduced its
+    // labels as literals, and the shared-ui and other-client modules are both
+    // ratcheted, so every one of them is translated here rather than counted as
+    // new backlog. Six of them ("Domain", "Record", "Finding", "Expected",
+    // "Recorded", "Everything agrees") also cover pre-existing literals
+    // elsewhere, which is why the audit total fell rather than held. Three more
+    // ("Discrepancies", "To investigate", "This report never changes data.") the
+    // detector does not flag at all; they are translated regardless, because a
+    // screen that is half Arabic is a defect whether or not a ratchet noticed.
+    expect(phase3SharedUiTranslations).toHaveLength(582);
+    expect(new Set(phase3SharedUiTranslations.map((entry) => entry.en)).size).toBe(582);
 
     for (const entry of phase3SharedUiTranslations) {
       expect(entry.en.trim()).not.toBe("");

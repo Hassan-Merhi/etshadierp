@@ -75,6 +75,7 @@ export const TestDataImport = lazy(() => import("@/pages/TestDataImport"));
 export const ImportCycleDiagnostics = lazy(() => import("@/pages/ImportCycleDiagnostics"));
 export const InventoryRepair = lazy(() => import("@/pages/InventoryRepair"));
 export const BalanceRepair = lazy(() => import("@/pages/BalanceRepair"));
+export const ConvergenceReconciliation = lazy(() => import("@/pages/ConvergenceReconciliation"));
 export const NetProfitDetails = lazy(() => import("@/pages/NetProfitDetails"));
 export const NetProfitReport = lazy(() => import("@/pages/NetProfitReport"));
 export const CompanyDataReset = lazy(() => import("@/pages/CompanyDataReset"));
@@ -110,9 +111,7 @@ export const FactoryAccounts = lazy(() => import("@/pages/factory/FactoryAccount
 export const FactoryVouchers = lazy(() => import("@/pages/factory/FactoryVouchers"));
 export const FactoryDaybook = lazy(() => import("@/pages/factory/FactoryDaybook"));
 export const FactoryLocationInventory = lazy(() => import("@/pages/factory/FactoryLocationInventory"));
-export const FactoryLocationInventoryMockup = lazy(
-  () => import("@/pages/factory/FactoryLocationInventoryMockup")
-);
+export const FactoryLocationInventoryMockup = lazy(() => import("@/pages/factory/FactoryLocationInventoryMockup"));
 export const FactoryProduction = lazy(() => import("@/pages/factory/FactoryProduction"));
 export const ProductionRawStock = lazy(() => import("@/pages/factory/ProductionRawStock"));
 export const RawStockRecalculate = lazy(() => import("@/pages/factory/production-raw-stock/RawStockRecalculate"));

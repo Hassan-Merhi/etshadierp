@@ -126,10 +126,10 @@
   },
   "frontend": {
     "global": {
-      "lines": 12,
-      "statements": 11,
-      "functions": 8,
-      "branches": 8
+      "lines": 16,
+      "statements": 15,
+      "functions": 9,
+      "branches": 10
     },
     "perFile": {
       "client/src/pages/StockHub.tsx": {

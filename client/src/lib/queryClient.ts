@@ -302,6 +302,10 @@ async function throwIfResNotOk(res: Response) {
     // Create error with structured data for proper handling
     const error: any = new Error(errorData.message || res.statusText);
     error.status = res.status;
+    // Machine-readable failure reason. Several endpoints answer with a stable
+    // `code` alongside the prose message and callers need to branch on it —
+    // dropping it here forced them to match on message text instead.
+    error.code = errorData.code;
     error.requiresConfirmation = errorData.requiresConfirmation;
     error.employeeBalance = errorData.employeeBalance;
     error.ledgerBalance = errorData.ledgerBalance;

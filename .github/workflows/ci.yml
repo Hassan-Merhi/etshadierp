@@ -17,7 +17,18 @@ jobs:
   ci:
     name: Check / Build / Lint / Test
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    # This job does install, lint, type-check, build, every static audit, and the
+    # full backend and frontend suites in one place. Recent runs on main took
+    # 27–34 minutes against the previous 35-minute limit; the last merge finished
+    # with 67 seconds to spare. That is not a margin — it means a slow runner
+    # cancels main, and the cancellation reads as "cancelled" rather than
+    # "failed", so it looks like someone pressed a button rather than a gate
+    # firing. 50 gives real headroom while still catching a genuine hang.
+    #
+    # This changes how long the job may take, not what it checks. Every audit,
+    # ceiling and suite below is unchanged. The sibling jobs already sit at
+    # 45–60 for less work.
+    timeout-minutes: 50
 
     services:
       postgres:
@@ -103,6 +114,14 @@ jobs:
       - name: Write-route coverage ratchet
         if: always() && steps.install.outcome == 'success'
         run: npm run audit:write-routes
+
+      # The ratchet above asks whether a sensitive write is tested. This asks
+      # whether it leaves the trail the rest of the system reconciles against:
+      # a canonical movement journal row for stock, an idempotency key for a
+      # voucher. Both backlogs pin their file set as well as their count.
+      - name: Write-evidence ratchet
+        if: always() && steps.install.outcome == 'success'
+        run: npm run audit:write-evidence
 
       # One Node version across .node-version, .nvmrc, .replit, package.json
       # engines, every workflow, CircleCI's image tag, and the README. Seven
@@ -200,9 +219,14 @@ jobs:
             fi
           fi
 
+          # Same paths and extensions as the CircleCI Parity job's formatting
+          # step. The two disagreed once — this job covered client/src, server
+          # and shared while parity also covered tests and scripts — and three
+          # unformatted test files reached the parity job because this one had
+          # never looked at them.
           mapfile -d '' changed_files < <(
-            git diff --name-only --diff-filter=ACMR -z "$base_sha" "$GITHUB_SHA" -- client/src server shared |
-              grep -zE '\.(ts|tsx|css)$' || true
+            git diff --name-only --diff-filter=ACMR -z "$base_sha" "$GITHUB_SHA" -- client/src server shared tests scripts |
+              grep -zE '\.(ts|tsx|css|mjs)$' || true
           )
 
           if [ "${#changed_files[@]}" -eq 0 ]; then
