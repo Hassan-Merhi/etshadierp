@@ -14,17 +14,6 @@ import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import {
   ScanLine,
   ArrowLeft,
   Play,
@@ -36,16 +25,19 @@ import {
   AlertTriangle,
   Package,
   Truck,
-  RotateCcw,
-  List,
   FilePlus,
 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 
 import type { LoadingSummaryResponse } from "./factoryinvoiceloadingscan/types";
-import { fmtTime } from "./factoryinvoiceloadingscan/utils";
 import { StatusBadge } from "./factoryinvoiceloadingscan/components/StatusBadge";
-// ── Types ──────────────────────────────────────────────────────────────────────
+import {
+  BaleReferencesDialog,
+  CancelSessionDialog,
+  CompleteSessionDialog,
+  SessionBalesDialog,
+} from "./factoryinvoiceloadingscan/components/SessionDialogs";
+import { SessionHistoryCard } from "./factoryinvoiceloadingscan/components/SessionHistoryCard";
 
 export default function FactoryInvoiceLoadingScan() {
   const [, navigate] = useLocation();
@@ -737,125 +729,13 @@ export default function FactoryInvoiceLoadingScan() {
 
       {/* ── Previous sessions ── */}
       {summary.sessions.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between gap-2">
-              <CardTitle className="text-sm font-medium">Loading Sessions</CardTitle>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    window.open(`/api/factory/invoices/${invoiceId}/loading-report/export/excel`, "_blank")
-                  }
-                  data-testid="button-export-report-excel"
-                >
-                  <FileSpreadsheet className="h-4 w-4 mr-1" />
-                  Full Report Excel
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.open(`/api/factory/invoices/${invoiceId}/loading-report/export/pdf`, "_blank")}
-                  data-testid="button-export-report-pdf"
-                >
-                  <FileDown className="h-4 w-4 mr-1" />
-                  Full Report PDF
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="table-responsive">
-              <Table>
-                <TableHeader className="sticky top-0 z-30 bg-background">
-                  <TableRow>
-                    <TableHead>Session</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Truck / Driver</TableHead>
-                    <TableHead>Started</TableHead>
-                    <TableHead>Completed</TableHead>
-                    <TableHead className="text-right">Bales</TableHead>
-                    <TableHead className="text-right w-16"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {summary.sessions.map((s) => (
-                    <TableRow
-                      key={s.id}
-                      data-testid={`row-session-${s.id}`}
-                      className={s.id === activeSessionId ? "bg-blue-50 dark:bg-blue-950/40" : ""}
-                    >
-                      <TableCell className="font-mono text-sm">#{s.id}</TableCell>
-                      <TableCell>
-                        <StatusBadge status={s.status} />
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {s.truckNo || s.driverName ? [s.truckNo, s.driverName].filter(Boolean).join(" / ") : "—"}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                        {fmtTime(s.startedAt)}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                        {fmtTime(s.completedAt)}
-                      </TableCell>
-                      <TableCell className="text-right font-medium">{s.totalBales}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          {s.status !== "CANCELLED" && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setViewSessionId(s.id)}
-                              data-testid={`button-view-session-bales-${s.id}`}
-                              title="View & manage bales"
-                            >
-                              <List className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                          {s.status === "OPEN" && s.id !== activeSessionId && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setActiveSessionId(s.id)}
-                              data-testid={`button-resume-session-${s.id}`}
-                              title="Resume this session"
-                            >
-                              <RotateCcw className="h-3.5 w-3.5 mr-1" />
-                              Resume
-                            </Button>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            title="Export session Excel"
-                            onClick={() =>
-                              window.open(`/api/factory/invoice-loading-sessions/${s.id}/export/excel`, "_blank")
-                            }
-                            data-testid={`button-session-excel-${s.id}`}
-                          >
-                            <FileSpreadsheet className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            title="Export session PDF"
-                            onClick={() =>
-                              window.open(`/api/factory/invoice-loading-sessions/${s.id}/export/pdf`, "_blank")
-                            }
-                            data-testid={`button-session-pdf-${s.id}`}
-                          >
-                            <FileDown className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+        <SessionHistoryCard
+          invoiceId={invoiceId}
+          sessions={summary.sessions}
+          activeSessionId={activeSessionId}
+          onViewSession={setViewSessionId}
+          onResumeSession={setActiveSessionId}
+        />
       )}
 
       {/* ── No sessions yet ── */}
@@ -875,220 +755,45 @@ export default function FactoryInvoiceLoadingScan() {
       )}
 
       {/* ── Dialogs ── */}
-      <AlertDialog open={completeDialogOpen} onOpenChange={setCompleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Complete loading session?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will mark session #{activeSessionId} as COMPLETED with {currentBales.length} bale
-              {currentBales.length !== 1 ? "s" : ""}. You can start another session later for remaining bales.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-complete-dialog">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setCompleteDialogOpen(false);
-                completeSessionMutation.mutate();
-              }}
-              disabled={completeSessionMutation.isPending}
-              data-testid="button-confirm-complete"
-            >
-              {completeSessionMutation.isPending ? "Completing…" : "Complete Session"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Cancel this loading session?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Session #{activeSessionId} will be cancelled. Scanned bales will be kept for audit history but will no
-              longer count as loaded. Bales can be re-scanned in a new session.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-cancel-dialog">Keep Session</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground"
-              onClick={() => {
-                setCancelDialogOpen(false);
-                cancelSessionMutation.mutate();
-              }}
-              disabled={cancelSessionMutation.isPending}
-              data-testid="button-confirm-cancel-session"
-            >
-              {cancelSessionMutation.isPending ? "Cancelling…" : "Cancel Session"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* View / Delete session bales dialog */}
-      <Dialog
-        open={viewSessionId !== null}
-        onOpenChange={(open) => {
-          if (!open) setViewSessionId(null);
+      <CompleteSessionDialog
+        open={completeDialogOpen}
+        onOpenChange={setCompleteDialogOpen}
+        sessionId={activeSessionId}
+        baleCount={currentBales.length}
+        isPending={completeSessionMutation.isPending}
+        onConfirm={() => {
+          setCompleteDialogOpen(false);
+          completeSessionMutation.mutate();
         }}
-      >
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          {(() => {
-            const session = summary?.sessions.find((s) => s.id === viewSessionId);
-            const sessionBales = (summary?.invoiceBales ?? []).filter((b) => b.loadedSessionId === viewSessionId);
-            return (
-              <>
-                <DialogHeader>
-                  <DialogTitle className="text-base flex flex-wrap items-center gap-2">
-                    Session #{viewSessionId}
-                    {session && <StatusBadge status={session.status} />}
-                    {session?.truckNo && (
-                      <span className="font-mono text-sm text-muted-foreground">{session.truckNo}</span>
-                    )}
-                    {session?.driverName && (
-                      <span className="text-sm text-muted-foreground">/ {session.driverName}</span>
-                    )}
-                  </DialogTitle>
-                </DialogHeader>
-                {sessionBales.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-6 text-center">No bales found in this session.</p>
-                ) : (
-                  <div className="space-y-2">
-                    <p className="text-xs text-muted-foreground">
-                      {sessionBales.length} bale{sessionBales.length !== 1 ? "s" : ""}. Click the trash icon to remove a
-                      bale and return it to unloaded.
-                    </p>
-                    <div className="table-responsive rounded-md border">
-                      <Table>
-                        <TableHeader className="sticky top-0 z-30 bg-background">
-                          <TableRow>
-                            <TableHead>Reference</TableHead>
-                            <TableHead>Article</TableHead>
-                            <TableHead>Product</TableHead>
-                            <TableHead className="text-right">Weight (kg)</TableHead>
-                            <TableHead className="w-8"></TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {sessionBales
-                            .sort((a, b) => a.baleReference.localeCompare(b.baleReference))
-                            .map((b) => (
-                              <TableRow key={b.baleId} data-testid={`row-view-session-bale-${b.baleId}`}>
-                                <TableCell className="font-mono text-sm">{b.baleReference}</TableCell>
-                                <TableCell className="text-xs">{b.articleCode || "—"}</TableCell>
-                                <TableCell className="text-xs text-muted-foreground">{b.productName || "—"}</TableCell>
-                                <TableCell className="text-right text-sm font-mono">
-                                  {parseFloat(b.weightKg || "0").toFixed(3)}
-                                </TableCell>
-                                <TableCell>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    disabled={removeBaleFromSessionMutation.isPending}
-                                    onClick={() =>
-                                      viewSessionId &&
-                                      removeBaleFromSessionMutation.mutate({
-                                        sessionId: viewSessionId,
-                                        baleId: b.baleId,
-                                      })
-                                    }
-                                    data-testid={`button-delete-session-bale-${b.baleId}`}
-                                    title="Remove bale and return to unloaded"
-                                  >
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </div>
-                )}
-              </>
-            );
-          })()}
-        </DialogContent>
-      </Dialog>
+      />
 
-      {/* Bale References Dialog */}
-      <Dialog
-        open={baleRefLine !== null}
-        onOpenChange={(open) => {
-          if (!open) setBaleRefLine(null);
+      <CancelSessionDialog
+        open={cancelDialogOpen}
+        onOpenChange={setCancelDialogOpen}
+        sessionId={activeSessionId}
+        isPending={cancelSessionMutation.isPending}
+        onConfirm={() => {
+          setCancelDialogOpen(false);
+          cancelSessionMutation.mutate();
         }}
-      >
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-base">
-              {baleRefLine?.name}
-              <span className="ml-2 font-mono text-sm text-muted-foreground">({baleRefLine?.code})</span>
-            </DialogTitle>
-          </DialogHeader>
-          {baleRefLine &&
-            (() => {
-              const bales = (summary?.invoiceBales ?? [])
-                .filter((b) => b.articleCode === baleRefLine.code)
-                .sort((a, b) => a.baleReference.localeCompare(b.baleReference));
-              if (bales.length === 0) {
-                return (
-                  <p className="text-sm text-muted-foreground py-4 text-center">
-                    No bale references found for this item.
-                  </p>
-                );
-              }
-              const loaded = bales.filter((b) => b.loaded);
-              const pending = bales.filter((b) => !b.loaded);
-              return (
-                <div className="space-y-4">
-                  <p className="text-xs text-muted-foreground">
-                    {bales.length} total ·{" "}
-                    <span className="text-green-700 dark:text-green-400">{loaded.length} loaded</span>
-                    {pending.length > 0 && (
-                      <>
-                        {" "}
-                        · <span className="text-amber-700 dark:text-amber-400">{pending.length} pending</span>
-                      </>
-                    )}
-                  </p>
-                  {loaded.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Loaded</p>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                        {loaded.map((b) => (
-                          <div
-                            key={b.baleId}
-                            className="rounded-md border bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800 px-2.5 py-1.5 font-mono text-sm text-center text-green-800 dark:text-green-300"
-                          >
-                            {b.baleReference}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {pending.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                        Not Yet Loaded
-                      </p>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                        {pending.map((b) => (
-                          <div
-                            key={b.baleId}
-                            className="rounded-md border bg-muted/30 px-2.5 py-1.5 font-mono text-sm text-center"
-                          >
-                            {b.baleReference}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-        </DialogContent>
-      </Dialog>
+      />
+
+      <SessionBalesDialog
+        sessionId={viewSessionId}
+        onClose={() => setViewSessionId(null)}
+        session={summary.sessions.find((s) => s.id === viewSessionId)}
+        bales={summary.invoiceBales.filter((b) => b.loadedSessionId === viewSessionId)}
+        removePending={removeBaleFromSessionMutation.isPending}
+        onRemoveBale={(baleId) =>
+          viewSessionId && removeBaleFromSessionMutation.mutate({ sessionId: viewSessionId, baleId })
+        }
+      />
+
+      <BaleReferencesDialog
+        line={baleRefLine}
+        onClose={() => setBaleRefLine(null)}
+        bales={baleRefLine ? summary.invoiceBales.filter((b) => b.articleCode === baleRefLine.code) : []}
+      />
     </div>
   );
 }
