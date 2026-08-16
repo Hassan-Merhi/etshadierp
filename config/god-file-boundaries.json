@@ -1,6 +1,6 @@
 {
-  "version": 19,
-  "description": "Repository-wide god-file architecture boundaries plus a one-way size ratchet. Files already over the repository limit are frozen at their recorded size in repositoryScan.grandfathered: they may shrink but never grow, and any new file crossing the limit fails until it is split or explicitly baselined. Version 19 permanently retires rentalPaymentPostingService.ts from the grandfathered backlog after the Wave 5 allocation extraction reduced it below the 900-line repository limit.",
+  "version": 20,
+  "description": "Repository-wide god-file architecture boundaries plus a one-way size ratchet. Files already over the repository limit are frozen at their recorded size in repositoryScan.grandfathered: they may shrink but never grow, and any new file crossing the limit fails until it is split or explicitly baselined. Version 20 permanently retires ContainerVerification.tsx from the grandfathered backlog after the Wave 9 split of its loaded-items editor, comparison breakdown and summary strip reduced it below the 900-line repository limit.",
   "retiredFiles": [
     "server/routesLegacy.ts",
     "server/routes/reportsRoutesLegacy.ts",
@@ -143,7 +143,6 @@
       "client/src/pages/BarcodeLookup.tsx": 1625,
       "client/src/pages/ContainerDetail.tsx": 1950,
       "client/src/pages/ContainerLoadingScan.tsx": 1133,
-      "client/src/pages/ContainerVerification.tsx": 1125,
       "client/src/pages/daybook/VoucherDetailsDialog.tsx": 1000,
       "client/src/pages/factory/BalesHistory.tsx": 1725,
       "client/src/pages/factory/CreateProformaV5Drawer.tsx": 1125,

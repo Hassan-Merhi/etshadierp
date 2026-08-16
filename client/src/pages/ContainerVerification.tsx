@@ -4,35 +4,19 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation, useSearch } from "wouter";
 import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import {
-  ArrowLeft,
-  Plus,
-  Trash2,
-  Upload,
-  Download,
-  FileCheck,
-  Pencil,
-  Save,
-  X,
-  AlertTriangle,
-  ArrowUpRight,
-  ArrowDownRight,
-  DollarSign,
-  RefreshCw,
-  List,
-  Star,
-} from "lucide-react";
+import { ArrowLeft, Download, FileCheck, List, Star } from "lucide-react";
 import * as XLSX from "@/lib/excelHelper";
 import { PageHeader } from "@/components/PageHeader";
 
-import type { LoadedItem, VerificationResult } from "./containerverification/types";
+import { AliasConflictAlert, ComparisonCards } from "./containerverification/ComparisonCards";
+import { LoadedItemsCard } from "./containerverification/LoadedItemsCard";
+import { SummaryCards } from "./containerverification/SummaryCards";
+import type { LoadedItem, LoadedItemDraft, VerificationResult } from "./containerverification/types";
+
 export default function ContainerVerification() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -48,22 +32,6 @@ export default function ContainerVerification() {
   const [selectedProformaId, setSelectedProformaId] = useState<string>("");
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
   const [autoCompareTriggered, setAutoCompareTriggered] = useState(false);
-  const [addingItem, setAddingItem] = useState(false);
-  const [newItem, setNewItem] = useState({
-    barcode: "",
-    itemName: "",
-    qty: "0",
-    weightPerBale: "0",
-    pricePerBale: "0",
-  });
-  const [editingItemId, setEditingItemId] = useState<number | null>(null);
-  const [editItemData, setEditItemData] = useState({
-    barcode: "",
-    itemName: "",
-    qty: "0",
-    weightPerBale: "0",
-    pricePerBale: "0",
-  });
   const [viewMode, setViewMode] = useState<"detailed" | "summary">("detailed");
 
   const { data: containerData } = useQuery<any>({
@@ -103,8 +71,6 @@ export default function ContainerVerification() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/containers", containerId, "loaded-items"] });
-      setAddingItem(false);
-      setNewItem({ barcode: "", itemName: "", qty: "0", weightPerBale: "0", pricePerBale: "0" });
       if (verificationResult) generateComparison();
     },
     onError: (e: any) => {
@@ -120,7 +86,6 @@ export default function ContainerVerification() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/containers", containerId, "loaded-items"] });
-      setEditingItemId(null);
       if (verificationResult) generateComparison();
     },
     onError: (e: any) => {
@@ -261,15 +226,12 @@ export default function ContainerVerification() {
     );
   };
 
-  const startEdit = (item: LoadedItem) => {
-    setEditingItemId(item.id);
-    setEditItemData({
-      barcode: item.barcode,
-      itemName: item.itemName || "",
-      qty: String(item.qty),
-      weightPerBale: item.weightPerBale || "0",
-      pricePerBale: item.pricePerBale || "0",
-    });
+  const requestAutoPopulate = () => {
+    if (!navigator.onLine) {
+      toast({ title: "Not available offline", description: "Auto-populate requires a connection" });
+      return;
+    }
+    autoPopulateMutation.mutate();
   };
 
   useEffect(() => {
@@ -351,212 +313,15 @@ export default function ContainerVerification() {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
-            <CardTitle className="text-sm">Loaded Items ({loadedItems.length})</CardTitle>
-            <div className="flex items-center gap-2">
-              {loadedItems.length === 0 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    if (!navigator.onLine) {
-                      toast({ title: "Not available offline", description: "Auto-populate requires a connection" });
-                      return;
-                    }
-                    autoPopulateMutation.mutate();
-                  }}
-                  disabled={autoPopulateMutation.isPending}
-                  data-testid="button-load-from-pos"
-                >
-                  <RefreshCw className={`mr-1 h-3 w-3 ${autoPopulateMutation.isPending ? "animate-spin" : ""}`} />
-                  Load from POs
-                </Button>
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fileInputRef.current?.click()}
-                data-testid="button-import-loaded"
-              >
-                <Upload className="mr-1 h-3 w-3" />
-                Import
-              </Button>
-              <Button size="sm" onClick={() => setAddingItem(true)} data-testid="button-add-loaded">
-                <Plus className="mr-1 h-3 w-3" />
-                Add
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="max-h-80 overflow-y-auto">
-              <Table>
-                <TableHeader className="sticky top-0 z-30 bg-background">
-                  <TableRow>
-                    <TableHead>Barcode</TableHead>
-                    <TableHead>Item</TableHead>
-                    <TableHead className="text-right">Qty</TableHead>
-                    <TableHead className="text-right">Wt/Bale</TableHead>
-                    <TableHead className="text-right">Price/Bale</TableHead>
-                    <TableHead className="w-16"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {addingItem && (
-                    <TableRow>
-                      <TableCell>
-                        <Input
-                          value={newItem.barcode}
-                          onChange={(e) => setNewItem({ ...newItem, barcode: e.target.value })}
-                          placeholder="Barcode"
-                          className="h-8 text-xs"
-                          data-testid="input-new-loaded-barcode"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          value={newItem.itemName}
-                          onChange={(e) => setNewItem({ ...newItem, itemName: e.target.value })}
-                          placeholder="Name"
-                          className="h-8 text-xs"
-                          data-testid="input-new-loaded-name"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          value={newItem.qty}
-                          onChange={(e) => setNewItem({ ...newItem, qty: e.target.value })}
-                          className="h-8 text-xs w-14 text-right"
-                          data-testid="input-new-loaded-qty"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          step="0.001"
-                          value={newItem.weightPerBale}
-                          onChange={(e) => setNewItem({ ...newItem, weightPerBale: e.target.value })}
-                          className="h-8 text-xs w-16 text-right"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={newItem.pricePerBale}
-                          onChange={(e) => setNewItem({ ...newItem, pricePerBale: e.target.value })}
-                          className="h-8 text-xs w-16 text-right"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Button size="icon" variant="ghost" onClick={() => addItemMutation.mutate(newItem)}>
-                            <Save className="h-3 w-3" />
-                          </Button>
-                          <Button size="icon" variant="ghost" onClick={() => setAddingItem(false)}>
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                  {loadedItems.map((item) => (
-                    <TableRow key={item.id}>
-                      {editingItemId === item.id ? (
-                        <>
-                          <TableCell>
-                            <Input
-                              value={editItemData.barcode}
-                              onChange={(e) => setEditItemData({ ...editItemData, barcode: e.target.value })}
-                              className="h-8 text-xs"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              value={editItemData.itemName}
-                              onChange={(e) => setEditItemData({ ...editItemData, itemName: e.target.value })}
-                              className="h-8 text-xs"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              type="number"
-                              value={editItemData.qty}
-                              onChange={(e) => setEditItemData({ ...editItemData, qty: e.target.value })}
-                              className="h-8 text-xs w-14 text-right"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              type="number"
-                              step="0.001"
-                              value={editItemData.weightPerBale}
-                              onChange={(e) => setEditItemData({ ...editItemData, weightPerBale: e.target.value })}
-                              className="h-8 text-xs w-16 text-right"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              value={editItemData.pricePerBale}
-                              onChange={(e) => setEditItemData({ ...editItemData, pricePerBale: e.target.value })}
-                              className="h-8 text-xs w-16 text-right"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={() => updateItemMutation.mutate({ id: item.id, data: editItemData })}
-                              >
-                                <Save className="h-3 w-3" />
-                              </Button>
-                              <Button size="icon" variant="ghost" onClick={() => setEditingItemId(null)}>
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </>
-                      ) : (
-                        <>
-                          <TableCell className="font-mono text-xs">{item.barcode}</TableCell>
-                          <TableCell className="text-xs">{item.itemName || "-"}</TableCell>
-                          <TableCell className="text-right font-mono text-xs">{item.qty}</TableCell>
-                          <TableCell className="text-right font-mono text-xs">
-                            {item.weightPerBale ? parseFloat(item.weightPerBale).toFixed(3) : "-"}
-                          </TableCell>
-                          <TableCell className="text-right font-mono text-xs">
-                            {item.pricePerBale ? parseFloat(item.pricePerBale).toFixed(2) : "-"}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              <Button size="icon" variant="ghost" onClick={() => startEdit(item)}>
-                                <Pencil className="h-3 w-3" />
-                              </Button>
-                              <Button size="icon" variant="ghost" onClick={() => deleteItemMutation.mutate(item.id)}>
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </>
-                      )}
-                    </TableRow>
-                  ))}
-                  {loadedItems.length === 0 && !addingItem && (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground text-sm py-6">
-                        No loaded items. Add manually or import from Excel.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+        <LoadedItemsCard
+          items={loadedItems}
+          autoPopulatePending={autoPopulateMutation.isPending}
+          onAutoPopulate={requestAutoPopulate}
+          onImportClick={() => fileInputRef.current?.click()}
+          onAdd={(draft: LoadedItemDraft) => addItemMutation.mutateAsync(draft)}
+          onUpdate={(id: number, draft: LoadedItemDraft) => updateItemMutation.mutateAsync({ id, data: draft })}
+          onDelete={(id: number) => deleteItemMutation.mutate(id)}
+        />
 
         <Card>
           <CardHeader>
@@ -637,34 +402,7 @@ export default function ContainerVerification() {
 
       {verificationResult && (
         <>
-          {verificationResult.aliasConflicts && verificationResult.aliasConflicts.length > 0 && (
-            <div
-              className="mb-4 rounded-md border border-orange-500/50 bg-orange-500/10 p-3"
-              data-testid="alert-alias-conflicts"
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <AlertTriangle className="h-4 w-4 text-orange-500 shrink-0" />
-                <span className="text-sm font-medium text-orange-700 dark:text-orange-400">
-                  {verificationResult.aliasConflicts.length} barcode alias conflict
-                  {verificationResult.aliasConflicts.length > 1 ? "s" : ""} detected — comparison below skipped these
-                  and may be incomplete
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground mb-2">
-                A barcode is registered as an alias for one item, but that exact barcode is also the item's own primary
-                code for a different stock item. This can cause proforma and loaded quantities to be matched to the
-                wrong item. Fix the alias in Stock Item Aliases before trusting this report.
-              </p>
-              <ul className="text-xs font-mono space-y-1">
-                {verificationResult.aliasConflicts.map((c, i) => (
-                  <li key={i}>
-                    "{c.aliasCode}" is aliased to {c.aliasedToName} ({c.aliasedToCode}), but is also the primary code of{" "}
-                    {c.ownerName} ({c.ownerCode})
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <AliasConflictAlert conflicts={verificationResult.aliasConflicts ?? []} />
           <div className="flex items-center gap-2 mb-4">
             <Button
               variant={viewMode === "summary" ? "default" : "outline"}
@@ -678,443 +416,20 @@ export default function ContainerVerification() {
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
-                <div className="flex items-center gap-2">
-                  <ArrowUpRight className="h-4 w-4 text-red-500" />
-                  <CardTitle className="text-sm">Overloaded ({overloaded.length})</CardTitle>
-                </div>
-                <Badge variant="secondary">{overloaded.length}</Badge>
-              </CardHeader>
-              <CardContent>
-                {overloaded.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">None</p>
-                ) : (
-                  <div className="max-h-[400px] overflow-y-auto">
-                    <Table>
-                      <TableHeader className="sticky top-0 z-30 bg-background">
-                        <TableRow>
-                          <TableHead>Item</TableHead>
-                          <TableHead className="text-right">Expected</TableHead>
-                          <TableHead className="text-right">Loaded</TableHead>
-                          <TableHead className="text-right">Excess</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {overloaded.map((c) => (
-                          <TableRow key={c.barcode}>
-                            <TableCell>
-                              <div className="text-xs font-medium">{c.itemName}</div>
-                              <div className="text-xs text-muted-foreground font-mono">{c.barcode}</div>
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-xs">{c.expectedQty}</TableCell>
-                            <TableCell className="text-right font-mono text-xs text-red-600 dark:text-red-400">
-                              {c.loadedQty}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-xs text-red-600 dark:text-red-400">
-                              +{c.loadedQty - c.expectedQty}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                        <TableRow className="bg-muted/50 font-bold">
-                          <TableCell className="text-xs font-bold">Total ({overloaded.length} items)</TableCell>
-                          <TableCell className="text-right font-mono text-xs font-bold">
-                            {overloaded.reduce((s, c) => s + c.expectedQty, 0)}
-                          </TableCell>
-                          <TableCell className="text-right font-mono text-xs font-bold text-red-600 dark:text-red-400">
-                            {overloaded.reduce((s, c) => s + c.loadedQty, 0)}
-                          </TableCell>
-                          <TableCell className="text-right font-mono text-xs font-bold text-red-600 dark:text-red-400">
-                            +{overloaded.reduce((s, c) => s + (c.loadedQty - c.expectedQty), 0)}
-                          </TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
-                <div className="flex items-center gap-2">
-                  <ArrowDownRight className="h-4 w-4 text-amber-500" />
-                  <CardTitle className="text-sm">Less Loaded / Missing ({lessLoaded.length})</CardTitle>
-                </div>
-                <Badge variant="secondary">{lessLoaded.length}</Badge>
-              </CardHeader>
-              <CardContent>
-                {lessLoaded.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">None</p>
-                ) : (
-                  <div className="max-h-[400px] overflow-y-auto">
-                    <Table>
-                      <TableHeader className="sticky top-0 z-30 bg-background">
-                        <TableRow>
-                          <TableHead>Item</TableHead>
-                          <TableHead className="text-right">Expected</TableHead>
-                          <TableHead className="text-right">Loaded</TableHead>
-                          <TableHead className="text-right">Short</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {lessLoaded.map((c) => (
-                          <TableRow key={c.barcode}>
-                            <TableCell>
-                              <div className="text-xs font-medium">{c.itemName}</div>
-                              <div className="text-xs text-muted-foreground font-mono">{c.barcode}</div>
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-xs">{c.expectedQty}</TableCell>
-                            <TableCell className="text-right font-mono text-xs text-amber-600 dark:text-amber-400">
-                              {c.loadedQty}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-xs text-amber-600 dark:text-amber-400">
-                              -{c.expectedQty - c.loadedQty}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                        <TableRow className="bg-muted/50 font-bold">
-                          <TableCell className="text-xs font-bold">Total ({lessLoaded.length} items)</TableCell>
-                          <TableCell className="text-right font-mono text-xs font-bold">
-                            {lessLoaded.reduce((s, c) => s + c.expectedQty, 0)}
-                          </TableCell>
-                          <TableCell className="text-right font-mono text-xs font-bold text-amber-600 dark:text-amber-400">
-                            {lessLoaded.reduce((s, c) => s + c.loadedQty, 0)}
-                          </TableCell>
-                          <TableCell className="text-right font-mono text-xs font-bold text-amber-600 dark:text-amber-400">
-                            -{lessLoaded.reduce((s, c) => s + (c.expectedQty - c.loadedQty), 0)}
-                          </TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-orange-500" />
-                  <CardTitle className="text-sm">Not Requested ({notRequested.length})</CardTitle>
-                </div>
-                <Badge variant="secondary">{notRequested.length}</Badge>
-              </CardHeader>
-              <CardContent>
-                {notRequested.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">None</p>
-                ) : (
-                  <div className="max-h-[400px] overflow-y-auto">
-                    <Table>
-                      <TableHeader className="sticky top-0 z-30 bg-background">
-                        <TableRow>
-                          <TableHead>Item</TableHead>
-                          <TableHead className="text-right">Loaded Qty</TableHead>
-                          <TableHead className="text-right">Total Weight</TableHead>
-                          <TableHead className="text-right">Total Value</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {notRequested.map((c) => (
-                          <TableRow key={c.barcode}>
-                            <TableCell>
-                              <div className="text-xs font-medium">{c.itemName}</div>
-                              <div className="text-xs text-muted-foreground font-mono">{c.barcode}</div>
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-xs text-orange-600 dark:text-orange-400">
-                              {c.loadedQty}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-xs">
-                              {c.loadedWeightTotal.toFixed(3)}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-xs">
-                              {c.loadedTotalValue.toFixed(2)}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                        <TableRow className="bg-muted/50 font-bold">
-                          <TableCell className="text-xs font-bold">Total ({notRequested.length} items)</TableCell>
-                          <TableCell className="text-right font-mono text-xs font-bold text-orange-600 dark:text-orange-400">
-                            {notRequested.reduce((s, c) => s + c.loadedQty, 0)}
-                          </TableCell>
-                          <TableCell className="text-right font-mono text-xs font-bold">
-                            {notRequested.reduce((s, c) => s + c.loadedWeightTotal, 0).toFixed(3)}
-                          </TableCell>
-                          <TableCell className="text-right font-mono text-xs font-bold">
-                            {notRequested.reduce((s, c) => s + c.loadedTotalValue, 0).toFixed(2)}
-                          </TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
-                <div className="flex items-center gap-2">
-                  <DollarSign className="h-4 w-4 text-blue-500" />
-                  <CardTitle className="text-sm">Price Differences ({priceDiffs.length})</CardTitle>
-                </div>
-                <Badge variant="secondary">{priceDiffs.length}</Badge>
-              </CardHeader>
-              <CardContent>
-                {priceDiffs.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">None</p>
-                ) : (
-                  <div className="max-h-[400px] overflow-y-auto">
-                    <Table>
-                      <TableHeader className="sticky top-0 z-30 bg-background">
-                        <TableRow>
-                          <TableHead>Item</TableHead>
-                          <TableHead className="text-right">Proforma</TableHead>
-                          <TableHead className="text-right">Loaded</TableHead>
-                          <TableHead className="text-right">Diff/Bale</TableHead>
-                          <TableHead className="text-right">Total Diff</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {priceDiffs.map((c) => (
-                          <TableRow key={c.barcode}>
-                            <TableCell>
-                              <div className="text-xs font-medium">{c.itemName}</div>
-                              <div className="text-xs text-muted-foreground font-mono">{c.barcode}</div>
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-xs">
-                              {c.expectedPricePerBale.toFixed(2)}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-xs">
-                              {c.loadedPricePerBale.toFixed(2)}
-                            </TableCell>
-                            <TableCell
-                              className={`text-right font-mono text-xs ${c.priceDiffPerBale > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}
-                            >
-                              {c.priceDiffPerBale > 0 ? "+" : ""}
-                              {c.priceDiffPerBale.toFixed(2)}
-                            </TableCell>
-                            <TableCell
-                              className={`text-right font-mono text-xs ${c.totalPriceDiff > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}
-                            >
-                              {c.totalPriceDiff > 0 ? "+" : ""}
-                              {c.totalPriceDiff.toFixed(2)}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                        {(() => {
-                          const totalDiff = priceDiffs.reduce((s, c) => s + c.totalPriceDiff, 0);
-                          return (
-                            <TableRow className="bg-muted/50 font-bold">
-                              <TableCell className="text-xs font-bold">Total ({priceDiffs.length} items)</TableCell>
-                              <TableCell></TableCell>
-                              <TableCell></TableCell>
-                              <TableCell></TableCell>
-                              <TableCell
-                                className={`text-right font-mono text-xs font-bold ${totalDiff > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}
-                              >
-                                {totalDiff > 0 ? "+" : ""}
-                                {totalDiff.toFixed(2)}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })()}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+          <ComparisonCards
+            overloaded={overloaded}
+            lessLoaded={lessLoaded}
+            notRequested={notRequested}
+            priceDiffs={priceDiffs}
+          />
 
           {viewMode === "summary" && (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mt-6">
-              <Card className="flex flex-col">
-                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                  <div className="flex items-center gap-2">
-                    <ArrowUpRight className="h-4 w-4 text-red-500" />
-                    <CardTitle className="text-xs">Overloaded</CardTitle>
-                  </div>
-                  <Badge variant="secondary">{overloaded.length}</Badge>
-                </CardHeader>
-                <CardContent className="flex-1 p-0">
-                  {overloaded.length === 0 ? (
-                    <p className="text-xs text-muted-foreground text-center py-3">None</p>
-                  ) : (
-                    <div className="max-h-[300px] overflow-y-auto">
-                      <Table>
-                        <TableHeader className="sticky top-0 z-30 bg-background">
-                          <TableRow>
-                            <TableHead className="text-xs py-1.5 px-3">Name</TableHead>
-                            <TableHead className="text-xs text-right py-1.5 px-3">Excess</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {overloaded.map((c) => (
-                            <TableRow key={c.barcode}>
-                              <TableCell className="text-xs py-1.5 px-3">{c.itemName}</TableCell>
-                              <TableCell className="text-right font-mono text-xs py-1.5 px-3 text-red-600 dark:text-red-400">
-                                +{c.loadedQty - c.expectedQty}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
-                  {overloaded.length > 0 && (
-                    <div className="border-t bg-muted/50 px-3 py-2 flex items-center justify-between gap-2 text-xs font-bold">
-                      <span>Total ({overloaded.length})</span>
-                      <span className="font-mono text-red-600 dark:text-red-400">
-                        +{overloaded.reduce((s, c) => s + (c.loadedQty - c.expectedQty), 0)}
-                      </span>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="flex flex-col">
-                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                  <div className="flex items-center gap-2">
-                    <ArrowDownRight className="h-4 w-4 text-amber-500" />
-                    <CardTitle className="text-xs">Less Loaded</CardTitle>
-                  </div>
-                  <Badge variant="secondary">{lessLoaded.length}</Badge>
-                </CardHeader>
-                <CardContent className="flex-1 p-0">
-                  {lessLoaded.length === 0 ? (
-                    <p className="text-xs text-muted-foreground text-center py-3">None</p>
-                  ) : (
-                    <div className="max-h-[300px] overflow-y-auto">
-                      <Table>
-                        <TableHeader className="sticky top-0 z-30 bg-background">
-                          <TableRow>
-                            <TableHead className="text-xs py-1.5 px-3">Name</TableHead>
-                            <TableHead className="text-xs text-right py-1.5 px-3">Short</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {lessLoaded.map((c) => (
-                            <TableRow key={c.barcode}>
-                              <TableCell className="text-xs py-1.5 px-3">{c.itemName}</TableCell>
-                              <TableCell className="text-right font-mono text-xs py-1.5 px-3 text-amber-600 dark:text-amber-400">
-                                -{c.expectedQty - c.loadedQty}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
-                  {lessLoaded.length > 0 && (
-                    <div className="border-t bg-muted/50 px-3 py-2 flex items-center justify-between gap-2 text-xs font-bold">
-                      <span>Total ({lessLoaded.length})</span>
-                      <span className="font-mono text-amber-600 dark:text-amber-400">
-                        -{lessLoaded.reduce((s, c) => s + (c.expectedQty - c.loadedQty), 0)}
-                      </span>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="flex flex-col">
-                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-orange-500" />
-                    <CardTitle className="text-xs">Not Requested</CardTitle>
-                  </div>
-                  <Badge variant="secondary">{notRequested.length}</Badge>
-                </CardHeader>
-                <CardContent className="flex-1 p-0">
-                  {notRequested.length === 0 ? (
-                    <p className="text-xs text-muted-foreground text-center py-3">None</p>
-                  ) : (
-                    <div className="max-h-[300px] overflow-y-auto">
-                      <Table>
-                        <TableHeader className="sticky top-0 z-30 bg-background">
-                          <TableRow>
-                            <TableHead className="text-xs py-1.5 px-3">Name</TableHead>
-                            <TableHead className="text-xs text-right py-1.5 px-3">Qty</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {notRequested.map((c) => (
-                            <TableRow key={c.barcode}>
-                              <TableCell className="text-xs py-1.5 px-3">{c.itemName}</TableCell>
-                              <TableCell className="text-right font-mono text-xs py-1.5 px-3 text-orange-600 dark:text-orange-400">
-                                {c.loadedQty}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
-                  {notRequested.length > 0 && (
-                    <div className="border-t bg-muted/50 px-3 py-2 flex items-center justify-between gap-2 text-xs font-bold">
-                      <span>Total ({notRequested.length})</span>
-                      <span className="font-mono text-orange-600 dark:text-orange-400">
-                        {notRequested.reduce((s, c) => s + c.loadedQty, 0)}
-                      </span>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="flex flex-col">
-                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="h-4 w-4 text-blue-500" />
-                    <CardTitle className="text-xs">Price Diff</CardTitle>
-                  </div>
-                  <Badge variant="secondary">{priceDiffs.length}</Badge>
-                </CardHeader>
-                <CardContent className="flex-1 p-0">
-                  {priceDiffs.length === 0 ? (
-                    <p className="text-xs text-muted-foreground text-center py-3">None</p>
-                  ) : (
-                    <div className="max-h-[300px] overflow-y-auto">
-                      <Table>
-                        <TableHeader className="sticky top-0 z-30 bg-background">
-                          <TableRow>
-                            <TableHead className="text-xs py-1.5 px-3">Name</TableHead>
-                            <TableHead className="text-xs text-right py-1.5 px-3">Diff/Bale</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {priceDiffs.map((c) => (
-                            <TableRow key={c.barcode}>
-                              <TableCell className="text-xs py-1.5 px-3">{c.itemName}</TableCell>
-                              <TableCell
-                                className={`text-right font-mono text-xs py-1.5 px-3 ${c.priceDiffPerBale > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}
-                              >
-                                {c.priceDiffPerBale > 0 ? "+" : ""}
-                                {c.priceDiffPerBale.toFixed(2)}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
-                  {priceDiffs.length > 0 &&
-                    (() => {
-                      const totalDiff = priceDiffs.reduce((s, c) => s + c.totalPriceDiff, 0);
-                      return (
-                        <div className="border-t bg-muted/50 px-3 py-2 flex items-center justify-between gap-2 text-xs font-bold">
-                          <span>Total ({priceDiffs.length})</span>
-                          <span
-                            className={`font-mono ${totalDiff > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}
-                          >
-                            {totalDiff > 0 ? "+" : ""}
-                            {totalDiff.toFixed(2)}
-                          </span>
-                        </div>
-                      );
-                    })()}
-                </CardContent>
-              </Card>
-            </div>
+            <SummaryCards
+              overloaded={overloaded}
+              lessLoaded={lessLoaded}
+              notRequested={notRequested}
+              priceDiffs={priceDiffs}
+            />
           )}
         </>
       )}
