@@ -1,0 +1,2 @@
+Phase 18 execution trigger.
+This temporary file exists only to trigger the compiler-gated Phase 18 sync/harvest workflow and will be removed before final certification.
