@@ -10,7 +10,7 @@ import {} from "@shared/schema";
 // Keyed by companyId. Multiple dashboard users share one DB round-trip.
 // ---------------------------------------------------------------------------
 export const _icCache = new Map<string, { data: unknown; expiresAt: number }>();
-export function _getCached(key: string): any | null {
+export function _getCached(key: string): unknown | null {
   const e = _icCache.get(key);
   if (!e) return null;
   if (Date.now() > e.expiresAt) {
