@@ -64,7 +64,7 @@ void cleanupStaleTemporaryExportArchives();
 
 export async function createTemporaryExportArchive(
   jobId: string,
-  companies: any[],
+  companies: unknown[],
   fromDate?: string,
   toDate?: string,
   onProgress?: (msg: string, level?: "info" | "success" | "warning" | "error") => void

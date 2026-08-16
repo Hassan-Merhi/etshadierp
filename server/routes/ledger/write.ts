@@ -208,7 +208,7 @@ export function registerLedgerAccountWriteRoutes(app: Express) {
       });
 
       try {
-        const _ledChanges: Record<string, { old?: any; new?: any }> = {};
+        const _ledChanges: Record<string, { old?: unknown; new?: unknown }> = {};
         for (const _f of [
           "name",
           "code",

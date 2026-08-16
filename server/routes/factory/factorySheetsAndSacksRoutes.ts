@@ -66,7 +66,7 @@ export function registerFactorySheetsAndSacksRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { from, to, action, itemId, limit } = req.query;
-      const params: any[] = [companyId];
+      const params: unknown[] = [companyId];
       const conditions: string[] = ["company_id = $1"];
 
       if (from) {

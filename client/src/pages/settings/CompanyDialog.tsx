@@ -16,7 +16,7 @@ type CompanyFormData = z.infer<typeof companyFormSchema>;
 interface CompanyDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  editingCompany: any;
+  editingCompany: unknown;
   onSubmit: (data: CompanyFormData) => void;
   isPending: boolean;
 }

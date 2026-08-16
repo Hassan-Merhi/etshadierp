@@ -91,7 +91,7 @@ export function PerWorkerView() {
   };
 
   const saveMutation = useMutation({
-    mutationFn: (records: any[]) => apiRequest("POST", "/api/factory/attendance/bulk", { records }),
+    mutationFn: (records: unknown[]) => apiRequest("POST", "/api/factory/attendance/bulk", { records }),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["/api/factory/attendance/worker", workerIdNum, startDate, endDate],

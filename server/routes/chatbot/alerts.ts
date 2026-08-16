@@ -85,7 +85,7 @@ export function registerChatbotAlertRoutes(app: Express) {
         .slice(0, 10);
 
       // Pending payrolls (DRAFT status in factory_payrolls)
-      let pendingPayrolls: any[] = [];
+      let pendingPayrolls: unknown[] = [];
       try {
         const { factoryPayrolls } = await import("@shared/schema");
         pendingPayrolls = await db

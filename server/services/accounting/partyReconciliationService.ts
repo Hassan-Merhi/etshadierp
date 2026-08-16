@@ -17,8 +17,8 @@ export interface ReconciliationBalance {
 }
 
 export interface ReconciliationAdapter {
-  loadCanonicalLedgerBalance(input: ReconciliationTarget & { tx: any }): Promise<ReconciliationBalance>;
-  loadProjectedBalance(input: ReconciliationTarget & { tx: any }): Promise<ReconciliationBalance>;
+  loadCanonicalLedgerBalance(input: ReconciliationTarget & { tx: unknown }): Promise<ReconciliationBalance>;
+  loadProjectedBalance(input: ReconciliationTarget & { tx: unknown }): Promise<ReconciliationBalance>;
 }
 
 export interface ReconciliationResult {

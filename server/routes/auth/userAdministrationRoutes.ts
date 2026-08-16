@@ -164,7 +164,7 @@ export function registerUserAdministrationRoutes(app: Express) {
       const [oldRecord] = await db.select().from(userCompanyRoles).where(eq(userCompanyRoles.id, id)).limit(1);
       const role = await storage.updateUserCompanyRole(id, parsed);
       if (oldRecord) {
-        const changes: Record<string, { old?: any; new?: any }> = {};
+        const changes: Record<string, { old?: unknown; new?: unknown }> = {};
         for (const key of Object.keys(parsed) as Array<keyof typeof parsed>) {
           const oldVal = oldRecord[key];
           const newVal = parsed[key];

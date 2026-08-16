@@ -23,7 +23,7 @@ interface UserManagementDrawerProps {
   user: any | null;
   open: boolean;
   onClose: () => void;
-  companies: any[];
+  companies: unknown[];
   onUserDeleted: () => void;
 }
 

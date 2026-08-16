@@ -33,7 +33,7 @@ export function createDatabaseCompanyIsolationAdapter(): CompanyIsolationLookupA
     async loadResourceCompany({ tx, resourceType, resourceId }) {
       const database = tx;
 
-      const lookups: Partial<Record<CompanyScopedResourceType, { table: any; idColumn: any; companyColumn: any }>> = {
+      const lookups: Partial<Record<CompanyScopedResourceType, { table: unknown; idColumn: unknown; companyColumn: unknown }>> = {
         voucher: {
           table: vouchers,
           idColumn: vouchers.id,

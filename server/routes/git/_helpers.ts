@@ -27,7 +27,7 @@ export const importUndoStore = new Map<
   {
     companyId: number;
     createdAt: number;
-    changes: Array<{ id: number; containerNumber: string; prevData: Record<string, any> }>;
+    changes: Array<{ id: number; containerNumber: string; prevData: Record<string, unknown> }>;
   }
 >();
 export const UNDO_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours

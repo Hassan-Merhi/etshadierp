@@ -57,7 +57,7 @@ export function registerPayrollPaymentSummaryPdfRoutes(app: Express) {
 
       let convertArabic: ((text: string) => string) | null = null;
       let bidi: {
-        getEmbeddingLevels: (text: string, direction: string) => any;
+        getEmbeddingLevels: (text: string, direction: string) => unknown;
         getReorderedString: (text: string, levels: any) => string;
       } | null = null;
       try {

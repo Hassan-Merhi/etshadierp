@@ -69,7 +69,7 @@ export function registerWorkerAdvanceAdminRoutes(app: Express) {
           advancesAccountId = advancesAccount.id;
         }
 
-        const created: any[] = [];
+        const created: unknown[] = [];
         for (const item of items) {
           const workerId = parseInt(item.workerId);
           const amount = parseFloat(item.amount);
@@ -248,7 +248,7 @@ export function registerWorkerAdvanceAdminRoutes(app: Express) {
         );
       }
 
-      const changes: any[] = [];
+      const changes: unknown[] = [];
       for (const [workerId, advances] of advancesByWorker) {
         const balances: { id: number; bal: number }[] = [];
         for (const adv of advances) {

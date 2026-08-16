@@ -22,7 +22,7 @@ function loadMap(key: string): Record<string, string | boolean> {
     return {};
   }
 }
-function saveMap(key: string, map: Record<string, any>) {
+function saveMap(key: string, map: Record<string, unknown>) {
   localStorage.setItem(key, JSON.stringify(map));
 }
 

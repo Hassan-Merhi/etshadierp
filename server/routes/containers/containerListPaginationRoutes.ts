@@ -45,7 +45,7 @@ function parsePagination(req: Request): {
 
 function sendPage(
   res: Response,
-  items: any[],
+  items: unknown[],
   total: number,
   page: number,
   limit: number,
