@@ -74,7 +74,7 @@ export default function LedgerVouchers() {
   const { formatAmountRaw: formatAmount } = useCurrencyContext();
   const { formatShortDate } = useDateFormat();
   const appMode = useAppMode();
-  const modeApiRequest = getApiRequest(appMode);
+  const _modeApiRequest = getApiRequest(appMode);
 
   const accountId = params?.accountId ? parseInt(params.accountId) : null;
   const year = params?.year ? parseInt(params.year) : null;

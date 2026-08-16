@@ -73,7 +73,7 @@ function makeResponse(statusCode = 200) {
   };
 }
 
-function storeJson(middleware: any, request: any, response: any, body: unknown) {
+function storeJson(middleware: unknown, request: unknown, response: unknown, body: unknown) {
   middleware(request, response, () => response.json(body));
 }
 

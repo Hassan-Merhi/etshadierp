@@ -87,7 +87,7 @@ export default function FactoryProformas() {
   const [renameValue, setRenameValue] = useState("");
   const [addLineMode, setAddLineMode] = useState<"manual" | "catalog">("catalog");
   const [catalogSearch, setCatalogSearch] = useState("");
-  const [catalogSelectedItem, setCatalogSelectedItem] = useState<any | null>(null);
+  const [catalogSelectedItem, setCatalogSelectedItem] = useState<unknown | null>(null);
   const [createLoadingProforma, setCreateLoadingProforma] = useState<Proforma | null>(null);
   const [createLoadingLocationId, setCreateLoadingLocationId] = useState<string>("");
   const [transferProforma, setTransferProforma] = useState<Proforma | null>(null);

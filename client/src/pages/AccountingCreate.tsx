@@ -20,7 +20,7 @@ import { entityConfig } from "./accountingcreate/utils";
 import { EntityFormWrapper } from "./accountingcreate/components/EntityFormWrapper";
 export default function AccountingCreate() {
   const appMode = useAppMode();
-  const modeApiRequest = getApiRequest(appMode);
+  const _modeApiRequest = getApiRequest(appMode);
   const [, navigate] = useLocation();
   const [selectedEntity, setSelectedEntity] = useState<EntityType>("location");
   const isFactory = appMode === "factory";

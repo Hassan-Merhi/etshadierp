@@ -118,7 +118,7 @@ export default function FactoryEmployeeAdvancesTab() {
     },
   });
 
-  const { data: repayments = [] } = useQuery<RepaymentRecord[]>({
+  const { data: _repayments = [] } = useQuery<RepaymentRecord[]>({
     queryKey: ["/api/factory/employee-advance-repayments"],
     queryFn: async () => {
       const res = await fetch("/api/factory/employee-advance-repayments", { credentials: "include" });

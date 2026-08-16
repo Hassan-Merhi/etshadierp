@@ -14,7 +14,7 @@ import { registerSupplierProfitPoOverrideRoutes } from "./po-overrides";
 import { registerSupplierProfitImportRoutes } from "./import-by-codes";
 import { registerSupplierProfitAddStockItemRoutes } from "./add-stock-item";
 
-export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any) {
+export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: unknown) {
   registerSupplierProfitLookupRoutes(app, requireAuth);
   registerSupplierProfitAnalyzeRoutes(app, requireAuth);
   registerSupplierProfitProformaRoutes(app, requireAuth);

@@ -12,7 +12,7 @@ export function _npsCached(key: string) {
   return c && Date.now() < c.expiresAt ? c.data : null;
 }
 
-export function _npsSetCache(key: string, data: any) {
+export function _npsSetCache(key: string, data: unknown) {
   _npsCache.set(key, { data, expiresAt: Date.now() + 30_000 });
   if (_npsCache.size > 500) {
     const now = Date.now();

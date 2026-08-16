@@ -28,7 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import type { ItemGroup, PLBasis, PLFilter, SalesReportItem, VoucherGroup } from "./salesreportdetail/types";
 import { LOCATION_PALETTE, formatNumericValue, profitColor } from "./salesreportdetail/utils";
 export default function SalesReportDetail() {
-  const [, navigate] = useLocation();
+  const [, _navigate] = useLocation();
   const handleBack = useBackToParent();
   const { formatAmount } = useCurrencyContext();
   const [plFilter, setPlFilter] = useState<PLFilter>("all");

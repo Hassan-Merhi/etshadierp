@@ -22,7 +22,7 @@ export function registerAiImportJobRoutes(app: Express) {
     try {
       const companyId = req.session.currentCompanyId;
       const userId = req.session.userId;
-      const username = req.session.username || "Unknown";
+      const _username = req.session.username || "Unknown";
 
       if (!companyId || !userId) return res.status(400).json({ message: "No company selected" });
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });

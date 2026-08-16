@@ -68,7 +68,7 @@ interface PosShift {
   notes: string | null;
 }
 
-interface TodaySales {
+interface _TodaySales {
   count: number;
   total: string;
   average: string;

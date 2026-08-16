@@ -129,7 +129,7 @@ export default function VoucherDetail() {
   const { formatAmount } = useCurrencyContext();
   const { formatShortDate } = useDateFormat();
   const appMode = useAppMode();
-  const modeApiRequest = getApiRequest(appMode);
+  const _modeApiRequest = getApiRequest(appMode);
 
   const voucherId = params?.voucherId ? parseInt(params.voucherId) : null;
   const fromDaybook = new URLSearchParams(window.location.search).get("from") === "daybook";

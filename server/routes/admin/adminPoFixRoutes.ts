@@ -436,7 +436,7 @@ export function registerAdminPoFixRoutes(app: Express) {
         const otherCharges = parseFloat(po.otherCharges || "0");
         const poTotal = itemsTotal + freight + surcharge + fumigation + documentCharges - discount + otherCharges;
 
-        const poSupplier = po.supplierId
+        const _poSupplier = po.supplierId
           ? await db.query.suppliers.findFirst({ where: eq(suppliers.id, po.supplierId) })
           : null;
         if (poTotal <= 0) {

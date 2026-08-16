@@ -31,7 +31,7 @@ export function registerChatbotStatusRoutes(app: Express) {
           .where(eq(systemSettings.key, "ai_provider"))
           .limit(1),
       ]);
-      const [user] = userRows;
+      const [_user] = userRows;
 
       // Get selected AI provider and check if its API key is configured
       const providerSetting = providerRows;
@@ -58,7 +58,7 @@ export function registerChatbotStatusRoutes(app: Express) {
         hasApiKey,
         isAdminOrOwner: userRole === "Admin" || userRole === "Owner" || userRole === "Developer",
       });
-    } catch (error: unknown) {
+    } catch (_error: unknown) {
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -96,7 +96,7 @@ export function registerChatbotStatusRoutes(app: Express) {
       }
 
       res.json({ success: true, provider: normalizedProvider });
-    } catch (error: unknown) {
+    } catch (_error: unknown) {
       res.status(500).json({ message: "Internal server error" });
     }
   });

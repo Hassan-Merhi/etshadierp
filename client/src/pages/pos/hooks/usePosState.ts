@@ -19,7 +19,7 @@ export function usePosState() {
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [zeroStockAlert, setZeroStockAlert] = useState(false);
   const [zeroStockItem, setZeroStockItem] = useState("");
-  const [savedSale, setSavedSale] = useState<any>(null);
+  const [savedSale, setSavedSale] = useState<unknown>(null);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [showDraftDialog, setShowDraftDialog] = useState(false);
   const [currentDraftId, setCurrentDraftId] = useState<number | null>(null);

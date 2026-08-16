@@ -140,7 +140,7 @@ export function PurchaseEditForm({
                       <FormField
                         control={form.control}
                         name={`items.${index}.stockItemId`}
-                        render={({ field: itemField }) => (
+                        render={({ field: _itemField }) => (
                           <FormItem>
                             <FormLabel className="text-xs">Stock Item</FormLabel>
                             <FormControl>

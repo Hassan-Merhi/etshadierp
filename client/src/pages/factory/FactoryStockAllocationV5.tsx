@@ -337,8 +337,8 @@ export default function FactoryStockAllocationV5() {
     containerName: string;
     status: "DRAFT" | "LOADING";
   } | null>(null);
-  const [cancelSuperUser, setCancelSuperUser] = useState("");
-  const [cancelSuperPass, setCancelSuperPass] = useState("");
+  const [_cancelSuperUser, setCancelSuperUser] = useState("");
+  const [_cancelSuperPass, setCancelSuperPass] = useState("");
 
   const cancelContainerMut = useMutation({
     mutationFn: ({

@@ -82,7 +82,7 @@ export function ApplicationLanguageProvider({ children }: { children: ReactNode 
       preferenceMutation.mutate(normalized);
       void queryClient.invalidateQueries({ refetchType: "active" }, { cancelRefetch: false });
     },
-    [preferenceMutation.mutate]
+    [preferenceMutation]
   );
 
   useEffect(() => {

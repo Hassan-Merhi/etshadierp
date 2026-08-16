@@ -45,7 +45,7 @@ interface Proforma {
 
 export default function SupplierProformas() {
   const { toast } = useToast();
-  const [, navigate] = useLocation();
+  const [, _navigate] = useLocation();
   const handleBack = useBackToParent();
   const params = useParams<{ supplierId: string }>();
   const supplierId = parseInt(params.supplierId);

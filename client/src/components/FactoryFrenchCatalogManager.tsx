@@ -83,7 +83,7 @@ export function FactoryFrenchCatalogManager() {
 
   useEffect(() => {
     if (open) void loadRows();
-  }, [open, status]);
+  }, [loadRows, open, status]);
 
   const startEdit = (row: FrenchCatalogRow) => {
     setEditing(row);

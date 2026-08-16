@@ -76,7 +76,7 @@ describe("offlinePrep endpoint", () => {
   it("offlinePrep.ts uses /api/stock-items/light not /api/stock-items", async () => {
     // Read the source file and check the endpoint string.
     // This is a compile-time-style check via string search in the module source.
-    const src = await fetch("/src/lib/offlinePrep.ts").catch(() => null);
+    const _src = await fetch("/src/lib/offlinePrep.ts").catch(() => null);
     // If running in a Node/Vitest environment without file serving, use the
     // import.meta.glob approach or just verify the shape via the exported helper.
     // The most portable check: import the module and verify its helpers exist.

@@ -73,7 +73,7 @@ export default function Login() {
   const [hasSavedCreds, setHasSavedCreds] = useState(false);
   const [biometryPending, setBiometryPending] = useState(false);
   const [showBioPrompt, setShowBioPrompt] = useState(false);
-  const pendingUserData = useRef<any>(null);
+  const pendingUserData = useRef<unknown>(null);
   const pendingCredentials = useRef<{ username: string; password: string } | null>(null);
 
   const [passKeyPending, setPassKeyPending] = useState(false);

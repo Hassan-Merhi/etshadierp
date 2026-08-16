@@ -40,7 +40,7 @@ export function registerChatbotGithubSettingsRoutes(app: Express) {
       const safeUrl = baseUrl.replace(/https?:\/\/[^@]+@/, "https://");
 
       res.json({ repoUrl: safeUrl, hasToken, configured: !!baseUrl });
-    } catch (error: unknown) {
+    } catch (_error: unknown) {
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -82,7 +82,7 @@ export function registerChatbotGithubSettingsRoutes(app: Express) {
       }
 
       res.json({ success: true });
-    } catch (error: unknown) {
+    } catch (_error: unknown) {
       res.status(500).json({ message: "Internal server error" });
     }
   });

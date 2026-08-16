@@ -73,7 +73,7 @@ export function registerBalanceRepairApplyRoutes(app: Express) {
         const contracts = await db.select().from(propertyContracts).where(eq(propertyContracts.companyId, companyId));
         const contractMap = new Map(contracts.map((c) => [c.id, c]));
         const allUnits = await db.select().from(propertyUnits).where(eq(propertyUnits.companyId, companyId));
-        const unitMap = new Map(allUnits.map((u) => [u.id, u]));
+        const _unitMap = new Map(allUnits.map((u) => [u.id, u]));
 
         const paymentsRows = await db.execute(sql`
           SELECT
@@ -118,7 +118,7 @@ export function registerBalanceRepairApplyRoutes(app: Express) {
           const cashAccId = row.cash_account_id ? Number(row.cash_account_id) : null;
           const amount = row.voucher_total ?? row.amount;
           const isShop = (row.unit_type ?? "WAREHOUSE") === "SHOP";
-          const contract = contractMap.get(Number(row.contract_id));
+          const _contract = contractMap.get(Number(row.contract_id));
           const module = row.module ?? "PROPERTIES";
 
           // If voucher was soft-deleted, un-delete it first

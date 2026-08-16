@@ -49,7 +49,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function IntercompanyRequests() {
-  const [, navigate] = useLocation();
+  const [, _navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 

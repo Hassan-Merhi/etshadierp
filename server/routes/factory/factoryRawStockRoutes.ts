@@ -55,7 +55,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
   // direct container cascade cannot correctly reprice by itself.
   app.use("/api/factory/containers", postOffloadHistoricalReplayMiddleware);
 
-  const confirmedRepair = (action: string, sourceType: string) =>
+  const _confirmedRepair = (action: string, sourceType: string) =>
     requireLegacyPrivilegedWrite({
       action,
       domain: "factory",

@@ -59,7 +59,7 @@ export function ImportBalesTab() {
         const data = new Uint8Array(evt.target?.result as ArrayBuffer);
         const workbook = await XLSX.read(data, { type: "array" });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json<any>(sheet, { header: 1 });
+        const jsonData = XLSX.utils.sheet_to_json<unknown>(sheet, { header: 1 });
 
         let headerRowIdx = -1;
         for (let i = 0; i < Math.min(jsonData.length, 10); i++) {
