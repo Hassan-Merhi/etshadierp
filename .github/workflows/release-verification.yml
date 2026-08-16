@@ -2,6 +2,16 @@ name: Release Verification
 
 on:
   workflow_dispatch:
+  # Dispatch-only meant nobody ran it. The reviewed-count contract this branch
+  # repairs was broken on 13 August by a commit that moved the catalogue and its
+  # test together but not the contract, and it went unseen until the workflow
+  # was first dispatched three days later. The gate was right the whole time and
+  # nobody had asked it anything.
+  #
+  # Sunday 04:00 UTC: clear of the working week, and clear of the hourly
+  # scheduled jobs so the runner queue is quiet.
+  schedule:
+    - cron: "0 4 * * 0"
 
 permissions:
   contents: read
