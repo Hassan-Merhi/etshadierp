@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v4
         with: {fetch-depth: 0, ref: agent/lint-phase-4-fast}
       - uses: actions/setup-node@v4
-        with: {node-version: '22.14.0', cache: npm}
+        with: {node-version: '22.14', cache: npm}
       - name: Merge latest main preserving runtime fixes
         shell: bash
         run: |
@@ -62,7 +62,6 @@ jobs:
               m=re.match(r'(.+?\.(?:ts|tsx))\(\d+,\d+\):\s+error\s+TS\d+:', line)
               if m: errs.add(m.group(1).replace('\\','/'))
           rev=set(errs & changed)
-          # If fallout is only in consumers, conservatively locate directly imported changed modules.
           if not rev and errs and changed:
               exts=['.ts','.tsx','/index.ts','/index.tsx']
               for ef in errs:
