@@ -70,7 +70,7 @@ interface ChatMessageListProps {
   accountQueryResult: AccountQueryResult | null;
   setAccountQueryResult: (v: AccountQueryResult | null) => void;
   poDraft: POImportDraft | null;
-  handleConfirmPOImport: (resolved: any) => void;
+  handleConfirmPOImport: (resolved: unknown) => void;
   setPoDraft: (v: POImportDraft | null) => void;
   poDraftSubmitting: boolean;
   poDraftResult: POImportResult | null;

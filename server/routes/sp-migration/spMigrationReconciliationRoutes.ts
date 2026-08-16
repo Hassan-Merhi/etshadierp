@@ -267,7 +267,7 @@ export function registerSpMigrationReconciliationRoutes(app: Express) {
   // ── HARD GUARD: No cutover endpoint ─────────────────────────────────────
   // This explicitly blocks any attempt to POST to /api/sp/migration/cutover.
   // Phase 5 final migration is not implemented.
-  app.all("/api/sp/migration/cutover", requireAuth, (_req: any, res: any) => {
+  app.all("/api/sp/migration/cutover", requireAuth, (_req: unknown, res: import("express").Response) => {
     return res.status(403).json({
       message: "BLOCKED: Final production migration (cutover) is not available. Phase 5 is disabled.",
       code: "CUTOVER_DISABLED",

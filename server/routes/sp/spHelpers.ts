@@ -8,7 +8,7 @@ import { firstRow } from "../../lib/queryResult";
 // Structural-only extraction from the former monolithic spRoutes.ts — logic is
 // byte-for-byte identical to what every SP route sub-module previously used.
 
-export function getCompanyId(req: any): number | null {
+export function getCompanyId(req: import("express").Request): number | null {
   return req.session?.currentCompanyId ?? null;
 }
 

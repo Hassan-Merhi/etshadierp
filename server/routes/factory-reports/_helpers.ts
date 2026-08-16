@@ -68,7 +68,7 @@ export function addPdfBranding(doc: any) {
   doc.font("Helvetica");
 }
 
-export function generateEmptyPdf(res: any, companyName: string, startDate: string, endDate: string) {
+export function generateEmptyPdf(res: import("express").Response, companyName: string, startDate: string, endDate: string) {
   const doc = new PDFDocument({ margin: 40, size: "A4" });
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", `attachment; filename="supplier_usage_report_${startDate}_${endDate}.pdf"`);
@@ -85,7 +85,7 @@ export function generateEmptyPdf(res: any, companyName: string, startDate: strin
   doc.end();
 }
 
-export async function generateEmptyExcel(res: any, companyName: string, startDate: string, endDate: string) {
+export async function generateEmptyExcel(res: import("express").Response, companyName: string, startDate: string, endDate: string) {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Summary");
   let xlLogoId: number | null = null;
@@ -117,7 +117,7 @@ export async function generateEmptyExcel(res: any, companyName: string, startDat
 }
 
 export async function generatePdf(
-  res: any,
+  res: import("express").Response,
   companyName: string,
   startDate: string,
   endDate: string,
@@ -253,7 +253,7 @@ export async function generatePdf(
 }
 
 export async function generateExcel(
-  res: any,
+  res: import("express").Response,
   companyName: string,
   startDate: string,
   endDate: string,

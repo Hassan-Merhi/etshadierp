@@ -549,7 +549,7 @@ export function registerStockPriceListImportRoutes(app: Express) {
     requireAuth,
     requireNonPOS,
     upload.single("file"),
-    async (req: any, res) => {
+    async (req: import("express").Request, res) => {
       try {
         const companyId = req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });

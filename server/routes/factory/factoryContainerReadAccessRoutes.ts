@@ -17,7 +17,7 @@ import {
  * table. Prefer the actively selected ERP company; factoryCompanyId can remain
  * populated from a previous factory-mode session and must not override it here.
  */
-function resolveErpContainerCompanyId(req: any): number | null {
+function resolveErpContainerCompanyId(req: import("express").Request): number | null {
   const raw = req.session?.currentCompanyId || req.session?.factoryCompanyId;
   const companyId = Number(raw);
   return Number.isInteger(companyId) && companyId > 0 ? companyId : null;

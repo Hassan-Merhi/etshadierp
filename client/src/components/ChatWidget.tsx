@@ -298,7 +298,7 @@ export function ChatWidget() {
     }
   };
 
-  const handleConfirmPOImport = async (resolved: any) => {
+  const handleConfirmPOImport = async (resolved: unknown) => {
     setPoDraftSubmitting(true);
     setPoDraftError(null);
     try {
