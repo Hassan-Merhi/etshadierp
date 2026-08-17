@@ -76,7 +76,7 @@ export function registerChatbotPoImportRoutes(app: Express) {
         otherCharges: number;
       }) {
         const supplier = tryMatchSupplier(extracted.supplierCode) || tryMatchSupplier(extracted.supplierName);
-        const lines: any[] = [];
+        const lines = [];
         for (const item of extracted.items) {
           if (item.quantity <= 0) continue;
           const matched = await tryMatchItem(item.code || "", item.name || "");
@@ -247,7 +247,7 @@ export function registerChatbotPoImportRoutes(app: Express) {
       const discount = parseFloat(col(first, "Discount", "discount") || "0") || 0;
       const otherCharges = parseFloat(col(first, "Other_Charges", "OtherCharges", "Other Charges") || "0") || 0;
 
-      const mappedLines: any[] = [];
+      const mappedLines = [];
       for (const row of rows) {
         const itemCode = col(
           row,

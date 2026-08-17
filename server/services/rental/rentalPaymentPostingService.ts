@@ -200,7 +200,7 @@ async function postGroupCore(
       { allocs, totalAmountStr, cashAccountId, currency, exchangeRate }
     );
 
-    const payEntries: any[] = [
+    const payEntries = [
       { voucherId: v.id, ledgerAccountId: cashAccountId, ...normEntry("0", totalAmountStr), narration },
     ];
 
@@ -393,7 +393,7 @@ async function postGroupCore(
       { allocs, totalAmountStr, cashAccountId, currency, exchangeRate }
     );
 
-    const lEntries: any[] = [
+    const lEntries = [
       {
         voucherId: v.id,
         ledgerAccountId: cashAccountId,

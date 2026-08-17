@@ -159,7 +159,7 @@ export function registerFactoryMixBatchUpdateRoutes(app: Express) {
         // DEFECT 15 FIX: use Decimal.js for cost accumulation (edit route).
         let dTotalWeightKg = new Decimal(0);
         let dTotalCost = new Decimal(0);
-        const sourceRecords: any[] = [];
+        const sourceRecords = [];
 
         for (const source of supplierSources || []) {
           // costPerKg from the client is NEVER trusted for a real supplier.

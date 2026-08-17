@@ -146,7 +146,7 @@ export async function rebuildPayrollGenVoucher(
   }
 
   // ── Step 2: remaining payrolls for this period ────────────────────────────
-  const remaining: any[] = await tx
+  const remaining = await tx
     .select({
       workerId: factoryPayrolls.workerId,
       baseSalary: factoryPayrolls.baseSalary,
@@ -239,7 +239,7 @@ export async function rebuildPayrollGenVoucher(
     { workerRows, totalNet, totalAdvances }
   );
 
-  const journalEntries: any[] = [];
+  const journalEntries = [];
 
   for (const { workerId, workerName, salAmt, bonAmt } of workerRows) {
     const accs = workerAccCache.get(workerId)!;

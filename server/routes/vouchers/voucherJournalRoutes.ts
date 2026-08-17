@@ -236,7 +236,7 @@ export function registerVoucherJournalRoutes(app: Express) {
           })
           .returning();
 
-        const voucherEntriesToCreate: any[] = [];
+        const voucherEntriesToCreate = [];
 
         // Create entries.
         // Each entry.amount is the original transaction-currency (CFA) value.
@@ -515,7 +515,7 @@ export function registerVoucherJournalRoutes(app: Express) {
         // Delete existing voucher entries
         await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
 
-        const voucherEntriesToCreate: any[] = [];
+        const voucherEntriesToCreate = [];
 
         // Create new entries with dual-currency normalization.
         for (const entry of entries) {

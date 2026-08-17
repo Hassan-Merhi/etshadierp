@@ -39,7 +39,7 @@ function getMonthStart(): Date {
   return new Date(today.getFullYear(), today.getMonth(), 1);
 }
 
-function filterBalesByDate(bales: any[], startDate: Date): any[] {
+function filterBalesByDate(bales: any[], startDate: Date) {
   return bales.filter((row) => {
     const created = new Date(row.bale.createdAt);
     return created >= startDate;
