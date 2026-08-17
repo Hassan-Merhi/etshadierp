@@ -20,7 +20,7 @@ type GuardRow = {
   response_body: unknown;
 };
 
-type ClaimResult =
+export type VoucherPathClaimResult =
   | { kind: "owner" }
   | { kind: "replay"; status: number; body: unknown }
   | { kind: "conflict" }
@@ -94,11 +94,15 @@ export function deterministicPhase6RequestIdentity(
   return `${prefix}:${companyId}:${source}`;
 }
 
-function requestFingerprint(method: string, pathname: string, body: VoucherRequestPayload): string {
+export function voucherPathRequestFingerprint(
+  method: string,
+  pathname: string,
+  body: VoucherRequestPayload
+): string {
   return sha256({ method: method.toUpperCase(), pathname, body });
 }
 
-async function ensureGuardTable(): Promise<void> {
+export async function ensureVoucherPathGuardTable(): Promise<void> {
   if (!ensureTablePromise) {
     ensureTablePromise = (async () => {
       await db.execute(sql`
@@ -140,7 +144,11 @@ async function readGuard(companyId: number, idempotencyKey: string): Promise<Gua
   return (result.rows[0] as GuardRow | undefined) ?? null;
 }
 
-async function waitForCompletion(companyId: number, idempotencyKey: string, fingerprint: string): Promise<ClaimResult> {
+async function waitForCompletion(
+  companyId: number,
+  idempotencyKey: string,
+  fingerprint: string
+): Promise<VoucherPathClaimResult> {
   for (let attempt = 0; attempt < 100; attempt += 1) {
     const row = await readGuard(companyId, idempotencyKey);
     if (!row) return { kind: "uncertain" };
@@ -153,14 +161,14 @@ async function waitForCompletion(companyId: number, idempotencyKey: string, fing
   return { kind: "uncertain" };
 }
 
-async function claimRequest(
+export async function claimVoucherPathRequest(
   companyId: number,
   idempotencyKey: string,
   requestKind: "operational" | "deterministic-source",
   pathname: string,
   fingerprint: string
-): Promise<ClaimResult> {
-  await ensureGuardTable();
+): Promise<VoucherPathClaimResult> {
+  await ensureVoucherPathGuardTable();
 
   const inserted = await db.execute(sql`
     INSERT INTO voucher_path_request_guards
@@ -181,7 +189,7 @@ async function claimRequest(
   return waitForCompletion(companyId, idempotencyKey, fingerprint);
 }
 
-async function completeRequest(
+export async function completeVoucherPathRequest(
   companyId: number,
   idempotencyKey: string,
   status: number,
@@ -204,9 +212,10 @@ async function completeRequest(
   // marker before deliberately starting a new sourceRunId.
   if (status >= 500) return;
 
+  const responseJson = JSON.stringify(body ?? null);
   await db.execute(sql`
     UPDATE voucher_path_request_guards
-    SET state = 'completed', response_status = ${status}, response_body = ${JSON.stringify(body ?? null)}::jsonb,
+    SET state = 'completed', response_status = ${status}, response_body = ${responseJson}::jsonb,
         updated_at = NOW()
     WHERE company_id = ${companyId} AND idempotency_key = ${idempotencyKey} AND state = 'processing'
   `);
@@ -252,10 +261,10 @@ export function registerVoucherPathPhase5to6Boundary(app: Express): void {
       });
     }
 
-    const fingerprint = requestFingerprint(req.method, pathname, body);
-    let claim: ClaimResult;
+    const fingerprint = voucherPathRequestFingerprint(req.method, pathname, body);
+    let claim: VoucherPathClaimResult;
     try {
-      claim = await claimRequest(
+      claim = await claimVoucherPathRequest(
         companyId,
         idempotencyKey,
         phase6 ? "deterministic-source" : "operational",
@@ -293,7 +302,7 @@ export function registerVoucherPathPhase5to6Boundary(app: Express): void {
 
     const captured = captureResponse(res);
     res.on("finish", () => {
-      void completeRequest(companyId, idempotencyKey, res.statusCode, captured.read(), phase6).catch((error) => {
+      void completeVoucherPathRequest(companyId, idempotencyKey, res.statusCode, captured.read(), phase6).catch((error) => {
         // The successful handler result has already been sent. Leaving the row
         // processing is intentionally fail-closed: a future retry cannot execute
         // the financial handler again after an uncertain guard-write outcome.
