@@ -1004,7 +1004,7 @@
     "GET /api/inventory/movement/drill [requireAuth > <anonymous>]",
     "GET /api/inventory/reconcile [requireAuth > <anonymous> > <anonymous>]",
     "GET /api/locations/:locationId/vouchers/today [requireAuth > checkPOSLocation > <anonymous>]",
-    "POST /api/locations/:locationId/import-cost-prices [requireAuth > checkPOSLocation > <anonymous>]",
+    "POST /api/locations/:locationId/import-cost-prices [requireAuth > <anonymous> > checkPOSLocation > <anonymous>]",
     "POST /api/locations/:locationId/import-inventory [requireAuth > checkPOSLocation > <anonymous>]",
     "GET /api/accounts/multi-currency/readiness [requireAuth > requireNonPOS > <anonymous>]",
     "GET /api/accounts/multi-currency/repair-center [requireAuth > requireNonPOS > <anonymous>]",

@@ -24,7 +24,7 @@ audit fails instead of allowing the reference to drift.
 | Write routes with no test at all | 0 of 328 | `npm run audit:write-routes` |
 | Write routes covered only by the guard sweep | 0 of 328 | `npm run audit:write-routes` |
 | Registered routes | 1,903 | `config/route-manifest.json` |
-| God-file backlog | 43 files, 20,723 excess lines | `npm run audit:god-files` |
+| God-file backlog | 51 files, 25,813 excess lines | `npm run audit:god-files` |
 
 The type-escape and ESLint rows are the **ceilings** those gates enforce, and
 they now equal what the tree measures.
