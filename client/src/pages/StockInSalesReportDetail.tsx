@@ -111,6 +111,8 @@ interface GroupedSalesRow {
   quantity: number;
   avgRate: number;
   totalValue: number;
+  profitPerBale: number;
+  totalProfit: number;
   locations: Array<{ name: string; quantity: number }>;
 }
 
@@ -196,6 +198,7 @@ function groupSalesRows(rows: StockOutRow[]): GroupedSalesRow[] {
       stockItemName: string;
       quantity: number;
       totalValue: number;
+      totalProfit: number;
       locations: Map<string, number>;
     }
   >();
@@ -208,10 +211,12 @@ function groupSalesRows(rows: StockOutRow[]): GroupedSalesRow[] {
       stockItemName: row.stockItemName,
       quantity: 0,
       totalValue: 0,
+      totalProfit: 0,
       locations: new Map<string, number>(),
     };
     group.quantity += Number(row.quantity || 0);
     group.totalValue += Number(row.totalSales || 0);
+    group.totalProfit += Number(row.costProfit || 0);
     sumMap(group.locations, row.locationName, Number(row.quantity || 0));
     groups.set(key, group);
   }
@@ -224,6 +229,8 @@ function groupSalesRows(rows: StockOutRow[]): GroupedSalesRow[] {
       quantity: group.quantity,
       totalValue: group.totalValue,
       avgRate: group.quantity === 0 ? 0 : group.totalValue / group.quantity,
+      profitPerBale: group.quantity === 0 ? 0 : group.totalProfit / group.quantity,
+      totalProfit: group.totalProfit,
       locations: mapToBreakdown(group.locations),
     }))
     .sort((a, b) => {
@@ -357,6 +364,8 @@ export default function StockInSalesReportDetail() {
         { header: "Qty", key: "qty", width: 14 },
         { header: "Avg Rate", key: "rate", width: 16 },
         { header: "Value", key: "value", width: 18 },
+        { header: "Profit / Bale", key: "profitPerBale", width: 18 },
+        { header: "Total Profit", key: "totalProfit", width: 18 },
       ];
       exportSales.forEach((row) =>
         salesSheet.addRow({
@@ -366,6 +375,8 @@ export default function StockInSalesReportDetail() {
           qty: row.quantity,
           rate: row.avgRate,
           value: row.totalValue,
+          profitPerBale: row.profitPerBale,
+          totalProfit: row.totalProfit,
         })
       );
       salesSheet.getRow(1).font = { bold: true };
@@ -439,52 +450,68 @@ export default function StockInSalesReportDetail() {
         </DropdownMenu>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {isLoading ? (
-          Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-24 rounded-xl" />)
+          Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-[98px] rounded-xl" />)
         ) : (
           <>
-            <div className="rounded-xl border bg-muted/30 p-3">
-              <p className="text-xs text-muted-foreground">Opening Stock</p>
-              <div className="mt-1 flex items-end justify-between gap-4">
+            <div className="flex min-h-[98px] flex-col rounded-xl border bg-muted/20 px-3.5 py-3">
+              <p className="text-[12px] font-medium leading-none text-muted-foreground">Opening Stock</p>
+              <div className="mt-auto grid grid-cols-2 gap-3 pt-3">
                 <div>
-                  <p className="text-[11px] text-muted-foreground">Qty</p>
-                  <p className="font-mono text-lg font-semibold">{formatNumber(summary.openingStockQty, 0)}</p>
+                  <p className="text-[9px] font-medium uppercase tracking-[0.08em] text-muted-foreground/80">Qty</p>
+                  <p className="mt-1 whitespace-nowrap font-mono text-[17px] font-semibold leading-none tracking-tight tabular-nums">
+                    {formatNumber(summary.openingStockQty, 0)}
+                  </p>
                 </div>
-                <div className="text-right">
-                  <p className="text-[11px] text-muted-foreground">Value</p>
-                  <p className="font-mono text-lg font-semibold">{roundedMoney(summary.openingStockValue)}</p>
+                <div className="min-w-0 text-right">
+                  <p className="text-[9px] font-medium uppercase tracking-[0.08em] text-muted-foreground/80">Value</p>
+                  <p className="mt-1 whitespace-nowrap font-mono text-[15px] font-semibold leading-none tracking-tight tabular-nums 2xl:text-[16px]">
+                    {roundedMoney(summary.openingStockValue)}
+                  </p>
                 </div>
               </div>
             </div>
-            <div className="rounded-xl border bg-muted/30 p-3">
-              <p className="text-xs text-muted-foreground">Stock In Qty</p>
-              <p className="mt-1 font-mono text-lg font-semibold">{formatNumber(summary.stockInQty, 0)}</p>
+            <div className="flex min-h-[98px] flex-col rounded-xl border bg-muted/20 px-3.5 py-3">
+              <p className="text-[12px] font-medium leading-none text-muted-foreground">Stock In Qty</p>
+              <p className="mt-auto whitespace-nowrap pt-3 font-mono text-[19px] font-semibold leading-none tracking-tight tabular-nums">
+                {formatNumber(summary.stockInQty, 0)}
+              </p>
             </div>
-            <div className="rounded-xl border bg-muted/30 p-3">
-              <p className="text-xs text-muted-foreground">Stock Out</p>
-              <p className="mt-1 font-mono text-lg font-semibold">{formatNumber(summary.stockOutQty, 0)}</p>
+            <div className="flex min-h-[98px] flex-col rounded-xl border bg-muted/20 px-3.5 py-3">
+              <p className="text-[12px] font-medium leading-none text-muted-foreground">Stock Out</p>
+              <p className="mt-auto whitespace-nowrap pt-3 font-mono text-[19px] font-semibold leading-none tracking-tight tabular-nums">
+                {formatNumber(summary.stockOutQty, 0)}
+              </p>
             </div>
-            <div className="rounded-xl border bg-muted/30 p-3">
-              <p className="text-xs text-muted-foreground">Closing / In Hand</p>
-              <div className="mt-1 flex items-end justify-between gap-4">
+            <div className="flex min-h-[98px] flex-col rounded-xl border bg-muted/20 px-3.5 py-3">
+              <p className="text-[12px] font-medium leading-none text-muted-foreground">Closing / In Hand</p>
+              <div className="mt-auto grid grid-cols-2 gap-3 pt-3">
                 <div>
-                  <p className="text-[11px] text-muted-foreground">Qty</p>
-                  <p className="font-mono text-lg font-semibold">{formatNumber(summary.closingStockQty, 0)}</p>
+                  <p className="text-[9px] font-medium uppercase tracking-[0.08em] text-muted-foreground/80">Qty</p>
+                  <p className="mt-1 whitespace-nowrap font-mono text-[17px] font-semibold leading-none tracking-tight tabular-nums">
+                    {formatNumber(summary.closingStockQty, 0)}
+                  </p>
                 </div>
-                <div className="text-right">
-                  <p className="text-[11px] text-muted-foreground">Value</p>
-                  <p className="font-mono text-lg font-semibold">{roundedMoney(summary.closingStockValue)}</p>
+                <div className="min-w-0 text-right">
+                  <p className="text-[9px] font-medium uppercase tracking-[0.08em] text-muted-foreground/80">Value</p>
+                  <p className="mt-1 whitespace-nowrap font-mono text-[15px] font-semibold leading-none tracking-tight tabular-nums 2xl:text-[16px]">
+                    {roundedMoney(summary.closingStockValue)}
+                  </p>
                 </div>
               </div>
             </div>
-            <div className="rounded-xl border bg-muted/30 p-3">
-              <p className="text-xs text-muted-foreground">Gross Profit</p>
-              <p className="mt-1 font-mono text-lg font-semibold">{roundedMoney(summary.costProfit)}</p>
+            <div className="flex min-h-[98px] flex-col rounded-xl border bg-muted/20 px-3.5 py-3">
+              <p className="text-[12px] font-medium leading-none text-muted-foreground">Gross Profit</p>
+              <p className="mt-auto whitespace-nowrap pt-3 font-mono text-[19px] font-semibold leading-none tracking-tight tabular-nums">
+                {roundedMoney(summary.costProfit)}
+              </p>
             </div>
-            <div className="rounded-xl border bg-muted/30 p-3">
-              <p className="text-xs text-muted-foreground">Avg Profit / Bale</p>
-              <p className="mt-1 font-mono text-lg font-semibold">{roundedMoney(summary.avgProfitPerBale)}</p>
+            <div className="flex min-h-[98px] flex-col rounded-xl border bg-muted/20 px-3.5 py-3">
+              <p className="text-[12px] font-medium leading-none text-muted-foreground">Avg Profit / Bale</p>
+              <p className="mt-auto whitespace-nowrap pt-3 font-mono text-[19px] font-semibold leading-none tracking-tight tabular-nums">
+                {roundedMoney(summary.avgProfitPerBale)}
+              </p>
             </div>
           </>
         )}
@@ -603,7 +630,7 @@ export default function StockInSalesReportDetail() {
             </div>
             <div className="overflow-hidden rounded-xl border">
               <div className="max-h-[520px] overflow-auto">
-                <Table className="min-w-[850px]">
+                <Table className="min-w-[1100px]">
                   <TableHeader>
                     <TableRow className="bg-muted/40 hover:bg-muted/40">
                       <TableHead>Date</TableHead>
@@ -612,20 +639,22 @@ export default function StockInSalesReportDetail() {
                       <TableHead className="text-right">Qty</TableHead>
                       <TableHead className="text-right">Avg Rate</TableHead>
                       <TableHead className="text-right">Value</TableHead>
+                      <TableHead className="text-right">Profit / Bale</TableHead>
+                      <TableHead className="text-right">Total Profit</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {isLoading ? (
                       Array.from({ length: 4 }).map((_, i) => (
                         <TableRow key={i}>
-                          <TableCell colSpan={6}>
+                          <TableCell colSpan={8}>
                             <Skeleton className="h-5 w-full" />
                           </TableCell>
                         </TableRow>
                       ))
                     ) : groupedSales.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                        <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
                           No sales found.
                         </TableCell>
                       </TableRow>
@@ -653,6 +682,8 @@ export default function StockInSalesReportDetail() {
                           <TableCell className="text-right font-mono">{formatNumber(row.quantity, 0)}</TableCell>
                           <TableCell className="text-right font-mono">{rate(row.avgRate)}</TableCell>
                           <TableCell className="text-right font-mono">{formatAmount(row.totalValue)}</TableCell>
+                          <TableCell className="text-right font-mono">{rate(row.profitPerBale)}</TableCell>
+                          <TableCell className="text-right font-mono">{formatAmount(row.totalProfit)}</TableCell>
                         </TableRow>
                       ))
                     )}
