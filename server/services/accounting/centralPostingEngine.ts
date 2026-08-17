@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import Decimal from "decimal.js";
 import type { VoucherEntryInsertFields, VoucherInsertFields, VoucherWithEntries } from "./accountingTypes";
 import { insertVoucherWithEntriesTx } from "./voucherPostingService";
@@ -41,8 +42,15 @@ export interface PostingIdempotencyStore {
     tx: any;
     companyId: number;
     source: PostingSourceIdentity;
+    requestFingerprint: string;
   }): Promise<VoucherWithEntries | null>;
-  record(input: { tx: any; companyId: number; voucherId: number; source: PostingSourceIdentity }): Promise<void>;
+  record(input: {
+    tx: any;
+    companyId: number;
+    voucherId: number;
+    source: PostingSourceIdentity;
+    requestFingerprint: string;
+  }): Promise<void>;
 }
 
 export interface PostingAuditWriter {
@@ -107,10 +115,66 @@ function amount(value: string | undefined, field: string, index: number): Decima
   if (!parsed.isFinite() || parsed.isNegative()) {
     throw new PostingValidationError(
       "POSTING_AMOUNT_INVALID",
-      `Entry ${index + 1} ${field} must be a finite non-negative amount`
+      `Entry ${index + 1} ${field} must be a finite non-negative amount`,
     );
   }
   return parsed;
+}
+
+function normalizedDecimal(value: string | null | undefined): string | null {
+  if (value == null || String(value).trim() === "") return null;
+  return new Decimal(value).toFixed();
+}
+
+function normalizedText(value: string | null | undefined): string | null {
+  if (value == null) return null;
+  return String(value);
+}
+
+/**
+ * Stable hash of the financial payload associated with one request identity.
+ * Actor/audit metadata is intentionally excluded: retransmission by a restored
+ * session is still the same financial request. Every persisted voucher/entry
+ * field that can change accounting meaning is included in fixed key order.
+ */
+export function buildPostingRequestFingerprint(request: CentralPostingRequest): string {
+  const canonical = {
+    companyId: request.voucher.companyId,
+    voucherNumber: request.voucher.voucherNumber.trim(),
+    voucherType: request.voucher.voucherType.trim(),
+    voucherDate: request.voucher.voucherDate.trim(),
+    totalAmount: normalizedDecimal(request.voucher.totalAmount),
+    description: normalizedText(request.voucher.description),
+    locationId: request.voucher.locationId ?? null,
+    optional: request.voucher.optional ?? false,
+    currency: normalizedText(request.voucher.currency ?? "USD"),
+    exchangeRate: normalizedDecimal(request.voucher.exchangeRate),
+    effectiveDate: normalizedText(request.voucher.effectiveDate),
+    sourceModule: normalizedText(request.voucher.sourceModule),
+    sourceType: request.source.sourceType.trim(),
+    sourceId: request.source.sourceId.trim(),
+    entries: request.entries.map((entry) => ({
+      ledgerAccountId: entry.ledgerAccountId ?? null,
+      bankAccountId: entry.bankAccountId ?? null,
+      fixedAssetId: entry.fixedAssetId ?? null,
+      supplierId: entry.supplierId ?? null,
+      employeeId: entry.employeeId ?? null,
+      customerId: entry.customerId ?? null,
+      factorySupplierId: entry.factorySupplierId ?? null,
+      debitAmount: normalizedDecimal(entry.debitAmount ?? "0"),
+      creditAmount: normalizedDecimal(entry.creditAmount ?? "0"),
+      narration: normalizedText(entry.narration),
+      transactionCurrency: normalizedText(entry.transactionCurrency),
+      transactionDebitAmount: normalizedDecimal(entry.transactionDebitAmount),
+      transactionCreditAmount: normalizedDecimal(entry.transactionCreditAmount),
+      baseDebitAmount: normalizedDecimal(entry.baseDebitAmount),
+      baseCreditAmount: normalizedDecimal(entry.baseCreditAmount),
+      historicalExchangeRate: normalizedDecimal(entry.historicalExchangeRate),
+      rateConvention: normalizedText(entry.rateConvention),
+    })),
+  };
+
+  return createHash("sha256").update(JSON.stringify(canonical)).digest("hex");
 }
 
 export function populatedPostingTargets(entry: VoucherEntryInsertFields): TargetField[] {
@@ -155,13 +219,13 @@ export function validateCentralPostingRequest(request: CentralPostingRequest): V
     if (!hasSupportedPostingTargetShape(entry)) {
       throw new PostingValidationError(
         "POSTING_TARGET_INVALID",
-        `Entry ${index + 1} must reference one accounting target or a verified customer and linked ledger pair`
+        `Entry ${index + 1} must reference one accounting target or a verified customer and linked ledger pair`,
       );
     }
     if (debit.isZero() === credit.isZero()) {
       throw new PostingValidationError(
         "POSTING_ENTRY_SIDE_INVALID",
-        `Entry ${index + 1} must contain either a debit or a credit, but not both`
+        `Entry ${index + 1} must contain either a debit or a credit, but not both`,
       );
     }
 
@@ -172,7 +236,7 @@ export function validateCentralPostingRequest(request: CentralPostingRequest): V
   if (debitTotal.isZero() || !debitTotal.equals(creditTotal)) {
     throw new PostingValidationError(
       "POSTING_UNBALANCED",
-      `Voucher is not balanced: debit=${debitTotal.toFixed()} credit=${creditTotal.toFixed()}`
+      `Voucher is not balanced: debit=${debitTotal.toFixed()} credit=${creditTotal.toFixed()}`,
     );
   }
 
@@ -185,7 +249,7 @@ export function validateCentralPostingRequest(request: CentralPostingRequest): V
   if (!declaredTotal.isFinite() || declaredTotal.isNegative() || !declaredTotal.equals(debitTotal)) {
     throw new PostingValidationError(
       "POSTING_TOTAL_MISMATCH",
-      `totalAmount must equal the balanced debit total (${debitTotal.toFixed()})`
+      `totalAmount must equal the balanced debit total (${debitTotal.toFixed()})`,
     );
   }
 
@@ -211,10 +275,11 @@ export function validateCentralPostingRequest(request: CentralPostingRequest): V
 export async function postBalancedVoucherTx(
   tx: any,
   request: CentralPostingRequest,
-  dependencies: CentralPostingDependencies
+  dependencies: CentralPostingDependencies,
 ): Promise<CentralPostingResult> {
   const totals = validateCentralPostingRequest(request);
   const companyId = request.voucher.companyId;
+  const requestFingerprint = buildPostingRequestFingerprint(request);
 
   await assertTransactionCompanyScope(tx, companyId);
 
@@ -222,6 +287,7 @@ export async function postBalancedVoucherTx(
     tx,
     companyId,
     source: request.source,
+    requestFingerprint,
   });
   if (existing) return { ...existing, replayed: true };
 
@@ -239,6 +305,7 @@ export async function postBalancedVoucherTx(
     companyId,
     voucherId: result.voucher.id,
     source: request.source,
+    requestFingerprint,
   });
 
   await dependencies.audit.recordPosting({
