@@ -1,4 +1,5 @@
 # Phase 18 integration trigger: compiler-gated proven repair batch
+# retrigger: restore proven Phase 18 repairs after current-main synchronization
 name: Phase 18 Integrate Proven Repairs
 on:
   push:
