@@ -21,6 +21,7 @@ import {
   type PostingSourceIdentity,
 } from "./centralPostingEngine";
 import { assertCustomerLinkedLedgerPairs } from "./customerLinkedLedgerValidation";
+import type { CompanyScopedReadTransaction } from "../security/transactionCompanyScope";
 
 const LEGACY_IDEMPOTENCY_TABLE = "accounting_posting_idempotency";
 const POSTING_AUDIT_TABLE = "accounting_postings";
@@ -80,7 +81,10 @@ export function collectPostingTargetIds(entries: VoucherEntryInsertFields[]): Po
 }
 
 async function assertCompanyOwnedIds(input: {
-  tx: any;
+  // select().from().where() is the whole surface this helper uses, and
+  // CompanyScopedReadTransaction is exactly that shape - so the transaction can
+  // be named rather than escaped.
+  tx: CompanyScopedReadTransaction;
   companyId: number;
   ids: number[];
   table: any;
@@ -95,7 +99,7 @@ async function assertCompanyOwnedIds(input: {
     .select({ id: idColumn })
     .from(table)
     .where(and(eq(companyColumn, companyId), inArray(idColumn, ids)));
-  const found = new Set(rows.map((row: { id: number }) => Number(row.id)));
+  const found = new Set(rows.map((row) => Number(row.id)));
   const missing = ids.filter((id) => !found.has(id));
   if (missing.length > 0) {
     throw new PostingValidationError(

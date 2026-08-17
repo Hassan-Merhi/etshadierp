@@ -1145,6 +1145,12 @@ describe("Container Offload Inventory Tests", () => {
     const [supplier] = await db
       .insert(schema.suppliers)
       .values({
+        // Explicit, because assign_supplier_company_id() only infers an owner
+        // when exactly one root company exists. A full suite run leaves many,
+        // so the trigger raises and this seed fails for reasons that have
+        // nothing to do with the offload behaviour under test. The container
+        // below is already scoped to this company; the supplier belongs to it.
+        companyId: ctx.companyId,
         code: supplierCode,
         legalName: `${TEST_PREFIX} Test Supplier`,
         email: "supplier@test.com",
