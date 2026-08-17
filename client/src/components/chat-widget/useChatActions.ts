@@ -10,6 +10,10 @@ import {
   PriceUpdateDraft,
   FilePatchDraft,
   PushResult,
+  VoucherSearchResult,
+  AccountQueryResult,
+  VerifyContainerDraft,
+  DataQueryResult,
 } from "./chatWidgetTypes";
 
 interface ChatActionsState {
@@ -23,12 +27,12 @@ interface ChatActionsState {
   setPendingStockAdj: React.Dispatch<React.SetStateAction<StockAdjustmentDraft | null>>;
   setPendingStockTransfer: React.Dispatch<React.SetStateAction<StockTransferDraft | null>>;
   setPendingStockTransferBatch: (v: StockTransferDraft[] | null) => void;
-  setVoucherSearchResults: (v: any) => void;
+  setVoucherSearchResults: React.Dispatch<React.SetStateAction<VoucherSearchResult[] | null>>;
   setPendingStockItem: React.Dispatch<React.SetStateAction<StockItemDraft | null>>;
   setPendingPriceUpdate: React.Dispatch<React.SetStateAction<PriceUpdateDraft | null>>;
-  setAccountQueryResult: (v: any) => void;
-  setVerifyContainerDraft: (v: any) => void;
-  setDataQueryResult: (v: any) => void;
+  setAccountQueryResult: React.Dispatch<React.SetStateAction<AccountQueryResult | null>>;
+  setVerifyContainerDraft: React.Dispatch<React.SetStateAction<VerifyContainerDraft | null>>;
+  setDataQueryResult: React.Dispatch<React.SetStateAction<DataQueryResult | null>>;
   setPendingFilePatches: (v: FilePatchDraft[]) => void;
   setAppliedPatchFiles: (fn: (prev: Set<string>) => Set<string>) => void;
   setPerFilePushResult: (fn: (prev: Record<string, PushResult>) => Record<string, PushResult>) => void;
