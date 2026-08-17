@@ -13,7 +13,7 @@ import { storedFiles, fileFolders } from "@shared/schema";
 import { eq, and, desc, asc } from "drizzle-orm";
 
 export function registerFileRoutes(app: Express) {
-  app.get("/api/file-folders", requireAuth, async (req: any, res) => {
+  app.get("/api/file-folders", requireAuth, async (req: import("express").Request, res) => {
     try {
       const companyId = req.session?.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company context" });
@@ -28,7 +28,7 @@ export function registerFileRoutes(app: Express) {
     }
   });
 
-  app.post("/api/file-folders", requireAuth, async (req: any, res) => {
+  app.post("/api/file-folders", requireAuth, async (req: import("express").Request, res) => {
     try {
       const companyId = req.session?.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company context" });
@@ -85,7 +85,7 @@ export function registerFileRoutes(app: Express) {
   });
 
   // ── File Storage ─────────────────────────────────────────────
-  app.get("/api/files", requireAuth, async (req: any, res) => {
+  app.get("/api/files", requireAuth, async (req: import("express").Request, res) => {
     try {
       const companyId = req.session?.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company context" });
@@ -110,7 +110,7 @@ export function registerFileRoutes(app: Express) {
     }
   });
 
-  app.post("/api/files/upload", requireAuth, upload.single("file"), async (req: any, res) => {
+  app.post("/api/files/upload", requireAuth, upload.single("file"), async (req: import("express").Request, res) => {
     try {
       const companyId = req.session?.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company context" });

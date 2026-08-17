@@ -216,7 +216,7 @@ export function registerDispatchBaleScanRoutes(app: Express) {
 
       const { reason } = req.body;
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
         const [scan] = await tx
           .select()
           .from(customerDispatchBaleScans)

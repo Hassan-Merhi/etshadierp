@@ -354,7 +354,7 @@ export function registerPosSaleWriteRoutes(app: Express) {
       const totalExpenses = expenseRows.reduce((s, e) => s + e.amount, 0);
       const netCash = isCredit ? depositAmt - totalExpenses : totalAmount - totalExpenses;
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
         // Step 1: Restore bales for old items
         const oldItems = await tx.select().from(factoryPosSaleItems).where(eq(factoryPosSaleItems.saleId, saleId));
         for (const oldItem of oldItems) {

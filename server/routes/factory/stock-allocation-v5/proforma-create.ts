@@ -170,7 +170,7 @@ export function registerV5ProformaCreateRoutes(app: Express) {
         .from(customerProformaLines)
         .where(eq(customerProformaLines.proformaId, proformaId));
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
         const today = getClientDate(req);
         const orderValues = containerNames.map((containerName: string) => ({
           companyId,

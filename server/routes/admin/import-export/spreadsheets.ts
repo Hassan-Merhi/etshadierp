@@ -90,7 +90,7 @@ export function registerSpreadsheetRoutes(app: Express) {
     }
   });
 
-  app.post("/api/live-spreadsheets", requireAuth, requireNonPOS, async (req: any, res) => {
+  app.post("/api/live-spreadsheets", requireAuth, requireNonPOS, async (req: import("express").Request, res) => {
     try {
       const role = req.session?.currentRole;
       if (role !== "Admin" && role !== "Owner" && role !== "Developer") {

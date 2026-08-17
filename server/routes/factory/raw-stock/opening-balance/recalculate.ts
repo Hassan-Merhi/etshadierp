@@ -27,7 +27,7 @@ export function registerRawStockRecalculateUsedRoutes(app: Express) {
   // Dangerous bulk recalc — bulk-overwrites usedKg for every raw stock record in the
   // company. Admin-only, defaults to a dry-run diff preview, and audit-logs every apply.
   // Only counts sources from mix batches that are NOT soft-deleted and NOT status='DELETED'.
-  app.post("/api/factory/raw-stock/recalculate-used", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/raw-stock/recalculate-used", requireAuth, async (req: any, res: import("express").Response) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
@@ -236,7 +236,7 @@ export function registerRawStockRecalculateUsedRoutes(app: Express) {
   // Dangerous one-time historical fix — bulk-overwrites costPerKg/totalCost on every bale
   // in every mix batch for the company. Admin-only, defaults to a dry-run diff preview,
   // and audit-logs every apply.
-  app.post("/api/factory/raw-stock/recalculate-bale-costs", requireAuth, async (req: any, res: any) => {
+  app.post("/api/factory/raw-stock/recalculate-bale-costs", requireAuth, async (req: any, res: import("express").Response) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;

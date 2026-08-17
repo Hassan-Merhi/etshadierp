@@ -203,7 +203,7 @@ export function registerCoreAuthRoutes(app: Express) {
     });
   });
 
-  app.patch("/api/me/password", requireLogin, async (req: any, res: any) => {
+  app.patch("/api/me/password", requireLogin, async (req: any, res: import("express").Response) => {
     try {
       const userId: string = req.session.userId;
       const { currentPassword, newPassword, confirmPassword } = req.body;
