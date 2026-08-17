@@ -35,3 +35,4 @@ jobs:
         shell: bash
         run: |
           set +e; node scripts/audit-i18n-phase14.mjs --json-out /tmp/i18n.json --markdown-out /tmp/i18n.md; echo I18N_EXIT=$?; set -e
+# phase18 measurement trigger 2026-08-17
