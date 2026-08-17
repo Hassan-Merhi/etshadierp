@@ -1,0 +1,110 @@
+name: Phase 18 Safe Unused Symbol Cleanup
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+env:
+  CI: true
+
+jobs:
+  cleanup:
+    if: contains(github.event.head_commit.message, '[phase18-unused-safe]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.14.0'
+          cache: npm
+      - run: npm ci
+      - name: Remove dead non-parameter declarations while preserving effects
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          npm run check
+          set +e
+          npx eslint . --format json --output-file /tmp/eslint-unused.json
+          set -e
+          cat > /tmp/unused-safe.cjs <<'NODE'
+          const ts=require('typescript'),fs=require('fs'),path=require('path');
+          const root=process.cwd();
+          const report=JSON.parse(fs.readFileSync('/tmp/eslint-unused.json','utf8'));
+          const byFile=new Map();
+          for(const r of report){const msgs=r.messages.filter(m=>m.severity===1&&m.ruleId==='unused-imports/no-unused-vars');if(msgs.length)byFile.set(path.relative(root,r.filePath).replaceAll('\\','/'),msgs)}
+          function pos(sf,node){const p=sf.getLineAndCharacterOfPosition(node.getStart(sf));return [p.line+1,p.character+1]}
+          function removeListItem(items,node){const i=items.indexOf(node);if(i<0)return null;if(items.length===1)return [node.getStart(),node.end,''];if(i<items.length-1)return [node.getStart(),items[i+1].getStart(),''];return [items[i-1].end,node.end,'']}
+          let candidates=0,files=0;
+          for(const [rel,msgs] of byFile){if(!fs.existsSync(rel))continue;const original=fs.readFileSync(rel,'utf8'),sf=ts.createSourceFile(rel,original,ts.ScriptTarget.Latest,true,rel.endsWith('x')?ts.ScriptKind.TSX:ts.ScriptKind.TS);const targets=new Set(msgs.map(m=>`${m.line}:${m.column}`)),edits=[];
+            function visit(n){
+              if(ts.isIdentifier(n)){const [line,col]=pos(sf,n);if(targets.has(`${line}:${col}`)){
+                let p=n.parent,e=null;
+                if(ts.isParameter(p)){ /* preserve callback/function arity in this pass */ }
+                else if(ts.isCatchClause(p.parent)&&p.parent.variableDeclaration===p){const cl=p.parent;e=[cl.getStart(sf)+5,cl.block.getStart(sf),' '];}
+                else if(ts.isBindingElement(p)){
+                  const q=p.parent;
+                  if(ts.isArrayBindingPattern(q)||ts.isObjectBindingPattern(q))e=removeListItem(q.elements,p);
+                }
+                else if(ts.isVariableDeclaration(p)){
+                  const list=p.parent;
+                  if(ts.isVariableDeclarationList(list)){
+                    if(list.declarations.length>1)e=removeListItem([...list.declarations],p);
+                    else if(ts.isVariableStatement(list.parent)){
+                      const st=list.parent;
+                      e=p.initializer?[st.getStart(sf),st.end,`(${p.initializer.getText(sf)});`]:[st.getStart(sf),st.end,''];
+                    }
+                  }
+                }
+                else if((ts.isFunctionDeclaration(p)||ts.isClassDeclaration(p)||ts.isInterfaceDeclaration(p)||ts.isTypeAliasDeclaration(p)||ts.isEnumDeclaration(p))&&p.parent===sf){e=[p.getFullStart(),p.end,''];}
+                if(e){edits.push(e);candidates++;targets.delete(`${line}:${col}`)}
+              }}
+              ts.forEachChild(n,visit)
+            }visit(sf);
+            if(!edits.length)continue;edits.sort((a,b)=>b[0]-a[0]);let text=original,last=Infinity;for(const e of edits){if(e[1]>last)continue;text=text.slice(0,e[0])+e[2]+text.slice(e[1]);last=e[0]}fs.writeFileSync(rel,text);files++;
+          }
+          console.log(`UNUSED_SAFE_CANDIDATES=${candidates} FILES=${files}`);
+          NODE
+          node /tmp/unused-safe.cjs
+          npx prettier --write $(git diff --name-only -- '*.ts' '*.tsx' '*.js' '*.mjs' | tr '\n' ' ') || true
+      - name: Compiler-gate changed files
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            set +e; npm run check >/tmp/unused-check.log 2>&1; rc=$?; set -e
+            if [ "$rc" -eq 0 ]; then echo "UNUSED_GREEN_ATTEMPT=$attempt"; break; fi
+            mapfile -t errs < <(sed -nE 's#^(.+\.(ts|tsx))\([0-9]+,[0-9]+\): error TS[0-9]+:.*#\1#p' /tmp/unused-check.log | sort -u)
+            reverted=0
+            for f in "${errs[@]}"; do
+              if git diff --name-only | grep -Fxq "$f"; then git restore --source=HEAD --worktree -- "$f"; reverted=$((reverted+1)); fi
+            done
+            echo "UNUSED_ROLLBACK_ATTEMPT=$attempt ERRORS=${#errs[@]} REVERTED=$reverted"
+            if [ "$reverted" -eq 0 ]; then cat /tmp/unused-check.log; git reset --hard HEAD; exit 0; fi
+          done
+          npm run check
+          set +e; npx eslint . --format json --output-file /tmp/eslint-after.json; set -e
+          node - <<'NODE'
+          const fs=require('fs');const r=JSON.parse(fs.readFileSync('/tmp/eslint-after.json','utf8'));let n=0;for(const f of r)for(const m of f.messages)if(m.severity===1&&m.ruleId==='unused-imports/no-unused-vars')n++;console.log('UNUSED_REMAINING='+n);
+          NODE
+      - name: Commit and robustly push
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -A
+          git reset -- .github/workflows/phase18-unused-safe.yml || true
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'refactor: remove dead unused declarations [phase18-unused] [skip ci]'
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main; git rebase origin/main; npm run check
+            if git push origin HEAD:main; then exit 0; fi
+          done
+          exit 1
