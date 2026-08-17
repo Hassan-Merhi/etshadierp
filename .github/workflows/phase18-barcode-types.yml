@@ -1,0 +1,156 @@
+name: Phase 18 Barcode Lookup Contracts
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+env:
+  CI: true
+
+jobs:
+  refactor:
+    if: contains(github.event.head_commit.message, '[phase18-barcode-types]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.14.0'
+          cache: npm
+      - run: npm ci
+      - name: Extract API result contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          cat > client/src/pages/barcodelookup/types.ts <<'TS'
+          import type { BaleLabelPrint, BaleProduct } from "@shared/schema";
+
+          export type SearchMode = "reference" | "article";
+
+          export interface ArticleLookupResult {
+            product: BaleProduct | null;
+            labelPrints: BaleLabelPrint[];
+          }
+
+          export interface ReferenceLookupResult {
+            labelPrint: BaleLabelPrint | null;
+            product: BaleProduct | null;
+            baleInfo: {
+              id: number;
+              baleCode: string;
+              status: string;
+              weightKg: string;
+              costPerKg: string;
+              totalCost: string;
+              productName: string | null;
+              grade: string | null;
+              stockEntryDate: string | null;
+              pressedAt: string | null;
+              finalizedAt: string | null;
+              workerName: string | null;
+              createdAt: string | null;
+              updatedAt: string | null;
+              deletedAt: string | null;
+            } | null;
+            locationInfo: { id: number; name: string; city: string | null; state: string | null } | null;
+            pressingBatch: {
+              id: number;
+              status: string;
+              expectedCount: number;
+              finalizedAt: string | null;
+              notes: string | null;
+            } | null;
+            mixBatch: {
+              id: number;
+              batchCode: string;
+              batchNumber: string | null;
+              name: string | null;
+              batchDate: string | null;
+              totalWeightKg: string;
+              costPerKg: string;
+              status: string;
+              operatorUser: string | null;
+            } | null;
+            containers_used: Array<{
+              id: number;
+              containerNumber: string;
+              origin: string | null;
+              arrivalDate: string | null;
+              status: string;
+              supplierName: string | null;
+              weightKgUsed: string | null;
+              currencyCode: string;
+              ratePerKg: string | null;
+            }>;
+            loadedOnOrder: {
+              orderId: number;
+              invoiceNumber: string | null;
+              orderDate: string;
+              status: string;
+              containerNumber: string | null;
+              shippingCompany: string | null;
+              containerNotes: string | null;
+              loadingStartedAt: string | null;
+              loadingFinalizedAt: string | null;
+              grandTotal: string;
+              totalQtyBales: number;
+              customerName: string | null;
+              priceUsed: string;
+              baleWeight: string;
+              scannedBy: string | null;
+            } | null;
+            auditHistory: Array<{
+              id: number;
+              action: string;
+              username: string;
+              changes: Record<string, { old: unknown; new: unknown }> | null;
+              createdAt: string;
+            }>;
+          }
+          TS
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('client/src/pages/BarcodeLookup.tsx')
+          s=p.read_text()
+          s=s.replace('import type { SearchMode } from "./barcodelookup/types";', 'import type { ArticleLookupResult, ReferenceLookupResult, SearchMode } from "./barcodelookup/types";')
+          article_start=s.index('  const [articleResult, setArticleResult] = useState<{')
+          article_end=s.index('  } | null>(null);', article_start)+len('  } | null>(null);')
+          s=s[:article_start]+'  const [articleResult, setArticleResult] = useState<ArticleLookupResult | null>(null);'+s[article_end:]
+          ref_start=s.index('  const [referenceResult, setReferenceResult] = useState<{')
+          ref_end=s.index('  } | null>(null);', ref_start)+len('  } | null>(null);')
+          s=s[:ref_start]+'  const [referenceResult, setReferenceResult] = useState<ReferenceLookupResult | null>(null);'+s[ref_end:]
+          p.write_text(s)
+          PY
+          npx prettier --write client/src/pages/BarcodeLookup.tsx client/src/pages/barcodelookup/types.ts
+      - name: Verify compiler and Barcode boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run check
+          set +e
+          npm run audit:god-files >/tmp/god.log 2>&1
+          rc=$?
+          set -e
+          cat /tmp/god.log
+          if grep -Fq 'client/src/pages/BarcodeLookup.tsx' /tmp/god.log; then exit 1; fi
+          echo "OTHER_GOD_FILE_FAILURES_REMAIN=$rc"
+          node scripts/audit-type-escapes.mjs --json >/tmp/type.json || true
+      - name: Commit and push
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add client/src/pages/BarcodeLookup.tsx client/src/pages/barcodelookup/types.ts
+          git commit -m 'refactor: extract Barcode Lookup result contracts [phase18-barcode] [skip ci]'
+          git fetch origin main
+          git rebase origin/main
+          npm run check
+          git push origin HEAD:main
