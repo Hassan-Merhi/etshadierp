@@ -1,0 +1,35 @@
+name: Phase 18 Current Any Inventory
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  inventory:
+    if: contains(github.event.head_commit.message, '[phase18-any-inventory]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with: {ref: main}
+      - uses: actions/setup-node@v6
+        with: {node-version: '22.14.0', cache: npm}
+      - run: npm ci
+      - name: Inventory explicit any by file and AST context
+        shell: bash
+        run: |
+          set +e
+          npx eslint "client/src/**/*.{ts,tsx}" "server/**/*.ts" "shared/**/*.ts" -f json -o /tmp/eslint.json
+          set -e
+          node - <<'NODE'
+          const fs=require('fs'),path=require('path'),ts=require('typescript');
+          const report=JSON.parse(fs.readFileSync('/tmp/eslint.json','utf8'));
+          const counts=[];
+          for(const f of report){const items=f.messages.filter(m=>m.ruleId==='@typescript-eslint/no-explicit-any');if(items.length)counts.push([path.relative(process.cwd(),f.filePath).replaceAll('\\','/'),items.length]);}
+          counts.sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]));
+          console.log('FILES_WITH_ANY='+counts.length);
+          console.log('TOP_FILES'); for(const [f,n] of counts.slice(0,120))console.log(`${n}\t${f}`);
+          const contexts=new Map(),samples=new Map();
+          for(const [file] of counts){const text=fs.readFileSync(file,'utf8'),sf=ts.createSourceFile(file,text,ts.ScriptTarget.Latest,true,file.endsWith('x')?ts.ScriptKind.TSX:ts.ScriptKind.TS);const visit=n=>{if(n.kind===ts.SyntaxKind.AnyKeyword){const p=n.parent,pp=p?.parent;let key=ts.SyntaxKind[p?.kind]||'Unknown';if(ts.isTypeReferenceNode(p))key=`TypeReference:${p.typeName.getText(sf)}`;else if(ts.isArrayTypeNode(p))key='ArrayElement';else if(ts.isUnionTypeNode(p))key='UnionMember';else if(ts.isParameter(p))key='Parameter';else if(ts.isPropertySignature(p))key='PropertySignature';else if(ts.isPropertyDeclaration(p))key='PropertyDeclaration';else if(ts.isAsExpression(p))key='AsExpression';else if(ts.isTypeAliasDeclaration(p))key='TypeAlias';else if(ts.isVariableDeclaration(p))key='VariableDeclaration';else if(ts.isCallExpression(pp)&&pp.typeArguments?.includes(p))key='CallTypeArgument';contexts.set(key,(contexts.get(key)||0)+1);if(!samples.has(key))samples.set(key,[]);if(samples.get(key).length<8){const lc=sf.getLineAndCharacterOfPosition(n.getStart(sf));samples.get(key).push(`${file}:${lc.line+1}:${lc.character+1} :: ${p.getText(sf).slice(0,180)}`)}}ts.forEachChild(n,visit)};visit(sf)}
+          console.log('CONTEXTS'); for(const [k,n] of [...contexts].sort((a,b)=>b[1]-a[1])){console.log(`${n}\t${k}`);for(const s of samples.get(k)||[])console.log(`  ${s}`)}
+          NODE
