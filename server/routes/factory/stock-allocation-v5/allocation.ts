@@ -7,7 +7,7 @@
 import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
-import { db } from "../../../db";
+import { db, pool } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { customerProformas, customerProformaLines, customers } from "@shared/schema";
 import { eq, inArray, sql, and, gte, lte } from "drizzle-orm";
@@ -38,18 +38,20 @@ export function registerV5StockAllocationRoutes(app: Express) {
       } = req.query;
 
       // 0. Build set of excluded article codes — products whose category OR name is Wiper/Garbage/Rag
-      const excludedCodesRaw = await db.execute(
-        sql`SELECT COALESCE(fbp.article_code, fbp.code) AS "articleCode"
-            FROM factory_bale_products fbp
-            LEFT JOIN factory_categories fc ON fc.id = fbp.category_id
-            WHERE fbp.company_id = ${companyId}
-              AND (
-                LOWER(fc.name) LIKE '%wiper%'
-                OR LOWER(fc.name) LIKE '%garbage%'
-                OR LOWER(fc.name) LIKE '%rag%'
-                OR LOWER(fbp.name) LIKE '%wiper%'
-                OR LOWER(fbp.name) LIKE '%garbage%'
-              )`
+      // pool.query (not db.execute) — Drizzle's db.execute crashes on multi-join raw SQL.
+      const excludedCodesRaw = await pool.query(
+        `SELECT COALESCE(fbp.article_code, fbp.code) AS "articleCode"
+         FROM factory_bale_products fbp
+         LEFT JOIN factory_categories fc ON fc.id = fbp.category_id
+         WHERE fbp.company_id = $1
+           AND (
+             LOWER(fc.name) LIKE '%wiper%'
+             OR LOWER(fc.name) LIKE '%garbage%'
+             OR LOWER(fc.name) LIKE '%rag%'
+             OR LOWER(fbp.name) LIKE '%wiper%'
+             OR LOWER(fbp.name) LIKE '%garbage%'
+           )`,
+        [companyId]
       );
       const excludedCodes = new Set<string>(
         resultRows(excludedCodesRaw)
@@ -260,14 +262,16 @@ export function registerV5StockAllocationRoutes(app: Express) {
 
       // 7. ALL active factory_bale_products — so users can allocate to zero-stock items
       //    Using both code and article_code columns to build a full code→name map + weight map
-      const allProductsRaw = await db.execute(
-        sql`SELECT code, COALESCE(article_code, code) AS "articleCode", name,
-                   weight_per_bale_kg AS "weightKg",
-                   COALESCE(fc.name, '') AS "categoryName"
-            FROM factory_bale_products fbp
-            LEFT JOIN factory_categories fc ON fc.id = fbp.category_id
-            WHERE fbp.company_id = ${companyId} AND fbp.active = true
-            ORDER BY fbp.name`
+      // pool.query (not db.execute) — Drizzle's db.execute crashes on multi-join raw SQL.
+      const allProductsRaw = await pool.query(
+        `SELECT fbp.code, COALESCE(fbp.article_code, fbp.code) AS "articleCode", fbp.name,
+                fbp.weight_per_bale_kg AS "weightKg",
+                COALESCE(fc.name, '') AS "categoryName"
+         FROM factory_bale_products fbp
+         LEFT JOIN factory_categories fc ON fc.id = fbp.category_id
+         WHERE fbp.company_id = $1 AND fbp.active = true
+         ORDER BY fbp.name`,
+        [companyId]
       );
       const allProductsMap = new Map<string, string>();
       const weightMap = new Map<string, number>();
