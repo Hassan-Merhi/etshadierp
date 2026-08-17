@@ -109,7 +109,7 @@ describe("write evidence ratchet", () => {
 
   it("records why each backlog exists so a reviewer can judge a new entry", () => {
     expect(baseline.stockWritesWithoutJournalEvidence.rationale.includes("postStockMovementTx")).toBe(true);
-    expect(baseline.voucherWritesWithoutRequestIdentity.rationale.includes("request id")).toBe(true);
+    expect(baseline.voucherWritesWithoutRequestIdentity.rationale.includes("stable posting identity")).toBe(true);
   });
 
   it("accounts for every file in the stock backlog", () => {
