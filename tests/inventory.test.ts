@@ -24,14 +24,10 @@ async function loginAsTestUser() {
   });
 
   if (loginRes.status !== 200) {
-    throw new Error(
-      `Login failed: ${loginRes.status} ${JSON.stringify(loginRes.body)}`,
-    );
+    throw new Error(`Login failed: ${loginRes.status} ${JSON.stringify(loginRes.body)}`);
   }
 
-  const switchRes = await agent
-    .post("/api/auth/set-company")
-    .send({ companyId: ctx.companyId });
+  const switchRes = await agent.post("/api/auth/set-company").send({ companyId: ctx.companyId });
 
   if (switchRes.status !== 200) {
     console.warn("Switch company response:", switchRes.status, switchRes.body);
@@ -101,10 +97,7 @@ describe("POS Sale Inventory Tests", () => {
   });
 
   it("should decrease inventory correctly when creating a sale", async () => {
-    const initialQty = await getInventoryQty(
-      ctx.locationId,
-      ctx.stockItemIds[0],
-    );
+    const initialQty = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
     expect(initialQty).toBe(100);
 
     const res = await agent.post("/api/pos/sales").send({
@@ -124,10 +117,7 @@ describe("POS Sale Inventory Tests", () => {
     expect(res.status).toBeGreaterThanOrEqual(200);
     expect(res.status).toBeLessThan(300);
 
-    const newQty = await getInventoryQty(
-      ctx.locationId,
-      ctx.stockItemIds[0],
-    );
+    const newQty = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
     expect(newQty).toBe(95);
   });
 
@@ -146,14 +136,8 @@ describe("POS Sale Inventory Tests", () => {
     expect(res.status).toBeGreaterThanOrEqual(200);
     expect(res.status).toBeLessThan(300);
 
-    const qty0 = await getInventoryQty(
-      ctx.locationId,
-      ctx.stockItemIds[0],
-    );
-    const qty1 = await getInventoryQty(
-      ctx.locationId,
-      ctx.stockItemIds[1],
-    );
+    const qty0 = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
+    const qty1 = await getInventoryQty(ctx.locationId, ctx.stockItemIds[1]);
     expect(qty0).toBe(97);
     expect(qty1).toBe(93);
   });
@@ -161,9 +145,7 @@ describe("POS Sale Inventory Tests", () => {
   it("should reject sale with invalid stockItemId", async () => {
     const res = await agent.post("/api/pos/sales").send({
       locationId: ctx.locationId,
-      items: [
-        { stockItemId: "invalid", quantity: 5, rate: 15 },
-      ],
+      items: [{ stockItemId: "invalid", quantity: 5, rate: 15 }],
       paymentAccountType: "ledger",
       paymentAccountId: ctx.cashAccountId,
       voucherDate: new Date().toISOString().split("T")[0],
@@ -178,9 +160,7 @@ describe("POS Sale Inventory Tests", () => {
   it("should reject sale with invalid quantity", async () => {
     const res = await agent.post("/api/pos/sales").send({
       locationId: ctx.locationId,
-      items: [
-        { stockItemId: ctx.stockItemIds[0], quantity: "abc", rate: 15 },
-      ],
+      items: [{ stockItemId: ctx.stockItemIds[0], quantity: "abc", rate: 15 }],
       paymentAccountType: "ledger",
       paymentAccountId: ctx.cashAccountId,
       voucherDate: new Date().toISOString().split("T")[0],
@@ -358,9 +338,7 @@ describe("Voucher Delete Inventory Reversal Tests", () => {
   it("should restore inventory when deleting a sales voucher", async () => {
     const saleRes = await agent.post("/api/pos/sales").send({
       locationId: ctx.locationId,
-      items: [
-        { stockItemId: ctx.stockItemIds[0], quantity: 10, rate: 15 },
-      ],
+      items: [{ stockItemId: ctx.stockItemIds[0], quantity: 10, rate: 15 }],
       paymentAccountType: "ledger",
       paymentAccountId: ctx.cashAccountId,
       voucherDate: new Date().toISOString().split("T")[0],
@@ -369,10 +347,7 @@ describe("Voucher Delete Inventory Reversal Tests", () => {
     expect(saleRes.status).toBeGreaterThanOrEqual(200);
     expect(saleRes.status).toBeLessThan(300);
 
-    const afterSaleQty = await getInventoryQty(
-      ctx.locationId,
-      ctx.stockItemIds[0],
-    );
+    const afterSaleQty = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
     expect(afterSaleQty).toBe(90);
 
     const voucherId = saleRes.body.voucher?.id || saleRes.body.voucherId || saleRes.body.id;
@@ -383,10 +358,7 @@ describe("Voucher Delete Inventory Reversal Tests", () => {
     expect(deleteRes.status).toBeGreaterThanOrEqual(200);
     expect(deleteRes.status).toBeLessThan(300);
 
-    const afterDeleteQty = await getInventoryQty(
-      ctx.locationId,
-      ctx.stockItemIds[0],
-    );
+    const afterDeleteQty = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
     expect(afterDeleteQty).toBe(100);
   });
 });
@@ -395,9 +367,7 @@ describe("Input Validation Tests", () => {
   it("should reject POS sale with NaN locationId", async () => {
     const res = await agent.post("/api/pos/sales").send({
       locationId: "notanumber",
-      items: [
-        { stockItemId: ctx.stockItemIds[0], quantity: 5, sellingPrice: 15 },
-      ],
+      items: [{ stockItemId: ctx.stockItemIds[0], quantity: 5, sellingPrice: 15 }],
       paymentAccountType: "ledger",
       paymentAccountId: ctx.cashAccountId,
     });
@@ -438,14 +408,7 @@ describe("adjustInventory Helper Tests", () => {
   it("should handle insert-or-update correctly", async () => {
     const { adjustInventory } = await import("../server/inventoryHelper");
 
-    const result = await adjustInventory(
-      db as any,
-      ctx.locationId,
-      ctx.stockItemIds[0],
-      10,
-      ctx.companyId,
-      12.0,
-    );
+    const result = await adjustInventory(db as any, ctx.locationId, ctx.stockItemIds[0], 10, ctx.companyId, 12.0);
 
     expect(result.previousQuantity).toBe(100);
     expect(result.newQuantity).toBe(110);
@@ -467,36 +430,21 @@ describe("adjustInventory Helper Tests", () => {
       })
       .returning();
 
-    const result = await adjustInventory(
-      db as any,
-      ctx.locationId,
-      newItem.id,
-      25,
-      ctx.companyId,
-      8.0,
-    );
+    const result = await adjustInventory(db as any, ctx.locationId, newItem.id, 25, ctx.companyId, 8.0);
 
     expect(result.previousQuantity).toBe(0);
     expect(result.newQuantity).toBe(25);
     expect(result.created).toBe(true);
     expect(result.averageRate).toBe(8.0);
 
-    await db
-      .delete(schema.inventory)
-      .where(eq(schema.inventory.stockItemId, newItem.id));
+    await db.delete(schema.inventory).where(eq(schema.inventory.stockItemId, newItem.id));
     await db.delete(schema.stockItems).where(eq(schema.stockItems.id, newItem.id));
   });
 
   it("should allow negative inventory", async () => {
     const { adjustInventory } = await import("../server/inventoryHelper");
 
-    const result = await adjustInventory(
-      db as any,
-      ctx.locationId,
-      ctx.stockItemIds[0],
-      -150,
-      ctx.companyId,
-    );
+    const result = await adjustInventory(db as any, ctx.locationId, ctx.stockItemIds[0], -150, ctx.companyId);
 
     expect(result.newQuantity).toBe(-50);
     expect(result.created).toBe(false);
@@ -513,20 +461,10 @@ describe("adjustInventory Helper Tests", () => {
         totalValue: "-5000.00",
       })
       .where(
-        and(
-          eq(schema.inventory.locationId, ctx.locationId),
-          eq(schema.inventory.stockItemId, ctx.stockItemIds[0]),
-        ),
+        and(eq(schema.inventory.locationId, ctx.locationId), eq(schema.inventory.stockItemId, ctx.stockItemIds[0]))
       );
 
-    const result = await adjustInventory(
-      db as any,
-      ctx.locationId,
-      ctx.stockItemIds[0],
-      200,
-      ctx.companyId,
-      1.0,
-    );
+    const result = await adjustInventory(db as any, ctx.locationId, ctx.stockItemIds[0], 200, ctx.companyId, 1.0);
 
     expect(result.newQuantity).toBe(100);
     expect(result.averageRate).toBeGreaterThanOrEqual(0);
@@ -544,19 +482,10 @@ describe("adjustInventory Helper Tests", () => {
         totalValue: "-4800.00",
       })
       .where(
-        and(
-          eq(schema.inventory.locationId, ctx.locationId),
-          eq(schema.inventory.stockItemId, ctx.stockItemIds[0]),
-        ),
+        and(eq(schema.inventory.locationId, ctx.locationId), eq(schema.inventory.stockItemId, ctx.stockItemIds[0]))
       );
 
-    const result = await adjustInventory(
-      db as any,
-      ctx.locationId,
-      ctx.stockItemIds[0],
-      -200,
-      ctx.companyId,
-    );
+    const result = await adjustInventory(db as any, ctx.locationId, ctx.stockItemIds[0], -200, ctx.companyId);
 
     expect(result.newQuantity).toBe(-100);
     expect(result.newTotalValue).toBe(0);
@@ -571,13 +500,7 @@ describe("adjustInventory Helper Tests", () => {
     // Until fixed, the invariant "qty <= 0 → value = 0, rate = 0" is NOT enforced.
     const { adjustInventory } = await import("../server/inventoryHelper");
 
-    const result = await adjustInventory(
-      db as any,
-      ctx.locationId,
-      ctx.stockItemIds[0],
-      -150,
-      ctx.companyId,
-    );
+    const result = await adjustInventory(db as any, ctx.locationId, ctx.stockItemIds[0], -150, ctx.companyId);
 
     expect(result.newQuantity).toBe(-50);
     expect(result.newTotalValue).toBe(0);
@@ -599,19 +522,10 @@ describe("adjustInventory Helper Tests", () => {
         totalValue: "10000.00",
       })
       .where(
-        and(
-          eq(schema.inventory.locationId, ctx.locationId),
-          eq(schema.inventory.stockItemId, ctx.stockItemIds[0]),
-        ),
+        and(eq(schema.inventory.locationId, ctx.locationId), eq(schema.inventory.stockItemId, ctx.stockItemIds[0]))
       );
 
-    const result = await adjustInventory(
-      db as any,
-      ctx.locationId,
-      ctx.stockItemIds[0],
-      -190,
-      ctx.companyId,
-    );
+    const result = await adjustInventory(db as any, ctx.locationId, ctx.stockItemIds[0], -190, ctx.companyId);
 
     expect(result.newQuantity).toBe(10);
     expect(result.newTotalValue).toBeGreaterThanOrEqual(0);
@@ -640,19 +554,10 @@ describe("reverseInventoryByExactValue Tests", () => {
         totalValue: "1056.40",
       })
       .where(
-        and(
-          eq(schema.inventory.locationId, ctx.locationId),
-          eq(schema.inventory.stockItemId, ctx.stockItemIds[0]),
-        ),
+        and(eq(schema.inventory.locationId, ctx.locationId), eq(schema.inventory.stockItemId, ctx.stockItemIds[0]))
       );
 
-    await reverseInventoryByExactValue(
-      db as any,
-      ctx.locationId,
-      ctx.stockItemIds[0],
-      200,
-      500,
-    );
+    await reverseInventoryByExactValue(db as any, ctx.locationId, ctx.stockItemIds[0], 200, 500);
 
     const record = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
     const qty = parseFloat(record!.quantity);
@@ -683,20 +588,10 @@ describe("reverseInventoryByExactValue Tests", () => {
         totalValue: "0.00",
       })
       .where(
-        and(
-          eq(schema.inventory.locationId, ctx.locationId),
-          eq(schema.inventory.stockItemId, ctx.stockItemIds[0]),
-        ),
+        and(eq(schema.inventory.locationId, ctx.locationId), eq(schema.inventory.stockItemId, ctx.stockItemIds[0]))
       );
 
-    await adjustInventory(
-      db as any,
-      ctx.locationId,
-      ctx.stockItemIds[0],
-      offloadQty,
-      ctx.companyId,
-      offloadRate,
-    );
+    await adjustInventory(db as any, ctx.locationId, ctx.stockItemIds[0], offloadQty, ctx.companyId, offloadRate);
 
     const afterFirstOffload = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
     const firstQty = parseFloat(afterFirstOffload!.quantity);
@@ -704,27 +599,14 @@ describe("reverseInventoryByExactValue Tests", () => {
     const firstRate = parseFloat(afterFirstOffload!.averageRate);
 
     for (let cycle = 0; cycle < 3; cycle++) {
-      await reverseInventoryByExactValue(
-        db as any,
-        ctx.locationId,
-        ctx.stockItemIds[0],
-        offloadQty,
-        offloadValue,
-      );
+      await reverseInventoryByExactValue(db as any, ctx.locationId, ctx.stockItemIds[0], offloadQty, offloadValue);
 
       const afterReverse = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
       expect(parseFloat(afterReverse!.quantity)).toBeCloseTo(0, 1);
       expect(parseFloat(afterReverse!.totalValue!)).toBe(0);
       expect(parseFloat(afterReverse!.averageRate)).toBe(0);
 
-      await adjustInventory(
-        db as any,
-        ctx.locationId,
-        ctx.stockItemIds[0],
-        offloadQty,
-        ctx.companyId,
-        offloadRate,
-      );
+      await adjustInventory(db as any, ctx.locationId, ctx.stockItemIds[0], offloadQty, ctx.companyId, offloadRate);
 
       const afterReoffload = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
       expect(parseFloat(afterReoffload!.quantity)).toBeCloseTo(firstQty, 1);
@@ -748,37 +630,21 @@ describe("reverseInventoryByExactValue Tests", () => {
         totalValue: "0.00",
       })
       .where(
-        and(
-          eq(schema.inventory.locationId, ctx.locationId),
-          eq(schema.inventory.stockItemId, ctx.stockItemIds[0]),
-        ),
+        and(eq(schema.inventory.locationId, ctx.locationId), eq(schema.inventory.stockItemId, ctx.stockItemIds[0]))
       );
 
     const offloadQty = 200;
     const offloadRate = 1.0;
     const offloadValue = offloadQty * offloadRate;
 
-    await adjustInventory(
-      db as any,
-      ctx.locationId,
-      ctx.stockItemIds[0],
-      offloadQty,
-      ctx.companyId,
-      offloadRate,
-    );
+    await adjustInventory(db as any, ctx.locationId, ctx.stockItemIds[0], offloadQty, ctx.companyId, offloadRate);
 
     const afterOffload = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
     expect(parseFloat(afterOffload!.quantity)).toBeCloseTo(190, 1);
     expect(parseFloat(afterOffload!.averageRate)).toBeGreaterThanOrEqual(0);
     expect(parseFloat(afterOffload!.totalValue!)).toBeGreaterThanOrEqual(0);
 
-    await reverseInventoryByExactValue(
-      db as any,
-      ctx.locationId,
-      ctx.stockItemIds[0],
-      offloadQty,
-      offloadValue,
-    );
+    await reverseInventoryByExactValue(db as any, ctx.locationId, ctx.stockItemIds[0], offloadQty, offloadValue);
 
     const afterReverse = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
     const reverseQty = parseFloat(afterReverse!.quantity);
@@ -789,14 +655,7 @@ describe("reverseInventoryByExactValue Tests", () => {
     expect(reverseValue).toBe(0);
     expect(reverseRate).toBe(0);
 
-    await adjustInventory(
-      db as any,
-      ctx.locationId,
-      ctx.stockItemIds[0],
-      offloadQty,
-      ctx.companyId,
-      offloadRate,
-    );
+    await adjustInventory(db as any, ctx.locationId, ctx.stockItemIds[0], offloadQty, ctx.companyId, offloadRate);
 
     const afterReoffload = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
     expect(parseFloat(afterReoffload!.quantity)).toBeCloseTo(190, 1);
@@ -836,46 +695,23 @@ describe("reverseInventoryByExactValue Tests", () => {
         totalValue: "0.00",
       })
       .where(
-        and(
-          eq(schema.inventory.locationId, ctx.locationId),
-          eq(schema.inventory.stockItemId, ctx.stockItemIds[0]),
-        ),
+        and(eq(schema.inventory.locationId, ctx.locationId), eq(schema.inventory.stockItemId, ctx.stockItemIds[0]))
       );
 
     const offloadQty = 200;
     const offloadValue = 200;
 
-    await adjustInventory(
-      db as any,
-      ctx.locationId,
-      ctx.stockItemIds[0],
-      offloadQty,
-      ctx.companyId,
-      1.0,
-    );
+    await adjustInventory(db as any, ctx.locationId, ctx.stockItemIds[0], offloadQty, ctx.companyId, 1.0);
 
     let record = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
     assertInvariants(record, "after offload");
 
-    await reverseInventoryByExactValue(
-      db as any,
-      ctx.locationId,
-      ctx.stockItemIds[0],
-      offloadQty,
-      offloadValue,
-    );
+    await reverseInventoryByExactValue(db as any, ctx.locationId, ctx.stockItemIds[0], offloadQty, offloadValue);
 
     record = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
     assertInvariants(record, "after reverse");
 
-    await adjustInventory(
-      db as any,
-      ctx.locationId,
-      ctx.stockItemIds[0],
-      offloadQty,
-      ctx.companyId,
-      1.0,
-    );
+    await adjustInventory(db as any, ctx.locationId, ctx.stockItemIds[0], offloadQty, ctx.companyId, 1.0);
 
     record = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
     assertInvariants(record, "after re-offload");
@@ -894,9 +730,7 @@ describe("Inventory Reconciliation Endpoint Tests", () => {
     expect(res.body.summary).toBeDefined();
     expect(res.body.summary.totalRecords).toBeGreaterThan(0);
 
-    const criticalOrError = res.body.issues.filter(
-      (i: any) => i.severity === "critical" || i.severity === "error",
-    );
+    const criticalOrError = res.body.issues.filter((i: any) => i.severity === "critical" || i.severity === "error");
     expect(criticalOrError.length).toBe(0);
   });
 
@@ -905,18 +739,13 @@ describe("Inventory Reconciliation Endpoint Tests", () => {
       .update(schema.inventory)
       .set({ totalValue: "9999.99" })
       .where(
-        and(
-          eq(schema.inventory.locationId, ctx.locationId),
-          eq(schema.inventory.stockItemId, ctx.stockItemIds[0]),
-        ),
+        and(eq(schema.inventory.locationId, ctx.locationId), eq(schema.inventory.stockItemId, ctx.stockItemIds[0]))
       );
 
     const res = await agent.get("/api/inventory/reconcile");
 
     expect(res.status).toBe(200);
-    const valueMismatches = res.body.issues.filter(
-      (i: any) => i.type === "value_mismatch",
-    );
+    const valueMismatches = res.body.issues.filter((i: any) => i.type === "value_mismatch");
     expect(valueMismatches.length).toBeGreaterThan(0);
     expect(valueMismatches[0].severity).toBe("error");
   });
@@ -926,18 +755,13 @@ describe("Inventory Reconciliation Endpoint Tests", () => {
       .update(schema.inventory)
       .set({ quantity: "-10.000", totalValue: "-100.00" })
       .where(
-        and(
-          eq(schema.inventory.locationId, ctx.locationId),
-          eq(schema.inventory.stockItemId, ctx.stockItemIds[0]),
-        ),
+        and(eq(schema.inventory.locationId, ctx.locationId), eq(schema.inventory.stockItemId, ctx.stockItemIds[0]))
       );
 
     const res = await agent.get("/api/inventory/reconcile");
 
     expect(res.status).toBe(200);
-    const negIssues = res.body.issues.filter(
-      (i: any) => i.type === "negative_inventory",
-    );
+    const negIssues = res.body.issues.filter((i: any) => i.type === "negative_inventory");
     expect(negIssues.length).toBeGreaterThan(0);
     expect(negIssues[0].severity).toBe("info");
   });
@@ -947,18 +771,13 @@ describe("Inventory Reconciliation Endpoint Tests", () => {
       .update(schema.inventory)
       .set({ quantity: "0.000", totalValue: "50.00" })
       .where(
-        and(
-          eq(schema.inventory.locationId, ctx.locationId),
-          eq(schema.inventory.stockItemId, ctx.stockItemIds[1]),
-        ),
+        and(eq(schema.inventory.locationId, ctx.locationId), eq(schema.inventory.stockItemId, ctx.stockItemIds[1]))
       );
 
     const res = await agent.get("/api/inventory/reconcile");
 
     expect(res.status).toBe(200);
-    const zeroQtyIssues = res.body.issues.filter(
-      (i: any) => i.type === "zero_qty_nonzero_value",
-    );
+    const zeroQtyIssues = res.body.issues.filter((i: any) => i.type === "zero_qty_nonzero_value");
     expect(zeroQtyIssues.length).toBeGreaterThan(0);
   });
 
@@ -981,9 +800,7 @@ describe("POS Sale Edit Tests", () => {
   it("should reverse old sale and apply new quantities when editing", async () => {
     const saleRes = await agent.post("/api/pos/sales").send({
       locationId: ctx.locationId,
-      items: [
-        { stockItemId: ctx.stockItemIds[0], quantity: 5, rate: 15 },
-      ],
+      items: [{ stockItemId: ctx.stockItemIds[0], quantity: 5, rate: 15 }],
       paymentAccountType: "ledger",
       paymentAccountId: ctx.cashAccountId,
       voucherDate: new Date().toISOString().split("T")[0],
@@ -999,9 +816,7 @@ describe("POS Sale Edit Tests", () => {
     expect(voucherId).toBeDefined();
 
     const editRes = await agent.put(`/api/vouchers/${voucherId}/sales`).send({
-      items: [
-        { stockItemId: ctx.stockItemIds[0], quantity: 3, sellingPrice: 20 },
-      ],
+      items: [{ stockItemId: ctx.stockItemIds[0], quantity: 3, sellingPrice: 20 }],
       paymentAccountType: "ledger",
       paymentAccountId: ctx.cashAccountId,
       voucherDate: new Date().toISOString().split("T")[0],
@@ -1017,9 +832,7 @@ describe("POS Sale Edit Tests", () => {
   it("should handle item swap during sale edit", async () => {
     const saleRes = await agent.post("/api/pos/sales").send({
       locationId: ctx.locationId,
-      items: [
-        { stockItemId: ctx.stockItemIds[0], quantity: 5, rate: 15 },
-      ],
+      items: [{ stockItemId: ctx.stockItemIds[0], quantity: 5, rate: 15 }],
       paymentAccountType: "ledger",
       paymentAccountId: ctx.cashAccountId,
       voucherDate: new Date().toISOString().split("T")[0],
@@ -1035,9 +848,7 @@ describe("POS Sale Edit Tests", () => {
     expect(afterSaleQty0).toBe(95);
 
     const editRes = await agent.put(`/api/vouchers/${voucherId}/sales`).send({
-      items: [
-        { stockItemId: ctx.stockItemIds[1], quantity: 3, sellingPrice: 20 },
-      ],
+      items: [{ stockItemId: ctx.stockItemIds[1], quantity: 3, sellingPrice: 20 }],
       paymentAccountType: "ledger",
       paymentAccountId: ctx.cashAccountId,
       voucherDate: new Date().toISOString().split("T")[0],
@@ -1093,9 +904,7 @@ describe("Stock Transfer Edit Tests", () => {
 
     const itemId = transferItems[0].id;
 
-    const patchRes = await agent
-      .patch(`/api/stock-transfer-items/${itemId}`)
-      .send({ quantity: "15" });
+    const patchRes = await agent.patch(`/api/stock-transfer-items/${itemId}`).send({ quantity: "15" });
 
     expect(patchRes.status).toBeLessThan(500);
   });
@@ -1103,33 +912,25 @@ describe("Stock Transfer Edit Tests", () => {
 
 describe("Edit Transaction Endpoint Tests", () => {
   it("should validate numeric fields in stock transfer item patch", async () => {
-    const res = await agent
-      .patch("/api/stock-transfer-items/99999")
-      .send({ quantity: "abc" });
+    const res = await agent.patch("/api/stock-transfer-items/99999").send({ quantity: "abc" });
 
     expect(res.status).toBe(400);
   });
 
   it("should validate numeric fields in stock adjustment item patch", async () => {
-    const res = await agent
-      .patch("/api/stock-adjustment-items/99999")
-      .send({ quantity: "abc" });
+    const res = await agent.patch("/api/stock-adjustment-items/99999").send({ quantity: "abc" });
 
     expect(res.status).toBe(400);
   });
 
   it("should reject invalid item ID in transfer item patch", async () => {
-    const res = await agent
-      .patch("/api/stock-transfer-items/notanumber")
-      .send({ quantity: "10" });
+    const res = await agent.patch("/api/stock-transfer-items/notanumber").send({ quantity: "10" });
 
     expect(res.status).toBe(400);
   });
 
   it("should reject invalid item ID in adjustment item patch", async () => {
-    const res = await agent
-      .patch("/api/stock-adjustment-items/notanumber")
-      .send({ quantity: "10" });
+    const res = await agent.patch("/api/stock-adjustment-items/notanumber").send({ quantity: "10" });
 
     expect(res.status).toBe(400);
   });
@@ -1210,39 +1011,27 @@ describe("Container Offload Inventory Tests", () => {
     await db
       .delete(schema.containerOffloadItems)
       .where(
-        sql`${schema.containerOffloadItems.offloadId} IN (SELECT id FROM container_offloads WHERE container_id = ${data.container.id})`,
+        sql`${schema.containerOffloadItems.offloadId} IN (SELECT id FROM container_offloads WHERE container_id = ${data.container.id})`
       );
-    await db
-      .delete(schema.containerOffloads)
-      .where(eq(schema.containerOffloads.containerId, data.container.id));
-    await db
-      .delete(schema.poLineItems)
-      .where(eq(schema.poLineItems.poId, data.po.id));
-    await db
-      .delete(schema.purchaseOrders)
-      .where(eq(schema.purchaseOrders.id, data.po.id));
-    await db
-      .delete(schema.containers)
-      .where(eq(schema.containers.id, data.container.id));
-    await db
-      .delete(schema.suppliers)
-      .where(eq(schema.suppliers.id, data.supplier.id));
+    await db.delete(schema.containerOffloads).where(eq(schema.containerOffloads.containerId, data.container.id));
+    await db.delete(schema.poLineItems).where(eq(schema.poLineItems.poId, data.po.id));
+    await db.delete(schema.purchaseOrders).where(eq(schema.purchaseOrders.id, data.po.id));
+    await db.delete(schema.containers).where(eq(schema.containers.id, data.container.id));
+    await db.delete(schema.suppliers).where(eq(schema.suppliers.id, data.supplier.id));
   }
 
   it("should add inventory when offloading a container", async () => {
     const containerData = await setupContainerData();
 
     try {
-      const res = await agent
-        .post(`/api/containers/${containerData.container.id}/offload`)
-        .send({
-          locationId: ctx.locationId,
-          offloadDate: "2026-02-06",
-          duties: "0",
-          officeCharges: "0",
-          transferCharges: "0",
-          transportFees: "0",
-        });
+      const res = await agent.post(`/api/containers/${containerData.container.id}/offload`).send({
+        locationId: ctx.locationId,
+        offloadDate: "2026-02-06",
+        duties: "0",
+        officeCharges: "0",
+        transferCharges: "0",
+        transportFees: "0",
+      });
 
       expect(res.status).toBeGreaterThanOrEqual(200);
       expect(res.status).toBeLessThan(300);
@@ -1260,16 +1049,14 @@ describe("Container Offload Inventory Tests", () => {
     const containerData = await setupContainerData();
 
     try {
-      const offloadRes = await agent
-        .post(`/api/containers/${containerData.container.id}/offload`)
-        .send({
-          locationId: ctx.locationId,
-          offloadDate: "2026-02-06",
-          duties: "0",
-          officeCharges: "0",
-          transferCharges: "0",
-          transportFees: "0",
-        });
+      const offloadRes = await agent.post(`/api/containers/${containerData.container.id}/offload`).send({
+        locationId: ctx.locationId,
+        offloadDate: "2026-02-06",
+        duties: "0",
+        officeCharges: "0",
+        transferCharges: "0",
+        transportFees: "0",
+      });
 
       expect(offloadRes.status).toBeGreaterThanOrEqual(200);
       expect(offloadRes.status).toBeLessThan(300);
@@ -1277,16 +1064,14 @@ describe("Container Offload Inventory Tests", () => {
       const qty0AfterFirstOffload = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
       expect(qty0AfterFirstOffload).toBe(120);
 
-      const reOffloadRes = await agent
-        .post(`/api/containers/${containerData.container.id}/offload`)
-        .send({
-          locationId: ctx.location2Id,
-          offloadDate: "2026-02-06",
-          duties: "0",
-          officeCharges: "0",
-          transferCharges: "0",
-          transportFees: "0",
-        });
+      const reOffloadRes = await agent.post(`/api/containers/${containerData.container.id}/offload`).send({
+        locationId: ctx.location2Id,
+        offloadDate: "2026-02-06",
+        duties: "0",
+        officeCharges: "0",
+        transferCharges: "0",
+        transportFees: "0",
+      });
 
       expect(reOffloadRes.status).toBeLessThan(500);
 
@@ -1320,19 +1105,15 @@ describe("Concurrency Tests", () => {
     const concurrentSales = Array.from({ length: NUM_CONCURRENT }, () =>
       agent.post("/api/pos/sales").send({
         locationId: ctx.locationId,
-        items: [
-          { stockItemId: ctx.stockItemIds[0], quantity: QTY_PER_SALE, rate: 15 },
-        ],
+        items: [{ stockItemId: ctx.stockItemIds[0], quantity: QTY_PER_SALE, rate: 15 }],
         paymentAccountType: "ledger",
         paymentAccountId: ctx.cashAccountId,
         voucherDate: new Date().toISOString().split("T")[0],
-      }),
+      })
     );
 
     const results = await Promise.all(concurrentSales);
-    const successCount = results.filter(
-      (r) => r.status === 200 || r.status === 201,
-    ).length;
+    const successCount = results.filter((r) => r.status === 200 || r.status === 201).length;
 
     expect(successCount).toBe(NUM_CONCURRENT);
 
@@ -1360,7 +1141,7 @@ describe("Concurrency Tests", () => {
         locationId: ctx.locationId,
         quantity: QTY_PER_ADJUST,
         type: "add",
-      }),
+      })
     );
 
     const results = await Promise.all(concurrentAdjustments);

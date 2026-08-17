@@ -118,6 +118,6 @@ describe("repository-wide god-file architecture boundaries", () => {
     // should be lowered as the split phases land.
     //
     expect(report.summary.grandfatheredFiles).toBeLessThanOrEqual(51);
-    expect(report.summary.grandfatheredExcessLines).toBeLessThanOrEqual(25819);
+    expect(report.summary.grandfatheredExcessLines).toBeLessThanOrEqual(25600);
   });
 });

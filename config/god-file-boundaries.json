@@ -185,7 +185,7 @@
       "server/index.ts": 1725,
       "server/services/factory/postOffloadPhase6Safety.ts": 927,
       "tests/excel-export-v2.test.ts": 1425,
-      "tests/inventory.test.ts": 1450,
+      "tests/inventory.test.ts": 1225,
       "tests/workflow.test.ts": 1025,
       "tests/xlsx-export.test.ts": 950
     }
