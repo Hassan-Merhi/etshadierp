@@ -39,7 +39,7 @@ jobs:
       - name: Set up canonical Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: "22.14"
+          node-version: "22.14.0"
           cache: npm
 
       - name: Normalize registry URLs
