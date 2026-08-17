@@ -10,9 +10,9 @@ import { isPhase5OperationalVoucherRequest } from "../shared/voucherPathIdentity
 describe("Phase 5 endpoint-level voucher coverage", () => {
   it("protects both customer-order charge voucher writers", () => {
     expect(isPhase5OperationalVoucherRequest("POST", "/api/factory/customer-orders/42/charges")).toBe(true);
-    expect(
-      isPhase5OperationalVoucherRequest("POST", "/api/factory/customer-orders/42/charges/relink-vouchers")
-    ).toBe(true);
+    expect(isPhase5OperationalVoucherRequest("POST", "/api/factory/customer-orders/42/charges/relink-vouchers")).toBe(
+      true
+    );
   });
 
   it("claims an explicitly authorized body company instead of the selected factory company", () => {
