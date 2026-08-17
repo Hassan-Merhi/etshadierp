@@ -4,6 +4,7 @@ import { sql } from "drizzle-orm";
 
 import { requireAuth } from "../../auth";
 import { db } from "../../db";
+import { replayAuthorizationContext } from "./replayAuthorizationContext";
 
 const REQUEST_KEY_MAX = 180;
 const CONCURRENT_REPLAY_WAIT_MS = 15_000;
@@ -73,6 +74,7 @@ function requestFingerprint(req: Request): string {
     method: req.method.toUpperCase(),
     path: req.path,
     body: canonicalize(req.body),
+    authorization: replayAuthorizationContext(req),
   };
   const serialized = JSON.stringify(payload) ?? "null";
   return createHash("sha256").update(serialized).digest("hex");
@@ -274,7 +276,7 @@ async function operationalVoucherBoundary(req: Request, res: Response, next: Nex
     if (stored.requestPath !== req.path || stored.requestFingerprint !== fingerprint) {
       res.status(409).json({
         code: "POSTING_IDEMPOTENCY_CONFLICT",
-        message: "This request identity was already used for a different accounting operation or payload.",
+        message: "This request identity was already used for a different accounting operation, payload, or authorization context.",
       });
       return;
     }
@@ -317,7 +319,6 @@ async function operationalVoucherBoundary(req: Request, res: Response, next: Nex
 }
 
 export function registerOperationalVoucherRequestBoundary(app: Express): void {
-  void ensureOperationalVoucherRequestTable();
   app.use((req, res, next) => {
     if (!isPhase4OperationalVoucherRequest(req.method, req.path, req.body) || isOptionalVoucherRequest(req)) {
       next();
