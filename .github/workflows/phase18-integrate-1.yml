@@ -1,0 +1,92 @@
+name: Phase 18 Integrate Proven Reductions
+on:
+  push:
+    branches: [agent/phase18-integrate-1]
+permissions:
+  contents: write
+env:
+  CI: true
+jobs:
+  integrate:
+    if: contains(github.event.head_commit.message, '[phase18-integrate-1]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/phase18-integrate-1
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.14.0'
+          cache: npm
+      - name: Apply proven source commits
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          apply_keep_ours_on_conflict() {
+            sha="$1"
+            echo "Applying $sha"
+            set +e
+            git cherry-pick "$sha"
+            rc=$?
+            set -e
+            if [ "$rc" -ne 0 ]; then
+              files=$(git diff --name-only --diff-filter=U || true)
+              if [ -z "$files" ]; then
+                git cherry-pick --abort || true
+                echo "Could not apply $sha; skipped"
+                return 0
+              fi
+              echo "$files" | while read -r f; do
+                [ -n "$f" ] || continue
+                git checkout --ours -- "$f"
+                git add "$f"
+              done
+              git add -A
+              GIT_EDITOR=true git cherry-pick --continue || {
+                git cherry-pick --abort || true
+                echo "Conflict continuation failed for $sha; skipped"
+              }
+            fi
+          }
+          apply_keep_ours_on_conflict 6427f8df815736eee8cd52774c4f9d2399df4e0b
+          apply_keep_ours_on_conflict 509507f615b03b0f40be841f7333c102c2c05f9e
+          apply_keep_ours_on_conflict 340a5f2a8da7d48d5fa883b768c54d853bf3fb54
+          git log -5 --oneline
+      - run: npm ci
+      - name: Compiler gate
+        run: npm run check
+      - name: Measure integrated tree
+        shell: bash
+        run: |
+          set +e
+          node scripts/audit-type-escapes.mjs >/tmp/type.log 2>&1; trc=$?
+          npm run lint >/tmp/lint.log 2>&1; lrc=$?
+          npm run audit:god-files >/tmp/god.log 2>&1; grc=$?
+          set -e
+          tail -n 8 /tmp/type.log || true
+          grep -A8 'Warnings by rule:' /tmp/lint.log || tail -n 20 /tmp/lint.log || true
+          tail -n 20 /tmp/god.log || true
+          echo "TYPE=$trc LINT=$lrc GOD=$grc"
+      - name: Push onto latest main safely
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            if git rebase origin/main; then
+              npm run check
+              if git push origin HEAD:main; then
+                echo "PUSHED_MAIN=$(git rev-parse HEAD)"
+                exit 0
+              fi
+            else
+              git rebase --abort || true
+            fi
+            sleep 2
+          done
+          echo 'Failed to integrate without overwriting concurrent main work'
+          exit 1
