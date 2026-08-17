@@ -143,7 +143,7 @@ export function DailyRateModal({ companyId }: DailyRateModalProps) {
       }
       setIsOpen(true);
     }
-  }, [todayRateCheck, isCheckingRate, company, companyId, previousRateValue]);
+  }, [todayRateCheck, isCheckingRate, company, companyId, previousRateValue, form]);
 
   const createRateMutation = useMutation({
     mutationFn: async (data: RateFormData) => {

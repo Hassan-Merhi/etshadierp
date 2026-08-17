@@ -138,7 +138,7 @@ export function InlineRoleEditor({ userId, companies, editingRole, onClose, onSa
       setPosViewOnly(false);
       setCanDeleteRecords(false);
     }
-  }, [editingRole?.id]);
+  }, [companies, editingRole, editingRole.id]);
 
   const { data: locations = [] } = useQuery<any[]>({
     queryKey: ["/api/locations", { companyId }],

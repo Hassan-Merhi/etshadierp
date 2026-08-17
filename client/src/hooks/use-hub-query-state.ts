@@ -52,7 +52,7 @@ export function useHubQueryState<T extends string>(options: HubQueryStateOptions
     window.addEventListener("popstate", syncFromLocation);
     return () => window.removeEventListener("popstate", syncFromLocation);
     
-  }, [options.key, options.defaultValue, allowedValuesKey, options.omitDefault]);
+  }, [options.key, options.defaultValue, allowedValuesKey, options.omitDefault, options]);
 
   const clearKeysKey = (options.clearKeys ?? []).join(",");
 
@@ -76,7 +76,7 @@ export function useHubQueryState<T extends string>(options: HubQueryStateOptions
       window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
     },
     
-    [options.key, options.defaultValue, clearKeysKey, options.omitDefault],
+    [options.omitDefault, options.defaultValue, options.key, options.clearKeys],
   );
 
   return [value, updateValue] as const;

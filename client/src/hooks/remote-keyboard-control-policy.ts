@@ -351,7 +351,7 @@ export function applyRemoteKeyboardCommand(
 
   if (command.type === "insert-text") {
     
-    if (typeof command.text !== "string" || command.text.length === 0 || /[\u0000-\u001f\u007f]/u.test(command.text)) {
+    if (typeof command.text !== "string" || command.text.length === 0 || Array.from(command.text).some((character) => { const code = character.charCodeAt(0); return code <= 31 || code === 127; })) {
       return { status: "ignored", reason: "invalid-text" };
     }
     if (

@@ -30,7 +30,7 @@ export function LinkDialog({
       setSelColId(state.sourceColId || "");
     }
   
-  }, [state.open]);
+  }, [sheets, state.open, state.sourceColId, state.sourceRowId, state.sourceSheetId]);
 
   const srcSheet = sheets.find((s) => s.stableId === selSheetId);
 

@@ -336,7 +336,7 @@ export default function StockTransferOrder() {
       // Storage is unavailable in private mode and can throw on quota; the value is a convenience, not state we need.
     }
     
-  }, []);
+  }, [editVoucherId]);
 
   // Autosave debounce effect (new transfers only)
   useEffect(() => {
@@ -519,7 +519,7 @@ export default function StockTransferOrder() {
         return { row, col };
       });
     },
-    [flatItems, selectedLocations, quantityPicker.open, openQuantityPicker, focusedCell, navigate]
+    [flatItems, selectedLocations, quantityPicker.open, openQuantityPicker, focusedCell]
   );
 
   const handleCellClick = async (

@@ -95,7 +95,7 @@ export function VoucherEntriesTable({
       setSidebarSearchValue("");
     }
     
-  }, [mobileEditOpen, mobileEditIndex]);
+  }, [mobileEditOpen, mobileEditIndex, form, onRowFocus, setSidebarSearchValue]);
 
   const openMobileEdit = (index: number) => {
     setMobileEditIndex(index);

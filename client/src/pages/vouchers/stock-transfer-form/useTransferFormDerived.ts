@@ -77,5 +77,5 @@ export function useTransferRateAutofill(
       cancelled = true;
     };
     
-  }, [signature]);
+  }, [signature, stockTransferForm, transferEntries]);
 }

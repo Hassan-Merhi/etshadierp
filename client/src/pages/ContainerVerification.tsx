@@ -294,7 +294,7 @@ export default function ContainerVerification() {
     ) {
       autoPopulateMutation.mutate();
     }
-  }, [loadedItems, loadingItems, containerData]);
+  }, [loadedItems, loadingItems, containerData, autoPopulateMutation]);
 
   // Auto-select supplier when opened via "Compare" from Daybook (supplierId URL param).
   useEffect(() => {

@@ -896,7 +896,7 @@ export default function FactoryLocationInventory() {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
     
-  }, [proformaAutoSave, proformaMode, editingProformaId, selections, editModeInitialized]);
+  }, [proformaAutoSave, proformaMode, editingProformaId, selections, editModeInitialized, doSaveProforma]);
 
   const handleExportExcel = () => {
     if (!savedProformaId) return;

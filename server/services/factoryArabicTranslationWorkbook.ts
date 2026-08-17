@@ -85,7 +85,7 @@ export const ARABIC_TRANSLATION_TEMPLATE_HEADERS = [
 const MAX_WORKBOOK_ROWS = 50_000;
 const MAX_TRANSLATION_LENGTH = 2_000;
 
-const CONTROL_CHARACTER_PATTERN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
+const CONTROL_CHARACTER_PATTERN = { test(value: string): boolean { return Array.from(value).some((character) => { const code = character.charCodeAt(0); return code <= 8 || code === 11 || code === 12 || (code >= 14 && code <= 31) || code === 127; }); } };
 const RTL_FROZEN_VIEW: ExcelJS.WorksheetView = {
   state: "frozen",
   xSplit: 0,

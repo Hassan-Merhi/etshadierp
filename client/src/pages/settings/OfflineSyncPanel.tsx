@@ -74,7 +74,7 @@ function OfflineSyncPanelContent() {
   useEffect(() => {
     void loadLogs();
     void refreshCounts();
-  }, []);
+  }, [refreshCounts]);
 
   const handleSyncNow = () => {
     if (!isOnline) {

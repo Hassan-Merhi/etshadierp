@@ -244,7 +244,7 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
   useEffect(() => {
     if (voucherIdToEdit) return;
     scheduleJournalSave(allJournalValues);
-  }, [JSON.stringify(allJournalValues), voucherIdToEdit]);
+  }, [allJournalValues, scheduleJournalSave, voucherIdToEdit]);
 
   const [activeJournalRow, setActiveJournalRow] = useState<number | null>(null);
   const [showAccountSidebar, setShowAccountSidebar] = useState(false);

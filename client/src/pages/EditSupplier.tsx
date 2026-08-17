@@ -78,7 +78,7 @@ export default function EditSupplier() {
           null,
       });
     }
-  }, [supplier]);
+  }, [form, supplier]);
 
   const updateMutation = useMutation({
     mutationFn: async (data) => {

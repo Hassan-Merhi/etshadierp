@@ -37,7 +37,7 @@ export function ExchangeRateInput({
         isInitialized.current = true;
       }
     }
-  }, [dailyRate, value]);
+  }, [dailyRate, onChange, value]);
 
   useEffect(() => {
     if (value !== null && value > 0 && !hasUserModified.current) {

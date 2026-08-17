@@ -69,7 +69,7 @@ export function TabAgentDuty() {
         .catch(() => {});
     }
     
-  }, [data]);
+  }, [data, sections]);
 
   const CONF_RANK: Record<AgentDutySummary["matchConfidence"], number> = { exact: 0, fuzzy: 1, unmapped: 2 };
   // In "all companies" mode always merge agents with the same name across companies.
@@ -115,7 +115,7 @@ export function TabAgentDuty() {
     }
     merged.sort((a, b) => a.agentName.localeCompare(b.agentName));
     return [{ companyId: 0, companyName: "All Companies", agents: merged }];
-  }, [sections, companyMode]); 
+  }, [companyMode, sections, CONF_RANK]); 
 
   const totalAgents = displaySections.reduce((s, c) => s + c.agents.length, 0);
 

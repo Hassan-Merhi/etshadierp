@@ -58,7 +58,7 @@ export function UserManagementDrawer({ user, open, onClose, companies, onUserDel
       setShowPasswordReset(false);
       setAdvancedOpen(false);
     }
-  }, [user?.id]);
+  }, [isPrivileged, user, user.id]);
 
   const { data: erpHiddenCostData } = useQuery<{ hiddenCostFields: string[] }>({
     queryKey: ["/api/erp-user-hidden-costs", user?.id],

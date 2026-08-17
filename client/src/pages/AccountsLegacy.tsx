@@ -440,7 +440,7 @@ export default function Accounts() {
       fromExternalNavRef.current = true;
       setSelectedAccount(found);
     }
-  }, [allAccounts, urlAccountId, urlAccountType]);
+  }, [allAccounts, selectedAccount, urlAccountId, urlAccountType]);
 
   // Dedicated query for Group accounts used by the Parent Group combobox.
   // Uses /api/ledger-accounts directly (same source as Account Groups page) so
@@ -648,7 +648,7 @@ export default function Accounts() {
     } else {
       bankForm.reset();
     }
-  }, [bankToEdit]);
+  }, [bankForm, bankToEdit]);
   const editForm = useForm({
     resolver: zodResolver(updateLedgerAccountSchema.omit({ id: true, companyId: true })),
   });

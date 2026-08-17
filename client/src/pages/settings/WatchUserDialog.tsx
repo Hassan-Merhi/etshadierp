@@ -360,7 +360,7 @@ export function WatchUserDialog({
     void requestFreshFrame();
     // The age threshold prevents repeated reconnect loops.
     
-  }, [Math.floor(frameAgeMs / 15000), hasScreen]);
+  }, [frameAgeMs, hasScreen, refreshing, requestFreshFrame]);
 
   const frameMetadata = useMemo(() => {
     const capture = screenFrame?.capture;

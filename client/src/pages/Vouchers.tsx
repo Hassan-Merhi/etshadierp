@@ -231,7 +231,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   useEffect(() => {
     if (voucherIdToEdit) return;
     schedulePaymentSave(allFormValues);
-  }, [JSON.stringify(allFormValues), voucherIdToEdit]);
+  }, [allFormValues, schedulePaymentSave, voucherIdToEdit]);
 
   const { hydratedVoucherIdRef } = useVoucherHydration({
     voucherToEdit,
@@ -267,7 +267,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       setEditVoucherId(null);
       hydratedVoucherIdRef.current = null;
     }
-  }, [tabParam, voucherIdToEdit]);
+  }, [hydratedVoucherIdRef, tabParam, voucherIdToEdit]);
 
   const paymentAccountType = form.watch("paymentAccountType");
   const paymentAccountId = form.watch("paymentAccountId");

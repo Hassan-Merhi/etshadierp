@@ -402,7 +402,7 @@ export default function SpreadsheetEditor() {
         }
       }, 1500);
     },
-    [openSheetId]
+    [openSheetId, updateMutation]
   );
 
   const handleChange = useCallback(

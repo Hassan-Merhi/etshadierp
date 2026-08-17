@@ -568,7 +568,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
         idB = b.data.id;
       return filters.sortOrder === "asc" ? idA - idB : idB - idA;
     });
-  }, [filteredVouchers, offloads, filters.sortOrder]);
+  }, [filters.voucherType, filters.sortOrder, filteredVouchers, voucherPage, offloads]);
 
   const visibleRows = useMemo(
     () =>

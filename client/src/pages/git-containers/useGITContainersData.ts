@@ -162,7 +162,7 @@ export function useGITContainersData({
       if (intervalId) clearInterval(intervalId);
       if (stopTimeoutId) clearTimeout(stopTimeoutId);
     };
-  }, [isBulkPending, showProgressBanner, isAllowed, queryClient]);
+  }, [isBulkPending, showProgressBanner, isAllowed, queryClient, setBulkProgress, setShowProgressBanner, bulkTrackMutation.isPending]);
 
   return {
     importMutation,

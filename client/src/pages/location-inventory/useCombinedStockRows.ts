@@ -94,14 +94,7 @@ export function useCombinedStockRows({
       .sort(
         (a, b) => a.stockGroupName.localeCompare(b.stockGroupName) || a.stockItemName.localeCompare(b.stockItemName)
       );
-  }, [
-    combinedStockRows,
-    allStockGroupFilter,
-    allStockCategoryFilter,
-    allStockLocationFilter,
-    allStockSearchTerm,
-    allInventoryLocations,
-  ]);
+  }, [combinedStockRows, allStockGroupFilter, allStockCategoryFilter, allStockLocationFilter, allStockSearchTerm]);
 
   return { allInventoryLocations, allInventoryGroups, filteredCombinedRows };
 }

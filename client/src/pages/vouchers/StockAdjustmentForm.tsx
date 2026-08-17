@@ -200,7 +200,7 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
       });
       hydratedVoucherIdRef.current = voucherIdToEdit;
     }
-  }, [stockAdjustmentToEdit, voucherToEdit, stockItems, stockAdjustmentForm]); 
+  }, [stockAdjustmentToEdit, voucherToEdit, stockItems, stockAdjustmentForm, voucherIdToEdit]); 
 
   const stockAdjustmentMutation = useMutation({
     mutationFn: async (data: StockAdjustmentFormData) => {

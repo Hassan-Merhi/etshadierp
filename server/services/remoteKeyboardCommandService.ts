@@ -118,7 +118,7 @@ function cleanInsertText(value: unknown): string | null {
   const codePoints = Array.from(value);
   if (codePoints.length === 0 || codePoints.length > MAX_TEXT_CODE_POINTS) return null;
   
-  if (/[\u0000-\u001f\u007f]/u.test(value)) return null;
+  if (Array.from(value).some((character) => { const code = character.charCodeAt(0); return code <= 31 || code === 127; })) return null;
   return value;
 }
 

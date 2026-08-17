@@ -266,7 +266,7 @@ export default function FactoryDaybook() {
       return sortOrder === "desc" ? -dateCmp : dateCmp;
     });
     return result;
-  }, [entries, statusFilter, debouncedSearchQuery, minAmount, maxAmount, sortOrder]);
+  }, [entries, isAdminOrOwner, currentUser?.role, currentUser.id, statusFilter, debouncedSearchQuery, minAmount, maxAmount, sortOrder]);
 
   // ── Condensed grouped rows ────────────────────────────────────────────────
   const condensedRows = useMemo(() => {

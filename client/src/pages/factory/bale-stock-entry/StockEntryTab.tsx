@@ -94,7 +94,7 @@ export function StockEntryTab() {
         selectedLogoId,
       });
     }
-  }, [cart, productionPositionByProduct, selectedLocationId, entryDate, selectedCustomerId, selectedLogoId]);
+  }, [cart, productionPositionByProduct, selectedLocationId, entryDate, selectedCustomerId, selectedLogoId, scheduleCartSave]);
 
   const { data: baleProducts, isLoading: productsLoading } = useQuery<FactoryBaleProduct[]>({
     queryKey: ["/api/factory/bale-products"],
