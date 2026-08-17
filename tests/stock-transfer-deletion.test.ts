@@ -137,6 +137,7 @@ afterAll(async () => {
   await db.delete(vouchers).where(eq(vouchers.id, draftVoucherId));
   await db.delete(inventory).where(eq(inventory.companyId, companyId));
   await db.execute(sql`DELETE FROM canonical_stock_movements WHERE stock_item_id = ${itemId}`);
+  await db.execute(sql`DELETE FROM canonical_stock_movement_audit WHERE company_id = ${companyId}`);
   await db.execute(sql`DELETE FROM canonical_stock_movement_requests WHERE company_id = ${companyId}`);
   await db.delete(stockItems).where(eq(stockItems.id, itemId));
   await db.delete(locations).where(eq(locations.companyId, companyId));
