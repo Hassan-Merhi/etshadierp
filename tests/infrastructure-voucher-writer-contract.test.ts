@@ -74,7 +74,11 @@ describe("Phase 3 infrastructure voucher writer contract", () => {
 
   it("uses deterministic source identity rather than timestamps as the idempotency key", () => {
     const helper = source("server/services/accounting/infrastructureVoucherIdentity.ts");
+    const posWriter = source("server/services/pos/createSaleVoucher.ts");
+
     expect(helper).toContain("infra:${normalizedType}:${normalizedId}:${normalizedPhase}");
     expect(helper).not.toMatch(/idempotencyKey:\s*[^\n]*(?:Date\.now|Math\.random)/);
+    expect(posWriter).toContain('infrastructurePostingIdentity("pos-sale", clientSaleId, "sales-voucher")');
+    expect(posWriter).not.toMatch(/clientSaleId\s*\|\|\s*voucherNumber/);
   });
 });
