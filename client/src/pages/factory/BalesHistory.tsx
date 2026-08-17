@@ -68,17 +68,7 @@ import {
 import { useLabelDesignColors } from "@/hooks/useLabelDesignColors";
 import type { FactoryMixBatch } from "@shared/schema";
 import { BaleWeightEditDialog, type WeightEditBale } from "@/components/BaleWeightEditDialog";
-
-const STATUS_COLORS: Record<string, string> = {
-  PENDING_PRESSING: "outline",
-  LABEL_PRINTED: "secondary",
-  PRESSED: "default",
-  FINALIZED: "default",
-  IN_STOCK: "default",
-  RESERVED: "outline",
-  SOLD: "destructive",
-  REPACKED: "secondary",
-};
+import { BALE_STATUS_COLORS, useBalesHistoryDateKeyboard } from "./baleshistory/pagePolicies";
 
 export default function BalesHistory() {
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
@@ -119,23 +109,7 @@ export default function BalesHistory() {
   const modeApiRequest = getApiRequest(appMode);
   const [weightEditBale, setWeightEditBale] = useState<WeightEditBale | null>(null);
 
-  // Keyboard +/- date navigation
-  useEffect(() => {
-    const fmt = "yyyy-MM-dd";
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-      if (tag === "input" || tag === "textarea" || tag === "select") return;
-      if (e.key === "-") {
-        e.preventDefault();
-        setDateFilter((prev) => (prev ? format(addDays(new Date(prev + "T00:00:00"), -1), fmt) : prev));
-      } else if (e.key === "+" || (e.key === "=" && e.shiftKey)) {
-        e.preventDefault();
-        setDateFilter((prev) => (prev ? format(addDays(new Date(prev + "T00:00:00"), 1), fmt) : prev));
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  useBalesHistoryDateKeyboard(setDateFilter);
 
   // Debounce search term — sends to server only after 300 ms of inactivity.
   useEffect(() => {
@@ -1088,7 +1062,7 @@ export default function BalesHistory() {
                             <Badge
                               key={s}
                               variant={
-                                (STATUS_COLORS[s] || "secondary") as
+                                (BALE_STATUS_COLORS[s] || "secondary") as
                                   | "default"
                                   | "outline"
                                   | "secondary"
@@ -1207,7 +1181,7 @@ export default function BalesHistory() {
                                   >
                                     <Badge
                                       variant={
-                                        (STATUS_COLORS[bale.status] || "secondary") as
+                                        (BALE_STATUS_COLORS[bale.status] || "secondary") as
                                           | "default"
                                           | "outline"
                                           | "secondary"
