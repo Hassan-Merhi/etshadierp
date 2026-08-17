@@ -55,8 +55,7 @@ jobs:
           node node_modules/tsx/dist/cli.mjs -e
           'import { pool } from "./server/db.ts";
           import { ensureCanonicalStockMovementJournal } from "./server/services/inventory/ensureCanonicalStockMovementJournal.ts";
-          await ensureCanonicalStockMovementJournal(pool);
-          await pool.end();'
+          void (async () => { await ensureCanonicalStockMovementJournal(pool); await pool.end(); })();'
       - name: Phase 3 tests
         run: node node_modules/vitest/vitest.mjs run server/services/accounting/voucherPostingService.test.ts tests/infrastructure-voucher-writer-contract.test.ts tests/infrastructure-voucher-identity.test.ts --maxWorkers=1 --no-file-parallelism
       - name: Production build
