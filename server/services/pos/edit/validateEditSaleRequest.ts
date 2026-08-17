@@ -14,6 +14,8 @@ import { locations, vouchers } from "@shared/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import type { HandlerErrorResult } from "./posEditSaleTypes";
 
+type SelectConnection = Pick<typeof db, "select">;
+
 /** Validates all items have positive quantities and prices. Throws (matching the original) rather than returning an error result. */
 export function validateItemsPositive(items: any[]): void {
   for (const item of items) {
@@ -88,7 +90,7 @@ export async function validateNewLocationBelongsToCompany(
   targetLocationId: number,
   oldLocationId: number,
   companyId: number,
-  connection: any = db
+  connection: SelectConnection = db
 ): Promise<{ ok: true } | { error: HandlerErrorResult }> {
   const [newLocation] = await connection
     .select()
