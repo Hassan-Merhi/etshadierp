@@ -64,9 +64,10 @@ export function resolveVoucherPathCompanyId(req: Request): number | null {
   if (path === "/api/sp/migration/opening-balance") {
     return positiveInteger(body.targetCompanyId);
   }
-  if (path === "/api/fix-old-po-credits") {
-    return positiveInteger(body.companyId) ?? positiveInteger(req.session.currentCompanyId);
-  }
+
+  const requestCompanyId = positiveInteger(body.companyId);
+  if (requestCompanyId) return requestCompanyId;
+
   if (path.startsWith("/api/factory/")) {
     return positiveInteger(req.session.factoryCompanyId) ?? positiveInteger(req.session.currentCompanyId);
   }
@@ -201,8 +202,6 @@ export async function completeVoucherPathRequest(
   body: unknown,
   deterministicSource: boolean
 ): Promise<void> {
-  // Validation/permission failures are not durable job outcomes. Deleting their
-  // reservation lets a corrected rerun use the same deterministic source input.
   if (deterministicSource && status >= 400 && status < 500) {
     await db.execute(sql`
       DELETE FROM voucher_path_request_guards
@@ -211,10 +210,6 @@ export async function completeVoucherPathRequest(
     return;
   }
 
-  // A 5xx/connection-loss outcome is deliberately left in `processing`.
-  // Re-executing an accounting/import handler after an unknown commit outcome
-  // would be less safe than failing closed. Operators can reconcile the source
-  // marker before deliberately starting a new sourceRunId.
   if (status >= 500) return;
 
   const responseJson = JSON.stringify(body ?? null);
@@ -319,9 +314,6 @@ async function voucherPathPhase5to6Boundary(req: Request, res: Response, next: N
   res.on("finish", () => {
     void completeVoucherPathRequest(companyId, idempotencyKey, res.statusCode, captured.read(), phase6).catch(
       (error) => {
-        // The successful handler result has already been sent. Leaving the row
-        // processing is intentionally fail-closed: a future retry cannot execute
-        // the financial handler again after an uncertain guard-write outcome.
         logger.error("Voucher request boundary completion persistence failed", {
           module: "voucher-path-request-boundary",
           path: pathname,
