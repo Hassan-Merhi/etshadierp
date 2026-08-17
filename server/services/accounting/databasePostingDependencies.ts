@@ -100,7 +100,7 @@ async function assertCompanyOwnedIds(input: {
   if (missing.length > 0) {
     throw new PostingValidationError(
       "POSTING_TARGET_NOT_OWNED",
-      `${label} ${missing.join(", ")} not found in company ${companyId}`,
+      `${label} ${missing.join(", ")} not found in company ${companyId}`
     );
   }
 }
@@ -139,13 +139,13 @@ function assertStoredIdentityMatches(input: {
   if (stored.sourceType !== source.sourceType || stored.sourceId !== source.sourceId) {
     throw new PostingValidationError(
       "POSTING_IDEMPOTENCY_CONFLICT",
-      `Idempotency key ${source.idempotencyKey} is already bound to ${stored.sourceType}:${stored.sourceId}`,
+      `Idempotency key ${source.idempotencyKey} is already bound to ${stored.sourceType}:${stored.sourceId}`
     );
   }
   if (stored.requestFingerprint !== requestFingerprint) {
     throw new PostingValidationError(
       "POSTING_IDEMPOTENCY_CONFLICT",
-      `Idempotency key ${source.idempotencyKey} was already used for a different posting payload`,
+      `Idempotency key ${source.idempotencyKey} was already used for a different posting payload`
     );
   }
 }
@@ -160,7 +160,7 @@ async function loadVoucherWithEntries(input: {
   if (!Number.isInteger(voucherId) || voucherId <= 0) {
     throw new PostingValidationError(
       "POSTING_IDEMPOTENCY_CORRUPT",
-      `Idempotency marker ${idempotencyKey} has no valid voucher reference`,
+      `Idempotency marker ${idempotencyKey} has no valid voucher reference`
     );
   }
 
@@ -172,7 +172,7 @@ async function loadVoucherWithEntries(input: {
   if (!voucher) {
     throw new PostingValidationError(
       "POSTING_IDEMPOTENCY_CORRUPT",
-      `Idempotency marker ${idempotencyKey} references a missing voucher`,
+      `Idempotency marker ${idempotencyKey} references a missing voucher`
     );
   }
 
@@ -294,8 +294,8 @@ export function createDatabasePostingDependencies(): CentralPostingDependencies 
           .where(
             and(
               eq(accountingPostingRequests.companyId, companyId),
-              eq(accountingPostingRequests.idempotencyKey, source.idempotencyKey),
-            ),
+              eq(accountingPostingRequests.idempotencyKey, source.idempotencyKey)
+            )
           )
           .limit(1);
 
@@ -325,8 +325,8 @@ export function createDatabasePostingDependencies(): CentralPostingDependencies 
             and(
               eq(auditLog.companyId, companyId),
               eq(auditLog.tableName, LEGACY_IDEMPOTENCY_TABLE),
-              eq(auditLog.recordIdentifier, source.idempotencyKey),
-            ),
+              eq(auditLog.recordIdentifier, source.idempotencyKey)
+            )
           )
           .orderBy(desc(auditLog.id))
           .limit(1);
@@ -338,13 +338,13 @@ export function createDatabasePostingDependencies(): CentralPostingDependencies 
         if (!legacySourceType || !legacySourceId) {
           throw new PostingValidationError(
             "POSTING_IDEMPOTENCY_CORRUPT",
-            `Legacy idempotency marker ${source.idempotencyKey} has no valid source identity`,
+            `Legacy idempotency marker ${source.idempotencyKey} has no valid source identity`
           );
         }
         if (legacySourceType !== source.sourceType || legacySourceId !== source.sourceId) {
           throw new PostingValidationError(
             "POSTING_IDEMPOTENCY_CONFLICT",
-            `Idempotency key ${source.idempotencyKey} is already bound to ${legacySourceType}:${legacySourceId}`,
+            `Idempotency key ${source.idempotencyKey} is already bound to ${legacySourceType}:${legacySourceId}`
           );
         }
 

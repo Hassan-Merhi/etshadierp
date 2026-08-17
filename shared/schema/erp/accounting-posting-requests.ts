@@ -29,15 +29,15 @@ export const accountingPostingRequests = pgTable(
   (table) => ({
     companyKeyUnique: uniqueIndex("accounting_posting_requests_company_key_unique").on(
       table.companyId,
-      table.idempotencyKey,
+      table.idempotencyKey
     ),
     companySourceIdx: index("accounting_posting_requests_company_source_idx").on(
       table.companyId,
       table.sourceType,
-      table.sourceId,
+      table.sourceId
     ),
     voucherIdx: index("accounting_posting_requests_voucher_idx").on(table.voucherId),
-  }),
+  })
 );
 
 export type AccountingPostingRequest = typeof accountingPostingRequests.$inferSelect;

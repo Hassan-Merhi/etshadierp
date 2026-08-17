@@ -2,12 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
 
 import { db } from "../server/db";
-import {
-  accountingPostingRequests,
-  auditLog,
-  voucherEntries,
-  vouchers,
-} from "../shared/schema";
+import { accountingPostingRequests, auditLog, voucherEntries, vouchers } from "../shared/schema";
 import {
   buildPostingRequestFingerprint,
   postBalancedVoucherTx,
@@ -63,8 +58,8 @@ async function clearPosting() {
     .where(
       and(
         eq(accountingPostingRequests.companyId, ctx.companyId),
-        eq(accountingPostingRequests.idempotencyKey, IDEMPOTENCY_KEY),
-      ),
+        eq(accountingPostingRequests.idempotencyKey, IDEMPOTENCY_KEY)
+      )
     );
   await db
     .delete(auditLog)
@@ -119,8 +114,8 @@ describe("canonical accounting posting idempotency", () => {
       .where(
         and(
           eq(accountingPostingRequests.companyId, ctx.companyId),
-          eq(accountingPostingRequests.idempotencyKey, IDEMPOTENCY_KEY),
-        ),
+          eq(accountingPostingRequests.idempotencyKey, IDEMPOTENCY_KEY)
+        )
       );
     expect(markers).toHaveLength(1);
     expect(markers[0].voucherId).toBe(first.voucher.id);

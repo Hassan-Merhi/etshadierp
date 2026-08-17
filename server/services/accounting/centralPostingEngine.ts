@@ -115,7 +115,7 @@ function amount(value: string | undefined, field: string, index: number): Decima
   if (!parsed.isFinite() || parsed.isNegative()) {
     throw new PostingValidationError(
       "POSTING_AMOUNT_INVALID",
-      `Entry ${index + 1} ${field} must be a finite non-negative amount`,
+      `Entry ${index + 1} ${field} must be a finite non-negative amount`
     );
   }
   return parsed;
@@ -219,13 +219,13 @@ export function validateCentralPostingRequest(request: CentralPostingRequest): V
     if (!hasSupportedPostingTargetShape(entry)) {
       throw new PostingValidationError(
         "POSTING_TARGET_INVALID",
-        `Entry ${index + 1} must reference one accounting target or a verified customer and linked ledger pair`,
+        `Entry ${index + 1} must reference one accounting target or a verified customer and linked ledger pair`
       );
     }
     if (debit.isZero() === credit.isZero()) {
       throw new PostingValidationError(
         "POSTING_ENTRY_SIDE_INVALID",
-        `Entry ${index + 1} must contain either a debit or a credit, but not both`,
+        `Entry ${index + 1} must contain either a debit or a credit, but not both`
       );
     }
 
@@ -236,7 +236,7 @@ export function validateCentralPostingRequest(request: CentralPostingRequest): V
   if (debitTotal.isZero() || !debitTotal.equals(creditTotal)) {
     throw new PostingValidationError(
       "POSTING_UNBALANCED",
-      `Voucher is not balanced: debit=${debitTotal.toFixed()} credit=${creditTotal.toFixed()}`,
+      `Voucher is not balanced: debit=${debitTotal.toFixed()} credit=${creditTotal.toFixed()}`
     );
   }
 
@@ -249,7 +249,7 @@ export function validateCentralPostingRequest(request: CentralPostingRequest): V
   if (!declaredTotal.isFinite() || declaredTotal.isNegative() || !declaredTotal.equals(debitTotal)) {
     throw new PostingValidationError(
       "POSTING_TOTAL_MISMATCH",
-      `totalAmount must equal the balanced debit total (${debitTotal.toFixed()})`,
+      `totalAmount must equal the balanced debit total (${debitTotal.toFixed()})`
     );
   }
 
@@ -275,7 +275,7 @@ export function validateCentralPostingRequest(request: CentralPostingRequest): V
 export async function postBalancedVoucherTx(
   tx: any,
   request: CentralPostingRequest,
-  dependencies: CentralPostingDependencies,
+  dependencies: CentralPostingDependencies
 ): Promise<CentralPostingResult> {
   const totals = validateCentralPostingRequest(request);
   const companyId = request.voucher.companyId;
