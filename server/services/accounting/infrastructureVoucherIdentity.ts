@@ -1,0 +1,190 @@
+import { createHash } from "crypto";
+import { and, eq, sql } from "drizzle-orm";
+import { accountingPostingRequests, auditLog, vouchers } from "@shared/schema";
+import { assertTransactionCompanyScope } from "../security/transactionCompanyScope";
+import { PostingValidationError, type PostingSourceIdentity } from "./centralPostingEngine";
+
+type VoucherInsert = typeof vouchers.$inferInsert;
+type VoucherRow = typeof vouchers.$inferSelect;
+
+interface DatabaseLike {
+  transaction: <T>(callback: (tx: any) => Promise<T>) => Promise<T>;
+}
+
+function requiredText(value: unknown, field: string): string {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) {
+    throw new PostingValidationError("POSTING_SOURCE_REQUIRED", `${field} is required`);
+  }
+  return normalized;
+}
+
+export function assertPostingSourceIdentity(source: PostingSourceIdentity): PostingSourceIdentity {
+  return {
+    sourceType: requiredText(source?.sourceType, "sourceType"),
+    sourceId: requiredText(source?.sourceId, "sourceId"),
+    idempotencyKey: requiredText(source?.idempotencyKey, "idempotencyKey"),
+  };
+}
+
+/**
+ * Deterministic source identity for lower-level infrastructure writers.
+ * The key is deliberately derived only from stable business identifiers — never
+ * timestamps, random suffixes, or display voucher numbers.
+ */
+export function infrastructurePostingIdentity(
+  sourceType: string,
+  sourceId: string | number,
+  phase = "voucher"
+): PostingSourceIdentity {
+  const normalizedType = requiredText(sourceType, "sourceType");
+  const normalizedId = requiredText(sourceId, "sourceId");
+  const normalizedPhase = requiredText(phase, "phase");
+  return {
+    sourceType: normalizedType,
+    sourceId: `${normalizedId}:${normalizedPhase}`,
+    idempotencyKey: `infra:${normalizedType}:${normalizedId}:${normalizedPhase}`,
+  };
+}
+
+function stableVoucherFingerprint(
+  voucher: VoucherInsert,
+  source: PostingSourceIdentity,
+  fingerprintPayload?: unknown
+): string {
+  // voucherNumber is intentionally excluded. A number may contain a legacy
+  // Date.now/random display suffix; retry identity must come from the source.
+  const { voucherNumber: _displayNumber, ...stableVoucher } = voucher;
+  return createHash("sha256")
+    .update(
+      JSON.stringify({
+        voucher: stableVoucher,
+        sourceType: source.sourceType,
+        sourceId: source.sourceId,
+        fingerprintPayload: fingerprintPayload ?? null,
+      })
+    )
+    .digest("hex");
+}
+
+function assertStoredIdentityMatches(input: {
+  source: PostingSourceIdentity;
+  requestFingerprint: string;
+  stored: { sourceType: string; sourceId: string; requestFingerprint: string };
+}) {
+  const { source, requestFingerprint, stored } = input;
+  if (stored.sourceType !== source.sourceType || stored.sourceId !== source.sourceId) {
+    throw new PostingValidationError(
+      "POSTING_IDEMPOTENCY_CONFLICT",
+      `Idempotency key ${source.idempotencyKey} is already bound to ${stored.sourceType}:${stored.sourceId}`
+    );
+  }
+  if (stored.requestFingerprint !== requestFingerprint) {
+    throw new PostingValidationError(
+      "POSTING_IDEMPOTENCY_CONFLICT",
+      `Idempotency key ${source.idempotencyKey} was already used for a different infrastructure voucher payload`
+    );
+  }
+}
+
+/**
+ * Transitional idempotent voucher-row boundary for infrastructure writers that
+ * still build voucher entries themselves. The durable identity lives in the
+ * same accounting_posting_requests table used by the Phase 2 central engine.
+ *
+ * Later operational phases can migrate these callers to postBalancedVoucherTx
+ * without changing their source identity contract.
+ */
+export async function insertInfrastructureVoucherTx(
+  tx: any,
+  voucher: VoucherInsert,
+  sourceInput: PostingSourceIdentity,
+  fingerprintPayload?: unknown
+): Promise<{ voucher: VoucherRow; replayed: boolean }> {
+  const source = assertPostingSourceIdentity(sourceInput);
+  const companyId = Number(voucher.companyId);
+  if (!Number.isInteger(companyId) || companyId <= 0) {
+    throw new PostingValidationError("POSTING_COMPANY_INVALID", "A valid companyId is required");
+  }
+
+  await assertTransactionCompanyScope(tx, companyId);
+  const requestFingerprint = stableVoucherFingerprint(voucher, source, fingerprintPayload);
+  const lockKey = `accounting-posting:${companyId}:${source.idempotencyKey}`;
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`);
+
+  const [marker] = await tx
+    .select({
+      sourceType: accountingPostingRequests.sourceType,
+      sourceId: accountingPostingRequests.sourceId,
+      requestFingerprint: accountingPostingRequests.requestFingerprint,
+      voucherId: accountingPostingRequests.voucherId,
+    })
+    .from(accountingPostingRequests)
+    .where(
+      and(
+        eq(accountingPostingRequests.companyId, companyId),
+        eq(accountingPostingRequests.idempotencyKey, source.idempotencyKey)
+      )
+    )
+    .limit(1);
+
+  if (marker) {
+    assertStoredIdentityMatches({ source, requestFingerprint, stored: marker });
+    const [existing] = await tx
+      .select()
+      .from(vouchers)
+      .where(and(eq(vouchers.id, Number(marker.voucherId)), eq(vouchers.companyId, companyId)))
+      .limit(1);
+    if (!existing) {
+      throw new PostingValidationError(
+        "POSTING_IDEMPOTENCY_CORRUPT",
+        `Idempotency marker ${source.idempotencyKey} references a missing voucher`
+      );
+    }
+    return { voucher: existing, replayed: true };
+  }
+
+  const [created] = await tx.insert(vouchers).values(voucher).returning();
+  if (!created) throw new Error("Voucher insert did not return a persisted voucher");
+
+  await tx.insert(accountingPostingRequests).values({
+    companyId,
+    idempotencyKey: source.idempotencyKey,
+    sourceType: source.sourceType,
+    sourceId: source.sourceId,
+    requestFingerprint,
+    voucherId: created.id,
+  });
+
+  await tx.insert(auditLog).values({
+    userId: "system",
+    username: "infrastructure-voucher-writer",
+    companyId,
+    action: "create",
+    tableName: "accounting_postings",
+    recordId: created.id,
+    recordIdentifier: source.idempotencyKey,
+    changes: {
+      sourceType: { new: source.sourceType },
+      sourceId: { new: source.sourceId },
+      idempotencyKey: { new: source.idempotencyKey },
+      writer: { new: "infrastructure" },
+    },
+  });
+
+  return { voucher: created, replayed: false };
+}
+
+export async function insertInfrastructureVoucher(
+  database: DatabaseLike,
+  voucher: VoucherInsert,
+  source: PostingSourceIdentity,
+  fingerprintPayload?: unknown
+): Promise<{ voucher: VoucherRow; replayed: boolean }> {
+  return database.transaction((tx) => insertInfrastructureVoucherTx(tx, voucher, source, fingerprintPayload));
+}
+
+/** Remove the durable marker before an intentional hard delete/rebuild. */
+export async function deleteInfrastructurePostingIdentityForVoucherTx(tx: any, voucherId: number): Promise<void> {
+  await tx.delete(accountingPostingRequests).where(eq(accountingPostingRequests.voucherId, voucherId));
+}
