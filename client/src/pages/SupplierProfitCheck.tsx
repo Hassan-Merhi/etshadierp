@@ -55,6 +55,7 @@ import {
   STORAGE_KEY_COLS,
   fmt,
   loadColVisibility,
+  isSupplierProfitQueryEnabled,
 } from "./supplierprofitcheck/utils";
 import { ProfitCell } from "./supplierprofitcheck/components/ProfitCell";
 import { StatusBadge } from "./supplierprofitcheck/components/StatusBadge";
@@ -137,7 +138,8 @@ export default function SupplierProfitCheck() {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers", companyId] });
       toast({ title: "Supplier stock group updated" });
     },
-    onError: (err: ClientErrorLike) => toast({ title: "Failed to update", description: err.message, variant: "destructive" }),
+    onError: (err: ClientErrorLike) =>
+      toast({ title: "Failed to update", description: err.message, variant: "destructive" }),
   });
   const { data: proformas = [] } = useQuery({
     queryKey: ["/api/suppliers", supplierId, "proformas"],
@@ -165,11 +167,7 @@ export default function SupplierProfitCheck() {
       return res.ok ? res.json() : [];
     },
   });
-  const queryEnabled =
-    !!supplierId &&
-    (sourceType === "all" ||
-      (sourceType === "proforma" && !!proformaId) ||
-      (sourceType === "otw_containers" && otwContainerIds.length > 0));
+  const queryEnabled = isSupplierProfitQueryEnabled(supplierId, sourceType, proformaId, otwContainerIds);
   const { data: rows = [], isLoading } = useQuery<AnalysisRow[]>({
     queryKey: [
       "/api/supplier-profit-check/analyze",
@@ -364,7 +362,8 @@ export default function SupplierProfitCheck() {
       setNewItemAvgSell("");
       toast({ title: "Item added", description: "The item is now included in the analysis." });
     },
-    onError: (err: ClientErrorLike) => toast({ title: "Failed to add item", description: err.message, variant: "destructive" }),
+    onError: (err: ClientErrorLike) =>
+      toast({ title: "Failed to add item", description: err.message, variant: "destructive" }),
   });
   const handleManualPoChange = useCallback(
     (stockItemId: number, value: string) => {
@@ -442,7 +441,7 @@ export default function SupplierProfitCheck() {
         setTimeout(() => setAutosaveStatus("idle"), 3000);
       }
     }, 1200);
-  }, [qtyVersion]); 
+  }, [qtyVersion]);
   const loaded = queryEnabled && !isLoading && rows.length >= 0;
   // ─── Charge math ─────────────────────────────────────────────────────────
   const totalBales = useMemo(() => {
