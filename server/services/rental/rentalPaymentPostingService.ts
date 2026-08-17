@@ -67,7 +67,7 @@ function hashGroupId(groupId: string): bigint {
  * Returns the created voucherId (or null if no cashAccountId).
  */
 async function postGroupCore(
-  tx: any,
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   opts: {
     companyId: number;
     module: RentalModule;

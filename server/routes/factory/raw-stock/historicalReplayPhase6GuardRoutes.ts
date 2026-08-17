@@ -50,7 +50,7 @@ function round2(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
-async function readCurrentNetPosition(req: any): Promise<number | null> {
+async function readCurrentNetPosition(req: import("express").Request): Promise<number | null> {
   try {
     const port = Number(process.env.PORT || 5000);
     if (!Number.isInteger(port) || port <= 0 || port > 65535 || typeof fetch !== "function") {

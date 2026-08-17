@@ -17,8 +17,8 @@ export function registerFactoryProductHistoryRoutes(app: Express) {
   // Shared implementation for the monthly-overview query (year-level view).
   // Called by both the 2-segment route (year from ?year=) and the 3-segment route (year from path).
   async function baleProductHistoryByYear(
-    req: any,
-    res: any,
+    req: import("express").Request,
+    res: import("express").Response,
     companyId: number,
     productId: number,
     locationId: number,

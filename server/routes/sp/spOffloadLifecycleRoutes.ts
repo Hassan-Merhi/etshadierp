@@ -57,7 +57,7 @@ export async function ensureSpOffloadReversalStorage(): Promise<void> {
 }
 
 async function createExactVoucherReversal(
-  tx: any,
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   input: {
     companyId: number;
     originalVoucherId: number;

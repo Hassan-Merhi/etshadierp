@@ -204,7 +204,7 @@ function normalizePosEntry(
 
 /** Insert the Dr (payment) + Cr (Sales revenue, or SP-split) voucher entries for a POS sale. */
 export async function insertSaleAccountingEntries(
-  tx: any,
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   params: {
     txVoucherId: number;
     voucherNumber: string;

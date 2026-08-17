@@ -103,7 +103,7 @@ async function getPositionState(companyId: number, positionId: number, asOf: str
 }
 
 async function writeRuleVersion(
-  tx: any,
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   companyId: number,
   positionId: number,
   effectiveFrom: string,
@@ -150,7 +150,7 @@ async function writeRuleVersion(
 }
 
 async function replaceMemberships(
-  tx: any,
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   companyId: number,
   positionId: number,
   effectiveFrom: string,

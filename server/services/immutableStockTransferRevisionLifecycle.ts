@@ -83,7 +83,7 @@ function lifecycleError(message: string, code: string): Error {
   return error;
 }
 
-async function lockTransfer(tx: any, transferId: number) {
+async function lockTransfer(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], transferId: number) {
   return firstRow(
     await tx.execute(sql`
       SELECT
@@ -121,7 +121,7 @@ function assertTransfer(transfer: any, companyId: number): asserts transfer {
 }
 
 async function assertCompanyScope(
-  tx: any,
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   companyId: number,
   destinationLocationId: number,
   items: Array<{ sourceLocationId: number; stockItemId: number }>
@@ -158,7 +158,7 @@ async function assertCompanyScope(
   }
 }
 
-async function assertSubmittedBaseline(tx: any, transferId: number, items: NormalizedImmutableRevisionItem[]) {
+async function assertSubmittedBaseline(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], transferId: number, items: NormalizedImmutableRevisionItem[]) {
   const current = await tx.select().from(stockTransferItems).where(eq(stockTransferItems.transferId, transferId));
   for (const item of items) {
     const row = current.find(
@@ -339,7 +339,7 @@ export async function createImmutableStockTransferRevision(
  * collects one pending revision per submitter, and approving only the clicked
  * row would silently discard the others.
  */
-async function lockedPendingRevisions(tx: any, transferId: number) {
+async function lockedPendingRevisions(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], transferId: number) {
   return rows(
     await tx.execute(sql`
       SELECT id, revision_number
@@ -352,7 +352,7 @@ async function lockedPendingRevisions(tx: any, transferId: number) {
   ).map((revision) => ({ id: Number(revision.id), revisionNumber: Number(revision.revision_number) }));
 }
 
-async function lockedRevision(tx: any, revisionId: number) {
+async function lockedRevision(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], revisionId: number) {
   return firstRow(
     await tx.execute(sql`
       SELECT

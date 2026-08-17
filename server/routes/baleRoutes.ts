@@ -276,7 +276,7 @@ export function registerBaleRoutes(app: Express) {
   // Helper: generate a reference number that is guaranteed not to clash with any
   // existing factory_bales ref for this company, by taking the max across both
   // sequence tables and the actual data.
-  async function generateSafeRef(tx: any, companyId: number): Promise<string> {
+  async function generateSafeRef(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], companyId: number): Promise<string> {
     // Find the true max numeric ref already in use for this company
     const [maxRow] = await tx
       .select({

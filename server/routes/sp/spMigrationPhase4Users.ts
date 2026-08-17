@@ -20,7 +20,7 @@ function roleSnapshot(row: any): any {
 }
 
 async function switchUserSessions(
-  tx: any,
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   params: {
     userId: string;
     fromCompanyId: number;
@@ -57,7 +57,7 @@ async function switchUserSessions(
   return resultRows(result).length;
 }
 
-async function loadUserLocations(tx: any, userId: string, companyId: number): Promise<any[]> {
+async function loadUserLocations(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], userId: string, companyId: number): Promise<any[]> {
   const result = await tx.execute(sql`
     SELECT location_id
     FROM user_locations
@@ -67,7 +67,7 @@ async function loadUserLocations(tx: any, userId: string, companyId: number): Pr
   return resultRows(result).map((row) => ({ locationId: pn(row.location_id) }));
 }
 
-async function loadCashMappings(tx: any, userId: string, companyId: number): Promise<any[]> {
+async function loadCashMappings(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], userId: string, companyId: number): Promise<any[]> {
   const result = await tx.execute(sql`
     SELECT location_id, cash_account_id, pos_station
     FROM user_location_cash_accounts
@@ -133,7 +133,7 @@ async function mapAllCashMappings(sourceId: number, targetId: number, rows: any[
   return mapped;
 }
 
-async function replaceLocations(tx: any, userId: string, companyId: number, rows: any[]): Promise<void> {
+async function replaceLocations(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], userId: string, companyId: number, rows: any[]): Promise<void> {
   await tx.execute(sql`DELETE FROM user_locations WHERE user_id = ${userId} AND company_id = ${companyId}`);
   for (const row of rows) {
     await tx.execute(sql`
@@ -143,7 +143,7 @@ async function replaceLocations(tx: any, userId: string, companyId: number, rows
   }
 }
 
-async function replaceCashMappings(tx: any, userId: string, companyId: number, rows: any[]): Promise<void> {
+async function replaceCashMappings(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], userId: string, companyId: number, rows: any[]): Promise<void> {
   await tx.execute(
     sql`DELETE FROM user_location_cash_accounts WHERE user_id = ${userId} AND company_id = ${companyId}`
   );
@@ -156,7 +156,7 @@ async function replaceCashMappings(tx: any, userId: string, companyId: number, r
 }
 
 async function upsertRole(
-  tx: any,
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   userId: string,
   companyId: number,
   role: any

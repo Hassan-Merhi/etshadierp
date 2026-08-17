@@ -423,7 +423,7 @@ export function registerBalesCrudRoutes(app: Express) {
         .limit(1);
       if (!worker) return res.status(400).json({ message: "Worker is inactive or belongs to another company" });
 
-      const updated = await db.transaction(async (tx: any) => {
+      const updated = await db.transaction(async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
         const [updatedBale] = await tx
           .update(factoryBales)
           .set({ finalizedBy: numericWorkerId, workerName: worker.fullName, updatedAt: new Date() })
@@ -482,7 +482,7 @@ export function registerBalesCrudRoutes(app: Express) {
         .limit(1);
       if (!worker) return res.status(400).json({ message: "Worker is inactive or belongs to another company" });
 
-      const updatedIds = await db.transaction(async (tx: any) => {
+      const updatedIds = await db.transaction(async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
         const updatedBales = await tx
           .update(factoryBales)
           .set({ finalizedBy: numericWorkerId, workerName: worker.fullName, updatedAt: new Date() })
@@ -525,7 +525,7 @@ export function registerBalesCrudRoutes(app: Express) {
       }
       const newWeightStr = rawWeight.toFixed(3);
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
         // Fetch bale and verify ownership
         const [bale] = await tx
           .select()
@@ -612,7 +612,7 @@ export function registerBalesCrudRoutes(app: Express) {
 
       if (id === null) return res.status(400).json({ message: "Invalid id" });
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
         const [originalBale] = await tx
           .select()
           .from(factoryBales)
