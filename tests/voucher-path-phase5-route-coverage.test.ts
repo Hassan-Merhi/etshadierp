@@ -82,4 +82,30 @@ describe("Phase 5 endpoint-level voucher coverage", () => {
 
     expect(changed).not.toBe(original);
   });
+
+  it("changes the replay fingerprint when a structured permission collection changes", () => {
+    const withCreatePermission = {
+      session: { userId: 7, currentRole: "Admin", currentCompanyId: 12 },
+      user: { id: 7, role: "Admin", permissions: ["act_create_voucher", "act_view_voucher"] },
+    } as unknown as Parameters<typeof replayAuthorizationContext>[0];
+    const withoutCreatePermission = {
+      session: { userId: 7, currentRole: "Admin", currentCompanyId: 12 },
+      user: { id: 7, role: "Admin", permissions: ["act_view_voucher"] },
+    } as unknown as Parameters<typeof replayAuthorizationContext>[0];
+
+    const permitted = voucherPathRequestFingerprint(
+      "POST",
+      "/api/vouchers",
+      { amount: "10.00" },
+      replayAuthorizationContext(withCreatePermission)
+    );
+    const revoked = voucherPathRequestFingerprint(
+      "POST",
+      "/api/vouchers",
+      { amount: "10.00" },
+      replayAuthorizationContext(withoutCreatePermission)
+    );
+
+    expect(revoked).not.toBe(permitted);
+  });
 });
