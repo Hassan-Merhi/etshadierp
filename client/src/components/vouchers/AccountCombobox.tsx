@@ -101,7 +101,7 @@ export function AccountCombobox({
     ...customers.map((c) => ({
       type: "customer" as const,
       id: c.id,
-      name: (c as any).legalName || (c as any).name || "",
+      name: (c).legalName || (c as any).name || "",
     })),
   ].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 

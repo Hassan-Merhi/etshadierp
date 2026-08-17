@@ -175,7 +175,7 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
   // Restricted to admin/owner/developer. Triggers full container cost recalculation.
   app.patch("/api/factory/daybook/:entryId/cost-edit", requireAuth, async (req: Request, res: Response) => {
     try {
-      const session = req.session as any;
+      const session = req.session;
       const companyId = session.factoryCompanyId || session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const userId = session.userId || null;
@@ -272,11 +272,11 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
           if (newFxRate) {
             fx = String(newFxRate); // fresh explicit request input — trust it even if it equals 1
           } else {
-            const fallbackRaw = (container as any).fxRateToUsdOffload || container.fxRateToUsd;
+            const fallbackRaw = (container).fxRateToUsdOffload || container.fxRateToUsd;
             const { fxRate: resolvedFx, looksSet } = resolveStoredFxRate(
               ccy,
               fallbackRaw,
-              (container as any).fxRateConfirmed
+              (container).fxRateConfirmed
             );
             if (!looksSet) throw new UnresolvedExchangeRateError(ccy);
             fx = String(resolvedFx);

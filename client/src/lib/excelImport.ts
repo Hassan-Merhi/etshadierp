@@ -219,7 +219,7 @@ export async function excelToFortune(buf: ArrayBuffer): Promise<FortuneSheet[]> 
         }
 
         // Fill
-        const fill = cell.fill as any;
+        const fill = cell.fill;
         if (fill && fill.type === "pattern" && fill.pattern && fill.pattern !== "none") {
           const bg = argbToHex(fill.fgColor?.argb);
           if (bg && bg !== "#000000" && bg !== "#FFFFFF") v.bg = bg;

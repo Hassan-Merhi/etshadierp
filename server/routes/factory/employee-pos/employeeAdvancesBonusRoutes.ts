@@ -448,7 +448,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
       const bonusRows = await db.execute(
         sql`SELECT * FROM worker_bonuses WHERE id = ${id} AND company_id = ${companyId}`
       );
-      const bonus = bonusRows.rows[0] as any;
+      const bonus = bonusRows.rows[0];
       if (!bonus) return res.status(404).json({ message: "Bonus not found" });
 
       await db.transaction(async (tx) => {

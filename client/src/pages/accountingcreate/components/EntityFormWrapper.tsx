@@ -77,7 +77,7 @@ function EntityFormWrapper({
         });
       }
 
-      form.reset(getDefaultValues(entityType) as any);
+      form.reset(getDefaultValues(entityType));
       onCreated?.();
     },
     onError: (error: ClientErrorLike) => {

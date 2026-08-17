@@ -142,7 +142,7 @@ export function registerShippingContainerDocumentRoutes(app: Express) {
         }
 
         const username: string =
-          (req.session as any).username || (req.session as any).email || (req.session as any).name || null;
+          (req.session as any).username || (req.session).email || (req.session).name || null;
 
         const [doc] = await db
           .insert(factoryShippingContainerDocuments)
