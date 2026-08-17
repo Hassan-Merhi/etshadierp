@@ -124,10 +124,10 @@ export default function WasteDispatchOptimized() {
     if (historyPage > totalPages) setHistoryPage(totalPages);
   }, [historyPage, history?.pagination.totalPages]);
 
-  const groups = summary?.groups ?? [];
+  const groups = useMemo(() => summary?.groups ?? [], [summary?.groups]);
   const summaryTotals = summary?.totals ?? { bales: 0, weight: 0, cost: 0 };
   const summaryPagination = summary?.pagination ?? { page: 1, limit: GROUP_PAGE_SIZE, total: 0, totalPages: 1 };
-  const historyItems = history?.items ?? [];
+  const historyItems = useMemo(() => history?.items ?? [], [history?.items]);
   const historyPagination = history?.pagination ?? { page: 1, limit: HISTORY_PAGE_SIZE, total: 0, totalPages: 1 };
 
   const visibleExpandedProductIds = useMemo(
