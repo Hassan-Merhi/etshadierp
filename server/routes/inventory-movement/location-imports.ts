@@ -9,12 +9,17 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { storage } from "../../storage";
-import { requireAuth, checkPOSLocation } from "../../auth";
+import { requireAuth, requireRole, checkPOSLocation } from "../../auth";
 import { stockItemCodeAliases } from "@shared/schema";
 
 export function registerLocationImportRoutes(app: Express) {
   // Update cost prices by barcode for a location
-  app.post("/api/locations/:locationId/import-cost-prices", requireAuth, checkPOSLocation, async (req, res) => {
+  app.post(
+    "/api/locations/:locationId/import-cost-prices",
+    requireAuth,
+    requireRole("Developer"),
+    checkPOSLocation,
+    async (req, res) => {
     try {
       const locationId = parseInt(req.params.locationId);
       if (isNaN(locationId)) {
@@ -47,7 +52,8 @@ export function registerLocationImportRoutes(app: Express) {
       logger.error("Error updating cost prices:", { error: error });
       res.status(500).json({ message: getErrorMessage(error) });
     }
-  });
+    }
+  );
 
   // Bulk import inventory for a location
   app.post("/api/locations/:locationId/import-inventory", requireAuth, checkPOSLocation, async (req, res) => {
