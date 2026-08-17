@@ -200,8 +200,8 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
                 return new Date(d) > new Date(latest) ? d : latest;
               }, null)
             : null;
-        const supplierPayments = allPayments.filter((p: any) => p.supplierId === s.id);
-        const totalPaid = supplierPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0);
+        const supplierPayments = allPayments.filter((p: { id: number; companyId: number; supplierId: number; date: string; amount: string; currencyCode: string; fxRateToUsd: string; amountUsd: string; paidFromAccountId: number | null; notes: string | null; createdAt: Date; }) => p.supplierId === s.id);
+        const totalPaid = supplierPayments.reduce((sum: number, p: { id: number; companyId: number; supplierId: number; date: string; amount: string; currencyCode: string; fxRateToUsd: string; amountUsd: string; paidFromAccountId: number | null; notes: string | null; createdAt: Date; }) => sum + parseFloat(p.amountUsd || "0"), 0);
         // Include voucher-based payments (payment vouchers) in the balance
         const voucherPaidUsd = voucherPaidBySupplier[s.id] || 0;
         // FX net (USD): FX-in transfers received minus FX-out transfers sent (in USD equivalent)
