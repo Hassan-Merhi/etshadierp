@@ -100,10 +100,7 @@ export async function insertVoucherWithEntriesTx(
 ): Promise<VoucherWithEntries<VoucherRow, VoucherEntryRow>> {
   requireSourceIdentity(source);
 
-  const [voucher] = (await tx
-    .insert(vouchers)
-    .values(buildVoucherValues(voucherFields))
-    .returning()) as VoucherRow[];
+  const [voucher] = (await tx.insert(vouchers).values(buildVoucherValues(voucherFields)).returning()) as VoucherRow[];
   if (!voucher || typeof voucher !== "object" || !("id" in voucher)) {
     throw new Error("Voucher insert did not return a persisted voucher");
   }

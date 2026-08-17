@@ -11,7 +11,9 @@ import {
   voucherEntries,
   vouchers,
 } from "@shared/schema";
-import { insertVoucherWithEntriesTx } from "../../services/accounting/voucherPostingService";
+import { postBalancedVoucherTx } from "../../services/accounting/centralPostingEngine";
+import { createDatabasePostingDependencies } from "../../services/accounting/databasePostingDependencies";
+import { infrastructurePostingIdentity } from "../../services/accounting/infrastructureVoucherIdentity";
 import { isCompanyIsolationError, resolveRequestCompanyId } from "../../services/security/requestCompanyScope";
 
 function errorMessage(error: unknown, fallback: string): string {
@@ -277,47 +279,47 @@ export function registerFactoryInsuranceRoutes(app: Express) {
         month: "long",
         year: "numeric",
       });
-      const voucherNumber = `INS-${year}-${String(month).padStart(2, "0")}-${Date.now()}`;
+      const voucherNumber = `INS-${year}-${String(month).padStart(2, "0")}`;
       const narration = `Insurance entries for ${monthLabel}`;
-      const result = await db.transaction(async (tx) =>
-        insertVoucherWithEntriesTx(
+      const result = await db.transaction((tx) =>
+        postBalancedVoucherTx(
           tx,
           {
-            companyId,
-            voucherNumber,
-            voucherType: "Journal",
-            description: narration,
-            voucherDate: periodStart,
-            totalAmount: totalAmount.toFixed(2),
-            sourceModule: "ERP",
-          },
-          // Dr Insurance Expense / Cr each member's liability.
-          //
-          // This ran the other way round until now — the expense account
-          // credited and the member liabilities debited — which is the reverse
-          // of standard double entry and of the convention every other posting
-          // here uses (see the transporter charge route: Dr expense / Cr the
-          // party owed). The effect was that running the monthly journal
-          // reduced recorded expense and made each member's liability account
-          // read as an asset.
-          //
-          // Only new journals are affected. Ones already posted keep the old
-          // direction; correcting those is a data question, not a code one, and
-          // is left to whoever owns the chart of accounts.
-          [
-            {
-              ledgerAccountId: expenseAccount.id,
-              debitAmount: totalAmount.toFixed(2),
-              creditAmount: "0",
-              narration,
+            voucher: {
+              companyId,
+              voucherNumber,
+              voucherType: "Journal",
+              description: narration,
+              voucherDate: periodStart,
+              totalAmount: totalAmount.toFixed(2),
+              sourceModule: "ERP",
             },
-            ...memberLedgers.map((member) => ({
-              ledgerAccountId: member.ledgerId,
-              debitAmount: "0",
-              creditAmount: member.amount.toFixed(2),
-              narration,
-            })),
-          ]
+            entries: [
+              {
+                ledgerAccountId: expenseAccount.id,
+                debitAmount: totalAmount.toFixed(2),
+                creditAmount: "0",
+                narration,
+              },
+              ...memberLedgers.map((member) => ({
+                ledgerAccountId: member.ledgerId,
+                debitAmount: "0",
+                creditAmount: member.amount.toFixed(2),
+                narration,
+              })),
+            ],
+            source: infrastructurePostingIdentity(
+              "factory-insurance",
+              `${companyId}:${year}:${String(month).padStart(2, "0")}`,
+              "monthly-journal"
+            ),
+            actor: {
+              userId: req.user?.id ?? null,
+              username: req.user?.username ?? null,
+              reason: "Generate monthly insurance journal",
+            },
+          },
+          createDatabasePostingDependencies()
         )
       );
 

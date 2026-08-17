@@ -59,14 +59,9 @@ async function clearPosting() {
   await db
     .delete(accountingPostingRequests)
     .where(
-      and(
-        eq(accountingPostingRequests.companyId, ctx.companyId),
-        eq(accountingPostingRequests.idempotencyKey, key)
-      )
+      and(eq(accountingPostingRequests.companyId, ctx.companyId), eq(accountingPostingRequests.idempotencyKey, key))
     );
-  await db
-    .delete(auditLog)
-    .where(and(eq(auditLog.companyId, ctx.companyId), eq(auditLog.recordIdentifier, key)));
+  await db.delete(auditLog).where(and(eq(auditLog.companyId, ctx.companyId), eq(auditLog.recordIdentifier, key)));
 
   const rows = await db
     .select({ id: vouchers.id })
