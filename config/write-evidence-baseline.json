@@ -3,7 +3,7 @@
   "description": "Ratchet on evidence, not on tests. audit-write-route-coverage.mjs asks whether a sensitive write route is tested and holds that at zero; this asks whether a write leaves the trail the rest of the system reconciles against, and both answers are currently backlogs rather than zeros. Neither list is a list of bugs: a company hard-delete that removes every inventory row, or a scheduler purging rows for a deleted stock item, has nothing to journal. The list is what a reviewer must look at when a file joins it. Both entries pin the set as well as the count, because a backlog that holds steady while a different file joins it is a new write path with no evidence wearing an old number. Re-pin downward with UPDATE_WRITE_EVIDENCE_BASELINE=1; the audit refuses upward.",
   "stockWritesWithoutJournalEvidence": {
     "rationale": "Files that move stock without going through postStockMovementTx, the only writer of the canonical stock movement journal. Stock moves two ways: a statement naming the inventory table, or a call to adjustInventory()/reverseInventoryByExactValue() in server/inventoryHelper.ts, which owns the balance arithmetic. The helper module itself is exempt — it is the layer the journal sits above and cannot know which document is calling it — but its callers are not. Convergence reconciliation compares stock documents against the journal, so a mutation missing from it is not a discrepancy the report finds; it is one the report cannot see.",
-    "ceiling": 46,
+    "ceiling": 45,
     "files": [
       "server/routes/admin/deleted-items/permanent-delete.ts",
       "server/routes/admin/repair/inventory-values.ts",
@@ -42,7 +42,6 @@
       "server/services/containers/offload-lifecycle/reverse.ts",
       "server/services/scheduler/maintenance.ts",
       "server/services/sp/spInventoryIntegrity.ts",
-      "server/services/stockTransferRevisionLifecycle.ts",
       "server/services/syncSalesItemCosts.ts",
       "server/storage/accounting/voucher-writes.ts",
       "server/storage/auth.ts",
@@ -128,9 +127,8 @@
         ]
       },
       "shadowed": {
-        "reason": "Write paths that cannot execute. Both register an Express route that an earlier registration already claims, and Express serves the first match: registerVoucherRoutes runs before registerFiscalTransferRoutes, and registerImmutableStockTransferRevisionRoutes before registerStockTransferRevisionLifecycleRoutes. Adding journal evidence here would be evidence written by code nothing calls; the real fix is deletion, which is a different change with a different risk. transfers-update.ts is only half dead — updateStockTransfer is unreachable, updateStockAdjustment is live and still owes evidence.",
+        "reason": "Write paths that cannot execute: they register an Express route an earlier registration already claims, and Express serves the first match. stockTransferRevisionLifecycle.ts has since been deleted along with its routes and its two test files — its normalizePendingRevisionItems has a live, stricter equivalent in immutableStockTransferRevisionInput.ts, which rejects duplicate items where the dead one silently kept the last, and that equivalent is tested. What remains here is transfers-update.ts, which is only half dead: updateStockTransfer was removed with its unreachable route, and updateStockAdjustment beside it is live and still owes journal evidence.",
         "files": [
-          "server/services/stockTransferRevisionLifecycle.ts",
           "server/storage/stock-ops/transfers-update.ts"
         ]
       }

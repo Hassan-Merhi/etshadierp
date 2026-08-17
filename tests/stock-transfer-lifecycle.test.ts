@@ -35,6 +35,13 @@ async function inventoryQty(locationId: number): Promise<number> {
 
 async function cleanup() {
   if (!companyId) return;
+  // The lifecycle now writes canonical movement journal rows, and those
+  // reference the stock items this teardown deletes. Without removing them
+  // first the delete fails on a foreign key, the suite reports a failure with
+  // no failing assertion, and the leftover company poisons the next run.
+  await db.execute(sql`DELETE FROM canonical_stock_movement_audit WHERE company_id = ${companyId}`);
+  await db.execute(sql`DELETE FROM canonical_stock_movement_requests WHERE company_id = ${companyId}`);
+  await db.execute(sql`DELETE FROM canonical_stock_movements WHERE company_id = ${companyId}`);
   await db.delete(stockTransferItems).where(eq(stockTransferItems.transferId, transferId));
   await db.delete(stockTransferVouchers).where(eq(stockTransferVouchers.id, transferId));
   await db.delete(vouchers).where(eq(vouchers.id, voucherId));

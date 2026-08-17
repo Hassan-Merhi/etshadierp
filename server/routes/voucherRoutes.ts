@@ -19,7 +19,6 @@ import { registerVoucherPurchaseUpdateRoutes } from "./vouchers/voucherPurchaseU
 import { registerVoucherTransferRoutes } from "./vouchers/transfer";
 import { registerSmartTransferPreviewRoutes } from "./vouchers/smartTransferPreviewRoutes";
 import { registerStockTransferLifecycleRoutes } from "./vouchers/stockTransferLifecycleRoutes";
-import { registerStockTransferRevisionLifecycleRoutes } from "./vouchers/stockTransferRevisionLifecycleRoutes";
 import { registerImmutableStockTransferRevisionRoutes } from "./vouchers/immutableStockTransferRevisionRoutes";
 
 function registerVoucherDetailCompatibility(app: Express) {
@@ -57,7 +56,6 @@ export function registerVoucherRoutes(app: Express) {
   // Stock-transfer lifecycle routes must shadow the older direct transfer editor.
   registerStockTransferLifecycleRoutes(app);
   registerImmutableStockTransferRevisionRoutes(app);
-  registerStockTransferRevisionLifecycleRoutes(app);
 
   // The daybook detail dialog reads `transfer`, while the canonical voucher
   // endpoint currently returns `transferData`. Preserve both keys so source and

@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
   "description": "Ordered snapshot of every registered Express route (method, path, guard chain) and middleware mount. Regenerate with UPDATE_ROUTE_MANIFEST=1 only when a route change is intended; during a file split the manifest must not change at all.",
-  "routeCount": 1905,
+  "routeCount": 1903,
   "middlewareMountCount": 91,
   "routes": [
     "GET /api/admin/operational-monitoring [requireAuth > <anonymous> > <anonymous>]",
@@ -1302,8 +1302,6 @@
     "POST /api/stock-transfer-revisions/:id/reject [requireAuth > requireNonPOS > <anonymous> > <anonymous>]",
     "PATCH /api/stock-transfer-revisions/:id/optional [requireAuth > requireNonPOS > <anonymous>]",
     "DELETE /api/stock-transfer-revisions/:id [requireAuth > requireNonPOS > <anonymous>]",
-    "POST /api/stock-transfers/:transferId/revisions [requireAuth > <anonymous>]",
-    "POST /api/stock-transfer-revisions/:id/approve [requireAuth > requireNonPOS > <anonymous> > <anonymous>]",
     "GET /api/vouchers/:id [<anonymous>]",
     "GET /api/vouchers [requireAuth > <anonymous>]",
     "GET /api/suppliers/:supplierId/unified-ledger [requireAuth > <anonymous>]",
