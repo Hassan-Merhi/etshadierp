@@ -1,3 +1,4 @@
+# Phase 18 safe-harvest retrigger: 2026-08-17 exact-head repair pass
 name: Phase 18 Main Sync and Safe Harvest
 on:
   push:
