@@ -1,0 +1,132 @@
+name: Phase 18 Current Usage Inference
+on:
+  push:
+    branches: [agent/phase18-current-inference]
+permissions:
+  contents: write
+env:
+  CI: true
+jobs:
+  infer:
+    if: contains(github.event.head_commit.message, '[phase18-current-inference]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/phase18-current-inference
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.14.0'
+          cache: npm
+      - run: npm ci
+      - name: Confirm compiler-green baseline
+        run: npm run check
+      - name: Derive concrete types from current usage
+        run: node scripts/phase18-current-usage-infer.cjs
+      - name: Dependency-aware compiler gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > scripts/.phase18-current-gate.py <<'PY'
+          import re, pathlib, subprocess, os
+          cwd = pathlib.Path.cwd().resolve()
+          changed_file = pathlib.Path('/tmp/phase18-current-inference.files')
+          changed = set(changed_file.read_text().splitlines()) if changed_file.exists() else set()
+
+          def rel(path_value):
+              try:
+                  return pathlib.Path(os.path.relpath(path_value, cwd)).as_posix()
+              except Exception:
+                  return ''
+
+          import_re = re.compile(r'(?:from\s+|import\s*\()\s*["\']([^"\']+)["\']')
+
+          def candidates(owner, spec):
+              if spec.startswith('.'):
+                  base = (owner.parent / spec).resolve()
+              elif spec.startswith('@/'):
+                  base = (cwd / 'client/src' / spec[2:]).resolve()
+              elif spec.startswith('@shared/'):
+                  base = (cwd / 'shared' / spec[8:]).resolve()
+              else:
+                  return []
+              return [pathlib.Path(str(base) + '.ts'), pathlib.Path(str(base) + '.tsx'), base / 'index.ts', base / 'index.tsx', base]
+
+          for attempt in range(1, 11):
+              proc = subprocess.run(['npm', 'run', 'check'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+              pathlib.Path('/tmp/phase18-current.check').write_text(proc.stdout)
+              if proc.returncode == 0:
+                  print('INFERENCE_GREEN_ATTEMPT', attempt)
+                  break
+
+              error_files = set()
+              for line in proc.stdout.splitlines():
+                  match = re.match(r'(.+?\.(?:ts|tsx))\(\d+,\d+\):\s+error\s+TS\d+:', line)
+                  if match:
+                      error_files.add(match.group(1).replace('\\', '/'))
+
+              revert = set(error_files & changed)
+              if not revert:
+                  queue = [((cwd / item).resolve(), 0) for item in error_files if (cwd / item).exists()]
+                  seen = set()
+                  while queue:
+                      current, depth = queue.pop(0)
+                      if str(current) in seen or depth > 4:
+                          continue
+                      seen.add(str(current))
+                      try:
+                          text = current.read_text(errors='replace')
+                      except Exception:
+                          continue
+                      for spec in import_re.findall(text):
+                          for candidate in candidates(current, spec):
+                              relative = rel(candidate)
+                              if relative in changed:
+                                  revert.add(relative)
+                              elif candidate.exists() and depth < 4:
+                                  queue.append((candidate, depth + 1))
+
+              print('ATTEMPT', attempt, 'ERROR_FILES', len(error_files), 'REVERT', len(revert), 'CHANGED', len(changed))
+              if not revert:
+                  print('\n'.join(proc.stdout.splitlines()[-160:]))
+                  pathlib.Path('/tmp/phase18-current.unresolved').write_text('1')
+                  break
+
+              for item in sorted(revert):
+                  subprocess.run(['git', 'restore', '--source=HEAD', '--staged', '--worktree', '--', item], check=False)
+                  changed.discard(item)
+              changed_file.write_text('\n'.join(sorted(changed)) + ('\n' if changed else ''))
+              if not changed:
+                  break
+          else:
+              pathlib.Path('/tmp/phase18-current.unresolved').write_text('1')
+          PY
+          python scripts/.phase18-current-gate.py
+          rm scripts/.phase18-current-gate.py
+          if [ -f /tmp/phase18-current.unresolved ]; then
+            echo 'INFERENCE_UNRESOLVED=1'
+            git reset --hard HEAD
+            exit 0
+          fi
+          npm run check
+      - name: Measure and commit compiler-green result
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          node scripts/audit-type-escapes.mjs > /tmp/type.log 2>&1
+          type_rc=$?
+          set -e
+          tail -n 8 /tmp/type.log || true
+          echo "TYPE_AUDIT_EXIT=$type_rc"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add client/src server shared
+          if git diff --cached --quiet; then
+            echo 'NO_INFERENCE_SOURCE_CHANGES=1'
+            exit 0
+          fi
+          git commit -m 'refactor: usage-derived compiler-green Phase 18 types [phase18-current-inference-result] [skip ci]'
+          git push origin HEAD:agent/phase18-current-inference
