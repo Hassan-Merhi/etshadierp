@@ -671,6 +671,55 @@ export function DataToolsTab() {
           </CardContent>
         </Card>
 
+        {/* Direct Location Cost Override — Developer only, ERP mode only */}
+        {dtCurrentUser?.role === "Developer" && appMode !== "factory" && (
+          <Card className="border-amber-500/40">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                Location Cost Price Override
+              </CardTitle>
+              <CardDescription>
+                Directly replace the average cost for existing inventory at one location. Developer use only; no voucher or
+                daybook entry is created.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-2">
+                <Label>Select Location</Label>
+                <Select value={costPriceLocationId} onValueChange={setCostPriceLocationId}>
+                  <SelectTrigger data-testid="select-location-cost-price-import">
+                    <SelectValue placeholder="Choose location..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(locations as any[]).map((loc: any) => (
+                      <SelectItem key={loc.id} value={String(loc.id)}>
+                        {loc.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  setCostPriceFile(null);
+                  setCostPricePreview([]);
+                  setCostPriceErrors([]);
+                  setCostPriceImportComplete(false);
+                  setCostPriceImportOpen(true);
+                }}
+                disabled={!costPriceLocationId}
+                data-testid="button-open-cost-price-import"
+              >
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Update Location Costs from Excel
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Silent Stock Transfer Card */}
         <Card>
           <CardHeader>
@@ -799,6 +848,149 @@ export function DataToolsTab() {
           </Card>
         )}
       </div>
+
+      {/* Developer-only direct location cost override dialog */}
+      {dtCurrentUser?.role === "Developer" && appMode !== "factory" && (
+        <Dialog
+          open={costPriceImportOpen}
+          onOpenChange={(open) => {
+            if (!isImportingCostPrice) {
+              if (!open) handleCostPriceDialogClose();
+              setCostPriceImportOpen(open);
+            }
+          }}
+        >
+          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Location Cost Price Override</DialogTitle>
+              <DialogDescription>
+                Upload an Excel file with <strong>barcode</strong> and <strong>costPrice</strong> columns. This overwrites
+                the selected location&apos;s current average rate and total value directly.
+              </DialogDescription>
+            </DialogHeader>
+
+            {costPriceImportComplete ? (
+              <div className="space-y-4">
+                <Alert>
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  <AlertDescription>Location cost prices were updated successfully.</AlertDescription>
+                </Alert>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    handleCostPriceDialogClose();
+                    setCostPriceImportOpen(false);
+                  }}
+                  data-testid="button-cost-price-import-close"
+                >
+                  Close
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <Alert className="border-amber-500/40">
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  <AlertDescription>
+                    This is a direct valuation correction. It does not create accounting entries and should not be used for
+                    normal stock receipts or production.
+                  </AlertDescription>
+                </Alert>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={downloadCostPriceTemplate}
+                    data-testid="button-download-cost-price-template"
+                  >
+                    <FileDown className="h-4 w-4 mr-1" />
+                    Download Template
+                  </Button>
+                  {costPriceFile && <span className="text-sm text-muted-foreground truncate">{costPriceFile.name}</span>}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="cost-price-import-file">Excel File</Label>
+                  <Input
+                    id="cost-price-import-file"
+                    type="file"
+                    accept=".xlsx,.xls"
+                    onChange={handleCostPriceFileChange}
+                    data-testid="input-cost-price-import-file"
+                  />
+                  <p className="text-xs text-muted-foreground">Each row must contain a matching item barcode and a costPrice greater than 0.</p>
+                </div>
+
+                {costPriceErrors.length > 0 && (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>
+                      <ul className="list-disc pl-4 space-y-1">
+                        {costPriceErrors.map((error, index) => (
+                          <li key={index}>{error}</li>
+                        ))}
+                      </ul>
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {costPricePreview.length > 0 && (
+                  <div className="border rounded-md overflow-hidden">
+                    <div className="max-h-[280px] overflow-y-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Barcode</TableHead>
+                            <TableHead className="text-right">New Cost</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {costPricePreview.map((row, index) => (
+                            <TableRow key={`${row.barcode}-${index}`}>
+                              <TableCell className="font-mono">{row.barcode}</TableCell>
+                              <TableCell className="text-right font-mono">{row.costPrice.toFixed(2)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    <div className="border-t px-3 py-2 text-xs text-muted-foreground">
+                      {costPricePreview.length} cost update{costPricePreview.length === 1 ? "" : "s"} ready
+                    </div>
+                  </div>
+                )}
+
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      handleCostPriceDialogClose();
+                      setCostPriceImportOpen(false);
+                    }}
+                    disabled={isImportingCostPrice}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleCostPriceImport}
+                    disabled={isImportingCostPrice || costPricePreview.length === 0 || costPriceErrors.length > 0}
+                    data-testid="button-apply-cost-price-import"
+                  >
+                    {isImportingCostPrice ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Updating…
+                      </>
+                    ) : (
+                      "Apply Cost Updates"
+                    )}
+                  </Button>
+                </DialogFooter>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Silent Production / Consumption Dialog */}
       {dtCurrentUser?.role === "Developer" && appMode !== "factory" && (
