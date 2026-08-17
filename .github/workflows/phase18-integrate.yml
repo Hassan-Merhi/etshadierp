@@ -1,3 +1,4 @@
+# Phase 18 integration trigger: compiler-gated proven repair batch
 name: Phase 18 Integrate Proven Repairs
 on:
   push:
