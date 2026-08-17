@@ -1,6 +1,7 @@
 import type { Pool } from "pg";
 
 import { logger } from "../../lib/logger";
+import { ensureAccountingPostingRequests } from "../accounting/ensureAccountingPostingRequests";
 
 import { canonicalStockMovementJournal } from "../../startup-schema/021-canonical-stock-movement-journal";
 
@@ -12,13 +13,19 @@ import { canonicalStockMovementJournal } from "../../startup-schema/021-canonica
  * runs — including production, which skips the ordered startup pass via
  * RUN_STARTUP_MIGRATIONS=false.
  *
+ * This unconditional startup hook also ensures the accounting posting request
+ * table. Both are write-safety evidence that must exist before routes serve
+ * mutations, including deployments where the ordered startup pass is disabled.
+ *
  * This rejects rather than resolving on failure. A deployment that cannot
- * record stock evidence must fail loudly at startup instead of serving
- * transfers that apply stock with no journal behind them.
+ * record canonical write evidence must fail loudly at startup instead of serving
+ * writes without their journal/idempotency protection.
  */
 export async function ensureCanonicalStockMovementJournal(pool: Pool): Promise<void> {
   for (const statement of canonicalStockMovementJournal) {
     await pool.query(statement);
   }
   logger.info("[startup] ✓ Canonical stock movement journal ensured");
+
+  await ensureAccountingPostingRequests(pool);
 }
