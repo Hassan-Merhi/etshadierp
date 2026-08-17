@@ -1,9 +1,11 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   attachAccountingRequestIdentity,
   isProtectedAccountingRequest,
+  markAccountingRequestOutcomeUncertain,
   releaseAccountingRequestIdentity,
+  shouldReleaseAccountingRequestIdentity,
 } from "../client/src/lib/accountingRequestIdentity";
 import voucherReview from "../config/voucher-write-evidence-review.json";
 import writeEvidenceBaseline from "../config/write-evidence-baseline.json";
@@ -85,6 +87,7 @@ const PHASE4_VOUCHER_CREATION_ROUTES: RouteCase[] = [
 const originalLocalStorageDescriptor = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
 
 afterEach(() => {
+  vi.restoreAllMocks();
   if (originalLocalStorageDescriptor) {
     Object.defineProperty(globalThis, "localStorage", originalLocalStorageDescriptor);
   } else {
@@ -218,13 +221,41 @@ describe("Phase 4 operational voucher retry boundary", () => {
     expect(first.clientRequestId).toBe(retry.clientRequestId);
     expect(values.size).toBe(1);
 
-    releaseAccountingRequestIdentity("POST", "/api/salary-advances", retry);
+    releaseAccountingRequestIdentity("POST", "/api/salary-advances", retry, true);
     expect(values.size).toBe(1);
 
     const next = attachAccountingRequestIdentity("POST", "/api/salary-advances", payload) as {
       clientRequestId: string;
     };
     expect(next.clientRequestId === first.clientRequestId).toBe(false);
+    releaseAccountingRequestIdentity("POST", "/api/salary-advances", next, true);
+  });
+
+  it("keeps an uncertain identity across legacy release attempts and long delays", () => {
+    const payload = { amount: "91.75", accountId: 44 };
+    const first = attachAccountingRequestIdentity("POST", "/api/payroll/pay-worker", payload) as {
+      clientRequestId: string;
+    };
+
+    expect(shouldReleaseAccountingRequestIdentity(409, "ACCOUNTING_REQUEST_OUTCOME_UNCERTAIN")).toBe(false);
+    markAccountingRequestOutcomeUncertain("POST", "/api/payroll/pay-worker", first);
+    releaseAccountingRequestIdentity("POST", "/api/payroll/pay-worker", first);
+
+    const now = Date.now();
+    vi.spyOn(Date, "now").mockReturnValue(now + 24 * 60 * 60 * 1000);
+    const retry = attachAccountingRequestIdentity("POST", "/api/payroll/pay-worker", payload) as {
+      clientRequestId: string;
+    };
+    expect(retry.clientRequestId).toBe(first.clientRequestId);
+
+    releaseAccountingRequestIdentity("POST", "/api/payroll/pay-worker", retry, true);
+  });
+
+  it("releases definite client outcomes but retains unknown 409 and server outcomes", () => {
+    expect(shouldReleaseAccountingRequestIdentity(422, "VALIDATION_ERROR")).toBe(true);
+    expect(shouldReleaseAccountingRequestIdentity(409, "POSTING_IDEMPOTENCY_CONFLICT")).toBe(true);
+    expect(shouldReleaseAccountingRequestIdentity(409)).toBe(false);
+    expect(shouldReleaseAccountingRequestIdentity(500)).toBe(false);
   });
 
   it("keeps optional manual vouchers outside the active posting boundary", () => {
