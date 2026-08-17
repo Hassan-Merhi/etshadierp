@@ -174,7 +174,7 @@ const FACTORY_PINNED_DEFAULTS: NavItem[] = [
   { title: "Vouchers", url: "/factory/vouchers", icon: FileText },
 ];
 
-export function useFactoryVisibleSections(user?: any): {
+export function useFactoryVisibleSections(user?: { role?: string | undefined }): {
   sections: FactoryNavSection[];
   isPinnedVisible: (item: NavItem) => boolean;
   isAdmin: boolean;

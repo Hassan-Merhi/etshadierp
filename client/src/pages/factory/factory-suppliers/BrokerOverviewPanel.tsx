@@ -80,7 +80,7 @@ export function BrokerOverviewPanel({
       balance: parseFloat(section.netBalance || "0"),
       isBrokerPool: !!section.isBrokerPool,
     }))
-    .filter((b: any) => Math.abs(b.balance) > 0.001);
+    .filter((b: { balance: number }) => Math.abs(b.balance) > 0.001);
 
   return (
     <div className="space-y-6">

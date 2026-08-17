@@ -105,7 +105,7 @@ export function ExportAccountsSection() {
     );
   const clearAll = () => setSelectedIds(new Set());
 
-  const getTransactionUrl = (acc: any): string => {
+  const getTransactionUrl = (acc: { accountId: string | number | bigint | boolean | null | undefined; type: string }): string => {
     const params = new URLSearchParams();
     if (fromDate) params.append("startDate", fromDate);
     if (toDate) params.append("endDate", toDate);

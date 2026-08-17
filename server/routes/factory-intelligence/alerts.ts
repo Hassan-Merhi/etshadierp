@@ -74,7 +74,7 @@ export function registerFactoryAlertRoutes(app: Express, requireAuth: any, db: a
 
       const alertExists = (type: string, entityType: string, entityId: number) => {
         return existingAlerts.some(
-          (a: any) => a.type === type && a.entityType === entityType && a.entityId === entityId
+          (a: { entityId: number; entityType: string; type: string }) => a.type === type && a.entityType === entityType && a.entityId === entityId
         );
       };
 

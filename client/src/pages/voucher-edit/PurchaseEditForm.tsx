@@ -366,7 +366,7 @@ export function PurchaseEditForm({
                       {formatNumber(
                         form
                           .watch("items")
-                          .reduce((sum: number, item: any) => sum + (parseFloat(item.quantity) || 0), 0)
+                          .reduce((sum: number, item: { quantity: string }) => sum + (parseFloat(item.quantity) || 0), 0)
                       )}
                     </td>
                     <td colSpan={3}></td>

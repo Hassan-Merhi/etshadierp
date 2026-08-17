@@ -47,8 +47,8 @@ async function isFullyCorrect(
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   containerId: number,
   next: ReturnType<typeof computeCorrectContainerCost>,
-  container: any,
-  rawStockRow: any
+  container: { finalPayableAmount: undefined | null | string | number; finalPayableAmountUsd: undefined | null | string | number; ratePerKgUsd: undefined | null | string | number },
+  rawStockRow: { costPerKg: undefined | null | string | number; costPerKgUsd: undefined | null | string | number }
 ): Promise<boolean> {
   // A. Container snapshot
   if (

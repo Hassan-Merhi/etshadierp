@@ -283,7 +283,7 @@ export async function cascadeContainerCostChange(
     const cascadeEligibleBatchIds = [
       ...new Set(
         mixSourcesWithStatus
-          .filter((row: any) => cascadeStatuses.includes(row.batchStatus))
+          .filter((row: { batchStatus: string }) => cascadeStatuses.includes(row.batchStatus))
           .map((row: any) => row.src.mixBatchId as number)
       ),
     ] as number[];
@@ -307,7 +307,7 @@ export async function cascadeContainerCostChange(
     const skippedCompletedBatchIds = [
       ...new Set(
         mixSourcesWithStatus
-          .filter((row: any) => !cascadeStatuses.includes(row.batchStatus))
+          .filter((row: { batchStatus: string }) => !cascadeStatuses.includes(row.batchStatus))
           .map((row: any) => row.src.mixBatchId as number)
       ),
     ] as number[];

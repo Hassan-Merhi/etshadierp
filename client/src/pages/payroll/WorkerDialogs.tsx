@@ -337,7 +337,7 @@ export function WorkerDialogs({
               <TableBody>
                 {allWorkers.map((worker) => {
                   const liveGroup = allWorkerGroups.find((g) => g.id === selectedWorkerGroupForMembers?.id);
-                  const isMember = liveGroup?.members?.some((m: any) => m.id === worker.id);
+                  const isMember = liveGroup?.members?.some((m: { id: number }) => m.id === worker.id);
                   return (
                     <TableRow key={worker.id}>
                       <TableCell>

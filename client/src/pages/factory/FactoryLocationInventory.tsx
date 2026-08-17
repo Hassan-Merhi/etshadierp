@@ -457,7 +457,7 @@ export default function FactoryLocationInventory() {
       if (!res.ok) throw new Error(json.message || "Failed to remove bales");
       return json;
     },
-    onSuccess: (result: any) => {
+    onSuccess: (result: { removed: string | number | bigint | boolean | null | undefined }) => {
       toast({ title: "Removed", description: `${result.removed} bale(s) removed from stock.` });
       queryClient.invalidateQueries({ queryKey: [`/api/factory/location-inventory/${selectedLocation?.id}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"], refetchType: "active" });
@@ -515,7 +515,7 @@ export default function FactoryLocationInventory() {
       fetch(`/api/factory/customer-proformas?customerId=${editCustId}`, { credentials: "include" })
         .then((r) => r.json())
         .then((proformas: any[]) => {
-          const found = proformas.find((p: any) => p.id === proformaId);
+          const found = proformas.find((p: { id: number }) => p.id === proformaId);
           if (found?.lines?.length) {
             setEditProformaLines(
               found.lines.map((l: any) => ({

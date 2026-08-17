@@ -103,11 +103,11 @@ export function registerFactorySupplierScoreRoutes(app: Express, requireAuth: an
       }
 
       for (const suppId of Object.keys(supplierStats).map(Number)) {
-        const supplierContainerIds = containers.filter((c: any) => c.supplierId === suppId).map((c: any) => c.id);
+        const supplierContainerIds = containers.filter((c: { supplierId: number }) => c.supplierId === suppId).map((c: any) => c.id);
 
         const supplierMixSources = mixSources.filter((s: any) => supplierContainerIds.includes(s.containerId));
         const mixBatchIds = Array.from(new Set(supplierMixSources.map((s: any) => s.mixBatchId))) as number[];
-        const balesFromSupplier = allBales.filter((b: any) => mixBatchIds.includes(b.mixBatchId));
+        const balesFromSupplier = allBales.filter((b: { mixBatchId: number }) => mixBatchIds.includes(b.mixBatchId));
         supplierStats[suppId].outputBales = balesFromSupplier.length;
       }
 

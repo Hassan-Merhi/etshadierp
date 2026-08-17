@@ -92,7 +92,7 @@ export default function PropertiesDashboard() {
       const response = await apiRequest("GET", "/api/accounts/all");
       if (!response.ok) throw new Error("Failed to fetch accounts");
       const accounts = await response.json();
-      return accounts.filter((acc: any) => acc.type && acc.type.toLowerCase() === "ledger");
+      return accounts.filter((acc: { type: string }) => acc.type && acc.type.toLowerCase() === "ledger");
     },
     enabled: !!selectedCompany,
   });

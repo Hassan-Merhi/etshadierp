@@ -41,7 +41,7 @@ export async function rebuildSaleItems(
   const { voucherId, targetLocationId, items, oldItemsMap, canSellNegativeStock, companyId, canonicalRevision } =
     params;
 
-  const sortedNewItems = [...items].sort((a: any, b: any) => a.stockItemId - b.stockItemId);
+  const sortedNewItems = [...items].sort((a: { stockItemId: number }, b: { stockItemId: number }) => a.stockItemId - b.stockItemId);
   let grandTotal = toInventoryDecimal(0);
   let totalSupplierCostEdit = toInventoryDecimal(0);
   let totalQtySoldEdit = toInventoryDecimal(0);

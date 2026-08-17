@@ -176,7 +176,7 @@ async function replaceMemberships(
       .set({ effectiveTo: effectiveFrom, updatedAt: new Date() })
       .where(eq(factoryProductionPositionMemberships.id, row.id));
   }
-  const currentIds = new Set(activeRows.filter((r: any) => desired.has(r.workerId)).map((r: any) => r.workerId));
+  const currentIds = new Set(activeRows.filter((r: { workerId: number }) => desired.has(r.workerId)).map((r: any) => r.workerId));
   const toAdd = workerIds.filter((id) => !currentIds.has(id));
   if (toAdd.length) {
     await tx

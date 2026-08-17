@@ -17,7 +17,7 @@ export async function loadCostInputs(tx: any, companyId: number, containerId: nu
         eq(factoryContainerCommissions.companyId, companyId)
       )
     );
-  const commissionRecord = commissions.sort((a: any, b: any) => b.id - a.id)[0] || null;
+  const commissionRecord = commissions.sort((a: { id: number }, b: { id: number }) => b.id - a.id)[0] || null;
 
   const otherChargeRows = await tx
     .select()
