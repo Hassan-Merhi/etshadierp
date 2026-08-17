@@ -88,12 +88,12 @@ describe("accounting request identity", () => {
     const first = attachAccountingRequestIdentity(
       "POST",
       PAYMENT_RECEIPT_URL,
-      paymentReceiptPayload(),
+      paymentReceiptPayload()
     ) as Record<string, unknown>;
     const retry = attachAccountingRequestIdentity(
       "POST",
       PAYMENT_RECEIPT_URL,
-      paymentReceiptPayload(),
+      paymentReceiptPayload()
     ) as Record<string, unknown>;
 
     expect(isProtectedAccountingRequest("POST", PAYMENT_RECEIPT_URL, first)).toBe(true);
