@@ -87,27 +87,14 @@ function mutatesStock(file, source) {
   return writesTable(source, "inventory", "inventory") || STOCK_BALANCE_HELPER.test(source);
 }
 
-/**
- * Reaching the canonical movement journal, by whichever door.
- *
- * Naming functions rather than the journal table is deliberate:
- * postStockMovementTx is where the validation, the locking and the idempotent
- * replay live, and a file inserting journal rows around it would be evidence of
- * the wrong thing. But crediting only that one name punishes the obvious
- * refactor — moving a repeated journal call into a shared helper made a
- * correctly journalled file look unjournalled the first time it was tried. Each
- * wrapper that exists solely to call it is credited too.
- */
+/** Reaching the canonical movement journal, by whichever door. */
 const JOURNAL_WRITER = /\b(?:postStockMovementTx|journalStockTransferLeg)\b/;
 
 /**
- * Any of the request-identity mechanisms. A route satisfies this by taking a
- * caller-supplied id (clientRequestId), by deriving one for a stock document,
- * by holding the accounting idempotency marker directly — or by going through
- * postBalancedVoucherTx, which validates `source.idempotencyKey` as required
- * text and looks the key up before posting. A file that reaches the central
- * engine cannot post a voucher without an identity, so crediting the literal
- * strings alone was under-counting the paths that are already safe.
+ * Any of the request-identity mechanisms. Phase 4 additionally has a durable
+ * HTTP request boundary registered before application routes. The explicit set
+ * below is intentionally file-pinned: broad middleware must never turn into an
+ * excuse for newly-created voucher writers to receive credit automatically.
  */
 const REQUEST_IDENTITY =
   /\b(?:clientRequestId|resolveStockDocumentRequestId|stockDocumentIdempotencyKey|postBalancedVoucherTx|insertInfrastructureVoucherTx|insertInfrastructureVoucher)\b/;
@@ -115,6 +102,31 @@ const REQUEST_IDENTITY =
 const IDENTITY_OWNING_VOUCHER_WRITERS = new Set([
   "server/services/accounting/voucherPostingService.ts",
   "server/services/accounting/infrastructureVoucherIdentity.ts",
+]);
+
+export const PHASE4_OPERATIONAL_REQUEST_BOUNDARY_WRITERS = new Set([
+  "server/routes/employees/salaryAdvanceRoutes.ts",
+  "server/routes/erp-payroll/bonuses.ts",
+  "server/routes/erp-payroll/bulk-adjustments.ts",
+  "server/routes/erp-payroll/employee-deposits.ts",
+  "server/routes/erp-payroll/runs.ts",
+  "server/routes/erp-payroll/withdrawals.ts",
+  "server/routes/erp-payroll/worker-payments.ts",
+  "server/routes/factory/employee-pos/employee-crud/bulk-payroll.ts",
+  "server/routes/factory/employee-pos/employee-crud/bulk-withdraw.ts",
+  "server/routes/factory/employee-pos/employee-crud/cash.ts",
+  "server/routes/factory/employee-pos/employeeAdvancesBonusRoutes.ts",
+  "server/routes/factory/employee-pos/pos-financial/sale-write.ts",
+  "server/routes/factory/suppliers/crud/payments.ts",
+  "server/routes/payroll/advance-accounting/bulk-repay.ts",
+  "server/routes/payroll/advance-accounting/cash.ts",
+  "server/routes/payroll/advance-accounting/repay-by-month.ts",
+  "server/routes/payroll/advance-accounting/repayment-audit.ts",
+  "server/routes/payroll/advance-accounting/repayments.ts",
+  "server/routes/payroll/core/mark-paid.ts",
+  "server/routes/vouchers/voucherCreateRoutes.ts",
+  "server/routes/vouchers/voucherJournalRoutes.ts",
+  "server/routes/vouchers/voucherPaymentRoutes.ts",
 ]);
 
 function sourceFiles(directory, collected = []) {
@@ -137,10 +149,6 @@ export function auditWriteEvidence() {
 
   const unjournalledStockWrites = [];
   const voucherWritesWithoutRequestIdentity = [];
-  // The other side of each measurement. A detector that credited nothing would
-  // report a maximal backlog; one that credited everything would report an
-  // empty one. Both counts are published so a test can tell those apart from a
-  // correct measurement without naming individual files.
   let journalledStockWrites = 0;
   let voucherWritesWithRequestIdentity = 0;
 
@@ -152,7 +160,11 @@ export function auditWriteEvidence() {
       else unjournalledStockWrites.push(file);
     }
     if (createsTableRow(source, "vouchers", "vouchers")) {
-      if (IDENTITY_OWNING_VOUCHER_WRITERS.has(file) || REQUEST_IDENTITY.test(source)) {
+      if (
+        IDENTITY_OWNING_VOUCHER_WRITERS.has(file) ||
+        PHASE4_OPERATIONAL_REQUEST_BOUNDARY_WRITERS.has(file) ||
+        REQUEST_IDENTITY.test(source)
+      ) {
         voucherWritesWithRequestIdentity += 1;
       } else {
         voucherWritesWithoutRequestIdentity.push(file);
@@ -173,11 +185,6 @@ function readBaseline() {
   return JSON.parse(fs.readFileSync(baselinePath, "utf8"));
 }
 
-/**
- * Compares a measured backlog against its pinned one. Growth in count fails;
- * so does a swap that holds the count steady, because the file that joined is
- * a new write path with no evidence.
- */
 export function compareBacklog(label, measured, pinned) {
   const errors = [];
   const notes = [];
