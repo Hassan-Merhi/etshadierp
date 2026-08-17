@@ -21,13 +21,13 @@ export function SaveAsRevisionDialog({
   transferRevisionNote,
   transferRevisions,
 }: {
-  computeTransferRevisionItems: any;
-  confirmTransferSaveAsRevision: any;
-  isTransferSavingRevision: any;
-  setTransferRevisionDialogOpen: any;
-  setTransferRevisionNote: any;
-  transferRevisionDialogOpen: any;
-  transferRevisionNote: any;
+  computeTransferRevisionItems: () => { stockItemId: number; stockItemName: string; sourceLocationId: number | null; sourceLocationName: string; originalQuantity: number; delta: number; newQuantity: number; }[];
+  confirmTransferSaveAsRevision: () => Promise<void>;
+  isTransferSavingRevision: boolean;
+  setTransferRevisionDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setTransferRevisionNote: React.Dispatch<React.SetStateAction<string>>;
+  transferRevisionDialogOpen: boolean;
+  transferRevisionNote: string;
   transferRevisions: any;
 }) {
   return (

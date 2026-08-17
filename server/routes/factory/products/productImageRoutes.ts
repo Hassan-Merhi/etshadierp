@@ -60,7 +60,7 @@ export function registerFactoryProductImageRoutes(app: Express) {
   });
 
   app.post("/api/factory/bale-product-images", requireAuth, (req: Request, res: Response) => {
-    productImageUpload.single("image")(req, res, async (err: any) => {
+    productImageUpload.single("image")(req, res, async (err: string) => {
       try {
         if (err) return res.status(400).json({ message: getErrorMessage(err) });
         const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;

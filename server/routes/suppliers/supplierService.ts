@@ -35,7 +35,7 @@ async function createUniqueSupplierCode(companyId: number, legalName: string, re
   return code;
 }
 
-function supplierAuditChanges(existing: any, updated: any) {
+function supplierAuditChanges(existing: { address: string | null; code: string; id: number; email: string; active: boolean; legalName: string; createdAt: Date; companyId: number; phone: string | null; deletedAt: Date | null; openingBalance: string | null; stockGroupId: number | null; taxId: string | null; paymentTerms: string | null; }, updated: { address: string | null; code: string; id: number; email: string; active: boolean; legalName: string; createdAt: Date; companyId: number; phone: string | null; deletedAt: Date | null; openingBalance: string | null; stockGroupId: number | null; taxId: string | null; paymentTerms: string | null; }) {
   const changes: Record<string, { old?: unknown; new?: unknown }> = {};
   for (const field of [
     "legalName",

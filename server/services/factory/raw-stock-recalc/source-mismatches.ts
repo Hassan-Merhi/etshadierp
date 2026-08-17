@@ -391,7 +391,7 @@ export async function applyZeroCostMixBatchSourcesFix(
                   )
                 ),
             ]);
-            const comm = comms.sort((a: any, b: any) => b.id - a.id)[0] || null;
+            const comm = comms.sort((a: { id: number; companyId: number; containerId: number; personName: string; commissionType: string; commissionRate: string; commissionTotal: string; currencyCode: string; fxRateToUsd: string; fxRateConfirmed: boolean; commissionTotalUsd: string | null; ledgerAccountId: number | null; createdAt: Date; }, b: { id: number; companyId: number; containerId: number; personName: string; commissionType: string; commissionRate: string; commissionTotal: string; currencyCode: string; fxRateToUsd: string; fxRateConfirmed: boolean; commissionTotalUsd: string | null; ledgerAccountId: number | null; createdAt: Date; }) => b.id - a.id)[0] || null;
             const computed = computeCorrectContainerCost(container, addl, comm, ocs);
             if (!computed.fxUnresolved && computed.costPerKgUsd > 0) {
               correctedCostPerKgUsd = computed.costPerKgUsd;

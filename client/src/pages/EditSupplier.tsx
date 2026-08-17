@@ -105,7 +105,7 @@ export default function EditSupplier() {
     },
   });
 
-  const onSubmit = (data: any) => {
+  const onSubmit = (data: { code: string; legalName: string; email: string; phone: string; address: string; taxId: string; paymentTerms: string; openingBalance: string; active: boolean; stockGroupId: number | null; }) => {
     updateMutation.mutate(data);
   };
 

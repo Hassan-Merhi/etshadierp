@@ -84,7 +84,7 @@ function EditableTransferDetail({
   });
 
   const revisionMutation = useMutation({
-    mutationFn: async (payload: { transferId: number; note: string; items: any[] }) => {
+    mutationFn: async (payload: { transferId: number; note: string; items: { stockItemId: number; stockItemName: string; sourceLocationId: number | undefined; sourceLocationName: string; originalQuantity: string; delta: string; newQuantity: string; }[] }) => {
       return apiRequest("POST", `/api/stock-transfers/${payload.transferId}/revisions`, {
         note: payload.note,
         items: payload.items,

@@ -9,7 +9,7 @@ interface UseSidebarSyncProps {
   paymentAccountType: string;
   sidebarHighlightedIndex: number;
   setSidebarHighlightedIndex: (i: number) => void;
-  entries: any[];
+  entries: { accountType: "customer" | "supplier" | "employee" | "bank" | "ledger" | "fixedAsset" | "factorySupplier"; accountId: number; accountName: string; amount: string; }[];
   activeRowIndex: number | null;
   allAccounts: CombinedAccount[];
 }

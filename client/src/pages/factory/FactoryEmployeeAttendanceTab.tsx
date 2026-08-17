@@ -96,7 +96,7 @@ function SummaryCard({
   color,
   testId,
 }: {
-  icon: any;
+  icon: React.JSX.Element;
   label: string;
   value: number;
   color: string;

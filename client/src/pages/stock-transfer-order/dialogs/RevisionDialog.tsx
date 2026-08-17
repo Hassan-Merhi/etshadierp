@@ -21,14 +21,14 @@ export function RevisionDialog({
   setRevisionDialogOpen,
   setRevisionNote,
 }: {
-  computeRevisionItems: any;
-  confirmSaveAsRevision: any;
-  isSavingRevision: any;
-  revisionDialogOpen: any;
-  revisionNote: any;
+  computeRevisionItems: () => { stockItemId: number; stockItemName: string; sourceLocationId: number | null; sourceLocationName: string; originalQuantity: number; delta: number; newQuantity: number; }[];
+  confirmSaveAsRevision: () => Promise<void>;
+  isSavingRevision: boolean;
+  revisionDialogOpen: boolean;
+  revisionNote: string;
   revisions: any;
-  setRevisionDialogOpen: any;
-  setRevisionNote: any;
+  setRevisionDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setRevisionNote: React.Dispatch<React.SetStateAction<string>>;
 }) {
   return (
     <Dialog open={revisionDialogOpen} onOpenChange={setRevisionDialogOpen}>

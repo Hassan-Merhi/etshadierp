@@ -53,7 +53,7 @@ interface UserListTableProps {
   users: any[];
   isLoading: boolean;
   selectedUserId?: string | null;
-  onSelectUser: (user: any) => void;
+  onSelectUser: (user: unknown) => void;
 }
 
 export function UserListTable({ users, isLoading, selectedUserId, onSelectUser }: UserListTableProps) {

@@ -165,7 +165,7 @@ export default function PressingBales() {
   const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
   const totalKgToConsume = cart.reduce((sum, item) => sum + item.qty * item.weightPerBaleKg, 0);
 
-  const printBaleLabels = async (bales: any[], products: FactoryBaleProduct[], weights: string[]) => {
+  const printBaleLabels = async (bales: ({ code: string; id: number; name: string; description: string | null; active: boolean; createdAt: Date; companyId: number; articleCode: string | null; deletedAt: Date | null; updatedAt: Date; categoryId: number | null; sellingPrice: string | null; weightPerBaleKg: string | null; productionPrice: string | null; labelDesignColor: string | null; nameAr: string | null; descriptionAr: string | null; }[]) | string[], products: FactoryBaleProduct[], weights: string[]) => {
     try {
       const labelData = bales.map((bale: any, idx: number) => ({
         productionBaleId: bale.id,

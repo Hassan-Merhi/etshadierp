@@ -28,7 +28,7 @@ export function registerBalesReimportRoutes(app: Express) {
   app.post("/api/factory/bales/reimport", requireAuth, async (req: any, res: any) => {
     const multer = (await import("multer")).default;
     const upload = multer({ storage: multer.memoryStorage() });
-    upload.single("file")(req, res, async (err: any) => {
+    upload.single("file")(req, res, async (err: string) => {
       if (err) return res.status(400).json({ message: "File upload error" });
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
@@ -407,7 +407,7 @@ export function registerBalesReimportRoutes(app: Express) {
   app.post("/api/factory/bales/bulk-update-names", requireAuth, async (req: any, res: any) => {
     const multer = (await import("multer")).default;
     const upload = multer({ storage: multer.memoryStorage() });
-    upload.single("file")(req, res, async (err: any) => {
+    upload.single("file")(req, res, async (err: string) => {
       if (err) return res.status(400).json({ message: "File upload error" });
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 

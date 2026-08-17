@@ -75,7 +75,7 @@ function applyPaginationHeaders(
   );
 }
 
-function sanitizeForPos(rows: any[]): any[] {
+function sanitizeForPos(rows: { id: number; companyId: number; locationId: number | null; locationName: string | null; voucherNumber: string; voucherType: string; voucherDate: string; description: string | null; totalAmount: string; currency: string; optional: boolean; shiftId: number | null; exchangeRate: string | null; sourceModule: string | null; isCreditSale: boolean | null; clientSaleId: string | null; deletedAt: Date | null; effectiveDate: string | null; createdAt: Date; }[]): any[] {
   return rows.map((voucher) => {
     const voucherType = String(voucher.voucherType || "").toLowerCase();
     if (

@@ -178,7 +178,7 @@ async function loadTransferData(voucher: any) {
   };
 }
 
-export async function loadVoucherRelatedData(voucher: any) {
+export async function loadVoucherRelatedData(voucher: { id: number; description: string | null; createdAt: Date; companyId: number; locationId: number | null; optional: boolean; exchangeRate: string | null; currency: string; effectiveDate: string | null; deletedAt: Date | null; locationName: string | null; voucherNumber: string; voucherType: string; voucherDate: string; totalAmount: string; shiftId: number | null; sourceModule: string | null; isCreditSale: boolean | null; clientSaleId: string | null; }) {
   const result = {
     purchaseOrder: null as any,
     salesItems: null as any,

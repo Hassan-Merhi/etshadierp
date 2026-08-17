@@ -356,7 +356,7 @@ export function registerContainerOffloadCreateRoutes(app: Express) {
               .from(purchaseOrders)
               .where(eq(purchaseOrders.containerId, containerId));
 
-            const calculatePurchaseOrderTotal = (purchaseOrder: any) =>
+            const calculatePurchaseOrderTotal = (purchaseOrder: { id: number; companyId: number; poNumber: string; containerId: number; supplierId: number; voucherId: number | null; currency: string; itemsTotal: string | null; freight: string | null; surcharge: string | null; fumigation: string | null; documentCharges: string | null; discount: string | null; otherCharges: string | null; chargesEdited: boolean | null; freightPaidBy: string | null; freightOwnAccountId: number | null; freightParentAccountId: number | null; status: string; createdAt: Date; }) =>
               subtractInventoryValues(
                 addInventoryValues(
                   purchaseOrder.itemsTotal,

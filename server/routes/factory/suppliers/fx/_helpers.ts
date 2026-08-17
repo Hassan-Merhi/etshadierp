@@ -8,4 +8,4 @@
  */
 export const PAYABLE_CONTAINER_STATUSES = new Set(["OFFLOADED", "RECEIVED", "PARTIALLY_RECEIVED"]);
 
-export const isPayableContainer = (c: any) => PAYABLE_CONTAINER_STATUSES.has(String(c.status || "").toUpperCase());
+export const isPayableContainer = (c: { id: number; supplierId: number | null; status: string; totalKg: string | null; actualReceivedKg: string | null; ratePerKg: string | null; freight: string | null; freightCurrencyCode: string | null; currencyCode: string; commissionAmount: string | null; commissionCurrencyCode: string | null; createdAt: Date; arrivalDate: string | null; }) => PAYABLE_CONTAINER_STATUSES.has(String(c.status || "").toUpperCase());

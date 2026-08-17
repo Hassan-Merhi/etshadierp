@@ -262,7 +262,7 @@ export function registerPayrollBonusRoutes(app: Express) {
       const bonusSingleName = bonusSingleIsDefault ? "Bonus Expense" : `Bonus Expense - ${bonusSingleGrp}`;
 
       const bonusSingleAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
-      let bonusSingleAccount = bonusSingleAccounts.find((a: any) => a.code === bonusSingleCode);
+      let bonusSingleAccount = bonusSingleAccounts.find((a: { code: string; id: number; name: string; active: boolean; createdAt: Date; companyId: number; deletedAt: Date | null; accountType: string; subType: string | null; parentId: number | null; openingBalance: string | null; openingBalanceSide: string | null; openingBalanceNativeAmount: string | null; openingBalanceCurrency: string | null; openingBalanceHistoricalRate: string | null; openingBalanceBaseAmount: string | null; isHidden: boolean; }) => a.code === bonusSingleCode);
       if (!bonusSingleAccount) {
         bonusSingleAccount = await storage.createLedgerAccount({
           companyId: req.session.currentCompanyId!,

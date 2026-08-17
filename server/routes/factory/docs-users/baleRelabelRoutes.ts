@@ -76,7 +76,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
         };
       });
 
-      const validCount = results.filter((r: any) => r.valid).length;
+      const validCount = results.filter((r: { currentRef: string; valid: boolean; error: string; productName?: undefined; articleCode?: undefined; weightKg?: undefined; status?: undefined; } | { currentRef: string; valid: boolean; productName: string; articleCode: string; weightKg: string; status: string; error?: undefined; }) => r.valid).length;
       const invalidCount = results.length - validCount;
       res.json({ results, validCount, invalidCount });
     } catch (error: unknown) {

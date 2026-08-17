@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
 
-function fmt2(v: any) {
+function fmt2(v: number) {
   const n = parseFloat(String(v ?? "0"));
   return isNaN(n) ? "$0.00" : `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }

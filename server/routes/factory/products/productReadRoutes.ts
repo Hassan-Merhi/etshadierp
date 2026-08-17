@@ -264,8 +264,8 @@ export function registerFactoryProductReadRoutes(app: Express) {
             }
           }
 
-          sales.sort((a: any, b: any) => b.orderDate.localeCompare(a.orderDate));
-          loaded.sort((a: any, b: any) => b.orderDate.localeCompare(a.orderDate));
+          sales.sort((a: { orderId: number; invoiceNumber: string; orderDate: string; containerNumber: string | null; customerName: string; qty: number; pricePerBale: string; total: string; status: string; }, b: { orderId: number; invoiceNumber: string; orderDate: string; containerNumber: string | null; customerName: string; qty: number; pricePerBale: string; total: string; status: string; }) => b.orderDate.localeCompare(a.orderDate));
+          loaded.sort((a: { orderId: number; invoiceNumber: string; orderDate: string; containerNumber: string | null; customerName: string; qty: number; pricePerBale: string; total: string; status: string; }, b: { orderId: number; invoiceNumber: string; orderDate: string; containerNumber: string | null; customerName: string; qty: number; pricePerBale: string; total: string; status: string; }) => b.orderDate.localeCompare(a.orderDate));
         }
       }
 

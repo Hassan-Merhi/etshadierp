@@ -31,20 +31,20 @@ export function ImportProformaExcelDialog({
   setIsExcelImportOpen,
 }: {
   bulkImportMutation: any;
-  customerId: any;
-  customers: any;
-  downloadProformaTemplate: any;
-  excelFileInputRef: any;
-  excelImportErrors: any;
-  excelImportLines: any;
-  excelImportLoading: any;
-  excelImportName: any;
-  handleExcelFile: any;
-  isExcelImportOpen: any;
-  setExcelImportErrors: any;
-  setExcelImportLines: any;
-  setExcelImportName: any;
-  setIsExcelImportOpen: any;
+  customerId: number | null;
+  customers: Customer[];
+  downloadProformaTemplate: () => Promise<void>;
+  excelFileInputRef: React.RefObject<HTMLInputElement>;
+  excelImportErrors: string[];
+  excelImportLines: { articleCode: string; productName: string; quantity: string; pricePerBale: string; }[];
+  excelImportLoading: boolean;
+  excelImportName: string;
+  handleExcelFile: (file: File) => Promise<void>;
+  isExcelImportOpen: boolean;
+  setExcelImportErrors: React.Dispatch<React.SetStateAction<string[]>>;
+  setExcelImportLines: React.Dispatch<React.SetStateAction<{ articleCode: string; productName: string; quantity: string; pricePerBale: string; }[]>>;
+  setExcelImportName: React.Dispatch<React.SetStateAction<string>>;
+  setIsExcelImportOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }) {
   return (
     <Dialog

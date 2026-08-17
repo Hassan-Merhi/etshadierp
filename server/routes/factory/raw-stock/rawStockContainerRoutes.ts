@@ -135,7 +135,7 @@ export function registerRawStockContainerRoutes(app: Express) {
               eq(factoryContainerCommissions.companyId, companyId)
             )
           );
-        const commissionRecord = commissionRows.sort((a: any, b: any) => b.id - a.id)[0] || null;
+        const commissionRecord = commissionRows.sort((a: { id: number; companyId: number; containerId: number; personName: string; commissionType: string; commissionRate: string; commissionTotal: string; currencyCode: string; fxRateToUsd: string; fxRateConfirmed: boolean; commissionTotalUsd: string | null; ledgerAccountId: number | null; createdAt: Date; }, b: { id: number; companyId: number; containerId: number; personName: string; commissionType: string; commissionRate: string; commissionTotal: string; currencyCode: string; fxRateToUsd: string; fxRateConfirmed: boolean; commissionTotalUsd: string | null; ledgerAccountId: number | null; createdAt: Date; }) => b.id - a.id)[0] || null;
 
         // 3. Build in-memory snapshot with the confirmed duty so the helper sees the
         //    correct, complete cost picture without a second round-trip.
