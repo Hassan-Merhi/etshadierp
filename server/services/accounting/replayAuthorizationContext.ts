@@ -1,6 +1,6 @@
 import type { Request } from "express";
 
-const AUTH_KEY = /(?:^|_)(?:user|role|permission|access|can|company|factory|location|station|account|credential)(?:_|$)/i;
+const AUTH_KEY = /user|role|permission|access|\bcan|can[A-Z_]|company|factory|location|station|account|credential/i;
 
 function primitive(value: unknown): string | number | boolean | null | undefined {
   if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
