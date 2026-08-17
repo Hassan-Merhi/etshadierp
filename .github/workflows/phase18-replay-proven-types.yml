@@ -1,0 +1,104 @@
+name: Phase 18 Replay Proven Types
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+env:
+  CI: true
+jobs:
+  replay:
+    if: contains(github.event.head_commit.message, '[phase18-replay-proven-types]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.14.0'
+          cache: npm
+      - run: npm ci
+      - name: Capture strict baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run check
+          set +e
+          node scripts/audit-type-escapes.mjs --json >/tmp/type-before.json
+          npx eslint "client/src/**/*.{ts,tsx}" "server/**/*.ts" "shared/**/*.ts" -f json -o /tmp/lint-before.json
+          set -e
+      - name: Replay source-only compiler-proven commits
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin \
+            agent/phase18-simple-type-salvage-result \
+            agent/phase18-top-client-types-result \
+            agent/phase18-property-unknown-result \
+            agent/phase18-framework-granular-result
+          apply_one() {
+            sha="$1"
+            echo "REPLAY=$sha"
+            set +e
+            git cherry-pick -X ours "$sha"
+            rc=$?
+            set -e
+            if [ "$rc" -eq 0 ]; then return 0; fi
+            conflicts="$(git diff --name-only --diff-filter=U || true)"
+            if [ -n "$conflicts" ]; then
+              while IFS= read -r f; do
+                [ -n "$f" ] || continue
+                git checkout --ours -- "$f"
+                git add "$f"
+              done <<< "$conflicts"
+              if GIT_EDITOR=true git cherry-pick --continue; then return 0; fi
+            fi
+            if git diff --cached --quiet && git diff --quiet; then
+              git cherry-pick --skip || true
+              return 0
+            fi
+            git cherry-pick --abort || true
+            echo "SKIPPED_UNSAFE=$sha"
+          }
+          apply_one 300966b377269eca2deba097cd6017114c9fd720
+          apply_one cdbebc3544086525d2090a169912cfe25f3e7297
+          apply_one 0fec2c65c203129c41774aeb5c7408e5facb87b3
+          apply_one 4c3816d3b32f9cb9a7445f677ff4f9957c4ea429
+          apply_one 0afa81c8a79dbba01fbbbc140d6d727470b5d4e8
+      - name: Require compiler green and non-regressing debt
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run check
+          set +e
+          node scripts/audit-type-escapes.mjs --json >/tmp/type-after.json
+          npx eslint "client/src/**/*.{ts,tsx}" "server/**/*.ts" "shared/**/*.ts" -f json -o /tmp/lint-after.json
+          set -e
+          node - <<'NODE'
+          const fs=require('fs');
+          const tb=JSON.parse(fs.readFileSync('/tmp/type-before.json','utf8'));
+          const ta=JSON.parse(fs.readFileSync('/tmp/type-after.json','utf8'));
+          const lb=JSON.parse(fs.readFileSync('/tmp/lint-before.json','utf8'));
+          const la=JSON.parse(fs.readFileSync('/tmp/lint-after.json','utf8'));
+          const count=r=>{let errors=0,warnings=0,explicitAny=0;for(const f of r)for(const m of f.messages){if(m.severity===2)errors++;if(m.severity===1)warnings++;if(m.ruleId==='@typescript-eslint/no-explicit-any')explicitAny++;}return{errors,warnings,explicitAny}};
+          const b=count(lb),a=count(la);
+          console.log('TYPE_BEFORE='+tb.summary.typeEscapeTotal+' TYPE_AFTER='+ta.summary.typeEscapeTotal);
+          console.log('LINT_BEFORE='+JSON.stringify(b)+' LINT_AFTER='+JSON.stringify(a));
+          if(a.errors!==0) process.exit(1);
+          if(ta.summary.typeEscapeTotal>tb.summary.typeEscapeTotal) process.exit(2);
+          if(a.warnings>b.warnings) process.exit(3);
+          if(a.explicitAny>b.explicitAny) process.exit(4);
+          NODE
+      - name: Rebase, reverify, and push source-only gains
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git rebase origin/main
+          npm run check
+          git push origin HEAD:main
