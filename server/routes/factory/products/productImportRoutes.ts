@@ -254,7 +254,7 @@ export function registerFactoryProductImportRoutes(app: Express) {
             .select()
             .from(factoryBaleProducts)
             .where(eq(factoryBaleProducts.companyId, companyId));
-          const productByArticle = new Map<string, any>();
+          const productByArticle = new Map();
           for (const p of allProducts) {
             if (p.articleCode) productByArticle.set(p.articleCode.trim().toUpperCase(), p);
           }
@@ -397,7 +397,7 @@ export function registerFactoryProductImportRoutes(app: Express) {
             .select()
             .from(factoryBaleProducts)
             .where(eq(factoryBaleProducts.companyId, companyId));
-          const productByArticle = new Map<string, any>();
+          const productByArticle = new Map();
           for (const p of allProducts) {
             if (p.articleCode) productByArticle.set(p.articleCode.trim().toUpperCase(), p);
           }

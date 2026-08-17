@@ -167,7 +167,7 @@ export default function StockTransferOrder() {
   const { formatAmount } = useCurrencyContext();
 
   // History dialog data query
-  const { data: historyData, isLoading: historyLoading } = useQuery<any>({
+  const { data: historyData, isLoading: historyLoading } = useQuery({
     queryKey: [
       "/api/locations",
       historyLocation?.id,
@@ -187,7 +187,7 @@ export default function StockTransferOrder() {
     enabled: historyDialogOpen && !!historyItem && !!historyLocation,
   });
 
-  const { data: detailData, isLoading: detailLoading } = useQuery<{ inTransactions: any[]; outTransactions: any[] }>({
+  const { data: detailData, isLoading: detailLoading } = useQuery({
     queryKey: [
       "/api/locations",
       historyLocation?.id,
@@ -207,7 +207,7 @@ export default function StockTransferOrder() {
     enabled: detailOpen && !!historyItem && !!historyLocation && detailMonth > 0,
   });
 
-  const { data: existingTransfer } = useQuery<any>({
+  const { data: existingTransfer } = useQuery({
     queryKey: ["/api/stock-transfers", editVoucherId],
     queryFn: async () => {
       const res = await fetch(`/api/stock-transfers?voucherId=${editVoucherId}`, { credentials: "include" });
@@ -219,7 +219,7 @@ export default function StockTransferOrder() {
     enabled: !!editVoucherId,
   });
 
-  const { data: existingVoucher } = useQuery<any>({
+  const { data: existingVoucher } = useQuery({
     queryKey: ["/api/vouchers", editVoucherId],
     queryFn: async () => {
       const res = await fetch(`/api/vouchers/${editVoucherId}`, { credentials: "include" });
@@ -237,7 +237,7 @@ export default function StockTransferOrder() {
     refetchOnReconnect: false,
   });
 
-  const { data: revisions = [] } = useQuery<any[]>({
+  const { data: revisions = [] } = useQuery({
     queryKey: ["/api/stock-transfers", existingTransfer?.id, "revisions"],
     queryFn: async () => {
       const res = await fetch(`/api/stock-transfers/${existingTransfer!.id}/revisions`, { credentials: "include" });
@@ -1107,14 +1107,7 @@ export default function StockTransferOrder() {
         toast({ title: "Error", description: "Could not read worksheet", variant: "destructive" });
         return;
       }
-      const rows = utils.sheet_to_json<{
-        Code?: any;
-        Name?: any;
-        "Qty Change"?: any;
-        "Item Name"?: any;
-        Change?: any;
-        Qty?: any;
-      }>(ws);
+      const rows = utils.sheet_to_json(ws);
 
       const preview: ImportPreviewRow[] = rows
         .filter((row) => row.Code !== undefined || row.Name !== undefined || row["Item Name"] !== undefined)

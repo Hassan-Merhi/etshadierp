@@ -14,7 +14,7 @@ import { vouchers, voucherEntries, factorySuppliers, factoryContainers, factoryS
 import { eq, and, sql, isNull } from "drizzle-orm";
 
 export function registerAccountVoucherSidebarRoutes(app: Express) {
-  const _vsBCache = new Map<number, { data: any; expiresAt: number }>();
+  const _vsBCache = new Map();
 
   app.get("/api/accounts/voucher-sidebar", requireAuth, async (req, res) => {
     try {

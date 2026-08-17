@@ -93,7 +93,7 @@ export function registerFactorySupplierUsageReportRoutes(app: Express, requireAu
 
       const allMixBatches = await db.select().from(factoryMixBatches).where(eq(factoryMixBatches.companyId, companyId));
 
-      const mixBatchMap = new Map<number, any>();
+      const mixBatchMap = new Map();
       for (const mb of allMixBatches) {
         mixBatchMap.set(mb.id, mb);
       }
@@ -106,12 +106,12 @@ export function registerFactorySupplierUsageReportRoutes(app: Express, requireAu
 
       const suppliers = await db.select().from(factorySuppliers).where(eq(factorySuppliers.companyId, companyId));
 
-      const supplierMap = new Map<number, any>();
+      const supplierMap = new Map();
       for (const s of suppliers) {
         supplierMap.set(s.id, s);
       }
 
-      const containerMap = new Map<number, any>();
+      const containerMap = new Map();
       for (const c of allContainers) {
         containerMap.set(c.id, c);
       }

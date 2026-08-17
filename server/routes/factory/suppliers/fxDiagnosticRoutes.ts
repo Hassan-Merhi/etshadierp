@@ -100,7 +100,7 @@ export function registerFactoryFxDiagnosticRoutes(app: Express) {
           .select()
           .from(factoryContainers)
           .where(eq(factoryContainers.companyId, companyId));
-        const containerById = new Map<number, any>(allContainers.map((c) => [c.id, c]));
+        const containerById = new Map(allContainers.map((c) => [c.id, c]));
         const nonUsdContainers = allContainers.filter((c) => c.currencyCode !== "USD");
 
         // Charges/commissions are scanned by companyId directly — NEVER gated on

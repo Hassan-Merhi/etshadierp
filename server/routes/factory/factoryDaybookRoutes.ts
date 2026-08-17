@@ -278,7 +278,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
         if (baleStockRows.length > 0) {
           // Collect all bale IDs across all zero bale stock entries
           // Only integer IDs are valid — old entries may have stored UUIDs which Postgres rejects
-          const baleIdToEntry = new Map<number, any[]>();
+          const baleIdToEntry = new Map();
           for (const row of baleStockRows) {
             try {
               const meta = JSON.parse(row.metaJson || "{}");

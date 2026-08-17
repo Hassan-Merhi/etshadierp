@@ -463,7 +463,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
               .from(factoryBaleProducts)
               .where(inArray(factoryBaleProducts.id, productIds as number[]))
           : [];
-      const productMap = new Map<number, any>(productRecords.map((p: any) => [p.id, p]));
+      const productMap = new Map(productRecords.map((p: any) => [p.id, p]));
       const balePriceMap = new Map<number, number>(
         baleLinks.map((l: any) => [l.baleId, parseFloat(l.priceUsed || "0")])
       );

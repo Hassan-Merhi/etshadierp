@@ -67,7 +67,7 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
           productIds.length > 0
             ? await tx.select().from(factoryBaleProducts).where(inArray(factoryBaleProducts.id, productIds))
             : [];
-        const productMap = new Map<number, any>(factoryProducts.map((p) => [p.id, p]));
+        const productMap = new Map(factoryProducts.map((p) => [p.id, p]));
 
         const stockItemCache = new Map<string, number>();
 

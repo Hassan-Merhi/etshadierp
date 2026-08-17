@@ -126,7 +126,7 @@ export function registerRawStockAdjRoutes(app: Express) {
       // Aggregate multiple source rows for the same batch into one timeline entry.
       // costPerKg is derived as totalCost / kg across THIS supplier's source rows only,
       // so a batch fed by this supplier more than once still shows one correct weighted rate.
-      const batchAggMap = new Map<number, any>();
+      const batchAggMap = new Map();
       for (const r of batchSourceRows) {
         const kg = parseFloat(r.weightKg as string) || 0;
         const cost = parseFloat(r.totalCost as string) || kg * (parseFloat(r.costPerKg as string) || 0);

@@ -39,7 +39,7 @@ export function PosSettingsTab() {
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
 
-  const { data: companySettings } = useQuery<any>({
+  const { data: companySettings } = useQuery({
     queryKey: ["/api/company-settings", selectedCompany?.id],
     enabled: !!selectedCompany?.id,
     queryFn: async () => {

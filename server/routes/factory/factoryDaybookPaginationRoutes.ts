@@ -44,7 +44,7 @@ async function deriveBaleStockEntryAmounts(rows: any[], companyId: number): Prom
   const baleRows = rows.filter((row) => row.txType === "BALE_STOCK_ENTRY" && row.metaJson);
   if (baleRows.length === 0) return;
 
-  const baleIdToRows = new Map<number, any[]>();
+  const baleIdToRows = new Map();
   for (const row of baleRows) {
     try {
       const meta = JSON.parse(row.metaJson || "{}");

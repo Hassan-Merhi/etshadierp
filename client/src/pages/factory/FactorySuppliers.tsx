@@ -143,7 +143,7 @@ export default function FactorySuppliers() {
 
   const [brokerIncludeOtw, setBrokerIncludeOtw] = useState(false);
 
-  const { data: brokerOverviewStatement, isLoading: brokerOverviewLoading } = useQuery<any>({
+  const { data: brokerOverviewStatement, isLoading: brokerOverviewLoading } = useQuery({
     queryKey: ["/api/factory/suppliers", parentViewSupplierId, "broker-statement", brokerIncludeOtw],
     queryFn: async () => {
       const res = await factoryApiRequest(
@@ -483,7 +483,7 @@ export default function FactorySuppliers() {
     },
   });
 
-  const [dueDialogSupplier, setDueDialogSupplier] = useState<any | null>(null);
+  const [dueDialogSupplier, setDueDialogSupplier] = useState(null);
 
   const formatNum = (v: string) =>
     parseFloat(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });

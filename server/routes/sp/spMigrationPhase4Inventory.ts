@@ -198,7 +198,7 @@ export async function buildExactInventoryPlan(sourceId: number, targetId: number
   }
 
   const targetRows = await loadTargetInventoryRows(targetId, Array.from(new Set(Array.from(stockItemMap.values()))));
-  const targetByKey = new Map<string, any>();
+  const targetByKey = new Map();
   for (const targetRow of targetRows) {
     const key = `${pn(targetRow.stock_item_id)}:${pn(targetRow.location_id)}`;
     if (targetByKey.has(key)) {

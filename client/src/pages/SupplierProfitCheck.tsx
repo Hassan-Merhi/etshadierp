@@ -111,7 +111,7 @@ export default function SupplierProfitCheck() {
   const [importLoading, setImportLoading] = useState(false);
   const importFileRef = useRef<HTMLInputElement>(null);
   // ─── Queries ─────────────────────────────────────────────────────────────
-  const { data: suppliers = [] } = useQuery<any[]>({
+  const { data: suppliers = [] } = useQuery({
     queryKey: ["/api/suppliers-all-spc"],
     queryFn: async () => {
       const res = await fetch("/api/suppliers", { credentials: "include" });
@@ -119,7 +119,7 @@ export default function SupplierProfitCheck() {
     },
     staleTime: 5 * 60 * 1000,
   });
-  const { data: stockGroups = [] } = useQuery<any[]>({
+  const { data: stockGroups = [] } = useQuery({
     queryKey: ["/api/stock-groups", companyId],
     enabled: !!companyId,
     queryFn: async () => {
@@ -139,7 +139,7 @@ export default function SupplierProfitCheck() {
     },
     onError: (err: ClientErrorLike) => toast({ title: "Failed to update", description: err.message, variant: "destructive" }),
   });
-  const { data: proformas = [] } = useQuery<any[]>({
+  const { data: proformas = [] } = useQuery({
     queryKey: ["/api/suppliers", supplierId, "proformas"],
     enabled: !!supplierId && sourceType === "proforma",
     queryFn: async () => {

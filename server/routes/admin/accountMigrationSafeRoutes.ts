@@ -81,7 +81,7 @@ async function lockCompanies(tx: any, sourceCompanyId: number, destinationCompan
 
 function deepestError(error: unknown): any {
   let current: any = error;
-  const seen = new Set<any>();
+  const seen = new Set();
   while (current?.cause && !seen.has(current.cause)) {
     seen.add(current);
     current = current.cause;

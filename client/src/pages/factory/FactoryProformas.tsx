@@ -174,7 +174,7 @@ export default function FactoryProformas() {
   // Phase 4: opening/expanding a proforma no longer downloads the ERP stock
   // catalog. The add-item dialog is the only consumer, and it only needs the
   // identity profile (id/code/name/uom).
-  const { data: allStockItems = [] } = useQuery<any[]>({
+  const { data: allStockItems = [] } = useQuery({
     queryKey: ["/api/stock-items/light?profile=identity", selectedCompany?.id],
     enabled: isAddLineOpen && !!selectedCompany?.id,
     staleTime: 30 * 60 * 1000,
@@ -463,7 +463,7 @@ export default function FactoryProformas() {
         setExcelImportErrors(["No sheets found in this file"]);
         return;
       }
-      const rows = excelUtils.sheet_to_json<Record<string, any>>(firstSheet);
+      const rows = excelUtils.sheet_to_json(firstSheet);
       if (rows.length === 0) {
         setExcelImportErrors(["The sheet appears to be empty"]);
         return;

@@ -61,7 +61,7 @@ export async function buildSpProductionClosureStatus(companyId: number): Promise
     ORDER BY evidence_type
   `);
   const evidence = resultRows(evidenceResult);
-  const evidenceMap = new Map<string, any>(evidence.map((row: any) => [row.evidence_type, row]));
+  const evidenceMap = new Map(evidence.map((row: any) => [row.evidence_type, row]));
   const checks = REQUIRED_STABILIZATION_CHECKS.map((type) => ({
     type,
     ...(evidenceMap.get(type) ?? {

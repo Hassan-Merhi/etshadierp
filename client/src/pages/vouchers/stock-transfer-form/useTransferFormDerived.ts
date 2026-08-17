@@ -59,7 +59,7 @@ export function useTransferRateAutofill(
     for (const [locationId, pending] of missingByLocation) {
       const pricingUrl = locationInventoryLightUrl(locationId, true);
       queryClient
-        .fetchQuery<any[]>({ queryKey: [pricingUrl] })
+        .fetchQuery({ queryKey: [pricingUrl] })
         .then((locationInventory) => {
           if (cancelled || !Array.isArray(locationInventory)) return;
           const rateByItem = new Map<number, string>();

@@ -55,7 +55,7 @@ export function registerFactoryMixBatchReadRoutes(app: Express) {
       // same stable historical derivation as before, read-only and concurrently.
       const supplierRateMap = await getLockedSupplierRatesReadOnlyBulk(db, Number(companyId), uniqueSupplierIds);
 
-      const sourcesByBatch = new Map<number, any[]>();
+      const sourcesByBatch = new Map();
       for (const src of sourceRows) {
         if (!sourcesByBatch.has(src.mixBatchId)) sourcesByBatch.set(src.mixBatchId, []);
         sourcesByBatch.get(src.mixBatchId)!.push(src);

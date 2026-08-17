@@ -237,7 +237,7 @@ export default function FactoryNetProfitAnalytics() {
     return p.toString();
   }, [startDate, endDate]);
 
-  const { data, isLoading } = useQuery<any>({
+  const { data, isLoading } = useQuery({
     queryKey: ["/api/reports/net-profit-statement", queryParams],
     queryFn: async ({ queryKey }) => {
       const params = queryKey[1] as string;

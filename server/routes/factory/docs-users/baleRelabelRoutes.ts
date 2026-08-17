@@ -50,7 +50,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
         .from(factoryBales)
         .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.referenceNumber, refCodes)));
 
-      const baleMap = new Map<string, any>(baleRows.map((b) => [b.referenceNumber, b]));
+      const baleMap = new Map(baleRows.map((b) => [b.referenceNumber, b]));
 
       // detect duplicate refs in the uploaded file
       const seen = new Set<string>();
@@ -116,7 +116,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
           .from(factoryBales)
           .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.referenceNumber, refCodes)));
 
-        const baleMap = new Map<string, any>(baleRows.map((b) => [b.referenceNumber, b]));
+        const baleMap = new Map(baleRows.map((b) => [b.referenceNumber, b]));
         const notFound = refCodes.filter((r) => !baleMap.has(r));
         if (notFound.length > 0) {
           throw new Error(

@@ -363,7 +363,7 @@ export function registerStatsReportsRoutes(app: Express) {
         )
         .execute();
 
-      const inventoryByItem = new Map<number, { quantity: any; totalValue: any }>();
+      const inventoryByItem = new Map();
       for (const record of inventoryData) {
         const existing = inventoryByItem.get(record.stockItemId) || {
           quantity: toInventoryDecimal(0),
@@ -462,7 +462,7 @@ export function registerStatsReportsRoutes(app: Express) {
           .where(and(...conditions))
           .execute();
       }
-      const inventoryByItem = new Map<number, { quantity: any; totalValue: any }>();
+      const inventoryByItem = new Map();
       for (const record of inventoryData) {
         const existing = inventoryByItem.get(record.stockItemId) || {
           quantity: toInventoryDecimal(0),

@@ -111,7 +111,7 @@ export function registerFactoryStockEntryRoutes(app: Express) {
           productIds.length > 0
             ? await tx.select().from(factoryBaleProducts).where(inArray(factoryBaleProducts.id, productIds))
             : [];
-        const productMap = new Map<number, any>(factoryProducts.map((p) => [p.id, p]));
+        const productMap = new Map(factoryProducts.map((p) => [p.id, p]));
 
         const categoryIdSet = new Set<number>();
         factoryProducts.forEach((p) => {
@@ -122,7 +122,7 @@ export function registerFactoryStockEntryRoutes(app: Express) {
           categoryIds.length > 0
             ? await tx.select().from(factoryCategories).where(inArray(factoryCategories.id, categoryIds))
             : [];
-        const categoryMap = new Map<number, any>(factoryCats.map((c) => [c.id, c]));
+        const categoryMap = new Map(factoryCats.map((c) => [c.id, c]));
 
         // Resolve worker and production-position attribution against the exact
         // stock-entry date. This validates company scope and effective-dated

@@ -142,12 +142,12 @@ function ScreenFeedDialog({
   const viewerSurfaceRef = useRef<HTMLDivElement>(null);
   const t = useCallback((value: string) => translateRemoteSupportPhase5Text(value, language), [language]);
 
-  const { data: presenceRaw } = useQuery<any>({
+  const { data: presenceRaw } = useQuery({
     queryKey: ["/api/user-presence", userId],
     queryFn: () => apiRequest("GET", `/api/user-presence/${userId}`).then((response) => response.json()),
     refetchInterval: 30000,
   });
-  const { data: activityRaw } = useQuery<any>({
+  const { data: activityRaw } = useQuery({
     queryKey: ["/api/user-presence", userId, "activity"],
     queryFn: () => apiRequest("GET", `/api/user-presence/${userId}/activity`).then((response) => response.json()),
     refetchInterval: 30000,

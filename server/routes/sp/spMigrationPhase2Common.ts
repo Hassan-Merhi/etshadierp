@@ -247,9 +247,9 @@ export async function loadTargetAccounts(targetId: number): Promise<{
     WHERE company_id = ${targetId} AND deleted_at IS NULL
   `);
   const rows = resultRows(result);
-  const bySubType = new Map<string, any>();
-  const byCode = new Map<string, any>();
-  const byType = new Map<string, any[]>();
+  const bySubType = new Map();
+  const byCode = new Map();
+  const byType = new Map();
   for (const row of rows) {
     if (row.sub_type) bySubType.set(String(row.sub_type), row);
     if (row.code) byCode.set(String(row.code).trim().toLowerCase(), row);

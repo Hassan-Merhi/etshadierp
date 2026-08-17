@@ -151,7 +151,7 @@ export function registerSpReportRoutes(app: Express) {
         .orderBy(asc(spStockMovements.articleCode));
 
       // Group by articleCode
-      const groups = new Map<string, any>();
+      const groups = new Map();
       for (const m of movements) {
         const key = m.articleCode;
         if (!groups.has(key)) {
@@ -245,7 +245,7 @@ export function registerSpReportRoutes(app: Express) {
 
       const salesArr = resultRows(salesRows);
       const stockArr = resultRows<{ article_code: string }>(stockRows);
-      const stockMap = new Map<string, any>();
+      const stockMap = new Map();
       for (const s of stockArr) stockMap.set(s.article_code, s);
 
       const rows = salesArr.map((r: any) => {

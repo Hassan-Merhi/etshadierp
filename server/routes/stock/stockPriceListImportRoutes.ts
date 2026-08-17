@@ -559,7 +559,7 @@ export function registerStockPriceListImportRoutes(app: Express) {
         const sheetName = wb.SheetNames[0];
         if (!sheetName) return res.status(400).json({ message: "Excel file has no sheets" });
 
-        const rows = sheetToJson<Record<string, any>>(wb.Sheets[sheetName]);
+        const rows = sheetToJson(wb.Sheets[sheetName]);
 
         // Pre-fetch all stock items for this company (by code)
         const allItems = await db

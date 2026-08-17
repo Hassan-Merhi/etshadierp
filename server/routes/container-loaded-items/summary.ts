@@ -60,7 +60,7 @@ export function registerContainerLoadedItemSummaryRoutes(app: Express, requireAu
 
         const { map: aliasMap } = await buildAliasMap(companyId);
 
-        const proformaByBarcode = new Map<string, any>();
+        const proformaByBarcode = new Map();
         for (const line of proformaLinesList) {
           const bc = resolveBarcode((line.barcode || "").trim(), aliasMap);
           if (proformaByBarcode.has(bc)) {
@@ -74,7 +74,7 @@ export function registerContainerLoadedItemSummaryRoutes(app: Express, requireAu
             });
           }
         }
-        const loadedByBarcode = new Map<string, any>();
+        const loadedByBarcode = new Map();
         for (const item of loadedItemsList) {
           const bc = resolveBarcode((item.barcode || "").trim(), aliasMap);
           if (loadedByBarcode.has(bc)) {

@@ -135,7 +135,7 @@ export default function TransactionJournal() {
     enabled: !!detailId,
   });
 
-  const { data: viewEntriesRaw, isLoading: viewEntriesLoading } = useQuery<any>({
+  const { data: viewEntriesRaw, isLoading: viewEntriesLoading } = useQuery({
     queryKey: ["/api/global/transactions", detailId, "view-entries"],
     queryFn: async () => {
       const res = await fetch(`/api/global/transactions/${detailId}/view-entries`);
