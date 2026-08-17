@@ -24,7 +24,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           npm run check
-          cat > /tmp/low-count.cjs <<'NODE'
+          cat > .phase18-low-count.cjs <<'NODE'
           const ts=require('typescript'),fs=require('fs'),path=require('path');
           const root=process.cwd();
           const configPath=ts.findConfigFile(root,ts.sys.fileExists,'tsconfig.json');
@@ -48,7 +48,8 @@ jobs:
           }
           console.log(`LOW_COUNT_ACCEPTED=${accepted} FILES=${files}`);
           NODE
-          node /tmp/low-count.cjs
+          node .phase18-low-count.cjs
+          rm -f .phase18-low-count.cjs
           git diff --name-only -- '*.ts' '*.tsx' > /tmp/low-count-files
           echo "CHANGED_FILES=$(wc -l </tmp/low-count-files | tr -d ' ')"
           if [ ! -s /tmp/low-count-files ]; then exit 0; fi
