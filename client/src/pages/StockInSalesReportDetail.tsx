@@ -111,6 +111,8 @@ interface GroupedSalesRow {
   quantity: number;
   avgRate: number;
   totalValue: number;
+  profitPerBale: number;
+  totalProfit: number;
   locations: Array<{ name: string; quantity: number }>;
 }
 
@@ -196,6 +198,7 @@ function groupSalesRows(rows: StockOutRow[]): GroupedSalesRow[] {
       stockItemName: string;
       quantity: number;
       totalValue: number;
+      totalProfit: number;
       locations: Map<string, number>;
     }
   >();
@@ -208,10 +211,12 @@ function groupSalesRows(rows: StockOutRow[]): GroupedSalesRow[] {
       stockItemName: row.stockItemName,
       quantity: 0,
       totalValue: 0,
+      totalProfit: 0,
       locations: new Map<string, number>(),
     };
     group.quantity += Number(row.quantity || 0);
     group.totalValue += Number(row.totalSales || 0);
+    group.totalProfit += Number(row.costProfit || 0);
     sumMap(group.locations, row.locationName, Number(row.quantity || 0));
     groups.set(key, group);
   }
@@ -224,6 +229,8 @@ function groupSalesRows(rows: StockOutRow[]): GroupedSalesRow[] {
       quantity: group.quantity,
       totalValue: group.totalValue,
       avgRate: group.quantity === 0 ? 0 : group.totalValue / group.quantity,
+      profitPerBale: group.quantity === 0 ? 0 : group.totalProfit / group.quantity,
+      totalProfit: group.totalProfit,
       locations: mapToBreakdown(group.locations),
     }))
     .sort((a, b) => {
@@ -357,6 +364,8 @@ export default function StockInSalesReportDetail() {
         { header: "Qty", key: "qty", width: 14 },
         { header: "Avg Rate", key: "rate", width: 16 },
         { header: "Value", key: "value", width: 18 },
+        { header: "Profit / Bale", key: "profitPerBale", width: 18 },
+        { header: "Total Profit", key: "totalProfit", width: 18 },
       ];
       exportSales.forEach((row) =>
         salesSheet.addRow({
@@ -366,6 +375,8 @@ export default function StockInSalesReportDetail() {
           qty: row.quantity,
           rate: row.avgRate,
           value: row.totalValue,
+          profitPerBale: row.profitPerBale,
+          totalProfit: row.totalProfit,
         })
       );
       salesSheet.getRow(1).font = { bold: true };
@@ -619,7 +630,7 @@ export default function StockInSalesReportDetail() {
             </div>
             <div className="overflow-hidden rounded-xl border">
               <div className="max-h-[520px] overflow-auto">
-                <Table className="min-w-[850px]">
+                <Table className="min-w-[1100px]">
                   <TableHeader>
                     <TableRow className="bg-muted/40 hover:bg-muted/40">
                       <TableHead>Date</TableHead>
@@ -628,20 +639,22 @@ export default function StockInSalesReportDetail() {
                       <TableHead className="text-right">Qty</TableHead>
                       <TableHead className="text-right">Avg Rate</TableHead>
                       <TableHead className="text-right">Value</TableHead>
+                      <TableHead className="text-right">Profit / Bale</TableHead>
+                      <TableHead className="text-right">Total Profit</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {isLoading ? (
                       Array.from({ length: 4 }).map((_, i) => (
                         <TableRow key={i}>
-                          <TableCell colSpan={6}>
+                          <TableCell colSpan={8}>
                             <Skeleton className="h-5 w-full" />
                           </TableCell>
                         </TableRow>
                       ))
                     ) : groupedSales.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                        <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
                           No sales found.
                         </TableCell>
                       </TableRow>
@@ -669,6 +682,8 @@ export default function StockInSalesReportDetail() {
                           <TableCell className="text-right font-mono">{formatNumber(row.quantity, 0)}</TableCell>
                           <TableCell className="text-right font-mono">{rate(row.avgRate)}</TableCell>
                           <TableCell className="text-right font-mono">{formatAmount(row.totalValue)}</TableCell>
+                          <TableCell className="text-right font-mono">{rate(row.profitPerBale)}</TableCell>
+                          <TableCell className="text-right font-mono">{formatAmount(row.totalProfit)}</TableCell>
                         </TableRow>
                       ))
                     )}
