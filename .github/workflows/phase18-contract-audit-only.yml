@@ -1,0 +1,29 @@
+name: Phase 18 Contract Audit Only
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  audit:
+    if: contains(github.event.head_commit.message, '[phase18-contract-audit]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with: {node-version: '22.14.0', cache: npm}
+      - run: npm ci
+      - name: Documentation state index
+        shell: bash
+        run: |
+          set +e
+          npm run audit:doc-index
+          echo DOC_INDEX_EXIT=$?
+          exit 0
+      - name: Script inventory
+        shell: bash
+        run: |
+          set +e
+          npm run audit:scripts
+          echo SCRIPT_INVENTORY_EXIT=$?
+          exit 0
