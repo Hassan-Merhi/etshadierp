@@ -2,8 +2,10 @@ import { createHash } from "node:crypto";
 import type { Express, NextFunction, Request, Response } from "express";
 import { sql } from "drizzle-orm";
 
+import { requireAuth } from "../../auth";
 import { db } from "../../db";
 import { logger } from "../../lib/logger";
+import { replayAuthorizationContext } from "./replayAuthorizationContext";
 import {
   isPhase5OperationalVoucherRequest,
   isPhase6DeterministicSpecialRequest,
@@ -97,9 +99,10 @@ export function deterministicPhase6RequestIdentity(
 export function voucherPathRequestFingerprint(
   method: string,
   pathname: string,
-  body: VoucherRequestPayload
+  body: VoucherRequestPayload,
+  authorization?: unknown
 ): string {
-  return sha256({ method: method.toUpperCase(), pathname, body });
+  return sha256({ method: method.toUpperCase(), pathname, body, authorization: authorization ?? null });
 }
 
 export async function ensureVoucherPathGuardTable(): Promise<void> {
@@ -239,81 +242,111 @@ function captureResponse(res: Response): { read: () => unknown } {
   return { read: () => body };
 }
 
-export function registerVoucherPathPhase5to6Boundary(app: Express): void {
-  app.use(async (req: Request, res: Response, next: NextFunction) => {
-    const pathname = normalizedPath(req);
-    const phase5 = isPhase5OperationalVoucherRequest(req.method, pathname);
-    const phase6 = isPhase6DeterministicSpecialRequest(req.method, pathname);
-    if (!phase5 && !phase6) return next();
+async function voucherPathPhase5to6Boundary(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const pathname = normalizedPath(req);
+  const phase5 = isPhase5OperationalVoucherRequest(req.method, pathname);
+  const phase6 = isPhase6DeterministicSpecialRequest(req.method, pathname);
+  if (!phase5 && !phase6) {
+    next();
+    return;
+  }
 
-    const companyId = resolveVoucherPathCompanyId(req);
-    if (!companyId) return next();
+  const companyId = resolveVoucherPathCompanyId(req);
+  if (!companyId) {
+    next();
+    return;
+  }
 
-    const body = isVoucherRequestPayload(req.body) ? req.body : {};
-    const idempotencyKey = phase6
-      ? deterministicPhase6RequestIdentity(req.method, pathname, companyId, body)
-      : phase5RequestIdentity(req, body);
+  const body = isVoucherRequestPayload(req.body) ? req.body : {};
+  const idempotencyKey = phase6
+    ? deterministicPhase6RequestIdentity(req.method, pathname, companyId, body)
+    : phase5RequestIdentity(req, body);
 
-    if (!idempotencyKey) {
-      return res.status(400).json({
-        code: "ACCOUNTING_REQUEST_ID_REQUIRED",
-        message: "A stable request identity is required for this accounting operation.",
-      });
-    }
+  if (!idempotencyKey) {
+    res.status(400).json({
+      code: "ACCOUNTING_REQUEST_ID_REQUIRED",
+      message: "A stable request identity is required for this accounting operation.",
+    });
+    return;
+  }
 
-    const fingerprint = voucherPathRequestFingerprint(req.method, pathname, body);
-    let claim: VoucherPathClaimResult;
-    try {
-      claim = await claimVoucherPathRequest(
-        companyId,
-        idempotencyKey,
-        phase6 ? "deterministic-source" : "operational",
-        pathname,
-        fingerprint
-      );
-    } catch (error) {
-      logger.error("Voucher request boundary claim failed", {
+  const fingerprint = voucherPathRequestFingerprint(req.method, pathname, body, replayAuthorizationContext(req));
+  let claim: VoucherPathClaimResult;
+  try {
+    claim = await claimVoucherPathRequest(
+      companyId,
+      idempotencyKey,
+      phase6 ? "deterministic-source" : "operational",
+      pathname,
+      fingerprint
+    );
+  } catch (error) {
+    logger.error("Voucher request boundary claim failed", {
+      module: "voucher-path-request-boundary",
+      path: pathname,
+      companyId,
+      error,
+    });
+    res.status(503).json({
+      code: "ACCOUNTING_REQUEST_GUARD_UNAVAILABLE",
+      message: "Accounting request protection is temporarily unavailable. The operation was not started.",
+    });
+    return;
+  }
+
+  if (claim.kind === "conflict") {
+    res.status(409).json({
+      code: "POSTING_IDEMPOTENCY_CONFLICT",
+      message: "This request identity was already used for different accounting data or authorization context.",
+    });
+    return;
+  }
+  if (claim.kind === "uncertain") {
+    res.status(409).json({
+      code: "ACCOUNTING_REQUEST_OUTCOME_UNCERTAIN",
+      message: "The original accounting request may still have completed. Reconcile its result before retrying.",
+    });
+    return;
+  }
+  if (claim.kind === "replay") {
+    res.status(claim.status).json(claim.body ?? null);
+    return;
+  }
+
+  const captured = captureResponse(res);
+  res.on("finish", () => {
+    void completeVoucherPathRequest(companyId, idempotencyKey, res.statusCode, captured.read(), phase6).catch((error) => {
+      // The successful handler result has already been sent. Leaving the row
+      // processing is intentionally fail-closed: a future retry cannot execute
+      // the financial handler again after an uncertain guard-write outcome.
+      logger.error("Voucher request boundary completion persistence failed", {
         module: "voucher-path-request-boundary",
         path: pathname,
         companyId,
         error,
       });
-      return res.status(503).json({
-        code: "ACCOUNTING_REQUEST_GUARD_UNAVAILABLE",
-        message: "Accounting request protection is temporarily unavailable. The operation was not started.",
-      });
-    }
-
-    if (claim.kind === "conflict") {
-      return res.status(409).json({
-        code: "POSTING_IDEMPOTENCY_CONFLICT",
-        message: "This request identity was already used for different accounting data.",
-      });
-    }
-    if (claim.kind === "uncertain") {
-      return res.status(409).json({
-        code: "ACCOUNTING_REQUEST_OUTCOME_UNCERTAIN",
-        message: "The original accounting request may still have completed. Reconcile its result before retrying.",
-      });
-    }
-    if (claim.kind === "replay") {
-      return res.status(claim.status).json(claim.body ?? null);
-    }
-
-    const captured = captureResponse(res);
-    res.on("finish", () => {
-      void completeVoucherPathRequest(companyId, idempotencyKey, res.statusCode, captured.read(), phase6).catch((error) => {
-        // The successful handler result has already been sent. Leaving the row
-        // processing is intentionally fail-closed: a future retry cannot execute
-        // the financial handler again after an uncertain guard-write outcome.
-        logger.error("Voucher request boundary completion persistence failed", {
-          module: "voucher-path-request-boundary",
-          path: pathname,
-          companyId,
-          error,
-        });
-      });
     });
-    return next();
+  });
+  next();
+}
+
+export function registerVoucherPathPhase5to6Boundary(app: Express): void {
+  app.use((req, res, next) => {
+    const pathname = normalizedPath(req);
+    if (
+      !isPhase5OperationalVoucherRequest(req.method, pathname) &&
+      !isPhase6DeterministicSpecialRequest(req.method, pathname)
+    ) {
+      next();
+      return;
+    }
+
+    void requireAuth(req, res, (authError?: unknown) => {
+      if (authError) {
+        next(authError);
+        return;
+      }
+      void voucherPathPhase5to6Boundary(req, res, next).catch(next);
+    });
   });
 }
