@@ -272,7 +272,7 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
           ? tot / safeNum(g.totalWt)
           : safeNum(g.pricePerKg)
         : safeNum(g.pricePerBale);
-    const rowCells: any[] = [
+    const rowCells: Array<string | number> = [
       idx + 1,
       safeStr(g.articleCode),
       safeStr(g.productName),
@@ -308,7 +308,7 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
   });
 
   // ── Totals row ──
-  const totRowCells: any[] = ["", "", "Totals", totalQty, "", fmtNum(totalWtAll)];
+  const totRowCells: Array<string | number> = ["", "", "Totals", totalQty, "", fmtNum(totalWtAll)];
   if (!hideSelling) {
     totRowCells.push("");
     totRowCells.push(fmtMoney(totalAll));
@@ -448,7 +448,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
 
       const baleLinks = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
       const baleIds = baleLinks.map((b: any) => b.baleId).filter(Boolean);
-      const baleRows: any[] =
+      const baleRows: Array<{ id: number; companyId: number; mixBatchId: number | null; productId: number | null; pressingBatchId: number | null; erpLocationId: number | null; baleCode: string; referenceNumber: string; articleCode: string | null; productName: string | null; productNameAr: string | null; category: string | null; categoryAr: string | null; grade: string | null; quantity: number; weightKg: string; costPerKg: string; totalCost: string; status: string; pressedAt: Date | null; finalizedAt: Date | null; finalizedBy: number | null; workerName: string | null; stockEntryDate: string | null; importBatchId: number | null; deletedAt: Date | null; createdAt: Date; updatedAt: Date; }> =
         baleIds.length > 0 ? await db.select().from(factoryBales).where(inArray(factoryBales.id, baleIds)) : [];
       const orderCharges = await db
         .select()
@@ -456,7 +456,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
         .where(eq(customerOrderCharges.orderId, orderId));
 
       const productIds = [...new Set(baleRows.map((b: any) => b.productId).filter((id: any) => id != null))];
-      const productRecords: any[] =
+      const productRecords: Array<{ id: number; companyId: number; code: string; articleCode: string | null; name: string; nameAr: string | null; description: string | null; descriptionAr: string | null; weightPerBaleKg: string | null; categoryId: number | null; sellingPrice: string | null; productionPrice: string | null; labelDesignColor: string | null; active: boolean; deletedAt: Date | null; createdAt: Date; updatedAt: Date; }> =
         productIds.length > 0
           ? await db
               .select()

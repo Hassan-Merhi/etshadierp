@@ -460,7 +460,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
           headerColor: string,
           altColor: string
         ) => {
-          const cols: any[] = [
+          const cols: Array<{ header: string; key: string; width: number; }> = [
             { header: "Article Code", key: "articleCode", width: 18 },
             { header: "Product Name", key: "productName", width: 38 },
             { header: "Category", key: "category", width: 22 },
@@ -571,7 +571,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
         });
 
         const baleSheet = workbook.addWorksheet("Bale Details");
-        const baleCols: any[] = [
+        const baleCols: Array<{ header: string; key: string; width: number; }> = [
           { header: "Bale Ref #", key: "referenceNumber", width: 24 },
           { header: "Article Code", key: "articleCode", width: 18 },
           { header: "Product Name", key: "productName", width: 38 },
@@ -623,7 +623,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
         });
 
         const garbageDetailSheet = workbook.addWorksheet("Garbage & Wiper Details");
-        const garbageBaleCols: any[] = [
+        const garbageBaleCols: Array<{ header: string; key: string; width: number; }> = [
           { header: "Bale Ref #", key: "referenceNumber", width: 24 },
           { header: "Bale Code", key: "baleCode", width: 18 },
           { header: "Article Code", key: "articleCode", width: 18 },
