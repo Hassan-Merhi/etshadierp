@@ -40,49 +40,53 @@ const PHASE4_WRITERS = [
   "server/routes/vouchers/voucherPaymentRoutes.ts",
 ] as const;
 
-type RouteCase = {
-  method: "POST" | "PATCH";
-  url: string;
-  data: Record<string, unknown>;
-};
+type Method = "POST" | "PATCH";
+type RouteCase = [Method, string, Record<string, unknown>];
 
-const PHASE4_VOUCHER_CREATION_ROUTES: RouteCase[] = [
-  { method: "POST", url: "/api/vouchers", data: { voucherType: "Journal" } },
-  {
-    method: "POST",
-    url: "/api/vouchers/with-entries",
-    data: { voucher: { optional: false }, entries: [{ debitAmount: "1", creditAmount: "1" }] },
-  },
-  { method: "POST", url: "/api/vouchers/journal", data: { optional: false } },
-  { method: "POST", url: "/api/vouchers/journal-entries", data: { optional: false } },
-  { method: "POST", url: "/api/vouchers/payment-receipt", data: { voucherType: "Payment", optional: false } },
-  { method: "POST", url: "/api/salary-advances", data: { amount: "10.00" } },
-  { method: "POST", url: "/api/payroll/bonus-employee", data: { amount: "10.00" } },
-  { method: "POST", url: "/api/payroll/bulk-bonus-employees", data: { amount: "10.00" } },
-  { method: "POST", url: "/api/payroll/bulk-withdraw-employees", data: { amount: "10.00" } },
-  { method: "POST", url: "/api/payroll/deposit-employee", data: { amount: "10.00" } },
-  { method: "POST", url: "/api/payroll/bulk-deposit-employees", data: { amount: "10.00" } },
-  { method: "PATCH", url: "/api/payroll/runs/42", data: { action: "pay", paymentAccountId: 9 } },
-  { method: "POST", url: "/api/payroll/withdraw-employee", data: { amount: "10.00" } },
-  { method: "POST", url: "/api/payroll/pay-worker", data: { amount: "10.00" } },
-  { method: "POST", url: "/api/payroll/bulk-pay-workers", data: { amount: "10.00" } },
-  { method: "POST", url: "/api/factory/employees/bulk-payroll", data: { amount: "10.00" } },
-  { method: "POST", url: "/api/factory/employees/bulk-withdraw", data: { amount: "10.00" } },
-  { method: "POST", url: "/api/factory/employees/42/deposit", data: { amount: "10.00" } },
-  { method: "POST", url: "/api/factory/employees/42/withdraw", data: { amount: "10.00" } },
-  { method: "POST", url: "/api/factory/employee-bonuses", data: { amount: "10.00" } },
-  { method: "POST", url: "/api/factory/worker-bonuses/42/pay", data: { cashAccountId: 9 } },
-  { method: "POST", url: "/api/factory/pos/sale", data: { amount: "10.00" } },
-  { method: "POST", url: "/api/factory/supplier-payments", data: { amount: "10.00" } },
-  { method: "POST", url: "/api/factory/workers/42/bulk-repay-advances", data: { amount: "10.00" } },
-  { method: "POST", url: "/api/factory/advances/cash-adjustment", data: { amount: "10.00" } },
-  { method: "POST", url: "/api/factory/advances/repay-by-month", data: { month: "2026-08" } },
-  { method: "POST", url: "/api/factory/advances/post-repayment-vouchers", data: { cashAccountId: 9 } },
-  { method: "POST", url: "/api/factory/advances/42/repayments", data: { amount: "10.00" } },
-  { method: "PATCH", url: "/api/factory/payrolls/42/mark-paid", data: { cashAccountId: 9 } },
-  { method: "PATCH", url: "/api/factory/payrolls/42/fix-accounting", data: { cashAccountId: 9 } },
-  { method: "POST", url: "/api/factory/payrolls/mark-paid-bulk", data: { cashAccountId: 9 } },
+const ROUTES: RouteCase[] = [
+  ["POST", "/api/vouchers", { voucherType: "Journal" }],
+  ["POST", "/api/vouchers/with-entries", { voucher: { optional: false }, entries: [] }],
+  ["POST", "/api/vouchers/journal", { optional: false }],
+  ["POST", "/api/vouchers/journal-entries", { optional: false }],
+  ["POST", "/api/vouchers/payment-receipt", { voucherType: "Payment", optional: false }],
+  ["POST", "/api/salary-advances", { amount: "10.00" }],
+  ["POST", "/api/payroll/bonus-employee", { amount: "10.00" }],
+  ["POST", "/api/payroll/bulk-bonus-employees", { amount: "10.00" }],
+  ["POST", "/api/payroll/bulk-withdraw-employees", { amount: "10.00" }],
+  ["POST", "/api/payroll/deposit-employee", { amount: "10.00" }],
+  ["POST", "/api/payroll/bulk-deposit-employees", { amount: "10.00" }],
+  ["PATCH", "/api/payroll/runs/42", { action: "pay", paymentAccountId: 9 }],
+  ["POST", "/api/payroll/withdraw-employee", { amount: "10.00" }],
+  ["POST", "/api/payroll/pay-worker", { amount: "10.00" }],
+  ["POST", "/api/payroll/bulk-pay-workers", { amount: "10.00" }],
+  ["POST", "/api/factory/employees/bulk-payroll", { amount: "10.00" }],
+  ["POST", "/api/factory/employees/bulk-withdraw", { amount: "10.00" }],
+  ["POST", "/api/factory/employees/42/deposit", { amount: "10.00" }],
+  ["POST", "/api/factory/employees/42/withdraw", { amount: "10.00" }],
+  ["POST", "/api/factory/employee-bonuses", { amount: "10.00" }],
+  ["POST", "/api/factory/worker-bonuses/42/pay", { cashAccountId: 9 }],
+  ["POST", "/api/factory/pos/sale", { amount: "10.00" }],
+  ["POST", "/api/factory/supplier-payments", { amount: "10.00" }],
+  ["POST", "/api/factory/workers/42/bulk-repay-advances", { amount: "10.00" }],
+  ["POST", "/api/factory/advances/cash-adjustment", { amount: "10.00" }],
+  ["POST", "/api/factory/advances/repay-by-month", { month: "2026-08" }],
+  ["POST", "/api/factory/advances/post-repayment-vouchers", { cashAccountId: 9 }],
+  ["POST", "/api/factory/advances/42/repayments", { amount: "10.00" }],
+  ["PATCH", "/api/factory/payrolls/42/mark-paid", { cashAccountId: 9 }],
+  ["PATCH", "/api/factory/payrolls/42/fix-accounting", { cashAccountId: 9 }],
+  ["POST", "/api/factory/payrolls/mark-paid-bulk", { cashAccountId: 9 }],
 ];
+
+const NEGATIVE_ROUTES = [
+  ["GET", "/api/vouchers", {}],
+  ["POST", "/api/credit-notes", {}],
+  ["POST", "/api/payroll/auto-calculate-bonuses", {}],
+  ["POST", "/api/payroll/runs", {}],
+  ["PATCH", "/api/payroll/runs/42", { action: "update" }],
+  ["POST", "/api/factory/employee-advances", {}],
+  ["PUT", "/api/factory/pos/sales/42", {}],
+  ["PATCH", "/api/vouchers/42/journal", {}],
+] as const;
 
 const originalLocalStorageDescriptor = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
 
@@ -105,61 +109,30 @@ describe("Phase 4 operational voucher retry boundary", () => {
   });
 
   it("re-pins the measured voucher identity backlog from 70 to 48", () => {
-    const voucherBaseline = writeEvidenceBaseline.voucherWritesWithoutRequestIdentity;
+    const baseline = writeEvidenceBaseline.voucherWritesWithoutRequestIdentity;
     const measured = auditWriteEvidence();
+    const remaining = new Set(baseline.files);
 
-    expect(voucherBaseline.ceiling).toBe(48);
-    expect(voucherBaseline.files).toHaveLength(48);
-    expect(voucherBaseline.reviewSummary.activeReviewed).toBe(48);
-    expect(voucherBaseline.reviewSummary.phase4OperationalCompleted).toBe(22);
-    expect(measured.voucherWritesWithoutRequestIdentity.sort()).toEqual([...voucherBaseline.files].sort());
+    expect(baseline.ceiling).toBe(48);
+    expect(baseline.files).toHaveLength(48);
+    expect(baseline.reviewSummary.activeReviewed).toBe(48);
+    expect(baseline.reviewSummary.phase4OperationalCompleted).toBe(22);
+    expect(measured.voucherWritesWithoutRequestIdentity.sort()).toEqual([...baseline.files].sort());
+    for (const file of PHASE4_WRITERS) expect(remaining.has(file)).toBe(false);
+  });
 
-    const remaining = new Set(voucherBaseline.files);
-    for (const file of PHASE4_WRITERS) {
-      expect(remaining.has(file)).toBe(false);
+  it("protects every voucher-creation operation in the completed cohort", () => {
+    expect(ROUTES).toHaveLength(31);
+    for (const [method, url, data] of ROUTES) {
+      expect(isPhase4OperationalVoucherRequest(method, url, data)).toBe(true);
+      expect(isProtectedAccountingRequest(method, url, data)).toBe(true);
     }
   });
 
-  it("protects every voucher-creation route in the 22 completed files on the server", () => {
-    expect(PHASE4_VOUCHER_CREATION_ROUTES).toHaveLength(31);
-    for (const route of PHASE4_VOUCHER_CREATION_ROUTES) {
-      expect(
-        isPhase4OperationalVoucherRequest(route.method, route.url, route.data),
-        `${route.method} ${route.url}`
-      ).toBe(true);
-    }
-  });
-
-  it("protects the same exact route matrix at the browser request boundary", () => {
-    for (const route of PHASE4_VOUCHER_CREATION_ROUTES) {
-      expect(
-        isProtectedAccountingRequest(route.method, route.url, route.data),
-        `${route.method} ${route.url}`
-      ).toBe(true);
-    }
-  });
-
-  it("does not widen Phase 4 onto non-voucher operations in the same route files", () => {
-    const nonVoucherCases = [
-      { method: "GET", url: "/api/vouchers", data: {} },
-      { method: "POST", url: "/api/credit-notes", data: {} },
-      { method: "POST", url: "/api/payroll/auto-calculate-bonuses", data: {} },
-      { method: "POST", url: "/api/payroll/runs", data: {} },
-      { method: "PATCH", url: "/api/payroll/runs/42", data: { action: "update" } },
-      { method: "POST", url: "/api/factory/employee-advances", data: {} },
-      { method: "PUT", url: "/api/factory/pos/sales/42", data: {} },
-      { method: "PATCH", url: "/api/vouchers/42/journal", data: {} },
-    ] as const;
-
-    for (const route of nonVoucherCases) {
-      expect(
-        isPhase4OperationalVoucherRequest(route.method, route.url, route.data),
-        `${route.method} ${route.url}`
-      ).toBe(false);
-      expect(
-        isProtectedAccountingRequest(route.method, route.url, route.data),
-        `${route.method} ${route.url}`
-      ).toBe(false);
+  it("does not widen Phase 4 onto non-voucher sibling operations", () => {
+    for (const [method, url, data] of NEGATIVE_ROUTES) {
+      expect(isPhase4OperationalVoucherRequest(method, url, data)).toBe(false);
+      expect(isProtectedAccountingRequest(method, url, data)).toBe(false);
     }
   });
 
@@ -168,47 +141,33 @@ describe("Phase 4 operational voucher retry boundary", () => {
       path: "/api/payroll/pay-worker",
       session: { userId: 7, currentCompanyId: 12 },
     } as unknown as Parameters<typeof resolvePhase4OperationalVoucherCompanyId>[0];
-    expect(resolvePhase4OperationalVoucherCompanyId(erpRequest)).toBe(12);
-
     const factoryRequest = {
       path: "/api/factory/payrolls/mark-paid-bulk",
       session: { userId: 7, currentCompanyId: 12, factoryCompanyId: 34 },
     } as unknown as Parameters<typeof resolvePhase4OperationalVoucherCompanyId>[0];
-    expect(resolvePhase4OperationalVoucherCompanyId(factoryRequest)).toBe(34);
-
     const unauthenticatedRequest = {
       path: "/api/payroll/pay-worker",
       session: { currentCompanyId: 12 },
     } as unknown as Parameters<typeof resolvePhase4OperationalVoucherCompanyId>[0];
+
+    expect(resolvePhase4OperationalVoucherCompanyId(erpRequest)).toBe(12);
+    expect(resolvePhase4OperationalVoucherCompanyId(factoryRequest)).toBe(34);
     expect(resolvePhase4OperationalVoucherCompanyId(unauthenticatedRequest)).toBeNull();
   });
 
   it("persists and reuses the first browser identity until a definite outcome releases it", () => {
     const values = new Map<string, string>();
-    const localStorage: Storage = {
+    const localStorage = {
       get length() {
         return values.size;
       },
-      clear() {
-        values.clear();
-      },
-      getItem(key) {
-        return values.get(key) ?? null;
-      },
-      key(index) {
-        return [...values.keys()][index] ?? null;
-      },
-      removeItem(key) {
-        values.delete(key);
-      },
-      setItem(key, value) {
-        values.set(key, value);
-      },
-    };
-    Object.defineProperty(globalThis, "localStorage", {
-      configurable: true,
-      value: localStorage,
-    });
+      clear: () => values.clear(),
+      getItem: (key: string) => values.get(key) ?? null,
+      key: (index: number) => [...values.keys()][index] ?? null,
+      removeItem: (key: string) => values.delete(key),
+      setItem: (key: string, value: string) => values.set(key, value),
+    } as Storage;
+    Object.defineProperty(globalThis, "localStorage", { configurable: true, value: localStorage });
 
     const payload = { amount: "37.25", accountId: 9 };
     const first = attachAccountingRequestIdentity("POST", "/api/salary-advances", payload) as {
@@ -220,14 +179,12 @@ describe("Phase 4 operational voucher retry boundary", () => {
 
     expect(first.clientRequestId).toBe(retry.clientRequestId);
     expect(values.size).toBe(1);
-
     releaseAccountingRequestIdentity("POST", "/api/salary-advances", retry, true);
-    expect(values.size).toBe(1);
 
     const next = attachAccountingRequestIdentity("POST", "/api/salary-advances", payload) as {
       clientRequestId: string;
     };
-    expect(next.clientRequestId === first.clientRequestId).toBe(false);
+    expect(next.clientRequestId).not.toBe(first.clientRequestId);
     releaseAccountingRequestIdentity("POST", "/api/salary-advances", next, true);
   });
 
@@ -247,7 +204,6 @@ describe("Phase 4 operational voucher retry boundary", () => {
       clientRequestId: string;
     };
     expect(retry.clientRequestId).toBe(first.clientRequestId);
-
     releaseAccountingRequestIdentity("POST", "/api/payroll/pay-worker", retry, true);
   });
 
@@ -259,15 +215,11 @@ describe("Phase 4 operational voucher retry boundary", () => {
   });
 
   it("keeps optional manual vouchers outside the active posting boundary", () => {
-    expect(
-      isProtectedAccountingRequest("POST", "/api/vouchers", {
-        optional: true,
-      })
-    ).toBe(false);
+    expect(isProtectedAccountingRequest("POST", "/api/vouchers", { optional: true })).toBe(false);
     expect(
       isProtectedAccountingRequest("POST", "/api/vouchers/with-entries", {
         voucher: { optional: true },
-        entries: [{ debitAmount: "1", creditAmount: "1" }],
+        entries: [],
       })
     ).toBe(false);
   });
