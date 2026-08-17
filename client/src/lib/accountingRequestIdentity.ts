@@ -1,6 +1,5 @@
-const ACCOUNTING_REQUEST_TTL_MS = 30 * 60 * 1000;
-const MAX_PENDING_ACCOUNTING_IDENTITIES = 100;
 const ACCOUNTING_REQUEST_STORAGE_KEY = "erp_pending_accounting_request_ids_v2";
+const ACCOUNTING_REQUEST_OUTCOME_UNCERTAIN = "ACCOUNTING_REQUEST_OUTCOME_UNCERTAIN";
 
 const PHASE4_OPERATIONAL_POST_PATHS = new Set([
   "/api/salary-advances",
@@ -160,40 +159,24 @@ function hydratePendingAccountingIdentities(): void {
       pendingAccountingRequestIds.set(key, { requestId: value.requestId, createdAt: value.createdAt });
     }
   } catch {
-    // Ignore corrupt/stale browser storage and start clean.
+    // Ignore corrupt browser storage and start with the in-memory set.
   }
-}
-
-function prunePendingAccountingIdentities(): void {
-  const cutoff = Date.now() - ACCOUNTING_REQUEST_TTL_MS;
-  let changed = false;
-  for (const [key, value] of pendingAccountingRequestIds) {
-    if (value.createdAt < cutoff) {
-      pendingAccountingRequestIds.delete(key);
-      changed = true;
-    }
-  }
-
-  while (pendingAccountingRequestIds.size > MAX_PENDING_ACCOUNTING_IDENTITIES) {
-    const oldestKey = pendingAccountingRequestIds.keys().next().value as string | undefined;
-    if (!oldestKey) break;
-    pendingAccountingRequestIds.delete(oldestKey);
-    changed = true;
-  }
-
-  if (changed) persistPendingAccountingIdentities();
 }
 
 hydratePendingAccountingIdentities();
-prunePendingAccountingIdentities();
 
+/**
+ * Protected accounting writes receive a stable identity before the request is
+ * sent. An identity is retained until the client observes a definite outcome.
+ * There is deliberately no age- or count-based eviction: losing an unresolved
+ * financial request identity can turn an uncertain commit into a duplicate.
+ */
 export function attachAccountingRequestIdentity(method: string, url: string, data: unknown): unknown {
   if (!isProtectedAccountingRequest(method, url, data)) return data;
   if (typeof data.clientRequestId === "string" && data.clientRequestId.trim()) {
     return data;
   }
 
-  prunePendingAccountingIdentities();
   const key = accountingPayloadKey(method, url, data);
   const existing = pendingAccountingRequestIds.get(key);
   const requestId = existing?.requestId || createClientRequestId();
@@ -211,6 +194,20 @@ export function releaseAccountingRequestIdentity(method: string, url: string, da
   persistPendingAccountingIdentities();
 }
 
-export function shouldReleaseAccountingRequestIdentity(status: number): boolean {
+export async function accountingResponseCode(response: Response): Promise<string | undefined> {
+  if (response.status !== 409) return undefined;
+  const payload: unknown = await response
+    .clone()
+    .json()
+    .catch(() => null);
+  return isRecord(payload) && typeof payload.code === "string" ? payload.code : undefined;
+}
+
+export function shouldReleaseAccountingRequestIdentity(status: number, responseCode?: string | number): boolean {
+  // A 409 without a readable code is conservative by design: it may be the
+  // fail-closed uncertain-outcome response, so never mint a fresh key for it.
+  if (status === 409 && (responseCode == null || responseCode === ACCOUNTING_REQUEST_OUTCOME_UNCERTAIN)) {
+    return false;
+  }
   return (status >= 200 && status < 400) || (status >= 400 && status < 500);
 }
