@@ -25,10 +25,10 @@ interface PlanStep {
   id: string;
   name: string;
   tool: string;
-  params: Record<string, any>;
+  params: Record<string, unknown>;
   requiresApproval: boolean;
   status: "pending" | "running" | "completed" | "failed" | "waiting_approval" | "skipped";
-  result?: any;
+  result?: unknown;
   error?: string;
   approvalId?: number;
   startedAt?: string;
@@ -243,7 +243,7 @@ export function registerAiAgentRoutes(app: Express) {
             taskType: plan.taskType,
             userInstruction: instruction,
             status: "planned",
-            planJson: plan as any,
+            planJson: plan,
           })
           .returning();
 
@@ -393,7 +393,7 @@ export function registerAiAgentRoutes(app: Express) {
           .update(aiAgentTasks)
           .set({
             status: newStatus,
-            planJson: plan as any,
+            planJson: plan,
             updatedAt: new Date(),
             errorMessage: failedStep ? (plan.steps.find((s) => s.status === "failed")?.error ?? "A step failed") : null,
           })
@@ -516,7 +516,7 @@ export function registerAiAgentRoutes(app: Express) {
           .update(aiAgentTasks)
           .set({
             status: finalStatus,
-            planJson: plan as any,
+            planJson: plan,
             updatedAt: new Date(),
           })
           .where(eq(aiAgentTasks.id, approval.taskId));
@@ -577,7 +577,7 @@ export function registerAiAgentRoutes(app: Express) {
           .update(aiAgentTasks)
           .set({
             status: "cancelled",
-            planJson: plan as any,
+            planJson: plan,
             updatedAt: new Date(),
           })
           .where(eq(aiAgentTasks.id, approval.taskId));

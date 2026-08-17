@@ -32,9 +32,9 @@ export function registerStockItemImportRoutes(app: Express) {
       const validStockGroupIds = new Set(validStockGroups.map((sg) => sg.id));
 
       const results = {
-        created: [] as any[],
-        skipped: [] as any[],
-        errors: [] as any[],
+        created: [] as unknown[],
+        skipped: [] as unknown[],
+        errors: [] as unknown[],
       };
 
       for (const item of items) {
@@ -231,7 +231,7 @@ export function registerStockItemImportRoutes(app: Express) {
     requireAuth,
     requireNonPOS,
     upload.single("file"),
-    async (req: any, res) => {
+    async (req: import("express").Request, res) => {
       try {
         const companyId = req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -241,7 +241,7 @@ export function registerStockItemImportRoutes(app: Express) {
         const sheetName = wb.SheetNames[0];
         if (!sheetName) return res.status(400).json({ message: "Excel file has no sheets" });
 
-        const rows = sheetToJson<Record<string, any>>(wb.Sheets[sheetName]);
+        const rows = sheetToJson<Record<string, unknown>>(wb.Sheets[sheetName]);
 
         // Pre-fetch all stock items for this company (by code)
         const allItems = await db
@@ -343,7 +343,7 @@ export function registerStockItemImportRoutes(app: Express) {
         try {
           await logAudit({
             userId: req.session.userId!,
-            username: (req.session as any).username || "unknown",
+            username: req.session.username || "unknown",
             companyId,
             action: "create",
             tableName: "stock_items",

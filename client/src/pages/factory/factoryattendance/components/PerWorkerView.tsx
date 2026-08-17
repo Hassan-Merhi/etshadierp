@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * PerWorkerView — extracted sub-component.
  *
@@ -90,14 +91,14 @@ export function PerWorkerView() {
   };
 
   const saveMutation = useMutation({
-    mutationFn: (records: any[]) => apiRequest("POST", "/api/factory/attendance/bulk", { records }),
+    mutationFn: (records: unknown[]) => apiRequest("POST", "/api/factory/attendance/bulk", { records }),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["/api/factory/attendance/worker", workerIdNum, startDate, endDate],
       });
       toast({ title: "Attendance saved", description: `${dates.length} days saved for this worker.` });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       if (err?._handledGlobally) return;
       toast({ title: "Save failed", description: err.message, variant: "destructive" });
     },

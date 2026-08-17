@@ -19,7 +19,7 @@ import {
 export function registerFactoryKpiRoutes(app: Express, requireAuth: any, db: any) {
   app.get("/api/factory/kpis/daily", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const from = req.query.from as string;
@@ -78,7 +78,7 @@ export function registerFactoryKpiRoutes(app: Express, requireAuth: any, db: any
 
   app.get("/api/factory/kpis/workers", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const from = req.query.from as string;
@@ -129,7 +129,7 @@ export function registerFactoryKpiRoutes(app: Express, requireAuth: any, db: any
 
   app.get("/api/factory/kpis/mixes", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const from = req.query.from as string;

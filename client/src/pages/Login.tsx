@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
@@ -72,7 +73,7 @@ export default function Login() {
   const [hasSavedCreds, setHasSavedCreds] = useState(false);
   const [biometryPending, setBiometryPending] = useState(false);
   const [showBioPrompt, setShowBioPrompt] = useState(false);
-  const pendingUserData = useRef<any>(null);
+  const pendingUserData = useRef<unknown>(null);
   const pendingCredentials = useRef<{ username: string; password: string } | null>(null);
 
   const [passKeyPending, setPassKeyPending] = useState(false);
@@ -120,12 +121,12 @@ export default function Login() {
         /* biometrics not available */
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [isNative]);
 
   const [, navigate] = useLocation();
   const passkeySupported =
-    PASSKEY_ENABLED && !isNative && typeof window !== "undefined" && !!(window as any).PublicKeyCredential;
+    PASSKEY_ENABLED && !isNative && typeof window !== "undefined" && !!window.PublicKeyCredential;
 
   const finalizeLogin = () => {
     if (!pendingUserData.current) return;
@@ -175,10 +176,10 @@ export default function Login() {
         window.location.href = "/";
       }
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       setPassword("");
       requestAnimationFrame(() => passwordInputRef.current?.focus());
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Login Failed",
         description: error.message || "Invalid username or password",

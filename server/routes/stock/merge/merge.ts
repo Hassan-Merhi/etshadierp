@@ -329,7 +329,7 @@ export function registerStockItemMergeRoutes(app: Express) {
             totalValue: r.totalValue,
           };
         }
-        (req as any)._mergeSnapshotAfter = snapshotAfter;
+        req._mergeSnapshotAfter = snapshotAfter;
       });
 
       try {
@@ -342,7 +342,7 @@ export function registerStockItemMergeRoutes(app: Express) {
           mergedItemCode: duplicateItem.code.slice(0, 50),
           mergedItemName: duplicateItem.name,
           snapshotBefore,
-          snapshotAfter: (req as any)._mergeSnapshotAfter ?? {},
+          snapshotAfter: req._mergeSnapshotAfter ?? {},
           mergedByUserId: String(userId),
           notes: notes ?? null,
         });

@@ -15,7 +15,7 @@ import { resultRows, firstRow } from "../../lib/queryResult";
  */
 async function prepareCorrectedReoffload(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const companyId = await requireSpCompany(req as any, res as any);
+    const companyId = await requireSpCompany(req, res);
     if (!companyId) return;
 
     const containerId = Number(req.body?.containerId);
@@ -32,7 +32,9 @@ async function prepareCorrectedReoffload(req: Request, res: Response, next: Next
         WHERE id = ${containerId} AND company_id = ${companyId}
         FOR UPDATE
       `);
-      const container = firstRow(containerResult) ?? (containerResult as any)[0];
+      const container =
+        firstRow(containerResult) ??
+        (containerResult as unknown as { [key: string]: Record<string, unknown> | undefined })[0];
       if (!container || container.status !== "open") return;
 
       const reversedRows = await tx.execute(sql`

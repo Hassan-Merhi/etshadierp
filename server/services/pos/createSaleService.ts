@@ -193,7 +193,7 @@ export async function createPosSale(
         voucherDate,
         notes,
         isCreditSale,
-        customerAccountName: customerAccount ? (customerAccount as any).name : undefined,
+        customerAccountName: customerAccount ? customerAccount.name : undefined,
         grandTotal,
         effectiveShiftId,
         clientSaleId,
@@ -332,7 +332,7 @@ export async function createPosSale(
         totalAmount: { old: undefined, new: grandTotal.toFixed(2) },
         date: { old: undefined, new: voucherDate },
         itemCount: { old: undefined, new: saleItems.length },
-        customer: { old: undefined, new: customerAccount ? (customerAccount as any).name : null },
+        customer: { old: undefined, new: customerAccount ? customerAccount.name : null },
       },
     });
   } catch {

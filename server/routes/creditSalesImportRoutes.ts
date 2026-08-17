@@ -393,7 +393,7 @@ export function registerCreditSalesImportRoutes(app: Express) {
         const _voucherDate = createdVoucher.voucherDate;
         const _voucherId = createdVoucher.id;
         const _custName = customer.legalName ?? "";
-        const _senderName = (req as any).user?.username || "Import";
+        const _senderName = req.user?.username || "Import";
         const _dateStr = getClientDate(req);
         setImmediate(async () => {
           // 1. Invoice PDF

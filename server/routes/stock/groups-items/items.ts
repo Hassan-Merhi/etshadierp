@@ -17,7 +17,7 @@ export function registerStockItemRoutes(app: Express) {
   // Stock Items
   app.get("/api/stock-items", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
+      const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
@@ -162,7 +162,7 @@ export function registerStockItemRoutes(app: Express) {
         try {
           await logAudit({
             userId: req.session.userId!,
-            username: (req.session as any).username || "unknown",
+            username: req.session.username || "unknown",
             companyId,
             action: "update",
             tableName: "stock_items",
@@ -223,7 +223,7 @@ export function registerStockItemRoutes(app: Express) {
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId: req.session.currentCompanyId!,
           action: "create",
           tableName: "stock_items",

@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { getErrorDetails } from "@shared/errorUtils";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient as useTQClient } from "@tanstack/react-query";
@@ -76,9 +77,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
   const otwContainers = (containers || []).filter((c) => STATUS_ACTIVE.has(c.status));
   // Supplier list for filter
   const suppliers = Array.from(
-    new Map(
-      otwContainers.map((c) => [String(c.supplierId ?? "none"), (c as any).supplierName || "No Supplier"])
-    ).entries()
+    new Map(otwContainers.map((c) => [String(c.supplierId ?? "none"), c.supplierName || "No Supplier"])).entries()
   ).sort((a, b) => a[1].localeCompare(b[1]));
   // Apply filters + sort
   let filtered = otwContainers.filter((c) => {
@@ -87,14 +86,13 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     if (freightFilter === "no_freight" && num(c.freight) > 0) return false;
     if (weightFilter === "has_weight" && !(num(c.totalKg) > 0)) return false;
     if (weightFilter === "no_weight" && num(c.totalKg) > 0) return false;
-    if (docsFilter === "received" && !(c as any).otwDocsReceived) return false;
-    if (docsFilter === "not_received" && !!(c as any).otwDocsReceived) return false;
+    if (docsFilter === "received" && !c.otwDocsReceived) return false;
+    if (docsFilter === "not_received" && !!c.otwDocsReceived) return false;
     if (delayedFilter === "delayed" && calcDelayDays(c) === 0) return false;
     if (delayedFilter === "overdue" && !isOverdue(c)) return false;
     if (search.trim()) {
       const q = search.toLowerCase();
-      if (!c.containerNumber?.toLowerCase().includes(q) && !(c as any).supplierName?.toLowerCase().includes(q))
-        return false;
+      if (!c.containerNumber?.toLowerCase().includes(q) && !c.supplierName?.toLowerCase().includes(q)) return false;
     }
     return true;
   });
@@ -105,8 +103,8 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
       const db = b.arrivalDate ? new Date(b.arrivalDate).getTime() : sortOrder === "ETA_ASC" ? Infinity : -Infinity;
       if (da !== db) return sortOrder === "ETA_ASC" ? da - db : db - da;
     }
-    const sa = ((a as any).supplierName || "").toLowerCase();
-    const sb = ((b as any).supplierName || "").toLowerCase();
+    const sa = (a.supplierName || "").toLowerCase();
+    const sb = (b.supplierName || "").toLowerCase();
     return sa.localeCompare(sb);
   });
   // Summary stats
@@ -114,10 +112,10 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
   const inTransit = otwContainers.filter((c) => c.status === "IN_TRANSIT").length;
   const arrived = otwContainers.filter((c) => c.status === "ARRIVED").length;
   const delayed = otwContainers.filter((c) => calcDelayDays(c) > 0).length;
-  const withErrors = otwContainers.filter((c) => !!(c as any).trackingError).length;
+  const withErrors = otwContainers.filter((c) => !!c.trackingError).length;
   const today = new Date().toDateString();
   const checkedToday = otwContainers.filter((c) => {
-    const fc = c as any;
+    const fc = c;
     return fc.trackingLastCheckedAt && new Date(fc.trackingLastCheckedAt).toDateString() === today;
   }).length;
   // Cost totals grouped by currency
@@ -132,9 +130,9 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
   }, {});
   // Freight totals grouped by currency
   const freightByCurrency = filtered.reduce<Record<string, { symbol: string; amount: number }>>((acc, c) => {
-    const freightAmt = num((c as any).freight);
+    const freightAmt = num(c.freight);
     if (freightAmt <= 0) return acc;
-    const ccy = (c as any).freightCurrencyCode || c.currencyCode || "USD";
+    const ccy = c.freightCurrencyCode || c.currencyCode || "USD";
     const sym = ccySym(ccy);
     if (!acc[ccy]) acc[ccy] = { symbol: sym, amount: 0 };
     acc[ccy].amount += freightAmt;
@@ -145,9 +143,9 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
   // represents the full USD balance (container cost + freight + commission), matching
   // how "Total (USD)" already implicitly combines cost-in-USD across containers.
   const commissionByCurrency = filtered.reduce<Record<string, { symbol: string; amount: number }>>((acc, c) => {
-    const commAmt = num((c as any).commissionAmount);
+    const commAmt = num(c.commissionAmount);
     if (commAmt <= 0) return acc;
-    const ccy = (c as any).commissionCurrencyCode || "USD";
+    const ccy = c.commissionCurrencyCode || "USD";
     const sym = ccySym(ccy);
     if (!acc[ccy]) acc[ccy] = { symbol: sym, amount: 0 };
     acc[ccy].amount += commAmt;
@@ -170,10 +168,10 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
       };
     }
   }
-  const docsReceived = filtered.filter((c) => !!(c as any).otwDocsReceived).length;
+  const docsReceived = filtered.filter((c) => !!c.otwDocsReceived).length;
   const totalWeight = filtered.reduce((sum, c) => sum + num(c.totalKg), 0);
   const timelineContainer = otwContainers.find((c) => c.id === timelineId) ?? null;
-  const trackingEnabledCount = otwContainers.filter((c) => (c as any).trackingEnabled !== false).length;
+  const trackingEnabledCount = otwContainers.filter((c) => c.trackingEnabled !== false).length;
   const hasActiveFilters =
     search ||
     supplierFilter !== "all" ||
@@ -192,7 +190,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
   async function saveNote(id: number, val: string) {
     try {
       await factoryApiRequest("PATCH", `/api/factory/containers/${id}`, { otwNote: val || null });
-      patchCacheContainer(id, { otwNote: val || null } as any);
+      patchCacheContainer(id, { otwNote: val || null });
       tqClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
     } catch (err) {
       toast({
@@ -230,7 +228,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
       patchCacheContainer(variables.id, { arrivalDate: variables.arrivalDate });
       tqClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Failed to update ETA", description: err?.message, variant: "destructive" });
     },
   });
@@ -268,7 +266,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
         }
       }, POLL_MS);
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       setTrackingNowId(null);
       toast({ title: "Tracking failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
@@ -282,13 +280,13 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     for (const c of filtered) {
       rows.push([
         c.containerNumber || "",
-        (c as any).supplierName || "",
+        c.supplierName || "",
         c.arrivalDate ? c.arrivalDate.slice(0, 10) : "",
         c.status || "",
         containerCost(c).amount > 0 ? String(containerCost(c).amount) : "",
-        num((c as any).freight) > 0 ? String(num((c as any).freight)) : "",
+        num(c.freight) > 0 ? String(num(c.freight)) : "",
         c.totalKg ? String(c.totalKg) : "",
-        (c as any).otwNote || "",
+        c.otwNote || "",
       ]);
     }
     const csv = rows.map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -426,7 +424,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
   }
   async function trackAll() {
     const eligible = otwContainers.filter((c) => {
-      const fc = c as any;
+      const fc = c;
       return fc.trackingEnabled !== false && /^[A-Z]{4}\d{7}$/.test((c.containerNumber || "").trim().toUpperCase());
     });
     if (eligible.length === 0) {
@@ -784,12 +782,12 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
           </TableHeader>
           <TableBody>
             {filtered.map((c, idx) => {
-              const fc = c as any;
+              const fc = c;
               const cost = containerCost(c);
               const frSym = ccySym(c.freightCurrencyCode || c.currencyCode);
               const commSym = ccySym(c.commissionCurrencyCode || "USD");
               const dutySym = ccySym(c.currencyCode);
-              const docDone = !!(c as any).otwDocsReceived;
+              const docDone = !!c.otwDocsReceived;
               const isTracking = trackingNowId === c.id;
               const hasError = !!fc.trackingError;
               const isEnabled = fc.trackingEnabled !== false;
@@ -910,7 +908,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
 
                   {/* Notes */}
                   <TableCell onClick={(e) => e.stopPropagation()}>
-                    <NotesCell containerId={c.id} note={(c as any).otwNote ?? ""} onSave={saveNote} />
+                    <NotesCell containerId={c.id} note={c.otwNote ?? ""} onSave={saveNote} />
                   </TableCell>
 
                   {/* Actions */}

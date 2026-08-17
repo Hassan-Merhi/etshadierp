@@ -24,12 +24,16 @@ import {
 import { eq, and, inArray, sql, isNotNull } from "drizzle-orm";
 import { _getCached, _setCached } from "../../services/shared/ttlCache";
 
-const numberValue = (value: unknown) => toInventoryDecimal(value as any).toNumber();
+const numberValue = (value: unknown) =>
+  toInventoryDecimal(value as unknown as Parameters<typeof toInventoryDecimal>[0]).toNumber();
 const percentage = (numerator: unknown, denominator: unknown) => {
-  const divisor = toInventoryDecimal(denominator as any);
+  const divisor = toInventoryDecimal(denominator as unknown as Parameters<typeof toInventoryDecimal>[0]);
   return divisor.isZero()
     ? 0
-    : multiplyInventoryValues(divideInventoryValues(numerator as any, divisor), 100).toNumber();
+    : multiplyInventoryValues(
+        divideInventoryValues(numerator as unknown as Parameters<typeof divideInventoryValues>[0], divisor),
+        100
+      ).toNumber();
 };
 
 export function registerStatsReportsRoutes(app: Express) {
@@ -175,7 +179,7 @@ export function registerStatsReportsRoutes(app: Express) {
       const { status, supplierId, startDate, endDate, allCompanies, specificCompanyId } = req.query;
       let companyCondition;
       if (allCompanies === "true") {
-        const isDeveloper = (req.user as any)?.role === "Developer";
+        const isDeveloper = req.user?.role === "Developer";
         const companyIds = isDeveloper
           ? (await storage.getAllCompanies()).map((company) => company.id)
           : (await storage.getUserCompaniesWithRoles(req.user!.id)).map((membership) => membership.companyId);

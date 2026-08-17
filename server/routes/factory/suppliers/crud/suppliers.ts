@@ -28,7 +28,7 @@ import { eq, and, or, inArray } from "drizzle-orm";
 export function registerFactorySupplierCrudRoutes(app: Express) {
   app.get("/api/factory/suppliers", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const results = await db
@@ -46,7 +46,7 @@ export function registerFactorySupplierCrudRoutes(app: Express) {
 
   app.post("/api/factory/suppliers", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const parsed = insertFactorySupplierSchema.parse({ ...req.body, companyId });
@@ -60,7 +60,7 @@ export function registerFactorySupplierCrudRoutes(app: Express) {
 
   app.patch("/api/factory/suppliers/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
@@ -82,7 +82,7 @@ export function registerFactorySupplierCrudRoutes(app: Express) {
 
   app.delete("/api/factory/suppliers/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
@@ -104,7 +104,7 @@ export function registerFactorySupplierCrudRoutes(app: Express) {
 
   app.patch("/api/factory/suppliers/:id/reactivate", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
@@ -124,7 +124,7 @@ export function registerFactorySupplierCrudRoutes(app: Express) {
   // Overwrite a factory supplier's opening balance
   app.patch("/api/factory/suppliers/:id/opening-balance", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
@@ -165,7 +165,7 @@ export function registerFactorySupplierCrudRoutes(app: Express) {
   // Mark / unmark a supplier as broker (explicit flag, independent of whether children exist)
   app.patch("/api/factory/suppliers/:id/set-broker", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
@@ -200,7 +200,7 @@ export function registerFactorySupplierCrudRoutes(app: Express) {
   // Hard-delete a factory supplier — cascades through all related records
   app.delete("/api/factory/suppliers/:id/permanent", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);

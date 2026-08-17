@@ -69,7 +69,7 @@ export const useFormInitialization = (
         accountName = fsAccount?.name || `Factory Supplier ${accountId}`;
       }
       paymentForm.reset({
-        paymentAccountType: accountType as any,
+        paymentAccountType: accountType,
         paymentAccountId: accountId,
         paymentAccountName: accountName,
         voucherDate: parseISO(voucher.voucherDate),
@@ -99,7 +99,7 @@ export const useFormInitialization = (
             );
             eAccountName = fsAccount?.name || `Factory Supplier ${eAccountId}`;
           }
-          const amount = isReceipt
+          const _amount = isReceipt
             ? mainIsLiability
               ? e.creditAmount
               : e.creditAmount
@@ -107,7 +107,7 @@ export const useFormInitialization = (
               ? e.debitAmount
               : e.debitAmount;
           return {
-            accountType: eAccountType as any,
+            accountType: eAccountType,
             accountId: eAccountId,
             accountName: eAccountName,
             amount: parseFloat(e.debitAmount) > 0 ? e.debitAmount : e.creditAmount,
@@ -139,7 +139,7 @@ export const useFormInitialization = (
           else if (accountType === "supplier") accountName = suppliers.find((a) => a.id === accountId)?.legalName || "";
           return {
             type,
-            accountType: accountType as any,
+            accountType: accountType,
             accountId,
             accountName,
             amount: type === "DR" ? e.debitAmount : e.creditAmount,

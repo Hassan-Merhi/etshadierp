@@ -316,7 +316,7 @@ export async function buildWeeklyReportExcelBuffer(companyId: number, period: st
       ];
       vals.forEach((v, ci) => {
         const c = dr.getCell(ci + 1);
-        c.value = v as any;
+        c.value = v;
         c.font = { size: 9 };
         c.border = BA;
         if (ci === 0) {
@@ -343,7 +343,7 @@ export async function buildWeeklyReportExcelBuffer(companyId: number, period: st
     ];
     totVals.forEach((v, ci) => {
       const c = totRow.getCell(ci + 1);
-      c.value = v as any;
+      c.value = v;
       c.font = { bold: true, size: 9 };
       c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: TBG } };
       c.border = BA;

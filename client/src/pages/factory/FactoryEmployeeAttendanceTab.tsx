@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -61,11 +62,11 @@ function localDateStr(d: Date) {
 function todayStr() {
   return localDateStr(new Date());
 }
-function currentMonthStart() {
+function _currentMonthStart() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
 }
-function currentMonthEnd() {
+function _currentMonthEnd() {
   const d = new Date();
   return localDateStr(new Date(d.getFullYear(), d.getMonth() + 1, 0));
 }
@@ -155,7 +156,7 @@ export default function FactoryEmployeeAttendanceTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employee-attendance", selectedDate] });
       toast({ title: "Attendance saved", description: `Saved for ${selectedDate}` });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       if (err?._handledGlobally) return;
       toast({ title: "Save failed", description: err.message, variant: "destructive" });
     },
@@ -507,7 +508,7 @@ function PerEmployeeView() {
       });
       toast({ title: "Attendance saved", description: `${dates.length} days saved.` });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       if (err?._handledGlobally) return;
       toast({ title: "Save failed", description: err.message, variant: "destructive" });
     },

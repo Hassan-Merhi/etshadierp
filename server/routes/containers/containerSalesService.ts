@@ -113,7 +113,10 @@ export const containerSalesService = {
         .select()
         .from(containerSales)
         .where(
-          and(eq(containerSales.companyId, companyId), eq(containerSales.voucherId, Number((posted.voucher as any).id)))
+          and(
+            eq(containerSales.companyId, companyId),
+            eq(containerSales.voucherId, Number((posted.voucher as { id: unknown }).id))
+          )
         )
         .limit(1);
       if (replayedSale) return replayedSale;

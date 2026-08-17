@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAdminOverride } from "@/hooks/use-admin-override";
@@ -110,7 +111,7 @@ function ChargeDialog({ transporterId, open, onClose }: { transporterId: number;
       setDescription("");
       onClose();
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   return (
@@ -221,7 +222,7 @@ function PaymentDialog({
       setDescription("");
       onClose();
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   return (
@@ -315,7 +316,7 @@ function TransporterStatement({ transporterId, onBack }: { transporterId: number
       queryClient.invalidateQueries({ queryKey: [API] });
       queryClient.invalidateQueries({ queryKey: [API, transporterId] });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const handlePrint = useReactToPrint({ contentRef: printRef });
@@ -512,7 +513,7 @@ function AddTransporterDialog({ open, onClose }: { open: boolean; onClose: () =>
       setNotes("");
       onClose();
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   return (

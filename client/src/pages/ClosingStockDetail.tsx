@@ -42,7 +42,7 @@ function formatQty(value: number): string {
   return `${formatNumber(value)} BL`;
 }
 
-function formatValue(value: number): string {
+function _formatValue(value: number): string {
   if (value === 0) return "";
   return formatNumber(value);
 }

@@ -36,7 +36,7 @@ export function registerOrphanedVoucherRepairRoutes(app: Express) {
       let deletedPayrollVouchers = 0;
       let deletedAdvanceVouchers = 0;
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         // ── PAYMENT-PAY-{payrollId}-{ts} ────────────────────────────────────────
         // Should exist only when the referenced payroll is in PAID status.
         // If the payroll is DRAFT, APPROVED, or deleted → the voucher is orphaned.

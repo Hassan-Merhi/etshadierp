@@ -159,7 +159,7 @@ export function SupplierStatement({
   const activeSt = (statementData.statement || []).filter((c) => c.status !== "OFFLOADED");
   const activeContainerCount = activeSt.length;
   const activeKg = activeSt.reduce(
-    (sum: number, c: any) => sum + parseFloat(c.actualReceivedKg || c.totalKg || "0"),
+    (sum: number, c) => sum + parseFloat(c.actualReceivedKg || c.totalKg || "0"),
     0
   );
   const currencyGroups = statementData.currencyGroups || [];
@@ -169,7 +169,7 @@ export function SupplierStatement({
     const cc = g.currencyCode;
     if (!ownMap[cc]) ownMap[cc] = { own: 0, totalFreight: 0 };
     ownMap[cc].own += parseFloat(g.netPayable || "0");
-    ownMap[cc].totalFreight += parseFloat((g as any).totalFreight || "0");
+    ownMap[cc].totalFreight += parseFloat(g.totalFreight || "0");
   }
 
   const renderBalCard = (cc: string, bal: number, label: string, testId: string, freight?: number) => {

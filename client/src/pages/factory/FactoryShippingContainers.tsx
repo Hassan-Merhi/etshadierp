@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -86,14 +87,14 @@ export default function FactoryShippingContainers() {
     try {
       const saved = localStorage.getItem(`fsc_col_vis_${me.id}`);
       if (saved) setColVis({ ...DEFAULT_COL_VIS, ...JSON.parse(saved) });
-    } catch {}
+    } catch { /* intentionally empty */ }
   }, [me?.id]);
   function toggleCol(id: ShippingColId) {
     setColVis((prev) => {
       const next = { ...prev, [id]: !prev[id] };
       try {
         if (me?.id) localStorage.setItem(`fsc_col_vis_${me.id}`, JSON.stringify(next));
-      } catch {}
+      } catch { /* intentionally empty */ }
       return next;
     });
   }
@@ -128,7 +129,7 @@ export default function FactoryShippingContainers() {
     enabled: doneExpanded,
     placeholderData: (previous) => previous,
   });
-  const done = donePageData?.rows ?? [];
+  const done = useMemo(() => (donePageData?.rows ?? []), [donePageData?.rows]);
   const doneTotal = donePageData?.total ?? 0;
   const doneTotalPages = donePageData?.totalPages ?? 0;
 
@@ -171,7 +172,7 @@ export default function FactoryShippingContainers() {
         );
       }, 8000);
     },
-    onError: (err: any) => toast({ title: "Tracking failed", description: err.message, variant: "destructive" }),
+    onError: (err: ClientErrorLike) => toast({ title: "Tracking failed", description: err.message, variant: "destructive" }),
   });
 
   useEffect(
@@ -191,14 +192,14 @@ export default function FactoryShippingContainers() {
   const patchRowMutation = useMutation({
     mutationFn: ({ id, patch }: { id: number; patch: object }) => apiRequest("PATCH", `${LIST_KEY}/${id}`, patch),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [LIST_KEY] }),
-    onError: (e: any) => toast({ title: "Update failed", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Update failed", description: e.message, variant: "destructive" }),
   });
 
   const syncOrderMutation = useMutation({
     mutationFn: ({ id, patch }: { id: number; patch: object }) =>
       apiRequest("PATCH", `${LIST_KEY}/${id}/sync-order`, patch),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [LIST_KEY] }),
-    onError: (e: any) => toast({ title: "Update failed", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Update failed", description: e.message, variant: "destructive" }),
   });
 
   const doneMutation = useMutation({
@@ -208,7 +209,7 @@ export default function FactoryShippingContainers() {
       queryClient.invalidateQueries({ queryKey: [LIST_KEY] });
       toast({ title: "Marked as done" });
     },
-    onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
   });
 
   const restoreMutation = useMutation({
@@ -217,7 +218,7 @@ export default function FactoryShippingContainers() {
       queryClient.invalidateQueries({ queryKey: [LIST_KEY] });
       toast({ title: "Restored to active" });
     },
-    onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
   });
 
   const deleteRowMutation = useMutation({
@@ -226,7 +227,7 @@ export default function FactoryShippingContainers() {
       queryClient.invalidateQueries({ queryKey: [LIST_KEY] });
       toast({ title: "Container record deleted" });
     },
-    onError: (e: any) => toast({ title: "Delete failed", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Delete failed", description: e.message, variant: "destructive" }),
   });
 
   const uploadShippingInvoiceMutation = useMutation({
@@ -249,7 +250,7 @@ export default function FactoryShippingContainers() {
       toast({ title: "Shipping invoice uploaded" });
       setShippingInvoiceUploadingId(null);
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       toast({ title: "Upload failed", description: e.message, variant: "destructive" });
       setShippingInvoiceUploadingId(null);
     },
@@ -261,7 +262,7 @@ export default function FactoryShippingContainers() {
       queryClient.invalidateQueries({ queryKey: [LIST_KEY] });
       toast({ title: "Shipping invoice removed" });
     },
-    onError: (e: any) => toast({ title: "Remove failed", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Remove failed", description: e.message, variant: "destructive" }),
   });
 
   function handleShippingInvoiceFileChange(e: React.ChangeEvent<HTMLInputElement>) {

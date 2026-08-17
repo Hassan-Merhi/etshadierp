@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -38,7 +39,7 @@ export function FixPOCreditsDialog({ open, onOpenChange, companies }: FixPOCredi
       setResult(data);
       toast({ title: "Success", description: data.message });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const reverseMutation = useMutation({
@@ -51,7 +52,7 @@ export function FixPOCreditsDialog({ open, onOpenChange, companies }: FixPOCredi
       setResult(data);
       toast({ title: "Success", description: data.message });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   return (
@@ -164,7 +165,7 @@ export function ResetCompanyDataDialog({ open, onOpenChange, companies }: ResetC
       setResult(data);
       toast({ title: "Success", description: data.message });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   return (

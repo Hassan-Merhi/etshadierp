@@ -20,7 +20,7 @@ import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { PeriodFilter, getDefaultPeriodValue, PeriodFilterValue } from "@/components/ui/period-filter";
 import { useDateJump } from "@/hooks/use-date-jump";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useCursorNav } from "@/contexts/CursorNavContext";
 import { PageHeader } from "@/components/PageHeader";
 import {
@@ -151,12 +151,12 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
     return showAllMonths ? data.monthlyData : data.monthlyData.filter(hasActivity);
   }, [data?.monthlyData, showAllMonths]);
 
-  const handleMonthClick = (month: number) => {
+  const handleMonthClick = useCallback((month: number) => {
     if (!isAllLocationsMode) {
       const year = new Date(periodFilter.fromDate).getFullYear();
       navigate(`/locations/${locationId}/stock-items/${stockItemId}/vouchers/${year}/${month}`);
     }
-  };
+  }, [isAllLocationsMode, locationId, navigate, periodFilter.fromDate, stockItemId]);
 
   const fmtQty = (n: number) => {
     if (n === 0) return "—";
@@ -197,7 +197,7 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
     };
     window.addEventListener("keydown", handleKeyDown, { capture: true });
     return () => window.removeEventListener("keydown", handleKeyDown, { capture: true });
-  }, [selectedRowIndex, visibleRows, isAllLocationsMode]);
+  }, [selectedRowIndex, visibleRows, isAllLocationsMode, handleMonthClick]);
 
   useEffect(() => {
     if (selectedRowIndex < 0 || !tableScrollContainer.current) return;
@@ -218,7 +218,7 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
         }),
     });
     return () => clearCursorNav();
-  }, [selectedRowIndex, visibleRows]);
+  }, [clearCursorNav, registerCursorNav, selectedRowIndex, visibleRows]);
 
   if (isLoading) {
     return (

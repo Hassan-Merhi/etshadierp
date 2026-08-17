@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { ArrowLeft, Package, Scale, Boxes, Pencil, Trash2 } from "lucide-react";
@@ -75,7 +76,7 @@ export default function BatchDetail({ batchId, onBack, onDeleted }: BatchDetailP
     queryKey: ["/api/factory/suppliers"],
   });
 
-  const supplierMap = Object.fromEntries((suppliers || []).map((s) => [s.id, s.name]));
+  const _supplierMap = Object.fromEntries((suppliers || []).map((s) => [s.id, s.name]));
 
   const editMutation = useMutation({
     mutationFn: async () => {
@@ -95,7 +96,7 @@ export default function BatchDetail({ batchId, onBack, onDeleted }: BatchDetailP
       setEditOpen(false);
       toast({ title: "Saved", description: "Batch updated successfully" });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -116,7 +117,7 @@ export default function BatchDetail({ batchId, onBack, onDeleted }: BatchDetailP
       setDeleteOpen(false);
       (onDeleted || onBack)();
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -187,7 +188,7 @@ export default function BatchDetail({ batchId, onBack, onDeleted }: BatchDetailP
             variant="outline"
             onClick={() => {
               setEditName(batch.name || "");
-              setEditNotes((batch as any).notes || "");
+              setEditNotes(batch.notes || "");
               setEditOpen(true);
             }}
             data-testid="button-edit-batch"
@@ -206,7 +207,7 @@ export default function BatchDetail({ batchId, onBack, onDeleted }: BatchDetailP
             <div className="flex items-center gap-3 flex-wrap">
               <Boxes className="h-5 w-5 text-muted-foreground" />
               <CardTitle data-testid="text-batch-name">{batch.name || batch.batchCode}</CardTitle>
-              <Badge variant={getStatusVariant(batch.status) as any} data-testid="badge-batch-status">
+              <Badge variant={getStatusVariant(batch.status)} data-testid="badge-batch-status">
                 {batch.status}
               </Badge>
             </div>
@@ -359,7 +360,19 @@ export default function BatchDetail({ batchId, onBack, onDeleted }: BatchDetailP
                           </TableCell>
                           <TableCell>
                             <Badge
-                              variant={(STATUS_COLORS[bale.status] || "secondary") as any}
+                              variant={
+                                (STATUS_COLORS[bale.status] || "secondary") as
+                                  | "default"
+                                  | "outline"
+                                  | "secondary"
+                                  | "destructive"
+                                  | "success"
+                                  | "warning"
+                                  | "info"
+                                  | "muted"
+                                  | null
+                                  | undefined
+                              }
                               data-testid={`badge-status-${bale.id}`}
                             >
                               {bale.status.replace(/_/g, " ")}

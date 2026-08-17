@@ -11,14 +11,7 @@ function requestPath(req: Request): string {
   return req.originalUrl.split("?", 1)[0] || req.path;
 }
 
-function deny(
-  req: Request,
-  res: Response,
-  status: number,
-  code: string,
-  message: string,
-  operation: string
-): void {
+function deny(req: Request, res: Response, status: number, code: string, message: string, operation: string): void {
   logger.error(
     JSON.stringify({
       event: "operational_permission_denied",
@@ -28,7 +21,7 @@ function deny(
       role: req._activeCompanyPermissionContext?.role ?? req.session.currentRole ?? null,
       companyId:
         req._activeCompanyPermissionContext?.companyId ??
-        (req.session as any).factoryCompanyId ??
+        req.session.factoryCompanyId ??
         req.session.currentCompanyId ??
         null,
       method: req.method,

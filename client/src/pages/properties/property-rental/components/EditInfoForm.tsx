@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * EditInfoForm — extracted sub-component.
  *
@@ -71,7 +72,7 @@ function EditInfoForm({
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units", unitId, "detail"] });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const saveUnit = useMutation({
@@ -80,7 +81,7 @@ function EditInfoForm({
       toast({ title: "Unit name updated" });
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const contractChanged =

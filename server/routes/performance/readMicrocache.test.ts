@@ -24,7 +24,7 @@ function makeRequest(overrides: Record<string, unknown> = {}) {
       currentPOSStation: 1,
     },
     ...overrides,
-  } as any;
+  };
 }
 
 function makeResponse(statusCode = 200) {
@@ -70,10 +70,10 @@ function makeResponse(statusCode = 200) {
       listeners.delete(event);
       return this;
     },
-  } as any;
+  };
 }
 
-function storeJson(middleware: any, request: any, response: any, body: unknown) {
+function storeJson(middleware: unknown, request: unknown, response: unknown, body: unknown) {
   middleware(request, response, () => response.json(body));
 }
 

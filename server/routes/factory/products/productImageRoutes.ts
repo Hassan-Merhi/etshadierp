@@ -43,7 +43,7 @@ export function registerFactoryProductImageRoutes(app: Express) {
 
   app.get("/api/factory/bale-product-images", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { articleCode } = req.query;
       const conditions = [eq(factoryBaleProductImages.companyId, companyId)];
@@ -63,7 +63,7 @@ export function registerFactoryProductImageRoutes(app: Express) {
     productImageUpload.single("image")(req, res, async (err: any) => {
       try {
         if (err) return res.status(400).json({ message: getErrorMessage(err) });
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
         if (!req.file) return res.status(400).json({ message: "No image uploaded" });
         const { articleCode, productId } = req.body;
@@ -89,7 +89,7 @@ export function registerFactoryProductImageRoutes(app: Express) {
 
   app.delete("/api/factory/bale-product-images/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });

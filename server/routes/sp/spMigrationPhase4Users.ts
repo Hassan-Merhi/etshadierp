@@ -229,7 +229,7 @@ export async function moveUsersToTargetExact(
     const userId = String(sourceRole.user_id);
     const mappedRole = await mapRole(sourceId, targetId, sourceRole);
 
-    await db.transaction(async (tx: any) => {
+    await db.transaction(async (tx) => {
       const sourceLocations = await loadUserLocations(tx, userId, sourceId);
       const sourceCashMappings = await loadCashMappings(tx, userId, sourceId);
       const targetLocationsBefore = await loadUserLocations(tx, userId, targetId);
@@ -363,7 +363,7 @@ export async function restoreUsersToSourceExact(
       ? change.target_cash_mappings_snapshot_before
       : [];
 
-    await db.transaction(async (tx: any) => {
+    await db.transaction(async (tx) => {
       const restoredSourceRole = await upsertRole(tx, userId, sourceId, sourceRole);
       if (restoredSourceRole.created) summary.sourceRolesRestored++;
       await replaceLocations(tx, userId, sourceId, sourceLocations);

@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * ItemFormDialog — extracted sub-component.
  *
@@ -52,7 +53,7 @@ function ItemFormDialog({
       toast({ title: existing ? "Item updated" : "Item added" });
       onClose();
     },
-    onError: (e: any) => toast({ title: "Save failed", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Save failed", description: e.message, variant: "destructive" }),
   });
 
   const handleSubmit = () => {

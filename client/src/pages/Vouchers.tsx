@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
@@ -109,7 +110,18 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
   const [activeTab, setActiveTab] = useState<
     "payment" | "receipt" | "journal" | "transfer" | "transferorder" | "adjustment" | "creditnote"
-  >((tabParam as any) || "payment");
+  >(
+    (tabParam as
+      | "payment"
+      | "receipt"
+      | "journal"
+      | "transfer"
+      | "transferorder"
+      | "adjustment"
+      | "creditnote"
+      | (() => "payment" | "receipt" | "journal" | "transfer" | "transferorder" | "adjustment" | "creditnote")) ||
+      "payment"
+  );
   const [editVoucherId, setEditVoucherId] = useState<number | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [accountPickersNeeded, setAccountPickersNeeded] = useState(() => !!voucherIdToEdit);
@@ -241,7 +253,12 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   });
 
   useEffect(() => {
-    if (tabParam) setActiveTab(tabParam as any);
+    if (tabParam)
+      setActiveTab(
+        tabParam as React.SetStateAction<
+          "payment" | "receipt" | "journal" | "transfer" | "transferorder" | "adjustment" | "creditnote"
+        >
+      );
     else setActiveTab("payment");
 
     if (voucherIdToEdit) {
@@ -353,7 +370,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         });
       }
     },
-    onError: (error: any, formData: VoucherFormData) => {
+    onError: (error: ClientErrorLike, formData: VoucherFormData) => {
       if (error.name === "OfflineQueued") {
         const voucherType = activeTab === "payment" ? "Payment" : "Receipt";
         const syntheticVoucher = {
@@ -364,7 +381,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           description: formData.notes || `${voucherType} (pending sync)`,
           totalAmount: formData.entries
             .filter((e) => parseFloat(e.amount || "0") > 0)
-            .reduce((sum: number, e: any) => sum + parseFloat(e.amount || "0"), 0)
+            .reduce((sum: number, e) => sum + parseFloat(e.amount || "0"), 0)
             .toFixed(2),
           optional: formData.optional || false,
           createdAt: new Date().toISOString(),
@@ -384,7 +401,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         });
         return;
       }
-      if ((error as any)._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || `Failed to ${voucherIdToEdit ? "update" : "create"} voucher`,
@@ -408,7 +425,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       toast({ title: "Statement sent to WhatsApp" });
       setWaPendingPrompt(null);
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "WhatsApp send failed", description: error.message, variant: "destructive" });
       setWaPendingPrompt(null);
@@ -423,7 +440,19 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const handleAccountCreated = async (account: { id: number; name: string; type: string }) => {
     if (!createAccountContext) return;
     if (createAccountContext.tab === "payment" || createAccountContext.tab === "receipt") {
-      const accountObj: Account = { id: account.id, name: account.name, type: account.type as any, code: "" };
+      const accountObj: Account = {
+        id: account.id,
+        name: account.name,
+        type: account.type as
+          | "customer"
+          | "ledger"
+          | "bank"
+          | "supplier"
+          | "employee"
+          | "fixedAsset"
+          | "factorySupplier",
+        code: "",
+      };
       handleSidebarAccountSelect(accountObj);
     }
     setCreateAccountContext(null);
@@ -531,7 +560,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                   label="Unsaved payment draft found"
                   onRestore={() => {
                     if (paymentDraft?.data) {
-                      const d = paymentDraft.data as any;
+                      const d = paymentDraft.data as unknown as object & { voucherDate: unknown } & {
+                        voucherDate: string | number | Date;
+                      };
                       form.reset({ ...d, voucherDate: d.voucherDate ? new Date(d.voucherDate) : new Date() });
                     }
                     discardPaymentDraft();
@@ -601,7 +632,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                   label="Unsaved receipt draft found"
                   onRestore={() => {
                     if (paymentDraft?.data) {
-                      const d = paymentDraft.data as any;
+                      const d = paymentDraft.data as unknown as object & { voucherDate: unknown } & {
+                        voucherDate: string | number | Date;
+                      };
                       form.reset({ ...d, voucherDate: d.voucherDate ? new Date(d.voucherDate) : new Date() });
                     }
                     discardPaymentDraft();

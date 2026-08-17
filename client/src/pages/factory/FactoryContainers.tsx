@@ -105,10 +105,10 @@ export default function FactoryContainers() {
       }
     >();
     for (const c of otwContainers) {
-      const key = String((c as any).supplierId ?? "none");
+      const key = String(c.supplierId ?? "none");
       if (!map.has(key)) {
         map.set(key, {
-          supplierId: (c as any).supplierId ?? null,
+          supplierId: c.supplierId ?? null,
           supplierName: c.supplierName || "No Supplier",
           containers: [],
           totalKg: 0,
@@ -165,7 +165,7 @@ export default function FactoryContainers() {
       });
     },
     onError: (err: Error) => {
-      if ((err as any)?._handledGlobally) return;
+      if ((err as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Import Failed", description: err.message, variant: "destructive" });
     },
   });
@@ -209,9 +209,9 @@ export default function FactoryContainers() {
 
   const filteredContainers = containers?.filter((c) => {
     if (statusFilter === "HAS_WEIGHT") {
-      if (!(parseFloat((c as any).totalKg) > 0)) return false;
+      if (!(parseFloat((c as { totalKg: string }).totalKg) > 0)) return false;
     } else if (statusFilter === "NO_WEIGHT") {
-      if (parseFloat((c as any).totalKg) > 0) return false;
+      if (parseFloat((c as { totalKg: string }).totalKg) > 0) return false;
     } else if (statusFilter !== "all" && c.status !== statusFilter) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();

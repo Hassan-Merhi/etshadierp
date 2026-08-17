@@ -104,13 +104,19 @@ export function registerStockItemWriteRoutes(app: Express) {
       try {
         const _stockChanges: Record<string, { old?: any; new?: any }> = {};
         for (const _f of ["name", "code", "uom", "barcode", "sellingPrice", "active"] as const) {
-          if (String((existingItem as any)[_f] ?? "") !== String((updated as any)[_f] ?? "")) {
-            _stockChanges[_f] = { old: (existingItem as any)[_f], new: (updated as any)[_f] };
+          if (
+            String((existingItem as { [key: string]: unknown })[_f] ?? "") !==
+            String((updated as { [key: string]: unknown })[_f] ?? "")
+          ) {
+            _stockChanges[_f] = {
+              old: (existingItem as { [key: string]: unknown })[_f],
+              new: (updated as { [key: string]: unknown })[_f],
+            };
           }
         }
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId: req.session.currentCompanyId!,
           action: "update",
           tableName: "stock_items",
@@ -167,7 +173,7 @@ export function registerStockItemWriteRoutes(app: Express) {
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId: req.session.currentCompanyId!,
           action: "delete",
           tableName: "stock_items",

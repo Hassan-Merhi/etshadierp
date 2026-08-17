@@ -154,7 +154,7 @@ function ScreenFeedDialog({
   });
 
   const presence = presenceRaw && typeof presenceRaw === "object" && !Array.isArray(presenceRaw) ? presenceRaw : null;
-  const activity = Array.isArray(activityRaw) ? (activityRaw as ActivityEvent[]) : [];
+  const activity = useMemo(() => (Array.isArray(activityRaw) ? (activityRaw as ActivityEvent[]) : []), [activityRaw]);
   const groupedActivity = useMemo(() => groupConsecutiveActivity(activity), [activity]);
 
   const setConnectionState = useCallback((value: boolean) => {

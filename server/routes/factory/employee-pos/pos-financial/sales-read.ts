@@ -14,7 +14,7 @@ import { eq, and, desc } from "drizzle-orm";
 export function registerPosSalesReadRoutes(app: Express) {
   app.get("/api/factory/pos/sales", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const sales = await db
         .select()
@@ -30,7 +30,7 @@ export function registerPosSalesReadRoutes(app: Express) {
   // GET /api/factory/pos/sales/:id — single sale with items
   app.get("/api/factory/pos/sales/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const saleId = parseInt(req.params.id);
       const [sale] = await db

@@ -45,8 +45,8 @@ const transferPatchSchema = z.object({
 });
 
 function errorStatus(error: unknown): number {
-  const code = String((error as any)?.code ?? "");
-  const message = String((error as any)?.message ?? "");
+  const code = String((error as { code: unknown })?.code ?? "");
+  const message = String((error as { message: unknown })?.message ?? "");
   if (code === "STOCK_TRANSFER_INSUFFICIENT_STOCK" || /insufficient stock/i.test(message)) return 409;
   if (/belong.*different company/i.test(message)) return 403;
   if (/required|positive|different|missing|deleted|not found|not a stock transfer|inactive/i.test(message)) return 400;
@@ -57,10 +57,11 @@ function sendError(res: Response, error: unknown, context: string) {
   const status = errorStatus(error);
   if (status === 500) logger.error(`[StockTransferLifecycle ${context}]`, { error: error });
   const payload: Record<string, unknown> = {
-    message: String((error as any)?.message ?? `Failed to ${context.toLowerCase()} stock transfer`),
+    message: String((error as { message: unknown })?.message ?? `Failed to ${context.toLowerCase()} stock transfer`),
   };
   for (const field of ["code", "stockItemId", "sourceLocationId", "requiredQuantity", "availableQuantity"]) {
-    if ((error as any)?.[field] !== undefined) payload[field] = (error as any)[field];
+    if ((error as { [key: string]: undefined })?.[field] !== undefined)
+      payload[field] = (error as { [key: string]: unknown })[field];
   }
   return res.status(status).json(payload);
 }
@@ -86,11 +87,19 @@ export function registerStockTransferLifecycleRoutes(app: Express) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const voucherId = Number(req.params.id);
-      if (!Number.isInteger(voucherId) || voucherId <= 0) return res.status(400).json({ message: "Invalid voucher ID" });
+      if (!Number.isInteger(voucherId) || voucherId <= 0)
+        return res.status(400).json({ message: "Invalid voucher ID" });
 
       const voucher = await getVoucher(voucherId);
-      if (!voucher || (voucher.voucherType !== "Stock Transfer" && voucher.voucherType !== "StockTransfer" && voucher.voucherType !== "Transfer")) return next();
-      if (voucher.companyId !== companyId) return res.status(403).json({ message: "Voucher belongs to a different company" });
+      if (
+        !voucher ||
+        (voucher.voucherType !== "Stock Transfer" &&
+          voucher.voucherType !== "StockTransfer" &&
+          voucher.voucherType !== "Transfer")
+      )
+        return next();
+      if (voucher.companyId !== companyId)
+        return res.status(403).json({ message: "Voucher belongs to a different company" });
 
       const targetOptional = req.body.optional === true;
       if (targetOptional === voucher.optional) return next();
@@ -161,11 +170,19 @@ export function registerStockTransferLifecycleRoutes(app: Express) {
         const companyId = req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
         const voucherId = Number(req.params.id);
-        if (!Number.isInteger(voucherId) || voucherId <= 0) return res.status(400).json({ message: "Invalid voucher ID" });
+        if (!Number.isInteger(voucherId) || voucherId <= 0)
+          return res.status(400).json({ message: "Invalid voucher ID" });
 
         const voucher = await getVoucher(voucherId);
-        if (!voucher || (voucher.voucherType !== "Stock Transfer" && voucher.voucherType !== "StockTransfer" && voucher.voucherType !== "Transfer")) return next();
-        if (voucher.companyId !== companyId) return res.status(403).json({ message: "Voucher belongs to a different company" });
+        if (
+          !voucher ||
+          (voucher.voucherType !== "Stock Transfer" &&
+            voucher.voucherType !== "StockTransfer" &&
+            voucher.voucherType !== "Transfer")
+        )
+          return next();
+        if (voucher.companyId !== companyId)
+          return res.status(403).json({ message: "Voucher belongs to a different company" });
 
         const [transfer] = await db
           .select()
@@ -210,11 +227,19 @@ export function registerStockTransferLifecycleRoutes(app: Express) {
         const companyId = req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
         const voucherId = Number(req.params.id);
-        if (!Number.isInteger(voucherId) || voucherId <= 0) return res.status(400).json({ message: "Invalid voucher ID" });
+        if (!Number.isInteger(voucherId) || voucherId <= 0)
+          return res.status(400).json({ message: "Invalid voucher ID" });
 
         const voucher = await getVoucher(voucherId);
-        if (!voucher || (voucher.voucherType !== "Stock Transfer" && voucher.voucherType !== "StockTransfer" && voucher.voucherType !== "Transfer")) return next();
-        if (voucher.companyId !== companyId) return res.status(403).json({ message: "Voucher belongs to a different company" });
+        if (
+          !voucher ||
+          (voucher.voucherType !== "Stock Transfer" &&
+            voucher.voucherType !== "StockTransfer" &&
+            voucher.voucherType !== "Transfer")
+        )
+          return next();
+        if (voucher.companyId !== companyId)
+          return res.status(403).json({ message: "Voucher belongs to a different company" });
 
         const result = await finalizeOptionalStockTransfer(companyId, voucherId);
         return res.json({ success: true, ...result });

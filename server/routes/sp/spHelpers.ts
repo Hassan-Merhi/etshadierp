@@ -8,8 +8,8 @@ import { firstRow } from "../../lib/queryResult";
 // Structural-only extraction from the former monolithic spRoutes.ts — logic is
 // byte-for-byte identical to what every SP route sub-module previously used.
 
-export function getCompanyId(req: any): number | null {
-  return (req.session as any)?.currentCompanyId ?? null;
+export function getCompanyId(req: import("express").Request): number | null {
+  return req.session?.currentCompanyId ?? null;
 }
 
 export async function requireSpCompany(req: Request, res: Response): Promise<number | null> {
@@ -19,7 +19,7 @@ export async function requireSpCompany(req: Request, res: Response): Promise<num
     return null;
   }
   const rows = await db.execute(sql`SELECT company_type FROM companies WHERE id = ${companyId} LIMIT 1`);
-  const row = firstRow(rows) ?? (rows as any)[0];
+  const row = firstRow(rows) ?? (rows as unknown as { [key: string]: Record<string, unknown> | undefined })[0];
   if (!row || row.company_type !== "supplier_partner") {
     res.status(403).json({ message: "Not a supplier_partner company" });
     return null;
@@ -41,7 +41,7 @@ export async function getSpAccount(companyId: number, subType: string) {
   return acct;
 }
 
-export function parseNum(v: any): number {
+export function parseNum(v: unknown): number {
   const n = parseFloat(String(v ?? "0"));
   return isNaN(n) ? 0 : n;
 }

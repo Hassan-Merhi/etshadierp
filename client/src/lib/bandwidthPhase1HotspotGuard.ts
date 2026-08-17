@@ -295,8 +295,15 @@ async function cloneSharedResponse(
 }
 
 export function installBandwidthPhase1HotspotGuard(): void {
-  if (typeof window === "undefined" || (window as any).__bandwidthPhase1HotspotGuardInstalled) return;
-  (window as any).__bandwidthPhase1HotspotGuardInstalled = true;
+  if (
+    typeof window === "undefined" ||
+    (window as unknown as (Window & typeof globalThis) & { __bandwidthPhase1HotspotGuardInstalled: boolean })
+      .__bandwidthPhase1HotspotGuardInstalled
+  )
+    return;
+  (
+    window as unknown as (Window & typeof globalThis) & { __bandwidthPhase1HotspotGuardInstalled: true }
+  ).__bandwidthPhase1HotspotGuardInstalled = true;
 
   const originalFetch = window.fetch.bind(window);
   const invalidationChannel =

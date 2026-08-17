@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useCallback } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -23,7 +24,7 @@ export const trackingFields = [
 ] as const;
 
 export const autoSizeStyle = (value: unknown, placeholder = "", minCh = 10, maxCh = 32) => {
-  const text = String((value ?? "") as any) || placeholder || "";
+  const text = String(value ?? "") || placeholder || "";
   const ch = Math.max(minCh, Math.min(maxCh, text.length + 2));
   return {
     width: `${ch}ch`,
@@ -47,13 +48,10 @@ export function useContainerTracking(filteredOtwContainers: Container[]) {
       // Immediately patch every cache entry that holds this container so that
       // the input doesn't revert to the stale server value while the
       // background refetch is in flight.
-      queryClient.setQueriesData(
-        { queryKey: ["/api/containers/active"], exact: false },
-        (old: unknown) => {
-          if (!Array.isArray(old)) return old;
-          return (old as Container[]).map((c) => (c.id === id ? { ...c, ...updatedContainer } : c));
-        },
-      );
+      queryClient.setQueriesData({ queryKey: ["/api/containers/active"], exact: false }, (old: unknown) => {
+        if (!Array.isArray(old)) return old;
+        return (old as Container[]).map((c) => (c.id === id ? { ...c, ...updatedContainer } : c));
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/containers/active"] });
       setTrackingEdits((prev) => {
         const next = { ...prev };
@@ -67,7 +65,7 @@ export function useContainerTracking(filteredOtwContainers: Container[]) {
       });
       toast({ title: "Saved", description: "Tracking info updated" });
     },
-    onError: (error: any, { id }) => {
+    onError: (error: ClientErrorLike, { id }) => {
       if (error?._handledGlobally) return;
       setSavingIds((prev) => {
         const next = new Set(prev);
@@ -118,13 +116,10 @@ export function useContainerTracking(filteredOtwContainers: Container[]) {
         const res = await apiRequest("PATCH", `/api/containers/${id}/tracking`, data);
         const updatedContainer: Container = await res.json();
         // Patch the cache immediately so the row shows the new value.
-        queryClient.setQueriesData(
-          { queryKey: ["/api/containers/active"], exact: false },
-          (old: unknown) => {
-            if (!Array.isArray(old)) return old;
-            return (old as Container[]).map((c) => (c.id === id ? { ...c, ...updatedContainer } : c));
-          },
-        );
+        queryClient.setQueriesData({ queryKey: ["/api/containers/active"], exact: false }, (old: unknown) => {
+          if (!Array.isArray(old)) return old;
+          return (old as Container[]).map((c) => (c.id === id ? { ...c, ...updatedContainer } : c));
+        });
         savedCount++;
       } catch (e) {
         errorCount++;
@@ -136,7 +131,11 @@ export function useContainerTracking(filteredOtwContainers: Container[]) {
     if (errorCount === 0) {
       toast({ title: "Saved", description: `${savedCount} container(s) updated` });
     } else {
-      toast({ title: "Partial save", description: `${savedCount} saved, ${errorCount} failed`, variant: "destructive" });
+      toast({
+        title: "Partial save",
+        description: `${savedCount} saved, ${errorCount} failed`,
+        variant: "destructive",
+      });
     }
   };
 
@@ -156,7 +155,11 @@ export function useContainerTracking(filteredOtwContainers: Container[]) {
       const focusInput = async (inputId: string | null) => {
         if (!inputId) return false;
         const el = document.getElementById(inputId) as HTMLInputElement | null;
-        if (el) { el.focus(); el.select?.(); return true; }
+        if (el) {
+          el.focus();
+          el.select?.();
+          return true;
+        }
         return false;
       };
 

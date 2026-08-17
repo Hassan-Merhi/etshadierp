@@ -30,7 +30,7 @@ export function BackupStatusCard({
   const dismissStuck = async () => {
     setDismissing(true);
     try {
-      const data = (await (await apiRequest("POST", "/api/export/cleanup-stuck-runs")).json()) as any;
+      const data = await (await apiRequest("POST", "/api/export/cleanup-stuck-runs")).json();
       toast({
         title:
           data.cleared > 0

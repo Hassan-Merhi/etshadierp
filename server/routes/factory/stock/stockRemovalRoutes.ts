@@ -18,7 +18,7 @@ import { eq, and, inArray } from "drizzle-orm";
 export function registerFactoryStockRemovalRoutes(app: Express) {
   app.post("/api/factory/stock-entry/remove", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { baleIds, supervisorUsername, supervisorPassword, reason } = req.body;
@@ -50,7 +50,7 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
         return res.status(403).json({ message: "Supervisor must have Admin, Owner, or Manager role" });
       }
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         const balesToRemove = await tx
           .select()
           .from(factoryBales)
@@ -67,7 +67,7 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
           productIds.length > 0
             ? await tx.select().from(factoryBaleProducts).where(inArray(factoryBaleProducts.id, productIds))
             : [];
-        const productMap = new Map<number, any>(factoryProducts.map((p: any) => [p.id, p]));
+        const productMap = new Map<number, any>(factoryProducts.map((p) => [p.id, p]));
 
         const stockItemCache = new Map<string, number>();
 
@@ -143,7 +143,7 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
   // Remove N bales of a specific product from a specific location
   app.post("/api/factory/stock-entry/remove-by-product", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { productId, locationId, qty, supervisorUsername, supervisorPassword, reason } = req.body;
@@ -171,7 +171,7 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
         return res.status(403).json({ message: "Supervisor must have Admin, Owner, or Manager role" });
       }
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         const balesToRemove = await tx
           .select()
           .from(factoryBales)
@@ -224,7 +224,7 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
 
       const today = getClientDate(req);
       const baleMetaJson = JSON.stringify({
-        bales: result.removed.map((b: any) => ({
+        bales: result.removed.map((b) => ({
           id: b.id,
           ref: b.referenceNumber,
           productName: b.productName || "Unknown",

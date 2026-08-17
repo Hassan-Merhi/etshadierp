@@ -27,7 +27,7 @@ export function registerFactoryProductReadRoutes(app: Express) {
 
   app.get("/api/factory/bale-products", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const results = await db
@@ -45,7 +45,7 @@ export function registerFactoryProductReadRoutes(app: Express) {
 
   app.get("/api/factory/bale-products/generate-code", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const grade = req.query.grade as string;
@@ -109,7 +109,7 @@ export function registerFactoryProductReadRoutes(app: Express) {
   // GET /api/factory/bale-products/merge-stats — must be before /:id to avoid interception
   app.get("/api/factory/bale-products/merge-stats", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const rows = await db.execute(sql`
@@ -138,7 +138,7 @@ export function registerFactoryProductReadRoutes(app: Express) {
 
   app.get("/api/factory/bale-products/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
@@ -160,7 +160,7 @@ export function registerFactoryProductReadRoutes(app: Express) {
 
   app.get("/api/factory/bale-product-detail/:productId", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const productId = parseId(req.params.productId);
       if (productId === null) return res.status(400).json({ message: "Invalid id" });
@@ -198,8 +198,8 @@ export function registerFactoryProductReadRoutes(app: Express) {
         const dateKey = ((bale.pressedAt || bale.createdAt) as Date).toISOString().split("T")[0];
         const existing = pressedMap.get(dateKey) || { date: dateKey, qty: 0, totalWeight: 0, totalCost: 0 };
         existing.qty += 1;
-        existing.totalWeight += parseFloat(bale.weightKg as any) || 0;
-        existing.totalCost += parseFloat(bale.totalCost as any) || 0;
+        existing.totalWeight += parseFloat(bale.weightKg) || 0;
+        existing.totalCost += parseFloat(bale.totalCost) || 0;
         pressedMap.set(dateKey, existing);
       }
       const pressed = Array.from(pressedMap.values()).sort((a, b) => b.date.localeCompare(a.date));
@@ -237,7 +237,7 @@ export function registerFactoryProductReadRoutes(app: Express) {
           for (const order of allRelevantOrders) {
             const balesInOrder = orderBalesForProduct.filter((b) => b.orderId === order.id);
             const qty = balesInOrder.length;
-            const total = balesInOrder.reduce((s: number, b: any) => s + parseFloat(b.priceUsed || "0"), 0);
+            const total = balesInOrder.reduce((s: number, b) => s + parseFloat(b.priceUsed || "0"), 0);
             const pricePerBale = qty > 0 ? total / qty : 0;
 
             const [customer] = await db
@@ -298,7 +298,7 @@ export function registerFactoryProductReadRoutes(app: Express) {
           totalWeight: 0,
         };
         existing.qty += 1;
-        existing.totalWeight += parseFloat(bale.weightKg as any) || 0;
+        existing.totalWeight += parseFloat(bale.weightKg) || 0;
         locStockMap.set(locId, existing);
       }
       const locIds = [...locStockMap.keys()].filter((id) => id > 0);
@@ -314,7 +314,7 @@ export function registerFactoryProductReadRoutes(app: Express) {
       }
       const currentStock = {
         totalQty: inStockBales.length,
-        totalWeight: inStockBales.reduce((s, b) => s + (parseFloat(b.weightKg as any) || 0), 0),
+        totalWeight: inStockBales.reduce((s, b) => s + (parseFloat(b.weightKg) || 0), 0),
         locations: Array.from(locStockMap.values()).sort((a, b) => b.qty - a.qty),
       };
 

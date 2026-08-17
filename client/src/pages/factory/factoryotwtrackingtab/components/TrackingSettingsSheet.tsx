@@ -1,20 +1,21 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * TrackingSettingsSheet — extracted sub-component.
  *
  * Extracted from FactoryOtwTrackingTab.tsx during the Phase 4 god-file split.
  */
-import {useState, useEffect} from "react";
-import {useMutation, useQueryClient as useTQClient} from "@tanstack/react-query";
-import {Button} from "@/components/ui/button";
-import {Label} from "@/components/ui/label";
-import {Separator} from "@/components/ui/separator";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Sheet, SheetContent, SheetHeader, SheetTitle} from "@/components/ui/sheet";
-import {Switch} from "@/components/ui/switch";
-import {Loader2, Settings2} from "lucide-react";
-import {useToast} from "@/hooks/use-toast";
-import {factoryApiRequest} from "@/lib/factoryApi";
-import type {ContainerWithSupplier} from "../types";
+import { useState, useEffect } from "react";
+import { useMutation, useQueryClient as useTQClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Switch } from "@/components/ui/switch";
+import { Loader2, Settings2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { factoryApiRequest } from "@/lib/factoryApi";
+import type { ContainerWithSupplier } from "../types";
 
 export // ── Tracking Settings Sheet ──────────────────────────────────────────────────
 function TrackingSettingsSheet({
@@ -34,7 +35,7 @@ function TrackingSettingsSheet({
 
   useEffect(() => {
     if (container) {
-      const fc = container as any;
+      const fc = container;
       setEnabled(fc.trackingEnabled !== false);
       setAutoUpdate(fc.trackingAutoUpdate !== false);
       setCarrierHint(fc.trackingCarrierHint ?? "");
@@ -55,7 +56,7 @@ function TrackingSettingsSheet({
       toast({ title: "Tracking settings saved" });
       onClose();
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Failed to save settings", description: err?.message, variant: "destructive" });
     },
   });

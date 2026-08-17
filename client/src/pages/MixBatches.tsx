@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, Suspense } from "react";
 import { lazyRetry as lazy } from "@/lib/lazyRetry";
 import * as XLSX from "@/lib/excelHelper";
@@ -88,7 +89,7 @@ export default function MixBatches() {
       setSelectedBaleIds(new Set());
       toast({ title: "Success", description: `${data.balesUpdated} bale(s) assigned to batch` });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
@@ -109,7 +110,7 @@ export default function MixBatches() {
       setDeleteId(null);
       toast({ title: "Deleted", description: "Batch deleted. Bales have been unlinked and are preserved." });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
@@ -288,8 +289,8 @@ export default function MixBatches() {
                 <TableBody>
                   {(() => {
                     const sorted = [...filteredBatches].sort((a, b) => {
-                      const da = (a as any).batchDate || a.createdAt || "";
-                      const db = (b as any).batchDate || b.createdAt || "";
+                      const da = a.batchDate || a.createdAt || "";
+                      const db = b.batchDate || b.createdAt || "";
                       return db > da ? 1 : db < da ? -1 : b.id - a.id;
                     });
                     return showAllBatches ? sorted : sorted.slice(0, 15);
@@ -310,7 +311,7 @@ export default function MixBatches() {
                           ${parseFloat(batch.costPerKg).toFixed(4)}
                         </TableCell>
                         <TableCell className="text-muted-foreground text-sm">
-                          {formatDisplayDate((batch as any).batchDate || batch.createdAt)}
+                          {formatDisplayDate(batch.batchDate || batch.createdAt)}
                         </TableCell>
                         <TableCell onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center gap-1">

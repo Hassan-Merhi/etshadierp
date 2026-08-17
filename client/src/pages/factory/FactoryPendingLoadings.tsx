@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -118,7 +119,7 @@ export default function FactoryPendingLoadings() {
       toast({ title: "Note saved" });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Failed to save note", description: error.message, variant: "destructive" });
     },
   });
@@ -163,7 +164,7 @@ export default function FactoryPendingLoadings() {
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/v5/stock-allocation") });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Delete failed", description: err.message, variant: "destructive" });
     },
   });
@@ -176,7 +177,7 @@ export default function FactoryPendingLoadings() {
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/v5/stock-allocation") });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Restore failed", description: err.message, variant: "destructive" });
     },
   });
@@ -222,7 +223,7 @@ export default function FactoryPendingLoadings() {
       toast({ title: "Proforma updated", description: "The loading's proforma has been saved successfully." });
       closeLinkDialog();
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Link failed", description: err.message, variant: "destructive" });
     },
   });

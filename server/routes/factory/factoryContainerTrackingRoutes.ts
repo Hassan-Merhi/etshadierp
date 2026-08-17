@@ -36,7 +36,7 @@ export function registerFactoryContainerTrackingRoutes(app: Express) {
         const containerId = parseId(req.params.id);
         if (containerId === null) return res.status(400).json({ message: "Invalid container id" });
 
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         const forceRefresh = !!req.body?.forceRefresh;
 
         const result = await refreshFactoryContainerEta(containerId, { forceRefresh, companyId });
@@ -56,7 +56,7 @@ export function registerFactoryContainerTrackingRoutes(app: Express) {
         return res.status(403).json({ message: "Not authorized to run bulk ETA refresh" });
       }
 
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       const forceRefresh = !!req.body?.forceRefresh;
       const containerIds = Array.isArray(req.body?.containerIds) ? req.body.containerIds : undefined;
 
@@ -77,7 +77,7 @@ export function registerFactoryContainerTrackingRoutes(app: Express) {
     requireNonPOS,
     async (req: Request, res: Response) => {
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         const summary = await getFactoryEtaTrackingSummary(companyId);
         res.json(summary);
       } catch (err: unknown) {

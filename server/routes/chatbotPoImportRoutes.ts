@@ -401,7 +401,7 @@ export function registerChatbotPoImportRoutes(app: Express) {
 
         if (existingPOs.length > 0) {
           return res.status(409).json({
-            message: `Container "${containerNumber}" already has ${existingPOs.length} PO(s) imported (${existingPOs.map((p: any) => p.poNumber).join(", ")}). To avoid duplicates, please delete the existing POs first or use a different container number.`,
+            message: `Container "${containerNumber}" already has ${existingPOs.length} PO(s) imported (${existingPOs.map((p) => p.poNumber).join(", ")}). To avoid duplicates, please delete the existing POs first or use a different container number.`,
           });
         }
       }

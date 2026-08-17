@@ -11,8 +11,8 @@ interface OtwEditableCellProps {
   minCh?: number;
   maxCh?: number;
   testId: string;
-  getEditValue: (container: Container, field: keyof Container) => any;
-  setEditValue: (id: number, field: keyof Container, value: any) => Promise<void>;
+  getEditValue: (container: Container, field: keyof Container) => unknown;
+  setEditValue: (id: number, field: keyof Container, value: unknown) => Promise<void>;
   handleKeyDown: (e: React.KeyboardEvent, id: number, fieldIdx: number) => void;
   autoSizeStyle: (value: unknown, placeholder?: string, minCh?: number, maxCh?: number) => React.CSSProperties;
 }

@@ -586,9 +586,9 @@ export function DaybookTable({
                         <div key={idx} className="flex items-center justify-between text-sm py-0.5">
                           <span className="text-muted-foreground truncate max-w-xs">
                             {e.accountName ||
-                              (e as any).supplierName ||
-                              (e as any).employeeName ||
-                              (e as any).assetName ||
+                              (e as unknown as ViewVoucherEntry & { supplierName: React.ReactNode }).supplierName ||
+                              (e as unknown as ViewVoucherEntry & { employeeName: React.ReactNode }).employeeName ||
+                              (e as unknown as ViewVoucherEntry & { assetName: React.ReactNode }).assetName ||
                               "—"}
                             {e.narration && (
                               <span className="ml-2 text-xs italic text-muted-foreground/60">{e.narration}</span>
@@ -835,7 +835,9 @@ export function DaybookTable({
       {/* ── Mobile card list (hidden on sm+) ── */}
       <div className="sm:hidden -mx-4 overflow-y-auto max-h-[calc(100vh-260px)]">
         {mobileItems.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-12">No transactions found. Create your first voucher to get started.</p>
+          <p className="text-sm text-muted-foreground text-center py-12">
+            No transactions found. Create your first voucher to get started.
+          </p>
         ) : (
           mobileItems
         )}

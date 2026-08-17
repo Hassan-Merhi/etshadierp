@@ -136,7 +136,7 @@ export function registerAccountLedgerBalanceRoutes(app: Express) {
         }
       }
 
-      const companyIdForBalance = (req.session as any).currentCompanyId as number | undefined;
+      const companyIdForBalance = req.session.currentCompanyId as number | undefined;
       const transactions = await storage.getVoucherEntriesByLedger(
         ledgerAccountId,
         undefined,

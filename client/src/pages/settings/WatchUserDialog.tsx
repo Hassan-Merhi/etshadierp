@@ -256,7 +256,7 @@ export function WatchUserDialog({
   }, [streamGeneration, userId]);
 
   const presence = presenceRaw && typeof presenceRaw === "object" && !Array.isArray(presenceRaw) ? presenceRaw : null;
-  const activity = Array.isArray(activityRaw) ? (activityRaw as ActivityEvent[]) : [];
+  const activity = useMemo(() => (Array.isArray(activityRaw) ? (activityRaw as ActivityEvent[]) : []), [activityRaw]);
   const groupedActivity = useMemo(() => groupConsecutiveActivity(activity), [activity]);
   const fallbackFrame =
     screenFrameRaw && typeof screenFrameRaw === "object" && !Array.isArray(screenFrameRaw)
@@ -359,7 +359,7 @@ export function WatchUserDialog({
     if (!hasScreen || frameAgeMs < 15000 || refreshing) return;
     void requestFreshFrame();
     // The age threshold prevents repeated reconnect loops.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [Math.floor(frameAgeMs / 15000), hasScreen]);
 
   const frameMetadata = useMemo(() => {

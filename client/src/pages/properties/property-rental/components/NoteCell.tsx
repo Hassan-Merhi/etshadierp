@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * NoteCell — extracted sub-component.
  *
@@ -33,7 +34,7 @@ function NoteCell({ contractId, note, testId }: { contractId: number; note: stri
       setEditing(false);
       toast({ title: "Note saved" });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   if (editing) {

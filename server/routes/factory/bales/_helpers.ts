@@ -7,8 +7,8 @@
 // ---------------------------------------------------------------------------
 // Lightweight in-process TTL cache for expensive dashboard KPI endpoint
 // ---------------------------------------------------------------------------
-export const _kpiCache = new Map<string, { data: any; expiresAt: number }>();
-export function _getKpiCached(key: string): any | null {
+export const _kpiCache = new Map<string, { data: unknown; expiresAt: number }>();
+export function _getKpiCached(key: string): unknown | null {
   const e = _kpiCache.get(key);
   if (!e) return null;
   if (Date.now() > e.expiresAt) {
@@ -17,7 +17,7 @@ export function _getKpiCached(key: string): any | null {
   }
   return e.data;
 }
-export function _setKpiCached(key: string, data: any, ttlMs = 30_000): void {
+export function _setKpiCached(key: string, data: unknown, ttlMs = 30_000): void {
   _kpiCache.set(key, { data, expiresAt: Date.now() + ttlMs });
   if (_kpiCache.size > 200) {
     const now = Date.now();

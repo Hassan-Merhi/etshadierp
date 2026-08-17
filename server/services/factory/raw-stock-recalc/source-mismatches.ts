@@ -230,7 +230,7 @@ export async function getMixBatchSourceCostMismatchPreview(
 
     const rawStock = rawStockByContainer.get(src.containerId);
     const containerReceivedKg = parseFloat(container?.actualReceivedKg || "0");
-    const rawStockUsedKg = rawStock ? parseFloat((rawStock as any).usedKg || "0") : containerReceivedKg;
+    const rawStockUsedKg = rawStock ? parseFloat(rawStock.usedKg || "0") : containerReceivedKg;
     const remainingKg = rawStock ? Math.max(0, parseFloat(rawStock.receivedKg || "0") - rawStockUsedKg) : 0;
 
     result.push({

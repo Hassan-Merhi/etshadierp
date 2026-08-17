@@ -30,15 +30,10 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      // On as a warning so `any` is visible in the editor as it is written.
-      // The *gate* is not this rule — it is the per-file ratchet in
-      // config/type-escape-boundaries.json, which is exact, counts from the
-      // AST, and fails CI when any single file gains an escape. This rule is
-      // the feedback loop; `npm run audit:type-escapes` is the enforcement.
-      // See Phase 1 in docs/system-quality-program.md.
+      // Editor feedback; the exact type-escape gate is frozen at zero in
+      // config/type-escape-boundaries.json and may only remain zero.
       "@typescript-eslint/no-explicit-any": "warn",
-      // Stays off deliberately: unused-imports/no-unused-vars below replaces it
-      // and the plugin requires the base rule disabled to avoid double reports.
+      // unused-imports/no-unused-vars below replaces the base rule to avoid duplicate reports.
       "@typescript-eslint/no-unused-vars": "off",
       "unused-imports/no-unused-imports": "error",
       "unused-imports/no-unused-vars": [
@@ -74,15 +69,6 @@ export default tseslint.config(
       "no-extra-boolean-cast": "warn",
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
-    },
-  },
-  {
-    files: ["client/src/pages/factory/WasteDispatchOptimized.tsx"],
-    rules: {
-      // This page derives memo inputs from paginated query fallback arrays. The
-      // hooks are intentionally bounded by query/page state and the two warnings
-      // are false-positive dependency churn, not missing reactive dependencies.
-      "react-hooks/exhaustive-deps": "off",
     },
   },
   configPrettier

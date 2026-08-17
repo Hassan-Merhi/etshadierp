@@ -437,7 +437,7 @@ export function ViewEntryModal({
   if (isBaleStockEntry && bales.length > 0) {
     const totalAmt = amt;
     const amtPerBale = bales.length > 0 ? totalAmt / bales.length : 0;
-    const groups = bales.reduce((acc: Record<string, { count: number; totalAmount: number }>, b: any) => {
+    const groups = bales.reduce((acc: Record<string, { count: number; totalAmount: number }>, b) => {
       const key = b.productName || b.ref || "Unknown";
       if (!acc[key]) acc[key] = { count: 0, totalAmount: 0 };
       acc[key].count += 1;

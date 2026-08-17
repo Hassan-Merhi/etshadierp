@@ -25,7 +25,7 @@ import { firstRow } from "../../../../lib/queryResult";
 export function registerOrderBaleScanRoutes(app: Express) {
   app.post("/api/factory/customer-orders/:id/bales", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseId(req.params.id);
@@ -33,8 +33,7 @@ export function registerOrderBaleScanRoutes(app: Express) {
       if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       const { scanCode, locationId } = req.body;
       if (!scanCode || !locationId) return res.status(400).json({ message: "scanCode and locationId are required" });
-      const scannerName: string | null =
-        (req.session as any)?.username || (req.session as any)?.name || (req.session as any)?.email || null;
+      const scannerName: string | null = req.session?.username || req.session?.name || req.session?.email || null;
 
       const [order] = await db
         .select()
@@ -140,7 +139,7 @@ export function registerOrderBaleScanRoutes(app: Express) {
           }
         | { ok: false; httpStatus: number; body: any };
 
-      const result: PickResult = await db.transaction(async (tx: any) => {
+      const result: PickResult = await db.transaction(async (tx) => {
         const [bale] = await tx
           .select()
           .from(factoryBales)
@@ -227,8 +226,8 @@ export function registerOrderBaleScanRoutes(app: Express) {
             );
           const proformaLine = pl || null;
           if (proformaLine) {
-            const pricingMode = (proformaLine as any).pricingMode ?? "per_bale";
-            const perKgVal = (proformaLine as any).pricePerKg;
+            const pricingMode = proformaLine.pricingMode ?? "per_bale";
+            const perKgVal = proformaLine.pricePerKg;
             if (pricingMode === "per_kg" && perKgVal) {
               const weightKg = parseFloat(String(bale.weightKg || "0"));
               const pkgRate = parseFloat(String(perKgVal));

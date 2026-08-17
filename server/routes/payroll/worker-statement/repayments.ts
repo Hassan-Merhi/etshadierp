@@ -19,7 +19,7 @@ import { getFactoryCompanyId, writeDaybookEntry } from "./_helpers";
 export function registerWorkerRepaymentDeleteRoutes(app: Express) {
   app.delete("/api/factory/advance-repayments/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const currentRole = (req.session as any).currentRole;
+      const currentRole = req.session.currentRole;
       if (currentRole !== "Admin" && currentRole !== "Owner" && currentRole !== "Developer") {
         return res.status(403).json({ message: "Only Admin or Owner can delete repayments" });
       }
@@ -43,7 +43,7 @@ export function registerWorkerRepaymentDeleteRoutes(app: Express) {
       const currentBal = parseFloat(advance?.remainingBalance || "0");
       const restoredBal = currentBal + repayAmt;
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         await tx.delete(factoryAdvanceRepayments).where(eq(factoryAdvanceRepayments.id, repaymentId));
 
         if (advance) {
@@ -72,7 +72,7 @@ export function registerWorkerRepaymentDeleteRoutes(app: Express) {
         amountCurrency: repayAmt,
         currencyCode: "USD",
         amountUsd: repayAmt,
-        createdBy: (req.session as any).userId ?? undefined,
+        createdBy: req.session.userId ?? undefined,
       });
 
       res.json({ message: "Repayment deleted", restoredBalance: restoredBal.toFixed(2) });

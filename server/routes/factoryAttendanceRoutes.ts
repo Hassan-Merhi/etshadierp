@@ -5,8 +5,8 @@ import { eq, and, inArray, gte, lte } from "drizzle-orm";
 import PDFDocument from "pdfkit";
 import { factoryAttendance, factoryWorkers } from "@shared/schema";
 
-function getFactoryCompanyId(req: any): number | undefined {
-  return (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+function getFactoryCompanyId(req: import("express").Request): number | undefined {
+  return req.session.factoryCompanyId || req.session.currentCompanyId;
 }
 
 export function registerFactoryAttendanceRoutes(app: Express, requireAuth: any, db: any) {

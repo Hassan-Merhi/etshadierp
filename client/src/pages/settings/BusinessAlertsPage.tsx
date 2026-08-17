@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -184,7 +185,7 @@ export function BusinessAlertsPage({ currentUser }: Props) {
       toast({ title: "Alert dismissed" });
       queryClient.invalidateQueries({ queryKey: ["/api/business-alerts"] });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const resolveMutation = useMutation({
@@ -194,7 +195,7 @@ export function BusinessAlertsPage({ currentUser }: Props) {
       queryClient.invalidateQueries({ queryKey: ["/api/business-alerts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/business-alerts/summary"] });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const reopenMutation = useMutation({
@@ -204,7 +205,7 @@ export function BusinessAlertsPage({ currentUser }: Props) {
       queryClient.invalidateQueries({ queryKey: ["/api/business-alerts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/business-alerts/summary"] });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const runChecksMutation = useMutation({
@@ -214,7 +215,7 @@ export function BusinessAlertsPage({ currentUser }: Props) {
       queryClient.invalidateQueries({ queryKey: ["/api/business-alerts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/business-alerts/summary"] });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const alerts = Array.isArray(alertsQuery.data) ? alertsQuery.data : [];

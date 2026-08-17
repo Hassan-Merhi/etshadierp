@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -136,7 +137,7 @@ export default function SupplierProfitCheck() {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers", companyId] });
       toast({ title: "Supplier stock group updated" });
     },
-    onError: (err: any) => toast({ title: "Failed to update", description: err.message, variant: "destructive" }),
+    onError: (err: ClientErrorLike) => toast({ title: "Failed to update", description: err.message, variant: "destructive" }),
   });
   const { data: proformas = [] } = useQuery<any[]>({
     queryKey: ["/api/suppliers", supplierId, "proformas"],
@@ -363,7 +364,7 @@ export default function SupplierProfitCheck() {
       setNewItemAvgSell("");
       toast({ title: "Item added", description: "The item is now included in the analysis." });
     },
-    onError: (err: any) => toast({ title: "Failed to add item", description: err.message, variant: "destructive" }),
+    onError: (err: ClientErrorLike) => toast({ title: "Failed to add item", description: err.message, variant: "destructive" }),
   });
   const handleManualPoChange = useCallback(
     (stockItemId: number, value: string) => {
@@ -441,7 +442,7 @@ export default function SupplierProfitCheck() {
         setTimeout(() => setAutosaveStatus("idle"), 3000);
       }
     }, 1200);
-  }, [qtyVersion]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [qtyVersion]); 
   const loaded = queryEnabled && !isLoading && rows.length >= 0;
   // ─── Charge math ─────────────────────────────────────────────────────────
   const totalBales = useMemo(() => {

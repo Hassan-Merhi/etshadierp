@@ -139,7 +139,9 @@ async function runPhase6Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         };
         break;
       }
-      const si6 = itemRow.rows[0] as any;
+      const si6 = itemRow.rows[0] as unknown as { id: unknown } & { code: unknown } & { group_name: unknown } & {
+        uom: unknown;
+      } & { selling_price: string } & { reorder_level: string } & { name: unknown };
       const invRows = await db.execute(sql`
         SELECT l.name AS location,
           CAST(inv.quantity AS numeric) AS qty,
@@ -423,7 +425,9 @@ async function runPhase6Report(ctx: DataQueryContext): Promise<DataQueryResult> 
           r.currency,
         ];
       });
-      const hdr = rows.rows[0] as any;
+      const hdr = rows.rows[0] as unknown as { container_number: unknown } & { supplier: unknown } & {
+        import_date: Parameters<typeof String>[0];
+      };
       tableRows6.push(["TOTAL", "", "", "", fmt(grandItems), "", ""]);
       dataQueryResult = {
         queryType: "container_items_list",
@@ -523,15 +527,7 @@ async function runPhase6Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ]);
         for (let i = 1; i < (entries || []).length && i < 4; i++) {
           const e = entries[i];
-          tableRows6.push([
-            "",
-            "",
-            "",
-            e.account,
-            e.dr > 0 ? fmt(e.dr) : "—",
-            e.cr > 0 ? fmt(e.cr) : "—",
-            "",
-          ]);
+          tableRows6.push(["", "", "", e.account, e.dr > 0 ? fmt(e.dr) : "—", e.cr > 0 ? fmt(e.cr) : "—", ""]);
         }
       }
       dataQueryResult = {

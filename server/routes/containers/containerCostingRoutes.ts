@@ -131,7 +131,7 @@ export function registerContainerCostingRoutes(app: Express) {
 
         for (const po of containerPOs) {
           const lineItems = await tx.select().from(poLineItems).where(eq(poLineItems.poId, po.id));
-          const newItemsTotal = lineItems.reduce((sum: number, li: any) => sum + parseFloat(li.lineTotal || "0"), 0);
+          const newItemsTotal = lineItems.reduce((sum: number, li) => sum + parseFloat(li.lineTotal || "0"), 0);
           await tx
             .update(purchaseOrders)
             .set({ itemsTotal: newItemsTotal.toFixed(2) })

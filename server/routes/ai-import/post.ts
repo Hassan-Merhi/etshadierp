@@ -43,11 +43,18 @@ export function registerAiImportPostRoutes(app: Express) {
 
       if (!rows.length) return res.status(400).json({ message: "No valid rows to post" });
 
-      const rowsToPost = rows.map((r) => ({ id: r.id, mappedData: r.mappedData as any }));
+      const rowsToPost = rows.map((r) => ({ id: r.id, mappedData: r.mappedData }));
 
       // Run everything in a single transaction
       const created = await db.transaction(async (tx) => {
-        const results = await postRows(companyId, userId, username, job.importType, rowsToPost, tx as any);
+        const results = await postRows(
+          companyId,
+          userId,
+          username,
+          job.importType,
+          rowsToPost,
+          tx as unknown as Parameters<typeof postRows>[5]
+        );
 
         // Update each row with the created record info
         for (const r of results) {
@@ -79,7 +86,7 @@ export function registerAiImportPostRoutes(app: Express) {
       });
     } catch (error: unknown) {
       logger.error("[AI Import] post error:", { error: getErrorMessage(error) });
-      res.status((error as any).status ?? 500).json({ message: getErrorMessage(error) });
+      res.status((error as { status: number }).status ?? 500).json({ message: getErrorMessage(error) });
     }
   });
 }

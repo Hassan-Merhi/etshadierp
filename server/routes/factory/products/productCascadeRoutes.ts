@@ -16,7 +16,7 @@ import { eq, and, sql } from "drizzle-orm";
 export function registerFactoryProductCascadeRoutes(app: Express) {
   app.post("/api/factory/bale-products/:id/cascade-update", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
@@ -76,7 +76,7 @@ export function registerFactoryProductCascadeRoutes(app: Express) {
 
       // Only admins/owners/developers may change the label design color
       if (labelDesignColor !== undefined) {
-        const userRole = (req.user as any)?.role || "";
+        const userRole = req.user?.role || "";
         if (!["Admin", "Owner", "Developer"].includes(userRole)) {
           return res.status(403).json({ message: "Only administrators can change the label design color" });
         }

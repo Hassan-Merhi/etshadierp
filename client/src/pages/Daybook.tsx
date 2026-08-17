@@ -454,7 +454,15 @@ export default function Daybook({ user }: { user?: any } = {}) {
   useEffect(() => {
     if (voucherToEdit && voucherEntries.length > 0 && !entriesLoading && !editFormInitialized) {
       editForm.reset({
-        voucherType: voucherToEdit.voucherType as any,
+        voucherType: voucherToEdit.voucherType as
+          | "Journal"
+          | "Payment"
+          | "Receipt"
+          | "Stock Transfer"
+          | "Sales"
+          | "Purchase"
+          | "Contra"
+          | undefined,
         voucherDate: voucherToEdit.voucherDate,
         description: voucherToEdit.description || "",
         optional: voucherToEdit.optional,
@@ -544,7 +552,9 @@ export default function Daybook({ user }: { user?: any } = {}) {
           return (
             v.voucherNumber.toLowerCase().includes(s) ||
             (v.description || "").toLowerCase().includes(s) ||
-            (v as any).locationName?.toLowerCase().includes(s)
+            (v as { locationName: { toLowerCase: () => { includes: (arg0: string) => unknown } } }).locationName
+              ?.toLowerCase()
+              .includes(s)
           );
         }
         return true;

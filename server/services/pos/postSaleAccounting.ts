@@ -64,7 +64,7 @@ export async function fetchSupplierPartnerAccountingContext(
 ): Promise<SupplierPartnerAccountingContext | { error: HandlerErrorResult }> {
   // Per-qty deduction that silently reduces Supplier Cash Payable (not income/expense)
   const spPosDeductionPerQty = isSpCompany
-    ? parseFloat(String((location as any).supplierPartnerPayableDeductionPerQty ?? "0")) || 0
+    ? parseFloat(String(location.supplierPartnerPayableDeductionPerQty ?? "0")) || 0
     : 0;
   const spPosTotalQtySold = isSpCompany ? inventoryValidation.reduce((sum, v) => sum + v.saleQty, 0) : 0;
 
@@ -97,7 +97,13 @@ export async function fetchSupplierPartnerAccountingContext(
   const [clrAcct] = await db
     .select({ id: ledgerAccounts.id })
     .from(ledgerAccounts)
-    .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.subType, "sp_cost_clearing"), isNull(ledgerAccounts.deletedAt)))
+    .where(
+      and(
+        eq(ledgerAccounts.companyId, companyId),
+        eq(ledgerAccounts.subType, "sp_cost_clearing"),
+        isNull(ledgerAccounts.deletedAt)
+      )
+    )
     .limit(1);
   const spPosCostClrAccountId = clrAcct?.id ?? null;
 
@@ -106,7 +112,11 @@ export async function fetchSupplierPartnerAccountingContext(
     .select({ id: ledgerAccounts.id })
     .from(ledgerAccounts)
     .where(
-      and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.subType, "sp_pay_deduction_clearing"), isNull(ledgerAccounts.deletedAt))
+      and(
+        eq(ledgerAccounts.companyId, companyId),
+        eq(ledgerAccounts.subType, "sp_pay_deduction_clearing"),
+        isNull(ledgerAccounts.deletedAt)
+      )
     )
     .limit(1);
   const spPosDeductionClrAccountId = ddcAcct?.id ?? null;
@@ -173,7 +183,9 @@ function normalizePosEntry(
     };
   } catch (e) {
     // Fallback for legacy paths: if normalization fails (missing rate etc.) store as-is
-    logger.warn("[POS] normalizeVoucherEntryAmounts failed, using legacy storage:", { error: (e as any)?.message });
+    logger.warn("[POS] normalizeVoucherEntryAmounts failed, using legacy storage:", {
+      error: (e as { message: unknown })?.message,
+    });
     const dStr = Math.abs(debitAmt).toFixed(2);
     const cStr = Math.abs(creditAmt).toFixed(2);
     return {
@@ -249,7 +261,7 @@ export async function insertSaleAccountingEntries(
   }
 
   const creditSaleNarration = isCreditSale
-    ? `Credit Invoice Sale at ${location.name} - ${(customerAccount as any).name}`
+    ? `Credit Invoice Sale at ${location.name} - ${customerAccount.name}`
     : `POS Sale - ${voucherNumber}`;
 
   // Debit entry (cash / bank / receivable account)

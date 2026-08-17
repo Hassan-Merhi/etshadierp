@@ -5,8 +5,8 @@ import { requireAuth, requireRole } from "../../../auth";
 import { getLockedRateDiagnosticsForCompany } from "../../../services/factory/rawStockLockedRate";
 import { getFactoryCostingConsistencyReport } from "../../../services/factory/factoryCostingConsistencyService";
 
-function getFactoryCompanyId(req: any): number | null {
-  return (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId || null;
+function getFactoryCompanyId(req: import("express").Request): number | null {
+  return req.session.factoryCompanyId || req.session.currentCompanyId || null;
 }
 
 export function registerRawStockDiagnosticRoutes(app: Express) {

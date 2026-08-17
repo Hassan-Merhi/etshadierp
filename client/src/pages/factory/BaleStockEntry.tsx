@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { ScanLine, List, CalendarDays, Tag, Factory, Users } from "lucide-react";
@@ -65,7 +66,7 @@ export default function BaleStockEntry() {
       toast({ title: "Production ended", description: "Worker Matrix PDF sent to WhatsApp group." });
       refetchSession();
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "End Production failed", description: err.message, variant: "destructive" });
     },
   });

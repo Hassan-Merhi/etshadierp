@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * GuaranteeForm — extracted sub-component.
  *
@@ -85,7 +86,7 @@ function GuaranteeForm({
       toast({ title: "Guarantee status reset" });
       invalidate();
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const post = useMutation({
@@ -100,7 +101,7 @@ function GuaranteeForm({
       toast({ title: "Guarantee posted to statement" });
       invalidate();
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const moveToCash = useMutation({
@@ -115,7 +116,7 @@ function GuaranteeForm({
       toast({ title: "Guarantee moved to cash successfully" });
       invalidate();
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const applyToRent = useMutation({
@@ -129,7 +130,7 @@ function GuaranteeForm({
       toast({ title: "Guarantee applied to rent", description: "Rent ledger updated. No cash moved." });
       invalidate();
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const undoGuaranteeAsRent = useMutation({
@@ -142,7 +143,7 @@ function GuaranteeForm({
       });
       invalidate();
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       setUndoConfirm(false);
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },

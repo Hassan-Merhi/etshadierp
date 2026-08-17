@@ -328,7 +328,7 @@ export function ContainersSectionPanel({ analytics }: { analytics: AnalyticsLega
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Companies</SelectItem>
-                  {userCompanies.map((c: any) => (
+                  {userCompanies.map((c) => (
                     <SelectItem key={c.companyId} value={String(c.companyId)}>
                       {c.companyName}
                     </SelectItem>

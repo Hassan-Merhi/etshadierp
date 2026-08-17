@@ -180,7 +180,7 @@ export function registerDispatchInvoiceRoutes(app: Express) {
 
       const { invoiceDate } = req.body;
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         // 1. Lock and validate batch
         const batchRows = await tx.execute(sql`
           SELECT * FROM customer_dispatch_batches

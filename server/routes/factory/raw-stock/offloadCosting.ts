@@ -244,7 +244,7 @@ export async function computeOffloadCosting(ctx: OffloadCostingContext): Promise
     : null;
 
   const helperResult = computeContainerLandedCost(
-    containerSnapshot as any,
+    containerSnapshot as unknown as Parameters<typeof computeContainerLandedCost>[0],
     addlForHelper,
     commissionForHelper,
     ocRowsForHelper

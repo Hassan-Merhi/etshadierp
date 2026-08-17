@@ -21,7 +21,7 @@ import { eq, and, sql, inArray, isNull } from "drizzle-orm";
 export function registerOrderChargesRoutes(app: Express) {
   app.post("/api/factory/customer-orders/:id/charges", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseId(req.params.id);
@@ -257,7 +257,7 @@ export function registerOrderChargesRoutes(app: Express) {
     requireAuth,
     async (req: Request, res: Response) => {
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 
         const orderId = parseId(req.params.id);
@@ -403,7 +403,7 @@ export function registerOrderChargesRoutes(app: Express) {
 
   app.patch("/api/factory/customer-orders/:id/charges/:chargeId", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseId(req.params.id);
@@ -654,7 +654,7 @@ export function registerOrderChargesRoutes(app: Express) {
 
   app.delete("/api/factory/customer-orders/:id/charges/:chargeId", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseId(req.params.id);

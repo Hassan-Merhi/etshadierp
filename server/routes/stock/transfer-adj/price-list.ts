@@ -139,11 +139,11 @@ export function registerPosPriceListRoutes(app: Express) {
         ]);
 
         const dubaiMap = new Map<number, string>();
-        for (const r of dubaiCostRes.rows as any[]) {
+        for (const r of (dubaiCostRes.rows)) {
           dubaiMap.set(Number(r.stockItemId), String(r.costDubai ?? "0"));
         }
         const offloadMap = new Map<number, string>();
-        for (const r of offloadCostRes.rows as any[]) {
+        for (const r of (offloadCostRes.rows)) {
           offloadMap.set(Number(r.stockItemId), String(r.offloadingCost ?? "0"));
         }
 
@@ -166,7 +166,7 @@ export function registerPosPriceListRoutes(app: Express) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const isPrivileged = ["Admin", "Owner", "Manager", "Developer"].includes((req.user as any)?.role || "");
+      const isPrivileged = ["Admin", "Owner", "Manager", "Developer"].includes(req.user?.role || "");
 
       // Get all configured master location IDs
       const groupRows = await db
@@ -254,8 +254,8 @@ export function registerPosPriceListRoutes(app: Express) {
             ORDER BY pli.stock_item_id, co.offloaded_at DESC
           `),
         ]);
-        for (const r of dubaiCostRes.rows as any[]) dubaiMap.set(Number(r.stockItemId), String(r.costDubai ?? "0"));
-        for (const r of offloadCostRes.rows as any[])
+        for (const r of (dubaiCostRes.rows)) dubaiMap.set(Number(r.stockItemId), String(r.costDubai ?? "0"));
+        for (const r of (offloadCostRes.rows))
           offloadMap.set(Number(r.stockItemId), String(r.offloadingCost ?? "0"));
       }
 

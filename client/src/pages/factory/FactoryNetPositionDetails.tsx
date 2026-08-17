@@ -320,7 +320,7 @@ function CustomNetPositionView({
     staleTime: 30_000,
   });
 
-  const payrollEmployees = payrollData?.employees ?? [];
+  const payrollEmployees = useMemo(() => (payrollData?.employees ?? []), [payrollData?.employees]);
 
   const toggleKey = useCallback((key: string) => {
     setHiddenKeys((prev) => {
@@ -588,7 +588,7 @@ export default function FactoryNetPositionDetails() {
   }
 
   if (error) {
-    const errAny = error as any;
+    const errAny = error as unknown as { code: unknown };
     const isEndpointBusy = errAny?.code === "ENDPOINT_BUSY";
     const friendlyMessage = isEndpointBusy
       ? "The report is already being generated. It will retry automatically in a few seconds…"

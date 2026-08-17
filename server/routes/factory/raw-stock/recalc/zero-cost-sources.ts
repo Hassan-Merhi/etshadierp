@@ -34,7 +34,7 @@ export function registerRawStockZeroCostSourceRoutes(app: Express) {
     requireRole(...ADMIN_ROLES),
     async (req: any, res: any) => {
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
         const rows = await getZeroCostMixBatchSourcesPreview(companyId);
         res.json(rows);
@@ -58,7 +58,7 @@ export function registerRawStockZeroCostSourceRoutes(app: Express) {
     requireRole(...ADMIN_ROLES),
     async (req: any, res: any) => {
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
         const { sourceIds, manualRates, confirm, confirmationToken } = req.body;
         if (!Array.isArray(sourceIds) || sourceIds.length === 0) {
@@ -75,7 +75,7 @@ export function registerRawStockZeroCostSourceRoutes(app: Express) {
         if (manualRates && typeof manualRates === "object") {
           for (const [key, value] of Object.entries(manualRates)) {
             const id = parseInt(key);
-            const rate = parseFloat(value as any);
+            const rate = parseFloat(value as string);
             if (!isNaN(id) && !isNaN(rate) && rate > 0) parsedManualRates[id] = rate;
           }
         }

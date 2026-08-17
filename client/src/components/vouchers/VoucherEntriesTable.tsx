@@ -94,7 +94,7 @@ export function VoucherEntriesTable({
       setMobileSearch("");
       setSidebarSearchValue("");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [mobileEditOpen, mobileEditIndex]);
 
   const openMobileEdit = (index: number) => {
@@ -139,9 +139,9 @@ export function VoucherEntriesTable({
     const entry = entries[index];
     if (!entry || !entry.accountId || !sidebarAccounts.length) return null;
     const found = sidebarAccounts.find((a) => {
-      if (a.type !== (entry.accountType as any)) return false;
+      if (a.type !== entry.accountType) return false;
       if (entry.accountType === "employee") {
-        return (a as any).accountId === entry.accountId;
+        return (a as unknown as Account & { accountId: number }).accountId === entry.accountId;
       }
       return a.id === entry.accountId;
     });

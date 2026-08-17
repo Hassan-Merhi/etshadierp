@@ -29,7 +29,7 @@ import {
 } from "../../services/factoryDocumentLanguage";
 
 function companyIdFrom(req: Request): number | null {
-  const value = Number((req.session as any)?.factoryCompanyId ?? (req.session as any)?.currentCompanyId);
+  const value = Number(req.session?.factoryCompanyId ?? req.session?.currentCompanyId);
   return Number.isSafeInteger(value) && value > 0 ? value : null;
 }
 
@@ -87,7 +87,7 @@ async function auditExport(req: Request, companyId: number, orderId: number, for
     entityType: "customer_order",
     entityId: orderId,
     companyId,
-    userId: Number((req.session as any)?.userId) || undefined,
+    userId: Number(req.session?.userId) || undefined,
     metadata: {
       format,
       language,
@@ -99,7 +99,7 @@ async function auditExport(req: Request, companyId: number, orderId: number, for
 async function sendInvoiceExcel(req: Request, res: Response, data: NonNullable<Awaited<ReturnType<typeof loadOrder>>>) {
   const language = parseFactoryDocumentLanguage(req.query.lang);
   const labels = FACTORY_DOCUMENT_LABELS[language];
-  const { hideSelling } = await getExportPriceVisibility(req as any);
+  const { hideSelling } = await getExportPriceVisibility(req);
   const noCharges = req.query.noCharges === "1";
   const ExcelJS = (await import("exceljs")).default;
   const workbook = new ExcelJS.Workbook();
@@ -230,7 +230,7 @@ async function sendInvoiceExcel(req: Request, res: Response, data: NonNullable<A
 async function sendInvoicePdf(req: Request, res: Response, data: NonNullable<Awaited<ReturnType<typeof loadOrder>>>) {
   const language = parseFactoryDocumentLanguage(req.query.lang);
   const labels = FACTORY_DOCUMENT_LABELS[language];
-  const { hideSelling } = await getExportPriceVisibility(req as any);
+  const { hideSelling } = await getExportPriceVisibility(req);
   const noCharges = req.query.noCharges === "1";
   const PDFDocument = (await import("pdfkit")).default;
   const doc = new PDFDocument({ margin: 36, size: "A4" });
@@ -283,7 +283,7 @@ async function sendInvoicePdf(req: Request, res: Response, data: NonNullable<Awa
   let totalQty = 0;
   let totalWeight = 0;
   let totalAmount = 0;
-  for (const line of data.lines as any[]) {
+  for (const line of (data.lines)) {
     if (doc.y > 730) doc.addPage();
     const y = doc.y;
     const qty = safeNumber(line.qty);
@@ -319,14 +319,14 @@ async function sendInvoicePdf(req: Request, res: Response, data: NonNullable<Awa
   doc.end();
 }
 
-async function loadBales(orderId: number) {
+async function _loadBales(orderId: number) {
   const links = await db
     .select()
     .from(customerOrderBales)
     .where(eq(customerOrderBales.orderId, orderId))
     .orderBy(customerOrderBales.id);
   const rows = await db.select().from(factoryBales).where(eq(factoryBales.companyId, -1));
-  const map = new Map<number, any>(rows.map((row) => [row.id, row]));
+  const map = new Map<number, unknown>(rows.map((row) => [row.id, row]));
   return { links, map };
 }
 
@@ -386,7 +386,7 @@ async function sendLoadingExcel(req: Request, res: Response, data: NonNullable<A
 }
 
 export function registerFactoryBilingualDocumentRoutes(app: Express): void {
-  const invoiceHandler = (format: "pdf" | "excel") => async (req: Request, res: Response, next: any) => {
+  const invoiceHandler = (format: "pdf" | "excel") => async (req: Request, res: Response, next: import("express").NextFunction) => {
     if (!hasExplicitLanguage(req)) return next();
     try {
       const companyId = companyIdFrom(req);
@@ -404,7 +404,7 @@ export function registerFactoryBilingualDocumentRoutes(app: Express): void {
     }
   };
 
-  const loadingHandler = async (req: Request, res: Response, next: any) => {
+  const loadingHandler = async (req: Request, res: Response, next: import("express").NextFunction) => {
     if (!hasExplicitLanguage(req)) return next();
     try {
       const companyId = companyIdFrom(req);

@@ -26,7 +26,7 @@ import { autoSavePriceToPriceList } from "./_helpers";
 export function registerFactoryCustomerProformaLineRoutes(app: Express) {
   app.post("/api/factory/customer-proforma-lines", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const parsed = insertCustomerProformaLineSchema.parse(req.body);
 
@@ -75,7 +75,7 @@ export function registerFactoryCustomerProformaLineRoutes(app: Express) {
 
   app.put("/api/factory/customer-proforma-lines/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
@@ -216,7 +216,7 @@ export function registerFactoryCustomerProformaLineRoutes(app: Express) {
 
   app.delete("/api/factory/customer-proforma-lines/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });

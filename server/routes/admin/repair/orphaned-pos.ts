@@ -276,15 +276,15 @@ export function registerAdminOrphanedPosRoutes(app: Express) {
       // Use batch deletes with inArray for efficiency
       // Delete sales items first (foreign key constraint)
       const salesResult = await db.delete(salesItems).where(inArray(salesItems.voucherId, voucherIds));
-      const deletedSalesItems = (salesResult as any).rowCount || voucherIds.length;
+      const deletedSalesItems = salesResult.rowCount || voucherIds.length;
 
       // Delete voucher entries
       const entriesResult = await db.delete(voucherEntries).where(inArray(voucherEntries.voucherId, voucherIds));
-      const deletedEntries = (entriesResult as any).rowCount || voucherIds.length;
+      const deletedEntries = entriesResult.rowCount || voucherIds.length;
 
       // Delete the vouchers themselves (hard delete since they're orphaned garbage)
       const vouchersResult = await db.delete(vouchers).where(inArray(vouchers.id, voucherIds));
-      const deletedVouchers = (vouchersResult as any).rowCount || voucherIds.length;
+      const deletedVouchers = vouchersResult.rowCount || voucherIds.length;
 
       res.json({
         message: `Deleted ${deletedVouchers} orphaned POS vouchers, ${deletedEntries} entries, and ${deletedSalesItems} sales items`,

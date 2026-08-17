@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * SettingsPopover — extracted sub-component.
  *
@@ -34,7 +35,7 @@ export function SettingsPopover({
       setOpen(false);
       onSaved();
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Failed", description: err?.message, variant: "destructive" });
     },
   });

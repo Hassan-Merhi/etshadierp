@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * RecalculateBaleCostsCard — extracted sub-component.
  *
@@ -23,7 +24,7 @@ export function RecalculateBaleCostsCard() {
       setResult(data);
       toast({ title: "Done", description: data.message });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       toast({ title: "Failed", description: error.message, variant: "destructive" });
     },
   });

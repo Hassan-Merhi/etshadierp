@@ -28,7 +28,7 @@ import { applySubsequentReceipt } from "./subsequentReceipt";
 export function registerRawStockOffloadRoutes(app: Express) {
   app.post("/api/factory/raw-stock/offload", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const {
@@ -109,7 +109,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
           const { fxRate: containerRate, looksSet: containerRateLooksSet } = resolveStoredFxRate(
             container.currencyCode,
             container.fxRateToUsd,
-            (container as any).fxRateConfirmed
+            container.fxRateConfirmed
           );
           if (!containerRateLooksSet) {
             return res.status(400).json({
@@ -139,8 +139,8 @@ export function registerRawStockOffloadRoutes(app: Express) {
       // (e.g. Embassy Shipping) that has nothing to do with the material supplier.
       const effectiveFreightSupplierId: number | null = reqFreightSupplierId
         ? parseInt(reqFreightSupplierId)
-        : !reqFreightAccountId && (container as any).freightSupplierId
-          ? (container as any).freightSupplierId
+        : !reqFreightAccountId && container.freightSupplierId
+          ? container.freightSupplierId
           : null;
 
       const freightVal = parseFloat(reqFreight || "0");
@@ -226,7 +226,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
             mixBatchAllocationsArr,
             reqDestination,
             idempotencyKey,
-            userId: (req.session as any).userId || null,
+            userId: req.session.userId || null,
           });
           return; // Skip all other financial posting — already done on first receipt
         }
@@ -284,7 +284,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
           receiptValueUsd: dReceivedKg.times(dCostPerKgUsd).toDecimalPlaces(6).toFixed(6),
           currencyCode,
           fxRateToUsd: String(fxRate),
-          createdBy: (req.session as any).userId || null,
+          createdBy: req.session.userId || null,
           idempotencyKey: idempotencyKey || null,
         });
 
@@ -349,7 +349,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
               ? "supplier"
               : reqFreightAccountId
                 ? "own"
-                : (container as any).freightPaidBy || "supplier",
+                : container.freightPaidBy || "supplier",
             // When own-account is used, persist the credit account so the
             // reverse-offload can correctly restore it without falling back
             // to the material supplier.
@@ -360,8 +360,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
             otherChargesAccountId: reqOtherChargesAccountId ? parseInt(reqOtherChargesAccountId) : null,
             otherChargesSupplierId: reqOtherChargesSupplierId ? parseInt(reqOtherChargesSupplierId) : null,
             commissionAmount: commTotalVal > 0 ? String(commTotalVal) : container.commissionAmount || "0",
-            commissionCurrencyCode:
-              commTotalVal > 0 ? commCurrencyForUsd : (container as any).commissionCurrencyCode || "USD",
+            commissionCurrencyCode: commTotalVal > 0 ? commCurrencyForUsd : container.commissionCurrencyCode || "USD",
             // Persist the resolved commission-specific FX rate so computeCorrectContainerCost
             // and repair scripts can use it without re-fetching.  When there is no commission
             // (commTotalVal == 0) clear all three fields so stale pre-offload values don't linger.
@@ -373,18 +372,18 @@ export function registerRawStockOffloadRoutes(app: Express) {
             dutyStatus,
             dutyNotes: reqDutyNotes || null,
             preOffloadFreight: container.freight || "0",
-            preOffloadFreightCurrencyCode: (container as any).freightCurrencyCode || container.currencyCode || "USD",
-            preOffloadFreightAccountId: (container as any).freightAccountId || null,
-            preOffloadFreightSupplierId: (container as any).freightSupplierId || null,
+            preOffloadFreightCurrencyCode: container.freightCurrencyCode || container.currencyCode || "USD",
+            preOffloadFreightAccountId: container.freightAccountId || null,
+            preOffloadFreightSupplierId: container.freightSupplierId || null,
             preOffloadOtherCharges: container.otherCharges || "0",
-            preOffloadOtherChargesAccountId: (container as any).otherChargesAccountId || null,
-            preOffloadOtherChargesSupplierId: (container as any).otherChargesSupplierId || null,
+            preOffloadOtherChargesAccountId: container.otherChargesAccountId || null,
+            preOffloadOtherChargesSupplierId: container.otherChargesSupplierId || null,
             preOffloadStatus: container.status,
             preOffloadCommissionAmount: container.commissionAmount || "0",
-            preOffloadCommissionCurrencyCode: (container as any).commissionCurrencyCode || "USD",
-            preOffloadCommissionAccountId: (container as any).commissionAccountId || null,
-            preOffloadCommissionSupplierId: (container as any).commissionSupplierId || null,
-            preOffloadCommissionNotes: (container as any).commissionNotes || null,
+            preOffloadCommissionCurrencyCode: container.commissionCurrencyCode || "USD",
+            preOffloadCommissionAccountId: container.commissionAccountId || null,
+            preOffloadCommissionSupplierId: container.commissionSupplierId || null,
+            preOffloadCommissionNotes: container.commissionNotes || null,
             destination: reqDestination ? String(reqDestination).trim() : container.destination || null,
             updatedAt: new Date(),
           })
@@ -450,7 +449,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
             fxRateToUsd: resolveStoredFxRateOrThrow(
               commissionRecord.currencyCode,
               commissionRecord.fxRateToUsd,
-              (commissionRecord as any).fxRateConfirmed
+              commissionRecord.fxRateConfirmed
             ),
             metaJson: JSON.stringify({ containerId, sourceType: "COMMISSION", commissionId: commissionRecord.id }),
           });
@@ -738,7 +737,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
 
       await logAudit({
         userId: req.session.userId!,
-        username: (req.session as any).username || req.session.userId!,
+        username: req.session.username || req.session.userId!,
         companyId,
         action: "offload",
         tableName: "production_raw_stock",

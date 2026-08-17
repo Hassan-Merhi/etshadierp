@@ -180,7 +180,7 @@ export function VoucherDetailsDialog({
               <div className="border rounded-lg overflow-hidden">
                 {selectedVoucher.voucherType === "Purchase" ? (
                   (() => {
-                    const purchaseItems = viewVoucherEntries.filter((e) => (e as any).isPurchaseItem);
+                    const purchaseItems = viewVoucherEntries.filter((e) => e.isPurchaseItem);
                     return (
                       <div>
                         {/* Supplier card */}
@@ -286,7 +286,7 @@ export function VoucherDetailsDialog({
                           purchaseOrderData &&
                           (() => {
                             const totalQty = purchaseItems.reduce(
-                              (sum: number, e: any) => sum + parseFloat(e.quantity || "0"),
+                              (sum: number, e) => sum + parseFloat(e.quantity || "0"),
                               0
                             );
                             const charges = [
@@ -345,8 +345,7 @@ export function VoucherDetailsDialog({
                     );
                     const totalProfit = filteredItems.reduce((s, e) => s + parseFloat(e.profit || "0"), 0);
                     const totalHassansPrice = filteredItems.reduce(
-                      (s, e) =>
-                        s + parseFloat(e.hassansPrice || "0") * parseFloat(e.quantity || "0"),
+                      (s, e) => s + parseFloat(e.hassansPrice || "0") * parseFloat(e.quantity || "0"),
                       0
                     );
                     const totalHassansProfit = filteredItems.reduce(
@@ -475,9 +474,7 @@ export function VoucherDetailsDialog({
                             <TableFooter>
                               <TableRow className="bg-muted/20 hover:bg-muted/20 font-semibold">
                                 <TableCell>Total</TableCell>
-                                <TableCell className="text-right font-mono text-muted-foreground">
-                                  {totalQty}
-                                </TableCell>
+                                <TableCell className="text-right font-mono text-muted-foreground">{totalQty}</TableCell>
                                 <TableCell aria-label="No price total" />
                                 <TableCell className="text-right font-mono text-muted-foreground">
                                   {formatAmount(totalCost)}
@@ -640,7 +637,11 @@ export function VoucherDetailsDialog({
                                     )}
                                     {isStockTransferType && (
                                       <TableCell className="text-sm text-muted-foreground">
-                                        {(entry as any).sourceLocationName || transferDetail?.sourceLocationName || "—"}
+                                        {(
+                                          entry as unknown as ViewVoucherEntry & { sourceLocationName: React.ReactNode }
+                                        ).sourceLocationName ||
+                                          transferDetail?.sourceLocationName ||
+                                          "—"}
                                       </TableCell>
                                     )}
                                     <TableCell className="text-right font-mono">
@@ -880,9 +881,7 @@ export function VoucherDetailsDialog({
                 ) : revisionsError ? (
                   <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 space-y-3">
                     <p className="text-sm font-medium">Could not load revision history</p>
-                    {revisionsErrorMessage && (
-                      <p className="text-xs text-muted-foreground">{revisionsErrorMessage}</p>
-                    )}
+                    {revisionsErrorMessage && <p className="text-xs text-muted-foreground">{revisionsErrorMessage}</p>}
                     <Button type="button" variant="outline" size="sm" onClick={retryVoucherRevisions}>
                       Retry
                     </Button>

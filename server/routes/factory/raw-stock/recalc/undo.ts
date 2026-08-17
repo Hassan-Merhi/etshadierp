@@ -20,7 +20,7 @@ export function registerRawStockRecalcUndoRoutes(app: Express) {
     requireRole(...ADMIN_ROLES),
     async (req: Request, res: Response) => {
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
         const { rows } = await pool.query(
           `SELECT id, company_id AS "companyId", user_id AS "userId", username,
@@ -51,7 +51,7 @@ export function registerRawStockRecalcUndoRoutes(app: Express) {
     requireRole(...ADMIN_ROLES),
     async (req: Request, res: Response) => {
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 
         const { undoLogId } = req.body;

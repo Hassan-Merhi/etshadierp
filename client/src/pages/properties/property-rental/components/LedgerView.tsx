@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * LedgerView — extracted sub-component.
  *
@@ -66,7 +67,7 @@ function LedgerView({
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
       onNoteUpdated?.();
     },
-    onError: (err: any) =>
+    onError: (err: ClientErrorLike) =>
       toast({
         title: "Fix failed",
         description: err?.message ?? "Could not reallocate payments.",
@@ -84,7 +85,7 @@ function LedgerView({
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
       onNoteUpdated?.();
     },
-    onError: (e: any) => toast({ title: "Reversal failed", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Reversal failed", description: e.message, variant: "destructive" }),
   });
 
   // FIX #7: use backend-calculated fields when available; fall back to frontend calculation.
@@ -155,7 +156,7 @@ function LedgerView({
     const guarRows = buildPayRows(guaranteePayments);
 
     const balColor = balance > 0 ? "#cc0000" : balance < 0 ? "#006600" : "#000";
-    const startStr = contract.startDate ? format(new Date(contract.startDate as any), "dd MMM yyyy") : "—";
+    const startStr = contract.startDate ? format(new Date(contract.startDate), "dd MMM yyyy") : "—";
 
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Rental Statement — ${contract.tenantName}</title>
     <style>

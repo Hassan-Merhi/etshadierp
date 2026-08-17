@@ -27,7 +27,7 @@ export function registerSupplierBalanceSingleRoutes(app: Express) {
   app.get("/api/factory/suppliers/:id/balance", requireAuth, async (req: Request, res: Response) => {
     res.set("Cache-Control", "no-store");
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const supplierId = parseId(req.params.id);
       if (supplierId === null) return res.status(400).json({ message: "Invalid id" });
@@ -37,7 +37,7 @@ export function registerSupplierBalanceSingleRoutes(app: Express) {
       const allSuppliers = await db.select().from(factorySuppliers).where(eq(factorySuppliers.companyId, companyId));
       const supplier = allSuppliers.find((s) => s.id === supplierId);
       if (!supplier) return res.status(404).json({ message: "Supplier not found" });
-      const children = allSuppliers.filter((s) => (s as any).parentId === supplierId);
+      const children = allSuppliers.filter((s) => s.parentId === supplierId);
       const supplierIds = [supplierId, ...children.map((c) => c.id)];
 
       // Load all containers, payments, and FX transfers for the relevant supplier IDs
@@ -78,7 +78,7 @@ export function registerSupplierBalanceSingleRoutes(app: Express) {
             sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-PAY-%'`
           )
         );
-      for (const row of voucherPaymentRows as any[]) {
+      for (const row of (voucherPaymentRows)) {
         const sid = row.factorySupplierId;
         if (!sid) continue;
         if (row.optional) continue; // optional vouchers don't affect the balance
@@ -114,17 +114,17 @@ export function registerSupplierBalanceSingleRoutes(app: Express) {
       // Charges posted to a ledger account have supplierId=null and must NOT appear on any supplier balance.
       const offloadAdditionalChargesForSupplier = await db
         .select({
-          supplierId: (factoryOffloadAdditionalCharges as any).supplierId,
+          supplierId: factoryOffloadAdditionalCharges.supplierId,
           amount: factoryOffloadAdditionalCharges.amount,
           currencyCode: factoryOffloadAdditionalCharges.currencyCode,
           fxRateToUsd: factoryOffloadAdditionalCharges.fxRateToUsd,
-          fxRateConfirmed: (factoryOffloadAdditionalCharges as any).fxRateConfirmed,
+          fxRateConfirmed: factoryOffloadAdditionalCharges.fxRateConfirmed,
         })
         .from(factoryOffloadAdditionalCharges)
         .where(
           and(
             eq(factoryOffloadAdditionalCharges.companyId, companyId),
-            sql`${(factoryOffloadAdditionalCharges as any).supplierId} = ANY(${sqlArray(supplierIds)})`
+            sql`${factoryOffloadAdditionalCharges.supplierId} = ANY(${sqlArray(supplierIds)})`
           )
         );
 
@@ -133,7 +133,7 @@ export function registerSupplierBalanceSingleRoutes(app: Express) {
       // For brokers, their balance = only direct entries + FX-in (no child rollup).
       const computeBalance = (sid: number, openingBal: number) => {
         const supplierContainers = allContainers.filter((c) => c.supplierId === sid);
-        const containerValue = supplierContainers.reduce((sum: number, c: any) => {
+        const containerValue = supplierContainers.reduce((sum: number, c) => {
           // Use totalKg (declared/agreed weight) not actualReceivedKg — weight differences
           // at offload affect inventory only, not what is owed to the supplier.
           const kg = parseFloat(c.totalKg || "0");
@@ -143,7 +143,7 @@ export function registerSupplierBalanceSingleRoutes(app: Express) {
           const { fxRate: fx, looksSet: fxLooksSet } = resolveStoredFxRate(
             containerCc,
             c.fxRateToUsd,
-            (c as any).fxRateConfirmed
+            c.fxRateConfirmed
           );
           if (!fxLooksSet) balanceFxUnresolved.add(sid);
           const freightCc = c.freightCurrencyCode || containerCc;
@@ -154,7 +154,7 @@ export function registerSupplierBalanceSingleRoutes(app: Express) {
           return sum + (kg * rate + freightInContainerCurr) * fx + freightDirectUsd;
         }, 0);
         // Commission from supplier's OWN containers (not broker-earned from other suppliers' containers)
-        const ownCommission = supplierContainers.reduce((sum: number, c: any) => {
+        const ownCommission = supplierContainers.reduce((sum: number, c) => {
           const commAmt = parseFloat(c.commissionAmount || "0");
           if (commAmt <= 0) return sum;
           const commCurr = (c.commissionCurrencyCode || c.currencyCode || "USD").toUpperCase();
@@ -165,7 +165,7 @@ export function registerSupplierBalanceSingleRoutes(app: Express) {
             const { fxRate: commFx, looksSet: commFxLooksSet } = resolveStoredFxRate(
               commCurr,
               c.fxRateToUsd,
-              (c as any).fxRateConfirmed
+              c.fxRateConfirmed
             );
             if (!commFxLooksSet) {
               balanceFxUnresolved.add(sid);
@@ -178,7 +178,7 @@ export function registerSupplierBalanceSingleRoutes(app: Express) {
           const { fxRate: commFx, looksSet: commFxLooksSet } = resolveStoredFxRate(
             commCurr,
             c.commissionFxRateToUsd,
-            (c as any).commissionFxRateConfirmed
+            c.commissionFxRateConfirmed
           );
           if (!commFxLooksSet) {
             balanceFxUnresolved.add(sid);
@@ -187,13 +187,13 @@ export function registerSupplierBalanceSingleRoutes(app: Express) {
           return sum + commAmt * commFx;
         }, 0);
         // Other charges from other suppliers' containers where this supplier is the charge recipient
-        const otherChargesValue = allContainers.reduce((sum: number, c: any) => {
+        const otherChargesValue = allContainers.reduce((sum: number, c) => {
           if (c.otherChargesSupplierId !== sid) return sum;
           const oc = parseFloat(c.otherCharges || "0");
           if (oc <= 0) return sum;
-          const ocCcy = (c as any).otherChargesCurrencyCode || "USD";
+          const ocCcy = c.otherChargesCurrencyCode || "USD";
           if (ocCcy === "USD") return sum + oc;
-          const { fxRate: fx, looksSet } = resolveStoredFxRate(ocCcy, c.fxRateToUsd, (c as any).fxRateConfirmed);
+          const { fxRate: fx, looksSet } = resolveStoredFxRate(ocCcy, c.fxRateToUsd, c.fxRateConfirmed);
           if (!looksSet) {
             balanceFxUnresolved.add(sid);
             return sum;
@@ -201,7 +201,7 @@ export function registerSupplierBalanceSingleRoutes(app: Express) {
           return sum + oc * fx;
         }, 0);
         // Post-offload additional charges explicitly assigned to this supplier (or children)
-        const offloadChargesValue = offloadAdditionalChargesForSupplier.reduce((sum: number, oc: any) => {
+        const offloadChargesValue = offloadAdditionalChargesForSupplier.reduce((sum: number, oc) => {
           if (oc.supplierId !== sid) return sum;
           const amt = parseFloat(oc.amount || "0");
           if (amt <= 0) return sum;
@@ -217,7 +217,7 @@ export function registerSupplierBalanceSingleRoutes(app: Express) {
         // FX net: FX-in transfers received minus FX-out transfers sent (in USD)
         // Use toAmountUsd for both directions — it's the actual USD value settled.
         let fxNetUsd = 0;
-        for (const t of allFxTransfers as any[]) {
+        for (const t of (allFxTransfers)) {
           if (t.toSupplierId === sid) {
             fxNetUsd += parseFloat(t.toAmountUsd || "0");
           }
@@ -226,7 +226,7 @@ export function registerSupplierBalanceSingleRoutes(app: Express) {
           }
         }
         const supplierPayments = allPayments.filter((p) => p.supplierId === sid);
-        const totalPaid = supplierPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0);
+        const totalPaid = supplierPayments.reduce((sum: number, p) => sum + parseFloat(p.amountUsd || "0"), 0);
         const voucherPaid = voucherPaidBySupplier[sid] || 0;
         return (
           openingBal +

@@ -28,7 +28,7 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
   const { data: myLocations = [] } = useQuery<{ id: number; name: string }[]>({
     queryKey: ["/api/my-locations"],
   });
-  const myLocationIds = new Set(myLocations.map((location) => location.id));
+  const myLocationIds = useMemo(() => new Set(myLocations.map((location) => location.id)), [myLocations]);
 
   const { data: allTransfers = [], isLoading } = useQuery<TransferSummary[]>({
     queryKey: ["/api/stock-transfers/list", dateFilter],

@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -63,8 +64,8 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
         description: `Found ${data.items.length} item(s). Click Validate to check the data.`,
       });
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Parse error",
         description: error.message,
@@ -94,8 +95,8 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
         });
       }
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Validation error",
         description: error.message,
@@ -118,8 +119,8 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
       queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
       navigate("/stock-transfers");
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Import error",
         description: error.message,

@@ -43,7 +43,7 @@ export function registerVoucherUpdateRoutes(app: Express) {
       }
 
       // Verify voucher belongs to current company (respect factory mode company)
-      const effectiveCompanyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
+      const effectiveCompanyId = req.session.currentCompanyId || req.session.factoryCompanyId;
       if (existingVoucher.companyId !== effectiveCompanyId) {
         return res.status(403).json({
           message: "Access denied: Voucher belongs to a different company",
@@ -103,7 +103,7 @@ export function registerVoucherUpdateRoutes(app: Express) {
 
         // Handle inventory changes when toggling optional status
         if (req.body.optional !== undefined && existingVoucher.optional !== req.body.optional) {
-          const wasOptional = existingVoucher.optional;
+          const _wasOptional = existingVoucher.optional;
           const willBeOptional = req.body.optional;
 
           // Check if there are stock operations linked to this voucher
@@ -342,7 +342,7 @@ export function registerVoucherUpdateRoutes(app: Express) {
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId: req.session.currentCompanyId!,
           action: "update",
           tableName: "vouchers",
@@ -360,7 +360,7 @@ export function registerVoucherUpdateRoutes(app: Express) {
   });
 
   // Custom error class for validation errors
-  class ValidationError extends Error {
+  class _ValidationError extends Error {
     constructor(message: string) {
       super(message);
       this.name = "ValidationError";

@@ -149,7 +149,7 @@ export function registerContainerDocumentsRoutes(app: Express) {
           totalKg: container.totalKg,
         },
         supplier: {
-          code: (supplier as any)?.code || "",
+          code: supplier?.code || "",
           legalName: supplier?.legalName || "",
         },
         purchaseOrders: posWithItems,
@@ -177,7 +177,7 @@ export function registerContainerDocumentsRoutes(app: Express) {
         const supplier = await storage.getSupplierById(container.supplierId);
         const purchaseOrders = await storage.getPurchaseOrdersByContainer(container.id);
 
-        const sheetData: any[][] = [];
+        const sheetData: unknown[][] = [];
 
         sheetData.push(["CONTAINER DETAILS"]);
         sheetData.push(["Container Number", container.containerNumber]);

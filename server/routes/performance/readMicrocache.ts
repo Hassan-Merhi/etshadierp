@@ -186,7 +186,7 @@ function isNonInvalidatingWrite(req: Request): boolean {
 }
 
 export function buildReadMicrocacheKey(req: Request): string {
-  const session = req.session as any;
+  const session = req.session;
   const bodyKey = isReadOnlyPost(req) ? stableSerialize(req.body ?? null) : "";
   return [
     req.method,
@@ -220,7 +220,7 @@ function isReplayableHeader(name: string): boolean {
   return normalized === "access-control-expose-headers" || PAGINATION_HEADER_PATTERN.test(normalized);
 }
 
-function captureReplayableHeaders(res: any): ReplayableHeaders {
+function captureReplayableHeaders(res: import("express").Response): ReplayableHeaders {
   const rawHeaders = res.getHeaders?.();
   if (!rawHeaders || typeof rawHeaders !== "object") return {};
 
@@ -232,13 +232,13 @@ function captureReplayableHeaders(res: any): ReplayableHeaders {
   return headers;
 }
 
-function replayHeaders(res: any, headers: ReplayableHeaders): void {
+function replayHeaders(res: import("express").Response, headers: ReplayableHeaders): void {
   for (const [name, value] of Object.entries(headers)) {
     res.setHeader?.(name, value);
   }
 }
 
-function setCacheHeaders(res: any, entry: ReadMicrocacheEntry, state: string): void {
+function setCacheHeaders(res: import("express").Response, entry: ReadMicrocacheEntry, state: string): void {
   res.setHeader?.("Cache-Control", "private, no-cache, must-revalidate");
   res.setHeader?.("ETag", entry.etag);
   res.setHeader?.("Vary", "Cookie, Accept-Encoding, X-Client-Date");
@@ -308,7 +308,7 @@ function createReadMicrocacheController(options: ReadMicrocacheOptions = {}): Re
     void options.publishInvalidation?.();
   }
 
-  function sendEntry(req: Request, res: any, entry: ReadMicrocacheEntry, state: "HIT" | "COALESCED"): void {
+  function sendEntry(req: Request, res: import("express").Response, entry: ReadMicrocacheEntry, state: "HIT" | "COALESCED"): void {
     replayHeaders(res, entry.headers);
     setCacheHeaders(res, entry, state);
     if (etagMatches(req.headers["if-none-match"], entry.etag)) {

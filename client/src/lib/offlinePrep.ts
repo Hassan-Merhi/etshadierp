@@ -392,11 +392,20 @@ export async function runOfflinePrep(companyId: number, onProgress: (p: PrepProg
 
         const items = dataset.extractItems(raw, companyId);
 
-        if (dataset.tableKey && (db as any)[dataset.tableKey]) {
-          const table = (db as any)[dataset.tableKey] as ReturnType<typeof db.users.toCollection>["db"]["table"];
+        if (dataset.tableKey && db[dataset.tableKey]) {
+          const table = db[dataset.tableKey] as ReturnType<typeof db.users.toCollection>["db"]["table"];
           // Clear existing data for this company, then bulk-insert
-          await (db as any)[dataset.tableKey].where("companyId").equals(companyId).delete();
-          await (db as any)[dataset.tableKey].bulkPut(items);
+          await (
+            db as unknown as {
+              [key: string]: { where: (arg0: "companyId") => { equals: (arg0: number) => { delete: () => unknown } } };
+            }
+          )[dataset.tableKey]
+            .where("companyId")
+            .equals(companyId)
+            .delete();
+          await (db as unknown as { [key: string]: { bulkPut: (arg0: CachedEntity[]) => unknown } })[
+            dataset.tableKey
+          ].bulkPut(items);
         } else {
           // Save as offlinePackages blob
           const existing = await db.offlinePackages.where("key").equals(`pkg_${dataset.id}_${companyId}`).first();
@@ -441,7 +450,7 @@ export async function runOfflinePrep(companyId: number, onProgress: (p: PrepProg
   // Step 2b: Pre-warm lazy-loaded factory page JS chunks so they work offline
   // without needing a prior visit. Dynamic import() fetches the chunk; the
   // service worker caches it automatically via stale-while-revalidate.
-  const pageChunks: Array<{ label: string; loader: () => Promise<any> }> = [
+  const pageChunks = [
     // ── Core factory pages ───────────────────────────────────────────────
     { label: "Dashboard", loader: () => import("@/pages/factory/FactoryDashboard") },
     { label: "Daybook", loader: () => import("@/pages/factory/FactoryDaybook") },

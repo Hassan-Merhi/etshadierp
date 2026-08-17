@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -76,7 +77,7 @@ export default function FactoryPriceList() {
       setEditingCell(null);
       toast({ title: "Price Updated", description: "Price has been saved and will take effect everywhere." });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },

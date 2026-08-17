@@ -15,7 +15,7 @@ import { eq, and, desc, sql, isNull } from "drizzle-orm";
 export function registerFactoryContainerListRoutes(app: Express) {
   app.get("/api/factory/containers", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const results = await db
@@ -145,7 +145,7 @@ export function registerFactoryContainerListRoutes(app: Express) {
   // ── GET single container by ID ────────────────────────────────────────────
   app.get("/api/factory/containers/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id, 10);
       if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });

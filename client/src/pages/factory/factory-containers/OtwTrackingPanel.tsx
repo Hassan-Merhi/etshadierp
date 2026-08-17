@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useMutation, useQueryClient as useTQClient } from "@tanstack/react-query";
 import { Loader2, RefreshCw, Settings2, AlertTriangle, Boxes, XCircle, Clock } from "lucide-react";
@@ -44,7 +45,7 @@ export function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrac
     const fc = c as any;
     return fc.trackingLastCheckedAt && new Date(fc.trackingLastCheckedAt).toDateString() === today;
   }).length;
-  const withErrors = containers.filter((c) => !!(c as any).trackingError).length;
+  const withErrors = containers.filter((c) => !!(c as { trackingError: unknown }).trackingError).length;
   const timelineContainer = containers.find((c) => c.id === timelineId) ?? null;
 
   const trackNowMutation = useMutation({
@@ -66,13 +67,13 @@ export function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrac
         variant: data.success ? "default" : "destructive",
       });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       setTrackingNowId(null);
       toast({ title: "Tracking failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
 
-  const totalWeightKg = containers.reduce((sum, c) => sum + (parseFloat((c as any).totalKg) || 0), 0);
+  const totalWeightKg = containers.reduce((sum, c) => sum + (parseFloat((c as { totalKg: string }).totalKg) || 0), 0);
 
   if (isLoading) {
     return (

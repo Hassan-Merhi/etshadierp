@@ -31,18 +31,10 @@ async function loadRoleRows(userId?: string): Promise<CompanyUserRoleRow[]> {
 
 function installJsonArrayFilter(res: Response, filter: (rows: any[]) => any[]): void {
   const originalJson = res.json.bind(res);
-  (res as any).json = (body: unknown) =>
-    originalJson(Array.isArray(body) ? filter(body) : body);
+  res.json = (body: unknown) => originalJson(Array.isArray(body) ? filter(body) : body);
 }
 
-function deny(
-  req: Request,
-  res: Response,
-  companyId: number,
-  reason: string,
-  message: string,
-  status = 404
-): false {
+function deny(req: Request, res: Response, companyId: number, reason: string, message: string, status = 404): false {
   logger.error(
     JSON.stringify({
       event: "company_user_role_scope_denied",
@@ -60,10 +52,7 @@ function deny(
   return false;
 }
 
-export async function enforceCompanyUserRoleScope(
-  req: Request,
-  res: Response
-): Promise<boolean> {
+export async function enforceCompanyUserRoleScope(req: Request, res: Response): Promise<boolean> {
   // This middleware is the first Program 3A gateway registered before legacy
   // routes, so globally destructive maintenance, two-company configuration, and
   // company-owned user-location checks run here as well.
@@ -82,9 +71,7 @@ export async function enforceCompanyUserRoleScope(
   if (method === "GET" && path === "/api/users") {
     const roleRows = await loadRoleRows();
     const visibleIds = visibleUserIdsForCompany(roleRows, companyId);
-    installJsonArrayFilter(res, (rows) =>
-      rows.filter((row) => typeof row?.id === "string" && visibleIds.has(row.id))
-    );
+    installJsonArrayFilter(res, (rows) => rows.filter((row) => typeof row?.id === "string" && visibleIds.has(row.id)));
     return true;
   }
 
@@ -92,22 +79,11 @@ export async function enforceCompanyUserRoleScope(
     const roleRows = await loadRoleRows();
     const userIds = [...new Set(roleRows.map((row) => row.userId))];
     const visibleSessionUserIds = new Set(
-      userIds.filter((targetUserId) =>
-        canMutateGlobalUserAccount(
-          roleRows,
-          targetUserId,
-          companyId,
-          actorRole
-        )
-      )
+      userIds.filter((targetUserId) => canMutateGlobalUserAccount(roleRows, targetUserId, companyId, actorRole))
     );
     visibleSessionUserIds.add(sessionUserId);
     installJsonArrayFilter(res, (rows) =>
-      rows.filter(
-        (row) =>
-          typeof row?.userId === "string" &&
-          visibleSessionUserIds.has(row.userId)
-      )
+      rows.filter((row) => typeof row?.userId === "string" && visibleSessionUserIds.has(row.userId))
     );
     return true;
   }
@@ -121,21 +97,8 @@ export async function enforceCompanyUserRoleScope(
     if (targetUserId === sessionUserId) return true;
 
     const targetRows = await loadRoleRows(targetUserId);
-    if (
-      !canMutateGlobalUserAccount(
-        targetRows,
-        targetUserId,
-        companyId,
-        actorRole
-      )
-    ) {
-      return deny(
-        req,
-        res,
-        companyId,
-        "SESSION_TARGET_SCOPE_DENIED",
-        "Session not found"
-      );
+    if (!canMutateGlobalUserAccount(targetRows, targetUserId, companyId, actorRole)) {
+      return deny(req, res, companyId, "SESSION_TARGET_SCOPE_DENIED", "Session not found");
     }
     return true;
   }
@@ -151,20 +114,12 @@ export async function enforceCompanyUserRoleScope(
     return true;
   }
 
-  const permissionMatch = path.match(
-    /^\/api\/admin\/users\/([^/]+)\/security-permissions$/
-  );
+  const permissionMatch = path.match(/^\/api\/admin\/users\/([^/]+)\/security-permissions$/);
   if (["GET", "PUT"].includes(method) && permissionMatch) {
     const targetUserId = decodeURIComponent(permissionMatch[1]);
     const targetRows = await loadRoleRows(targetUserId);
     if (!canAccessTargetUser(targetRows, targetUserId, companyId, actorRole)) {
-      return deny(
-        req,
-        res,
-        companyId,
-        "SECURITY_PERMISSION_TARGET_SCOPE_DENIED",
-        "User not found"
-      );
+      return deny(req, res, companyId, "SECURITY_PERMISSION_TARGET_SCOPE_DENIED", "User not found");
     }
     return true;
   }
@@ -180,21 +135,8 @@ export async function enforceCompanyUserRoleScope(
 
   if (globalUserMutationId) {
     const targetRows = await loadRoleRows(globalUserMutationId);
-    if (
-      !canMutateGlobalUserAccount(
-        targetRows,
-        globalUserMutationId,
-        companyId,
-        actorRole
-      )
-    ) {
-      return deny(
-        req,
-        res,
-        companyId,
-        "GLOBAL_USER_MUTATION_SCOPE_DENIED",
-        "User not found"
-      );
+    if (!canMutateGlobalUserAccount(targetRows, globalUserMutationId, companyId, actorRole)) {
+      return deny(req, res, companyId, "GLOBAL_USER_MUTATION_SCOPE_DENIED", "User not found");
     }
     return true;
   }
@@ -216,13 +158,7 @@ export async function enforceCompanyUserRoleScope(
     if (typeof targetUserId === "string" && targetUserId.length > 0) {
       const targetRows = await loadRoleRows(targetUserId);
       if (!canAssignExistingTargetUser(targetRows, targetUserId, actorRole)) {
-        return deny(
-          req,
-          res,
-          companyId,
-          "ROLE_TARGET_SCOPE_DENIED",
-          "User not found"
-        );
+        return deny(req, res, companyId, "ROLE_TARGET_SCOPE_DENIED", "User not found");
       }
     }
     return true;

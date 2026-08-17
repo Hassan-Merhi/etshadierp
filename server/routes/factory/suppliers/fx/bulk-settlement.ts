@@ -29,7 +29,7 @@ export function registerSupplierBulkFxSettlementRoutes(app: Express) {
   // supplier's outstanding balance.
   app.post("/api/factory/suppliers/:brokerId/bulk-fx-settlement", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const brokerId = parseId(req.params.brokerId);
       if (brokerId === null) return res.status(400).json({ message: "Invalid id" });
@@ -162,7 +162,7 @@ export function registerSupplierBulkFxSettlementRoutes(app: Express) {
       const supplierData: Array<{ supplierId: number; name: string; available: number; containers: any[] }> = [];
       for (const sup of linkedSuppliers) {
         const supContainers = allContainers.filter((c) => c.supplierId === sup.id);
-        const totalValue = supContainers.reduce((s: number, c: any) => {
+        const totalValue = supContainers.reduce((s: number, c) => {
           const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
           const rate = parseFloat(c.ratePerKg || "0");
           const freight = parseFloat(c.freight || "0");
@@ -272,7 +272,7 @@ export function registerSupplierBulkFxSettlementRoutes(app: Express) {
 
       // Create FX transfers and allocation rows in a transaction
       const settlementDate = date || getClientDate(req);
-      const results = await db.transaction(async (tx: any) => {
+      const results = await db.transaction(async (tx) => {
         const created = [];
         for (const alloc of allocations) {
           const [fxTransfer] = await tx

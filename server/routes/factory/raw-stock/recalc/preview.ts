@@ -41,7 +41,7 @@ export function registerRawStockRecalcPreviewRoutes(app: Express) {
     requireRole(...ADMIN_ROLES),
     async (req: any, res: any) => {
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
         const rows = await getRawStockRecalcPreview(companyId);
         res.json(rows);
@@ -62,7 +62,7 @@ export function registerRawStockRecalcPreviewRoutes(app: Express) {
     requireRole(...ADMIN_ROLES),
     async (req: any, res: any) => {
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
         const { containerIds, includeCompletedBatches } = req.body;
         if (!Array.isArray(containerIds) || containerIds.length === 0) {
@@ -93,7 +93,7 @@ export function registerRawStockRecalcPreviewRoutes(app: Express) {
     requireRole(...ADMIN_ROLES),
     async (req: any, res: any) => {
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
         const { containerIds, confirm, confirmationToken, includeCompletedBatches, includeHistoricalContainers } =
           req.body;

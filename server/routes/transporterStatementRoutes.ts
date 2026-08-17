@@ -389,7 +389,8 @@ export function registerTransporterStatementRoutes(app: Express) {
         sql`SELECT payment_terms_days FROM transporter_payment_settings
             WHERE company_id = ${companyId} AND ledger_account_id = ${accountId} LIMIT 1`
       );
-      const paymentTermsDays: number = (settingsRows.rows?.[0] as any)?.payment_terms_days ?? 0;
+      const paymentTermsDays: number =
+        (settingsRows.rows?.[0] as { payment_terms_days: number })?.payment_terms_days ?? 0;
 
       // Fetch all voucher entries for this account (all time for running balance)
       const rawEntries = await db.execute(sql`

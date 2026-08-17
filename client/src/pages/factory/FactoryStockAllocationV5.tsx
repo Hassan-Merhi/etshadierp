@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useMemo, Fragment, useCallback, useEffect, useRef } from "react";
 import { useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -127,7 +128,7 @@ export default function FactoryStockAllocationV5() {
       setAddCtDialog(null);
       queryClient.invalidateQueries({ queryKey: ["/api/factory/v5/stock-allocation"] });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Error adding containers", description: err.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -160,7 +161,7 @@ export default function FactoryStockAllocationV5() {
       setCloseDialog(null);
       queryClient.invalidateQueries({ queryKey: ["/api/factory/v5/stock-allocation"] });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Error closing proforma", description: err.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -214,7 +215,7 @@ export default function FactoryStockAllocationV5() {
       setEditDraftDialog(null);
       queryClient.invalidateQueries({ queryKey: ["/api/factory/v5/stock-allocation"] });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({
         title: "Error updating quantities",
         description: err.message ?? "Unknown error",
@@ -287,7 +288,7 @@ export default function FactoryStockAllocationV5() {
       setLinkSelected(new Set());
       queryClient.invalidateQueries({ queryKey: ["/api/factory/v5/stock-allocation"] });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Linking failed", description: err.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -325,7 +326,7 @@ export default function FactoryStockAllocationV5() {
       cancelledContainersQuery.refetch();
       queryClient.invalidateQueries({ queryKey: ["/api/factory/v5/stock-allocation"] });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Restore failed", description: err.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -336,8 +337,8 @@ export default function FactoryStockAllocationV5() {
     containerName: string;
     status: "DRAFT" | "LOADING";
   } | null>(null);
-  const [cancelSuperUser, setCancelSuperUser] = useState("");
-  const [cancelSuperPass, setCancelSuperPass] = useState("");
+  const [_cancelSuperUser, setCancelSuperUser] = useState("");
+  const [_cancelSuperPass, setCancelSuperPass] = useState("");
 
   const cancelContainerMut = useMutation({
     mutationFn: ({
@@ -359,7 +360,7 @@ export default function FactoryStockAllocationV5() {
       setCancelSuperPass("");
       queryClient.invalidateQueries({ queryKey: ["/api/factory/v5/stock-allocation"] });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Cancel failed", description: err.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -433,7 +434,7 @@ export default function FactoryStockAllocationV5() {
     setTimeout(() => {
       firstMatchRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 120);
-  }, [focusProformaId, rows.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [focusProformaId, rows.length]); 
 
   // Auto-open edit drawer when navigated here with openEdit=true
   const editOpenedRef = useRef(false);

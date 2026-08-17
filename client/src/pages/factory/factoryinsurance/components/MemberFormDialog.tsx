@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * MemberFormDialog — extracted sub-component.
  *
@@ -48,7 +49,7 @@ function MemberFormDialog({
       toast({ title: existing ? "Member updated" : "Member added" });
       onClose();
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       toast({ title: "Save failed", description: e.message, variant: "destructive" });
     },
   });

@@ -405,7 +405,7 @@ export function registerRentalPaymentsAccrualRoutes(
 
         // Separate posted (effective) and scheduled
         postedPayments = rentPaymentsAll.filter(
-          (p: any) => p.postingStatus === "POSTED" && String(p.paymentDate) <= asOfDate
+          (p) => p.postingStatus === "POSTED" && String(p.paymentDate) <= asOfDate
         );
         scheduledPayments = rentPaymentsAll.filter((p) => p.postingStatus === "SCHEDULED");
 
@@ -552,9 +552,9 @@ export function registerRentalPaymentsAccrualRoutes(
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const statusFilter = req.query.status as string | undefined;
-      const conditions: any[] = [eq(propertyPayments.companyId, companyId), eq(propertyPayments.module, module)];
+      const conditions = [eq(propertyPayments.companyId, companyId), eq(propertyPayments.module, module)];
       if (statusFilter) {
-        conditions.push(sql`${(propertyPayments as any).postingStatus} = ${statusFilter}`);
+        conditions.push(sql`${propertyPayments.postingStatus} = ${statusFilter}`);
       }
 
       const payments = await db
@@ -571,9 +571,9 @@ export function registerRentalPaymentsAccrualRoutes(
           exchangeRate: propertyPayments.exchangeRate,
           cashAccountId: propertyPayments.cashAccountId,
           voucherId: propertyPayments.voucherId,
-          postingStatus: (propertyPayments as any).postingStatus,
-          paymentGroupId: (propertyPayments as any).paymentGroupId,
-          postedAt: (propertyPayments as any).postedAt,
+          postingStatus: propertyPayments.postingStatus,
+          paymentGroupId: propertyPayments.paymentGroupId,
+          postedAt: propertyPayments.postedAt,
           tenantName: propertyContracts.tenantName,
           unitNumber: propertyUnits.unitNumber,
           locationGroup: propertyUnits.locationGroup,
@@ -641,7 +641,7 @@ export function registerRentalPaymentsAccrualRoutes(
       const rows = await db
         .select({
           id: propertyPayments.id,
-          paymentGroupId: (propertyPayments as any).paymentGroupId,
+          paymentGroupId: propertyPayments.paymentGroupId,
           contractId: propertyPayments.contractId,
           unitId: propertyPayments.unitId,
           amount: propertyPayments.amount,
@@ -650,7 +650,7 @@ export function registerRentalPaymentsAccrualRoutes(
           forMonth: propertyPayments.forMonth,
           currency: propertyPayments.currency,
           notes: propertyPayments.notes,
-          postingStatus: (propertyPayments as any).postingStatus,
+          postingStatus: propertyPayments.postingStatus,
           cashAccountId: propertyPayments.cashAccountId,
           createdAt: propertyPayments.createdAt,
         })

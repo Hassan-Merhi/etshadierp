@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * OpeningStockImport — extracted sub-component.
  *
@@ -32,7 +33,7 @@ export function OpeningStockImport() {
       setResult(data);
       toast({ title: "Import complete", description: `${data.imported} opening stock records imported` });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       if (err?._handledGlobally) return;
       toast({ title: "Import failed", description: err.message, variant: "destructive" });
     },
@@ -67,7 +68,7 @@ export function OpeningStockImport() {
       Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
-        complete: (results) => parse(results.data as any[]),
+        complete: (results) => parse((results.data)),
       });
     } else if (ext === "xlsx" || ext === "xls") {
       const reader = new FileReader();

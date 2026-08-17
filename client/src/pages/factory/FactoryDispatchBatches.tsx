@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
@@ -194,7 +195,7 @@ export default function FactoryDispatchBatches() {
       resetForm();
       if (data.batch?.id) navigate(`/factory/dispatch-batches/${data.batch.id}`);
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });

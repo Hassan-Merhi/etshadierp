@@ -25,7 +25,7 @@ import { eq, and, or, sql, inArray } from "drizzle-orm";
 export function registerFactoryLocationInventoryRoutes(app: Express) {
   app.get("/api/factory/location-inventory/:locationId", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const locationId = parseId(req.params.locationId);
@@ -132,13 +132,13 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
         const existing = grouped.get(groupKey);
         const qty = parseFloat(String(b.quantity || "1"));
         const weight = parseFloat(String(b.weightKg || "0"));
-        const productionPrice = parseFloat(String((product as any)?.productionPrice || "0"));
+        const productionPrice = parseFloat(String(product?.productionPrice || "0"));
         const sellingPrice = String(product?.sellingPrice || "0");
         const categoryName = product?.categoryId
           ? categoryMap.get(product.categoryId) || b.category || null
           : b.category || null;
         const categoryId = product?.categoryId || null;
-        const refNum: string = (b as any).referenceNumber || "";
+        const refNum: string = b.referenceNumber || "";
         const isLoading = loadingBaleIds.has(b.id);
         if (existing) {
           existing.quantity += qty;
@@ -152,7 +152,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
             productId: product?.id || b.productId || 0,
             articleCode: product?.articleCode || b.articleCode || b.baleCode || "",
             productName: product?.name || b.productName || "Unknown",
-            productNameAr: (product as any)?.nameAr || null,
+            productNameAr: product?.nameAr || null,
             category: categoryName,
             categoryId,
             quantity: qty,
@@ -178,7 +178,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
   // Returns inventory with pending proforma reservations subtracted
   app.get("/api/factory/location-inventory/:locationId/available", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const locationId = parseId(req.params.locationId);
@@ -253,7 +253,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
         const existing = grouped.get(groupKey);
         const qty = parseFloat(String(b.quantity || "1"));
         const weight = parseFloat(String(b.weightKg || "0"));
-        const productionPrice = parseFloat(String((product as any)?.productionPrice || "0"));
+        const productionPrice = parseFloat(String(product?.productionPrice || "0"));
         const sellingPrice = String(product?.sellingPrice || "0");
         const categoryName = product?.categoryId
           ? categoryMap.get(product.categoryId) || b.category || null
@@ -269,7 +269,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
             productId: product?.id || b.productId || 0,
             articleCode: product?.articleCode || b.articleCode || b.baleCode || "",
             productName: product?.name || b.productName || "Unknown",
-            productNameAr: (product as any)?.nameAr || null,
+            productNameAr: product?.nameAr || null,
             category: categoryName,
             categoryId,
             quantity: qty,
@@ -301,7 +301,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
     requireAuth,
     async (req: Request, res: Response) => {
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 
         const locationId = parseId(req.params.locationId);
@@ -370,10 +370,8 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
 
         const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
         const productCategoryNameMap = new Map(products.map((p) => [p.id, categoryMap.get(p.categoryId!) || ""]));
-        const productProductionPriceMap = new Map(
-          products.map((p) => [p.id, parseFloat((p as any).productionPrice || "0")])
-        );
-        const productSellingPriceMap = new Map(products.map((p) => [p.id, parseFloat((p as any).sellingPrice || "0")]));
+        const productProductionPriceMap = new Map(products.map((p) => [p.id, parseFloat(p.productionPrice || "0")]));
+        const productSellingPriceMap = new Map(products.map((p) => [p.id, parseFloat(p.sellingPrice || "0")]));
 
         const isWiperOrGarbage = (catName: string) => {
           const n = catName.toLowerCase();
@@ -595,7 +593,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
             articleCode: b.articleCode || "",
             productName: b.productName || "",
             category: productCategoryNameMap.get(pid) || b.category || "",
-            grade: (b as any).grade || "",
+            grade: b.grade || "",
             weightKg: parseFloat(String(b.weightKg || "0")),
           };
           if (includeCost) {
@@ -652,7 +650,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
             articleCode: b.articleCode || "",
             productName: b.productName || "",
             category: productCategoryNameMap.get(pid) || b.category || "",
-            grade: (b as any).grade || "",
+            grade: b.grade || "",
             weightKg: w,
           };
           if (includeCost) {
@@ -688,7 +686,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
           }
           const gtr = garbageDetailSheet.addRow(gtd);
           gtr.font = { bold: true };
-          gtr.eachCell({ includeEmpty: false }, (cell: any) => {
+          gtr.eachCell({ includeEmpty: false }, (cell) => {
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: TOTAL_BG } };
           });
           gtr.getCell("weightKg").numFmt = NUM_FMT;

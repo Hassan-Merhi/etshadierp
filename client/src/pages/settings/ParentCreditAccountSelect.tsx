@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -84,8 +85,8 @@ export function ParentCreditAccountSelect({ company }: { company: any }) {
       queryClient.invalidateQueries({ queryKey: ["/api/companies"] });
       toast({ title: "Saved", description: "Parent credit account updated" });
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -106,8 +107,8 @@ export function ParentCreditAccountSelect({ company }: { company: any }) {
       setIsCreating(false);
       setNewAccountName("");
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error creating account", description: error.message, variant: "destructive" });
     },
   });

@@ -71,9 +71,9 @@ export function computeFactoryDefaultPage(myAccess: MyAccess | undefined): strin
       const key = item.url.replace(/^\//, "");
       if (myAccess.pageKeys.includes(key)) return item.url;
       // Accept old pre-hub-merge keys that now redirect to this hub
-      const legacyKeys = SUBPAGE_PARENT
-        .filter(([, parentKey]) => parentKey === key)
-        .map(([prefix]) => prefix.replace(/^\//, ""));
+      const legacyKeys = SUBPAGE_PARENT.filter(([, parentKey]) => parentKey === key).map(([prefix]) =>
+        prefix.replace(/^\//, "")
+      );
       if (legacyKeys.some((lk) => myAccess.pageKeys.includes(lk))) return item.url;
     }
   }
@@ -127,9 +127,9 @@ export function computeFactoryGuardRedirect(params: {
   // 1. Per-user page restriction
   if (isRestrictedUser && requiredKey && !VIEWABLE_BY_ALL.has(requiredKey)) {
     const hasDirectAccess = myAccess.pageKeys.includes(requiredKey);
-    const hasLegacyAccess = SUBPAGE_PARENT
-      .filter(([, parentKey]) => parentKey === requiredKey)
-      .some(([prefix]) => myAccess.pageKeys.includes(prefix.replace(/^\//, "")));
+    const hasLegacyAccess = SUBPAGE_PARENT.filter(([, parentKey]) => parentKey === requiredKey).some(([prefix]) =>
+      myAccess.pageKeys.includes(prefix.replace(/^\//, ""))
+    );
     if (!hasDirectAccess && !hasLegacyAccess) return factoryDefaultPage;
   }
 
@@ -138,9 +138,9 @@ export function computeFactoryGuardRedirect(params: {
     for (const section of FACTORY_NAV_SECTIONS) {
       for (const item of section.items) {
         const itemKey = item.url.replace(/^\//, "");
-        if (itemKey === requiredKey && (item as any).featureFlag) {
-          const flag = (item as any).featureFlag as string;
-          const defaultOn = !!(item as any).featureFlagDefaultOn;
+        if (itemKey === requiredKey && item.featureFlag) {
+          const flag = item.featureFlag as string;
+          const defaultOn = !!item.featureFlagDefaultOn;
           const enabled = defaultOn ? factorySettings[flag] !== false : factorySettings[flag] === true;
           if (!enabled) return factoryDefaultPage;
         }

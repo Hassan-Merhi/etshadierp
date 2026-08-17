@@ -105,17 +105,17 @@ export const transferRepository = {
       storage.getAllCompanies(),
       accountIds.length > 0
         ? db.select().from(ledgerAccounts).where(inArray(ledgerAccounts.id, accountIds))
-        : Promise.resolve([] as any[]),
+        : Promise.resolve(([])),
     ]);
     const companyMap = new Map(companies.map((company) => [company.id, company]));
     const accountMap = new Map(accounts.map((account) => [account.id, account]));
 
     return transfers.map((transfer) => ({
       ...transfer,
-      fromCompanyName: (companyMap.get(transfer.fromCompanyId) as any)?.name ?? "Unknown",
-      toCompanyName: (companyMap.get(transfer.toCompanyId) as any)?.name ?? "Unknown",
-      fromAccountName: (accountMap.get(transfer.fromLedgerAccountId) as any)?.name ?? "Unknown",
-      toAccountName: (accountMap.get(transfer.toLedgerAccountId) as any)?.name ?? "Unknown",
+      fromCompanyName: companyMap.get(transfer.fromCompanyId)?.name ?? "Unknown",
+      toCompanyName: companyMap.get(transfer.toCompanyId)?.name ?? "Unknown",
+      fromAccountName: accountMap.get(transfer.fromLedgerAccountId)?.name ?? "Unknown",
+      toAccountName: accountMap.get(transfer.toLedgerAccountId)?.name ?? "Unknown",
     }));
   },
 

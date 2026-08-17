@@ -6,7 +6,7 @@ import { fill, wFont, ctr, right, ALT_ROW, DARK_BLUE, NUM, NUM4 } from "./consta
 export function buildSummaryItemwiseSheet(
   wb: ExcelJS.Workbook,
   items: ItemRow[],
-  dayCount: number
+  _dayCount: number
 ): void {
   const ws = wb.addWorksheet("Summary-Itemwise", { state: "hidden" });
   ws.columns = [

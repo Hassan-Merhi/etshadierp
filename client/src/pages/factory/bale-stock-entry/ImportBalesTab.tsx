@@ -59,7 +59,7 @@ export function ImportBalesTab() {
         const data = new Uint8Array(evt.target?.result as ArrayBuffer);
         const workbook = await XLSX.read(data, { type: "array" });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json<any>(sheet, { header: 1 });
+        const jsonData = XLSX.utils.sheet_to_json<unknown>(sheet, { header: 1 });
 
         let headerRowIdx = -1;
         for (let i = 0; i < Math.min(jsonData.length, 10); i++) {
@@ -89,7 +89,7 @@ export function ImportBalesTab() {
           (h) => h.includes("REF NUMBER") || h === "REF" || h === "REF CODE" || h === "REFERENCE"
         );
 
-        const parseExcelDate = (val: any): string => {
+        const parseExcelDate = (val: unknown): string => {
           if (!val && val !== 0) return "";
           const raw = String(val).trim();
           if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);

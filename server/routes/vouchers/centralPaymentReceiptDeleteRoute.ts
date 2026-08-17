@@ -94,7 +94,7 @@ async function deleteActivePaymentReceipt(req: Request, res: Response, next: Nex
         return {
           replayed: true,
           voucher: lockedVoucher,
-          entries: [] as any[],
+          entries: ([]),
         };
       }
 
@@ -189,7 +189,7 @@ async function deleteActivePaymentReceipt(req: Request, res: Response, next: Nex
         const entrySnapshot = await snapshotVoucherEntries(deletion.entries);
         await logAudit({
           userId: userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId,
           action: "delete",
           tableName: "vouchers",

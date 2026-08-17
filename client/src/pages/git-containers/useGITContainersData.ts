@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -95,7 +96,7 @@ export function useGITContainersData({
           : `Auto-tracking disabled for ${data.updated} containers`,
       });
     },
-    onError: (err: any) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
+    onError: (err: ClientErrorLike) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
   });
 
   const bulkTrackMutation = useMutation({
@@ -116,7 +117,7 @@ export function useGITContainersData({
         setShowProgressBanner(true);
       }
     },
-    onError: (err: any) => toast({ title: "Track All failed", description: err.message, variant: "destructive" }),
+    onError: (err: ClientErrorLike) => toast({ title: "Track All failed", description: err.message, variant: "destructive" }),
   });
 
   const isBulkPending = bulkTrackMutation.isPending;

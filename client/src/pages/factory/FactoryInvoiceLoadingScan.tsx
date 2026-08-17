@@ -283,7 +283,7 @@ export default function FactoryInvoiceLoadingScan() {
   }
 
   if (isError || (!isLoading && !summary)) {
-    const msg = (error as any)?.message || "Invoice not found";
+    const msg = error?.message || "Invoice not found";
     return (
       <div className="flex flex-col items-center justify-center h-full p-6 gap-3">
         <p className="text-destructive font-medium">{msg}</p>

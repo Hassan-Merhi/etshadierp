@@ -117,7 +117,7 @@ function cleanInsertText(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const codePoints = Array.from(value);
   if (codePoints.length === 0 || codePoints.length > MAX_TEXT_CODE_POINTS) return null;
-  // eslint-disable-next-line no-control-regex -- server-side half of the same remote-input boundary — text carrying C0/DEL is refused rather than sanitised, so the match is intentional
+  
   if (/[\u0000-\u001f\u007f]/u.test(value)) return null;
   return value;
 }

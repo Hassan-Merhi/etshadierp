@@ -27,7 +27,7 @@ export function registerFactoryCustomerStatementPdfRoutes(app: Express) {
   // ── Customer Statement: PDF Export ──────────────────────────────────────
   app.get("/api/factory/customers/:id/statement/export-pdf", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const customerId = parseInt(req.params.id);
       if (isNaN(customerId)) return res.status(400).json({ message: "Invalid customer ID" });
@@ -49,7 +49,7 @@ export function registerFactoryCustomerStatementPdfRoutes(app: Express) {
 
       // Pull voucher entries (same logic as statement endpoint)
       const voucherRowsPdf: any[] = [];
-      const ledgerAccountIdPdf = (customer as any).ledgerAccountId;
+      const ledgerAccountIdPdf = customer.ledgerAccountId;
       const voucherCondPdf = ledgerAccountIdPdf
         ? sql`(${voucherEntries.ledgerAccountId} = ${ledgerAccountIdPdf} OR ${voucherEntries.customerId} = ${customerId})`
         : sql`${voucherEntries.customerId} = ${customerId}`;
@@ -224,7 +224,7 @@ export function registerFactoryCustomerStatementPdfRoutes(app: Express) {
 
       // ── Fetch company logo — prefer companySettings.logoUrl, fall back to disk ──
       let logoBuffer: Buffer | null = null;
-      const logoUrl = (settings as any)?.logoUrl as string | undefined;
+      const logoUrl = settings?.logoUrl as string | undefined;
       if (logoUrl) {
         try {
           logoBuffer = await new Promise<Buffer>((resolve, reject) => {
@@ -269,8 +269,8 @@ export function registerFactoryCustomerStatementPdfRoutes(app: Express) {
         getReorderedString: (t: string, l: any) => string;
       } | null = null;
       try {
-        custConvAr = (require("arabic-reshaper") as any).convertArabic;
-        custBidi = (require("bidi-js") as any)();
+        custConvAr = require("arabic-reshaper").convertArabic;
+        custBidi = require("bidi-js")();
       } catch {
         // Failure here is non-fatal and the surrounding flow continues deliberately.
       }

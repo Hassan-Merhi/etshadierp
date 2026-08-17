@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -117,7 +118,7 @@ export function StockReportSection() {
       queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/stock-settings"] });
       toast({ title: "Stock report settings saved" });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const sendNow = useMutation({
@@ -129,7 +130,7 @@ export function StockReportSection() {
     onSuccess: (data: any) => {
       toast({ title: "Reports sent", description: data?.message || "Done" });
     },
-    onError: (e: any) => toast({ title: "Send failed", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Send failed", description: e.message, variant: "destructive" }),
   });
 
   const canSend = !!(rCompanyId && rRecipientId);

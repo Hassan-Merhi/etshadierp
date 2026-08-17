@@ -1,3 +1,5 @@
+const PAY_FROM_LEDGER_TYPES = new Set(["Cash", "Bank", "Loans"]);
+
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { stockItemKeys } from "@/lib/queryKeys";
@@ -155,7 +157,6 @@ export function useVoucherQueries({
   });
 
   // Pay From / Receive Into field: only Cash, Bank, and Loans ledger accounts + all bank accounts
-  const PAY_FROM_LEDGER_TYPES = new Set(["Cash", "Bank", "Loans"]);
   const payFromAccounts = useMemo<CombinedAccount[]>(
     () =>
       [

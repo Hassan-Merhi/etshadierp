@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -299,7 +300,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", voucherIdToEdit] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers/list"] });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Approval failed", description: err.message, variant: "destructive" });
     },
   });
@@ -321,7 +322,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
         description: `Found ${data.items.length} item(s). Click Validate to check the data.`,
       });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Parse error", description: error.message, variant: "destructive" });
     },
@@ -348,7 +349,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
         });
       }
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Validation error", description: error.message, variant: "destructive" });
     },
@@ -374,7 +375,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       setImportDestLocation("");
       setImportNotes("");
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Import error", description: error.message, variant: "destructive" });
     },
@@ -495,7 +496,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
         });
       }
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       const isEditMode = !!voucherIdToEdit;
       toast({
@@ -515,8 +516,8 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
     >();
     for (const item of stockTransferToEdit.items) {
       const key: RevKey = `${item.stockItemId}-${item.sourceLocationId ?? "null"}`;
-      const si = stockItems.find((s: any) => s.id === item.stockItemId);
-      const sl = locations.find((l: any) => l.id === item.sourceLocationId);
+      const si = stockItems.find((s) => s.id === item.stockItemId);
+      const sl = locations.find((l) => l.id === item.sourceLocationId);
       originalMap.set(key, {
         qty: parseFloat(item.quantity) || 0,
         stockItemId: item.stockItemId,
@@ -710,7 +711,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
     const voucherDate = formData.voucherDate
       ? format(formData.voucherDate, "yyyy-MM-dd")
       : format(new Date(), "yyyy-MM-dd");
-    const validEntries = formData.entries.filter((e: any) => e.stockItemId > 0 && parseFloat(e.quantity) > 0);
+    const validEntries = formData.entries.filter((e) => e.stockItemId > 0 && parseFloat(e.quantity) > 0);
     if (validEntries.length === 0) {
       toast({
         title: "No data to export",
@@ -719,10 +720,10 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       });
       return;
     }
-    const destLoc = locations?.find((l: any) => l.id === formData.destinationLocationId);
+    const destLoc = locations?.find((l) => l.id === formData.destinationLocationId);
     const destLocationName = destLoc?.name || "";
     if (detailed) {
-      const exportData = validEntries.map((entry: any) => ({
+      const exportData = validEntries.map((entry) => ({
         Date: voucherDate,
         "Source Location": entry.sourceLocationName || "",
         "Destination Location": destLocationName,
@@ -741,9 +742,9 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       await writeFile(workbook, fileName);
       toast({ title: "Export successful", description: `Downloaded ${fileName} with ${validEntries.length} items.` });
     } else {
-      const totalQty = validEntries.reduce((sum: number, e: any) => sum + parseFloat(e.quantity), 0);
+      const totalQty = validEntries.reduce((sum: number, e) => sum + parseFloat(e.quantity), 0);
       const totalAmount = validEntries.reduce(
-        (sum: number, e: any) => sum + parseFloat(e.quantity) * parseFloat(e.rate || "0"),
+        (sum: number, e) => sum + parseFloat(e.quantity) * parseFloat(e.rate || "0"),
         0
       );
       const exportData = [
@@ -858,7 +859,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
               title: "Form Validation Error",
               description:
                 Object.values(errors)
-                  .map((e: any) => e?.message || JSON.stringify(e))
+                  .map((e) => e?.message || JSON.stringify(e))
                   .join(", ") || "Please check all fields",
               variant: "destructive",
             });
@@ -1014,7 +1015,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                   const mobileFilteredLocs =
                     activeTransferRow === index && activeFieldType === "source"
                       ? locations
-                          .filter((loc: any) => {
+                          .filter((loc) => {
                             if (!transferSourceSearchTerm.trim()) return true;
                             const term = transferSourceSearchTerm.toLowerCase();
                             return (loc.name || "").toLowerCase().includes(term);
@@ -1079,7 +1080,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                           />
                           {mobileFilteredLocs.length > 0 && (
                             <div className="border rounded-md bg-popover shadow-md max-h-36 overflow-y-auto z-20 relative">
-                              {mobileFilteredLocs.map((loc: any) => (
+                              {mobileFilteredLocs.map((loc) => (
                                 <button
                                   key={loc.id}
                                   type="button"
@@ -1155,7 +1156,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                                   e.preventDefault();
                                   const sourceId = Number(transferInventorySource);
                                   if (!(sourceId > 0)) return;
-                                  const sourceLocation = locations.find((l: any) => l.id === sourceId);
+                                  const sourceLocation = locations.find((l) => l.id === sourceId);
                                   stockTransferForm.setValue(`entries.${index}.sourceLocationId`, sourceId, {
                                     shouldValidate: true,
                                   });

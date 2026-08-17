@@ -1,27 +1,28 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * BaleImport — extracted sub-component.
  *
  * Extracted from FactoryImport.tsx during the Phase 4 god-file split.
  */
-import {useState, useCallback} from "react";
-import {useMutation, useQuery} from "@tanstack/react-query";
-import type {FactoryBaleProduct} from "@shared/schema";
-import {X, Loader2} from "lucide-react";
-import {Button} from "@/components/ui/button";
-import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
-import {Input} from "@/components/ui/input";
-import {Badge} from "@/components/ui/badge";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {useToast} from "@/hooks/use-toast";
-import {factoryApiRequest} from "@/lib/factoryApi";
+import { useState, useCallback } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import type { FactoryBaleProduct } from "@shared/schema";
+import { X, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { factoryApiRequest } from "@/lib/factoryApi";
 import Papa from "papaparse";
 
-import type {BaleRow} from "../types";
-import {EMPTY_BALE} from "../utils";
-import {ImportModeChooser} from "./ImportModeChooser";
-import {ManualEntryCard} from "./ManualEntryCard";
-import {ImportResult} from "./ImportResult";
+import type { BaleRow } from "../types";
+import { EMPTY_BALE } from "../utils";
+import { ImportModeChooser } from "./ImportModeChooser";
+import { ManualEntryCard } from "./ManualEntryCard";
+import { ImportResult } from "./ImportResult";
 
 export function BaleImport() {
   const [mode, setMode] = useState<"choose" | "csv" | "manual">("choose");
@@ -51,7 +52,7 @@ export function BaleImport() {
       setResult(data);
       toast({ title: "Import complete", description: `${data.imported} bales imported` });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       if (err?._handledGlobally) return;
       toast({ title: "Import failed", description: err.message, variant: "destructive" });
     },
@@ -233,7 +234,7 @@ export function BaleImport() {
       onRemove={(i) => setRows(rows.filter((_, idx) => idx !== i))}
       onChange={(i, field, value) => {
         const updated = [...rows];
-        (updated[i] as any)[field] = value;
+        (updated[i] as unknown as BaleRow & { [key: string]: string })[field] = value;
         setRows(updated);
       }}
       onSubmit={() => importMutation.mutate(rows.filter((r) => r.baleCode && r.weightKg))}

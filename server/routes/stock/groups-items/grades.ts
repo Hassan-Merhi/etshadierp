@@ -40,7 +40,7 @@ export function registerStockGradeRoutes(app: Express) {
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId,
           action: "create",
           tableName: "stock_grades",
@@ -79,14 +79,14 @@ export function registerStockGradeRoutes(app: Express) {
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId,
           action: "update",
           tableName: "stock_grades",
           recordId: id,
           recordIdentifier: updated.name,
           changes: Object.fromEntries(
-            Object.entries(updates).map(([k, v]) => [k, { old: (existing as any)[k], new: v }])
+            Object.entries(updates).map(([k, v]) => [k, { old: (existing as { [key: string]: unknown })[k], new: v }])
           ),
         });
       } catch {
@@ -113,7 +113,7 @@ export function registerStockGradeRoutes(app: Express) {
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId,
           action: "update",
           tableName: "stock_grades",

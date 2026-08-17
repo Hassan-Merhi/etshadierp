@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
 import * as XLSX from "@/lib/excelHelper";
@@ -52,7 +53,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   const { toast } = useToast();
   const qc = useQueryClient();
   const today = new Date().toLocaleDateString("en-CA");
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString("en-CA");
+  const _thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString("en-CA");
 
   // fromActive: send startDate; toActive: send endDate (activating To deactivates From)
   const [fromActive, setFromActive] = useState(true);
@@ -63,7 +64,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   useEffect(() => {
     if (!onActiveDateChange) return;
     onActiveDateChange(fromActive ? fromDate : null);
-  }, [fromActive, fromDate]);
+  }, [fromActive, fromDate, onActiveDateChange]);
 
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
   const [productCategoryFilter, setProductCategoryFilter] = useState<string[]>([]);
@@ -90,7 +91,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   const pageSize = 9999;
 
   // (no pagination state — all records load in a single request)
-  const filtersKey = useMemo(
+  const _filtersKey = useMemo(
     () =>
       [
         fromActive ? fromDate : "",
@@ -301,7 +302,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
       setEditingDateKey(null);
       qc.invalidateQueries({ queryKey: ["/api/factory/bales/stock-entry-history"] });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Update failed", description: err.message, variant: "destructive" });
     },
   });
@@ -315,7 +316,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
       toast({ title: "Worker assigned", description: `Worker updated for ${vars.baleIds.length} bale(s).` });
       qc.invalidateQueries({ queryKey: ["/api/factory/bales/stock-entry-history"] });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Assignment failed", description: err.message, variant: "destructive" });
     },
   });
@@ -334,7 +335,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     onSuccess: () => {
       toast({ title: "Sent", description: "Worker PDF sent to production WhatsApp group." });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       if (err?._handledGlobally) return;
       toast({ title: "Send failed", description: err.message, variant: "destructive" });
     },
@@ -424,7 +425,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     setIncludeUnassigned(true);
   }
 
-  function fmtTime(iso: string | null) {
+  function _fmtTime(iso: string | null) {
     if (!iso) return "—";
     try {
       return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -500,7 +501,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     await XLSX.writeFile(wb, `stock-entry-history-${fromDate}-to-${toDate}.xlsx`);
   }
 
-  async function handlePrintMatrix() {
+  async function _handlePrintMatrix() {
     if (filteredGroups.length === 0) return;
     const groupsWithBales = await fetchGroupsWithBales();
     const matrix = buildWorkerMatrix(groupsWithBales);
@@ -646,7 +647,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
       </tr>
     </tbody>
   </table>
-  <script>window.onload = function(){ window.print(); };<\/script>
+  <script>window.onload = function(){ window.print(); };</script>
 </body>
 </html>`;
 
@@ -824,7 +825,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     </tbody>
   </table>
 
-  <script>window.onload = function(){ window.print(); };<\/script>
+  <script>window.onload = function(){ window.print(); };</script>
 </body>
 </html>`;
 
@@ -1040,7 +1041,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
               Location
             </div>
             <MultiSelectFilter
-              options={locations.map((l: any) => ({ value: String(l.id), label: l.name }))}
+              options={locations.map((l) => ({ value: String(l.id), label: l.name }))}
               selected={locationIdFilter}
               onChange={setLocationIdFilter}
               placeholder="Locations"

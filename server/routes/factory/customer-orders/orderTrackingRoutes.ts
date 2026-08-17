@@ -10,7 +10,7 @@ import { eq, and, desc, sql, inArray, isNull } from "drizzle-orm";
 export function registerOrderTrackingRoutes(app: Express) {
   app.get("/api/factory/invoice-container-tracking", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const rows = await db
@@ -52,7 +52,7 @@ export function registerOrderTrackingRoutes(app: Express) {
   // them to ERP containers table, and triggers live tracking for each one.
   app.post("/api/factory/shipping-containers/track-now", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       // Get all active factory customer orders with a container number

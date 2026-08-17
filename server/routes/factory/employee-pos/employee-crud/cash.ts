@@ -16,7 +16,7 @@ export function registerFactoryEmployeeCashRoutes(app: Express) {
   // DR: PAYROLL_DEPOSIT_EXPENSE, CR: Employee (via employeeId)
   app.post("/api/factory/employees/:id/deposit", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -113,7 +113,7 @@ export function registerFactoryEmployeeCashRoutes(app: Express) {
   // DR: Employee (via employeeId), CR: Cash ledger account
   app.post("/api/factory/employees/:id/withdraw", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);

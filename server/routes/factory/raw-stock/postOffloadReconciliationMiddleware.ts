@@ -76,8 +76,8 @@ export function postOffloadReconciliationMiddleware(req: Request, res: Response,
   const pathMatch = POST_OFFLOAD_PATH.exec(req.originalUrl);
   if (!action || !pathMatch) return next();
 
-  if ((req as any)[INTERCEPTED]) return next();
-  (req as any)[INTERCEPTED] = true;
+  if ((req as unknown as Record<PropertyKey, unknown>)[INTERCEPTED]) return next();
+  (req as unknown as Record<PropertyKey, unknown>)[INTERCEPTED] = true;
 
   const containerId = Number.parseInt(pathMatch[1], 10);
   const originalJson = res.json.bind(res);
@@ -92,9 +92,9 @@ export function postOffloadReconciliationMiddleware(req: Request, res: Response,
     }
 
     void (async () => {
-      const companyId = Number((req.session as any)?.factoryCompanyId || (req.session as any)?.currentCompanyId || 0);
-      const userId = String((req.session as any)?.userId || (req as any).user?.id || "system");
-      const username = (req.session as any)?.username || null;
+      const companyId = Number(req.session?.factoryCompanyId || req.session?.currentCompanyId || 0);
+      const userId = String(req.session?.userId || req.user?.id || "system");
+      const username = req.session?.username || null;
       const chargeId = Number.isInteger(Number(body?.chargeId)) ? Number(body.chargeId) : null;
 
       let reconciliation: PostOffloadReconciliationResult;

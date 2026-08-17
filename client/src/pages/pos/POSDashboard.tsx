@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -67,7 +68,7 @@ interface PosShift {
   notes: string | null;
 }
 
-interface TodaySales {
+interface _TodaySales {
   count: number;
   total: string;
   average: string;
@@ -179,8 +180,8 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
         description: "Your shift has been opened successfully.",
       });
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to open shift",
@@ -213,8 +214,8 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
         variant: variance !== 0 ? "destructive" : "default",
       });
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to close shift",

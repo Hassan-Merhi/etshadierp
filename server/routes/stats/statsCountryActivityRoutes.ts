@@ -47,7 +47,7 @@ export function registerStatsCountryActivityRoutes(app: Express) {
       }
 
       // Helper: normalize any date value from pg to a YYYY-MM-DD string
-      const toDateKey = (raw: any): string => {
+      const toDateKey = (raw: unknown): string => {
         if (!raw) return "";
         if (raw instanceof Date) return raw.toISOString().substring(0, 10);
         if (typeof raw === "string") return raw.substring(0, 10);
@@ -79,7 +79,7 @@ export function registerStatsCountryActivityRoutes(app: Express) {
       const companyDayMap = new Map<number, DayMap>();
       for (const c of companies) companyDayMap.set(Number(c.id), new Map<string, DayEntry>());
 
-      const ensureDay = (rawCompanyId: any, day: string): DayEntry | null => {
+      const ensureDay = (rawCompanyId: unknown, day: string): DayEntry | null => {
         const companyId = Number(rawCompanyId);
         const m = companyDayMap.get(companyId);
         if (!m) return null;
@@ -95,9 +95,9 @@ export function registerStatsCountryActivityRoutes(app: Express) {
         // Aggregate with container details via json_agg
         const offloadsResult = await pool.query<{
           company_id: string;
-          day: any;
+          day: unknown;
           cnt: string;
-          containers: any;
+          containers: unknown;
         }>(
           `
           SELECT
@@ -144,7 +144,7 @@ export function registerStatsCountryActivityRoutes(app: Express) {
         try {
           const locResult = await pool.query<{
             company_id: string;
-            day: any;
+            day: unknown;
             location_id: string;
             location_name: string;
             cnt: string;
@@ -191,9 +191,9 @@ export function registerStatsCountryActivityRoutes(app: Express) {
         const companyIdList = companyIds.join(",");
         const purchasesResult = await pool.query<{
           company_id: string;
-          day: any;
+          day: unknown;
           cnt: string;
-          containers: any;
+          containers: unknown;
         }>(
           `
           SELECT
@@ -242,7 +242,7 @@ export function registerStatsCountryActivityRoutes(app: Express) {
       // ── 4. Build date spine ──────────────────────────────────────────────
       let dateSeries: string[] = [];
       try {
-        const datesResult = await pool.query<{ day: any }>(
+        const datesResult = await pool.query<{ day: unknown }>(
           `
           SELECT gs::date AS day
           FROM generate_series($1::date, $2::date, INTERVAL '1 day') AS gs

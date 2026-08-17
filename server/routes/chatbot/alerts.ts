@@ -85,7 +85,7 @@ export function registerChatbotAlertRoutes(app: Express) {
         .slice(0, 10);
 
       // Pending payrolls (DRAFT status in factory_payrolls)
-      let pendingPayrolls: any[] = [];
+      let pendingPayrolls: unknown[] = [];
       try {
         const { factoryPayrolls } = await import("@shared/schema");
         pendingPayrolls = await db
@@ -108,7 +108,7 @@ export function registerChatbotAlertRoutes(app: Express) {
         overdueCustomers,
         pendingPayrolls,
       });
-    } catch (error: unknown) {
+    } catch (_error: unknown) {
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -129,7 +129,7 @@ export function registerChatbotAlertRoutes(app: Express) {
       await db.update(users).set({ chatbotEnabled: enabled }).where(eq(users.id, userId));
 
       res.json({ message: `Chatbot ${enabled ? "enabled" : "disabled"} for user` });
-    } catch (error: unknown) {
+    } catch (_error: unknown) {
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -154,7 +154,7 @@ export function registerChatbotAlertRoutes(app: Express) {
         .where(eq(users.active, true));
 
       res.json(allUsers);
-    } catch (error: unknown) {
+    } catch (_error: unknown) {
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -185,9 +185,9 @@ export function registerChatbotAlertRoutes(app: Express) {
         actionName: actionName || null,
         createdRecordId: createdRecordId || null,
         status: status || "confirmed",
-      } as any);
+      });
       res.json({ success: true });
-    } catch (error: unknown) {
+    } catch (_error: unknown) {
       res.status(500).json({ message: "Internal server error" });
     }
   });

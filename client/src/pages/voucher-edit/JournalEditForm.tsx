@@ -161,7 +161,7 @@ export function JournalEditForm({
                   <FormField
                     control={form.control}
                     name={`entries.${index}.accountId`}
-                    render={({ field: accountField }) => (
+                    render={({ field: _accountField }) => (
                       <FormItem>
                         <FormLabel className="text-xs">Account</FormLabel>
                         <FormControl>
@@ -268,7 +268,7 @@ export function JournalEditForm({
                         <FormField
                           control={form.control}
                           name={`entries.${index}.accountId`}
-                          render={({ field: accountField }) => (
+                          render={({ field: _accountField }) => (
                             <FormItem>
                               <FormControl>
                                 <AccountAutocomplete

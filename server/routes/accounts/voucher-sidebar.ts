@@ -58,20 +58,20 @@ export function registerAccountVoucherSidebarRoutes(app: Express) {
         storage.getAllBankAccounts(companyId),
         storage.getAllFixedAssets(companyId),
         storage.getAllEmployees(companyId),
-        isFactoryCompany || isPropertiesCompany ? Promise.resolve([] as any[]) : storage.getAllSuppliers(),
+        isFactoryCompany || isPropertiesCompany ? Promise.resolve(([])) : storage.getAllSuppliers(),
         isFactoryCompany
           ? db
               .select()
               .from(factorySuppliers)
               .where(eq(factorySuppliers.companyId, companyId))
               .orderBy(factorySuppliers.name)
-          : Promise.resolve([] as any[]),
+          : Promise.resolve(([])),
         isFactoryCompany
           ? db.select().from(factoryContainers).where(eq(factoryContainers.companyId, companyId))
-          : Promise.resolve([] as any[]),
+          : Promise.resolve(([])),
         isFactoryCompany
           ? db.select().from(factorySupplierPayments).where(eq(factorySupplierPayments.companyId, companyId))
-          : Promise.resolve([] as any[]),
+          : Promise.resolve(([])),
         db
           .select({
             id: vouchers.id,
@@ -98,11 +98,11 @@ export function registerAccountVoucherSidebarRoutes(app: Express) {
       // FACTORY-PAY-* voucher IDs — excluded when computing factory supplier voucher-paid amounts
       // to prevent double-counting with fPayments (factorySupplierPayments).
       const factoryPayVoucherIds = new Set(
-        (companyVouchers as any[]).filter((v) => (v.voucherNumber || "").startsWith("FACTORY-PAY-")).map((v) => v.id)
+        ((companyVouchers)).filter((v) => (v.voucherNumber || "").startsWith("FACTORY-PAY-")).map((v) => v.id)
       );
       // Map from voucherId -> {currency, exchangeRate} for USD conversion of factory supplier entries
       const voucherCurrencyMap = new Map<number, { currency: string; exchangeRate: string }>(
-        (companyVouchers as any[]).map((v) => [
+        ((companyVouchers)).map((v) => [
           v.id,
           { currency: v.currency || "USD", exchangeRate: v.exchangeRate || "1" },
         ])
@@ -157,8 +157,8 @@ export function registerAccountVoucherSidebarRoutes(app: Express) {
           }
         }
 
-        if ((entry as any).factorySupplierId) {
-          const fsId = (entry as any).factorySupplierId as number;
+        if (entry.factorySupplierId) {
+          const fsId = entry.factorySupplierId as number;
           // Only track non-FACTORY-PAY-* debits as ERP voucher payments.
           // FACTORY-PAY-* vouchers are already counted via fPayments.
           if (!factoryPayVoucherIds.has(entry.voucherId) && debit > 0 && credit === 0) {
@@ -179,8 +179,8 @@ export function registerAccountVoucherSidebarRoutes(app: Express) {
           });
         }
 
-        if ((entry as any).customerId) {
-          const cId = (entry as any).customerId as number;
+        if (entry.customerId) {
+          const cId = entry.customerId as number;
           const existing = customerBalances.get(cId) || { debits: 0, credits: 0 };
           customerBalances.set(cId, {
             debits: existing.debits + debit,
@@ -305,7 +305,7 @@ export function registerAccountVoucherSidebarRoutes(app: Express) {
 
           // Container value: sum((actualReceivedKg || totalKg) * ratePerKg + freight) * fxRateToUsd
           const supplierContainers = fContainers.filter((c) => aggregateIds.includes(c.supplierId));
-          const containerValueUsd = supplierContainers.reduce((sum: number, c: any) => {
+          const containerValueUsd = supplierContainers.reduce((sum: number, c) => {
             const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
             const rate = parseFloat(c.ratePerKg || "0");
             const freight = parseFloat(c.freight || "0");
@@ -315,12 +315,12 @@ export function registerAccountVoucherSidebarRoutes(app: Express) {
 
           // Commission owed to this supplier as broker (exclude containers where they're also the main supplier)
           const brokerContainers = fContainers.filter(
-            (c: any) =>
+            (c) =>
               c.commissionSupplierId === supplier.id &&
               !aggregateIds.includes(c.supplierId) &&
               parseFloat(c.commissionAmount || "0") > 0
           );
-          const commissionValueUsd = brokerContainers.reduce((sum: number, c: any) => {
+          const commissionValueUsd = brokerContainers.reduce((sum: number, c) => {
             const commAmt = parseFloat(c.commissionAmount || "0");
             const fx = parseFloat(c.fxRateToUsd || "1");
             const commCurr = c.commissionCurrencyCode || c.currencyCode || "USD";
@@ -330,7 +330,7 @@ export function registerAccountVoucherSidebarRoutes(app: Express) {
           // Total paid via factorySupplierPayments (in USD) — aggregated across all linked IDs
           const supplierPayments = fPayments.filter((p) => aggregateIds.includes(p.supplierId));
           const totalPaidUsd = supplierPayments.reduce(
-            (sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"),
+            (sum: number, p) => sum + parseFloat(p.amountUsd || "0"),
             0
           );
 

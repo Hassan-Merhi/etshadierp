@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -105,7 +106,7 @@ export function FileStorageTab() {
     return visibleName(f).toLowerCase().includes(search.toLowerCase());
   });
 
-  const fileCountForFolder = (id: number | null) =>
+  const _fileCountForFolder = (id: number | null) =>
     allFiles.filter((f) => (id === null ? f.folderId == null : f.folderId === id)).length;
 
   const onRenameFolder = (id: number, name: string) => {
@@ -130,7 +131,7 @@ export function FileStorageTab() {
       setNewFolderOpen(false);
       queryClient.invalidateQueries({ queryKey: ["/api/file-folders"] });
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (!e?._handledGlobally) toast({ title: "Failed", description: e.message, variant: "destructive" });
     },
   });
@@ -143,7 +144,7 @@ export function FileStorageTab() {
       setRenameFolderOpen(false);
       queryClient.invalidateQueries({ queryKey: ["/api/file-folders"] });
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (!e?._handledGlobally) toast({ title: "Failed", description: e.message, variant: "destructive" });
     },
   });
@@ -156,7 +157,7 @@ export function FileStorageTab() {
       if (selectedFolderId === deleteFolderId) setSelectedFolderId("unfiled");
       queryClient.invalidateQueries({ queryKey: ["/api/file-folders"] });
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (!e?._handledGlobally) toast({ title: "Cannot delete", description: e.message, variant: "destructive" });
       setDeleteFolderId(null);
     },
@@ -181,7 +182,7 @@ export function FileStorageTab() {
       if (fileInputRef.current) fileInputRef.current.value = "";
       queryClient.invalidateQueries({ queryKey: ["/api/files"] });
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (!e?._handledGlobally) toast({ title: "Upload failed", description: e.message, variant: "destructive" });
     },
   });
@@ -194,7 +195,7 @@ export function FileStorageTab() {
       setRenameFileOpen(false);
       queryClient.invalidateQueries({ queryKey: ["/api/files"] });
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (!e?._handledGlobally) toast({ title: "Failed", description: e.message, variant: "destructive" });
     },
   });
@@ -207,7 +208,7 @@ export function FileStorageTab() {
       setMoveFileOpen(false);
       queryClient.invalidateQueries({ queryKey: ["/api/files"] });
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (!e?._handledGlobally) toast({ title: "Failed", description: e.message, variant: "destructive" });
     },
   });
@@ -219,7 +220,7 @@ export function FileStorageTab() {
       setDeleteFileId(null);
       queryClient.invalidateQueries({ queryKey: ["/api/files"] });
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (!e?._handledGlobally) toast({ title: "Failed", description: e.message, variant: "destructive" });
     },
   });

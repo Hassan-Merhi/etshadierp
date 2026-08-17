@@ -32,8 +32,8 @@ export function registerGlobalTransactionRoutes(app: Express, requireAuth: any) 
   // Returns vouchers across all ERP companies the user has access to.
   app.get("/api/global/transactions", requireAuth, requireNonPOS, async (req, res) => {
     try {
-      const userId = (req.session as any).userId as string;
-      const userRole = (req.session as any).currentRole as string;
+      const userId = req.session.userId as string;
+      const userRole = req.session.currentRole as string;
       const isAdmin = userRole === "Admin" || userRole === "Developer";
       const isPrivileged = ["Admin", "Owner", "Manager", "Developer"].includes(userRole);
 
@@ -241,8 +241,8 @@ export function registerGlobalTransactionRoutes(app: Express, requireAuth: any) 
   // Returns the distinct voucher types present across the user's companies
   app.get("/api/global/transactions/voucher-types", requireAuth, requireNonPOS, async (req, res) => {
     try {
-      const userId = (req.session as any).userId as string;
-      const userRole = (req.session as any).currentRole as string;
+      const userId = req.session.userId as string;
+      const userRole = req.session.currentRole as string;
       const isAdmin = userRole === "Admin" || userRole === "Developer";
 
       let allowedCompanyIds: number[];

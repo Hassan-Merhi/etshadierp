@@ -153,9 +153,9 @@ async function getSharedBrowser(): Promise<any> {
     }
   }
 
-  const puppeteerExtra = _require("puppeteer-extra") as any;
+  const puppeteerExtra = _require("puppeteer-extra");
   if (!_stealthRegistered) {
-    const StealthPlugin = _require("puppeteer-extra-plugin-stealth") as any;
+    const StealthPlugin = _require("puppeteer-extra-plugin-stealth");
     puppeteerExtra.use(StealthPlugin());
     _stealthRegistered = true;
   }
@@ -331,7 +331,7 @@ export async function scrapeTracking(containerNumber: string): Promise<ScraperRe
       };
     }
 
-    const data = capturedData as any;
+    const data = capturedData as unknown as { shipments: ParcelsAppShipment[] } & { parcels: ParcelsAppShipment[] };
     const all: ParcelsAppShipment[] = data.shipments ?? data.parcels ?? [];
     const shipment =
       all.find((s: any) => s.trackingId === containerNumber || s.id === containerNumber) ?? all[0] ?? null;

@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * EditableTransferDetail — extracted sub-component.
  *
@@ -96,7 +97,7 @@ function EditableTransferDetail({
       setNote("");
       onBack();
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -124,14 +125,17 @@ function EditableTransferDetail({
     quantity: i.quantity ?? "0",
   }));
 
-  const alreadyAddedIds = new Set([...extraItems.map((e) => e.stockItemId), ...myItems.map((i) => i.stockItemId)]);
+  const alreadyAddedIds = useMemo(
+    () => new Set([...extraItems.map((e) => e.stockItemId), ...myItems.map((i) => i.stockItemId)]),
+    [extraItems, myItems]
+  );
 
   const panelMatches = useMemo(
     () =>
       locationInventory.filter(
         (i) => !alreadyAddedIds.has(i.stockItemId) && i.name.toLowerCase().includes(panelSearch.toLowerCase())
       ),
-    [locationInventory, panelSearch, extraItems, myItems]
+    [locationInventory, alreadyAddedIds, panelSearch]
   );
 
   useEffect(() => {

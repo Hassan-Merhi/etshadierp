@@ -412,13 +412,13 @@ export function registerSpContainerRoutes(app: Express) {
         });
       }
 
-      const discountFactor = 1 - parseFloat((container.discountPct as any) || "0") / 100;
-      const totalQty = lines.reduce((s, l) => s + parseFloat((l.qty as any) || "0"), 0);
+      const discountFactor = 1 - parseFloat(container.discountPct || "0") / 100;
+      const totalQty = lines.reduce((s, l) => s + parseFloat(l.qty || "0"), 0);
 
       const enriched = lines.map((l) => {
         const alias = aliasMap.get(l.articleCode);
-        const qty = parseFloat((l.qty as any) || "0");
-        const unitRate = parseFloat((l.unitRateUsd as any) || "0");
+        const qty = parseFloat(l.qty || "0");
+        const unitRate = parseFloat(l.unitRateUsd || "0");
         const discountedBaseRate = unitRate * discountFactor;
         return {
           id: l.id,
@@ -457,7 +457,7 @@ export function registerSpContainerRoutes(app: Express) {
 
       const containerId = req.query.containerId ? parseInt(req.query.containerId as string) : null;
 
-      const conditions: any[] = [eq(spPrepaidCharges.companyId, companyId)];
+      const conditions = [eq(spPrepaidCharges.companyId, companyId)];
       if (containerId) conditions.push(eq(spPrepaidCharges.containerId, containerId));
 
       const rows = await db

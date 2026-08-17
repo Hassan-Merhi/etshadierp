@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef } from "react";
 import { useLocation } from "wouter";
@@ -101,7 +102,7 @@ export default function FactoryBaleRelabeling() {
       setValidationResults(data.results);
       setStep("validate");
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Validation failed", description: e.message, variant: "destructive" });
     },
@@ -128,7 +129,7 @@ export default function FactoryBaleRelabeling() {
       setStep("done");
       toast({ title: "Relabeling applied", description: `${data.items.length} bales recoded successfully` });
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Apply failed", description: e.message, variant: "destructive" });
     },

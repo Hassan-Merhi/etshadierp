@@ -2,10 +2,7 @@ import type { Request } from "express";
 import { eq } from "drizzle-orm";
 import { userCompanyRoles } from "@shared/schema";
 import { db } from "../../db";
-import {
-  chooseActiveCompanyRole,
-  resolvePermissionCompanyId,
-} from "./activeCompanyPermissionPolicy";
+import { chooseActiveCompanyRole, resolvePermissionCompanyId } from "./activeCompanyPermissionPolicy";
 
 export interface ActiveCompanyPermissionContext {
   userId: string;
@@ -26,9 +23,7 @@ export class ActiveCompanyPermissionContextError extends Error {
   constructor(
     message: string,
     public readonly status: 401 | 403,
-    public readonly code:
-      | "ACTIVE_COMPANY_CONTEXT_REQUIRED"
-      | "ACTIVE_COMPANY_ROLE_REQUIRED"
+    public readonly code: "ACTIVE_COMPANY_CONTEXT_REQUIRED" | "ACTIVE_COMPANY_ROLE_REQUIRED"
   ) {
     super(message);
     this.name = "ActiveCompanyPermissionContextError";
@@ -47,9 +42,7 @@ declare module "express-serve-static-core" {
  * Factory and Properties use the pinned company; ordinary ERP/POS routes use
  * currentCompanyId even when another browser tab has Factory mode open.
  */
-export async function getActiveCompanyPermissionContext(
-  req: Request
-): Promise<ActiveCompanyPermissionContext> {
+export async function getActiveCompanyPermissionContext(req: Request): Promise<ActiveCompanyPermissionContext> {
   if (req._activeCompanyPermissionContext) {
     return req._activeCompanyPermissionContext;
   }
@@ -59,7 +52,7 @@ export async function getActiveCompanyPermissionContext(
   const companyId = resolvePermissionCompanyId({
     path: requestPath,
     currentCompanyId: req.session.currentCompanyId,
-    factoryCompanyId: (req.session as any).factoryCompanyId,
+    factoryCompanyId: req.session.factoryCompanyId,
   });
   if (!userId || !companyId) {
     throw new ActiveCompanyPermissionContextError(

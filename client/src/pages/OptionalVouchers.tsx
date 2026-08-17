@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -62,7 +63,7 @@ export default function OptionalVouchers() {
       toast({ title: "Voucher Finalized", description: "The voucher has been posted successfully." });
       setFinalizeVoucherId(null);
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
@@ -79,7 +80,7 @@ export default function OptionalVouchers() {
       toast({ title: "Voucher Deleted", description: "The voucher has been deleted." });
       setDeleteVoucherId(null);
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
@@ -252,7 +253,7 @@ export default function OptionalVouchers() {
         >
           <FileText className="h-10 w-10 opacity-30" />
           <p className="text-sm font-medium">Failed to load optional vouchers</p>
-          <p className="text-xs text-muted-foreground">{(error as any)?.message}</p>
+          <p className="text-xs text-muted-foreground">{error?.message}</p>
         </div>
       ) : vouchers.length === 0 ? (
         <div

@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
@@ -81,11 +82,11 @@ export function AgentCard({
       return null;
     }
   });
-  const saveOrder = (order: number[] | null) => {
+  const saveOrder = useCallback((order: number[] | null) => {
     if (order === null) localStorage.removeItem(storageKey);
     else localStorage.setItem(storageKey, JSON.stringify(order));
     setCustomOrder(order);
-  };
+  }, [storageKey]);
   const resetOrder = () => saveOrder(null);
 
   // ── Prepaid designations ──────────────────────────────────────────────────
@@ -119,7 +120,7 @@ export function AgentCard({
           description: "It now appears at the top of the list with a Prepaid badge.",
         });
     },
-    onError: (e: any, _vars, context) => {
+    onError: (e: ClientErrorLike, _vars, context) => {
       if (context?.previous !== undefined) queryClient.setQueryData(prepaidQKey, context.previous);
       toast({ title: "Failed to update prepaid", description: e.message, variant: "destructive" });
     },
@@ -133,7 +134,7 @@ export function AgentCard({
       setReplaceTarget(null);
       setReplaceAmountWarning(null);
     },
-    onError: (e: any) => toast({ title: "Replace failed", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Replace failed", description: e.message, variant: "destructive" }),
   });
 
   // ── Note ──────────────────────────────────────────────────────────────────
@@ -157,7 +158,7 @@ export function AgentCard({
   // ── Adjustments ──────────────────────────────────────────────────────────
   const adjQKey = [`/api/git/agent-adjustments/${companyId}/${encodeURIComponent(agent.agentName)}`];
   const { data: adjData } = useQuery<AdjEntry[]>({ queryKey: adjQKey, initialData: [], staleTime: 120_000 });
-  const adjustments: AdjEntry[] = adjData ?? [];
+  const adjustments: AdjEntry[] = useMemo(() => (adjData ?? []), [adjData]);
   const createAdjMutation = useMutation({
     mutationFn: (body: { description: string; amount: number; type: "debit" | "credit" }) =>
       apiRequest("POST", `/api/git/agent-adjustments/${companyId}/${encodeURIComponent(agent.agentName)}`, body),
@@ -168,13 +169,13 @@ export function AgentCard({
       setNewType("debit");
       setShowAdjForm(false);
     },
-    onError: (e: any) => toast({ title: "Failed to add entry", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Failed to add entry", description: e.message, variant: "destructive" }),
   });
   const deleteAdjMutation = useMutation({
     mutationFn: (id: number) =>
       apiRequest("DELETE", `/api/git/agent-adjustments/${companyId}/${encodeURIComponent(agent.agentName)}/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: adjQKey }),
-    onError: (e: any) => toast({ title: "Failed to delete", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Failed to delete", description: e.message, variant: "destructive" }),
   });
   const saveAdj = () => {
     const amt = parseFloat(newAmount);
@@ -340,7 +341,7 @@ export function AgentCard({
     if (staleIds.length === 0) return;
     setPendingGraduationIds((prev) => [...new Set([...prev, ...staleIds])]);
     setAllPrepaidMutation.mutate(dbPrepaidIds.filter((id) => validTransitIdSet.has(id)));
-  }, [validTransitIdSet]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [validTransitIdSet]); 
   useEffect(() => {
     if (pendingGraduationIds.length === 0) return;
     const openPartialIdSet = new Set(allOpenPartial.map((r) => r.id));
@@ -349,7 +350,7 @@ export function AgentCard({
     setPendingGraduationIds((prev) => prev.filter((id) => !openPartialIdSet.has(id)));
     const existing = customOrder ?? allOpenPartial.map((r) => r.id);
     saveOrder([...toPromote, ...existing.filter((id) => !toPromote.includes(id))]);
-  }, [allOpenPartial, pendingGraduationIds]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [allOpenPartial, pendingGraduationIds]); 
 
   const confidenceBadge = {
     exact: { label: "Exact match", cls: "bg-green-700 text-white" },

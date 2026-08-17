@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "One-way ratchet on ESLint warnings, counted by scripts/run-lint.mjs from a single ESLint run. totals.warningCeiling replaces the hand-typed --max-warnings number that used to live in package.json: it is the exact measured count, may only fall, and is the value npm run lint enforces. perRule freezes each rule at its own count so a drawdown in one rule cannot silently pay for a regression in another - removing 500 `any` annotations while adding 500 react-hooks/exhaustive-deps warnings is a net loss that a single total would report as progress. step is the drawdown unit: when measured warnings sit a full step under the ceiling, scripts/audit-lint-warnings.mjs asks for the gain to be locked in. Lower a ceiling in the same change that removes the warnings - leaving headroom lets it refill silently.",
+  "description": "One-way ratchet on ESLint warnings, counted by scripts/run-lint.mjs from a single ESLint run. totals.warningCeiling is the exact measured count, may only fall, and is the value npm run lint enforces. perRule freezes each warning rule at its own count so a drawdown in one rule cannot silently pay for a regression in another. Lower a ceiling in the same change that removes warnings; leaving headroom lets it refill silently.",
   "scan": {
     "patterns": [
       "client/src/**/*.{ts,tsx}",
@@ -11,20 +11,15 @@
     "step": 500
   },
   "totals": {
-    "warningCeiling": 9270,
+    "warningCeiling": 33,
     "errorCeiling": 0
   },
   "perRule": {
-    "@typescript-eslint/no-explicit-any": 8644,
-    "unused-imports/no-unused-vars": 505,
-    "react-hooks/exhaustive-deps": 117,
-    "no-useless-escape": 2,
-    "no-empty": 2
+    "react-hooks/exhaustive-deps": 28,
+    "no-control-regex": 5
   },
   "notes": {
-    "@typescript-eslint/no-explicit-any": "Exactly the type-escape backlog seen from ESLint: 8644 = the 8646 in config/type-escape-boundaries.json minus its 2 suppressions, which are not an ESLint rule. The binding gate for this rule stays config/type-escape-boundaries.json, which freezes every file individually and is therefore strictly stronger than a repository total. This ceiling exists so the two cannot disagree - it must be lowered whenever the type-escape ceiling is.",
-    "errorCeiling": "Zero and permanent. ESLint errors are not part of the drawdown; the ratchet governs warnings only.",
-    "no-empty": "The 3 that remain are in client/src/pages/Payroll.tsx, client/src/pages/StockEntryHistory.tsx and client/src/pages/factory/FactoryShippingContainers.tsx. Documenting an empty catch costs two lines under this Prettier config, which pushes each of those files past its frozen god-file cap, so the cleanup is blocked until they are split - see Phase 4 of docs/god-file-split-program.md. Raising a god-file baseline to absorb it is what working rule 1 forbids.",
-    "no-useless-escape": "The 2 that remain are the deliberate <\\/script> escapes in client/src/pages/StockEntryHistory.tsx. Removing the backslash lets the literal end an enclosing script block early; the fix used elsewhere - a SCRIPT_CLOSE constant - adds lines that file has no room for under its god-file cap."
+    "errorCeiling": "Zero and permanent. ESLint errors are not part of the warning drawdown.",
+    "phase17": "Exact Phase 17 reconciliation on the Phase 16-cleaned tree: 33 warnings total, consisting of 28 react-hooks/exhaustive-deps warnings and 5 no-control-regex warnings. Type escapes are separately frozen at zero in config/type-escape-boundaries.json. Full warning repair and final certification remain Phase 18."
   }
 }

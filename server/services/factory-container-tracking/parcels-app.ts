@@ -77,10 +77,7 @@ export async function trackViaParcelsApp(
         trackingDetectedCarrier: detectedCarrier,
       };
       if (finalEta) updateSet.arrivalDate = finalEta;
-      await db
-        .update(factoryContainers)
-        .set(updateSet as any)
-        .where(eq(factoryContainers.id, containerId));
+      await db.update(factoryContainers).set(updateSet).where(eq(factoryContainers.id, containerId));
       ep(containerId, "HTTP scraper", "success", lastStatus ?? "got data");
       logger.info(`[FactoryTracking] ${containerNumber} → http_scraper: status=${lastStatus ?? "?"}`);
       return { success: true, lastStatus, lastLocation, lastDescription, lastCheckedAt: now, error: null };
@@ -117,10 +114,7 @@ export async function trackViaParcelsApp(
           trackingDetectedCarrier: detectedCarrier,
         };
         if (finalEta) updateSet.arrivalDate = finalEta;
-        await db
-          .update(factoryContainers)
-          .set(updateSet as any)
-          .where(eq(factoryContainers.id, containerId));
+        await db.update(factoryContainers).set(updateSet).where(eq(factoryContainers.id, containerId));
         if (mdResult.events?.length) {
           const fakeShipment: ParcelsAppShipment = {
             trackingId: containerNumber,
@@ -180,10 +174,7 @@ export async function trackViaParcelsApp(
         trackingDetectedCarrier: detectedCarrier,
       };
       if (finalEta) updateSet.arrivalDate = finalEta;
-      await db
-        .update(factoryContainers)
-        .set(updateSet as any)
-        .where(eq(factoryContainers.id, containerId));
+      await db.update(factoryContainers).set(updateSet).where(eq(factoryContainers.id, containerId));
       ep(containerId, "Maersk public HTTP", "success", mpResult.latestStatus ?? "got data");
       logger.info(`[FactoryTracking] ${containerNumber} → maersk_public: status=${mpResult.latestStatus ?? "?"}`);
       return {
@@ -234,10 +225,7 @@ export async function trackViaParcelsApp(
           trackingDetectedCarrier: detectedCarrier,
         };
         if (finalEta) updateSet.arrivalDate = finalEta;
-        await db
-          .update(factoryContainers)
-          .set(updateSet as any)
-          .where(eq(factoryContainers.id, containerId));
+        await db.update(factoryContainers).set(updateSet).where(eq(factoryContainers.id, containerId));
         ep(containerId, "CMA CGM API", "success", apiResult.latestStatus ?? "got data");
         logger.info(`[FactoryTracking] ${containerNumber} → cma_cgm_api: status=${apiResult.latestStatus ?? "?"}`);
         return {
@@ -281,10 +269,7 @@ export async function trackViaParcelsApp(
           trackingDetectedCarrier: detectedCarrier,
         };
         if (finalEta) updateSet.arrivalDate = finalEta;
-        await db
-          .update(factoryContainers)
-          .set(updateSet as any)
-          .where(eq(factoryContainers.id, containerId));
+        await db.update(factoryContainers).set(updateSet).where(eq(factoryContainers.id, containerId));
         ep(containerId, "CMA public HTTP", "success", cmaResult.latestStatus ?? "got data");
         logger.info(`[FactoryTracking] ${containerNumber} → cma_public: status=${cmaResult.latestStatus ?? "?"}`);
         return {
@@ -329,10 +314,7 @@ export async function trackViaParcelsApp(
             trackingDetectedCarrier: detectedCarrier,
           };
           if (finalEta) updateSet.arrivalDate = finalEta;
-          await db
-            .update(factoryContainers)
-            .set(updateSet as any)
-            .where(eq(factoryContainers.id, containerId));
+          await db.update(factoryContainers).set(updateSet).where(eq(factoryContainers.id, containerId));
           ep(containerId, "17track API (CMA)", "success", result17.latestStatus ?? "got data");
           logger.info(`[FactoryTracking] ${containerNumber} → 17track (CMA): status=${result17.latestStatus ?? "?"}`);
           return {
@@ -398,10 +380,7 @@ export async function trackViaParcelsApp(
         trackingDetectedCarrier: detectedCarrier,
       };
       if (finalEta) updateSet.arrivalDate = finalEta;
-      await db
-        .update(factoryContainers)
-        .set(updateSet as any)
-        .where(eq(factoryContainers.id, containerId));
+      await db.update(factoryContainers).set(updateSet).where(eq(factoryContainers.id, containerId));
       ep(containerId, "CMA CGM API", "success", cmaFallResult.latestStatus ?? "got data");
       logger.info(
         `[FactoryTracking] ${containerNumber} → cma_cgm_api (leasing): status=${cmaFallResult.latestStatus ?? "?"}`
@@ -445,10 +424,7 @@ export async function trackViaParcelsApp(
         trackingDetectedCarrier: detectedCarrier,
       };
       if (finalEta) updateSet.arrivalDate = finalEta;
-      await db
-        .update(factoryContainers)
-        .set(updateSet as any)
-        .where(eq(factoryContainers.id, containerId));
+      await db.update(factoryContainers).set(updateSet).where(eq(factoryContainers.id, containerId));
       ep(containerId, "Puppeteer scraper", "success", lastStatus ?? "got data");
       logger.info(`[FactoryTracking] ${containerNumber} → parcelsapp_scraper: status=${lastStatus ?? "?"}`);
       return { success: true, lastStatus, lastLocation, lastDescription, lastCheckedAt: now, error: null };
@@ -484,10 +460,7 @@ export async function trackViaParcelsApp(
           trackingDetectedCarrier: detectedCarrier,
         };
         if (finalEta) updateSet.arrivalDate = finalEta;
-        await db
-          .update(factoryContainers)
-          .set(updateSet as any)
-          .where(eq(factoryContainers.id, containerId));
+        await db.update(factoryContainers).set(updateSet).where(eq(factoryContainers.id, containerId));
         ep(containerId, "17track API", "success", result17.latestStatus ?? "got data");
         logger.info(`[FactoryTracking] ${containerNumber} → 17track: status=${result17.latestStatus ?? "?"}`);
         return {
@@ -510,7 +483,7 @@ export async function trackViaParcelsApp(
     const noProviderError = "No tracking provider configured";
     await db
       .update(factoryContainers)
-      .set({ trackingLastCheckedAt: now, trackingError: noProviderError } as any)
+      .set({ trackingLastCheckedAt: now, trackingError: noProviderError })
       .where(eq(factoryContainers.id, containerId));
     return {
       success: false,
@@ -566,7 +539,7 @@ export async function trackViaParcelsApp(
       : (result.error ?? "Tracking failed");
     await db
       .update(factoryContainers)
-      .set({ trackingLastCheckedAt: now, trackingError: errMsg, trackingProvider: "parcelsapp" } as any)
+      .set({ trackingLastCheckedAt: now, trackingError: errMsg, trackingProvider: "parcelsapp" })
       .where(eq(factoryContainers.id, containerId));
     return {
       success: false,
@@ -599,10 +572,7 @@ export async function trackViaParcelsApp(
     trackingFallbackReason: fallbackReason,
   };
   if (finalEta) updateSet.arrivalDate = finalEta;
-  await db
-    .update(factoryContainers)
-    .set(updateSet as any)
-    .where(eq(factoryContainers.id, containerId));
+  await db.update(factoryContainers).set(updateSet).where(eq(factoryContainers.id, containerId));
 
   ep(containerId, "ParcelsApp API", "success", lastStatus ?? "got data");
   logger.info(`[FactoryTracking] ${containerNumber} → parcelsapp: status=${lastStatus ?? "?"}`);

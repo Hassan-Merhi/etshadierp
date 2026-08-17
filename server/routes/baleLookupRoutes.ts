@@ -34,7 +34,7 @@ export function registerBaleLookupRoutes(app: Express) {
   // Lookup by ARTICLE code
   app.get("/api/lookup/article/:articleCode", requireAuth, async (req, res) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
@@ -48,14 +48,24 @@ export function registerBaleLookupRoutes(app: Express) {
         // factoryBales.productId points to factory_bale_products, not bale_products
         // Use case-insensitive match so article codes with mixed case are still found.
         db
-          .select({ id: factoryBaleProducts.id, name: factoryBaleProducts.name, code: factoryBaleProducts.code, articleCode: factoryBaleProducts.articleCode, active: factoryBaleProducts.active })
+          .select({
+            id: factoryBaleProducts.id,
+            name: factoryBaleProducts.name,
+            code: factoryBaleProducts.code,
+            articleCode: factoryBaleProducts.articleCode,
+            active: factoryBaleProducts.active,
+          })
           .from(factoryBaleProducts)
-          .where(and(eq(factoryBaleProducts.companyId, companyId), ilike(factoryBaleProducts.articleCode, articleCode))),
+          .where(
+            and(eq(factoryBaleProducts.companyId, companyId), ilike(factoryBaleProducts.articleCode, articleCode))
+          ),
       ]);
 
       // Use ERP product for display if found; fall back to factory product
       const factoryProduct = factoryProductRows[0] ?? null;
-      const displayProduct = erpProduct || (factoryProduct ? { ...factoryProduct, weightPerBaleKg: null, description: null, categoryId: null } : null);
+      const displayProduct =
+        erpProduct ||
+        (factoryProduct ? { ...factoryProduct, weightPerBaleKg: null, description: null, categoryId: null } : null);
 
       // IDs in factory_bale_products that match this article code
       const factoryProductIds = factoryProductRows.map((p) => p.id);
@@ -110,13 +120,11 @@ export function registerBaleLookupRoutes(app: Express) {
         .where(directBalesWhereClause);
 
       // Only include bales not already covered by a label print
-      const uncoveredBales = directBalesRaw.filter(
-        (b) => b.referenceNumber && !coveredRefs.has(b.referenceNumber)
-      );
+      const uncoveredBales = directBalesRaw.filter((b) => b.referenceNumber && !coveredRefs.has(b.referenceNumber));
 
       // Synthesize label-print-like entries (negative ID to avoid collision with real print IDs)
       const syntheticEntries = uncoveredBales.map((b) => ({
-        id: -(b.id),
+        id: -b.id,
         referenceNumber: b.referenceNumber,
         approxWeightKg: b.weightKg,
         articleCode,
@@ -145,7 +153,7 @@ export function registerBaleLookupRoutes(app: Express) {
   // Lookup by REFERENCE number
   app.get("/api/lookup/reference/:referenceNumber", requireAuth, async (req, res) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
@@ -160,10 +168,12 @@ export function registerBaleLookupRoutes(app: Express) {
         const [directBale] = await db
           .select()
           .from(factoryBales)
-          .where(and(
-            eq(factoryBales.companyId, companyId),
-            sql`LOWER(${factoryBales.referenceNumber}) = LOWER(${referenceNumber})`
-          ))
+          .where(
+            and(
+              eq(factoryBales.companyId, companyId),
+              sql`LOWER(${factoryBales.referenceNumber}) = LOWER(${referenceNumber})`
+            )
+          )
           .limit(1);
 
         if (!directBale) {
@@ -295,7 +305,7 @@ export function registerBaleLookupRoutes(app: Express) {
       let locationInfo: any = null;
       let pressingBatch: any = null;
       let mixBatch: any = null;
-      let containers_used: any[] = [];
+      let containers_used: unknown[] = [];
 
       const [factoryBale] = await db
         .select()
@@ -499,7 +509,7 @@ export function registerBaleLookupRoutes(app: Express) {
       }
 
       // Fetch audit history for this bale
-      let auditHistory: any[] = [];
+      let auditHistory: unknown[] = [];
       if (baleInfo?.id) {
         auditHistory = await db
           .select({
@@ -535,7 +545,7 @@ export function registerBaleLookupRoutes(app: Express) {
   // Mark a label as scanned
   app.post("/api/lookup/reference/:referenceNumber/scan", requireAuth, async (req, res) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
@@ -570,7 +580,7 @@ export function registerBaleLookupRoutes(app: Express) {
     requireRole("Admin", "Owner", "Developer"),
     async (req, res) => {
       try {
-        const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 
         const referenceNumber = decodeURIComponent(req.params.referenceNumber).toUpperCase();
@@ -612,7 +622,7 @@ export function registerBaleLookupRoutes(app: Express) {
         // Write audit entry so "Deleted by" info is available on the barcode lookup
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId,
           action: "delete",
           tableName: "factory_bales",
@@ -636,7 +646,7 @@ export function registerBaleLookupRoutes(app: Express) {
     requireRole("Admin", "Owner", "Developer"),
     async (req, res) => {
       try {
-        const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 
         const referenceNumber = decodeURIComponent(req.params.referenceNumber).toUpperCase();

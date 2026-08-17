@@ -25,7 +25,7 @@ export function registerV5LocationSummaryRoutes(app: Express) {
   // Does NOT read proforma_stock_reservations or any V2/V3 table.
   app.get("/api/factory/v5/location-summary", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const locationId = parseInt(String(req.query.locationId));

@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * MigrateVoucherDescriptionsCard — extracted sub-component.
  *
@@ -26,7 +27,7 @@ export function MigrateVoucherDescriptionsCard() {
         description: `Fixed ${data.chargesFixed} charge entries and ${data.narrationFixed} narrations.`,
       });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       toast({ title: "Update failed", description: error.message, variant: "destructive" });
     },
   });

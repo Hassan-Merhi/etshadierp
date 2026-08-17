@@ -213,7 +213,7 @@ export async function getLockedRateDiagnosticsForCompany(
     }
   }
 
-  return db.transaction(async (tx: any) => {
+  return db.transaction(async (tx) => {
     const rows: LockedRateDiagnosticRow[] = [];
     for (const supplier of suppliers) {
       const persistedRaw = supplier.currentRawMaterialCostPerKgUsd;

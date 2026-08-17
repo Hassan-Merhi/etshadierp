@@ -10,7 +10,7 @@ import { eq, and, sql } from "drizzle-orm";
 export function registerEmployeeAdvancesBonusRoutes(app: Express) {
   app.get("/api/factory/employee-advances", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { employeeId, status } = req.query as { employeeId?: string; status?: string };
 
@@ -37,7 +37,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
 
   app.post("/api/factory/employee-advances", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { employeeId, advanceDate, amount, cashAccountId, notes } = req.body;
       if (!employeeId || !advanceDate || !amount)
@@ -64,7 +64,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
 
   app.post("/api/factory/employee-advances/:id/repay", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const advId = parseInt(req.params.id);
       const { repaymentDate, amount, cashAccountId, notes } = req.body;
@@ -95,7 +95,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
 
   app.get("/api/factory/employee-advance-repayments", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { advanceId } = req.query as { advanceId?: string };
       const advFilter = advanceId ? sql`AND r.advance_id = ${parseInt(advanceId)}` : sql``;
@@ -116,7 +116,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
 
   app.delete("/api/factory/employee-advances/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       await db.execute(
         sql`DELETE FROM employee_advance_repayments WHERE advance_id = ${parseInt(req.params.id)} AND company_id = ${companyId}`
@@ -134,7 +134,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
 
   app.get("/api/factory/employee-bonuses", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { employeeId } = req.query as { employeeId?: string };
       const empFilter = employeeId ? sql`AND eb.employee_id = ${parseInt(employeeId)}` : sql``;
@@ -154,7 +154,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
 
   app.post("/api/factory/employee-bonuses", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { employeeId, bonusDate, amount, notes } = req.body;
       if (!employeeId || !bonusDate || !amount)
@@ -237,7 +237,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
 
   app.delete("/api/factory/employee-bonuses/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const bonusResult = await db.execute(
         sql`SELECT * FROM employee_bonuses WHERE id = ${parseInt(req.params.id)} AND company_id = ${companyId}`
@@ -282,7 +282,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
 
   app.get("/api/factory/worker-bonuses", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
+      const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { workerId, status } = req.query as { workerId?: string; status?: string };
       const workerFilter = workerId ? sql`AND wb.worker_id = ${parseInt(workerId)}` : sql``;
@@ -309,7 +309,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
 
   app.post("/api/factory/worker-bonuses", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
+      const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { workerId, bonusDate, amount, notes } = req.body;
       if (!workerId || !bonusDate || !amount)
@@ -337,7 +337,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
 
   app.post("/api/factory/worker-bonuses/:id/pay", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
+      const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { cashAccountId, paidDate } = req.body;
       if (!cashAccountId) return res.status(400).json({ message: "cashAccountId required" });
@@ -393,7 +393,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
       }
 
       // Mark bonus as paid and create journal entry in a transaction
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         await tx.execute(sql`
           UPDATE worker_bonuses SET status = 'paid', cash_account_id = ${cashId}, paid_date = ${payDate}
           WHERE id = ${parseInt(req.params.id)} AND company_id = ${companyId} AND status = 'pending'
@@ -441,7 +441,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
 
   app.delete("/api/factory/worker-bonuses/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
+      const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id);
 
@@ -451,7 +451,7 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
       const bonus = bonusRows.rows[0] as any;
       if (!bonus) return res.status(404).json({ message: "Bonus not found" });
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         // Paid bonuses are posted with voucherNumber `WBONUS-{id}-{ts}` (see /pay above) —
         // there's no voucher_id FK column on worker_bonuses, so look the voucher up by that
         // naming convention and reverse it along with its entries before deleting the bonus.

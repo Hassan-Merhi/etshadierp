@@ -35,7 +35,7 @@ export function registerSpMigrationRunRoutes(app: Express) {
   });
 
   // ── GET /api/sp/migration/runs ──────────────────────────────────────────
-  app.get("/api/sp/migration/runs", requireAuth, requireRole("Developer"), async (_req: any, res: any) => {
+  app.get("/api/sp/migration/runs", requireAuth, requireRole("Developer"), async (_req: unknown, res: import("express").Response) => {
     try {
       const runs = (
         await db.execute(sql`
@@ -52,7 +52,7 @@ export function registerSpMigrationRunRoutes(app: Express) {
       `)
       ).rows;
       return res.json({ runs });
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       return res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -62,7 +62,7 @@ export function registerSpMigrationRunRoutes(app: Express) {
   // source_type='opening_stock' + "recreate containers manually") is permanently retired.
   // Use the staged endpoints instead: gc-account-plan, gc-stock-master, gc-stock-opening,
   // gc-sales-readonly, gc-containers, gc-profit-opening, gc-reconciliation.
-  app.post("/api/sp/migration/rehearsal", requireAuth, requireRole("Developer"), async (_req: any, res: any) => {
+  app.post("/api/sp/migration/rehearsal", requireAuth, requireRole("Developer"), async (_req: unknown, res: import("express").Response) => {
     return res.status(410).json({
       message: "The old all-in-one GC migration flow is disabled. Use the staged migration steps instead.",
       code: "OLD_GC_REHEARSAL_DISABLED",
@@ -83,7 +83,7 @@ export function registerSpMigrationRunRoutes(app: Express) {
         SELECT id, source_company_id, target_company_id, status
         FROM sp_migration_rehearsal_runs WHERE id = ${runId} LIMIT 1
       `)
-      ).rows[0] as any;
+      ).rows[0];
 
       if (!runRow) return res.status(404).json({ message: "Run not found" });
       if (runRow.status === "rolled_back") {

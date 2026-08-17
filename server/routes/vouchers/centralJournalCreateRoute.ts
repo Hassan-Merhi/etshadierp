@@ -22,11 +22,7 @@ import { applyEmployeeBalanceDeltasTx } from "../../services/accounting/employee
 import { buildManualJournalPostingRequest } from "../../services/accounting/manualJournalPosting";
 import { recalculateOrderTotals } from "../factory/_helpers";
 import { checkAccountWhatsAppRule } from "../factoryWhatsappRoutes";
-import {
-  buildVoucherChangesForCreate,
-  logAudit,
-  snapshotVoucherEntries,
-} from "../_helpers";
+import { buildVoucherChangesForCreate, logAudit, snapshotVoucherEntries } from "../_helpers";
 
 const postingDependencies = createDatabasePostingDependencies();
 
@@ -46,10 +42,7 @@ async function syncJournalToOrderCharge(
   if (!customerEntry) return;
 
   const ledgerCreditEntries = savedEntries.filter(
-    (entry) =>
-      entry.ledgerAccountId !== null &&
-      entry.customerId === null &&
-      Number(entry.creditAmount || 0) > 0
+    (entry) => entry.ledgerAccountId !== null && entry.customerId === null && Number(entry.creditAmount || 0) > 0
   );
 
   for (const ledgerEntry of ledgerCreditEntries) {
@@ -71,10 +64,7 @@ async function syncJournalToOrderCharge(
       .from(customerOrderCharges)
       .innerJoin(
         customerOrders,
-        and(
-          eq(customerOrderCharges.orderId, customerOrders.id),
-          eq(customerOrders.companyId, companyId)
-        )
+        and(eq(customerOrderCharges.orderId, customerOrders.id), eq(customerOrders.companyId, companyId))
       )
       .where(
         and(
@@ -163,8 +153,7 @@ async function writeFactoryDaybook(result: PersistedPostingResult, companyId: nu
     txType: "JOURNAL",
     referenceId: result.voucher.id,
     referenceTable: "vouchers",
-    description:
-      result.voucher.description || `Journal voucher #${result.voucher.voucherNumber}`,
+    description: result.voucher.description || `Journal voucher #${result.voucher.voucherNumber}`,
     currencyCode: currency,
     amountCurrency: String(transactionTotal),
     fxRateToUsd: erpRateToDaybookFxRateToUsd(currency, "USD", result.voucher.exchangeRate),
@@ -229,7 +218,7 @@ async function createActiveJournal(req: Request, res: Response, next: NextFuncti
       clientRequestId,
       actor: {
         userId: userId ?? null,
-        username: (req.session as any).username || "unknown",
+        username: req.session.username || "unknown",
         reason: "Manual journal creation",
       },
     });
@@ -245,11 +234,7 @@ async function createActiveJournal(req: Request, res: Response, next: NextFuncti
     }
 
     const result = (await db.transaction(async (tx) => {
-      const posted = (await postBalancedVoucherTx(
-        tx,
-        built.request,
-        postingDependencies
-      )) as PersistedPostingResult;
+      const posted = (await postBalancedVoucherTx(tx, built.request, postingDependencies)) as PersistedPostingResult;
 
       if (!posted.replayed) {
         await applyEmployeeBalanceDeltasTx({
@@ -270,13 +255,12 @@ async function createActiveJournal(req: Request, res: Response, next: NextFuncti
     } = { prompt: false };
 
     if (!result.replayed) {
-      await syncJournalToOrderCharge(companyId, result.entries, result.voucher.id).catch(
-        (error: unknown) =>
-          logger.error("Central journal order-charge sync failed (non-fatal)", {
-            companyId,
-            voucherId: result.voucher.id,
-            error,
-          })
+      await syncJournalToOrderCharge(companyId, result.entries, result.voucher.id).catch((error: unknown) =>
+        logger.error("Central journal order-charge sync failed (non-fatal)", {
+          companyId,
+          voucherId: result.voucher.id,
+          error,
+        })
       );
 
       await writeFactoryDaybook(result, companyId).catch((error: unknown) =>
@@ -292,10 +276,7 @@ async function createActiveJournal(req: Request, res: Response, next: NextFuncti
         let accountType = mainAccountType ? String(mainAccountType) : "ledger";
         if (!accountId) {
           const firstLedgerDebit = entries.find(
-            (entry: any) =>
-              entry.accountType === "ledger" &&
-              entry.type === "DR" &&
-              Number(entry.accountId) > 0
+            (entry: any) => entry.accountType === "ledger" && entry.type === "DR" && Number(entry.accountId) > 0
           );
           if (firstLedgerDebit) {
             accountId = Number(firstLedgerDebit.accountId);
@@ -324,7 +305,7 @@ async function createActiveJournal(req: Request, res: Response, next: NextFuncti
         const auditEntries = await snapshotVoucherEntries(result.entries);
         await logAudit({
           userId: userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId,
           action: "create",
           tableName: "vouchers",

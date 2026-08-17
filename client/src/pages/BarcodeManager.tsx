@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -49,8 +50,8 @@ export default function BarcodeManager() {
       queryClient.invalidateQueries({ queryKey: ["/api/pending-barcodes", selectedCompany?.id] });
       toast({ title: `Imported ${data.count} barcodes` });
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Import failed", description: error.message, variant: "destructive" });
     },
   });
@@ -64,7 +65,7 @@ export default function BarcodeManager() {
       toast({ title: "Barcode added" });
       setManualBarcode("");
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error adding barcode", description: error.message, variant: "destructive" });
     },
@@ -120,7 +121,7 @@ export default function BarcodeManager() {
         } else {
           toast({ title: "No barcodes found in file", variant: "destructive" });
         }
-      } catch (error) {
+      } catch (_error) {
         toast({ title: "Error reading file", variant: "destructive" });
       }
     };

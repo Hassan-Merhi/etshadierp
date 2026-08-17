@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -137,8 +138,8 @@ export default function BaleTransfers() {
       toast({ title: "Transfer created successfully" });
       handleCloseDialog();
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error creating transfer", description: error.message, variant: "destructive" });
     },
   });
@@ -153,8 +154,8 @@ export default function BaleTransfers() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
       toast({ title: "Transfer completed" });
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error completing transfer", description: error.message, variant: "destructive" });
     },
   });
@@ -170,8 +171,8 @@ export default function BaleTransfers() {
       setDeleteConfirm(null);
       if (expandedId !== null) setExpandedId(null);
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error deleting transfer", description: error.message, variant: "destructive" });
       setDeleteConfirm(null);
     },

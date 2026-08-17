@@ -41,7 +41,7 @@ export function registerBalesPressingRoutes(app: Express) {
   registerFactoryFxRatesRoutes(app);
   app.post("/api/factory/pressing/create-and-print", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { productId, weightPerBale } = req.body;
@@ -51,7 +51,7 @@ export function registerBalesPressingRoutes(app: Express) {
       }
       if (quantity === null) return res.status(400).json({ message: QUANTITY_MESSAGE });
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         const [product] = await tx
           .select()
           .from(factoryBaleProducts)
@@ -132,7 +132,7 @@ export function registerBalesPressingRoutes(app: Express) {
 
   app.post("/api/factory/pressing/create-multi", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { items } = req.body;
@@ -146,7 +146,7 @@ export function registerBalesPressingRoutes(app: Express) {
       }
       const quantities = parsedQuantities as number[];
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         const totalExpected = quantities.reduce((sum: number, quantity: number) => sum + quantity, 0);
 
         const [pressingBatch] = await tx
@@ -237,7 +237,7 @@ export function registerBalesPressingRoutes(app: Express) {
 
   app.post("/api/factory/bales/create-batch", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { productId, weightPerBale } = req.body;
@@ -247,7 +247,7 @@ export function registerBalesPressingRoutes(app: Express) {
       }
       if (quantity === null) return res.status(400).json({ message: QUANTITY_MESSAGE });
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         const [product] = await tx
           .select()
           .from(factoryBaleProducts)
@@ -322,7 +322,7 @@ export function registerBalesPressingRoutes(app: Express) {
 
   app.get("/api/factory/pressing-batches", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const batches = await db
@@ -348,7 +348,7 @@ export function registerBalesPressingRoutes(app: Express) {
         .orderBy(desc(factoryPressingBatches.createdAt));
 
       const enriched = await Promise.all(
-        batches.map(async (batch: any) => {
+        batches.map(async (batch) => {
           const balesForBatch = await db
             .select()
             .from(factoryBales)
@@ -371,7 +371,7 @@ export function registerBalesPressingRoutes(app: Express) {
 
   app.get("/api/factory/pressing-batches/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);

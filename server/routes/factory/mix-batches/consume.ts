@@ -16,7 +16,7 @@ import { eq, and, desc, sql } from "drizzle-orm";
 export function registerFactoryMixBatchConsumeRoutes(app: Express) {
   app.post("/api/factory/mix-batches/consume", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { usages, operatorUser, usedDate } = req.body as {
@@ -31,7 +31,7 @@ export function registerFactoryMixBatchConsumeRoutes(app: Express) {
       if (!usedDate) return res.status(400).json({ message: "usedDate is required" });
 
       const results: any[] = [];
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         for (const u of usages) {
           const { batchId, kgUsed, notes } = u;
           if (!batchId || !(kgUsed > 0)) continue;
@@ -61,7 +61,7 @@ export function registerFactoryMixBatchConsumeRoutes(app: Express) {
             operatorUser: operatorUser || null,
             usedDate,
             notes: notes || null,
-          } as any);
+          });
 
           const isFullyConsumed = kgUsed >= remaining - 0.001;
 
@@ -114,7 +114,7 @@ export function registerFactoryMixBatchConsumeRoutes(app: Express) {
                 batchDate: usedDate || null,
                 carryForwardFromId: batchId,
                 status: "CARRY_FORWARD",
-              } as any)
+              })
               .returning();
 
             results.push({
@@ -137,7 +137,7 @@ export function registerFactoryMixBatchConsumeRoutes(app: Express) {
 
   app.get("/api/factory/suppliers/:id/mix-batch-history", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const supplierId = parseId(req.params.id);

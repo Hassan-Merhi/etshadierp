@@ -57,12 +57,12 @@ export function registerPayrollPaymentSummaryPdfRoutes(app: Express) {
 
       let convertArabic: ((text: string) => string) | null = null;
       let bidi: {
-        getEmbeddingLevels: (text: string, direction: string) => any;
-        getReorderedString: (text: string, levels: any) => string;
+        getEmbeddingLevels: (text: string, direction: string) => unknown;
+        getReorderedString: (text: string, levels: unknown) => string;
       } | null = null;
       try {
-        convertArabic = (require("arabic-reshaper") as any).convertArabic;
-        bidi = (require("bidi-js") as any)();
+        convertArabic = require("arabic-reshaper").convertArabic;
+        bidi = require("bidi-js")();
       } catch {
         // Failure here is non-fatal and the surrounding flow continues deliberately.
       }

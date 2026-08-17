@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { formatNumber } from "@/lib/formatNumber";
@@ -79,8 +80,8 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
     if (!open || !batch || !currentSources || !supplierStock || initialized) return;
 
     setBatchName(batch.name || "");
-    setNotes((batch as any).notes || "");
-    setBatchDate((batch as any).batchDate || new Date().toLocaleDateString("en-CA"));
+    setNotes(batch.notes || "");
+    setBatchDate(batch.batchDate || new Date().toLocaleDateString("en-CA"));
 
     // Aggregate supplier sources by supplierId
     const supplierMap = new Map<
@@ -213,7 +214,7 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
       onOpenChange(false);
       toast({ title: "Batch updated", description: "Sources and totals have been recalculated." });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -340,7 +341,7 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
   const totalWeight = selectedSources.reduce((s, x) => s + x.weightKg, 0);
   const totalCost = selectedSources.reduce((s, x) => s + x.totalCost, 0);
   const blendedCostPerKg = totalWeight > 0 ? totalCost / totalWeight : 0;
-  const currentUsedKg = batch ? parseFloat((batch as any).usedKg || "0") : 0;
+  const currentUsedKg = batch ? parseFloat(batch.usedKg || "0") : 0;
   // Warn if clearly below used (>1 kg gap). Backend enforces the strict check.
   const belowUsed = totalWeight < currentUsedKg - 1;
 
@@ -543,7 +544,9 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
                             </div>
                           )}
                         </TableCell>
-                        <TableCell className="text-right font-mono text-sm">${formatNumber(sel.totalCost, 4)}</TableCell>
+                        <TableCell className="text-right font-mono text-sm">
+                          ${formatNumber(sel.totalCost, 4)}
+                        </TableCell>
                         <TableCell>
                           <Button
                             type="button"

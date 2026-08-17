@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { getErrorDetails } from "@shared/errorUtils";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -112,7 +113,7 @@ export function ExportCenter() {
       const body: any = { mode };
       if (fromDate) body.fromDate = fromDate;
       if (toDate) body.toDate = toDate;
-      const result = (await (await apiRequest("POST", "/api/export/start", body)).json()) as any;
+      const result = await (await apiRequest("POST", "/api/export/start", body)).json();
       setActiveJobId(result.jobId);
       setActiveMode(mode);
       setProgressOpen(true);
@@ -132,7 +133,7 @@ export function ExportCenter() {
       toast({ title: "WhatsApp export started", description: data.message });
       [5, 20, 45, 75, 120].forEach((s) => setTimeout(() => refetchBackup(), s * 1000));
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       toast({ variant: "destructive", title: "WhatsApp send failed", description: e.message });
     },
   });

@@ -105,7 +105,7 @@ export async function getGreenInstanceState(instanceId: string, apiToken: string
     const url = baseUrl(instanceId, apiToken, "getStateInstance");
     const response = await fetch(url, { method: "GET", signal: AbortSignal.timeout(8000) });
     if (!response.ok) return "unknown";
-    const json = (await response.json().catch(() => null)) as any;
+    const json = await response.json().catch(() => null);
     const state: string = json?.stateInstance ?? "unknown";
     const validStates: GreenInstanceState[] = ["authorized", "notAuthorized", "sleepMode", "starting", "yellowCard"];
     return validStates.includes(state as GreenInstanceState) ? (state as GreenInstanceState) : "unknown";
@@ -476,7 +476,7 @@ export async function getAgentDutyWaGroups(): Promise<Record<string, string>> {
     instanceId: r.instance_id ?? "",
     apiToken: r.api_token ?? "",
     enabled: r.enabled ?? false,
-  } as any;
+  };
 }
 
 export async function getAgentDutyWaCredentials(): Promise<{

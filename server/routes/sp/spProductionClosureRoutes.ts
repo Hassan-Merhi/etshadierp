@@ -30,7 +30,7 @@ const CUTOVER_EVIDENCE_TYPES = [
 const ALL_EVIDENCE_TYPES = new Set<string>([...REQUIRED_STABILIZATION_CHECKS, ...CUTOVER_EVIDENCE_TYPES]);
 
 function username(req: Request): string | null {
-  return String((req as any).user?.username ?? req.session.username ?? "") || null;
+  return String(req.user?.username ?? req.session.username ?? "") || null;
 }
 
 async function latestActiveCutover(companyId: number): Promise<any | null> {
@@ -129,7 +129,7 @@ export async function buildSpProductionClosureStatus(companyId: number): Promise
 export function registerSpProductionClosureRoutes(app: Express): void {
   app.get("/api/sp/production/closure-status", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = Number(await requireSpCompany(req as any, res as any));
+      const companyId = Number(await requireSpCompany(req, res));
       if (!companyId) return;
       res.json(await buildSpProductionClosureStatus(companyId));
     } catch (error: unknown) {
@@ -139,7 +139,7 @@ export function registerSpProductionClosureRoutes(app: Express): void {
 
   app.post("/api/sp/production/evidence", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = Number(await requireSpCompany(req as any, res as any));
+      const companyId = Number(await requireSpCompany(req, res));
       if (!companyId) return;
       const cutover = await latestActiveCutover(companyId);
       if (!cutover) {
@@ -179,7 +179,7 @@ export function registerSpProductionClosureRoutes(app: Express): void {
 
   app.post("/api/sp/production/close-rollback-window", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = Number(await requireSpCompany(req as any, res as any));
+      const companyId = Number(await requireSpCompany(req, res));
       if (!companyId) return;
       const status = await buildSpProductionClosureStatus(companyId);
       if (status.status !== "PASS") {

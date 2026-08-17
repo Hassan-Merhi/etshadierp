@@ -540,7 +540,7 @@ export default function FactoryLocationInventory() {
     )
       return;
     const productByArticleCode = new Map<string, any>();
-    (inventoryData as any[]).forEach((prod: any) => {
+    ((inventoryData)).forEach((prod: any) => {
       productByArticleCode.set((prod.articleCode || "").toLowerCase(), prod);
     });
     const newSelections = new Map<number, ProformaSelection>();
@@ -605,7 +605,11 @@ export default function FactoryLocationInventory() {
     return applySortProducts(
       activeInventoryData.filter((p) => {
         const matchesSearch = productMatchesSearch(
-          { name: p.productName, nameAr: (p as any).productNameAr, articleCode: p.articleCode },
+          {
+            name: p.productName,
+            nameAr: (p as unknown as FactoryBaleProduct & { productNameAr: string | null | undefined }).productNameAr,
+            articleCode: p.articleCode,
+          },
           productSearch
         );
         const matchesCat = categoryFilter.length === 0 || categoryFilter.includes(p.category ?? "Uncategorized");
@@ -891,7 +895,7 @@ export default function FactoryLocationInventory() {
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [proformaAutoSave, proformaMode, editingProformaId, selections, editModeInitialized]);
 
   const handleExportExcel = () => {

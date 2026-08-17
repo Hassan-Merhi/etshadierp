@@ -1,0 +1,76 @@
+# Phase 18 integration trigger: compiler-gated proven repair batch
+# retrigger: restore proven Phase 18 repairs after current-main synchronization
+name: Phase 18 Integrate Proven Repairs
+on:
+  push:
+    branches: [agent/lint-phase-4-fast]
+permissions:
+  contents: write
+jobs:
+  integrate:
+    if: contains(github.event.head_commit.message, '[phase18-integrate-batch1]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: agent/lint-phase-4-fast
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.14'
+          cache: npm
+      - name: Integrate only proven source-result commits
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin --prune
+          for commit in \
+            b76b2bc58 \
+            35587b691 \
+            e239e3719 \
+            2c61c7139
+          do
+            echo "CHERRY_PICK=$commit"
+            if git cherry-pick -X theirs "$commit"; then
+              continue
+            fi
+
+            # An already-integrated/empty repair is safe to skip. Any real
+            # unresolved conflict remains a hard failure and is never pushed.
+            if git diff --cached --quiet && git diff --quiet; then
+              git cherry-pick --skip
+              continue
+            fi
+
+            echo "Unresolved conflict while integrating $commit"
+            git status --short
+            exit 1
+          done
+      - run: npm ci
+      - name: Require compiler-green integrated head
+        run: npm run check
+      - name: Measure integrated escape debt and lint
+        shell: bash
+        run: |
+          set +e
+          node scripts/audit-type-escapes.mjs --json >/tmp/escapes.json
+          arc=$?
+          npx eslint "client/src/**/*.{ts,tsx}" "server/**/*.ts" "shared/**/*.ts" -f json -o /tmp/lint.json
+          lrc=$?
+          set -e
+          node - <<'NODE'
+          const e=require('/tmp/escapes.json');
+          console.log('INTEGRATED_ESCAPE_SUMMARY='+JSON.stringify(e.summary));
+          const lint=require('/tmp/lint.json'); let errors=0,warnings=0; const rules={};
+          for(const f of lint) for(const m of f.messages){if(m.severity===2)errors++;else if(m.severity===1)warnings++;rules[m.ruleId||'<none>']=(rules[m.ruleId||'<none>']||0)+1;}
+          console.log('INTEGRATED_LINT_ERRORS='+errors);console.log('INTEGRATED_LINT_WARNINGS='+warnings);console.log('INTEGRATED_LINT_RULES='+JSON.stringify(rules));
+          NODE
+          echo "AUDIT_EXIT=$arc ESLINT_EXIT=$lrc"
+      - name: Push compiler-green integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push origin HEAD:agent/lint-phase-4-fast

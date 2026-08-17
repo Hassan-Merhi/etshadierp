@@ -35,7 +35,7 @@ export function registerContainerSalesRoutes(app: Express) {
       const companyId = getActiveCustomerCompanyId(req);
       const sale = await containerSalesService.create(companyId, req.body, {
         userId: req.session.userId ?? null,
-        username: (req.session as any).username || "unknown",
+        username: req.session.username || "unknown",
         reason: "Container sale",
       });
       return res.status(201).json(sale);

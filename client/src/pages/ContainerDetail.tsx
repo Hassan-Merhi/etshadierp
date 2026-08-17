@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useEffect, useRef } from "react";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
@@ -185,7 +186,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
     onSuccess: (data: any) => {
       setPriceImportPreview(data.preview || []);
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       toast({ title: "Preview failed", description: e.message, variant: "destructive" });
     },
   });
@@ -202,7 +203,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       setPriceImportError(null);
       queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       toast({ title: "Apply failed", description: e.message, variant: "destructive" });
     },
   });
@@ -220,7 +221,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       let priceCol = -1;
       let headerRow = -1;
 
-      sheet.eachRow((row: any, rowNumber: number) => {
+      sheet.eachRow((row, rowNumber: number) => {
         const vals = row.values as any[];
         if (headerRow === -1) {
           vals.forEach((cell: any, colIdx: number) => {
@@ -253,7 +254,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
           "unit_price",
           "unit price",
         ];
-        sheet.eachRow((row: any) => {
+        sheet.eachRow((row) => {
           const vals = row.values as any[];
           const firstCell = String(vals[1] ?? "")
             .toLowerCase()
@@ -309,7 +310,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       setUploadFile(null);
       toast({ title: "Document uploaded" });
     },
-    onError: (e: any) => toast({ title: "Upload failed", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Upload failed", description: e.message, variant: "destructive" }),
   });
 
   const deleteDocMutation = useMutation({
@@ -321,7 +322,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
       toast({ title: "Document deleted" });
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Delete failed", description: e.message, variant: "destructive" });
     },
@@ -367,7 +368,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       freightForm.reset();
       toast({ title: "Freight charge added" });
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Failed", description: e.message, variant: "destructive" });
     },
@@ -381,7 +382,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       queryClient.invalidateQueries({ queryKey: ["/api/factory/containers", containerId, "freight"] });
       toast({ title: "Freight charge removed" });
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Failed", description: e.message, variant: "destructive" });
     },
@@ -402,7 +403,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       paymentForm.reset({ paymentDate: new Date().toLocaleDateString("en-CA"), amount: "", method: "", reference: "" });
       toast({ title: "Payment recorded" });
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Failed", description: e.message, variant: "destructive" });
     },
@@ -416,7 +417,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       queryClient.invalidateQueries({ queryKey: ["/api/factory/containers", containerId, "freight"] });
       toast({ title: "Payment deleted" });
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Failed", description: e.message, variant: "destructive" });
     },
@@ -618,7 +619,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
         description: "The purchase order and associated data have been removed",
       });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Deletion Failed",
@@ -641,7 +642,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       });
       setLocation("/containers");
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Deletion Failed",
@@ -664,7 +665,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
         description: data.message || "Purchase voucher amounts updated successfully",
       });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Sync Failed",
@@ -687,7 +688,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
         description: "Container status restored to IN_TRANSIT",
       });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Reverse Failed",
@@ -726,7 +727,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       setShowSellDialog(false);
       form.reset();
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Sale Failed",
@@ -798,7 +799,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
         </div>
       );
     }
-    if (!spContainerData || (spContainerData as any).error) {
+    if (!spContainerData || spContainerData.error) {
       return (
         <div className="flex flex-col items-center justify-center min-h-[400px]">
           <Package className="w-16 h-16 text-muted-foreground mb-4" />
@@ -813,7 +814,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       );
     }
 
-    const spc = spContainerData as any;
+    const spc = spContainerData;
     const discFactor = 1 - parseFloat(spc.discountPct || "0") / 100;
     const baseCost = (spc.lines || []).reduce(
       (s: number, l: any) => s + parseFloat(l.qty || "0") * parseFloat(l.unitRateUsd || "0") * discFactor,
@@ -1023,7 +1024,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
   if (!containerData) return null;
 
   const { container, pos, charges } = containerData;
-  const supplier = suppliers.find((s: any) => s.id === container.supplierId);
+  const supplier = suppliers.find((s) => s.id === container.supplierId);
 
   // Compute totals live from the actual PO and charges data so they are
   // always accurate, even when the stored container totals are stale.

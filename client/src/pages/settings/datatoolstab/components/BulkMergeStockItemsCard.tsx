@@ -31,7 +31,7 @@ export function BulkMergeStockItemsCard({ embedded }: { embedded?: boolean }) {
       ["old_code", "keep_code"],
       ["ITEM-OLD-001", "ITEM-KEEP-001"],
     ]);
-    (ws as any)["!cols"] = [{ wch: 24 }, { wch: 24 }];
+    ws["!cols"] = [{ wch: 24 }, { wch: 24 }];
     utils.book_append_sheet(wb, ws, "Merge Pairs");
     await writeFile(wb, "bulk_merge_template.xlsx");
   }

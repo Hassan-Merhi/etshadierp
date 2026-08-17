@@ -206,14 +206,14 @@ export function AuditLog({
     setPage(1);
   };
 
-  const errorStatus = (error as any)?.status;
-  const errorCode = (error as any)?.code;
+  const errorStatus = (error as unknown as (Error | null) & { status: unknown })?.status;
+  const errorCode = (error as unknown as (Error | null) & { code: unknown })?.code;
   const isPermissionError =
     errorStatus === 403 ||
-    String((error as any)?.message || "")
+    String(error?.message || "")
       .toLowerCase()
       .includes("access denied") ||
-    String((error as any)?.message || "")
+    String(error?.message || "")
       .toLowerCase()
       .includes("permission");
   const isCompanyError = errorStatus === 409 || errorCode === "AUDIT_COMPANY_REQUIRED";

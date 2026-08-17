@@ -48,16 +48,14 @@ export function registerContainerSyncVoucherRoutes(app: Express) {
           documentCharges: po.documentCharges,
           discount: po.discount,
           otherCharges: po.otherCharges,
-          freightPaidBy: (po as any).freightPaidBy,
+          freightPaidBy: po.freightPaidBy,
         });
-        const poFreightPaidBy: string = (po as any).freightPaidBy || "supplier";
+        const poFreightPaidBy: string = po.freightPaidBy || "supplier";
         const poFreight = parseFloat(po.freight || "0");
-        const poFreightParentAccountId: number | null = (po as any).freightParentAccountId
-          ? Number((po as any).freightParentAccountId)
+        const poFreightParentAccountId: number | null = po.freightParentAccountId
+          ? Number(po.freightParentAccountId)
           : null;
-        const poFreightOwnAccountId: number | null = (po as any).freightOwnAccountId
-          ? Number((po as any).freightOwnAccountId)
-          : null;
+        const poFreightOwnAccountId: number | null = po.freightOwnAccountId ? Number(po.freightOwnAccountId) : null;
         const hasParentFreight = poFreightPaidBy === "parent" && poFreight > 0 && !!poFreightParentAccountId;
         const hasOwnFreight = poFreightPaidBy === "own" && poFreight > 0 && !!poFreightOwnAccountId;
         const hasEmbeddedFreight = hasParentFreight || hasOwnFreight;
@@ -121,7 +119,7 @@ export function registerContainerSyncVoucherRoutes(app: Express) {
             const toDeleteIds: number[] = [];
 
             for (const entry of entries) {
-              const acctId = (entry as any).ledgerAccountId as number | null;
+              const acctId = entry.ledgerAccountId as number | null;
               const isDebit = parseFloat(entry.debitAmount || "0") > 0 && parseFloat(entry.creditAmount || "0") === 0;
               const isCredit = parseFloat(entry.creditAmount || "0") > 0 && parseFloat(entry.debitAmount || "0") === 0;
 
@@ -188,16 +186,16 @@ export function registerContainerSyncVoucherRoutes(app: Express) {
               const isDebit = parseFloat(entry.debitAmount || "0") > 0 && parseFloat(entry.creditAmount || "0") === 0;
               const isCredit = parseFloat(entry.creditAmount || "0") > 0 && parseFloat(entry.debitAmount || "0") === 0;
               if (isDebit) {
-                if (!purchasesAcctId) purchasesAcctId = (entry as any).ledgerAccountId ?? null;
+                if (!purchasesAcctId) purchasesAcctId = entry.ledgerAccountId ?? null;
                 // Goods DR entry — update to intercoTotal; freight DR will be added/kept separately
-                if ((entry as any).ledgerAccountId !== freightAccountId) {
+                if (entry.ledgerAccountId !== freightAccountId) {
                   await db
                     .update(voucherEntries)
                     .set({ debitAmount: poIntercoTotal.toFixed(2), creditAmount: "0" })
                     .where(eq(voucherEntries.id, entry.id));
                 }
               } else if (isCredit) {
-                if ((entry as any).ledgerAccountId === freightAccountId) {
+                if (entry.ledgerAccountId === freightAccountId) {
                   // Freight CR entry — update to current freight amount
                   freightCrFound = true;
                   await db

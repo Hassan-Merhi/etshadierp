@@ -170,13 +170,13 @@ async function hasPermission(
 
 async function enforceSpAccess(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const companyId = await requireSpCompany(req as any, res as any);
+    const companyId = await requireSpCompany(req, res);
     if (!companyId) return;
     await ensureSpAccessControlStorage();
 
     const permission = classifyPermission(req);
-    const userId = String((req as any).user?.id ?? req.session.userId ?? "");
-    const role = String((req as any).user?.role ?? req.session.currentRole ?? "");
+    const userId = String(req.user?.id ?? req.session.userId ?? "");
+    const role = String(req.user?.role ?? req.session.currentRole ?? "");
     if (!userId || !(await hasPermission(companyId, userId, role, permission))) {
       await db.execute(sql`
         INSERT INTO sp_audit_events(company_id, user_id, username, role, permission, action, method, path, status_code, request_body)
@@ -190,8 +190,8 @@ async function enforceSpAccess(req: Request, res: Response, next: NextFunction):
     }
 
     const sensitive = sensitiveRequirement(req);
-    const reason = String((req.body as any)?.reason ?? "").trim();
-    const confirmation = String((req.body as any)?.confirmation ?? "").trim();
+    const reason = String(req.body?.reason ?? "").trim();
+    const confirmation = String(req.body?.confirmation ?? "").trim();
     let idempotencyKey: string | null = null;
     if (sensitive) {
       if (confirmation !== sensitive.confirmation) {
@@ -208,7 +208,7 @@ async function enforceSpAccess(req: Request, res: Response, next: NextFunction):
         });
         return;
       }
-      idempotencyKey = String(req.header("Idempotency-Key") ?? (req.body as any)?.idempotencyKey ?? "").trim();
+      idempotencyKey = String(req.header("Idempotency-Key") ?? req.body?.idempotencyKey ?? "").trim();
       if (!idempotencyKey) {
         res.status(400).json({
           code: "SP_IDEMPOTENCY_KEY_REQUIRED",

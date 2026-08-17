@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -183,7 +184,7 @@ export default function DeletedItems() {
       });
       setConfirmDialog({ open: false, action: "restore", item: null });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Error",
@@ -206,7 +207,7 @@ export default function DeletedItems() {
       });
       setConfirmDialog({ open: false, action: "delete", item: null });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Error",
@@ -232,7 +233,7 @@ export default function DeletedItems() {
         variant: "destructive",
       });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Error",

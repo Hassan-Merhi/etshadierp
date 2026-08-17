@@ -82,9 +82,9 @@ async function getSharedBrowser(): Promise<any> {
     }
   }
 
-  const puppeteerExtra = _require("puppeteer-extra") as any;
+  const puppeteerExtra = _require("puppeteer-extra");
   if (!_stealthRegistered) {
-    const StealthPlugin = _require("puppeteer-extra-plugin-stealth") as any;
+    const StealthPlugin = _require("puppeteer-extra-plugin-stealth");
     puppeteerExtra.use(StealthPlugin());
     _stealthRegistered = true;
   }

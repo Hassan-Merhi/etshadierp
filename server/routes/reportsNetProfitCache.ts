@@ -5,14 +5,14 @@
  * account-level drill-down routes (reportsNetProfitStatementRoutes.ts), so it
  * lives here to avoid a circular import between the two.
  */
-const _npsCache = new Map<string, { data: any; expiresAt: number }>();
+const _npsCache = new Map<string, { data: unknown; expiresAt: number }>();
 
 export function _npsCached(key: string) {
   const c = _npsCache.get(key);
   return c && Date.now() < c.expiresAt ? c.data : null;
 }
 
-export function _npsSetCache(key: string, data: any) {
+export function _npsSetCache(key: string, data: unknown) {
   _npsCache.set(key, { data, expiresAt: Date.now() + 30_000 });
   if (_npsCache.size > 500) {
     const now = Date.now();

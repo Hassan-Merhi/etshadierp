@@ -96,7 +96,7 @@ export function registerAccountStatementRoutes(app: Express) {
       const accountType = req.params.type;
       const accountId = parseInt(req.params.id);
       const { endDate } = req.query as { endDate?: string };
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       if (isNaN(accountId)) return res.status(400).json({ message: "Invalid account ID" });
 
@@ -305,7 +305,7 @@ export function registerAccountStatementRoutes(app: Express) {
     try {
       const accountType = req.params.type;
       const accountId = parseInt(req.params.id);
-      const companyId = (req.session as any).currentCompanyId;
+      const companyId = req.session.currentCompanyId;
       const { startDate, endDate, lang = "en" } = req.query as { startDate?: string; endDate?: string; lang?: string };
 
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -395,7 +395,7 @@ export function registerAccountStatementRoutes(app: Express) {
         if (!acct) return res.status(404).json({ message: "Account not found" });
         accountName = acct.name;
         openingBalance = parseFloat(acct.openingBalance || "0");
-        openingBalanceSide = (acct as any).openingBalanceSide || "Dr";
+        openingBalanceSide = acct.openingBalanceSide || "Dr";
       } else if (accountType === "bank") {
         const [acct] = await db
           .select({ name: bankAccounts.name })

@@ -176,12 +176,12 @@ export async function getRawStockRecalcPreview(companyId: number): Promise<Recal
     const diffPct = oldCostPerKgUsd > 0 ? ((next.costPerKgUsd - oldCostPerKgUsd) / oldCostPerKgUsd) * 100 : 0;
 
     const receivedKg = parseFloat(row.receivedKg || "0");
-    const usedKg = parseFloat((row.usedKg as any) || "0");
+    const usedKg = parseFloat(row.usedKg || "0");
     const remainingKg = Math.max(0, receivedKg - usedKg);
     const sc = sourceCountByContainer.get(container.id);
 
     const rawStockValuationKg = parseFloat(
-      (container as any).totalKg || container.declaredKg || container.actualReceivedKg || "0"
+      container.totalKg || container.declaredKg || container.actualReceivedKg || "0"
     );
     results.push({
       containerId: container.id,
@@ -229,9 +229,7 @@ export async function getRawStockRecalcPreview(companyId: number): Promise<Recal
     const receivedKg = parseFloat(container.actualReceivedKg || "0");
     const sc = sourceCountByContainer.get(container.id);
 
-    const histValuationKg = parseFloat(
-      (container as any).totalKg || container.declaredKg || container.actualReceivedKg || "0"
-    );
+    const histValuationKg = parseFloat(container.totalKg || container.declaredKg || container.actualReceivedKg || "0");
     results.push({
       containerId: container.id,
       rawStockId: null,

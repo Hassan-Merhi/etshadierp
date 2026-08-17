@@ -27,7 +27,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
    */
   app.post("/api/factory/bales/relabel/validate", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { rows } = req.body;
@@ -50,7 +50,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
         .from(factoryBales)
         .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.referenceNumber, refCodes)));
 
-      const baleMap = new Map<string, any>(baleRows.map((b: any) => [b.referenceNumber, b]));
+      const baleMap = new Map<string, any>(baleRows.map((b) => [b.referenceNumber, b]));
 
       // detect duplicate refs in the uploaded file
       const seen = new Set<string>();
@@ -89,9 +89,9 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
    */
   app.post("/api/factory/bales/relabel/apply", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const userId: string | null = (req.session as any).userId || null;
+      const userId: string | null = req.session.userId || null;
 
       const { rows, printFormat, designColor, filename } = req.body;
       if (!Array.isArray(rows) || rows.length === 0) {
@@ -101,7 +101,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
       const validRows = rows.filter((r: any) => String(r.currentRef || "").trim());
       if (validRows.length === 0) return res.status(400).json({ message: "No valid rows to apply" });
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         // 1. Fetch bales to recode
         const refCodes = validRows.map((r: any) => String(r.currentRef).trim());
         const baleRows = await tx
@@ -116,7 +116,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
           .from(factoryBales)
           .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.referenceNumber, refCodes)));
 
-        const baleMap = new Map<string, any>(baleRows.map((b: any) => [b.referenceNumber, b]));
+        const baleMap = new Map<string, any>(baleRows.map((b) => [b.referenceNumber, b]));
         const notFound = refCodes.filter((r) => !baleMap.has(r));
         if (notFound.length > 0) {
           throw new Error(
@@ -226,7 +226,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
    */
   app.get("/api/factory/bales/relabel/sessions", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const sessions = await db
@@ -237,7 +237,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
         .limit(10);
 
       // attach items counts
-      const sessionIds = sessions.map((s: any) => s.id);
+      const sessionIds = sessions.map((s) => s.id);
       const itemsBySession: Record<number, any[]> = {};
       if (sessionIds.length > 0) {
         const items = await db.select().from(baleRecodeItems).where(inArray(baleRecodeItems.sessionId, sessionIds));
@@ -247,7 +247,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
         }
       }
 
-      const enriched = sessions.map((s: any) => ({
+      const enriched = sessions.map((s) => ({
         ...s,
         items: itemsBySession[s.id] || [],
       }));

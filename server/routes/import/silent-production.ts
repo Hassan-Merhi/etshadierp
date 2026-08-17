@@ -16,7 +16,7 @@ export function registerSilentProductionRoutes(app: Express) {
   // POST /api/inventory/silent-production — Developer-only silent production/consumption adjustment
   app.post("/api/inventory/silent-production", requireAuth, requireNonPOS, async (req, res) => {
     try {
-      if ((req as any).user?.role !== "Developer") {
+      if (req.user?.role !== "Developer") {
         return res.status(403).json({ message: "Developer access required" });
       }
       const companyId = req.session.currentCompanyId;

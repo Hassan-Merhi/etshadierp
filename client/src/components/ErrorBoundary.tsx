@@ -42,7 +42,7 @@ function isChunkLoadError(error: unknown): boolean {
     combined.includes("Importing a module script failed") ||
     combined.includes("Unable to preload CSS") ||
     combined.includes("ChunkLoadError") ||
-    (error as any)?.name === "ChunkLoadError"
+    (error as { name: "ChunkLoadError" })?.name === "ChunkLoadError"
   );
 }
 

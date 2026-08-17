@@ -495,7 +495,7 @@ export function PayrollRunDialogs({ payroll }: { payroll: FactoryPayrollState })
                   });
                   if (!resp.ok) {
                     const err = await resp.json().catch(() => ({}));
-                    throw new Error((err as any).message || "Export failed");
+                    throw new Error(err.message || "Export failed");
                   }
                   const blob = await resp.blob();
                   const url = URL.createObjectURL(blob);

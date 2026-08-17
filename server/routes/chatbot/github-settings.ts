@@ -40,7 +40,7 @@ export function registerChatbotGithubSettingsRoutes(app: Express) {
       const safeUrl = baseUrl.replace(/https?:\/\/[^@]+@/, "https://");
 
       res.json({ repoUrl: safeUrl, hasToken, configured: !!baseUrl });
-    } catch (error: unknown) {
+    } catch (_error: unknown) {
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -65,12 +65,9 @@ export function registerChatbotGithubSettingsRoutes(app: Express) {
           .where(eq(systemSettings.key, key))
           .limit(1);
         if (existing.length > 0) {
-          await db
-            .update(systemSettings)
-            .set({ value, updatedAt: new Date() } as any)
-            .where(eq(systemSettings.key, key));
+          await db.update(systemSettings).set({ value, updatedAt: new Date() }).where(eq(systemSettings.key, key));
         } else {
-          await db.insert(systemSettings).values({ key, value } as any);
+          await db.insert(systemSettings).values({ key, value });
         }
       };
 
@@ -85,7 +82,7 @@ export function registerChatbotGithubSettingsRoutes(app: Express) {
       }
 
       res.json({ success: true });
-    } catch (error: unknown) {
+    } catch (_error: unknown) {
       res.status(500).json({ message: "Internal server error" });
     }
   });

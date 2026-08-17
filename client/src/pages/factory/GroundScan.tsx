@@ -92,7 +92,7 @@ export default function GroundScan() {
       const valid = stockLocations.some((l) => String(l.id) === selectedLocationId);
       if (!valid) setSelectedLocationId("all");
     }
-  }, [stockLocations]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [stockLocations]); 
 
   const invalidate = () =>
     queryClient.invalidateQueries(

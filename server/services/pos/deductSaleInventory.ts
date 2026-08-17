@@ -29,7 +29,7 @@ export async function lockAndDeductInventoryForSaleItem(
 ): Promise<LockedInventoryResult> {
   const { item, currentRate, inventoryRecord, saleQty } = validatedItem;
 
-  const stockLockResult = await (tx as any).execute(sql`
+  const stockLockResult = await tx.execute(sql`
     SELECT i.quantity, i.average_rate, si.name AS item_name
     FROM inventory i
     LEFT JOIN stock_items si ON si.id = i.stock_item_id

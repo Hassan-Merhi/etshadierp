@@ -17,7 +17,7 @@ import { eq, and, sql } from "drizzle-orm";
 export function registerFactoryProductWriteRoutes(app: Express) {
   app.post("/api/factory/bale-products", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const callerRole = req.user?.role || "";
@@ -242,7 +242,7 @@ export function registerFactoryProductWriteRoutes(app: Express) {
 
       // Try insert; if code/articleCode constraint fires (race condition),
       // keep incrementing the numeric suffix until we find a free slot.
-      let product: any;
+      let product: unknown;
       const knownPrefixesRetry = ["HMD10", "HMD11", "HMD12", "HMD13", "HMD14", "HMD16", "HMD00"];
       const retryPrefix = knownPrefixesRetry.find(
         (p) => articleCode.startsWith(p) && /^\d+$/.test(articleCode.slice(p.length))
@@ -284,7 +284,7 @@ export function registerFactoryProductWriteRoutes(app: Express) {
 
   app.patch("/api/factory/bale-products/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);

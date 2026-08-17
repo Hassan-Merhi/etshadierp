@@ -183,8 +183,8 @@ export default function StockItems() {
   }
 
   // Derived stats
-  const activeCount = displayItems.filter((i) => i.active).length;
-  const inactiveCount = displayItems.filter((i) => !i.active).length;
+  const _activeCount = displayItems.filter((i) => i.active).length;
+  const _inactiveCount = displayItems.filter((i) => !i.active).length;
 
   // ─── Mutations: stock items ───────────────────────────────────────────────
   const deleteMutation = useMutation({
@@ -196,7 +196,7 @@ export default function StockItems() {
       toast({ title: "Success", description: data.message || "Stock items deleted successfully" });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to delete stock items", variant: "destructive" });
     },
   });
@@ -216,7 +216,7 @@ export default function StockItems() {
       toast({ title: "Success", description: data.message || "Stock adjusted successfully" });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to adjust stock", variant: "destructive" });
     },
   });
@@ -233,7 +233,7 @@ export default function StockItems() {
       toast({ title: "Success", description: data.message || "Category assigned successfully" });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to assign category", variant: "destructive" });
     },
   });
@@ -247,7 +247,7 @@ export default function StockItems() {
       toast({ title: "Grade created" });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -262,7 +262,7 @@ export default function StockItems() {
       toast({ title: "Grade updated" });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -276,7 +276,7 @@ export default function StockItems() {
       toast({ title: "Grade deleted" });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -290,7 +290,7 @@ export default function StockItems() {
       toast({ title: "Category created" });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -305,7 +305,7 @@ export default function StockItems() {
       toast({ title: "Category updated" });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -319,7 +319,7 @@ export default function StockItems() {
       toast({ title: "Category deleted" });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });

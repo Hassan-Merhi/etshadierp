@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
@@ -397,7 +398,7 @@ export default function SmartTransferGeneratorDialog({
         description: `${result.achievedQuantity} of ${result.targetQuantity} bales suggested across ${result.lines.length} lines.`,
       });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Could not generate preview", description: error.message, variant: "destructive" });
     },

@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * PaymentForm — extracted sub-component.
  *
@@ -69,7 +70,7 @@ export function PaymentForm({
       queryClient.invalidateQueries({ queryKey: [apiBase + "/payments/scheduled"] });
       setForm((f) => ({ ...f, amount: "", notes: "" }));
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const allocations = useMemo(() => {

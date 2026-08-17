@@ -2,29 +2,15 @@ import type { Request, Response } from "express";
 import { db } from "../db";
 import { logger } from "../lib/logger";
 import { resolveActiveCompanyId } from "../routes/helpers/resolveActiveCompanyId";
-import {
-  CompanyIsolationError,
-  authorizeCompanyScopedResourceTx,
-} from "../services/security/companyIsolationPolicy";
+import { CompanyIsolationError, authorizeCompanyScopedResourceTx } from "../services/security/companyIsolationPolicy";
 import { createDatabaseCompanyIsolationAdapter } from "../services/security/databaseCompanyIsolationAdapter";
 import { classifyCompanyOwnedRoute } from "../services/security/companyResourceRoutePolicy";
 
-const AUTHENTICATED_ROLES = [
-  "Developer",
-  "Admin",
-  "Owner",
-  "Manager",
-  "POS",
-  "Normal User",
-  "View Only",
-] as const;
+const AUTHENTICATED_ROLES = ["Developer", "Admin", "Owner", "Manager", "POS", "Normal User", "View Only"] as const;
 
 const adapter = createDatabaseCompanyIsolationAdapter();
 
-export async function enforceCompanyResourceScope(
-  req: Request,
-  res: Response
-): Promise<boolean> {
+export async function enforceCompanyResourceScope(req: Request, res: Response): Promise<boolean> {
   const match = classifyCompanyOwnedRoute(req.path);
   if (!match) return true;
 
@@ -38,10 +24,7 @@ export async function enforceCompanyResourceScope(
   // spurious CROSS_COMPANY_ACCESS_DENIED denials.  Only factory-domain routes
   // (e.g. /api/factory/containers/:id) should use the factory company.
   // This mirrors the approach already used in auth.ts → authorizeExplicitCompanyScope.
-  const companyId =
-    match.domain === "factory"
-      ? resolveActiveCompanyId(req)
-      : ((req.session as any).currentCompanyId ?? null);
+  const companyId = match.domain === "factory" ? resolveActiveCompanyId(req) : (req.session.currentCompanyId ?? null);
 
   if (!userId || !role || !companyId) return true;
 
@@ -78,9 +61,7 @@ export async function enforceCompanyResourceScope(
       })
     );
 
-    const notFound =
-      error.code === "RESOURCE_NOT_FOUND" ||
-      error.code === "CROSS_COMPANY_ACCESS_DENIED";
+    const notFound = error.code === "RESOURCE_NOT_FOUND" || error.code === "CROSS_COMPANY_ACCESS_DENIED";
     res.status(notFound ? 404 : 403).json({
       message: notFound ? "Record not found" : "Forbidden",
       code: error.code,

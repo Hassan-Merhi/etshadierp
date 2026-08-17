@@ -53,23 +53,23 @@ export interface RawStockCostResult {
 
 export interface RawStockCostingAdapter {
   findExisting(input: {
-    tx: any;
+    tx: unknown;
     companyId: number;
     supplierId: number;
     source: RawStockCostSourceIdentity;
   }): Promise<RawStockCostResult | null>;
   validateOwnership(input: {
-    tx: any;
+    tx: unknown;
     companyId: number;
     supplierId: number;
   }): Promise<void>;
   lockCurrentState(input: {
-    tx: any;
+    tx: unknown;
     companyId: number;
     supplierId: number;
   }): Promise<RawStockCostState>;
   appendCostEvent(input: {
-    tx: any;
+    tx: unknown;
     request: RawStockCostEventRequest;
     before: RawStockCostState;
     after: RawStockCostState;
@@ -77,21 +77,21 @@ export interface RawStockCostingAdapter {
     costDelta: string;
   }): Promise<void>;
   persistState(input: {
-    tx: any;
+    tx: unknown;
     companyId: number;
     supplierId: number;
     expectedVersion: number;
     next: RawStockCostState;
   }): Promise<void>;
   recordIdempotency(input: {
-    tx: any;
+    tx: unknown;
     companyId: number;
     supplierId: number;
     source: RawStockCostSourceIdentity;
     result: RawStockCostResult;
   }): Promise<void>;
   recordAudit(input: {
-    tx: any;
+    tx: unknown;
     request: RawStockCostEventRequest;
     before: RawStockCostState;
     after: RawStockCostState;
@@ -240,7 +240,7 @@ export function validateRawStockCostEvent(request: RawStockCostEventRequest): Va
  * and audit recorded inside the caller-owned transaction.
  */
 export async function applyRawStockCostEventTx(
-  tx: any,
+  tx: unknown,
   request: RawStockCostEventRequest,
   adapter: RawStockCostingAdapter
 ): Promise<RawStockCostResult> {

@@ -11,7 +11,7 @@ import * as seventeenTrack from "../../lib/trackingProviders/seventeenTrackProvi
 const INACTIVE_LOWER = ["offloaded", "closed", "completed"] as const;
 
 export function isInactiveStatus(status: string): boolean {
-  return INACTIVE_LOWER.includes(status.toLowerCase() as any);
+  return INACTIVE_LOWER.includes(status.toLowerCase() as "closed" | "offloaded" | "completed");
 }
 
 export const activeStatusFilter = sql`LOWER(${factoryContainers.status}) NOT IN ('offloaded','closed','completed')`;
@@ -59,7 +59,7 @@ export function ep(containerId: number, provider: string, status: ProgressStep["
 
 // ── Quota helpers (shared with ERP — reads from ERP's checks table for quota) ─
 
-async function checkParcelsAppQuota(): Promise<boolean> {
+async function _checkParcelsAppQuota(): Promise<boolean> {
   const limit = Math.max(1, parseInt(process.env.PARCELSAPP_MONTHLY_LIMIT ?? "500") || 500);
   try {
     const now = new Date();

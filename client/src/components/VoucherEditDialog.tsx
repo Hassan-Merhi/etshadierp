@@ -266,7 +266,7 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
       onOpenChange(false);
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,

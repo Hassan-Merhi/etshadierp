@@ -71,7 +71,7 @@ export function registerFactoryCompanyImportRoutes(app: Express) {
         if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
         try {
-          const targetCompanyId = (req.session as any).currentCompanyId;
+          const targetCompanyId = req.session.currentCompanyId;
           if (!targetCompanyId) return res.status(400).json({ message: "No company selected" });
 
           const jsonStr = req.file.buffer.toString("utf-8");
@@ -231,7 +231,7 @@ export function registerFactoryCompanyImportRoutes(app: Express) {
             return rec;
           }
 
-          await db.transaction(async (tx: any) => {
+          await db.transaction(async (tx) => {
             async function insertAndMap(
               tableName: string,
               drizzleTable: any,

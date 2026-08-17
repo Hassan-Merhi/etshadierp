@@ -26,7 +26,7 @@ export function registerPosEditSaleRoutes(app: Express): void {
         voucherId,
         currentCompanyId: req.session.currentCompanyId,
         userId: req.session.userId!,
-        username: (req.session as any).username || "unknown",
+        username: req.session.username || "unknown",
         userRole: req.user?.role,
         canSellNegativeStock: req.user?.canSellNegativeStock || false,
         body: req.body,
@@ -44,7 +44,7 @@ export function registerPosEditSaleRoutes(app: Express): void {
         try {
           await logAudit({
             userId: req.session.userId!,
-            username: (req.session as any).username || "unknown",
+            username: req.session.username || "unknown",
             companyId: req.session.currentCompanyId!,
             action: "update",
             tableName: "vouchers",
@@ -58,7 +58,14 @@ export function registerPosEditSaleRoutes(app: Express): void {
       }
       res.status(result.status).json(result.body);
     } catch (error: unknown) {
-      logger.error("POS sale update failed", { module: "pos", action: "updateSale", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
+      logger.error("POS sale update failed", {
+        module: "pos",
+        action: "updateSale",
+        userId: _uid,
+        companyId: _cid,
+        durationMs: Date.now() - _t,
+        error,
+      });
       if (getErrorMessage(error).includes("Inventory not found")) {
         return res.status(404).json({ message: getErrorMessage(error) });
       }

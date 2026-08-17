@@ -51,14 +51,14 @@ export function registerGitReportRoutes(app: Express) {
    */
   app.get("/api/git/agent-duty-summary", requireAuth, requireRole("Admin", "Owner"), async (req, res) => {
     try {
-      const userId = String((req.user as any).id);
-      const role = String((req.session as any)?.currentRole ?? (req.user as any).role ?? "");
-      const sessionCompanyId: number | undefined = (req.session as any)?.currentCompanyId;
+      const userId = String((req.user as { id: unknown }).id);
+      const role = String(req.session?.currentRole ?? (req.user as { role: unknown }).role ?? "");
+      const sessionCompanyId: number | undefined = req.session?.currentCompanyId;
       const scope = await resolveGitCompanyScope(
         userId,
         role,
         req.query as Record<string, string | string[] | undefined>,
-        sessionCompanyId,
+        sessionCompanyId
       );
       if ("error" in scope) {
         return res.status(scope.status).json({ message: scope.error, code: scope.code });
@@ -72,7 +72,7 @@ export function registerGitReportRoutes(app: Express) {
             companyId,
             companyName: nameMap[companyId] ?? `Company ${companyId}`,
             agents: await buildAgentsForCompany(companyId),
-          })),
+          }))
         );
         sections.sort((left, right) => left.companyId - right.companyId);
         return res.json({ asOf, mode: "all", companies: sections });
@@ -102,9 +102,9 @@ export function registerGitReportRoutes(app: Express) {
     preFilter?: (rows: EnrichedContainer[]) => EnrichedContainer[]
   ): Promise<void> {
     try {
-      const userId: string = (req.user as any).id;
-      const role = String((req.session as any)?.currentRole ?? (req.user as any).role ?? "");
-      const sessionCompanyId: number | undefined = (req.session as any)?.currentCompanyId;
+      const userId: string = (req.user as { id: string }).id;
+      const role = String(req.session?.currentRole ?? (req.user as { role: unknown }).role ?? "");
+      const sessionCompanyId: number | undefined = req.session?.currentCompanyId;
 
       const scope = await resolveGitCompanyScope(
         userId,
@@ -201,7 +201,6 @@ export function registerGitReportRoutes(app: Express) {
    */
   app.get("/api/git/containers", requireAuth, requireRole("Admin", "Owner"), (req, res) => handleGitListing(req, res));
 
-
   app.get("/api/git/containers/:id", requireAuth, requireRole("Admin", "Owner"), async (req, res, next) => {
     // Pass through literal sub-paths (e.g. import-template.xlsx) to later handlers.
     if (!/^\d+$/.test(req.params.id)) return next();
@@ -210,9 +209,9 @@ export function registerGitReportRoutes(app: Express) {
       if (!Number.isFinite(containerId) || containerId <= 0) {
         return res.status(400).json({ message: "Invalid container ID" });
       }
-      const userId: string = (req.user as any).id;
-      const role = String((req.session as any)?.currentRole ?? (req.user as any).role ?? "");
-      const sessionCompanyId: number | undefined = (req.session as any)?.currentCompanyId;
+      const userId: string = (req.user as { id: string }).id;
+      const role = String(req.session?.currentRole ?? (req.user as { role: unknown }).role ?? "");
+      const sessionCompanyId: number | undefined = req.session?.currentCompanyId;
       const scope = await resolveGitCompanyScope(
         userId,
         role,
@@ -253,9 +252,9 @@ export function registerGitReportRoutes(app: Express) {
    */
   app.get("/api/git/summary", requireAuth, requireRole("Admin", "Owner"), async (req, res) => {
     try {
-      const userId: string = (req.user as any).id;
-      const role = String((req.session as any)?.currentRole ?? (req.user as any).role ?? "");
-      const sessionCompanyId: number | undefined = (req.session as any)?.currentCompanyId;
+      const userId: string = (req.user as { id: string }).id;
+      const role = String(req.session?.currentRole ?? (req.user as { role: unknown }).role ?? "");
+      const sessionCompanyId: number | undefined = req.session?.currentCompanyId;
 
       const scope = await resolveGitCompanyScope(
         userId,

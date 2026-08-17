@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Download, Languages, Pencil, Search, Upload } from "lucide-react";
 import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
 import { Button } from "@/components/ui/button";
@@ -65,7 +65,7 @@ export function FactoryFrenchCatalogManager() {
 
   const readyPreviewRows = useMemo(() => previewRows.filter((row) => row.status === "ready"), [previewRows]);
 
-  const loadRows = async () => {
+  const loadRows = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ q: query, status });
@@ -79,11 +79,11 @@ export function FactoryFrenchCatalogManager() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [query, status, toast]);
 
   useEffect(() => {
     if (open) void loadRows();
-  }, [open, status]);
+  }, [loadRows, open, status]);
 
   const startEdit = (row: FrenchCatalogRow) => {
     setEditing(row);

@@ -40,7 +40,7 @@ export function registerFactoryCustomerLogoRoutes(app: Express) {
 
   app.get("/api/factory/customers/:id/logos", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const customerId = parseInt(req.params.id);
       if (isNaN(customerId)) return res.status(400).json({ message: "Invalid customer ID" });
@@ -65,7 +65,7 @@ export function registerFactoryCustomerLogoRoutes(app: Express) {
     customerLogoUpload.single("image")(req, res, async (err: any) => {
       try {
         if (err) return res.status(400).json({ message: err.message });
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
         if (!req.file) return res.status(400).json({ message: "No image uploaded" });
         const customerId = parseInt(req.params.id);
@@ -96,7 +96,7 @@ export function registerFactoryCustomerLogoRoutes(app: Express) {
 
   app.patch("/api/factory/customer-logos/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const logoId = parseInt(req.params.id);
       if (isNaN(logoId)) return res.status(400).json({ message: "Invalid logo ID" });
@@ -120,7 +120,7 @@ export function registerFactoryCustomerLogoRoutes(app: Express) {
 
   app.delete("/api/factory/customer-logos/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const logoId = parseInt(req.params.id);
       if (isNaN(logoId)) return res.status(400).json({ message: "Invalid logo ID" });
@@ -142,7 +142,7 @@ export function registerFactoryCustomerLogoRoutes(app: Express) {
 
   app.get("/api/factory/customer-logos/:id/image", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const logoId = parseInt(req.params.id);
       if (isNaN(logoId)) return res.status(400).json({ message: "Invalid logo ID" });

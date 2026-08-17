@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { releaseDebtEnglish } from "@/i18n/finalCloseoutTranslations";
 import { useState } from "react";
 import { Link } from "wouter";
@@ -119,7 +120,7 @@ export default function SpOverview() {
       setSelectedSale(null);
       setReason("");
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       toast({ title: releaseDebtEnglish("Reversal failed"), description: error.message, variant: "destructive" });
     },
   });

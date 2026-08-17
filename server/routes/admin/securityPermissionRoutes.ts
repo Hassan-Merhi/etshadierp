@@ -19,7 +19,7 @@ function activeCompany(req: any): number | null {
 
 async function requirePermissionAdministrator(req: Request, res: Response, next: NextFunction) {
   try {
-    const permissions = await hydrateSessionNamedPermissions(db, req.session as any);
+    const permissions = await hydrateSessionNamedPermissions(db, req.session);
     if (!permissions.includes("security.permissions.manage")) {
       return res.status(403).json({ message: "Forbidden" });
     }
@@ -53,7 +53,7 @@ export function registerSecurityPermissionRoutes(app: Express) {
       const actorUserId = req.session.userId;
       if (!companyId || !actorUserId) return res.status(403).json({ message: "Forbidden" });
       const permissions = normalizePermissionList(req.body?.permissions);
-      const saved = await db.transaction((tx: any) =>
+      const saved = await db.transaction((tx) =>
         replaceNamedPermissions(tx, {
           userId: req.params.userId,
           companyId,

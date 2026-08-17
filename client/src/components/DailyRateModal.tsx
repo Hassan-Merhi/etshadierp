@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -171,8 +172,8 @@ export function DailyRateModal({ companyId }: DailyRateModalProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/balance-sheet"] });
       setIsOpen(false);
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -206,10 +207,7 @@ export function DailyRateModal({ companyId }: DailyRateModalProps) {
           </DialogTitle>
           <DialogDescription>
             No exchange rate has been set for today (
-            {format(
-              todayRateCheck?.today ? new Date(`${todayRateCheck.today}T00:00:00`) : new Date(),
-              "MMM d, yyyy"
-            )}
+            {format(todayRateCheck?.today ? new Date(`${todayRateCheck.today}T00:00:00`) : new Date(), "MMM d, yyyy")}
             ).
           </DialogDescription>
         </DialogHeader>

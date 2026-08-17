@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { getErrorDetails } from "@shared/errorUtils";
 import { QueryClient, QueryFunction, MutationCache, QueryCache } from "@tanstack/react-query";
 import { isSafeToQueue, enqueueRequest, getDescriptionForRequest } from "./offlineQueue";
@@ -66,7 +67,7 @@ export function resetCsrfToken() {
 /* ── Capacitor API base URL ──────────────────────────────────────────────── */
 // Set VITE_API_BASE_URL at Capacitor build time, e.g. "https://your-server.com".
 // Empty string in all web builds — every code path below falls back unchanged.
-const _CAPACITOR_API_BASE: string = ((import.meta as any).env?.VITE_API_BASE_URL as string) || "";
+const _CAPACITOR_API_BASE: string = (import.meta.env?.VITE_API_BASE_URL as string) || "";
 
 /* ── Session-expiry redirect ─────────────────────────────────────────────── */
 // Single-fire: only after /api/auth/me confirms the session is truly gone do
@@ -171,8 +172,11 @@ export function _testOnly_setRedirectFn(fn: ((href: string) => void) | null) {
 //   • Falls through cleanly if the token cannot be fetched
 //   • Auto-retries once on CSRF_TOKEN_MISMATCH (stale cached token after
 //     server restart / session regeneration on Render)
-if (typeof window !== "undefined" && !(window as any).__csrfFetchPatched) {
-  (window as any).__csrfFetchPatched = true;
+if (
+  typeof window !== "undefined" &&
+  !(window as unknown as (Window & typeof globalThis) & { __csrfFetchPatched: number }).__csrfFetchPatched
+) {
+  (window as unknown as (Window & typeof globalThis) & { __csrfFetchPatched: true }).__csrfFetchPatched = true;
   const originalFetch = window.fetch.bind(window);
 
   async function fetchWithCsrf(input: RequestInfo | URL, init?: RequestInit, isRetry = false): Promise<Response> {
@@ -468,7 +472,7 @@ export const getQueryFn: <T>(options: { on401: UnauthorizedBehavior }) => QueryF
 // a fresh fetch so the component recovers silently. If there are no observers
 // (component unmounted), just remove the error so it doesn't flash on remount.
 const globalQueryCache = new QueryCache({
-  onError: (error: any, query) => {
+  onError: (error: ClientErrorLike, query) => {
     // NOTE: 401 handling is intentionally NOT here. The global fetch interceptor
     // is the single source of session-expiry detection; it verifies /api/auth/me
     // before redirecting. Handling 401 here too would bypass that check and cause
@@ -490,7 +494,7 @@ const globalQueryCache = new QueryCache({
 // run their own onError AFTER this; they should skip another toast by checking
 // error._handledGlobally.
 const globalMutationCache = new MutationCache({
-  onError: (error: any) => {
+  onError: (error: ClientErrorLike) => {
     if (error?.name === "OfflineQueued") {
       error._handledGlobally = true;
       const label = error.description ? `${error.description} saved` : "Action saved";

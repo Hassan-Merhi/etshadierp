@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import type { SaleRow, Location } from "../pos-components/posTypes";
+import type { SaleRow, Location, PosAutoSaveState } from "../pos-components/posTypes";
 import { getAppDate } from "@/lib/queryClient";
 
 export function usePosState() {
@@ -19,7 +19,7 @@ export function usePosState() {
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [zeroStockAlert, setZeroStockAlert] = useState(false);
   const [zeroStockItem, setZeroStockItem] = useState("");
-  const [savedSale, setSavedSale] = useState<any>(null);
+  const [savedSale, setSavedSale] = useState<unknown>(null);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [showDraftDialog, setShowDraftDialog] = useState(false);
   const [currentDraftId, setCurrentDraftId] = useState<number | null>(null);
@@ -50,15 +50,15 @@ export function usePosState() {
   const lastSavedFingerprintRef = useRef<string>("");
   const autoSaveInProgressRef = useRef(false);
   const mobileSearchInputRef = useRef<HTMLInputElement>(null);
-  const autoSaveStateRef = useRef({
-    activeLocation: null as any,
-    rows: [] as any[],
+  const autoSaveStateRef = useRef<PosAutoSaveState>({
+    activeLocation: null,
+    rows: [],
     notes: "",
     isCreditSale: false,
     paymentAccountType: "",
-    paymentAccountId: null as string | null,
-    selectedCustomerId: null as string | null,
-    currentDraftId: null as number | null,
+    paymentAccountId: null,
+    selectedCustomerId: null,
+    currentDraftId: null,
     saveDraftIsPending: false,
   });
 

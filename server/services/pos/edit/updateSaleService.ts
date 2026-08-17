@@ -64,7 +64,7 @@ export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ stat
   if ("error" in voucherResult) return err(voucherResult.error);
   const preExistingVoucher = voucherResult.existingVoucher;
 
-  if (isReadonlyMigratedVoucher(preExistingVoucher as any)) {
+  if (isReadonlyMigratedVoucher(preExistingVoucher)) {
     return err({ status: 403, body: { message: READONLY_MIGRATED_VOUCHER_MESSAGE } });
   }
 
@@ -92,7 +92,7 @@ export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ stat
         },
       };
     }
-    if (isReadonlyMigratedVoucher(lockedVoucher as any)) {
+    if (isReadonlyMigratedVoucher(lockedVoucher)) {
       return { error: { status: 403, body: { message: READONLY_MIGRATED_VOUCHER_MESSAGE } } };
     }
 

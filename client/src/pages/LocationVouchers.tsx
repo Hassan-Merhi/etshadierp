@@ -12,7 +12,7 @@ import { useDateJump } from "@/hooks/use-date-jump";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCursorNav } from "@/contexts/CursorNavContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { PageHeader } from "@/components/PageHeader";
 
 interface Transaction {
@@ -127,7 +127,7 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
 
   const isLoading = showAllMonths ? rangeLoading : monthLoading;
   const data = showAllMonths ? rangeData : monthData;
-  const totals = data?.totals;
+  const _totals = data?.totals;
 
   const formatNumber = (num: number | null | undefined, decimals = 2) => {
     if (num == null || isNaN(num) || num === 0) return "";
@@ -147,7 +147,7 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
     return t === "stock transfer" || t === "stocktransfer" || t === "st";
   };
 
-  const allTransactions: Transaction[] = data?.transactions || [];
+  const allTransactions: Transaction[] = useMemo(() => (data?.transactions || []), [data?.transactions]);
 
   const filteredTransactions = useMemo(() => {
     return allTransactions.filter((txn) => {
@@ -228,7 +228,7 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
 
   const navigableRows = useMemo(() => filteredTransactions.filter((t) => !t.isOpeningBalance), [filteredTransactions]);
 
-  const handleTableKeyDown = (e: KeyboardEvent) => {
+  const handleTableKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === "Escape") {
       if (hasAnyOpenDialog()) return;
       e.preventDefault();
@@ -251,12 +251,12 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
         if (url) navigate(url);
       }
     }
-  };
+  }, [locationId, navigableRows, navigate, selectedRowIndex, stockItemId]);
 
   useEffect(() => {
     window.addEventListener("keydown", handleTableKeyDown, { capture: true });
     return () => window.removeEventListener("keydown", handleTableKeyDown, { capture: true });
-  }, [selectedRowIndex, data]);
+  }, [selectedRowIndex, data, handleTableKeyDown]);
 
   useEffect(() => {
     if (selectedRowIndex < 0 || !tableScrollContainer.current) return;
@@ -278,7 +278,7 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
         }),
     });
     return () => clearCursorNav();
-  }, [selectedRowIndex, navigableRows]);
+  }, [selectedRowIndex, navigableRows, registerCursorNav, clearCursorNav]);
 
   const getVchTypeBadge = (vchType: string) => {
     const t = (vchType || "").toLowerCase();
@@ -327,11 +327,7 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
                 <MapPin className="h-4 w-4" />
                 <span>{data.location.name}</span>
                 <span>•</span>
-                <span>
-                  {showAllMonths
-                    ? String(year)
-                    : `${"monthName" in (data as any) ? (data as any).monthName : ""} ${year}`}
-                </span>
+                <span>{showAllMonths ? String(year) : `${"monthName" in data ? data.monthName : ""} ${year}`}</span>
               </div>
             )}
           </div>
@@ -425,7 +421,7 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
           <CardTitle className="text-base">
             {showAllMonths
               ? `All Transactions — ${year}`
-              : `Transactions — ${"monthName" in ((data as any) ?? {}) ? (data as any).monthName : ""} ${year}`}
+              : `Transactions — ${"monthName" in (data ?? {}) ? (data as { monthName: unknown }).monthName : ""} ${year}`}
           </CardTitle>
         </CardHeader>
         <CardContent className="overflow-auto flex-1 p-0" ref={tableScrollContainer}>

@@ -15,7 +15,7 @@ export function registerFactoryCustomerPriceListRoutes(app: Express) {
   // ───────────────────────────────────────────────
 
   // GET  /api/factory/customer-price-lists/:customerId
-  app.get("/api/factory/customer-price-lists/:customerId", requireAuth, async (req: any, res: any) => {
+  app.get("/api/factory/customer-price-lists/:customerId", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -42,7 +42,7 @@ export function registerFactoryCustomerPriceListRoutes(app: Express) {
   app.post(
     "/api/factory/customer-price-lists/:customerId/from-proforma/:proformaId",
     requireAuth,
-    async (req: any, res: any) => {
+    async (req: import("express").Request, res: import("express").Response) => {
       try {
         const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -106,7 +106,7 @@ export function registerFactoryCustomerPriceListRoutes(app: Express) {
 
   // PUT /api/factory/customer-price-lists/:customerId
   // Bulk upsert — body: [{ articleCode, pricePerBale }]
-  app.put("/api/factory/customer-price-lists/:customerId", requireAuth, async (req: any, res: any) => {
+  app.put("/api/factory/customer-price-lists/:customerId", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -135,7 +135,7 @@ export function registerFactoryCustomerPriceListRoutes(app: Express) {
   });
 
   // DELETE /api/factory/customer-price-lists/:customerId/:articleCode
-  app.delete("/api/factory/customer-price-lists/:customerId/:articleCode", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/customer-price-lists/:customerId/:articleCode", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

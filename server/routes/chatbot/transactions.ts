@@ -103,7 +103,7 @@ export function registerChatbotTransactionRoutes(app: Express) {
               )
             )
             .limit(1);
-          const currentStock = parseFloat(invRow?.quantity as any) || 0;
+          const currentStock = parseFloat(invRow?.quantity) || 0;
           // AI-driven confirmation must never authorize negative inventory; that override
           // stays a manual, explicit user action on the normal stock transfer screen.
           if (qty > currentStock) {
@@ -233,7 +233,7 @@ export function registerChatbotTransactionRoutes(app: Express) {
       if (!q) return res.json({ results: [] });
 
       const searchModules = modules.length > 0 ? modules : ["vouchers", "customers", "suppliers", "items"];
-      const results: any[] = [];
+      const results: unknown[] = [];
 
       if (searchModules.includes("vouchers")) {
         const vrows = await db

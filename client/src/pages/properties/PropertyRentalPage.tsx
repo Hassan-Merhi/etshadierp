@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -78,9 +79,9 @@ export default function PropertyRentalPage({
         totalGuarantee += (u as any).guaranteeRemaining ?? Number(u.contract.guaranteeAmount || 0);
         const outstanding = u.outstanding ?? 0;
         if (outstanding > 0) totalOwed += outstanding;
-        totalCredit += (u as any).prepaidCredit ?? 0;
-        totalPaid += (u as any).totalPaid ?? 0;
-        if (u.contract.status === "ACTIVE" || !(u.contract as any).status) {
+        totalCredit += u.prepaidCredit ?? 0;
+        totalPaid += u.totalPaid ?? 0;
+        if (u.contract.status === "ACTIVE" || !u.contract.status) {
           totalMonthlyRent += Number(u.contract.rentalAmount || 0);
         }
       }
@@ -115,7 +116,7 @@ export default function PropertyRentalPage({
       });
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
     },
-    onError: (e: any) => toast({ title: "Accrual failed", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Accrual failed", description: e.message, variant: "destructive" }),
   });
 
   const resetAccrual = useMutation({
@@ -135,7 +136,7 @@ export default function PropertyRentalPage({
       });
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
     },
-    onError: (e: any) => toast({ title: "Re-accrual failed", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Re-accrual failed", description: e.message, variant: "destructive" }),
   });
 
   const deleteUnit = useMutation({
@@ -145,7 +146,7 @@ export default function PropertyRentalPage({
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
       setConfirmDeleteUnitId(null);
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       toast({ title: "Cannot delete", description: e.message, variant: "destructive" });
       setConfirmDeleteUnitId(null);
     },
@@ -413,7 +414,10 @@ export default function PropertyRentalPage({
                                   <Checkbox
                                     checked={selectedContractIds.has(u.contract.id)}
                                     onCheckedChange={() =>
-                                      toggleSelect(u.contract!.id, { stopPropagation: () => {} } as any)
+                                      toggleSelect(u.contract!.id, { stopPropagation: () => {} } as React.MouseEvent<
+                                        Element,
+                                        MouseEvent
+                                      >)
                                     }
                                     onClick={(e) => e.stopPropagation()}
                                     data-testid={`checkbox-unit-${u.id}`}
@@ -483,34 +487,36 @@ export default function PropertyRentalPage({
                               >
                                 {u.contract
                                   ? fmtMoneyCurrency(
-                                      (u as any).guaranteeRemaining ?? u.contract.guaranteeAmount,
+                                      (
+                                        u as unknown as Unit & {
+                                          guaranteeRemaining: string | number | null | undefined;
+                                        }
+                                      ).guaranteeRemaining ?? u.contract.guaranteeAmount,
                                       u.contract.currency
                                     )
                                   : "—"}
                               </td>
                               <td
-                                className={`px-3 py-2 text-right tabular-nums font-semibold ${(u.outstanding ?? 0) > 0 ? "text-red-600 dark:text-red-400" : (u as any).prepaidCredit > 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}
+                                className={`px-3 py-2 text-right tabular-nums font-semibold ${(u.outstanding ?? 0) > 0 ? "text-red-600 dark:text-red-400" : (u as { prepaidCredit: 0 }).prepaidCredit > 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}
                               >
                                 {u.outstanding !== null
                                   ? fmtMoneyCurrency(
                                       (u.outstanding ?? 0) > 0
                                         ? u.outstanding!
-                                        : (u as any).prepaidCredit > 0
-                                          ? (u as any).prepaidCredit
+                                        : (u as { prepaidCredit: 0 }).prepaidCredit > 0
+                                          ? u.prepaidCredit
                                           : 0,
                                       u.contract?.currency
                                     )
                                   : "—"}
                               </td>
                               <td className="px-3 py-2 text-right tabular-nums text-muted-foreground text-xs">
-                                {(u as any).scheduledAmount > 0
-                                  ? fmtMoneyCurrency((u as any).scheduledAmount, u.contract?.currency)
+                                {(u as { scheduledAmount: 0 }).scheduledAmount > 0
+                                  ? fmtMoneyCurrency(u.scheduledAmount, u.contract?.currency)
                                   : "—"}
                               </td>
                               <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">
-                                {(u as any).nextBillingDate
-                                  ? format(new Date((u as any).nextBillingDate + "T00:00:00Z"), "dd MMM")
-                                  : "—"}
+                                {u.nextBillingDate ? format(new Date(u.nextBillingDate + "T00:00:00Z"), "dd MMM") : "—"}
                               </td>
                               <td className="px-3 py-2 text-xs text-muted-foreground">
                                 {u.contract ? format(new Date(u.contract.startDate), "dd MMM yyyy") : "—"}

@@ -16,9 +16,9 @@ import { _getCached, _setCached } from "../shared/ttlCache";
 // getMonthlyData — /api/stats/monthly-data
 // Returns last 6 months of sales volume and profit for dashboard charts.
 // ---------------------------------------------------------------------------
-export async function getMonthlyData(companyId: number): Promise<
-  Array<{ month: string; sales: number; profit: number }>
-> {
+export async function getMonthlyData(
+  companyId: number
+): Promise<Array<{ month: string; sales: number; profit: number }>> {
   // Get all Sales vouchers for this company (excluding optional)
   const salesVouchers = await db
     .select()
@@ -56,13 +56,7 @@ export async function getMonthlyData(companyId: number): Promise<
   ];
 
   // Name patterns to exclude (container-related costs only)
-  const excludedNamePatterns = [
-    "duties",
-    "transport charges",
-    "container license",
-    "import charge",
-    "transfer charge",
-  ];
+  const excludedNamePatterns = ["duties", "transport charges", "container license", "import charge", "transfer charge"];
 
   // Normalize function: uppercase + remove spaces/underscores for comparison
   const normalizeCode = (code: string) => code.toUpperCase().replace(/[\s_-]/g, "");
@@ -75,9 +69,7 @@ export async function getMonthlyData(companyId: number): Promise<
     // Support both correct format (accountType="Expense") and legacy format
     // (accountType="Indirect Expense" or "Direct Expense")
     const isExpenseAccount =
-      acc.accountType === "Expense" ||
-      acc.accountType === "Indirect Expense" ||
-      acc.accountType === "Direct Expense";
+      acc.accountType === "Expense" || acc.accountType === "Indirect Expense" || acc.accountType === "Direct Expense";
 
     if (!isExpenseAccount) return false;
 
@@ -218,9 +210,7 @@ export async function getStockSummary(companyId: number): Promise<{
 // Returns aggregated expense totals by account type for dashboard donut chart.
 // Uses TTL cache (30 s) to avoid repeated expensive joins.
 // ---------------------------------------------------------------------------
-export async function getExpenseBreakdown(
-  companyId: number
-): Promise<Array<{ name: string; value: number }> | null> {
+export async function getExpenseBreakdown(companyId: number): Promise<Array<{ name: string; value: number }> | null> {
   const _ebCacheKey = `expense-breakdown:${companyId}`;
   const _ebCached = _getCached(_ebCacheKey);
   if (_ebCached) return _ebCached;
@@ -285,7 +275,7 @@ export async function getExpenseBreakdown(
         eq(vouchers.companyId, companyId),
         eq(vouchers.optional, false),
         isNull(vouchers.deletedAt),
-        inArray(voucherEntries.ledgerAccountId as any, [...expenseAccountIds])
+        inArray(voucherEntries.ledgerAccountId, [...expenseAccountIds])
       )
     )
     .execute();

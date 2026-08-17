@@ -180,7 +180,7 @@ export function registerFactoryProductHistoryRoutes(app: Express) {
 
       // Sum per-month movements for the grand total row (except Net/KG-Net/Value which use snapshot)
       const grandTotalMovements = monthlyData.reduce(
-        (acc: any, m: any) => ({
+        (acc: any, m) => ({
           baleCount: acc.baleCount + m.balesIn,
           balesIn: acc.balesIn + m.balesIn,
           balesOut: acc.balesOut + m.balesOut,
@@ -212,7 +212,7 @@ export function registerFactoryProductHistoryRoutes(app: Express) {
     "/api/factory/bale-product-history/:productId/:locationId",
     requireAuth,
     async (req: Request, res: Response) => {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const productId = parseId(req.params.productId);
       if (productId === null) return res.status(400).json({ message: "Invalid id" });
@@ -231,7 +231,7 @@ export function registerFactoryProductHistoryRoutes(app: Express) {
     "/api/factory/bale-product-history/:productId/:locationId/:year(\\d+)",
     requireAuth,
     async (req: Request, res: Response) => {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const productId = parseId(req.params.productId);
       if (productId === null) return res.status(400).json({ message: "Invalid id" });
@@ -248,7 +248,7 @@ export function registerFactoryProductHistoryRoutes(app: Express) {
     requireAuth,
     async (req: Request, res: Response) => {
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 
         const productId = parseId(req.params.productId);
@@ -306,7 +306,7 @@ export function registerFactoryProductHistoryRoutes(app: Express) {
     requireAuth,
     async (req: Request, res: Response) => {
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 
         const productId = parseId(req.params.productId);

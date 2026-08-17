@@ -52,7 +52,7 @@ function rowInfo(row: { imageData: string | null; imageUpdatedAt: Date | null })
 
 export function registerLabelBannersRoutes(app: any, requireAuth: any) {
   // ── Serve custom banner image from DB when present, else fall through ────────
-  app.get("/labels/hmd-:slug.jpg", async (req: any, res: any, next: any) => {
+  app.get("/labels/hmd-:slug.jpg", async (req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) => {
     const { slug } = req.params;
     if (!/^[a-z0-9-]+$/.test(slug)) return next();
     try {
@@ -82,7 +82,7 @@ export function registerLabelBannersRoutes(app: any, requireAuth: any) {
   });
 
   // ── GET /api/factory/label-design-colors — full list with image status ──────
-  app.get("/api/factory/label-design-colors", requireAuth, async (_req: any, res: any) => {
+  app.get("/api/factory/label-design-colors", requireAuth, async (_req: unknown, res: import("express").Response) => {
     try {
       const colors = await db
         .select()
@@ -95,7 +95,7 @@ export function registerLabelBannersRoutes(app: any, requireAuth: any) {
   });
 
   // ── GET /api/factory/label-banners — legacy compat (same data) ─────────────
-  app.get("/api/factory/label-banners", requireAuth, async (_req: any, res: any) => {
+  app.get("/api/factory/label-banners", requireAuth, async (_req: unknown, res: import("express").Response) => {
     try {
       const colors = await db
         .select()

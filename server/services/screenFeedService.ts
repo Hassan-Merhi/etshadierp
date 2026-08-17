@@ -54,7 +54,7 @@ export function sanitizeScreenFeedFailureReason(value: unknown): string | undefi
   const sanitized = value
     .replace(URL_LIKE_RE, "[url]")
     .replace(EMAIL_LIKE_RE, "[email]")
-    // eslint-disable-next-line no-control-regex -- stripping control characters is the point: this sanitises a failure reason before it is logged, and C0/DEL in that string is how a log line gets forged.
+    
     .replace(/[\u0000-\u001f\u007f]/g, " ")
     .replace(/\s+/g, " ")
     .trim()

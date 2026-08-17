@@ -274,10 +274,10 @@ function BatchDetailView({ batch, onBack }: { batch: any; onBack: () => void }) 
             const bale = baleMap.get(lp.productionBaleId) || {};
             return {
               referenceNumber: lp.referenceNumber,
-              articleCode: lp.articleCode || (bale as any).articleCode || "",
+              articleCode: lp.articleCode || (bale as { articleCode: unknown }).articleCode || "",
               pieces: lp.pieces || 1,
-              approxWeightKg: lp.approxWeightKg || (bale as any).weightKg || "0",
-              productName: (bale as any).productName || "",
+              approxWeightKg: lp.approxWeightKg || (bale as { weightKg: unknown }).weightKg || "0",
+              productName: (bale as { productName: unknown }).productName || "",
               locationName: locName,
             };
           });
@@ -321,7 +321,7 @@ function BatchDetailView({ batch, onBack }: { batch: any; onBack: () => void }) 
       onBack();
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });

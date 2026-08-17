@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -142,8 +143,8 @@ export function StockItemDetailsDialog({
         description: "Stock item details updated successfully",
       });
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Update Failed",
         description: error.message || "Failed to update stock item",
@@ -167,8 +168,8 @@ export function StockItemDetailsDialog({
         description: "Transaction updated successfully",
       });
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Update Failed",
         description: error.message || "Failed to update transaction",
@@ -192,8 +193,8 @@ export function StockItemDetailsDialog({
         description: "Code alias created successfully",
       });
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Creation Failed",
         description: error.message || "Failed to create code alias",
@@ -214,8 +215,8 @@ export function StockItemDetailsDialog({
         description: "Code alias deleted successfully",
       });
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Deletion Failed",
         description: error.message || "Failed to delete code alias",
@@ -239,8 +240,8 @@ export function StockItemDetailsDialog({
         description: "Location price saved successfully",
       });
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Failed",
         description: error.message || "Failed to save location price",
@@ -261,8 +262,8 @@ export function StockItemDetailsDialog({
         description: "Location price deleted successfully",
       });
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Deletion Failed",
         description: error.message || "Failed to delete location price",

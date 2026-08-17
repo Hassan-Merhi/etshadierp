@@ -90,7 +90,7 @@ export async function postRentAccrualForCompany(
     .where(
       and(
         eq(propertyContracts.companyId, companyId),
-        eq(propertyContracts.module, moduleParam as any),
+        eq(propertyContracts.module, moduleParam),
         eq(propertyContracts.status, "ACTIVE"),
         eq(propertyUnits.unitType, "SHOP")
       )
@@ -137,7 +137,7 @@ export async function postRentAccrualForCompany(
   const unitNameById = new Map(allContracts.map((c) => [c.unitId, c.unitNumber]));
 
   // Billing day (day-of-month) keyed by contractId
-  const billingDayByContract = new Map(allContracts.map((c) => [c.id, new Date(c.startDate as any).getUTCDate()]));
+  const billingDayByContract = new Map(allContracts.map((c) => [c.id, new Date(c.startDate).getUTCDate()]));
 
   const [asY, asM, asD] = effectiveAsOf.split("-").map(Number);
   const curYear = asY;
@@ -274,7 +274,7 @@ export async function postRentAccrualForCompany(
             )
           );
           const actualPaidByRowId = new Map<number, number>(
-            (paidQueryResult.rows as any[]).map((r) => [Number(r.ledger_row_id), Number(r.total_paid)])
+            ((paidQueryResult.rows)).map((r) => [Number(r.ledger_row_id), Number(r.total_paid)])
           );
 
           type Entry = { id: number; amount: number; unitId: number; month: number; year: number };
@@ -323,11 +323,11 @@ export async function postRentAccrualForCompany(
               companyId,
               voucherNumber: `ACCR-RENT-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               voucherType: "Journal",
-              voucherDate: effectiveAsOf as any,
+              voucherDate: effectiveAsOf,
               description: voucherDesc,
               totalAmount: String(totalAmount),
               currency: batchCurrency,
-              sourceModule: moduleParam as any,
+              sourceModule: moduleParam,
             })
             .returning();
 
@@ -475,11 +475,11 @@ export async function postRentAccrualForCompany(
               companyId,
               voucherNumber: `ADV-REC-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               voucherType: "Journal",
-              voucherDate: effectiveAsOf as any,
+              voucherDate: effectiveAsOf,
               description: desc15,
               totalAmount: String(totalExpense15),
               currency: batchCurrency,
-              sourceModule: moduleParam as any,
+              sourceModule: moduleParam,
             })
             .returning();
 
@@ -577,11 +577,11 @@ export async function postRentAccrualForCompany(
               companyId,
               voucherNumber: `PREP-RENT-REC-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               voucherType: "Journal",
-              voucherDate: effectiveAsOf as any,
+              voucherDate: effectiveAsOf,
               description: vDesc,
               totalAmount: String(totalExpected),
               currency: batchCurrency,
-              sourceModule: moduleParam as any,
+              sourceModule: moduleParam,
             })
             .returning();
 
@@ -661,7 +661,7 @@ export async function postRentAccrualForCompany(
       .where(
         and(
           eq(propertyContracts.companyId, companyId),
-          eq(propertyContracts.module, moduleParam as any),
+          eq(propertyContracts.module, moduleParam),
           eq(propertyContracts.status, "ACTIVE"),
           ne(propertyUnits.unitType, "SHOP")
         )
@@ -669,9 +669,7 @@ export async function postRentAccrualForCompany(
     if (landlordContracts.length > 0) {
       const landlordIds = landlordContracts.map((c) => c.id);
       const landlordUnitNames = new Map(landlordContracts.map((c) => [c.unitId, c.unitNumber]));
-      const landlordBillingDay = new Map(
-        landlordContracts.map((c) => [c.id, new Date(c.startDate as any).getUTCDate()])
-      );
+      const landlordBillingDay = new Map(landlordContracts.map((c) => [c.id, new Date(c.startDate).getUTCDate()]));
       const isLandlordDue = (row: { year: number; month: number; contractId: number }) => {
         const bd = landlordBillingDay.get(row.contractId) ?? 1;
         return isRentalPeriodDue(row.year, row.month, bd, effectiveAsOf);
@@ -726,11 +724,11 @@ export async function postRentAccrualForCompany(
               companyId,
               voucherNumber: `DEF-RENT-REC-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               voucherType: "Journal",
-              voucherDate: effectiveAsOf as any,
+              voucherDate: effectiveAsOf,
               description: vDesc,
               totalAmount: String(totalDeferred),
               currency: lBatchCurrency,
-              sourceModule: moduleParam as any,
+              sourceModule: moduleParam,
             })
             .returning();
           // One debit line per row for only the deferred (collected) portion

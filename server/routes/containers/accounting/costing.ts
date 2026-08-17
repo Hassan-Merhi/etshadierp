@@ -89,7 +89,7 @@ export function registerContainerCostingRoutes(app: Express) {
               documentCharges: po.documentCharges,
               discount: po.discount,
               otherCharges: po.otherCharges,
-              freightPaidBy: (po as any).freightPaidBy,
+              freightPaidBy: po.freightPaidBy,
             });
 
             if (grossTotal <= 0) {
@@ -98,14 +98,12 @@ export function registerContainerCostingRoutes(app: Express) {
             }
 
             // Resolve freight info from calcPoAmounts result
-            const poFreightPaidBy: string = (po as any).freightPaidBy || "supplier";
+            const poFreightPaidBy: string = po.freightPaidBy || "supplier";
             const poFreight = parseFloat(po.freight || "0");
-            const poFreightParentAccountId: number | null = (po as any).freightParentAccountId
-              ? Number((po as any).freightParentAccountId)
+            const poFreightParentAccountId: number | null = po.freightParentAccountId
+              ? Number(po.freightParentAccountId)
               : null;
-            const poFreightOwnAccountId: number | null = (po as any).freightOwnAccountId
-              ? Number((po as any).freightOwnAccountId)
-              : null;
+            const poFreightOwnAccountId: number | null = po.freightOwnAccountId ? Number(po.freightOwnAccountId) : null;
             const hasParentFreight = poFreightPaidBy === "parent" && poFreight > 0 && !!poFreightParentAccountId;
             const hasOwnFreight = poFreightPaidBy === "own" && poFreight > 0 && !!poFreightOwnAccountId;
             const hasEmbeddedFreight = hasParentFreight || hasOwnFreight;
@@ -148,24 +146,23 @@ export function registerContainerCostingRoutes(app: Express) {
                   if (isSameCompanyPo) {
                     // Same-company: freight CR entry must exist at freightParentAccountId
                     const freightCrEntry = entries.find(
-                      (e: any) =>
+                      (e) =>
                         Number(e.ledgerAccountId) === poFreightParentAccountId &&
                         parseFloat(e.creditAmount || "0") > 0 &&
                         parseFloat(e.debitAmount || "0") === 0
                     );
                     freightEntryMissing =
-                      !freightCrEntry ||
-                      Math.abs(parseFloat((freightCrEntry as any).creditAmount || "0") - poFreight) > 0.001;
+                      !freightCrEntry || Math.abs(parseFloat(freightCrEntry.creditAmount || "0") - poFreight) > 0.001;
                   } else {
                     // Interco: detect old single-DR structure or wrong DR sum → needs rebuild
                     const drEntries = entries.filter(
-                      (e: any) => parseFloat(e.debitAmount || "0") > 0 && parseFloat(e.creditAmount || "0") === 0
+                      (e) => parseFloat(e.debitAmount || "0") > 0 && parseFloat(e.creditAmount || "0") === 0
                     );
-                    const drSum = drEntries.reduce((s: number, e: any) => s + parseFloat(e.debitAmount || "0"), 0);
+                    const drSum = drEntries.reduce((s: number, e) => s + parseFloat(e.debitAmount || "0"), 0);
                     const strayFreightCr = poFreightParentAccountId
                       ? entries.some(
-                          (e: any) =>
-                            Number((e as any).ledgerAccountId) === poFreightParentAccountId &&
+                          (e) =>
+                            Number(e.ledgerAccountId) === poFreightParentAccountId &&
                             parseFloat(e.creditAmount || "0") > 0
                         )
                       : false;
@@ -175,7 +172,7 @@ export function registerContainerCostingRoutes(app: Express) {
                 } else if (hasOwnFreight) {
                   // Own-freight: freight CR to freightAccountId must exist in child's voucher
                   const freightCrEntry = entries.find(
-                    (e: any) => e.ledgerAccountId === freightAccountId && parseFloat(e.creditAmount || "0") > 0
+                    (e) => e.ledgerAccountId === freightAccountId && parseFloat(e.creditAmount || "0") > 0
                   );
                   freightEntryMissing = !freightCrEntry;
                 }
@@ -203,7 +200,7 @@ export function registerContainerCostingRoutes(app: Express) {
                       const toDeleteIds: number[] = [];
                       const freightCrCandidates3: number[] = [];
                       for (const entry of entries) {
-                        const acctId = (entry as any).ledgerAccountId as number | null;
+                        const acctId = entry.ledgerAccountId as number | null;
                         const isDebit =
                           parseFloat(entry.debitAmount || "0") > 0 && parseFloat(entry.creditAmount || "0") === 0;
                         const isCredit =
@@ -266,7 +263,7 @@ export function registerContainerCostingRoutes(app: Express) {
                       const toDeleteIds: number[] = [];
 
                       for (const entry of entries) {
-                        const acctId = (entry as any).ledgerAccountId as number | null;
+                        const acctId = entry.ledgerAccountId as number | null;
                         const isDebit =
                           parseFloat(entry.debitAmount || "0") > 0 && parseFloat(entry.creditAmount || "0") === 0;
                         const isCredit =
@@ -331,15 +328,15 @@ export function registerContainerCostingRoutes(app: Express) {
                       const isCredit =
                         parseFloat(entry.creditAmount || "0") > 0 && parseFloat(entry.debitAmount || "0") === 0;
                       if (isDebit) {
-                        if (!purchasesAcctId) purchasesAcctId = (entry as any).ledgerAccountId ?? null;
-                        if ((entry as any).ledgerAccountId !== freightAccountId) {
+                        if (!purchasesAcctId) purchasesAcctId = entry.ledgerAccountId ?? null;
+                        if (entry.ledgerAccountId !== freightAccountId) {
                           await db
                             .update(voucherEntries)
                             .set({ debitAmount: intercoTotal.toFixed(2), creditAmount: "0" })
                             .where(eq(voucherEntries.id, entry.id));
                         }
                       } else if (isCredit) {
-                        if ((entry as any).ledgerAccountId === freightAccountId) {
+                        if (entry.ledgerAccountId === freightAccountId) {
                           freightCrFound = true;
                           await db
                             .update(voucherEntries)
@@ -423,7 +420,7 @@ export function registerContainerCostingRoutes(app: Express) {
             }
             // ── Stale FREIGHT- voucher cleanup / missing parent freight account warning ──
             const freightVoucherNum = `FREIGHT-${cNum}-${po.poNumber}`;
-            if (poFreightPaidBy === "parent" && poFreight > 0 && !(po as any).freightParentAccountId) {
+            if (poFreightPaidBy === "parent" && poFreight > 0 && !po.freightParentAccountId) {
               missingParentFreightAccount.push(
                 `PO ${po.poNumber}: freight set to parent-paid but no parent account configured`
               );

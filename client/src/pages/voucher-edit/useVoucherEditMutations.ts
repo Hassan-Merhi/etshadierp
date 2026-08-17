@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -58,8 +59,8 @@ export function useVoucherEditMutations({
       toast({ title: "Success", description: "Voucher updated successfully" });
       handleBack();
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to update voucher", variant: "destructive" });
     },
   });
@@ -74,8 +75,8 @@ export function useVoucherEditMutations({
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       toast({ title: "Success", description: "Optional status updated successfully" });
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if (error?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to update optional status",
@@ -101,8 +102,8 @@ export function useVoucherEditMutations({
       toast({ title: "Success", description: "Sales voucher updated successfully" });
       navigate(`${modePrefix}/daybook`);
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to update sales voucher", variant: "destructive" });
     },
   });
@@ -124,8 +125,8 @@ export function useVoucherEditMutations({
       toast({ title: "Success", description: "Purchase voucher updated successfully" });
       navigate(`${modePrefix}/daybook`);
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if (error?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to update purchase voucher",
@@ -151,8 +152,8 @@ export function useVoucherEditMutations({
       toast({ title: "Success", description: "Adjustment voucher updated successfully" });
       navigate(`${modePrefix}/daybook`);
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if (error?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to update adjustment voucher",
@@ -178,8 +179,8 @@ export function useVoucherEditMutations({
       toast({ title: "Success", description: "Stock transfer voucher updated successfully" });
       navigate(`${modePrefix}/daybook`);
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if (error?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to update stock transfer voucher",

@@ -105,10 +105,10 @@ export function registerPayrollMarkPaidRoutes(app: Express) {
         ? await findOrCreateLedger(companyId, "Payroll Payable", "Liability")
         : null;
 
-      const updated = await db.transaction(async (tx: any) => {
+      const updated = await db.transaction(async (tx) => {
         const [payroll] = await tx
           .update(factoryPayrolls)
-          .set({ status: "PAID", paidAt: new Date(paymentDate), cashAccountId } as any)
+          .set({ status: "PAID", paidAt: new Date(paymentDate), cashAccountId })
           .where(and(eq(factoryPayrolls.id, id), eq(factoryPayrolls.companyId, companyId)))
           .returning();
         if (!payroll) throw new Error("Payroll record not found");
@@ -220,10 +220,7 @@ export function registerPayrollMarkPaidRoutes(app: Express) {
           { voucherId: pVoucher.id, ledgerAccountId: cashAccountId, ...normUsd("0", netAmt.toFixed(2)), narration },
         ]);
       }
-      await db
-        .update(factoryPayrolls)
-        .set({ cashAccountId } as any)
-        .where(eq(factoryPayrolls.id, id));
+      await db.update(factoryPayrolls).set({ cashAccountId }).where(eq(factoryPayrolls.id, id));
       res.json({ message: "Accounting entry generated", voucherId: pVoucher.id });
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
@@ -237,7 +234,7 @@ export function registerPayrollMarkPaidRoutes(app: Express) {
       const { payrollIds, cashAccountId } = req.body;
       if (!payrollIds?.length) return res.status(400).json({ message: "payrollIds required" });
       const normalizedIds = [
-        ...new Set((payrollIds as any[]).map(Number).filter((id) => Number.isInteger(id) && id > 0)),
+        ...new Set((payrollIds as unknown[]).map(Number).filter((id) => Number.isInteger(id) && id > 0)),
       ];
       if (normalizedIds.length === 0) return res.status(400).json({ message: "Valid payrollIds required" });
       const cashId = cashAccountId ? parseInt(cashAccountId) : null;
@@ -247,7 +244,7 @@ export function registerPayrollMarkPaidRoutes(app: Express) {
       if (!pendingGuard.ok) return res.status(pendingGuard.status).json(pendingGuard);
 
       const payableAccBulk = cashId ? await findOrCreateLedger(companyId, "Payroll Payable", "Liability") : null;
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         const payrollsToMark = await tx
           .select()
           .from(factoryPayrolls)
@@ -255,15 +252,15 @@ export function registerPayrollMarkPaidRoutes(app: Express) {
 
         await tx
           .update(factoryPayrolls)
-          .set({ status: "PAID", paidAt: new Date(bulkPrToday), cashAccountId: cashId } as any)
+          .set({ status: "PAID", paidAt: new Date(bulkPrToday), cashAccountId: cashId })
           .where(and(eq(factoryPayrolls.companyId, companyId), inArray(factoryPayrolls.id, normalizedIds)));
 
-        const workerIds = Array.from(new Set<number>(payrollsToMark.map((payroll: any) => payroll.workerId)));
+        const workerIds = Array.from(new Set<number>(payrollsToMark.map((payroll) => payroll.workerId)));
         const workerRows = await tx
           .select({ id: factoryWorkers.id, fullName: factoryWorkers.fullName })
           .from(factoryWorkers)
           .where(inArray(factoryWorkers.id, workerIds));
-        const workerMap = new Map(workerRows.map((worker: any) => [worker.id, worker.fullName]));
+        const workerMap = new Map(workerRows.map((worker) => [worker.id, worker.fullName]));
 
         for (const payroll of payrollsToMark) {
           if (cashId && payableAccBulk) {

@@ -24,7 +24,7 @@ import { resultRows, firstRow } from "../../../../lib/queryResult";
 export function registerOrderBaleBulkImportRoutes(app: Express) {
   app.post("/api/factory/customer-orders/:id/bales/bulk-import", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseId(req.params.id);
@@ -36,8 +36,7 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
       if (!locationId || (!hasItems && !hasRefNumbers)) {
         return res.status(400).json({ message: "locationId and either items or refNumbers are required" });
       }
-      const scannerName: string | null =
-        (req.session as any)?.username || (req.session as any)?.name || (req.session as any)?.email || null;
+      const scannerName: string | null = req.session?.username || req.session?.name || req.session?.email || null;
 
       const [order] = await db
         .select()
@@ -89,7 +88,7 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
           // the join row + flip status atomically. Two concurrent bulk-imports
           // referencing the same physical bale will block at the lock; only
           // one will see status='IN_STOCK', the other will skip.
-          const refResult = await db.transaction(async (tx: any) => {
+          const refResult = await db.transaction(async (tx) => {
             // Try referenceNumber first, then fall back to baleCode
             let [bale] = await tx
               .select()
@@ -145,8 +144,8 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
                   )
                 );
               if (pl) {
-                const pMode = (pl as any).pricingMode ?? "per_bale";
-                const pkgRate = parseFloat(String((pl as any).pricePerKg ?? "0"));
+                const pMode = pl.pricingMode ?? "per_bale";
+                const pkgRate = parseFloat(String(pl.pricePerKg ?? "0"));
                 if (pMode === "per_kg" && pkgRate > 0) {
                   const baleWt = parseFloat(String(bale.weightKg || "0"));
                   priceUsed = (!isNaN(baleWt) ? baleWt * pkgRate : 0).toFixed(2);
@@ -250,7 +249,7 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
         // then insert + status-update inside the same tx. Concurrent imports
         // for the same article will block at the lock and re-evaluate, so
         // they cannot grab the same physical bales.
-        const articleResult = await db.transaction(async (tx: any) => {
+        const articleResult = await db.transaction(async (tx) => {
           // Find available bales, oldest first
           const availableBales = await tx
             .select()
@@ -272,7 +271,7 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
           // taken before this tx. Note: the snapshot can be stale, so for V5
           // we re-verify each candidate inside the tx below before inserting.
           const candidateBales = availableBales.filter(
-            (b: any) => !alreadyAddedBaleIds.has(b.id) && !v5BlockedBaleIds.has(b.id)
+            (b) => !alreadyAddedBaleIds.has(b.id) && !v5BlockedBaleIds.has(b.id)
           );
 
           const addedIds: number[] = [];
@@ -311,8 +310,8 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
                   )
                 );
               if (pl) {
-                const pMode = (pl as any).pricingMode ?? "per_bale";
-                const pkgRate = parseFloat(String((pl as any).pricePerKg ?? "0"));
+                const pMode = pl.pricingMode ?? "per_bale";
+                const pkgRate = parseFloat(String(pl.pricePerKg ?? "0"));
                 if (pMode === "per_kg" && pkgRate > 0) {
                   const baleWt = parseFloat(String(bale.weightKg || "0"));
                   priceUsed = (!isNaN(baleWt) ? baleWt * pkgRate : 0).toFixed(2);

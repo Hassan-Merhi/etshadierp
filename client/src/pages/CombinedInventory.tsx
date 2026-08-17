@@ -113,7 +113,7 @@ export default function CombinedInventory() {
     retry: false,
   });
 
-  const inventoryRows = inventoryPage?.data ?? [];
+  const inventoryRows = useMemo(() => (inventoryPage?.data ?? []), [inventoryPage?.data]);
   const inventoryTotal = inventoryPage?.total ?? 0;
   const inventoryTotalPages = inventoryPage?.totalPages ?? 1;
 
@@ -143,7 +143,7 @@ export default function CombinedInventory() {
 
     containerDetailsQueries.forEach((q) => {
       if (!q.data) return;
-      const containerData = q.data as any;
+      const containerData = q.data as unknown as { pos: { forEach: (...args: unknown[]) => unknown } };
       containerData?.pos?.forEach((po: any) => {
         po.items?.forEach((item: any) => {
           const qty = parseFloat(item.quantity || "0");
@@ -237,7 +237,7 @@ export default function CombinedInventory() {
             stockItemId: item.id,
             stockItemName: item.name,
             stockGroupId: item.stockGroupId ?? null,
-            stockGroupName: (item as any).stockGroupName || "",
+            stockGroupName: item.stockGroupName || "",
             otwQty: 0,
             inHandQty: 0,
             totalQty: 0,
@@ -502,8 +502,8 @@ export default function CombinedInventory() {
       {/* Partial-load notice — only shown when total rows exceed the first page */}
       {inventoryTotalPages > 1 && (
         <p className="text-xs text-muted-foreground -mt-2">
-          Showing first {inventoryRows.length.toLocaleString()} of {inventoryTotal.toLocaleString()} inventory rows.
-          Use search to narrow results, or click Refresh to reload.
+          Showing first {inventoryRows.length.toLocaleString()} of {inventoryTotal.toLocaleString()} inventory rows. Use
+          search to narrow results, or click Refresh to reload.
         </p>
       )}
 

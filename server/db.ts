@@ -130,7 +130,11 @@ export const db = drizzle(pool, { schema });
 
 // Lightweight pool snapshot exposed on globalThis so mjs lifecycle/health
 // modules can read it without creating a circular import dependency.
-(globalThis as any).__erpDatabasePoolSnapshot = () => ({
+(
+  globalThis as unknown as typeof globalThis & {
+    __erpDatabasePoolSnapshot: () => { totalCount: number; idleCount: number; waitingCount: number };
+  }
+).__erpDatabasePoolSnapshot = () => ({
   totalCount: pool.totalCount,
   idleCount: pool.idleCount,
   waitingCount: pool.waitingCount,

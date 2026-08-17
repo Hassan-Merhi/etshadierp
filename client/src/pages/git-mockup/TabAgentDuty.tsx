@@ -68,7 +68,7 @@ export function TabAgentDuty() {
         })
         .catch(() => {});
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [data]);
 
   const CONF_RANK: Record<AgentDutySummary["matchConfidence"], number> = { exact: 0, fuzzy: 1, unmapped: 2 };
@@ -115,7 +115,7 @@ export function TabAgentDuty() {
     }
     merged.sort((a, b) => a.agentName.localeCompare(b.agentName));
     return [{ companyId: 0, companyName: "All Companies", agents: merged }];
-  }, [sections, companyMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sections, companyMode]); 
 
   const totalAgents = displaySections.reduce((s, c) => s + c.agents.length, 0);
 

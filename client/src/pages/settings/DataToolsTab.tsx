@@ -152,7 +152,7 @@ export function DataToolsTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/sales-report"] });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if (error?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
@@ -192,7 +192,7 @@ export function DataToolsTab() {
         return;
       }
       const headerRow = utils.sheet_to_json<string[]>(worksheet, { header: 1 })[0] || [];
-      const columns = headerRow.map((h: any) => String(h || "").trim());
+      const columns = headerRow.map((h) => String(h || "").trim());
       const requiredCols = ["barcode", "costPrice"];
       const missingCols = requiredCols.filter((col) => !columns.includes(col));
       if (missingCols.length > 0) {
@@ -291,7 +291,7 @@ export function DataToolsTab() {
         return;
       }
       const headerRow = utils.sheet_to_json<string[]>(worksheet, { header: 1 })[0] || [];
-      const columns = headerRow.map((h: any) => String(h || "").trim());
+      const columns = headerRow.map((h) => String(h || "").trim());
       const requiredCols = ["Item_barcode", "quantity", "rate", "value"];
       const missingCols = requiredCols.filter((col) => !columns.includes(col));
       if (missingCols.length > 0) {
@@ -401,7 +401,7 @@ export function DataToolsTab() {
   };
 
   const getCurrentQty = (stockItemId: number): number => {
-    const locRow = silentLocInventory.find((inv: any) => inv.stockItemId === stockItemId);
+    const locRow = silentLocInventory.find((inv) => inv.stockItemId === stockItemId);
     return locRow ? parseFloat(locRow.quantity || "0") : 0;
   };
 
@@ -941,7 +941,7 @@ export function DataToolsTab() {
                                   <div className="text-center text-sm text-muted-foreground py-4">No items found</div>
                                 );
                               return filtered.map((si: any) => {
-                                const locRow = silentLocInventory.find((inv: any) => inv.stockItemId === si.id);
+                                const locRow = silentLocInventory.find((inv) => inv.stockItemId === si.id);
                                 const currentQty = locRow ? parseFloat(locRow.quantity || "0") : 0;
                                 return (
                                   <button

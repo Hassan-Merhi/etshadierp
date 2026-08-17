@@ -16,7 +16,7 @@ export function registerPosSaleDeleteRoutes(app: Express) {
   // DELETE /api/factory/pos/sales/:id — void a factory POS sale
   app.delete("/api/factory/pos/sales/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const saleId = parseInt(req.params.id);
       const [sale] = await db
@@ -26,7 +26,7 @@ export function registerPosSaleDeleteRoutes(app: Express) {
       if (!sale) return res.status(404).json({ message: "Sale not found" });
       if (sale.status === "VOIDED") return res.status(400).json({ message: "Sale already voided" });
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         // Restore bales to IN_STOCK by finding bales that were sold around the sale date/product
         const items = await tx.select().from(factoryPosSaleItems).where(eq(factoryPosSaleItems.saleId, saleId));
         for (const item of items) {
@@ -46,7 +46,7 @@ export function registerPosSaleDeleteRoutes(app: Express) {
               .orderBy(desc(factoryBales.id))
               .limit(item.quantity)
               .for("update");
-            const baleIds = soldBales.map((b: any) => b.id);
+            const baleIds = soldBales.map((b) => b.id);
             if (baleIds.length > 0) {
               await tx
                 .update(factoryBales)

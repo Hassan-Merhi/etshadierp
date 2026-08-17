@@ -65,7 +65,7 @@ export function registerFactoryStockEntryHistoryPaginationRoutes(app: Express): 
       if (!wantsPagination(req)) return next();
 
       try {
-        const session = req.session as any;
+        const session = req.session;
         const companyId = session.factoryCompanyId || session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 

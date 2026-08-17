@@ -2,7 +2,22 @@ import ExcelJS from "exceljs";
 import { ItemRow } from "./types";
 import { toUtcDate } from "./dateHelpers";
 import { r2, applyCell } from "./styleHelpers";
-import { fill, ctr, right, thin, boldSm, normSm, DARK_BLUE, GREEN_HDR, YELLOW_GRP, PURPLE_QTY, ALT_ROW, WHITE, wFont, NUM } from "./constants";
+import {
+  fill,
+  ctr,
+  right,
+  thin,
+  boldSm,
+  normSm,
+  DARK_BLUE,
+  GREEN_HDR,
+  YELLOW_GRP,
+  PURPLE_QTY,
+  ALT_ROW,
+  WHITE,
+  wFont,
+  NUM,
+} from "./constants";
 
 // ── Ageing sheet ──────────────────────────────────────────────────────────────
 // Buckets each item's Closing Qty into 0-30/31-60/61-90/91-120/121+ days based
@@ -18,26 +33,31 @@ export function buildAgeingSheet(
 ): void {
   const ws = wb.addWorksheet("Ageing");
   ws.views = [{ state: "frozen", xSplit: 0, ySplit: 1 }];
-  ws.pageSetup.orientation    = "landscape";
-  ws.pageSetup.fitToPage      = true;
-  ws.pageSetup.fitToWidth     = 1;
-  ws.pageSetup.fitToHeight    = 0;
+  ws.pageSetup.orientation = "landscape";
+  ws.pageSetup.fitToPage = true;
+  ws.pageSetup.fitToWidth = 1;
+  ws.pageSetup.fitToHeight = 0;
   ws.pageSetup.printTitlesRow = "1:1";
 
   ws.columns = [
-    { header: "Group",           key: "grp",   width: 18 },
-    { header: "Item Code",       key: "code",  width: 14 },
-    { header: "Item Name",       key: "name",  width: 28 },
-    { header: "Closing Qty",     key: "cqty",  width: 12 },
-    { header: "Closing Value",   key: "cval",  width: 13 },
-    { header: "0-30 Days Qty",   key: "b1",    width: 12 },
-    { header: "31-60 Days Qty",  key: "b2",    width: 12 },
-    { header: "61-90 Days Qty",  key: "b3",    width: 12 },
-    { header: "91-120 Days Qty", key: "b4",    width: 12 },
-    { header: "121+ Days Qty",   key: "b5",    width: 12 },
-    { header: "Ageing Basis",    key: "basis", width: 28 },
+    { header: "Group", key: "grp", width: 18 },
+    { header: "Item Code", key: "code", width: 14 },
+    { header: "Item Name", key: "name", width: 28 },
+    { header: "Closing Qty", key: "cqty", width: 12 },
+    { header: "Closing Value", key: "cval", width: 13 },
+    { header: "0-30 Days Qty", key: "b1", width: 12 },
+    { header: "31-60 Days Qty", key: "b2", width: 12 },
+    { header: "61-90 Days Qty", key: "b3", width: 12 },
+    { header: "91-120 Days Qty", key: "b4", width: 12 },
+    { header: "121+ Days Qty", key: "b5", width: 12 },
+    { header: "Ageing Basis", key: "basis", width: 28 },
   ];
-  ws.getRow(1).eachCell(c => { c.fill = fill(DARK_BLUE); c.font = wFont(9); c.alignment = ctr; c.border = thin; });
+  ws.getRow(1).eachCell((c) => {
+    c.fill = fill(DARK_BLUE);
+    c.font = wFont(9);
+    c.alignment = ctr;
+    c.border = thin;
+  });
   ws.getRow(1).height = 16;
   ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 11 } };
 
@@ -71,17 +91,33 @@ export function buildAgeingSheet(
     const r = rowIdx++;
     const row = ws.getRow(r);
     row.values = [
-      item.groupName, item.itemCode, item.itemName,
-      closeQty || null, r2(item.closeValue) || null,
-      ...buckets, basis,
+      item.groupName,
+      item.itemCode,
+      item.itemName,
+      closeQty || null,
+      r2(item.closeValue) || null,
+      ...buckets,
+      basis,
     ];
     ws.getCell(r, 1).fill = fill(YELLOW_GRP); // Group column — yellow
     ws.getCell(r, 4).fill = fill(PURPLE_QTY); // Closing Qty — light purple
-    [6,7,8,9,10].forEach(c => { ws.getCell(r, c).fill = fill(PURPLE_QTY); }); // bucket qty cols — light purple
-    if ((rowIdx - 2) % 2 === 1) row.eachCell(c => { if (!c.fill || (c.fill as any).fgColor?.argb === undefined) c.fill = fill(ALT_ROW); });
-    [4,5,6,7,8,9,10].forEach(c => { ws.getCell(r, c).numFmt = NUM; ws.getCell(r, c).alignment = right; ws.getCell(r, c).border = thin; });
-    ws.getCell(r, 11).font = normSm; ws.getCell(r, 11).border = thin;
-    ws.getCell(r, 2).border = thin; ws.getCell(r, 3).border = thin; ws.getCell(r, 1).border = thin;
+    [6, 7, 8, 9, 10].forEach((c) => {
+      ws.getCell(r, c).fill = fill(PURPLE_QTY);
+    }); // bucket qty cols — light purple
+    if ((rowIdx - 2) % 2 === 1)
+      row.eachCell((c) => {
+        if (!c.fill || (c.fill as { fgColor: { argb: undefined } }).fgColor?.argb === undefined) c.fill = fill(ALT_ROW);
+      });
+    [4, 5, 6, 7, 8, 9, 10].forEach((c) => {
+      ws.getCell(r, c).numFmt = NUM;
+      ws.getCell(r, c).alignment = right;
+      ws.getCell(r, c).border = thin;
+    });
+    ws.getCell(r, 11).font = normSm;
+    ws.getCell(r, 11).border = thin;
+    ws.getCell(r, 2).border = thin;
+    ws.getCell(r, 3).border = thin;
+    ws.getCell(r, 1).border = thin;
     row.height = 13;
   }
 
@@ -95,11 +131,16 @@ export function buildAgeingSheet(
   ws.getCell(totRow, 4).numFmt = NUM;
   applyCell(ws, totRow, 5, r2(grandCloseVal) || null, fill(GREEN_HDR), { ...boldSm, color: { argb: WHITE } }, right);
   ws.getCell(totRow, 5).numFmt = NUM;
-  [0,1,2,3,4].forEach((b, i) => {
+  [0, 1, 2, 3, 4].forEach((b, i) => {
     const c = ws.getCell(totRow, 6 + i);
-    c.value = r2(bucketTotals[b]) || null; c.numFmt = NUM;
-    c.fill = fill(GREEN_HDR); c.font = { ...boldSm, color: { argb: WHITE } }; c.alignment = right; c.border = thin;
+    c.value = r2(bucketTotals[b]) || null;
+    c.numFmt = NUM;
+    c.fill = fill(GREEN_HDR);
+    c.font = { ...boldSm, color: { argb: WHITE } };
+    c.alignment = right;
+    c.border = thin;
   });
-  ws.getCell(totRow, 11).fill = fill(GREEN_HDR); ws.getCell(totRow, 11).border = thin;
+  ws.getCell(totRow, 11).fill = fill(GREEN_HDR);
+  ws.getCell(totRow, 11).border = thin;
   ws.getRow(totRow).height = 16;
 }

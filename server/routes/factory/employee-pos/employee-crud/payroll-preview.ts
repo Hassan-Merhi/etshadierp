@@ -17,7 +17,7 @@ export function registerFactoryEmployeePayrollPreviewRoutes(app: Express) {
   // Returns attendance-based salary calculation for each active employee
   app.get("/api/factory/employee-payroll-preview", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
       if (!startDate || !endDate) return res.status(400).json({ message: "startDate and endDate are required" });

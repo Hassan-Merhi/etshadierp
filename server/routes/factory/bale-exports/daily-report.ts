@@ -24,7 +24,7 @@ import fs from "fs";
 export function registerFactoryDailyReportRoutes(app: Express) {
   app.get("/api/factory/daily-report", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const date = req.query.date as string | undefined;
@@ -61,7 +61,7 @@ export function registerFactoryDailyReportRoutes(app: Express) {
 
   app.get("/api/factory/daily-report/export", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const dateParam = req.query.date as string | undefined;

@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { getErrorDetails } from "@shared/errorUtils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -219,7 +220,7 @@ export default function FactoryInvoiceDetail() {
     queryKey: ["/api/factory/dispatch-batches", order?.dispatchBatchId],
     queryFn: async () => {
       const res = await fetch(`/api/factory/dispatch-batches/${order!.dispatchBatchId}`, { credentials: "include" });
-      if (!res.ok) return null as any;
+      if (!res.ok) return null;
       return res.json();
     },
     enabled: !!order?.dispatchBatchId,
@@ -293,7 +294,7 @@ export default function FactoryInvoiceDetail() {
       invalidateCustomerBalances(order?.customerId ?? undefined);
       navigate("/factory/invoicing?tab=invoices");
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
@@ -322,7 +323,7 @@ export default function FactoryInvoiceDetail() {
       }
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
@@ -348,7 +349,7 @@ export default function FactoryInvoiceDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
       setEditingArticleCode(null);
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
       setEditingArticleCode(null);
@@ -369,7 +370,7 @@ export default function FactoryInvoiceDetail() {
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
       invalidateCustomerBalances(order?.customerId ?? undefined);
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Cannot revert", description: error.message, variant: "destructive" });
     },
@@ -398,7 +399,7 @@ export default function FactoryInvoiceDetail() {
       }
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
@@ -429,7 +430,7 @@ export default function FactoryInvoiceDetail() {
       setShowProformaDialog(false);
       setSelectedProformaId("");
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
@@ -453,7 +454,7 @@ export default function FactoryInvoiceDetail() {
       setExchangeBale(null);
       setNewRefInput("");
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
@@ -473,7 +474,7 @@ export default function FactoryInvoiceDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
       setRemoveBaleState(null);
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
@@ -508,7 +509,7 @@ export default function FactoryInvoiceDetail() {
       const res = await fetch(url, { credentials: "include", cache: "no-store" });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error((err as any).message || `Server error ${res.status}`);
+        throw new Error(err.message || `Server error ${res.status}`);
       }
       const blob = await res.blob();
       if (blob.size === 0) {

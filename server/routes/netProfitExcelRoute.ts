@@ -88,7 +88,7 @@ export function registerNetProfitExcelRoute(app: Express) {
           : [];
 
       // Map entries by voucherId for fast monthly lookup
-      const entriesByVoucherId = new Map<number, any[]>();
+      const entriesByVoucherId = new Map<number, unknown[]>();
       for (const e of allPeriodEntries) {
         if (!entriesByVoucherId.has(e.voucherId)) entriesByVoucherId.set(e.voucherId, []);
         entriesByVoucherId.get(e.voucherId)!.push(e);
@@ -219,7 +219,7 @@ export function registerNetProfitExcelRoute(app: Express) {
       // Opening Stock
       const allStockItems = await storage.getAllStockItems(companyId);
       let openingStockValue = 0;
-      for (const item of allStockItems) openingStockValue += parseFloat((item as any).openingValue || "0");
+      for (const item of allStockItems) openingStockValue += parseFloat(item.openingValue || "0");
 
       // Closing Stock (current inventory)
       const activeLocData = await db
@@ -245,11 +245,30 @@ export function registerNetProfitExcelRoute(app: Express) {
       // Build supplier balance map from all-time entries
       const xlsxSupplierBals = new Map<number, { debit: number; credit: number }>();
       for (const e of allTimeEntriesXlsx) {
-        if ((e as any).supplierId) {
-          const d = parseFloat((e as any).debitAmount || "0"),
-            c = parseFloat((e as any).creditAmount || "0");
-          const cur = xlsxSupplierBals.get((e as any).supplierId) || { debit: 0, credit: 0 };
-          xlsxSupplierBals.set((e as any).supplierId, { debit: cur.debit + d, credit: cur.credit + c });
+        if (
+          (
+            e as unknown as { ledgerAccountId: number | null; debitAmount: string; creditAmount: string } & {
+              supplierId: unknown;
+            }
+          ).supplierId
+        ) {
+          const d = parseFloat(e.debitAmount || "0"),
+            c = parseFloat(e.creditAmount || "0");
+          const cur = xlsxSupplierBals.get(
+            (
+              e as unknown as { ledgerAccountId: number | null; debitAmount: string; creditAmount: string } & {
+                supplierId: number;
+              }
+            ).supplierId
+          ) || { debit: 0, credit: 0 };
+          xlsxSupplierBals.set(
+            (
+              e as unknown as { ledgerAccountId: number | null; debitAmount: string; creditAmount: string } & {
+                supplierId: number;
+              }
+            ).supplierId,
+            { debit: cur.debit + d, credit: cur.credit + c }
+          );
         }
       }
 
@@ -327,8 +346,8 @@ export function registerNetProfitExcelRoute(app: Express) {
         if (npExpenseTypes.includes(acc.accountType || "")) continue;
         if (acc.accountType === "Income") continue;
         if (isExcludedFromNp(acc)) continue;
-        const opening = parseFloat((acc as any).openingBalance || "0");
-        const openingSigned = (acc as any).openingBalanceSide === "Dr" ? opening : -opening;
+        const opening = parseFloat(acc.openingBalance || "0");
+        const openingSigned = acc.openingBalanceSide === "Dr" ? opening : -opening;
         const bal = allTimeBalsXlsx.get(acc.id) || { debit: 0, credit: 0 };
         let net = openingSigned + bal.debit - bal.credit;
         // Revalue Cash accounts: amounts are in CFA, divide by current rate to get USD
@@ -353,7 +372,7 @@ export function registerNetProfitExcelRoute(app: Express) {
           .where(and(eq(employees.companyId, companyId), eq(employees.active, true), isNull(employees.deletedAt)))
           .execute();
         let xlsxWorkerBal = 0;
-        for (const emp of xlsxEmployees) xlsxWorkerBal += parseFloat((emp as any).currentBalance || "0");
+        for (const emp of xlsxEmployees) xlsxWorkerBal += parseFloat(emp.currentBalance || "0");
         if (xlsxWorkerBal > 0) npOnUs += xlsxWorkerBal;
         else if (xlsxWorkerBal < 0) npForUs += Math.abs(xlsxWorkerBal);
 
@@ -364,7 +383,7 @@ export function registerNetProfitExcelRoute(app: Express) {
           .where(and(eq(containers.companyId, companyId), eq(containers.status, "OTW")))
           .execute();
         for (const c of xlsxOtwContainers) {
-          npForUs += parseFloat((c as any).grandTotal || (c as any).itemsTotal || "0");
+          npForUs += parseFloat(c.grandTotal || c.itemsTotal || "0");
         }
       }
 
@@ -374,9 +393,9 @@ export function registerNetProfitExcelRoute(app: Express) {
       if (xlsxShouldIncludeSuppliers) {
         const xlsxAllSuppliers = await db.select().from(suppliers).where(isNull(suppliers.deletedAt)).execute();
         for (const sup of xlsxAllSuppliers) {
-          const balance = xlsxSupplierBals.get((sup as any).id);
+          const balance = xlsxSupplierBals.get(sup.id);
           if (balance) {
-            const opening = parseFloat((sup as any).openingBalance || "0");
+            const opening = parseFloat(sup.openingBalance || "0");
             const netBalance = opening + balance.credit - balance.debit;
             if (netBalance > 0) npOnUs += netBalance;
             else if (netBalance < 0) npForUs += Math.abs(netBalance);
@@ -390,9 +409,9 @@ export function registerNetProfitExcelRoute(app: Express) {
       const importChargesParent = companyAccounts.find((acc) => acc.code === "IMPORT_CHARGES");
       const importChargesIds = new Set<number>();
       if (importChargesParent) {
-        importChargesIds.add((importChargesParent as any).id);
+        importChargesIds.add(importChargesParent.id);
         companyAccounts.forEach((acc) => {
-          if (acc.parentId === (importChargesParent as any).id) importChargesIds.add(acc.id);
+          if (acc.parentId === importChargesParent.id) importChargesIds.add(acc.id);
         });
       }
 
@@ -453,7 +472,7 @@ export function registerNetProfitExcelRoute(app: Express) {
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || req.session.userId!,
+          username: req.session.username || req.session.userId!,
           companyId: companyId!,
           action: "export",
           tableName: "reports",

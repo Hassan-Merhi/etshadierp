@@ -21,8 +21,8 @@ import {
 } from "@shared/schema";
 
 /** Prefer the factory-pinned company ID so cross-tab ERP company switches don't corrupt factory writes. */
-function getFactoryCompanyId(req: any): number | undefined {
-  return (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+function getFactoryCompanyId(req: import("express").Request): number | undefined {
+  return req.session.factoryCompanyId || req.session.currentCompanyId;
 }
 
 /** Write a single daybook entry (factory audit log). */
@@ -80,7 +80,7 @@ async function findOrCreateLedger(companyId: number, name: string, accountType: 
       .select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
       .from(ledgerAccounts)
       .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\\d+$'`));
-    const nextCode = String((parseInt((maxCodeRow as any)?.maxCode || "0") || 0) + 1 + attempt);
+    const nextCode = String((parseInt((maxCodeRow as { maxCode: string })?.maxCode || "0") || 0) + 1 + attempt);
     try {
       const [created] = await db
         .insert(ledgerAccounts)
@@ -272,7 +272,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
   // DELETE /api/factory/advances/:id - Delete advance (admin/owner only)
   app.delete("/api/factory/advances/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const currentRole = (req.session as any).currentRole;
+      const currentRole = req.session.currentRole;
       if (currentRole !== "Admin" && currentRole !== "Owner" && currentRole !== "Developer") {
         return res.status(403).json({ message: "Only Admin or Owner can delete advances" });
       }
@@ -357,7 +357,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
           referenceId: id,
           referenceTable: "factory_worker_advances",
           description: `Advance deleted for ${worker?.fullName || "Unknown"}: $${parseFloat(advance.amount).toFixed(2)}${repayNote}${voucherNote}`,
-          createdBy: (req.session as any).userId ?? undefined,
+          createdBy: req.session.userId ?? undefined,
         });
       });
 
@@ -371,7 +371,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
   // POST /api/factory/advances/:id/reverse - Reverse a paid advance (restore to outstanding)
   app.post("/api/factory/advances/:id/reverse", requireAuth, async (req: Request, res: Response) => {
     try {
-      const currentRole = (req.session as any).currentRole;
+      const currentRole = req.session.currentRole;
       if (currentRole !== "Admin" && currentRole !== "Owner" && currentRole !== "Developer") {
         return res.status(403).json({ message: "Only Admin, Owner, or Developer can reverse advances" });
       }
@@ -417,7 +417,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
           referenceId: id,
           referenceTable: "factory_worker_advances",
           description: `Advance reversed for ${worker?.fullName || "Unknown"}: $${parseFloat(advance.amount).toFixed(2)} restored to outstanding (${repayments.length} repayment(s) removed)`,
-          createdBy: (req.session as any).userId ?? undefined,
+          createdBy: req.session.userId ?? undefined,
         });
       });
 
@@ -472,7 +472,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
 
   app.post("/api/factory/advances/post-accounting", requireAuth, async (req: Request, res: Response) => {
     try {
-      const currentRole = (req.session as any).currentRole;
+      const currentRole = req.session.currentRole;
       if (currentRole !== "Admin" && currentRole !== "Owner" && currentRole !== "Developer") {
         return res.status(403).json({ message: "Only Admin or Owner can post accounting" });
       }
@@ -619,7 +619,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
   // Updates cashAccountId on selected advances, creates/patches PAYMENT-ADV-* vouchers, and writes daybook entries.
   app.post("/api/factory/advances/bulk-update-cash-account", requireAuth, async (req: Request, res: Response) => {
     try {
-      const currentRole = (req.session as any).currentRole;
+      const currentRole = req.session.currentRole;
       if (currentRole !== "Admin" && currentRole !== "Owner" && currentRole !== "Developer") {
         return res.status(403).json({ message: "Only Admin or Owner can update advance cash accounts" });
       }
@@ -781,7 +781,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
             description: `Cash account assigned for advance to ${workerName}: $${amount.toFixed(2)} → ${acct.name}`,
             amountCurrency: amount,
             amountUsd: amount,
-            createdBy: (req.session as any).userId ?? undefined,
+            createdBy: req.session.userId ?? undefined,
           });
         }
 

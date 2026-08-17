@@ -16,7 +16,7 @@ export function registerFactoryCustomerMigrationRoutes(app: Express) {
   // ─── One-time migration: fix charge descriptions & payment narrations ───────
   app.post("/api/factory/migrate-voucher-descriptions", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       let chargesFixed = 0;

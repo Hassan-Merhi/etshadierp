@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { useEscapeBack } from "@/hooks/use-escape-back";
@@ -170,7 +171,7 @@ export default function ProformaAddLine() {
       setQty("1");
       setPrice("");
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
@@ -221,7 +222,7 @@ export default function ProformaAddLine() {
     }, AUTOSAVE_DELAY_MS);
 
     return clearAutoSaveTimers;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [autoSave, selectedItem?.id, qty, price]);
 
   const handleSelectItem = (item: StockItem) => {

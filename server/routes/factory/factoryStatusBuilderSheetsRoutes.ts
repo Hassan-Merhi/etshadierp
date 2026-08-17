@@ -350,7 +350,7 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
     try {
       const wb = xlsxUtils.book_new();
 
-      const sheet1: any[][] = [
+      const sheet1 = [
         ["Label", "Week 1", "Week 2", "Week 3", "Week 4"],
         ["Target", 150, 150, 150, 150],
         ["Actual", 120, 135, 140, 155],

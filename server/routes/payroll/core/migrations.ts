@@ -389,8 +389,8 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
         message: "Payroll accounts fixed",
         vouchersUpdated,
         accountsDeleted,
-        salaryAccountsReparented: (salReparent as any).rowCount ?? 0,
-        bonusAccountsReparented: (bonReparent as any).rowCount ?? 0,
+        salaryAccountsReparented: salReparent.rowCount ?? 0,
+        bonusAccountsReparented: bonReparent.rowCount ?? 0,
       });
     } catch (error: unknown) {
       logger.error("migrate-worker-names error:", { error: error });
@@ -454,8 +454,8 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
         message: "Salary groups migration complete",
         salaryGroupId: salaryGroup.id,
         bonusGroupId: bonusGroup.id,
-        salaryAccountsReparented: (salRes as any).rowCount ?? 0,
-        bonusAccountsReparented: (bonRes as any).rowCount ?? 0,
+        salaryAccountsReparented: salRes.rowCount ?? 0,
+        bonusAccountsReparented: bonRes.rowCount ?? 0,
       });
     } catch (error: unknown) {
       logger.error("migrate-salary-groups error:", { error: error });

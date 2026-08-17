@@ -133,25 +133,22 @@ export async function loadNetProfitData(companyId: number, toDate: string | null
         )
       )
       .then((r) =>
-        r.rows.map(
-          (row) =>
-            ({
-              id: row.id,
-              companyId: row.company_id,
-              code: row.code,
-              name: row.name,
-              accountType: row.account_type,
-              subType: row.sub_type,
-              openingBalance: row.opening_balance ?? "0",
-              openingBalanceSide: row.opening_balance_side ?? "Dr",
-              active: row.active,
-              isHidden: row.is_hidden,
-              parentId: row.parent_id,
-              deletedAt: row.deleted_at,
-              createdAt: row.created_at,
-              category: row.category,
-            }) as any
-        )
+        r.rows.map((row) => ({
+          id: row.id,
+          companyId: row.company_id,
+          code: row.code,
+          name: row.name,
+          accountType: row.account_type,
+          subType: row.sub_type,
+          openingBalance: row.opening_balance ?? "0",
+          openingBalanceSide: row.opening_balance_side ?? "Dr",
+          active: row.active,
+          isHidden: row.is_hidden,
+          parentId: row.parent_id,
+          deletedAt: row.deleted_at,
+          createdAt: row.created_at,
+          category: row.category,
+        }))
       ),
     storage.getParentCompanyId(),
     // 1. Ledger-account balances — account-company scoped (migrated-account rule)

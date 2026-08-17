@@ -121,7 +121,7 @@ export function registerLocationWhatsappLegacyCompatibilityRoutes(app: Express) 
         try {
           await logAudit({
             userId: req.session.userId!,
-            username: (req.session as any).username || "unknown",
+            username: req.session.username || "unknown",
             companyId,
             action: "update_location_whatsapp_group_legacy",
             tableName: "location_whatsapp_stock_reports",

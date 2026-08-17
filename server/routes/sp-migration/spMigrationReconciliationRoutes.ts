@@ -68,12 +68,12 @@ export function registerSpMigrationReconciliationRoutes(app: Express) {
           await db.execute(
             sql`SELECT COALESCE(SUM(quantity),0) AS q, COALESCE(SUM(quantity*average_rate),0) AS v FROM inventory WHERE company_id = ${sourceId}`
           )
-        ).rows[0] as any;
+        ).rows[0];
         const tgtStock = (
           await db.execute(
             sql`SELECT COALESCE(SUM(quantity),0) AS q, COALESCE(SUM(quantity*average_rate),0) AS v FROM inventory WHERE company_id = ${targetId}`
           )
-        ).rows[0] as any;
+        ).rows[0];
         areas.push({
           area: "Stock in hand",
           status: stockMismatches.length === 0 ? "PASS" : "WARN",
@@ -99,24 +99,24 @@ export function registerSpMigrationReconciliationRoutes(app: Express) {
           await db.execute(
             sql`SELECT COUNT(*) AS cnt FROM vouchers WHERE company_id = ${sourceId} AND voucher_type IN ('Sales','Sale') AND deleted_at IS NULL`
           )
-        ).rows[0] as any;
+        ).rows[0];
         const tgtSales = (
           await db.execute(
             sql`SELECT COUNT(*) AS cnt FROM vouchers WHERE company_id = ${targetId} AND source_module = 'SP_MIGRATION_READONLY' AND deleted_at IS NULL`
           )
-        ).rows[0] as any;
+        ).rows[0];
         const srcSaleItems = (
           await db.execute(sql`
           SELECT COUNT(*) AS cnt FROM sales_items si JOIN vouchers v ON v.id = si.voucher_id
           WHERE v.company_id = ${sourceId} AND v.voucher_type IN ('Sales','Sale') AND v.deleted_at IS NULL
         `)
-        ).rows[0] as any;
+        ).rows[0];
         const migratedSaleItems = (
           await db.execute(sql`
           SELECT COUNT(*) AS cnt FROM sales_items si JOIN vouchers v ON v.id = si.voucher_id
           WHERE v.company_id = ${targetId} AND v.source_module = 'SP_MIGRATION_READONLY' AND v.deleted_at IS NULL
         `)
-        ).rows[0] as any;
+        ).rows[0];
         const migratedVouchersWithoutItems = (
           await db.execute(sql`
           SELECT v.voucher_number FROM vouchers v
@@ -155,13 +155,13 @@ export function registerSpMigrationReconciliationRoutes(app: Express) {
         ).rows as any[];
         const srcContainers = (
           await db.execute(sql`SELECT COUNT(*) AS cnt FROM containers WHERE company_id = ${sourceId}`)
-        ).rows[0] as any;
+        ).rows[0];
         const tgtContainers = (
           await db.execute(sql`
           SELECT COUNT(*) AS cnt FROM sp_migration_source_links WHERE source_table = 'containers' AND target_table = 'sp_containers'
             AND run_id IN (SELECT id FROM sp_migration_rehearsal_runs WHERE source_company_id = ${sourceId} AND target_company_id = ${targetId})
         `)
-        ).rows[0] as any;
+        ).rows[0];
         areas.push({
           area: "Containers",
           status: unmigratedContainers.length === 0 ? "PASS" : "WARN",
@@ -267,7 +267,7 @@ export function registerSpMigrationReconciliationRoutes(app: Express) {
   // ── HARD GUARD: No cutover endpoint ─────────────────────────────────────
   // This explicitly blocks any attempt to POST to /api/sp/migration/cutover.
   // Phase 5 final migration is not implemented.
-  app.all("/api/sp/migration/cutover", requireAuth, (_req: any, res: any) => {
+  app.all("/api/sp/migration/cutover", requireAuth, (_req: unknown, res: import("express").Response) => {
     return res.status(403).json({
       message: "BLOCKED: Final production migration (cutover) is not available. Phase 5 is disabled.",
       code: "CUTOVER_DISABLED",

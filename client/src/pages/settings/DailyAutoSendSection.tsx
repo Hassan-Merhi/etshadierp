@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -45,7 +46,7 @@ export function DailyAutoSendSection() {
     mutationFn: (patch: Partial<{ dailyAutoSend: boolean; dailyRecipientId: number | null }>) =>
       apiRequest("PUT", "/api/whatsapp/settings", patch),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/settings"] }),
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const sendNow = useMutation({
@@ -53,7 +54,7 @@ export function DailyAutoSendSection() {
     onSuccess: (data: any) => {
       toast({ title: "Daily export sent", description: data?.message || "ZIP sent to WhatsApp group" });
     },
-    onError: (e: any) => toast({ title: "Send failed", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Send failed", description: e.message, variant: "destructive" }),
   });
 
   const isActive = !!(settings?.enabled && settings?.dailyAutoSend && settings?.dailyRecipientId);

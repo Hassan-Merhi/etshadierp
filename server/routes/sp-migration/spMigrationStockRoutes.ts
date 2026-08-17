@@ -188,7 +188,7 @@ export function registerSpMigrationStockRoutes(app: Express) {
               await db.execute(sql`
               SELECT id FROM locations WHERE company_id = ${targetId} AND code = 'UNASSIGNED' AND deleted_at IS NULL LIMIT 1
             `)
-            ).rows[0] as any;
+            ).rows[0];
             if (unassigned) {
               targetLocId = pn(unassigned.id);
             } else {
@@ -214,7 +214,7 @@ export function registerSpMigrationStockRoutes(app: Express) {
             WHERE company_id = ${targetId} AND stock_item_id = ${targetStockItemId} AND location_id = ${targetLocId}
               AND source_type = 'migration_opening_stock' LIMIT 1
           `)
-          ).rows[0] as any;
+          ).rows[0];
           if (already) {
             skipped++;
             continue;
@@ -228,7 +228,7 @@ export function registerSpMigrationStockRoutes(app: Express) {
             WHERE company_id = ${targetId} AND stock_item_id = ${targetStockItemId} AND location_id = ${targetLocId}
             LIMIT 1
           `)
-          ).rows[0] as any;
+          ).rows[0];
           if (existingInv && pn(existingInv.quantity) > 0) {
             mismatchedItems++;
             summary.push(
@@ -274,12 +274,12 @@ export function registerSpMigrationStockRoutes(app: Express) {
             await db.execute(sql`
             SELECT COALESCE(SUM(quantity), 0) AS q FROM inventory WHERE company_id = ${sourceId} AND location_id = ${srcLocId}
           `)
-          ).rows[0] as any;
+          ).rows[0];
           const tgtTotal = (
             await db.execute(sql`
             SELECT COALESCE(SUM(quantity), 0) AS q FROM inventory WHERE company_id = ${targetId} AND location_id = ${tgtLocId}
           `)
-          ).rows[0] as any;
+          ).rows[0];
           const locNameRow = sourceLocs.find((l) => pn(l.id) === srcLocId);
           perLocationRecon.push({
             location: locNameRow?.name ?? `location #${srcLocId}`,

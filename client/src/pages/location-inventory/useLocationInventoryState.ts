@@ -92,7 +92,7 @@ export function useLocationInventoryState({ companyId, toast }: UseLocationInven
   const openWaGroupDialog = (loc: Location, e?: { stopPropagation: () => void }) => {
     e?.stopPropagation();
     setWaGroupLocation(loc);
-    setWaGroupSelectedId((loc as any).whatsappGroupChatId ?? "");
+    setWaGroupSelectedId(loc.whatsappGroupChatId ?? "");
     setWaGroupSearch("");
     setWaGroupDialogOpen(true);
   };

@@ -23,10 +23,7 @@ export async function backfillEtaFromEvents(containerId: number): Promise<void> 
 
   if (latest?.eventTime) {
     const eta = new Date(latest.eventTime).toISOString().slice(0, 10);
-    await db
-      .update(containers)
-      .set({ eta, etaSource: "event" } as any)
-      .where(eq(containers.id, containerId));
+    await db.update(containers).set({ eta, etaSource: "event" }).where(eq(containers.id, containerId));
     logger.info(`[ContainerTracking] Backfilled ETA from stored events → ${eta} (container ${containerId})`);
   }
 }
@@ -47,7 +44,7 @@ export async function saveDirectEvents(containerId: number, result: CarrierTrack
           eventStatus: ev.status,
           eventLocation: ev.location,
           eventDescription: ev.description,
-          rawEventJson: { provider: result.provider, ...ev } as any,
+          rawEventJson: { provider: result.provider, ...ev },
         })
         .onConflictDoNothing();
     } catch (err: unknown) {
@@ -76,7 +73,7 @@ export async function saveParcelsAppEvents(containerId: number, shipment: Parcel
           eventStatus: ev.status,
           eventLocation: ev.location,
           eventDescription: ev.description,
-          rawEventJson: ev as any,
+          rawEventJson: ev,
         })
         .onConflictDoNothing();
     } catch (err: unknown) {
@@ -99,7 +96,7 @@ export async function saveTrackingCheck(
       status,
       checkedAt: new Date(),
       errorMessage,
-      rawResponseJson: rawResponse as any,
+      rawResponseJson: rawResponse,
     });
   } catch (err: unknown) {
     logger.warn("[ContainerTracking] Check record save warn:", { error: getErrorMessage(err) });

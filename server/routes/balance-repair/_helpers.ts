@@ -33,7 +33,7 @@ export async function findOrCreateLedgerAccount(
       companyId,
       code: `${code}-${Date.now()}`,
       name,
-      accountType: accountType as any,
+      accountType: accountType,
       subType: subType ?? null,
       active: true,
     })

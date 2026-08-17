@@ -18,7 +18,7 @@ export function registerFactoryMixBatchFinalizeDeleteRoutes(app: Express) {
   // ── Finalize a mix batch (mark as fully consumed/completed) ──
   app.post("/api/factory/mix-batches/:id/finalize", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
@@ -55,7 +55,7 @@ export function registerFactoryMixBatchFinalizeDeleteRoutes(app: Express) {
 
   app.delete("/api/factory/mix-batches/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
@@ -120,7 +120,7 @@ export function registerFactoryMixBatchFinalizeDeleteRoutes(app: Express) {
       if (!result) return res.status(404).json({ message: "Mix batch not found" });
       await logAudit({
         userId: req.session.userId!,
-        username: (req.session as any).username || req.session.userId!,
+        username: req.session.username || req.session.userId!,
         companyId,
         action: "delete",
         tableName: "factory_mix_batches",

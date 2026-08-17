@@ -21,7 +21,7 @@ export function registerFactoryContainerImportRoutes(app: Express) {
 
   app.post("/api/factory/containers/import-excel", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { rows } = req.body;
@@ -99,7 +99,7 @@ export function registerFactoryContainerImportRoutes(app: Express) {
             }
           }
 
-          await db.transaction(async (tx: any) => {
+          await db.transaction(async (tx) => {
             let supplierId: number | null = null;
             if (row.supplierName && row.supplierName.trim()) {
               const key = row.supplierName.toLowerCase().trim();

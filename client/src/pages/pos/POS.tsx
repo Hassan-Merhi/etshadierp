@@ -176,7 +176,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   // Supplier Partner companies too, same as normal ERP POS.
   useEffect(() => {
     if (editVoucherId) return;
-    const locCashId = (posSelectedLocation as any)?.cashAccountId;
+    const locCashId = posSelectedLocation?.cashAccountId;
     if (posUser && locCashId) {
       setPaymentAccountType("cash");
       setPaymentAccountId(String(locCashId));
@@ -730,7 +730,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         stockInventoryLoading={stockInventoryLoading}
         handleStockPrint={handleStockPrint}
         handleSendWhatsAppReport={handleSendWhatsAppReport}
-        stockInventory={(stockInventory as any[]).map((item: any) => ({
+        stockInventory={((stockInventory)).map((item) => ({
           stockItemName: item.stockItemName,
           stockItemCode: item.stockItemCode,
           stock: parseFloat(item.quantity),

@@ -26,7 +26,7 @@ export function registerRawStockRecalcRoutes(app: Express): void {
     if (typeof sqlText === "string" && UNDO_LOG_CREATE_TABLE_PATTERN.test(sqlText)) {
       return Promise.resolve({ rows: [], rowCount: 0, command: "SKIPPED_RUNTIME_DDL", fields: [] });
     }
-    return originalQuery.apply(pool, args as any);
+    return originalQuery.apply(pool, args);
   };
 
   try {

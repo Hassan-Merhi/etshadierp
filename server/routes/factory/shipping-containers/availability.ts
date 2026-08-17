@@ -52,7 +52,7 @@ export function registerShippingAvailabilityRoutes(app: Express) {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
       const { date, shippingCompany, availableContainers, note } = req.body;
-      const updates: Record<string, any> = {};
+      const updates: Record<string, unknown> = {};
       if (date !== undefined) updates.date = date;
       if (shippingCompany !== undefined) updates.shippingCompany = shippingCompany;
       if (availableContainers !== undefined) updates.availableContainers = Number(availableContainers);

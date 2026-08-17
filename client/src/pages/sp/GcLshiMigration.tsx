@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import {useState} from "react";
 import {useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
 import {apiRequest} from "@/lib/queryClient";
@@ -33,7 +34,7 @@ export default function GcLshiMigration() {
 
   // Account plan / rename state (Step 3 — before staged migration)
   const [accountEdits, setAccountEdits] = useState<Record<string, { code: string; name: string }>>({});
-  const [accountsCreated, setAccountsCreated] = useState(false);
+  const [_accountsCreated, setAccountsCreated] = useState(false);
 
   // Opening balance
   const [obAmount, setObAmount] = useState("");
@@ -147,7 +148,7 @@ export default function GcLshiMigration() {
       qc.invalidateQueries({ queryKey: ["/api/companies"] });
       setTargetCompanyId(result.company.id);
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const openingBalanceMutation = useMutation({
@@ -157,7 +158,7 @@ export default function GcLshiMigration() {
       toast({ title: "Opening balance created", description: `Voucher ${result.voucherNumber} for $${result.amount}` });
       setObAmount("");
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const createAccountsMutation = useMutation({
@@ -171,7 +172,7 @@ export default function GcLshiMigration() {
       setAccountsCreated(true);
       refetchAccountPlan();
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const rollbackMutation = useMutation({
@@ -182,7 +183,7 @@ export default function GcLshiMigration() {
       refetchRuns();
       refetchPreview();
     },
-    onError: (e: any) => toast({ title: "Rollback failed", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Rollback failed", description: e.message, variant: "destructive" }),
   });
 
   // ── Helpers ─────────────────────────────────────────────────────────────

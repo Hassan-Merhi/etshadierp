@@ -25,7 +25,7 @@ export function registerDispatchTruckRideRoutes(app: Express) {
       const batchId = parseId(req.params.id);
       if (batchId === null) return res.status(400).json({ message: "Invalid id" });
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         const [batch] = await tx
           .select()
           .from(customerDispatchBatches)

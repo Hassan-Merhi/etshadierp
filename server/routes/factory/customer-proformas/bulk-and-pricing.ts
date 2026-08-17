@@ -23,7 +23,7 @@ import { autoSavePriceToPriceList } from "./_helpers";
 export function registerFactoryCustomerProformaBulkPricingRoutes(app: Express) {
   app.post("/api/factory/customer-proformas/bulk", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { customerId, name, isActive, lines } = req.body;
@@ -42,7 +42,7 @@ export function registerFactoryCustomerProformaBulkPricingRoutes(app: Express) {
 
       const parsed = insertCustomerProformaSchema.parse({ companyId, customerId, name, isActive: isActive || false });
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         const [proforma] = await tx.insert(customerProformas).values(parsed).returning();
 
         const lineValues = validLines.map((l) => ({
@@ -81,7 +81,7 @@ export function registerFactoryCustomerProformaBulkPricingRoutes(app: Express) {
 
   app.put("/api/factory/customer-proformas/:id/replace-lines", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
@@ -105,7 +105,7 @@ export function registerFactoryCustomerProformaBulkPricingRoutes(app: Express) {
           .json({ message: "At least one line must have articleCode, productName, and quantity > 0" });
       }
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         await tx.delete(customerProformaLines).where(eq(customerProformaLines.proformaId, id));
         const lineValues = validLines.map((l) => ({
           proformaId: id,
@@ -135,7 +135,7 @@ export function registerFactoryCustomerProformaBulkPricingRoutes(app: Express) {
     requireAuth,
     async (req: Request, res: Response) => {
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 
         const id = parseId(req.params.id);
@@ -160,7 +160,7 @@ export function registerFactoryCustomerProformaBulkPricingRoutes(app: Express) {
         let skipped = 0;
         let fixed = 0;
         for (const line of lines) {
-          if ((line as any).priceFixed) {
+          if (line.priceFixed) {
             fixed++;
             continue;
           }
@@ -190,7 +190,7 @@ export function registerFactoryCustomerProformaBulkPricingRoutes(app: Express) {
     requireAuth,
     async (req: Request, res: Response) => {
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 
         const id = parseId(req.params.id);
@@ -214,7 +214,7 @@ export function registerFactoryCustomerProformaBulkPricingRoutes(app: Express) {
         let skipped = 0;
         let fixed = 0;
         for (const line of lines) {
-          if ((line as any).priceFixed) {
+          if (line.priceFixed) {
             fixed++;
             continue;
           }

@@ -35,8 +35,8 @@ export function normUsd(debit: string | number, credit: string | number) {
 }
 
 /** Prefer the factory-pinned company ID so cross-tab ERP company switches don't corrupt factory writes. */
-export function getFactoryCompanyId(req: any): number | undefined {
-  return (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+export function getFactoryCompanyId(req: import("express").Request): number | undefined {
+  return req.session.factoryCompanyId || req.session.currentCompanyId;
 }
 
 /** Write a single daybook entry (factory audit log). */
@@ -99,7 +99,7 @@ export async function findOrCreateLedger(
       .select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
       .from(ledgerAccounts)
       .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\\d+$'`));
-    const nextCode = String((parseInt((maxCodeRow as any)?.maxCode || "0") || 0) + 1 + attempt);
+    const nextCode = String((parseInt((maxCodeRow as { maxCode: string })?.maxCode || "0") || 0) + 1 + attempt);
     try {
       const insertVals: any = { companyId, code: nextCode, name, accountType, active: true, isHidden: false };
       if (opts?.parentId) insertVals.parentId = opts.parentId;

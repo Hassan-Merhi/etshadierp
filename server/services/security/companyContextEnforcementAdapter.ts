@@ -134,7 +134,7 @@ export function requireExplicitCompanyContext(options: CompanyContextOptions = {
     const assertions = assertionValues(req, fields);
     const requestPath = req.originalUrl?.split("?", 1)[0] || req.path || "/";
     const decision = decideRouteCompanyContext(
-      req.session as any,
+      req.session,
       requestPath,
       assertions,
       options.includeLegacyFactorySessionAssertion !== false
@@ -154,9 +154,9 @@ export function requireExplicitCompanyContext(options: CompanyContextOptions = {
     }
 
     if (isPinnedCompanyRoute(requestPath)) {
-      (req.session as any).factoryCompanyId = decision.companyId;
+      (req.session as { factoryCompanyId: unknown }).factoryCompanyId = decision.companyId;
     }
-    (req as any).securityCompanyId = decision.companyId;
+    (req as unknown as { securityCompanyId: number | null }).securityCompanyId = decision.companyId;
     next();
   };
 }

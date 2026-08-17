@@ -25,7 +25,7 @@ export function registerFactoryProductImportRoutes(app: Express) {
         try {
           if (err) return res.status(400).json({ message: getErrorMessage(err) });
 
-          const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+          const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
           if (!companyId) return res.status(400).json({ message: "No company selected" });
 
           if (!req.file) return res.status(400).json({ message: "No file uploaded" });
@@ -230,7 +230,7 @@ export function registerFactoryProductImportRoutes(app: Express) {
         try {
           if (err) return res.status(400).json({ message: getErrorMessage(err) });
 
-          const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+          const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
           if (!companyId) return res.status(400).json({ message: "No company selected" });
 
           if (!req.file) return res.status(400).json({ message: "No file uploaded" });
@@ -371,7 +371,7 @@ export function registerFactoryProductImportRoutes(app: Express) {
         try {
           if (err) return res.status(400).json({ message: getErrorMessage(err) });
 
-          const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+          const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
           if (!companyId) return res.status(400).json({ message: "No company selected" });
 
           if (!req.file) return res.status(400).json({ message: "No file uploaded" });

@@ -169,7 +169,7 @@ export default function BarcodeLookup() {
       setArticleResult(null);
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Not Found", description: error.message, variant: "destructive" });
       setReferenceResult(null);
     },
@@ -189,7 +189,7 @@ export default function BarcodeLookup() {
       setReferenceResult(null);
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Not Found", description: error.message, variant: "destructive" });
       setArticleResult(null);
     },
@@ -221,7 +221,7 @@ export default function BarcodeLookup() {
       toast({ title: "Scanned", description: "Label marked as scanned" });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -358,7 +358,7 @@ export default function BarcodeLookup() {
       toast({ title: "Bale returned to stock", description: `Bale removed from order.${invoiceMsg}` });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -385,7 +385,7 @@ export default function BarcodeLookup() {
       });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       setSwapPreview(null);
       toast({ title: "Lookup Failed", description: error.message, variant: "destructive" });
     },
@@ -424,7 +424,7 @@ export default function BarcodeLookup() {
       });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Swap Failed", description: error.message, variant: "destructive" });
     },
   });
@@ -446,7 +446,7 @@ export default function BarcodeLookup() {
       setSearchValue(ref);
       setTimeout(() => referenceLookup.mutate(ref), 0);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); 
 
   const handleSearch = () => {
     if (!searchValue.trim()) return;
@@ -549,19 +549,16 @@ export default function BarcodeLookup() {
                 <div className="flex items-center justify-between gap-3 px-4 py-3 border-b bg-muted/20 flex-wrap">
                   <div className="flex items-center gap-2">
                     <Package className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <span className="font-bold text-base">{(articleResult.product as any).name}</span>
-                    <Badge
-                      variant={(articleResult.product as any).active ? "default" : "secondary"}
-                      className="text-xs"
-                    >
-                      {(articleResult.product as any).active ? "Active" : "Inactive"}
+                    <span className="font-bold text-base">{articleResult.product.name}</span>
+                    <Badge variant={articleResult.product.active ? "default" : "secondary"} className="text-xs">
+                      {articleResult.product.active ? "Active" : "Inactive"}
                     </Badge>
                   </div>
                   <div className="flex items-center gap-4 text-sm">
                     <div>
                       <span className="text-xs text-muted-foreground uppercase tracking-wide mr-1.5">Article Code</span>
                       <span className="font-mono font-semibold">
-                        {(articleResult.product as any).articleCode || (articleResult.product as any).code}
+                        {articleResult.product.articleCode || articleResult.product.code}
                       </span>
                     </div>
                     <div>
@@ -616,7 +613,24 @@ export default function BarcodeLookup() {
                   </TableHeader>
                   <TableBody>
                     {articleResult.labelPrints.map((lp) => {
-                      const baleStatus = (lp as any).baleStatus as string | null;
+                      const baleStatus = (
+                        lp as unknown as {
+                          id: number;
+                          companyId: number;
+                          createdAt: Date;
+                          articleCode: string;
+                          productionBaleId: number | null;
+                          productId: number | null;
+                          referenceNumber: string;
+                          pieces: number;
+                          approxWeightKg: string;
+                          printedByUserId: string | null;
+                          printedAt: Date;
+                          scannedByUserId: string | null;
+                          scannedAt: Date | null;
+                          customerLogoId: number | null;
+                        } & { baleStatus: string | null }
+                      ).baleStatus as string | null;
                       const isDeleted = baleStatus === "DELETED" || baleStatus === "REMOVED";
                       return (
                         <TableRow
@@ -777,22 +791,39 @@ export default function BarcodeLookup() {
                         data-testid="text-ref-printed-at"
                       >
                         <Clock className="h-3 w-3" />
-                        {formatDateOnly(referenceResult.labelPrint.printedAt as any) ?? "N/A"}
+                        {formatDateOnly(
+                          referenceResult.labelPrint.printedAt as unknown as Date & (string | null | undefined)
+                        ) ?? "N/A"}
                       </p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Product Name</p>
                       <p className="font-semibold" data-testid="text-bale-product-name">
-                        {(referenceResult.baleInfo as any)?.productName ||
-                          (referenceResult.product as any)?.name ||
-                          "—"}
+                        {referenceResult.baleInfo?.productName || referenceResult.product?.name || "—"}
                       </p>
                       <p
                         className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1"
                         data-testid="text-ref-printed-by"
                       >
                         <User className="h-3 w-3" />
-                        {(referenceResult.labelPrint as any).printedByName ||
+                        {(
+                          referenceResult.labelPrint as unknown as {
+                            id: number;
+                            companyId: number;
+                            createdAt: Date;
+                            articleCode: string;
+                            productionBaleId: number | null;
+                            productId: number | null;
+                            referenceNumber: string;
+                            pieces: number;
+                            approxWeightKg: string;
+                            printedByUserId: string | null;
+                            printedAt: Date;
+                            scannedByUserId: string | null;
+                            scannedAt: Date | null;
+                            customerLogoId: number | null;
+                          } & { printedByName: React.ReactNode }
+                        ).printedByName ||
                           referenceResult.labelPrint.printedByUserId ||
                           "Unknown"}
                       </p>
@@ -800,7 +831,7 @@ export default function BarcodeLookup() {
                     <div>
                       <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Pieces</p>
                       <p className="font-mono font-semibold" data-testid="text-ref-pieces">
-                        {(referenceResult.labelPrint as any).pieces ?? 1}
+                        {referenceResult.labelPrint.pieces ?? 1}
                       </p>
                     </div>
                     {referenceResult.baleInfo?.workerName && (
@@ -840,7 +871,7 @@ export default function BarcodeLookup() {
                         </button>
                       ) : (
                         <span className="font-bold font-mono text-base">
-                          {smartNum((referenceResult.labelPrint as any).approxWeightKg)} KG
+                          {smartNum(referenceResult.labelPrint.approxWeightKg)} KG
                         </span>
                       )}
                     </div>
@@ -859,7 +890,10 @@ export default function BarcodeLookup() {
                     {referenceResult.labelPrint.scannedAt ? (
                       <div className="ml-auto flex items-center gap-1.5 text-sm text-muted-foreground">
                         <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        Scanned {formatDateOnly(referenceResult.labelPrint.scannedAt as any)}
+                        Scanned{" "}
+                        {formatDateOnly(
+                          referenceResult.labelPrint.scannedAt as unknown as Date & (string | null | undefined)
+                        )}
                       </div>
                     ) : (
                       <div className="ml-auto">
@@ -1195,18 +1229,15 @@ export default function BarcodeLookup() {
                         label="Article Code"
                         value={
                           <span className="font-mono font-semibold">
-                            {(referenceResult.product as any).articleCode || (referenceResult.product as any).code}
+                            {referenceResult.product.articleCode || referenceResult.product.code}
                           </span>
                         }
                       />
-                      <InfoRow label="Product Name" value={(referenceResult.product as any).name} />
+                      <InfoRow label="Product Name" value={referenceResult.product.name} />
                       <div>
                         <p className="text-sm text-muted-foreground">Status</p>
-                        <Badge
-                          variant={(referenceResult.product as any).active ? "default" : "secondary"}
-                          className="text-xs"
-                        >
-                          {(referenceResult.product as any).active ? "Active" : "Inactive"}
+                        <Badge variant={referenceResult.product.active ? "default" : "secondary"} className="text-xs">
+                          {referenceResult.product.active ? "Active" : "Inactive"}
                         </Badge>
                       </div>
                     </div>

@@ -52,11 +52,11 @@ export function registerFactoryMixBatchWhatsappRoutes(app: Express, requireAuth:
       }
       // Non-fatal: audit write must not block the WhatsApp confirmation response
       try {
-        const waCompanyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const waCompanyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (waCompanyId) {
           await logAudit({
             userId: req.session.userId!,
-            username: (req.session as any).username || req.session.userId!,
+            username: req.session.username || req.session.userId!,
             companyId: waCompanyId,
             action: "send_whatsapp",
             tableName: "reports",

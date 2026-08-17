@@ -394,7 +394,7 @@ export function SupplierPaymentFxDialogs({
                   fxConversionMutation.mutate({
                     ...fxConversionForm,
                     sourceType: fxSourceType,
-                  } as any);
+                  });
                 }, "Record FX Conversion")
               }
               disabled={

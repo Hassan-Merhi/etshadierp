@@ -33,8 +33,8 @@ const pendingRevisionSchema = z.object({
 });
 
 function errorStatus(error: unknown): number {
-  const code = String((error as any)?.code ?? "");
-  const message = String((error as any)?.message ?? "");
+  const code = String((error as { code: unknown })?.code ?? "");
+  const message = String((error as { message: unknown })?.message ?? "");
   if (
     code === "STOCK_TRANSFER_INSUFFICIENT_STOCK" ||
     code === "STOCK_TRANSFER_DESTINATION_STOCK_CONFLICT" ||
@@ -43,7 +43,11 @@ function errorStatus(error: unknown): number {
     return 409;
   }
   if (/different company|own source location/i.test(message)) return 403;
-  if (/required|positive|non-negative|different|missing|deleted|not found|not a stock transfer|inactive|no effective/i.test(message)) {
+  if (
+    /required|positive|non-negative|different|missing|deleted|not found|not a stock transfer|inactive|no effective/i.test(
+      message
+    )
+  ) {
     return 400;
   }
   return 500;
@@ -53,10 +57,13 @@ function sendError(res: Response, error: unknown, context: string) {
   const status = errorStatus(error);
   if (status === 500) logger.error(`[StockTransferRevisionLifecycle ${context}]`, { error: error });
   const payload: Record<string, unknown> = {
-    message: String((error as any)?.message ?? `Failed to ${context.toLowerCase()} stock transfer revision`),
+    message: String(
+      (error as { message: unknown })?.message ?? `Failed to ${context.toLowerCase()} stock transfer revision`
+    ),
   };
   for (const field of ["code", "stockItemId", "sourceLocationId", "requiredQuantity", "availableQuantity"]) {
-    if ((error as any)?.[field] !== undefined) payload[field] = (error as any)[field];
+    if ((error as { [key: string]: undefined })?.[field] !== undefined)
+      payload[field] = (error as { [key: string]: unknown })[field];
   }
   return res.status(status).json(payload);
 }
@@ -86,9 +93,7 @@ export function registerStockTransferRevisionLifecycleRoutes(app: Express) {
         const parsed = pendingRevisionSchema.parse(req.body);
         const role = req.user?.role ?? req.session.currentRole;
         const assignedLocationId =
-          role === "POS"
-            ? Number(req.user?.assignedLocationId ?? req.session.currentLocationId ?? 0) || null
-            : null;
+          role === "POS" ? Number(req.user?.assignedLocationId ?? req.session.currentLocationId ?? 0) || null : null;
         if (role === "POS" && !assignedLocationId) {
           return res.status(403).json({ message: "POS user has no assigned source location" });
         }
@@ -112,7 +117,7 @@ export function registerStockTransferRevisionLifecycleRoutes(app: Express) {
         try {
           await logAudit({
             userId,
-            username: (req.session as any).username || (req.user as any)?.username || "unknown",
+            username: req.session.username || req.user?.username || "unknown",
             companyId,
             action: "update",
             tableName: "stock_transfer_revisions",
@@ -161,7 +166,9 @@ export function registerStockTransferRevisionLifecycleRoutes(app: Express) {
               voucherDate: result.voucherDate,
             });
           } catch (error: unknown) {
-            logger.error("[RevisedTransferWA] Failed to send safe pending revision:", { error: getErrorMessage(error) });
+            logger.error("[RevisedTransferWA] Failed to send safe pending revision:", {
+              error: getErrorMessage(error),
+            });
           }
         });
       } catch (error) {
@@ -195,7 +202,7 @@ export function registerStockTransferRevisionLifecycleRoutes(app: Express) {
         try {
           await logAudit({
             userId: String(req.user?.id ?? req.session.userId ?? "unknown"),
-            username: (req.session as any).username || (req.user as any)?.username || "unknown",
+            username: req.session.username || req.user?.username || "unknown",
             companyId,
             action: "update",
             tableName: "stock_transfer_revisions",

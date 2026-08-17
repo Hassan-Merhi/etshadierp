@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -48,7 +49,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function IntercompanyRequests() {
-  const [, navigate] = useLocation();
+  const [, _navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -105,7 +106,7 @@ export default function IntercompanyRequests() {
       setSelectedAccountId("");
       setApproveDescription("");
     },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: ClientErrorLike) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const dismissMutation = useMutation({
@@ -119,7 +120,7 @@ export default function IntercompanyRequests() {
       setDismissDialogRequest(null);
       setDismissNote("");
     },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: ClientErrorLike) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   function handleApprove() {

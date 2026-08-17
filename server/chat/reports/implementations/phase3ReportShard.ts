@@ -349,7 +349,7 @@ async function runPhase3Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         };
         break;
       }
-      const acct3 = acctRows.rows[0] as any;
+      const acct3 = acctRows.rows[0];
       const txRows3 = await db.execute(sql`
         SELECT v.voucher_date, v.voucher_type, v.description,
           CAST(ve.debit_amount AS numeric) AS debit,
@@ -451,25 +451,11 @@ async function runPhase3Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         totKgPressed += kgPressed;
         totBales += bales;
         totWaste += waste;
-        return [
-          String(r.date).slice(0, 10),
-          fmtDec(kgIn),
-          fmtDec(kgPressed),
-          String(bales),
-          fmtDec(waste),
-          efficiency,
-        ];
+        return [String(r.date).slice(0, 10), fmtDec(kgIn), fmtDec(kgPressed), String(bales), fmtDec(waste), efficiency];
       });
       const avgEff = totKgIn > 0 ? ((totKgPressed / totKgIn) * 100).toFixed(1) + "%" : "—";
       if (tableRows2.length)
-        tableRows2.push([
-          "TOTAL",
-          fmtDec(totKgIn),
-          fmtDec(totKgPressed),
-          String(totBales),
-          fmtDec(totWaste),
-          avgEff,
-        ]);
+        tableRows2.push(["TOTAL", fmtDec(totKgIn), fmtDec(totKgPressed), String(totBales), fmtDec(totWaste), avgEff]);
       const stats3 = [
         { label: "Total Kg In", value: fmtDec(totKgIn) },
         { label: "Total Kg Pressed", value: fmtDec(totKgPressed) },

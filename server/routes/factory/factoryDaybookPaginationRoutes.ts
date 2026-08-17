@@ -87,7 +87,7 @@ async function deriveBaleStockEntryAmounts(rows: any[], companyId: number): Prom
           .select({
             id: factoryBaleProducts.id,
             articleCode: factoryBaleProducts.articleCode,
-            productionPrice: (factoryBaleProducts as any).productionPrice,
+            productionPrice: factoryBaleProducts.productionPrice,
           })
           .from(factoryBaleProducts)
           .where(
@@ -99,7 +99,7 @@ async function deriveBaleStockEntryAmounts(rows: any[], companyId: number): Prom
 
   const priceByProductId = new Map<number, number>();
   const priceByArticleCode = new Map<string, number>();
-  for (const product of products as any[]) {
+  for (const product of (products)) {
     const price = Number.parseFloat(product.productionPrice || "0") || 0;
     priceByProductId.set(product.id, price);
     if (product.articleCode) priceByArticleCode.set(product.articleCode, price);
@@ -128,7 +128,7 @@ export function registerFactoryDaybookPaginationRoutes(app: Express): void {
     if (!wantsPagination(req)) return next();
 
     try {
-      const session = req.session as any;
+      const session = req.session;
       const companyId = session.factoryCompanyId || session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 

@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { getErrorDetails } from "@shared/errorUtils";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -80,7 +81,7 @@ export function DailyExportSection() {
       qc.invalidateQueries({ queryKey: ["/api/export/recipients"] });
       toast({ title: "Recipient added" });
     },
-    onError: (e: any) => toast({ variant: "destructive", title: "Error", description: e.message }),
+    onError: (e: ClientErrorLike) => toast({ variant: "destructive", title: "Error", description: e.message }),
   });
 
   const removeRecipient = useMutation({
@@ -152,7 +153,7 @@ export function DailyExportSection() {
       const body: any = { mode };
       if (fromDate) body.fromDate = fromDate;
       if (toDate) body.toDate = toDate;
-      const result = (await (await apiRequest("POST", "/api/export/start", body)).json()) as any;
+      const result = await (await apiRequest("POST", "/api/export/start", body)).json();
       setActiveJobId(result.jobId);
       setActiveMode(mode);
       setProgressOpen(true);
@@ -187,7 +188,7 @@ export function DailyExportSection() {
       const body: any = {};
       if (fromDate) body.fromDate = fromDate;
       if (toDate) body.toDate = toDate;
-      const data = (await (await apiRequest("POST", "/api/daily-export/trigger-whatsapp", body)).json()) as any;
+      const data = await (await apiRequest("POST", "/api/daily-export/trigger-whatsapp", body)).json();
       toast({ title: "WhatsApp export started", description: data.message || "Building ZIP and sending." });
       [5, 20, 45, 75, 120].forEach((s) => setTimeout(() => refetchBackup(), s * 1000));
     } catch (e) {
@@ -202,7 +203,7 @@ export function DailyExportSection() {
     mutationFn: () => apiRequest("POST", "/api/whatsapp/send-net-position", { startDate: npStart, endDate: npEnd }),
     onSuccess: (data: any) =>
       toast({ title: "Sent via WhatsApp", description: data?.message || "Net position report sent" }),
-    onError: (e: any) => toast({ variant: "destructive", title: "Send failed", description: e.message }),
+    onError: (e: ClientErrorLike) => toast({ variant: "destructive", title: "Send failed", description: e.message }),
   });
 
   const downloadNpExcel = () => {

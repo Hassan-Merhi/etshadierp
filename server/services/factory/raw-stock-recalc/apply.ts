@@ -205,7 +205,7 @@ export async function applyRawStockRecalc(
       const alreadyCorrect = await isFullyCorrect(tx, containerId, next, container, rawStockRow);
       if (alreadyCorrect) {
         const receivedKg = parseFloat(container.actualReceivedKg || "0");
-        const usedKg = rawStockRow ? parseFloat((rawStockRow as any).usedKg || "0") : receivedKg;
+        const usedKg = rawStockRow ? parseFloat(rawStockRow.usedKg || "0") : receivedKg;
         const remainingKg = Math.max(0, receivedKg - usedKg);
         return {
           containerId,
@@ -249,7 +249,7 @@ export async function applyRawStockRecalc(
 
       // Determine fully-used before writing (for locked-rate decision)
       const receivedKg = parseFloat(container.actualReceivedKg || "0");
-      const usedKg = rawStockRow ? parseFloat((rawStockRow as any).usedKg || "0") : receivedKg;
+      const usedKg = rawStockRow ? parseFloat(rawStockRow.usedKg || "0") : receivedKg;
       const remainingKg = Math.max(0, receivedKg - usedKg);
       const fullyUsed = receivedKg > 0 && remainingKg === 0;
 
@@ -278,10 +278,10 @@ export async function applyRawStockRecalc(
         const [rsAfter] = await tx
           .select({ receivedKg: factoryRawStock.receivedKg, usedKg: factoryRawStock.usedKg })
           .from(factoryRawStock)
-          .where(eq(factoryRawStock.id, (rawStockRow as any).id));
+          .where(eq(factoryRawStock.id, rawStockRow.id));
         if (rsAfter) {
           const receivedBefore = new Decimal(rawStockRow.receivedKg || "0").toDecimalPlaces(3);
-          const usedBefore = new Decimal((rawStockRow as any).usedKg || "0").toDecimalPlaces(3);
+          const usedBefore = new Decimal(rawStockRow.usedKg || "0").toDecimalPlaces(3);
           const receivedAfter = new Decimal(rsAfter.receivedKg || "0").toDecimalPlaces(3);
           const usedAfter = new Decimal(rsAfter.usedKg || "0").toDecimalPlaces(3);
           if (!receivedBefore.equals(receivedAfter) || !usedBefore.equals(usedAfter)) {

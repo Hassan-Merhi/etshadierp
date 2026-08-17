@@ -7,16 +7,14 @@ import { eq, and, asc } from "drizzle-orm";
 import { z } from "zod";
 
 function getCompanyId(req: Request): number | null {
-  const s = (req as any).session;
+  const s = req.session;
   return s?.factoryCompanyId || s?.currentCompanyId || null;
 }
 
 const contactBodySchema = z.object({
   name: z.string().min(1, "Name is required"),
   role: z.string().optional().nullable(),
-  numbers: z
-    .array(z.object({ label: z.string(), number: z.string() }))
-    .default([]),
+  numbers: z.array(z.object({ label: z.string(), number: z.string() })).default([]),
   notes: z.string().optional().nullable(),
 });
 
@@ -93,9 +91,7 @@ export function registerFactoryContactRoutes(app: Express) {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
 
-      await db
-        .delete(factoryContacts)
-        .where(and(eq(factoryContacts.id, id), eq(factoryContacts.companyId, companyId)));
+      await db.delete(factoryContacts).where(and(eq(factoryContacts.id, id), eq(factoryContacts.companyId, companyId)));
 
       res.json({ ok: true });
     } catch (e: unknown) {

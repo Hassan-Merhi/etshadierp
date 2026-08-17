@@ -29,7 +29,7 @@ export function LinkDialog({
       setSelRowId(state.sourceRowId || "");
       setSelColId(state.sourceColId || "");
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  
   }, [state.open]);
 
   const srcSheet = sheets.find((s) => s.stableId === selSheetId);

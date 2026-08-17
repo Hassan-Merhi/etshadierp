@@ -27,7 +27,7 @@ export function registerFactoryFinancialSnapshotRoutes(app: Express) {
   // ─────────────────────────────────────────────────────────────────────────
   app.get("/api/factory/financial-snapshot", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
@@ -88,9 +88,9 @@ export function registerFactoryFinancialSnapshotRoutes(app: Express) {
           and(eq(factoryBales.companyId, companyId), inArray(factoryBales.status, ["IN_STOCK", "RESERVED_FOR_ORDER"]))
         );
 
-      const baleWeightTotal = parseFloat((baleAgg[0] as any)?.totalWeight || "0");
-      const baleCount = parseInt((baleAgg[0] as any)?.totalCount || "0");
-      const baleValueTotal = parseFloat((baleAgg[0] as any)?.totalValue || "0");
+      const baleWeightTotal = parseFloat(baleAgg[0]?.totalWeight || "0");
+      const baleCount = parseInt(baleAgg[0]?.totalCount || "0");
+      const baleValueTotal = parseFloat(baleAgg[0]?.totalValue || "0");
 
       // ── 4. Outstanding worker advances ────────────────────────────────────
       const advanceAgg = await db
@@ -101,8 +101,8 @@ export function registerFactoryFinancialSnapshotRoutes(app: Express) {
         .from(factoryWorkerAdvances)
         .where(and(eq(factoryWorkerAdvances.companyId, companyId), eq(factoryWorkerAdvances.fullyPaid, false)));
 
-      const outstandingAdvances = parseFloat((advanceAgg[0] as any)?.total || "0");
-      const advanceCount = parseInt((advanceAgg[0] as any)?.count || "0");
+      const outstandingAdvances = parseFloat(advanceAgg[0]?.total || "0");
+      const advanceCount = parseInt(advanceAgg[0]?.count || "0");
 
       // ── 5. Active worker count ────────────────────────────────────────────
       const workerAgg = await db
@@ -111,7 +111,7 @@ export function registerFactoryFinancialSnapshotRoutes(app: Express) {
         })
         .from(factoryWorkers)
         .where(and(eq(factoryWorkers.companyId, companyId), eq(factoryWorkers.active, true)));
-      const activeWorkerCount = parseInt((workerAgg[0] as any)?.total || "0");
+      const activeWorkerCount = parseInt(workerAgg[0]?.total || "0");
 
       // ── 6. Equity / Capital ledger accounts with balances ─────────────────
       const equityAccounts = await db

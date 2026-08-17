@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment, useRef } from "react";
+import { useState, useEffect, Fragment, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { hasAnyOpenDialog } from "@/hooks/use-escape-back";
@@ -38,7 +38,7 @@ interface StockGroupData {
   items: StockItemData[];
 }
 
-interface LocationSummaryResponse {
+interface _LocationSummaryResponse {
   stockGroups: StockGroupData[];
   grandTotals: Record<number, LocationData>;
   asOfDate: string;
@@ -125,7 +125,7 @@ export default function LocationSummary() {
         }
       }, 100);
     }
-  }, []);
+  }, [savedState]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(selectedLocationIds));
@@ -178,7 +178,7 @@ export default function LocationSummary() {
   const buildRowKey = (groupId: number | string, itemId?: number | string) =>
     itemId ? `${groupId}-item-${itemId}` : `group-${groupId}`;
 
-  const getAllRows = () => {
+  const getAllRows = useCallback(() => {
     if (!summaryData?.stockGroups?.length) return [];
     const rows: Array<{ key: string; groupId: number; itemId?: number; groupIndex: number; itemIndex?: number }> = [];
 
@@ -202,7 +202,7 @@ export default function LocationSummary() {
     });
 
     return rows;
-  };
+  }, [expandedGroups, hiddenRows, summaryData?.stockGroups]);
 
   // Immediate scroll function - called directly from keydown handler for faster response
   const scrollToRowImmediate = (rowKey: string) => {
@@ -226,7 +226,7 @@ export default function LocationSummary() {
     }
   };
 
-  const handleTableKeyDown = (e: KeyboardEvent) => {
+  const handleTableKeyDown = useCallback((e: KeyboardEvent) => {
     if (locationDialogOpen || !summaryData?.stockGroups?.length) return;
 
     const allRows = getAllRows();
@@ -303,22 +303,13 @@ export default function LocationSummary() {
       e.preventDefault();
       window.history.back();
     }
-  };
+  }, [getAllRows, locationDialogOpen, navigate, selectedLocationIndex, selectedLocations, selectedRowKey, summaryData, toast]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => handleTableKeyDown(e);
     window.addEventListener("keydown", handler, { capture: true });
     return () => window.removeEventListener("keydown", handler, { capture: true });
-  }, [
-    selectedRowKey,
-    summaryData,
-    expandedGroups,
-    locationDialogOpen,
-    selectedLocationIndex,
-    selectedLocations,
-    hiddenRows,
-    summaryData,
-  ]);
+  }, [selectedRowKey, summaryData, expandedGroups, locationDialogOpen, selectedLocationIndex, selectedLocations, hiddenRows, handleTableKeyDown]);
 
   useEffect(() => {
     if (!tableScrollContainer.current) return;
@@ -467,7 +458,7 @@ export default function LocationSummary() {
                   >
                     Particulars
                   </th>
-                  {selectedLocations.map((location, locIndex) => (
+                  {selectedLocations.map((location, _locIndex) => (
                     <th
                       key={location.id}
                       colSpan={3}
@@ -480,7 +471,7 @@ export default function LocationSummary() {
                   ))}
                 </tr>
                 <tr className="bg-muted/80">
-                  {selectedLocations.map((location, locIndex) => (
+                  {selectedLocations.map((location, _locIndex) => (
                     <Fragment key={`header-${location.id}`}>
                       <th
                         className="text-right py-1 px-2 font-medium border-b bg-muted/80"
@@ -687,7 +678,7 @@ export default function LocationSummary() {
                       <td className="py-1 px-2 border-r sticky left-0 bg-primary/10 text-primary z-10">
                         Grand Total (by Location)
                       </td>
-                      {selectedLocations.map((location, locIndex) => {
+                      {selectedLocations.map((location, _locIndex) => {
                         const data = summaryData.grandTotals[location.id] || { quantity: 0, rate: 0, value: 0 };
                         return (
                           <Fragment key={`grand-${location.id}`}>

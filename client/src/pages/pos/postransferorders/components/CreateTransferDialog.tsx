@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * CreateTransferDialog — extracted sub-component.
  *
@@ -50,7 +51,7 @@ export function CreateTransferDialog({
     enabled: !!sourceId && open,
   });
 
-  const addedIds = new Set(items.map((i) => i.stockItemId));
+  const addedIds = useMemo(() => new Set(items.map((i) => i.stockItemId)), [items]);
 
   const searchMatches = useMemo(() => {
     const s = itemSearch.toLowerCase().trim();
@@ -118,7 +119,7 @@ export function CreateTransferDialog({
       queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers/list"] });
       handleClose();
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });

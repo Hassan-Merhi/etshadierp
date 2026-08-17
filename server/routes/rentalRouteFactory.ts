@@ -54,7 +54,7 @@ export function registerRentalRoutes(
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       // Authentication stores the active role in currentRole. Keep the legacy
       // role fallback for older sessions while enforcing the same Admin/Developer gate.
-      const session = req.session as any;
+      const session = req.session;
       const userRole = session?.currentRole ?? session?.role;
       if (userRole !== "Admin" && userRole !== "Developer") {
         return res.status(403).json({ message: "Administrator or Developer role required" });

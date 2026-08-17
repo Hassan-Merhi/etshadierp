@@ -32,7 +32,7 @@ import { eq, and, sql, inArray } from "drizzle-orm";
 export function registerOrderFinalizeRoutes(app: Express) {
   app.post("/api/factory/customer-orders/:id/finalize", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseId(req.params.id);
@@ -287,7 +287,7 @@ export function registerOrderFinalizeRoutes(app: Express) {
         message: `Invoice ${result.invoiceNumber} finalized for ${result.customerName || "customer"}`,
         entityType: "customer_order",
         entityId: result.id,
-        triggeredByUserId: (req.session as any)?.userId ?? null,
+        triggeredByUserId: req.session?.userId ?? null,
         companyId: result.companyId ?? companyId,
       }).catch(() => {});
 
@@ -300,7 +300,7 @@ export function registerOrderFinalizeRoutes(app: Express) {
 
   app.get("/api/factory/customer-orders/:id/finalize-preview", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseId(req.params.id);

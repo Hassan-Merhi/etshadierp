@@ -395,11 +395,11 @@ export function deriveEstimatedDeliveryDate(shipment: ParcelsAppShipment): strin
     shipment.estimatedDeliveryDate,
     shipment.estimatedDelivery,
     shipment.eta,
-    (shipment as any).estimatedTimeOfArrival,
-    (shipment as any).scheduledArrival,
-    (shipment as any).plannedArrival,
-    (shipment as any).predictedETA,
-    (shipment as any).ETA,
+    (shipment as unknown as ParcelsAppShipment & { estimatedTimeOfArrival: unknown }).estimatedTimeOfArrival,
+    (shipment as unknown as ParcelsAppShipment & { scheduledArrival: unknown }).scheduledArrival,
+    (shipment as unknown as ParcelsAppShipment & { plannedArrival: unknown }).plannedArrival,
+    (shipment as unknown as ParcelsAppShipment & { predictedETA: unknown }).predictedETA,
+    (shipment as unknown as ParcelsAppShipment & { ETA: unknown }).ETA,
   ];
   for (const raw of topLevel) {
     const d = tryDate(raw);
@@ -455,7 +455,7 @@ export function deriveEstimatedDeliveryDate(shipment: ParcelsAppShipment): strin
   // It can also be a past actual-delivery date, so only use it when the date is
   // strictly in the future (> today).  This is the ONLY circumstance where we
   // use delivered_by — never for containers that have already been delivered.
-  const deliveredByRaw = (shipment as any).delivered_by as string | undefined;
+  const deliveredByRaw = shipment.delivered_by as string | undefined;
   if (deliveredByRaw) {
     const d = tryDate(deliveredByRaw);
     if (d && d > todayStr) {

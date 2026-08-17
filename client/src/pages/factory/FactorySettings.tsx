@@ -1,24 +1,41 @@
-import {useState, useEffect, useRef} from "react";
-import {useQuery, useMutation} from "@tanstack/react-query";
-import {queryClient} from "@/lib/queryClient";
-import {factoryApiRequest} from "@/lib/factoryApi";
-import {Card, CardContent, CardHeader, CardTitle, CardDescription} from "@/components/ui/card";
-import {Switch} from "@/components/ui/switch";
-import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
-import {Label} from "@/components/ui/label";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Loader2, Save, Search, ArrowRight, CheckCircle, Wrench, Upload, Download, WifiOff, ToggleRight, DollarSign, AlertTriangle, FileSpreadsheet, Images, MessageCircle} from "lucide-react";
-import {useToast} from "@/hooks/use-toast";
-import {OfflinePrepPanel} from "@/components/OfflinePrepPanel";
-import {ImportBalesTab} from "./bale-stock-entry/ImportBalesTab";
-import {PageHeader} from "@/components/PageHeader";
+import type { ClientErrorLike } from "@/lib/clientError";
+import { useState, useEffect, useRef } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
+import { factoryApiRequest } from "@/lib/factoryApi";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Loader2,
+  Save,
+  Search,
+  ArrowRight,
+  CheckCircle,
+  Wrench,
+  Upload,
+  Download,
+  WifiOff,
+  ToggleRight,
+  DollarSign,
+  AlertTriangle,
+  FileSpreadsheet,
+  Images,
+  MessageCircle,
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { OfflinePrepPanel } from "@/components/OfflinePrepPanel";
+import { ImportBalesTab } from "./bale-stock-entry/ImportBalesTab";
+import { PageHeader } from "@/components/PageHeader";
 
-import type {FactorySettingsData, Location, RenamePreviewItem, WaChat} from "./factorysettings/types";
-import {defaultSettings} from "./factorysettings/utils";
-import {RecalculateBaleCostsCard} from "./factorysettings/components/RecalculateBaleCostsCard";
-import {MigrateVoucherDescriptionsCard} from "./factorysettings/components/MigrateVoucherDescriptionsCard";
+import type { FactorySettingsData, Location, RenamePreviewItem, WaChat } from "./factorysettings/types";
+import { defaultSettings } from "./factorysettings/utils";
+import { RecalculateBaleCostsCard } from "./factorysettings/components/RecalculateBaleCostsCard";
+import { MigrateVoucherDescriptionsCard } from "./factorysettings/components/MigrateVoucherDescriptionsCard";
 export default function FactorySettings() {
   const { toast } = useToast();
   const { data: currentUser } = useQuery<{ role?: string }>({ queryKey: ["/api/auth/me"] });
@@ -273,7 +290,13 @@ export default function FactorySettings() {
   useEffect(() => {
     if (data) {
       setSettings({ ...defaultSettings, ...data });
-      setProdWaGroupId((data as any).productionWorkerMatrixWhatsappGroupId ?? "");
+      setProdWaGroupId(
+        (
+          data as unknown as FactorySettingsData & {
+            productionWorkerMatrixWhatsappGroupId: React.SetStateAction<string>;
+          }
+        ).productionWorkerMatrixWhatsappGroupId ?? ""
+      );
     }
   }, [data]);
 
@@ -323,7 +346,7 @@ export default function FactorySettings() {
       setWeeklyWaPickerOpen(false);
       toast({ title: "Saved", description: "Weekly report WhatsApp group updated." });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
@@ -349,7 +372,7 @@ export default function FactorySettings() {
       setProdWaPickerOpen(false);
       toast({ title: "Saved", description: "Production WhatsApp group updated." });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },

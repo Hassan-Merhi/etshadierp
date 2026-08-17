@@ -29,7 +29,7 @@ export function registerFactoryCustomerProformaLoadingRoutes(app: Express) {
   // Create a pending loading from a proforma — auto-adds matching bales from stock
   app.post("/api/factory/customer-proformas/:id/create-loading", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const proformaId = parseId(req.params.id);
@@ -72,7 +72,7 @@ export function registerFactoryCustomerProformaLoadingRoutes(app: Express) {
       );
       logger.info(`[create-loading] proformaId=${proformaId} companyId=${companyId}`);
       const alreadyLoadedMap = new Map<string, number>(
-        (resultRows(alreadyLoadedRaw) || (alreadyLoadedRaw as unknown as any[])).map((r: any) => [
+        (resultRows(alreadyLoadedRaw) || ((alreadyLoadedRaw as unknown))).map((r: any) => [
           r.articleCode,
           Number(r.loaded),
         ])
@@ -175,8 +175,8 @@ export function registerFactoryCustomerProformaLoadingRoutes(app: Express) {
         for (const bale of available) {
           const resolvedBaleName =
             proformaProductNameMap.get(bale.articleCode || "") || bale.productName || bale.articleCode || bale.baleCode;
-          const linePricingMode = (line as any).pricingMode ?? "per_bale";
-          const linePerKg = parseFloat(String((line as any).pricePerKg ?? "0"));
+          const linePricingMode = line.pricingMode ?? "per_bale";
+          const linePerKg = parseFloat(String(line.pricePerKg ?? "0"));
           let resolvedPriceUsed: string;
           if (linePricingMode === "per_kg" && linePerKg > 0) {
             const baleWt = parseFloat(String(bale.weightKg || "0"));

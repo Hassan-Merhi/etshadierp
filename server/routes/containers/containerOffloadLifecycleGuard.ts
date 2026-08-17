@@ -34,7 +34,7 @@ function uniquePositiveIds(values: unknown[]): number[] {
 }
 
 async function guardContainerOffload(req: Request, res: Response, next: NextFunction): Promise<void> {
-  const companyId = Number((req.session as any)?.currentCompanyId);
+  const companyId = Number(req.session?.currentCompanyId);
   if (!Number.isInteger(companyId) || companyId <= 0) {
     res.status(400).json({ message: "No company selected" });
     return;
@@ -84,10 +84,10 @@ async function guardContainerOffload(req: Request, res: Response, next: NextFunc
   };
 
   try {
-    const lockResult = await client.query<{ locked: boolean }>(
-      "SELECT pg_try_advisory_lock($1, $2) AS locked",
-      [companyId, containerId]
-    );
+    const lockResult = await client.query<{ locked: boolean }>("SELECT pg_try_advisory_lock($1, $2) AS locked", [
+      companyId,
+      containerId,
+    ]);
     if (!lockResult.rows[0]?.locked) {
       client.release();
       released = true;
@@ -219,9 +219,7 @@ async function guardContainerOffload(req: Request, res: Response, next: NextFunc
     }
 
     const ownFreightAccountIds = uniquePositiveIds(
-      purchaseOrders.rows
-        .filter((row) => row.freight_paid_by === "own")
-        .map((row) => row.freight_own_account_id)
+      purchaseOrders.rows.filter((row) => row.freight_paid_by === "own").map((row) => row.freight_own_account_id)
     );
     if (ownFreightAccountIds.length > 0) {
       const ownRows = await client.query<{ id: number }>(
@@ -269,9 +267,7 @@ async function guardContainerOffload(req: Request, res: Response, next: NextFunc
     }
 
     const parentFreightAccountIds = uniquePositiveIds(
-      purchaseOrders.rows
-        .filter((row) => row.freight_paid_by === "parent")
-        .map((row) => row.freight_parent_account_id)
+      purchaseOrders.rows.filter((row) => row.freight_paid_by === "parent").map((row) => row.freight_parent_account_id)
     );
     if (parentFreightAccountIds.length > 0) {
       const validCompanyIds = uniquePositiveIds([companyId, parentCompanyId]);

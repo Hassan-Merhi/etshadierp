@@ -28,7 +28,7 @@ import fs from "fs";
 export function registerFactoryCustomerProformaExportRoutes(app: Express) {
   app.get("/api/factory/customer-proformas/:id/export/excel", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
@@ -44,7 +44,7 @@ export function registerFactoryCustomerProformaExportRoutes(app: Express) {
 
       const [customer] = await db.select().from(customers).where(eq(customers.id, proforma.customerId));
       const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
-      const [settings] = await db
+      const [_settings] = await db
         .select()
         .from(companySettings)
         .where(eq(companySettings.companyId, companyId))
@@ -78,7 +78,7 @@ export function registerFactoryCustomerProformaExportRoutes(app: Express) {
 
       const { hideProformaPrice: hideSellingExcel } = await getExportPriceVisibility(req);
 
-      const baseCurrency = (company as any)?.baseCurrency || "USD";
+      const baseCurrency = company?.baseCurrency || "USD";
       const currencySymbolMap: Record<string, string> = {
         USD: "$ ",
         GBP: "£",
@@ -230,7 +230,7 @@ export function registerFactoryCustomerProformaExportRoutes(app: Express) {
 
   app.get("/api/factory/customer-proformas/:id/export/pdf", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
@@ -246,7 +246,7 @@ export function registerFactoryCustomerProformaExportRoutes(app: Express) {
 
       const [customer] = await db.select().from(customers).where(eq(customers.id, proforma.customerId));
       const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
-      const [settings] = await db
+      const [_settings] = await db
         .select()
         .from(companySettings)
         .where(eq(companySettings.companyId, companyId))
@@ -280,7 +280,7 @@ export function registerFactoryCustomerProformaExportRoutes(app: Express) {
 
       const { hideProformaPrice: hideSellingPdf } = await getExportPriceVisibility(req);
 
-      const baseCurrencyPdf = (company as any)?.baseCurrency || "USD";
+      const baseCurrencyPdf = company?.baseCurrency || "USD";
       const currencySymbolMapPdf: Record<string, string> = {
         USD: "$ ",
         GBP: "£",

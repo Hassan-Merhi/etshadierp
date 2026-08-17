@@ -35,7 +35,7 @@ export async function calculateNetPositionAsOf(
 ): Promise<NetPositionSnapshot> {
   const companyAccounts = await storage.getAllLedgerAccounts(companyId, true);
   const companyRow = await storage.getCompanyById(companyId);
-  const isSupplierPartner = (companyRow as any)?.companyType === "supplier_partner";
+  const isSupplierPartner = companyRow?.companyType === "supplier_partner";
 
   // Two separate aggregation queries — same rationale as the net-profit route:
   //
@@ -116,7 +116,7 @@ export async function calculateNetPositionAsOf(
   // For non-SP companies, the generic exclusion of internal sp_stock / sp_cost_clearing applies.
   const accountsForClassify = isSupplierPartner
     ? companyAccounts.filter(
-        (a: any) => a.accountType === "Cash" || a.subType === "sp_payable" || a.subType === "sp_hadi_intercompany"
+        (a) => a.accountType === "Cash" || a.subType === "sp_payable" || a.subType === "sp_hadi_intercompany"
       )
     : companyAccounts.filter((a) => a.subType !== "sp_stock" && a.subType !== "sp_cost_clearing");
   const classified = classifyNetPositionAccounts(accountsForClassify, accountBalances, {
@@ -181,8 +181,36 @@ export async function calculateNetPositionAsOf(
   let employeeAdvanceTotal = 0;
   let employeeLiabilityTotal = 0;
   for (const emp of companyEmployees) {
-    const opening = parseFloat((emp as any).openingBalance || "0");
-    const openingSide = (emp as any).openingBalanceSide === "Dr" ? 1 : -1;
+    const opening = parseFloat(emp.openingBalance || "0");
+    const openingSide =
+      (
+        emp as unknown as {
+          id: number;
+          companyId: number;
+          code: string;
+          firstName: string;
+          lastName: string;
+          email: string | null;
+          phone: string | null;
+          joinDate: string;
+          department: string | null;
+          employeeType: string;
+          monthlySalary: string;
+          openingBalance: string | null;
+          currentBalance: string;
+          totalDeposits: string;
+          totalWithdrawals: string;
+          active: boolean;
+          salesBonusPct: string | null;
+          salesBonusPctSourceCompanyId: number | null;
+          salesBonusPctLocationId: number | null;
+          balesBonusRate: string | null;
+          deletedAt: Date | null;
+          createdAt: Date;
+        } & { openingBalanceSide: "Dr" }
+      ).openingBalanceSide === "Dr"
+        ? 1
+        : -1;
     const signedOpening = opening * openingSide;
     const balance = employeeBalances.get(emp.id) || { debit: 0, credit: 0 };
     const netBalance = signedOpening + balance.debit - balance.credit;

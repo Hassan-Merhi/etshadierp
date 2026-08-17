@@ -250,7 +250,7 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
       const beforeJson = JSON.stringify(entry);
       const sourceType: string = meta.sourceType || entry.txType;
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         // ── 1. Update the specific source record ────────────────────────────────
         if (sourceType === "BASE_MATERIAL" || entry.txType === "OFFLOAD_RAW_STOCK") {
           // Editing base material cost: derive new ratePerKg from amount / actualKg
@@ -263,7 +263,11 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
             .set({ ratePerKg: String(newRate.toFixed(6)), currencyCode: ccy, updatedAt: new Date() })
             .where(eq(factoryContainers.id, containerId!));
         } else if (sourceType === "FREIGHT" || entry.txType === "FREIGHT") {
-          const ccy = newCurrencyCode || (container as any).freightCurrencyCode || container.currencyCode || "USD";
+          const ccy =
+            newCurrencyCode ||
+            (container as { freightCurrencyCode: unknown }).freightCurrencyCode ||
+            container.currencyCode ||
+            "USD";
           let fx: string;
           if (newFxRate) {
             fx = String(newFxRate); // fresh explicit request input — trust it even if it equals 1
@@ -385,7 +389,7 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
             const { fxRate: containerFx, looksSet: containerFxLooksSet } = resolveStoredFxRate(
               containerCcy,
               container.fxRateToUsd,
-              (container as any).fxRateConfirmed
+              (container as { fxRateConfirmed: boolean | undefined }).fxRateConfirmed
             );
             if (!containerFxLooksSet) throw new UnresolvedExchangeRateError(containerCcy);
             const totalUsd = containerCcy === "USD" ? totalCost : totalCost * containerFx;
@@ -518,7 +522,7 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
       const txTypeVal = voucherTxTypeMap[voucher.voucherType] || "JOURNAL";
       const today = getClientDate(req);
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         // 0. Read employee-linked entries BEFORE deletion so we can reverse balances
         const empEntries = await tx
           .select()

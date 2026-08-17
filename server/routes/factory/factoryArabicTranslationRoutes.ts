@@ -8,10 +8,7 @@ import { db } from "../../db";
 import { contentDisposition } from "../../lib/contentDisposition";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
-import {
-  requireActionAccess,
-  requireExportAccess,
-} from "../../lib/permissionMiddleware";
+import { requireActionAccess, requireExportAccess } from "../../lib/permissionMiddleware";
 import { writeAuditEvent } from "../../services/audit/auditService";
 import {
   createArabicTranslationErrorWorkbook,
@@ -26,8 +23,7 @@ import {
   type TranslationPreviewEnvelope,
 } from "../../services/factoryArabicTranslationWorkbook";
 
-const XLSX_MIME =
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const MAX_PREVIEW_RESPONSE_ROWS = 200;
 const AUDIT_BRANCH_SIZE = 100;
@@ -37,10 +33,7 @@ const upload = multer({
   limits: { fileSize: MAX_FILE_SIZE_BYTES, files: 1 },
   fileFilter: (_req, file, callback) => {
     const validExtension = file.originalname.toLowerCase().endsWith(".xlsx");
-    const validMime =
-      !file.mimetype ||
-      file.mimetype === XLSX_MIME ||
-      file.mimetype === "application/octet-stream";
+    const validMime = !file.mimetype || file.mimetype === XLSX_MIME || file.mimetype === "application/octet-stream";
     if (!validExtension || !validMime) {
       callback(new Error("Only .xlsx files are supported"));
       return;
@@ -61,11 +54,7 @@ class TranslationRouteError extends Error {
   }
 }
 
-function uploadArabicWorkbook(
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void {
+function uploadArabicWorkbook(req: Request, res: Response, next: NextFunction): void {
   receiveArabicWorkbook(req, res, (error: unknown) => {
     if (!error) {
       next();
@@ -80,7 +69,7 @@ function uploadArabicWorkbook(
 }
 
 function getFactoryCompanyId(req: Request): number | null {
-  const value = Number((req.session as any)?.factoryCompanyId);
+  const value = Number(req.session?.factoryCompanyId);
   return Number.isSafeInteger(value) && value > 0 ? value : null;
 }
 
@@ -99,8 +88,7 @@ function getUpload(req: Request): { buffer: Buffer; fileName: string } {
   }
   return {
     buffer: file.buffer,
-    fileName:
-      file.originalname.trim().slice(0, 255) || "factory-arabic-names.xlsx",
+    fileName: file.originalname.trim().slice(0, 255) || "factory-arabic-names.xlsx",
   };
 }
 
@@ -128,12 +116,7 @@ async function loadCatalog(
         isNull(factoryCategories.deletedAt)
       )
     )
-    .where(
-      and(
-        eq(factoryBaleProducts.companyId, companyId),
-        isNull(factoryBaleProducts.deletedAt)
-      )
-    )
+    .where(and(eq(factoryBaleProducts.companyId, companyId), isNull(factoryBaleProducts.deletedAt)))
     .orderBy(factoryBaleProducts.id);
 }
 
@@ -151,16 +134,12 @@ function previewSummary(preview: TranslationPreview) {
     blankOrInvalidArabicNames: preview.blankOrInvalidArabicNames,
     categoryConflicts: preview.categoryConflicts,
     blocked: preview.blocked,
-    rejectedRows: preview.rows.filter(
-      (row) => !["update", "unchanged"].includes(row.status)
-    ).length,
+    rejectedRows: preview.rows.filter((row) => !["update", "unchanged"].includes(row.status)).length,
   };
 }
 
 function previewForResponse(preview: TranslationPreviewEnvelope) {
-  const rejectedRows = preview.rows.filter(
-    (row) => !["update", "unchanged"].includes(row.status)
-  );
+  const rejectedRows = preview.rows.filter((row) => !["update", "unchanged"].includes(row.status));
   return {
     ...preview,
     rows: rejectedRows.slice(0, MAX_PREVIEW_RESPONSE_ROWS),
@@ -209,25 +188,16 @@ async function buildPreview(input: {
   });
 }
 
-function sendWorkbook(
-  res: Response,
-  workbook: Buffer,
-  fileName: string
-): Response {
+function sendWorkbook(res: Response, workbook: Buffer, fileName: string): Response {
   res.setHeader("Content-Type", XLSX_MIME);
-  res.setHeader(
-    "Content-Disposition",
-    contentDisposition(fileName, "attachment")
-  );
+  res.setHeader("Content-Disposition", contentDisposition(fileName, "attachment"));
   res.setHeader("Cache-Control", "private, no-store");
   return res.send(workbook);
 }
 
 function sendRouteError(res: Response, error: unknown): Response {
   if (error instanceof TranslationRouteError) {
-    return res
-      .status(error.status)
-      .json({ message: error.message, ...error.details });
+    return res.status(error.status).json({ message: error.message, ...error.details });
   }
   return res.status(400).json({ message: getErrorMessage(error) });
 }
@@ -257,19 +227,10 @@ export function registerFactoryArabicTranslationRoutes(app: Express) {
       try {
         const companyId = getFactoryCompanyId(req);
         if (!companyId) {
-          throw new TranslationRouteError(
-            403,
-            "Factory company access required"
-          );
+          throw new TranslationRouteError(403, "Factory company access required");
         }
-        const workbook = await createArabicTranslationTemplate(
-          await loadCatalog(companyId)
-        );
-        return sendWorkbook(
-          res,
-          workbook,
-          "factory-arabic-names-template.xlsx"
-        );
+        const workbook = await createArabicTranslationTemplate(await loadCatalog(companyId));
+        return sendWorkbook(res, workbook, "factory-arabic-names-template.xlsx");
       } catch (error) {
         logger.error("Failed to export Factory Arabic translation template", {
           error,
@@ -288,18 +249,13 @@ export function registerFactoryArabicTranslationRoutes(app: Express) {
       try {
         const companyId = getFactoryCompanyId(req);
         if (!companyId) {
-          throw new TranslationRouteError(
-            403,
-            "Factory company access required"
-          );
+          throw new TranslationRouteError(403, "Factory company access required");
         }
         const { buffer } = getUpload(req);
         const preview = await buildPreview({
           companyId,
           buffer,
-          mode: getImportMode(
-            (req.body as Record<string, unknown> | undefined)?.mode
-          ),
+          mode: getImportMode((req.body as Record<string, unknown> | undefined)?.mode),
         });
         return res.json(previewForResponse(preview));
       } catch (error) {
@@ -318,18 +274,13 @@ export function registerFactoryArabicTranslationRoutes(app: Express) {
       try {
         const companyId = getFactoryCompanyId(req);
         if (!companyId) {
-          throw new TranslationRouteError(
-            403,
-            "Factory company access required"
-          );
+          throw new TranslationRouteError(403, "Factory company access required");
         }
         const { buffer } = getUpload(req);
         const preview = await buildPreview({
           companyId,
           buffer,
-          mode: getImportMode(
-            (req.body as Record<string, unknown> | undefined)?.mode
-          ),
+          mode: getImportMode((req.body as Record<string, unknown> | undefined)?.mode),
         });
         return sendWorkbook(
           res,
@@ -351,21 +302,14 @@ export function registerFactoryArabicTranslationRoutes(app: Express) {
       try {
         const companyId = getFactoryCompanyId(req);
         if (!companyId) {
-          throw new TranslationRouteError(
-            403,
-            "Factory company access required"
-          );
+          throw new TranslationRouteError(403, "Factory company access required");
         }
         const { buffer, fileName } = getUpload(req);
         const body = (req.body ?? {}) as Record<string, unknown>;
         const mode = getImportMode(body.mode);
-        const suppliedPreviewToken =
-          typeof body.previewToken === "string" ? body.previewToken.trim() : "";
+        const suppliedPreviewToken = typeof body.previewToken === "string" ? body.previewToken.trim() : "";
         if (!suppliedPreviewToken) {
-          throw new TranslationRouteError(
-            400,
-            "Preview the workbook before applying it"
-          );
+          throw new TranslationRouteError(400, "Preview the workbook before applying it");
         }
 
         const result = await db.transaction(
@@ -447,15 +391,8 @@ export function registerFactoryArabicTranslationRoutes(app: Express) {
                 changedProductIds.push(updatedProduct.id);
               }
 
-              if (
-                row.categoryId &&
-                row.changes.categoryNameAr &&
-                row.targetCategoryNameAr
-              ) {
-                categoryTargets.set(
-                  row.categoryId,
-                  row.targetCategoryNameAr
-                );
+              if (row.categoryId && row.changes.categoryNameAr && row.targetCategoryNameAr) {
+                categoryTargets.set(row.categoryId, row.targetCategoryNameAr);
               }
             }
 
@@ -472,10 +409,7 @@ export function registerFactoryArabicTranslationRoutes(app: Express) {
                 )
                 .returning({ id: factoryCategories.id });
               if (!updatedCategory) {
-                throw new TranslationRouteError(
-                  409,
-                  `Category ${categoryId} changed during import. Preview again.`
-                );
+                throw new TranslationRouteError(409, `Category ${categoryId} changed during import. Preview again.`);
               }
               changedCategoryIds.push(updatedCategory.id);
             }
@@ -490,7 +424,7 @@ export function registerFactoryArabicTranslationRoutes(app: Express) {
               ...previewSummary(preview),
               changedProductIds: uniqueProductIds,
               changedCategoryIds: uniqueCategoryIds,
-              appliedByUserId: String((req.session as any).userId),
+              appliedByUserId: String(req.session.userId),
               companyId,
             };
             const auditSummary = {
@@ -501,12 +435,8 @@ export function registerFactoryArabicTranslationRoutes(app: Express) {
 
             await writeAuditEvent(
               {
-                userId: String((req.session as any).userId ?? ""),
-                username: String(
-                  (req.session as any).username ??
-                    (req.session as any).userId ??
-                    "unknown"
-                ),
+                userId: String(req.session.userId ?? ""),
+                username: String(req.session.username ?? req.session.userId ?? "unknown"),
                 companyId,
                 action: "import",
                 tableName: "factory_bale_products",
@@ -515,7 +445,7 @@ export function registerFactoryArabicTranslationRoutes(app: Express) {
                   arabicTranslationImport: { new: auditSummary },
                 },
               },
-              tx as any
+              tx
             );
 
             return summary;

@@ -17,7 +17,7 @@ import { adjustInventory } from "../../../inventoryHelper";
 export function registerAdminRepairMiscRoutes(app: Express) {
   app.post("/api/vouchers/:id/finalize", requireAuth, requireNonPOS, async (req, res) => {
     try {
-      const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
+      const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const voucherId = parseInt(req.params.id);

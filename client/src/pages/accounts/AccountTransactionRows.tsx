@@ -6,7 +6,7 @@ export interface AccountTransactionRowsProps {
   selectedVoucherIds: Set<number>;
   toggleSelectAll: () => void;
   toggleVoucherSelection: (id: number) => void;
-  handleOpenVoucher: (v: any) => void;
+  handleOpenVoucher: (v: unknown) => void;
   formatAmount: (amt: number) => string;
   hideBalances: boolean;
   appMode: string;

@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useEffect, Fragment, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -334,7 +335,7 @@ export default function StockTransferOrder() {
     } catch {
       // Storage is unavailable in private mode and can throw on quota; the value is a convenience, not state we need.
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, []);
 
   // Autosave debounce effect (new transfers only)
@@ -1018,7 +1019,7 @@ export default function StockTransferOrder() {
         navigate("/daybook");
       }
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Error",

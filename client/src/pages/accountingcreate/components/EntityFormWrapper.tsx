@@ -1,24 +1,25 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * EntityFormWrapper — extracted sub-component.
  *
  * Extracted from AccountingCreate.tsx during the Phase 4 god-file split.
  */
-import {useForm} from "react-hook-form";
-import {zodResolver} from "@hookform/resolvers/zod";
-import {useToast} from "@/hooks/use-toast";
-import {useMutation} from "@tanstack/react-query";
-import {queryClient} from "@/lib/queryClient";
-import {useAppMode} from "@/contexts/AppModeContext";
-import {getApiRequest} from "@/lib/factoryApi";
-import {useCompany} from "@/contexts/CompanyContext";
-import type {EntityType} from "../types";
-import {entityConfig, getDefaultValues} from "../utils";
-import {LocationForm} from "./LocationForm";
-import {LedgerAccountForm} from "./LedgerAccountForm";
-import {EmployeeForm} from "./EmployeeForm";
-import {SupplierForm} from "./SupplierForm";
-import {StockGroupForm} from "./StockGroupForm";
-import {StockItemForm} from "./StockItemForm";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useToast } from "@/hooks/use-toast";
+import { useMutation } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
+import { useCompany } from "@/contexts/CompanyContext";
+import type { EntityType } from "../types";
+import { entityConfig, getDefaultValues } from "../utils";
+import { LocationForm } from "./LocationForm";
+import { LedgerAccountForm } from "./LedgerAccountForm";
+import { EmployeeForm } from "./EmployeeForm";
+import { SupplierForm } from "./SupplierForm";
+import { StockGroupForm } from "./StockGroupForm";
+import { StockItemForm } from "./StockItemForm";
 
 export // Wrapper component to properly recreate form when entity changes
 function EntityFormWrapper({
@@ -79,8 +80,8 @@ function EntityFormWrapper({
       form.reset(getDefaultValues(entityType) as any);
       onCreated?.();
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message || "Failed to create record",

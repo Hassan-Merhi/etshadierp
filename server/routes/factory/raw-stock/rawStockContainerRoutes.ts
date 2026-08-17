@@ -59,7 +59,7 @@ async function resolvePostOffloadChargeFx(opts: {
   }
   // Third currency — fetch independently
   const fetched = await getOrFetchFxRateToUsd(companyId, chargeCcy, txDate);
-  const rate = parseFloat(fetched as any);
+  const rate = parseFloat(fetched);
   if (!rate || rate <= 0) {
     throw new Error(
       `Cannot resolve FX rate for charge currency ${chargeCcy} on ${txDate}. Add an FX rate for this currency first.`
@@ -71,14 +71,14 @@ async function resolvePostOffloadChargeFx(opts: {
 export function registerRawStockContainerRoutes(app: Express) {
   app.patch("/api/factory/containers/:id/confirm-duty", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const containerId = parseId(req.params.id);
 
       if (containerId === null) return res.status(400).json({ message: "Invalid id" });
       const { dutyAmount, dutyNotes } = req.body;
-      const userId = String((req.session as any).userId || (req.user as any)?.id || "system");
+      const userId = String(req.session.userId || req.user?.id || "system");
 
       if (!dutyAmount || parseFloat(dutyAmount) <= 0) {
         return res.status(400).json({ message: "Valid duty amount is required" });
@@ -102,7 +102,7 @@ export function registerRawStockContainerRoutes(app: Express) {
       // offload mutations from racing this route. All financial writes (duty fields,
       // financials, cascade, daybook) are inside one transaction — a partial failure
       // rolls everything back.
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         // 1. Lock container FOR UPDATE — authoritative source for all reads below.
         const [lockedContainer] = await tx
           .select()
@@ -147,7 +147,7 @@ export function registerRawStockContainerRoutes(app: Express) {
         };
 
         // 4. Compute new inclusive landed cost — pure computation, no db calls.
-        const next = computeCorrectContainerCost(containerSnapshot as any, additionalChargesRows, commissionRecord);
+        const next = computeCorrectContainerCost(containerSnapshot, additionalChargesRows, commissionRecord);
         if (next.fxUnresolved) {
           throw Object.assign(
             new Error(new UnresolvedExchangeRateError(lockedContainer.currencyCode || "USD").message),
@@ -193,8 +193,8 @@ export function registerRawStockContainerRoutes(app: Express) {
         // 8. Daybook entry for the duty confirmation.
         const { fxRate } = resolveStoredFxRate(
           lockedContainer.currencyCode,
-          (lockedContainer as any).fxRateToUsdOffload || lockedContainer.fxRateToUsd,
-          (lockedContainer as any).fxRateConfirmed
+          lockedContainer.fxRateToUsdOffload || lockedContainer.fxRateToUsd,
+          lockedContainer.fxRateConfirmed
         );
         const today = req.body.txDate || getClientDate(req);
         await writeDaybookEntry(tx, {
@@ -213,14 +213,14 @@ export function registerRawStockContainerRoutes(app: Express) {
       res.json({ message: "Duty confirmed and costs recalculated", newCostPerKg: resultCostPerKg });
     } catch (error: unknown) {
       logger.error("Error confirming duty:", { error: error });
-      res.status((error as any).status || 500).json({ message: getErrorMessage(error) });
+      res.status((error as { status: number }).status || 500).json({ message: getErrorMessage(error) });
     }
   });
 
   // ── Post-offload charges: add duties/charges after a container has been offloaded ──
   app.post("/api/factory/containers/:id/post-offload-charges", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const containerId = parseId(req.params.id);
       if (containerId === null) return res.status(400).json({ message: "Invalid id" });
@@ -248,8 +248,8 @@ export function registerRawStockContainerRoutes(app: Express) {
       const containerCcy = container.currencyCode || "USD";
       const { fxRate: containerFxRate, looksSet: pocFxLooksSet } = resolveStoredFxRate(
         containerCcy,
-        (container as any).fxRateToUsdOffload || container.fxRateToUsd,
-        (container as any).fxRateConfirmed
+        container.fxRateToUsdOffload || container.fxRateToUsd,
+        container.fxRateConfirmed
       );
       if (!pocFxLooksSet) {
         return res.status(400).json({ message: new UnresolvedExchangeRateError(containerCcy).message });
@@ -269,7 +269,7 @@ export function registerRawStockContainerRoutes(app: Express) {
         });
       }
 
-      const userId = String((req.session as any).userId || (req.user as any)?.id || "system");
+      const userId = String(req.session.userId || req.user?.id || "system");
 
       // Resolve FX and accounting context BEFORE transaction (may call external APIs)
       const resolvedChargeInputs: Array<{
@@ -287,8 +287,8 @@ export function registerRawStockContainerRoutes(app: Express) {
             chargeCcy,
             containerCcy,
             containerFxRate,
-            containerFxRateDateOffload: (container as any).fxRateDateOffload || null,
-            containerFxConfirmed: !!(container as any).fxRateConfirmed,
+            containerFxRateDateOffload: container.fxRateDateOffload || null,
+            containerFxConfirmed: !!container.fxRateConfirmed,
             txDate,
             companyId,
           });
@@ -322,8 +322,8 @@ export function registerRawStockContainerRoutes(app: Express) {
         resolvedChargeInputs.push({ ...fxResolved, accountingCtx: acctCtx });
       }
 
-      const oldContainerCostPerKgUsd = parseFloat((container as any).ratePerKgUsd || "0");
-      const oldContainerTotalUsd = parseFloat((container as any).finalPayableAmountUsd || "0");
+      const oldContainerCostPerKgUsd = parseFloat(container.ratePerKgUsd || "0");
+      const oldContainerTotalUsd = parseFloat(container.finalPayableAmountUsd || "0");
 
       let lastResult: any = null;
       const allCascadeResults: any[] = [];
@@ -418,7 +418,7 @@ export function registerRawStockContainerRoutes(app: Express) {
   // Returns charge history (active + undone) for a container, newest first.
   app.get("/api/factory/containers/:id/post-offload-charges", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const containerId = parseId(req.params.id);
       if (containerId === null) return res.status(400).json({ message: "Invalid id" });
@@ -449,7 +449,7 @@ export function registerRawStockContainerRoutes(app: Express) {
     requireRole(...ADMIN_ROLES),
     async (req: Request, res: Response) => {
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
         const containerId = parseId(req.params.id);
         const chargeId = parseId(req.params.chargeId);
@@ -481,8 +481,8 @@ export function registerRawStockContainerRoutes(app: Express) {
         const chargeCcy = currencyCode || "USD";
         const { fxRate: containerFxRate, looksSet: pocFxLooksSet } = resolveStoredFxRate(
           containerCcy,
-          (container as any).fxRateToUsdOffload || container.fxRateToUsd,
-          (container as any).fxRateConfirmed
+          container.fxRateToUsdOffload || container.fxRateToUsd,
+          container.fxRateConfirmed
         );
         if (!pocFxLooksSet) {
           return res.status(400).json({ message: new UnresolvedExchangeRateError(containerCcy).message });
@@ -495,8 +495,8 @@ export function registerRawStockContainerRoutes(app: Express) {
             chargeCcy,
             containerCcy,
             containerFxRate,
-            containerFxRateDateOffload: (container as any).fxRateDateOffload || null,
-            containerFxConfirmed: !!(container as any).fxRateConfirmed,
+            containerFxRateDateOffload: container.fxRateDateOffload || null,
+            containerFxConfirmed: !!container.fxRateConfirmed,
             txDate,
             companyId,
           });
@@ -527,7 +527,7 @@ export function registerRawStockContainerRoutes(app: Express) {
           acctCtx = { voucherCompanyId: companyId, chargesPayableAcctId: cpAcctId };
         }
 
-        const userId = String((req.session as any).userId || (req.user as any)?.id || "system");
+        const userId = String(req.session.userId || req.user?.id || "system");
         let mutResult: any;
 
         try {
@@ -592,7 +592,7 @@ export function registerRawStockContainerRoutes(app: Express) {
     requireRole(...ADMIN_ROLES),
     async (req: Request, res: Response) => {
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
         const containerId = parseId(req.params.id);
         const chargeId = parseId(req.params.chargeId);
@@ -607,7 +607,7 @@ export function registerRawStockContainerRoutes(app: Express) {
         if (!container) return res.status(404).json({ message: "Container not found" });
 
         const txDate = undoDate || getClientDate(req);
-        const userId = String((req.session as any).userId || (req.user as any)?.id || "system");
+        const userId = String(req.session.userId || req.user?.id || "system");
         let mutResult: any;
 
         try {
@@ -665,7 +665,7 @@ export function registerRawStockContainerRoutes(app: Express) {
     requireRole(...ADMIN_ROLES),
     async (req: Request, res: Response) => {
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
         const containerId = parseId(req.params.id);
         const chargeId = parseId(req.params.chargeId);
@@ -682,7 +682,7 @@ export function registerRawStockContainerRoutes(app: Express) {
           .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)));
         if (!container) return res.status(404).json({ message: "Container not found" });
 
-        const userId = String((req.session as any).userId || (req.user as any)?.id || "system");
+        const userId = String(req.session.userId || req.user?.id || "system");
         let mutResult: any;
 
         try {
@@ -719,7 +719,7 @@ export function registerRawStockContainerRoutes(app: Express) {
 
   app.get("/api/factory/containers/:id/duty-audit-log", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const containerId = parseId(req.params.id);
@@ -740,7 +740,7 @@ export function registerRawStockContainerRoutes(app: Express) {
 
   app.get("/api/factory/container-commissions/:containerId", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const containerId = parseId(req.params.containerId);

@@ -28,7 +28,7 @@ interface ValidationResult {
   validationType: string;
   file1Name: string | null;
   file2Name: string | null;
-  summary: Record<string, any>;
+  summary: Record<string, unknown>;
   errors: ValidationItem[];
   warnings: ValidationItem[];
   suggestedFixes: SuggestedFix[];
@@ -37,11 +37,11 @@ interface ValidationResult {
 
 // ─── File parsing ─────────────────────────────────────────────────────────────
 
-async function parseFile(buffer: Buffer, originalName: string): Promise<Record<string, any>[]> {
+async function parseFile(buffer: Buffer, originalName: string): Promise<Record<string, unknown>[]> {
   const ext = originalName.split(".").pop()?.toLowerCase() ?? "";
   if (ext === "csv") {
     const text = buffer.toString("utf-8");
-    const result = Papa.parse<Record<string, any>>(text, {
+    const result = Papa.parse<Record<string, unknown>>(text, {
       header: true,
       skipEmptyLines: true,
       transformHeader: (h: string) => h.trim(),
@@ -83,7 +83,7 @@ const NAME_HEADERS = [
   "stock item",
 ];
 
-function detectColumn(rows: Record<string, any>[], candidates: string[]): string | null {
+function detectColumn(rows: Record<string, unknown>[], candidates: string[]): string | null {
   if (!rows.length) return null;
   const keys = Object.keys(rows[0]);
   for (const candidate of candidates) {
@@ -138,7 +138,7 @@ function normalizeName(raw: string): string {
 
 async function runItemCodeCheck(
   companyId: number,
-  rows: Record<string, any>[],
+  rows: Record<string, unknown>[],
   file1Name: string
 ): Promise<ValidationResult> {
   const codeCol = detectColumn(rows, CODE_HEADERS);
@@ -183,7 +183,7 @@ async function runItemCodeCheck(
   const errors: ValidationItem[] = [];
   const warnings: ValidationItem[] = [];
   const suggestedFixes: SuggestedFix[] = [];
-  const cleanedRows: Record<string, any>[] = [];
+  const cleanedRows: Record<string, unknown>[] = [];
 
   let found = 0,
     missing = 0,
@@ -284,7 +284,7 @@ async function runItemCodeCheck(
 
 async function runDuplicateNameCheck(
   _companyId: number,
-  rows: Record<string, any>[],
+  rows: Record<string, unknown>[],
   file1Name: string
 ): Promise<ValidationResult> {
   const nameCol = detectColumn(rows, NAME_HEADERS);
@@ -314,7 +314,7 @@ async function runDuplicateNameCheck(
   const errors: ValidationItem[] = [];
   const warnings: ValidationItem[] = [];
   const suggestedFixes: SuggestedFix[] = [];
-  const cleanedRows: Record<string, any>[] = [];
+  const cleanedRows: Record<string, unknown>[] = [];
   let duplicateGroups = 0;
   let duplicateItems = 0;
 

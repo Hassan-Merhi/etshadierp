@@ -17,7 +17,7 @@ import {
  * table. Prefer the actively selected ERP company; factoryCompanyId can remain
  * populated from a previous factory-mode session and must not override it here.
  */
-function resolveErpContainerCompanyId(req: any): number | null {
+function resolveErpContainerCompanyId(req: import("express").Request): number | null {
   const raw = req.session?.currentCompanyId || req.session?.factoryCompanyId;
   const companyId = Number(raw);
   return Number.isInteger(companyId) && companyId > 0 ? companyId : null;
@@ -59,7 +59,7 @@ export function registerFactoryContainerReadAccessRoutes(app: Express) {
         .where(and(eq(containerDocuments.containerId, containerId), eq(containerDocuments.companyId, companyId)));
       const docTypes = await db.select().from(containerDocumentTypes).orderBy(containerDocumentTypes.label);
       const requiredTypes = docTypes.filter(
-        (docType: any) => docType.isRequired && (docType.companyId == null || docType.companyId === companyId)
+        (docType) => docType.isRequired && (docType.companyId == null || docType.companyId === companyId)
       );
       const uploadedTypeIds = new Set(rawDocs.map((doc) => doc.docTypeId));
 
@@ -111,7 +111,7 @@ export function registerFactoryContainerReadAccessRoutes(app: Express) {
           )
         );
 
-      const paymentsByFreight = new Map<number, any[]>();
+      const paymentsByFreight = new Map<number, unknown[]>();
       for (const payment of payments) {
         const existing = paymentsByFreight.get(payment.containerFreightId) ?? [];
         existing.push(payment);

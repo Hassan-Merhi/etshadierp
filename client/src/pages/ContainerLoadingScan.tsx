@@ -45,7 +45,7 @@ export default function ContainerLoadingScan() {
   const [scanCode, setScanCode] = useState("");
   const [scanFlash, setScanFlash] = useState<"success" | "error" | null>(null);
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [_expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<"detailed" | "condensed">("detailed");
   const [lastScannedRef, setLastScannedRef] = useState<{
     baleReference: string;
@@ -150,7 +150,7 @@ export default function ContainerLoadingScan() {
       setTimeout(() => scannerRef.current?.focus(), 100);
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -173,9 +173,16 @@ export default function ContainerLoadingScan() {
       setPendingBypassOverloadRef(null);
       setScanFlash("success");
       setShowScanSuccessPopup(true);
-      const speechMsg = variables.allowBypassProforma ? "Bypass confirmed. Item added." : "Scanned successfully";
+      const _speechMsg = variables.allowBypassProforma ? "Bypass confirmed. Item added." : "Scanned successfully";
       try {
-        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const ctx = new (
+          window.AudioContext ||
+          (
+            window as unknown as (Window & typeof globalThis) & {
+              webkitAudioContext: { new (contextOptions?: AudioContextOptions): AudioContext; prototype: AudioContext };
+            }
+          ).webkitAudioContext
+        )();
         const osc = ctx.createOscillator();
         osc.connect(ctx.destination);
         osc.frequency.value = 1000;
@@ -217,12 +224,22 @@ export default function ContainerLoadingScan() {
       scannerRef.current?.focus();
     },
     onError: (error: Error, variables: any) => {
-      if ((error as any).overloaded) {
+      if ((error as unknown as Error & { overloaded: unknown }).overloaded) {
         setPendingBypassOverloadRef(variables.scanCode);
         setPendingBypassBaleRef(null);
         setScanFlash("error");
         try {
-          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const ctx = new (
+            window.AudioContext ||
+            (
+              window as unknown as (Window & typeof globalThis) & {
+                webkitAudioContext: {
+                  new (contextOptions?: AudioContextOptions): AudioContext;
+                  prototype: AudioContext;
+                };
+              }
+            ).webkitAudioContext
+          )();
           const osc = ctx.createOscillator();
           osc.connect(ctx.destination);
           osc.frequency.value = 550;
@@ -241,12 +258,22 @@ export default function ContainerLoadingScan() {
         scannerRef.current?.focus();
         return;
       }
-      if ((error as any).notInProforma) {
+      if ((error as unknown as Error & { notInProforma: unknown }).notInProforma) {
         setPendingBypassBaleRef(variables.scanCode);
         setPendingBypassOverloadRef(null);
         setScanFlash("error");
         try {
-          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const ctx = new (
+            window.AudioContext ||
+            (
+              window as unknown as (Window & typeof globalThis) & {
+                webkitAudioContext: {
+                  new (contextOptions?: AudioContextOptions): AudioContext;
+                  prototype: AudioContext;
+                };
+              }
+            ).webkitAudioContext
+          )();
           const osc = ctx.createOscillator();
           osc.connect(ctx.destination);
           osc.frequency.value = 600;
@@ -268,7 +295,14 @@ export default function ContainerLoadingScan() {
       setScanFlash("error");
       setShowScanErrorPopup(true);
       try {
-        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const ctx = new (
+          window.AudioContext ||
+          (
+            window as unknown as (Window & typeof globalThis) & {
+              webkitAudioContext: { new (contextOptions?: AudioContextOptions): AudioContext; prototype: AudioContext };
+            }
+          ).webkitAudioContext
+        )();
         const osc = ctx.createOscillator();
         osc.type = "sawtooth";
         osc.connect(ctx.destination);
@@ -306,7 +340,7 @@ export default function ContainerLoadingScan() {
       toast({ title: "Bale removed" });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -325,7 +359,7 @@ export default function ContainerLoadingScan() {
       navigate("/factory/invoicing?tab=invoices");
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
       setShowFinalizeDialog(false);
     },
@@ -352,7 +386,7 @@ export default function ContainerLoadingScan() {
       );
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error saving note", description: error.message, variant: "destructive" });
     },
   });

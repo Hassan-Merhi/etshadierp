@@ -117,8 +117,8 @@ export const interCompanyTransferService = {
 
       const existingTransfer = await transferRepository.findTransferByVoucherIdsTx(
         tx,
-        Number((fromPosted.voucher as any).id),
-        Number((toPosted.voucher as any).id)
+        Number((fromPosted.voucher as { id: unknown }).id),
+        Number((toPosted.voucher as { id: unknown }).id)
       );
       if (existingTransfer) return existingTransfer;
 
@@ -130,8 +130,8 @@ export const interCompanyTransferService = {
         amount: fromBuilt.amount,
         fromLedgerAccountId: parsed.fromLedgerAccountId,
         toLedgerAccountId: parsed.toLedgerAccountId,
-        fromVoucherId: (fromPosted.voucher as any).id,
-        toVoucherId: (toPosted.voucher as any).id,
+        fromVoucherId: (fromPosted.voucher as { id: unknown }).id,
+        toVoucherId: (toPosted.voucher as { id: unknown }).id,
         description: parsed.description ?? null,
         sourcePaymentId: parsed.sourcePaymentId ?? null,
       });

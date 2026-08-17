@@ -128,7 +128,7 @@ export function usePosCheckout({
     }
 
     const saleData = {
-      locationId: activeLocation?.id || (editVoucher as any)?.locationId,
+      locationId: activeLocation?.id || editVoucher?.locationId,
       shiftId: posUser && currentShift ? currentShift.id : undefined,
       clientSaleId: !editVoucherId ? clientSaleIdRef.current : undefined,
       paymentAccountType: isCreditSale ? "credit" : paymentAccountType,

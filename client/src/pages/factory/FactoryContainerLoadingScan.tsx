@@ -74,7 +74,7 @@ export default function FactoryContainerLoadingScan() {
   const [ignoreProforma, setIgnoreProforma] = useState(false);
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
   const [finalizeDate, setFinalizeDate] = useState(new Date().toLocaleDateString("en-CA"));
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [_expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<"detailed" | "condensed">("detailed");
   const [lastScannedRef, setLastScannedRef] = useState<{
     baleReference: string;
@@ -217,7 +217,7 @@ export default function FactoryContainerLoadingScan() {
       setTimeout(() => scannerRef.current?.focus(), 100);
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
@@ -244,9 +244,16 @@ export default function FactoryContainerLoadingScan() {
       setPendingBypassOverloadRef(null);
       setScanFlash("success");
       setShowScanSuccessPopup(true);
-      const speechMsg = variables.allowBypassProforma ? "Bypass confirmed. Item added." : "Scanned successfully";
+      const _speechMsg = variables.allowBypassProforma ? "Bypass confirmed. Item added." : "Scanned successfully";
       try {
-        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const ctx = new (
+          window.AudioContext ||
+          (
+            window as unknown as (Window & typeof globalThis) & {
+              webkitAudioContext: { new (contextOptions?: AudioContextOptions): AudioContext; prototype: AudioContext };
+            }
+          ).webkitAudioContext
+        )();
         const osc = ctx.createOscillator();
         osc.connect(ctx.destination);
         osc.frequency.value = 1000;
@@ -287,13 +294,23 @@ export default function FactoryContainerLoadingScan() {
       setScanCode("");
     },
     onError: (error: Error, variables: any) => {
-      if ((error as any)?._handledGlobally) return;
-      if ((error as any).overloaded) {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
+      if ((error as unknown as Error & { overloaded: unknown }).overloaded) {
         setPendingBypassOverloadRef(variables.scanCode);
         setPendingBypassBaleRef(null);
         setScanFlash("error");
         try {
-          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const ctx = new (
+            window.AudioContext ||
+            (
+              window as unknown as (Window & typeof globalThis) & {
+                webkitAudioContext: {
+                  new (contextOptions?: AudioContextOptions): AudioContext;
+                  prototype: AudioContext;
+                };
+              }
+            ).webkitAudioContext
+          )();
           const osc = ctx.createOscillator();
           osc.connect(ctx.destination);
           osc.frequency.value = 550;
@@ -311,12 +328,22 @@ export default function FactoryContainerLoadingScan() {
         setScanCode("");
         return;
       }
-      if ((error as any).notInProforma) {
+      if ((error as unknown as Error & { notInProforma: unknown }).notInProforma) {
         setPendingBypassBaleRef(variables.scanCode);
         setPendingBypassOverloadRef(null);
         setScanFlash("error");
         try {
-          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const ctx = new (
+            window.AudioContext ||
+            (
+              window as unknown as (Window & typeof globalThis) & {
+                webkitAudioContext: {
+                  new (contextOptions?: AudioContextOptions): AudioContext;
+                  prototype: AudioContext;
+                };
+              }
+            ).webkitAudioContext
+          )();
           const osc = ctx.createOscillator();
           osc.connect(ctx.destination);
           osc.frequency.value = 600;
@@ -337,7 +364,14 @@ export default function FactoryContainerLoadingScan() {
       setScanFlash("error");
       setShowScanErrorPopup(true);
       try {
-        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const ctx = new (
+          window.AudioContext ||
+          (
+            window as unknown as (Window & typeof globalThis) & {
+              webkitAudioContext: { new (contextOptions?: AudioContextOptions): AudioContext; prototype: AudioContext };
+            }
+          ).webkitAudioContext
+        )();
         const osc = ctx.createOscillator();
         osc.type = "sawtooth";
         osc.connect(ctx.destination);
@@ -395,7 +429,7 @@ export default function FactoryContainerLoadingScan() {
       toast({ title: "Bale removed" });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
@@ -437,7 +471,7 @@ export default function FactoryContainerLoadingScan() {
       setTimeout(() => scannerRef.current?.focus(), 100);
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Import failed", description: error.message, variant: "destructive" });
     },
   });
@@ -461,7 +495,7 @@ export default function FactoryContainerLoadingScan() {
     onError: (error: Error) => {
       if (error?._handledGlobally) return;
       setShowFinalizeDialog(false);
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
@@ -482,7 +516,7 @@ export default function FactoryContainerLoadingScan() {
       toast({ title: "Note saved" });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Failed to save note", description: error.message, variant: "destructive" });
     },
   });
@@ -756,7 +790,7 @@ export default function FactoryContainerLoadingScan() {
         ? "ring-2 ring-red-500 bg-red-50 dark:bg-red-950 transition-all"
         : "";
 
-  const activeProforma =
+  const _activeProforma =
     selectedProformaId && selectedProformaId !== "none"
       ? proformas.find((p) => p.id === parseInt(selectedProformaId)) || null
       : null;

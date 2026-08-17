@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import {useState, useEffect, useRef, useCallback} from "react";
 import {useQuery, useMutation} from "@tanstack/react-query";
 import {queryClient, apiRequest} from "@/lib/queryClient";
@@ -100,7 +101,7 @@ export default function FactoryStatusBuilder() {
     return () => {
       if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [localSheets]);
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -205,7 +206,7 @@ export default function FactoryStatusBuilder() {
       setActiveIdx((prev) => prev + 1);
       queryClient.invalidateQueries({ queryKey: ["/api/factory/status-builder/sheets"] });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const saveMutation = useMutation({
@@ -232,7 +233,7 @@ export default function FactoryStatusBuilder() {
       if (!silentSaveRef.current) toast({ title: "Saved", description: "All pages saved." });
       silentSaveRef.current = false;
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       silentSaveRef.current = false;
       toast({ title: "Save failed", description: e.message, variant: "destructive" });
     },
@@ -246,7 +247,7 @@ export default function FactoryStatusBuilder() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/status-builder/sheets"] });
       toast({ title: "Page deleted" });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const importMutation = useMutation({
@@ -276,7 +277,7 @@ export default function FactoryStatusBuilder() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/status-builder/sheets"] });
       toast({ title: "Imported", description: `${sheets.length} page(s) imported.` });
     },
-    onError: (e: any) => toast({ title: "Import failed", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Import failed", description: e.message, variant: "destructive" }),
   });
 
   const handleExport = () => window.open("/api/factory/status-builder/sheets/export", "_blank");
@@ -424,7 +425,7 @@ export default function FactoryStatusBuilder() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [activeIdx, localSheets]);
 
   // ── Render ─────────────────────────────────────────────────────────────────

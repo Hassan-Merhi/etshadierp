@@ -33,7 +33,7 @@ export function registerBalesReimportRoutes(app: Express) {
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 
         const ExcelJS = (await import("exceljs")).default;
@@ -112,12 +112,12 @@ export function registerBalesReimportRoutes(app: Express) {
           });
         }
 
-        const result = await db.transaction(async (tx: any) => {
+        const result = await db.transaction(async (tx) => {
           const existingBarcodes = await tx
             .select({ referenceNumber: factoryBales.referenceNumber })
             .from(factoryBales)
             .where(eq(factoryBales.companyId, companyId));
-          const existingRefSet = new Set(existingBarcodes.map((b: any) => b.referenceNumber));
+          const existingRefSet = new Set(existingBarcodes.map((b) => b.referenceNumber));
 
           const duplicates = rows.filter((r) => existingRefSet.has(r.referenceNumber));
           if (duplicates.length > 0) {
@@ -134,7 +134,7 @@ export function registerBalesReimportRoutes(app: Express) {
             .select({ id: locations.id })
             .from(locations)
             .where(eq(locations.companyId, companyId));
-          allLocs.forEach((l: any) => validLocIds.add(l.id));
+          allLocs.forEach((l) => validLocIds.add(l.id));
 
           const invalidLocRows = rows.filter((r) => r.erpLocationId && !validLocIds.has(r.erpLocationId));
           if (invalidLocRows.length > 0) {
@@ -250,7 +250,7 @@ export function registerBalesReimportRoutes(app: Express) {
             let stockGroupId: number | null = null;
             if (bale.category) {
               const catName = bale.category as string;
-              const catId = (product as any)?.categoryId as number | undefined;
+              const catId = product?.categoryId as number | undefined;
               const cacheKey = catId ? String(catId) : catName;
               const cached = stockGroupCache.get(cacheKey);
               if (cached) {
@@ -346,7 +346,7 @@ export function registerBalesReimportRoutes(app: Express) {
   // GET /api/factory/bales/export-names.xlsx — Export all bales for bulk product-name editing
   app.get("/api/factory/bales/export-names.xlsx", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const bales = await db
@@ -412,7 +412,7 @@ export function registerBalesReimportRoutes(app: Express) {
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 
         const { read: readXlsx, utils } = await import("xlsx");
@@ -463,7 +463,7 @@ export function registerBalesReimportRoutes(app: Express) {
         try {
           await logAudit({
             userId: req.session.userId!,
-            username: (req.session as any).username || req.session.userId!,
+            username: req.session.username || req.session.userId!,
             companyId,
             action: "update",
             tableName: "factory_bales",

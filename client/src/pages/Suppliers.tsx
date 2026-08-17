@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -84,7 +85,7 @@ export default function Suppliers() {
       toast({ title: "Supplier deleted" });
       setSupplierToDelete(null);
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
       setSupplierToDelete(null);

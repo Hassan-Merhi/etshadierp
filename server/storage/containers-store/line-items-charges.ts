@@ -46,7 +46,7 @@ export async function getLineItemsByPO(poId: number): Promise<POLineItem[]> {
     .leftJoin(schema.stockCategories, eq(schema.stockItems.categoryId, schema.stockCategories.id))
     .where(eq(schema.poLineItems.poId, poId));
 
-  return items as any;
+  return items;
 }
 
 export async function createPOLineItem(lineItem: InsertPOLineItem): Promise<POLineItem> {

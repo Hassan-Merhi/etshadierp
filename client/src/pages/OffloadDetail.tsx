@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useParams, useLocation } from "wouter";
 import { useBackToParent } from "@/hooks/use-back-to-parent";
 import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
@@ -180,7 +181,7 @@ export default function OffloadDetail() {
       queryClient.invalidateQueries({ queryKey: [`/api/offloads/${id}`] });
       toast({ title: data.optional ? "Offload suspended" : "Offload restored", description: data.message });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -201,7 +202,7 @@ export default function OffloadDetail() {
       : displayDuties + displayOfficeCharges + displayTransportFees + displayTransferCharges + displayAddlCharges) +
     storedAdditionalCharges;
 
-  const displayCostPerBale = live?.hasVouchers
+  const _displayCostPerBale = live?.hasVouchers
     ? live.additionalCostPerBale
     : Number(offload?.additionalCostPerBale || 0);
 
@@ -479,7 +480,7 @@ export default function OffloadDetail() {
       ) : isError ? (
         <div className="text-center py-12 space-y-2">
           <p className="text-muted-foreground font-medium">Could not load offload #{id}</p>
-          <p className="text-sm text-muted-foreground">{(error as any)?.message || "Unknown error"}</p>
+          <p className="text-sm text-muted-foreground">{error?.message || "Unknown error"}</p>
           <Button variant="outline" className="mt-4" onClick={handleBack}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Go Back

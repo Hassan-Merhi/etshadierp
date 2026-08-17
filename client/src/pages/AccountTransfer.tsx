@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -189,7 +190,8 @@ export default function AccountTransfer() {
   function toggleOne(id: number) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }
@@ -213,7 +215,7 @@ export default function AccountTransfer() {
       queryClient.invalidateQueries({ queryKey: ["/api/voucher-entries/by-account", fromAccountId] });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
     },
-    onError: (e: any) => toast({ title: "Transfer failed", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Transfer failed", description: e.message, variant: "destructive" }),
   });
 
   function resetAll() {
@@ -344,7 +346,9 @@ export default function AccountTransfer() {
                           onCheckedChange={toggleAll}
                           data-testid="checkbox-select-all"
                           ref={(el) => {
-                            if (el) (el as any).indeterminate = someChecked && !allChecked;
+                            if (el)
+                              (el as unknown as HTMLButtonElement & { indeterminate: boolean }).indeterminate =
+                                someChecked && !allChecked;
                           }}
                         />
                       </th>

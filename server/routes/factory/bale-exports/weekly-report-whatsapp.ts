@@ -14,7 +14,7 @@ import { buildWeeklyReportExcelBuffer } from "./_helpers";
 export function registerFactoryWeeklyReportWhatsappRoutes(app: Express) {
   // ── Weekly Report — WhatsApp settings & send ───────────────────────────────
 
-  app.get("/api/factory/weekly-report-wa-settings", requireAuth, async (_req: any, res: any) => {
+  app.get("/api/factory/weekly-report-wa-settings", requireAuth, async (_req: unknown, res: import("express").Response) => {
     try {
       const r = await pool.query(
         `SELECT weekly_report_wa_group_chat_id, instance_id, api_token FROM whatsapp_settings WHERE id = 1`
@@ -44,7 +44,7 @@ export function registerFactoryWeeklyReportWhatsappRoutes(app: Express) {
 
   app.post("/api/factory/send-weekly-report-whatsapp", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const r = await pool.query(
         `SELECT weekly_report_wa_group_chat_id, instance_id, api_token, enabled FROM whatsapp_settings WHERE id = 1`

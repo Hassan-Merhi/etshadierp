@@ -21,12 +21,66 @@ export function registerEmployeeRoutes(app: Express) {
       const transformedEmployees = employees.map((emp) => {
         // Use stored currentBalance which is kept in sync by payroll operations and journal vouchers
         // The syncEmployeePayrollBalance function updates currentBalance when vouchers are created/edited/deleted
-        const currentBalance = parseFloat((emp as any).currentBalance || "0");
+        const currentBalance = parseFloat(emp.currentBalance || "0");
 
         return {
           ...emp,
-          firstName: emp.firstName || (emp as any).first_name,
-          lastName: emp.lastName || (emp as any).last_name,
+          firstName:
+            emp.firstName ||
+            (
+              emp as unknown as {
+                id: number;
+                companyId: number;
+                code: string;
+                phone: string | null;
+                openingBalance: string | null;
+                active: boolean;
+                deletedAt: Date | null;
+                createdAt: Date;
+                email: string | null;
+                firstName: string;
+                lastName: string;
+                joinDate: string;
+                department: string | null;
+                employeeType: string;
+                monthlySalary: string;
+                currentBalance: string;
+                totalDeposits: string;
+                totalWithdrawals: string;
+                salesBonusPct: string | null;
+                salesBonusPctSourceCompanyId: number | null;
+                salesBonusPctLocationId: number | null;
+                balesBonusRate: string | null;
+              } & { first_name: unknown }
+            ).first_name,
+          lastName:
+            emp.lastName ||
+            (
+              emp as unknown as {
+                id: number;
+                companyId: number;
+                code: string;
+                phone: string | null;
+                openingBalance: string | null;
+                active: boolean;
+                deletedAt: Date | null;
+                createdAt: Date;
+                email: string | null;
+                firstName: string;
+                lastName: string;
+                joinDate: string;
+                department: string | null;
+                employeeType: string;
+                monthlySalary: string;
+                currentBalance: string;
+                totalDeposits: string;
+                totalWithdrawals: string;
+                salesBonusPct: string | null;
+                salesBonusPctSourceCompanyId: number | null;
+                salesBonusPctLocationId: number | null;
+                balesBonusRate: string | null;
+              } & { last_name: unknown }
+            ).last_name,
           currentBalance: currentBalance.toFixed(2),
           calculatedBalance: currentBalance.toFixed(2),
         };
@@ -52,7 +106,7 @@ export function registerEmployeeRoutes(app: Express) {
       if (!employee) {
         return res.status(404).json({ message: "Employee not found" });
       }
-      const balance = parseFloat((employee as any).currentBalance || "0").toFixed(2);
+      const balance = parseFloat(employee.currentBalance || "0").toFixed(2);
       res.json({ balance });
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
@@ -204,7 +258,7 @@ export function registerEmployeeRoutes(app: Express) {
         balesBonusRate,
       } = req.body;
 
-      const updates: Record<string, any> = {};
+      const updates: Record<string, unknown> = {};
       if (firstName !== undefined) updates.firstName = firstName;
       if (lastName !== undefined) updates.lastName = lastName;
       if (code !== undefined) updates.code = code;
@@ -234,7 +288,7 @@ export function registerEmployeeRoutes(app: Express) {
         return res.status(400).json({ message: "No fields to update" });
       }
 
-      const updated = await storage.updateEmployee(id, companyId, updates as any);
+      const updated = await storage.updateEmployee(id, companyId, updates);
       if (!updated) return res.status(404).json({ message: "Employee not found" });
 
       res.json(updated);

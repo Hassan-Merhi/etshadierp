@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -69,7 +70,7 @@ export function RecipientsTab({
       qc.invalidateQueries({ queryKey: ["/api/export/recipients"] });
       toast({ title: "Recipient added" });
     },
-    onError: (e: any) => toast({ variant: "destructive", title: "Error", description: e.message }),
+    onError: (e: ClientErrorLike) => toast({ variant: "destructive", title: "Error", description: e.message }),
   });
 
   const removeEmailRecipient = useMutation({

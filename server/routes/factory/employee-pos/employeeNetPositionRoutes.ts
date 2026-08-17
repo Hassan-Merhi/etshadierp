@@ -34,10 +34,10 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       // 2. currentCompanyId (if it's factory-type)
       // 3. first active factory-type company in DB
       // 4. fall back to currentCompanyId
-      let companyId: number | null = (req.session as any).factoryCompanyId || null;
+      let companyId: number | null = req.session.factoryCompanyId || null;
 
       if (!companyId) {
-        const currentId = (req.session as any).currentCompanyId;
+        const currentId = req.session.currentCompanyId;
         if (currentId) {
           const [cur] = await db
             .select({ id: companies.id, companyType: companies.companyType })
@@ -56,11 +56,11 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         if (fc) companyId = fc.id;
       }
 
-      if (!companyId) companyId = (req.session as any).currentCompanyId;
+      if (!companyId) companyId = (req.session as { currentCompanyId: number | null }).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       // Pin it for subsequent requests this session
-      (req.session as any).factoryCompanyId = companyId;
+      req.session.factoryCompanyId = companyId;
 
       // ── As-of date ────────────────────────────────────────────────────────────
       // All date-sensitive queries are filtered to data created/dated on or before asOf.
@@ -239,7 +239,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
           .innerJoin(
             customerOrders,
             and(
-              eq(customerOrders.id, customerBalances.referenceId as any),
+              eq(customerOrders.id, customerBalances.referenceId),
               eq(customerOrders.companyId, companyId),
               eq(customerOrders.status, "FINALIZED"),
               lte(customerOrders.orderDate, asOf)
@@ -276,7 +276,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
                     lte(vouchers.voucherDate, asOf)
                   )
                 )
-                .where(inArray(voucherEntries.ledgerAccountId as any, custLedgerIds))
+                .where(inArray(voucherEntries.ledgerAccountId, custLedgerIds))
                 .groupBy(voucherEntries.ledgerAccountId)
             : [];
         const cLedgerVoucherMap = new Map(
@@ -300,7 +300,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
               lte(vouchers.voucherDate, asOf)
             )
           )
-          .where(and(inArray(voucherEntries.customerId as any, cIds), isNull(voucherEntries.ledgerAccountId)))
+          .where(and(inArray(voucherEntries.customerId, cIds), isNull(voucherEntries.ledgerAccountId)))
           .groupBy(voucherEntries.customerId);
 
         const cVoucherMap = new Map((cVoucherRows as any[]).map((r: any) => [r.customerId, parseFloat(r.net || "0")]));

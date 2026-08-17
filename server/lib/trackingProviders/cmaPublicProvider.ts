@@ -118,7 +118,7 @@ function parseResponse(containerNumber: string, data: unknown, base: CarrierTrac
     return { ...base, noData: true, error: "empty_response" };
   }
 
-  const d = data as Record<string, any>;
+  const d = data as Record<string, unknown>;
 
   // CMA response shapes vary — be defensive
   const shipment: any =

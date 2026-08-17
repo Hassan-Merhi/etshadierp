@@ -67,7 +67,7 @@ export async function trackOneContainer(
     await saveTrackingCheck(containerId, "skipped", "invalid_container_number", errMsg, null);
     await db
       .update(containers)
-      .set({ trackingLastCheckedAt: now, trackingError: errMsg } as any)
+      .set({ trackingLastCheckedAt: now, trackingError: errMsg })
       .where(eq(containers.id, containerId));
 
     return {
@@ -112,10 +112,7 @@ export async function trackOneContainer(
         updateSet.etaSource = etaSrc;
       }
 
-      await db
-        .update(containers)
-        .set(updateSet as any)
-        .where(eq(containers.id, containerId));
+      await db.update(containers).set(updateSet).where(eq(containers.id, containerId));
       await logAndConfirmEta(
         containerId,
         containerNumber,

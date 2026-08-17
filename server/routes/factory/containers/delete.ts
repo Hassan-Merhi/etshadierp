@@ -29,7 +29,7 @@ export function registerFactoryContainerDeleteRoutes(app: Express) {
   app.post("/api/factory/containers/bulk-delete", requireAuth, async (req: Request, res: Response) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { ids } = req.body as { ids: number[] };
@@ -47,7 +47,7 @@ export function registerFactoryContainerDeleteRoutes(app: Express) {
             isNull(factoryContainers.deletedAt)
           )
         );
-      const ownedIds = owned.map((c: any) => c.id);
+      const ownedIds = owned.map((c) => c.id);
       if (ownedIds.length === 0) return res.status(404).json({ message: "No containers found" });
 
       // Soft-delete: hide containers from main listings while preserving all child rows
@@ -75,7 +75,7 @@ export function registerFactoryContainerDeleteRoutes(app: Express) {
 
   app.delete("/api/factory/containers/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
@@ -83,7 +83,7 @@ export function registerFactoryContainerDeleteRoutes(app: Express) {
       if (id === null) return res.status(400).json({ message: "Invalid id" });
 
       let updatedId: number | null = null;
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         // Soft-delete the container
         const [updated] = await tx
           .update(factoryContainers)
@@ -104,7 +104,7 @@ export function registerFactoryContainerDeleteRoutes(app: Express) {
           .select({ id: factoryRawStock.id })
           .from(factoryRawStock)
           .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryRawStock.containerId, id)));
-        const rsIds = rsRows.map((r: any) => r.id);
+        const rsIds = rsRows.map((r) => r.id);
 
         const commRows = await tx
           .select({ id: factoryContainerCommissions.id })
@@ -112,7 +112,7 @@ export function registerFactoryContainerDeleteRoutes(app: Express) {
           .where(
             and(eq(factoryContainerCommissions.companyId, companyId), eq(factoryContainerCommissions.containerId, id))
           );
-        const commIds = commRows.map((r: any) => r.id);
+        const commIds = commRows.map((r) => r.id);
 
         // 2. Delete daybook entries linked to this container
         if (rsIds.length > 0) {
@@ -170,7 +170,7 @@ export function registerFactoryContainerDeleteRoutes(app: Express) {
             )
           );
         if (containerVouchers.length > 0) {
-          const vIds = containerVouchers.map((v: any) => v.id);
+          const vIds = containerVouchers.map((v) => v.id);
           await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
           await tx.delete(vouchers).where(inArray(vouchers.id, vIds));
         }
@@ -187,7 +187,7 @@ export function registerFactoryContainerDeleteRoutes(app: Express) {
   // ── Backfill: create missing goods-import credits for existing containers ────
   app.post("/api/factory/containers/backfill-import-credits", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const allContainers = await db
@@ -234,7 +234,7 @@ export function registerFactoryContainerDeleteRoutes(app: Express) {
           backfillFxRate = resolveStoredFxRateOrThrow(
             container.currencyCode,
             container.fxRateToUsd,
-            (container as any).fxRateConfirmed
+            container.fxRateConfirmed
           );
         } catch {
           skipped++;

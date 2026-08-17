@@ -19,7 +19,7 @@ import { eq, and, inArray } from "drizzle-orm";
 export function registerOrderLoadingRoutes(app: Express) {
   app.post("/api/factory/customer-orders-loading", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { customerId, proformaIdUsed, locationId, orderDate, containerNotes } = req.body;
@@ -60,7 +60,7 @@ export function registerOrderLoadingRoutes(app: Express) {
         message: `New loading started for ${loadingCustomer?.legalName || "customer"}`,
         entityType: "customer_order",
         entityId: order.id,
-        triggeredByUserId: (req.session as any)?.userId ?? null,
+        triggeredByUserId: req.session?.userId ?? null,
         companyId,
       }).catch(() => {});
 
@@ -73,7 +73,7 @@ export function registerOrderLoadingRoutes(app: Express) {
 
   app.post("/api/factory/customer-orders/:id/finalize-loading", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseId(req.params.id);
@@ -123,7 +123,7 @@ export function registerOrderLoadingRoutes(app: Express) {
           .from(customers)
           .where(eq(customers.id, order.customerId));
         const txDate = req.body?.txDate || getClientDate(req);
-        const totalValue = bales.reduce((sum: number, b: any) => sum + parseFloat(b.priceUsed || "0"), 0);
+        const totalValue = bales.reduce((sum: number, b) => sum + parseFloat(b.priceUsed || "0"), 0);
 
         await writeDaybookEntry(tx, {
           companyId,
@@ -172,7 +172,7 @@ export function registerOrderLoadingRoutes(app: Express) {
         message: lsMsg,
         entityType: "customer_order",
         entityId: orderId,
-        triggeredByUserId: (req.session as any)?.userId ?? null,
+        triggeredByUserId: req.session?.userId ?? null,
         companyId,
       }).catch(() => {});
 

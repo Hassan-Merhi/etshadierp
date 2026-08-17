@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient as useTQClient } from "@tanstack/react-query";
 import { Loader2, CheckCircle, XCircle, Minus, AlertCircle, Activity, MapPin, Settings2 } from "lucide-react";
@@ -178,7 +179,7 @@ export function TrackingSettingsSheet({
 
   useEffect(() => {
     if (container) {
-      const fc = container as any;
+      const fc = container;
       setEnabled(fc.trackingEnabled !== false);
       setAutoUpdate(fc.trackingAutoUpdate !== false);
       setCarrierHint(fc.trackingCarrierHint ?? "");
@@ -199,7 +200,7 @@ export function TrackingSettingsSheet({
       toast({ title: "Tracking settings saved" });
       onClose();
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Failed to save settings", description: err?.message, variant: "destructive" });
     },
   });

@@ -7,7 +7,7 @@ import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 
 function factoryCompanyId(req: Request): number | null {
-  const value = Number((req.session as any)?.factoryCompanyId);
+  const value = Number(req.session?.factoryCompanyId);
   return Number.isSafeInteger(value) && value > 0 ? value : null;
 }
 
@@ -17,7 +17,7 @@ function isFrenchRequest(req: Request): boolean {
   return req.query.lang === "fr" || header === "fr" || /(?:^|;\s*)factory_catalog_language=fr(?:;|$)/.test(cookie);
 }
 
-function accessError(res: any) {
+function accessError(res: import("express").Response) {
   return res.status(403).json({
     message: "You do not have access to the selected Factory company.",
     code: "FACTORY_COMPANY_ACCESS_REQUIRED",

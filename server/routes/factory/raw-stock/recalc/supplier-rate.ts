@@ -42,7 +42,7 @@ export function registerRawStockSupplierRateRoutes(app: Express) {
     requireAuth,
     requireRole(...ADMIN_ROLES),
     async (req: any, res: any) => {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { supplierId, dryRun } = req.body;
       const isDryRun = dryRun === true;
@@ -108,7 +108,7 @@ export function registerRawStockSupplierRateRoutes(app: Express) {
 
           const oldRate = parseFloat((existing.currentRawMaterialCostPerKgUsd as string) || "0");
           const supplierName = existing.name || `Supplier #${sid}`;
-          const { costPerKgUsd, totalReceivedKg, rows } = await db.transaction(async (tx: any) => {
+          const { costPerKgUsd, totalReceivedKg, rows } = await db.transaction(async (tx) => {
             return getStableSupplierCost(tx, companyId, sid);
           });
 
@@ -188,7 +188,7 @@ export function registerRawStockSupplierRateRoutes(app: Express) {
     requireAuth,
     requireRole(...ADMIN_ROLES),
     async (req: any, res: any) => {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       try {
@@ -250,7 +250,7 @@ export function registerRawStockSupplierRateRoutes(app: Express) {
     requireAuth,
     requireRole(...ADMIN_ROLES),
     async (req: any, res: any) => {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { restorations } = req.body;

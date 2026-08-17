@@ -484,9 +484,9 @@ export function ProductionTabPanel({ report }: { report: DailyProductionReportSt
             if (wipersRows.length > 0) {
               wgCats.push({
                 categoryName: "Wipers",
-                qty: wipersRows.reduce((s: number, r: any) => s + r.qty, 0),
-                totalWeightKg: wipersRows.reduce((s: number, r: any) => s + r.totalWeightKg, 0),
-                totalValue: wipersRows.reduce((s: number, r: any) => s + r.totalValue, 0),
+                qty: wipersRows.reduce((s: number, r) => s + r.qty, 0),
+                totalWeightKg: wipersRows.reduce((s: number, r) => s + r.totalWeightKg, 0),
+                totalValue: wipersRows.reduce((s: number, r) => s + r.totalValue, 0),
               });
               wgProds.push(
                 ...wipersRows.map((r) => ({
@@ -503,9 +503,9 @@ export function ProductionTabPanel({ report }: { report: DailyProductionReportSt
             if (garbageRows.length > 0) {
               wgCats.push({
                 categoryName: "Garbage",
-                qty: garbageRows.reduce((s: number, r: any) => s + r.qty, 0),
-                totalWeightKg: garbageRows.reduce((s: number, r: any) => s + r.totalWeightKg, 0),
-                totalValue: garbageRows.reduce((s: number, r: any) => s + r.totalValue, 0),
+                qty: garbageRows.reduce((s: number, r) => s + r.qty, 0),
+                totalWeightKg: garbageRows.reduce((s: number, r) => s + r.totalWeightKg, 0),
+                totalValue: garbageRows.reduce((s: number, r) => s + r.totalValue, 0),
               });
               wgProds.push(
                 ...garbageRows.map((r) => ({
@@ -521,7 +521,7 @@ export function ProductionTabPanel({ report }: { report: DailyProductionReportSt
             }
           }
           const mergedCategories = [...(data?.production.byCategory ?? []), ...wgCats];
-          const mergedProducts = [...((data?.production.byProduct ?? []) as any[]), ...wgProds];
+          const mergedProducts = [...(((data?.production.byProduct ?? []))), ...wgProds];
           const mergedTotalBales = (data?.production.totalBales ?? 0) + wgCats.reduce((s, c) => s + c.qty, 0);
           const mergedTotalWeightKg =
             (data?.production.totalWeightKg ?? 0) + wgCats.reduce((s, c) => s + c.totalWeightKg, 0);

@@ -16,7 +16,7 @@ export function registerRawStockUnlinkedBaleRoutes(app: Express) {
   // Get all bales with no mix batch link (unlinked / not yet sourced from raw stock)
   app.get("/api/factory/bales/unlinked", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const bales = await db

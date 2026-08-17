@@ -393,7 +393,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
       let rowChanged = false;
       for (let c = S_DATE_START; c <= salesLastCol; c++) {
         const cell = row.getCell(c);
-        const v = cell.value as any;
+        const v = cell.value;
         if (v && typeof v === "object" && "sharedFormula" in v) {
           cell.value = null;
           rowChanged = true;
@@ -504,7 +504,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
     let rowChanged = false;
     for (let c = E_DATE_START; c <= entryLastCol; c++) {
       const cell = row.getCell(c);
-      const v = cell.value as any;
+      const v = cell.value;
       if (v && typeof v === "object" && "sharedFormula" in v) {
         cell.value = null;
         rowChanged = true;
@@ -664,9 +664,9 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
   //   Costing=hidden, Sales=hidden, ENTRY=visible, Summary=visible,
   //   Ageing=VISIBLE (template has it visible — do NOT hide it), Summary-Itemwise=hidden
   // The old code incorrectly set Ageing to "hidden". Removed.
-  if (costingWs) (costingWs as any).state = "hidden";
-  if (salesWs) (salesWs as any).state = "hidden";
-  if (summaryIWs) (summaryIWs as any).state = "hidden";
+  if (costingWs) costingWs.state = "hidden";
+  if (salesWs) salesWs.state = "hidden";
+  if (summaryIWs) summaryIWs.state = "hidden";
   // ENTRY, Summary, Ageing: leave as visible (template default)
 
   // ── 6. Sales sheet alignment check ────────────────────────────────────────

@@ -20,7 +20,7 @@ export class SecuritySchemaUnavailableError extends Error {
   constructor(cause?: unknown) {
     super("Critical security permissions schema is unavailable");
     this.name = "SecuritySchemaUnavailableError";
-    (this as any).cause = cause;
+    this.cause = cause;
   }
 }
 
@@ -72,7 +72,9 @@ export async function replaceNamedPermissions(
   await assertUserBelongsToCompany(tx, params.userId, params.companyId);
   await tx
     .delete(userSecurityPermissions)
-    .where(and(eq(userSecurityPermissions.userId, params.userId), eq(userSecurityPermissions.companyId, params.companyId)));
+    .where(
+      and(eq(userSecurityPermissions.userId, params.userId), eq(userSecurityPermissions.companyId, params.companyId))
+    );
   if (permissions.length) {
     await tx.insert(userSecurityPermissions).values(
       permissions.map((permission) => ({

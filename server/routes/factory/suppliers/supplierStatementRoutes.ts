@@ -26,7 +26,7 @@ import { buildLinkedSupplierGroups } from "./linkedSupplierGroups";
 export function registerSupplierStatementRoutes(app: Express) {
   app.get("/api/factory/suppliers/:id/statement", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const supplierId = parseId(req.params.id);
@@ -78,7 +78,7 @@ export function registerSupplierStatementRoutes(app: Express) {
         .where(
           and(
             eq(factoryContainers.companyId, companyId),
-            eq((factoryContainers as any).commissionSupplierId, supplierId),
+            eq(factoryContainers.commissionSupplierId, supplierId),
             sql`${factoryContainers.supplierId} != ${supplierId}`,
             isNull(factoryContainers.deletedAt)
           )
@@ -129,7 +129,7 @@ export function registerSupplierStatementRoutes(app: Express) {
         .where(
           and(
             eq(factoryOffloadAdditionalCharges.companyId, companyId),
-            eq((factoryOffloadAdditionalCharges as any).supplierId, supplierId)
+            eq(factoryOffloadAdditionalCharges.supplierId, supplierId)
           )
         )
         .orderBy(factoryOffloadAdditionalCharges.createdAt);
@@ -142,7 +142,7 @@ export function registerSupplierStatementRoutes(app: Express) {
           containerId: factoryContainers.id,
           description: sql<string>`'Other Charges'`,
           amount: factoryContainers.otherCharges,
-          otherChargesCurrencyCode: (factoryContainers as any).otherChargesCurrencyCode,
+          otherChargesCurrencyCode: factoryContainers.otherChargesCurrencyCode,
           containerCurrencyCode: factoryContainers.currencyCode,
           fxRateToUsd: factoryContainers.fxRateToUsd,
           createdAt: factoryContainers.createdAt,
@@ -183,7 +183,7 @@ export function registerSupplierStatementRoutes(app: Express) {
         const value = kg * rate + (freightCc === containerCc ? freight : 0);
         const containerCommissions = commissions.filter((cm) => cm.containerId === c.id);
         const totalCommission = containerCommissions.reduce(
-          (sum: number, cm: any) => sum + parseFloat(cm.commissionTotal || "0"),
+          (sum: number, cm) => sum + parseFloat(cm.commissionTotal || "0"),
           0
         );
 
@@ -197,7 +197,7 @@ export function registerSupplierStatementRoutes(app: Express) {
           status: effectiveStatus,
           currencyCode: containerCc,
           fxRateToUsd: (() => {
-            const { fxRate, looksSet } = resolveStoredFxRate(containerCc, c.fxRateToUsd, (c as any).fxRateConfirmed);
+            const { fxRate, looksSet } = resolveStoredFxRate(containerCc, c.fxRateToUsd, c.fxRateConfirmed);
             return looksSet ? String(fxRate) : "unresolved";
           })(),
           declaredKg: c.declaredKg,
@@ -211,22 +211,22 @@ export function registerSupplierStatementRoutes(app: Express) {
           finalPayableAmount: c.finalPayableAmount,
           commissionAmount: c.commissionAmount || "0",
           commissionCurrencyCode: c.commissionCurrencyCode || "USD",
-          commissionSupplierId: (c as any).commissionSupplierId || null,
-          commissionNotes: (c as any).commissionNotes || null,
+          commissionSupplierId: c.commissionSupplierId || null,
+          commissionNotes: c.commissionNotes || null,
           commissions: containerCommissions,
           totalCommission: totalCommission.toFixed(2),
           notes: c.notes,
         };
       });
 
-      const totalValue = statement.reduce((sum: number, s: any) => sum + parseFloat(s.value), 0);
+      const totalValue = statement.reduce((sum: number, s) => sum + parseFloat(s.value), 0);
       const totalKg = statement.reduce(
-        (sum: number, s: any) => sum + parseFloat(s.actualReceivedKg || s.totalKg || "0"),
+        (sum: number, s) => sum + parseFloat(s.actualReceivedKg || s.totalKg || "0"),
         0
       );
-      const totalCommissions = statement.reduce((sum: number, s: any) => sum + parseFloat(s.totalCommission), 0);
+      const totalCommissions = statement.reduce((sum: number, s) => sum + parseFloat(s.totalCommission), 0);
       const totalDirectCommissions = statement.reduce(
-        (sum: number, s: any) => sum + parseFloat(s.commissionAmount || "0"),
+        (sum: number, s) => sum + parseFloat(s.commissionAmount || "0"),
         0
       );
 
@@ -279,7 +279,7 @@ export function registerSupplierStatementRoutes(app: Express) {
       }, 0);
 
       const totalPayments =
-        payments.reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0) + voucherPaymentsTotal;
+        payments.reduce((sum: number, p) => sum + parseFloat(p.amountUsd || "0"), 0) + voucherPaymentsTotal;
 
       // Group by currency for multi-currency statement
       const byCurrency: Record<
@@ -378,7 +378,7 @@ export function registerSupplierStatementRoutes(app: Express) {
       }
 
       // Opening balance (always stored in USD) — add to USD bucket so it appears in netPayable
-      const supplierOpeningBal = parseFloat((supplier as any).openingBalance || "0");
+      const supplierOpeningBal = parseFloat(supplier.openingBalance || "0");
       if (supplierOpeningBal !== 0) {
         if (!byCurrency["USD"])
           byCurrency["USD"] = {
@@ -518,7 +518,7 @@ export function registerSupplierStatementRoutes(app: Express) {
       // Is this a linked (child) supplier? Cross-currency freight from linked suppliers flows
       // automatically into the parent broker's statement from container data — no explicit FX
       // transfer is needed. Treat such freight as already settled to avoid double-counting.
-      const isLinkedSupplier = !!(supplier as any).parentId;
+      const isLinkedSupplier = !!supplier.parentId;
 
       const currencyGroups = Object.entries(byCurrency)
         .map(([cc, data]) => {
@@ -591,14 +591,14 @@ export function registerSupplierStatementRoutes(app: Express) {
         // looks resolved (confirmed non-USD rate, or legacy heuristic where no flag exists yet).
         const ctrs: any[] = cg.containers;
         const resolvedCtrs = ctrs.filter((c) => {
-          const { looksSet } = resolveStoredFxRate(cg.currencyCode, c.fxRateToUsd, (c as any).fxRateConfirmed);
+          const { looksSet } = resolveStoredFxRate(cg.currencyCode, c.fxRateToUsd, c.fxRateConfirmed);
           return looksSet;
         });
         const totalRawVal = resolvedCtrs.reduce((s: number, c: any) => s + parseFloat(c.value || "0"), 0);
         if (totalRawVal <= 0) return sum; // no resolved-rate containers → exclude rather than guess
         const weightedRate =
           resolvedCtrs.reduce((s: number, c: any) => {
-            const { fxRate } = resolveStoredFxRate(cg.currencyCode, c.fxRateToUsd, (c as any).fxRateConfirmed);
+            const { fxRate } = resolveStoredFxRate(cg.currencyCode, c.fxRateToUsd, c.fxRateConfirmed);
             return s + parseFloat(c.value || "0") * fxRate;
           }, 0) / totalRawVal;
         return sum + netPay * weightedRate;

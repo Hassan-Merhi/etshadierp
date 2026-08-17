@@ -16,7 +16,7 @@ import { resultRows } from "../../../lib/queryResult";
 export function registerFactoryStockQueryRoutes(app: Express) {
   app.get("/api/factory/stock-entry/in-stock", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { locationId } = req.query;
@@ -57,7 +57,7 @@ export function registerFactoryStockQueryRoutes(app: Express) {
   // including the bale count per location. Used by Ground Scan to auto-scope verification.
   app.get("/api/factory/stock-entry/in-stock-locations", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const rows = await db.execute(
@@ -86,7 +86,7 @@ export function registerFactoryStockQueryRoutes(app: Express) {
   // Returns array of IN_STOCK bales with referenceNumber, weightKg, etc. for a single articleCode.
   app.get("/api/factory/bale-stock-list", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const articleCode = ((req.query.articleCode as string) || "").trim();
@@ -149,7 +149,7 @@ export function registerFactoryStockQueryRoutes(app: Express) {
   // Optional locationId filters to only bales at that ERP location (mirrors location-inventory page).
   app.get("/api/factory/bale-stock-count", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const rawCodes = (req.query.articleCodes as string) || "";

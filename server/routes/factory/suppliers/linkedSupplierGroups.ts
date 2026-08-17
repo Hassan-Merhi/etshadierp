@@ -59,36 +59,36 @@ export async function buildLinkedSupplierGroups(
 
     const linkedByCurrency: Record<string, { containers: any[]; totalValue: number; totalCommission: number }> = {};
     for (const c of linkedContainers) {
-      const kg = parseFloat((c as any).actualReceivedKg || c.totalKg || "0");
+      const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
       const rate = parseFloat(c.ratePerKg || "0");
-      const freight = parseFloat((c as any).freight || "0");
+      const freight = parseFloat(c.freight || "0");
       const cc = c.currencyCode || "USD";
       // Use freightCurrencyCode directly (DB default is "USD", so AUD containers correctly separate USD freight)
-      const freightCc = (c as any).freightCurrencyCode || cc;
+      const freightCc = c.freightCurrencyCode || cc;
       const freightSameCcy = freightCc === cc;
       // Only include freight in this currency's value when it shares the container's currency
       const value = kg * rate + (freightSameCcy ? freight : 0);
       const cComms = commissions.filter((cm) => cm.containerId === c.id);
       const totalComm = cComms.reduce((s: number, cm: any) => s + parseFloat(cm.commissionTotal || "0"), 0);
-      const commCc = (c as any).commissionCurrencyCode || "USD";
+      const commCc = c.commissionCurrencyCode || "USD";
       if (!linkedByCurrency[cc]) linkedByCurrency[cc] = { containers: [], totalValue: 0, totalCommission: 0 };
       linkedByCurrency[cc].containers.push({
         id: c.id,
         containerNumber: c.containerNumber,
-        date: (c as any).arrivalDate || c.createdAt,
+        date: c.arrivalDate || c.createdAt,
         freight: freight.toFixed(2),
         freightCurrencyCode: freightCc,
         value: value.toFixed(2),
         currencyCode: cc,
         fxRateToUsd: (() => {
-          const { fxRate, looksSet } = resolveStoredFxRate(cc, c.fxRateToUsd, (c as any).fxRateConfirmed);
+          const { fxRate, looksSet } = resolveStoredFxRate(cc, c.fxRateToUsd, c.fxRateConfirmed);
           return looksSet ? String(fxRate) : "unresolved";
         })(),
         status: c.status,
         commissionAmount: c.commissionAmount || "0",
         commissionCurrencyCode: commCc,
-        commissionSupplierId: (c as any).commissionSupplierId || null,
-        commissionNotes: (c as any).commissionNotes || null,
+        commissionSupplierId: c.commissionSupplierId || null,
+        commissionNotes: c.commissionNotes || null,
         notes: c.notes,
       });
       linkedByCurrency[cc].totalValue += value;
@@ -104,11 +104,11 @@ export async function buildLinkedSupplierGroups(
     }
 
     const linkedPaidByCurrency: Record<string, number> = {};
-    for (const p of linkedPayments as any[]) {
+    for (const p of (linkedPayments)) {
       const cc = p.currencyCode || "USD";
       linkedPaidByCurrency[cc] = (linkedPaidByCurrency[cc] || 0) + parseFloat(p.amount || "0");
     }
-    for (const t of linkedFxTransfers as any[]) {
+    for (const t of (linkedFxTransfers)) {
       if (t.fromSupplierId === linked.id) {
         // Linked supplier sent funds out (FX Out) — counts as settled against their balance
         const cc = t.fromCurrencyCode || "USD";
@@ -134,7 +134,7 @@ export async function buildLinkedSupplierGroups(
         containerCount: data.containers.length,
         lastActivity:
           linkedContainers.length > 0
-            ? (linkedContainers[linkedContainers.length - 1] as any).arrivalDate ||
+            ? linkedContainers[linkedContainers.length - 1].arrivalDate ||
               linkedContainers[linkedContainers.length - 1].createdAt
             : null,
       };
@@ -147,7 +147,7 @@ export async function buildLinkedSupplierGroups(
       currencyGroups: linkedCurrencyGroups,
       lastActivity:
         linkedContainers.length > 0
-          ? (linkedContainers[linkedContainers.length - 1] as any).arrivalDate ||
+          ? linkedContainers[linkedContainers.length - 1].arrivalDate ||
             linkedContainers[linkedContainers.length - 1].createdAt
           : null,
     });

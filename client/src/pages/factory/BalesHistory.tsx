@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef, useMemo, useEffect } from "react";
 import { addDays, format } from "date-fns";
@@ -230,8 +231,8 @@ export default function BalesHistory() {
       toast({ title: "Bale deleted" });
       setDeleteConfirm(null);
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error deleting bale", description: error.message, variant: "destructive" });
       setDeleteConfirm(null);
     },
@@ -245,8 +246,8 @@ export default function BalesHistory() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
       toast({ title: "Status updated" });
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error updating status", description: error.message, variant: "destructive" });
     },
   });
@@ -261,8 +262,8 @@ export default function BalesHistory() {
       setBulkStatus("");
       toast({ title: "Bulk status updated" });
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error updating status", description: error.message, variant: "destructive" });
     },
   });
@@ -277,8 +278,8 @@ export default function BalesHistory() {
       setEditingNameId(null);
       toast({ title: "Product name updated" });
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error updating name", description: error.message, variant: "destructive" });
     },
   });
@@ -314,7 +315,7 @@ export default function BalesHistory() {
         : "";
       toast({ title: "Bale returned to stock", description: `Bale removed from order.${invoiceMsg}` });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
@@ -339,8 +340,8 @@ export default function BalesHistory() {
       };
       openBrowserReprint([label]);
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error repacking bale", description: error.message, variant: "destructive" });
       setRepackConfirm(null);
     },
@@ -1084,7 +1085,23 @@ export default function BalesHistory() {
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
                           {uniqueStatuses.map((s) => (
-                            <Badge key={s} variant={(STATUS_COLORS[s] || "secondary") as any} className="text-xs">
+                            <Badge
+                              key={s}
+                              variant={
+                                (STATUS_COLORS[s] || "secondary") as
+                                  | "default"
+                                  | "outline"
+                                  | "secondary"
+                                  | "destructive"
+                                  | "success"
+                                  | "warning"
+                                  | "info"
+                                  | "muted"
+                                  | null
+                                  | undefined
+                              }
+                              className="text-xs"
+                            >
                               {s.replace(/_/g, " ")}
                             </Badge>
                           ))}
@@ -1189,7 +1206,19 @@ export default function BalesHistory() {
                                     data-testid={`select-status-${bale.id}`}
                                   >
                                     <Badge
-                                      variant={(STATUS_COLORS[bale.status] || "secondary") as any}
+                                      variant={
+                                        (STATUS_COLORS[bale.status] || "secondary") as
+                                          | "default"
+                                          | "outline"
+                                          | "secondary"
+                                          | "destructive"
+                                          | "success"
+                                          | "warning"
+                                          | "info"
+                                          | "muted"
+                                          | null
+                                          | undefined
+                                      }
                                       className="text-xs"
                                     >
                                       {bale.status.replace(/_/g, " ")}

@@ -25,7 +25,7 @@ export function registerSupplierBulkFxPrefetchRoutes(app: Express) {
   // client can run the greedy allocation algorithm offline.
   app.get("/api/factory/suppliers/:brokerId/bulk-fx-prefetch", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const brokerId = parseId(req.params.brokerId);
       if (brokerId === null) return res.status(400).json({ message: "Invalid id" });
@@ -116,7 +116,7 @@ export function registerSupplierBulkFxPrefetchRoutes(app: Express) {
       }> = [];
       for (const sup of linkedSuppliers) {
         const supContainers = allContainers.filter((c) => c.supplierId === sup.id);
-        const totalValue = supContainers.reduce((s: number, c: any) => {
+        const totalValue = supContainers.reduce((s: number, c) => {
           const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
           const rate = parseFloat(c.ratePerKg || "0");
           const freight = parseFloat(c.freight || "0");

@@ -89,7 +89,7 @@ export function registerLedgerAccountWriteRoutes(app: Express) {
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId: parsed.companyId,
           action: "create",
           tableName: "ledger_accounts",
@@ -208,7 +208,7 @@ export function registerLedgerAccountWriteRoutes(app: Express) {
       });
 
       try {
-        const _ledChanges: Record<string, { old?: any; new?: any }> = {};
+        const _ledChanges: Record<string, { old?: unknown; new?: unknown }> = {};
         for (const _f of [
           "name",
           "code",
@@ -218,13 +218,13 @@ export function registerLedgerAccountWriteRoutes(app: Express) {
           "openingBalanceSide",
           "active",
         ] as const) {
-          if (String((existingAccount as any)[_f] ?? "") !== String((updatedAccount as any)[_f] ?? "")) {
-            _ledChanges[_f] = { old: (existingAccount as any)[_f], new: (updatedAccount as any)[_f] };
+          if (String(existingAccount[_f] ?? "") !== String(updatedAccount[_f] ?? "")) {
+            _ledChanges[_f] = { old: existingAccount[_f], new: updatedAccount[_f] };
           }
         }
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId: req.session.currentCompanyId!,
           action: "update",
           tableName: "ledger_accounts",

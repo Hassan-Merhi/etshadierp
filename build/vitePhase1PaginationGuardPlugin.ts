@@ -18,7 +18,7 @@ function daybookPaginationIsAlreadyIntegrated(source: string): boolean {
  */
 export function phase1PaginationPlugin(): Plugin {
   const legacyPlugin = createLegacyPhase1PaginationPlugin();
-  const legacyTransform = legacyPlugin.transform as any;
+  const legacyTransform = (legacyPlugin.transform);
 
   return {
     ...legacyPlugin,

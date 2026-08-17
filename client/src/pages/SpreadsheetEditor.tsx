@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Workbook } from "@fortune-sheet/react";
@@ -155,23 +156,23 @@ function fortuneToXlsx(sheets: FortuneSheet[]): any {
       maxC = Math.max(maxC, c);
     };
 
-    const sheetData = (sheet as any).data as any[][] | undefined;
+    const sheetData = (sheet.data);
     if (sheetData && Array.isArray(sheetData) && sheetData.length > 0) {
       for (let r = 0; r < sheetData.length; r++) {
         if (!sheetData[r]) continue;
         for (let c = 0; c < sheetData[r].length; c++) writeCell(r, c, sheetData[r][c]);
       }
     } else {
-      for (const cell of (sheet.celldata || []) as any[]) writeCell(cell.r, cell.c, cell.v);
+      for (const cell of ((sheet.celldata || []))) writeCell(cell.r, cell.c, cell.v);
     }
 
     ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: maxR, c: maxC } });
 
-    const cfg = (sheet as any).config || {};
+    const cfg = sheet.config || {};
 
     // Merged cells
     if (cfg.merge) {
-      ws["!merges"] = Object.values(cfg.merge).map((m: any) => ({
+      ws["!merges"] = Object.values(cfg.merge).map((m) => ({
         s: { r: m.r, c: m.c },
         e: { r: m.r + m.rs - 1, c: m.c + m.cs - 1 },
       }));
@@ -210,7 +211,7 @@ function fortuneToXlsx(sheets: FortuneSheet[]): any {
     }
 
     // Auto filter
-    const fs = (sheet as any).filter_select;
+    const fs = sheet.filter_select;
     if (fs) {
       const c1 = XLSX.utils.encode_col(fs.column[0]);
       const c2 = XLSX.utils.encode_col(fs.column[1]);
@@ -352,7 +353,7 @@ export default function SpreadsheetEditor() {
       setSheetName(sheet.name);
       setSaveStatus("saved");
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error creating spreadsheet", variant: "destructive" });
     },
@@ -367,7 +368,7 @@ export default function SpreadsheetEditor() {
       setSaveStatus("saved");
       queryClient.invalidateQueries({ queryKey: ["/api/spreadsheets"], exact: true });
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       setSaveStatus("unsaved");
     },
@@ -382,7 +383,7 @@ export default function SpreadsheetEditor() {
       if (openSheetId === deleteTarget) setOpenSheetId(null);
       setDeleteTarget(null);
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error deleting spreadsheet", variant: "destructive" });
     },

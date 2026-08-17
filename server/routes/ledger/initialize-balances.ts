@@ -583,7 +583,7 @@ export function registerAccountingBalanceInitRoutes(app: Express) {
           sqlStatements.push(
             `INSERT INTO ledger_accounts (company_id, code, name, account_type, opening_balance, opening_balance_side, active)\nVALUES (${result.companyId}, '${result.accountCode}', '${result.accountName}', 'Profit', ${result.openingBalance}, '${result.openingBalanceSide}', true);`
           );
-        } else if ((result as any).accountUpdated) {
+        } else if (result.accountUpdated) {
           sqlStatements.push(
             `UPDATE ledger_accounts SET opening_balance = '${result.openingBalance}', opening_balance_side = '${result.openingBalanceSide}'\nWHERE company_id = ${result.companyId} AND code = '${result.accountCode}';`
           );

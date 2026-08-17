@@ -420,7 +420,9 @@ export function registerPoImportRoutes(app: Express) {
         const companyRow = await db.execute(
           sql`SELECT company_type FROM companies WHERE id = ${currentCompanyId} LIMIT 1`
         );
-        const companyType = firstRow(companyRow)?.company_type ?? (companyRow as any)[0]?.company_type;
+        const companyType =
+          firstRow(companyRow)?.company_type ??
+          (companyRow as unknown as { [key: string]: { company_type: unknown } })[0]?.company_type;
         const isSpCompany = companyType === "supplier_partner";
 
         if (isSpCompany) {
@@ -722,7 +724,7 @@ export function registerPoImportRoutes(app: Express) {
             chargesEdited: hasAnyCharges,
             freightPaidBy: resolvedFreightPaidBy,
             freightParentAccountId: resolvedFreightPaidBy === "parent" ? resolvedFreightParentAccountId : null,
-          } as any,
+          },
           getClientDate(req)
         );
 

@@ -55,14 +55,14 @@ function ensurePhase4Schema(): Promise<void> {
 
 function collectCompanyIds(req: Request): number[] {
   const values = [
-    (req.session as any)?.currentCompanyId,
-    (req.body as any)?.companyId,
-    (req.body as any)?.sourceCompanyId,
-    (req.body as any)?.targetCompanyId,
-    (req.query as any)?.companyId,
-    (req.query as any)?.sourceCompanyId,
-    (req.query as any)?.targetCompanyId,
-    (req.params as any)?.companyId,
+    req.session?.currentCompanyId,
+    req.body?.companyId,
+    req.body?.sourceCompanyId,
+    req.body?.targetCompanyId,
+    req.query?.companyId,
+    req.query?.sourceCompanyId,
+    req.query?.targetCompanyId,
+    req.params?.companyId,
   ];
   return Array.from(
     new Set(
@@ -110,7 +110,7 @@ async function phase4WriteGuard(req: Request, res: Response, next: NextFunction)
       if (allowedMigrationWrite) return next();
 
       const migrationCompanyIds = collectCompanyIds(req);
-      const runId = String((req.body as any)?.runId ?? "").trim();
+      const runId = String(req.body?.runId ?? "").trim();
       if (runId) {
         const run = await db.execute(sql`
           SELECT source_company_id, target_company_id
@@ -192,7 +192,7 @@ function installPhase4WriteGuard(app: Express): void {
   if (installedApps.has(app)) return;
   installedApps.add(app);
   app.use(phase4WriteGuard);
-  const stack = (app as any)?._router?.stack as any[] | undefined;
+  const stack = app?._router?.stack as any[] | undefined;
   if (!stack?.length) return;
   const layer = stack.pop();
   const firstRouteIndex = stack.findIndex((entry: any) => Boolean(entry.route));

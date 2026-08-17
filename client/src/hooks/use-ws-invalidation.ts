@@ -78,7 +78,7 @@ export function useWsInvalidation() {
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     // Capacitor builds set VITE_WS_URL explicitly; web builds derive it from window.location.
-    const _CAPACITOR_WS_URL: string = ((import.meta as any).env?.VITE_WS_URL as string) || "";
+    const _CAPACITOR_WS_URL: string = (import.meta.env?.VITE_WS_URL as string) || "";
 
     function connect() {
       if (unmountedRef.current) return;

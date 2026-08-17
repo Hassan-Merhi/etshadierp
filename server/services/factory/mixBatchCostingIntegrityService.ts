@@ -1,8 +1,4 @@
-import {
-  calculateCostLine,
-  calculateWeightedAverageCost,
-  factoryCostDecimal,
-} from "./factoryCostingEngine";
+import { calculateCostLine, calculateWeightedAverageCost, factoryCostDecimal } from "./factoryCostingEngine";
 
 export interface MixBatchSourceIdentity {
   sourceType: string;
@@ -67,29 +63,20 @@ export interface MixBatchCostingResult {
 
 export interface MixBatchCostingAdapter {
   findExisting(input: {
-    tx: any;
+    tx: unknown;
     companyId: number;
     batchId: string;
     source: MixBatchSourceIdentity;
   }): Promise<MixBatchCostingResult | null>;
-  validateOwnership(input: {
-    tx: any;
-    companyId: number;
-    batchId: string;
-    supplierIds: number[];
-  }): Promise<void>;
-  lockSupplierStates(input: {
-    tx: any;
-    companyId: number;
-    supplierIds: number[];
-  }): Promise<LockedSupplierCostState[]>;
+  validateOwnership(input: { tx: unknown; companyId: number; batchId: string; supplierIds: number[] }): Promise<void>;
+  lockSupplierStates(input: { tx: unknown; companyId: number; supplierIds: number[] }): Promise<LockedSupplierCostState[]>;
   appendSupplierDeductions(input: {
-    tx: any;
+    tx: unknown;
     request: MixBatchCostingRequest;
     components: MixBatchComponentResult[];
   }): Promise<void>;
   persistSupplierStates(input: {
-    tx: any;
+    tx: unknown;
     companyId: number;
     states: Array<{
       supplierId: number;
@@ -101,20 +88,12 @@ export interface MixBatchCostingAdapter {
     }>;
   }): Promise<void>;
   persistMixBatchCost(input: {
-    tx: any;
+    tx: unknown;
     request: MixBatchCostingRequest;
     result: MixBatchCostingResult;
   }): Promise<void>;
-  recordIdempotency(input: {
-    tx: any;
-    request: MixBatchCostingRequest;
-    result: MixBatchCostingResult;
-  }): Promise<void>;
-  recordAudit(input: {
-    tx: any;
-    request: MixBatchCostingRequest;
-    result: MixBatchCostingResult;
-  }): Promise<void>;
+  recordIdempotency(input: { tx: unknown; request: MixBatchCostingRequest; result: MixBatchCostingResult }): Promise<void>;
+  recordAudit(input: { tx: unknown; request: MixBatchCostingRequest; result: MixBatchCostingResult }): Promise<void>;
 }
 
 export class MixBatchCostingValidationError extends Error {
@@ -152,11 +131,13 @@ function normalizeCurrency(value: unknown): string {
 
 function decimal(value: unknown, field: string, options: { allowZero?: boolean } = {}) {
   try {
-    return factoryCostDecimal(value as any, field, { allowZero: options.allowZero === true });
+    return factoryCostDecimal(value as unknown as Parameters<typeof factoryCostDecimal>[0], field, {
+      allowZero: options.allowZero === true,
+    });
   } catch {
     throw new MixBatchCostingValidationError(
       "MIX_BATCH_AMOUNT_INVALID",
-      `${field} must be ${options.allowZero ? "non-negative" : "positive"}`,
+      `${field} must be ${options.allowZero ? "non-negative" : "positive"}`
     );
   }
 }
@@ -174,7 +155,10 @@ export function validateMixBatchCostingRequest(request: MixBatchCostingRequest):
   const currency = normalizeCurrency(request.currency);
 
   if (!Array.isArray(request.components) || request.components.length === 0) {
-    throw new MixBatchCostingValidationError("MIX_BATCH_COMPONENTS_REQUIRED", "At least one mix-batch component is required");
+    throw new MixBatchCostingValidationError(
+      "MIX_BATCH_COMPONENTS_REQUIRED",
+      "At least one mix-batch component is required"
+    );
   }
 
   const seen = new Set<number>();
@@ -183,7 +167,7 @@ export function validateMixBatchCostingRequest(request: MixBatchCostingRequest):
     if (seen.has(supplierId)) {
       throw new MixBatchCostingValidationError(
         "MIX_BATCH_DUPLICATE_SUPPLIER",
-        `Supplier ${supplierId} appears more than once in the same mix batch`,
+        `Supplier ${supplierId} appears more than once in the same mix batch`
       );
     }
     seen.add(supplierId);
@@ -195,7 +179,7 @@ export function validateMixBatchCostingRequest(request: MixBatchCostingRequest):
     ) {
       throw new MixBatchCostingValidationError(
         "MIX_BATCH_VERSION_INVALID",
-        `components[${index}].expectedRawStockVersion is invalid`,
+        `components[${index}].expectedRawStockVersion is invalid`
       );
     }
     return supplierId;
@@ -213,9 +197,9 @@ export function validateMixBatchCostingRequest(request: MixBatchCostingRequest):
  * drifts because of consumption.
  */
 export async function createMixBatchCostTx(
-  tx: any,
+  tx: unknown,
   request: MixBatchCostingRequest,
-  adapter: MixBatchCostingAdapter,
+  adapter: MixBatchCostingAdapter
 ): Promise<MixBatchCostingResult> {
   const validated = validateMixBatchCostingRequest(request);
 
@@ -242,7 +226,7 @@ export async function createMixBatchCostTx(
   if (lockedStates.length !== validated.supplierIds.length) {
     throw new MixBatchCostingValidationError(
       "MIX_BATCH_SUPPLIER_STATE_MISSING",
-      "One or more supplier raw-stock states could not be locked",
+      "One or more supplier raw-stock states could not be locked"
     );
   }
 
@@ -253,13 +237,13 @@ export async function createMixBatchCostTx(
     if (!state) {
       throw new MixBatchCostingValidationError(
         "MIX_BATCH_SUPPLIER_STATE_MISSING",
-        `Missing locked state for supplier ${component.supplierId}`,
+        `Missing locked state for supplier ${component.supplierId}`
       );
     }
     if (normalizeCurrency(state.currency) !== validated.currency) {
       throw new MixBatchCostingValidationError(
         "MIX_BATCH_CURRENCY_MISMATCH",
-        `Supplier ${component.supplierId} currency ${state.currency} does not match ${validated.currency}`,
+        `Supplier ${component.supplierId} currency ${state.currency} does not match ${validated.currency}`
       );
     }
     if (!Number.isInteger(state.version) || state.version < 0) {
@@ -268,7 +252,7 @@ export async function createMixBatchCostTx(
     if (component.expectedRawStockVersion != null && component.expectedRawStockVersion !== state.version) {
       throw new MixBatchCostingValidationError(
         "MIX_BATCH_VERSION_CONFLICT",
-        `Supplier ${component.supplierId} expected version ${component.expectedRawStockVersion} but locked version is ${state.version}`,
+        `Supplier ${component.supplierId} expected version ${component.expectedRawStockVersion} but locked version is ${state.version}`
       );
     }
 
@@ -283,25 +267,25 @@ export async function createMixBatchCostTx(
     if (!availableQuantity.isZero() && !totalCost.div(availableQuantity).eq(unitCost)) {
       throw new MixBatchCostingValidationError(
         "MIX_BATCH_SUPPLIER_STATE_INCONSISTENT",
-        `Supplier ${component.supplierId} quantity, total cost, and unit cost are inconsistent`,
+        `Supplier ${component.supplierId} quantity, total cost, and unit cost are inconsistent`
       );
     }
     if (availableQuantity.isZero() && (!totalCost.isZero() || !unitCost.isZero())) {
       throw new MixBatchCostingValidationError(
         "MIX_BATCH_SUPPLIER_STATE_INCONSISTENT",
-        `Supplier ${component.supplierId} has cost without quantity`,
+        `Supplier ${component.supplierId} has cost without quantity`
       );
     }
     if (!expectedUnitCost.eq(unitCost)) {
       throw new MixBatchCostingValidationError(
         "MIX_BATCH_RATE_CONFLICT",
-        `Supplier ${component.supplierId} cost/kg changed from ${expectedUnitCost.toFixed()} to ${unitCost.toFixed()}`,
+        `Supplier ${component.supplierId} cost/kg changed from ${expectedUnitCost.toFixed()} to ${unitCost.toFixed()}`
       );
     }
     if (quantity.gt(availableQuantity)) {
       throw new MixBatchCostingValidationError(
         "MIX_BATCH_INSUFFICIENT_STOCK",
-        `Supplier ${component.supplierId} has ${availableQuantity.toFixed()} kg but ${quantity.toFixed()} kg was requested`,
+        `Supplier ${component.supplierId} has ${availableQuantity.toFixed()} kg but ${quantity.toFixed()} kg was requested`
       );
     }
 
@@ -311,13 +295,13 @@ export async function createMixBatchCostTx(
     if (afterQuantity.isZero() && !afterTotalCost.isZero()) {
       throw new MixBatchCostingValidationError(
         "MIX_BATCH_DEPLETION_COST_REMAINDER",
-        `Supplier ${component.supplierId} would retain cost after full depletion`,
+        `Supplier ${component.supplierId} would retain cost after full depletion`
       );
     }
     if (!afterQuantity.isZero() && !afterTotalCost.div(afterQuantity).eq(unitCost)) {
       throw new MixBatchCostingValidationError(
         "MIX_BATCH_SUPPLIER_RATE_DRIFT",
-        `Supplier ${component.supplierId} cost/kg would change during mix-batch deduction`,
+        `Supplier ${component.supplierId} cost/kg would change during mix-batch deduction`
       );
     }
 
@@ -339,7 +323,7 @@ export async function createMixBatchCostTx(
       quantityKg: component.quantityKg,
       unitCostPerKg: component.unitCostPerKg,
       totalCost: component.value,
-    })),
+    }))
   );
 
   const result: MixBatchCostingResult = {

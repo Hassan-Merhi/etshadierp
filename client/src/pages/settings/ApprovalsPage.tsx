@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -56,7 +57,7 @@ function ReviewDialog({ request, action, onClose, onDone }: ReviewDialogProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/approvals/my"] });
       onDone();
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   return (
@@ -232,7 +233,7 @@ export function ApprovalsPage({ currentUser }: Props) {
       toast({ title: "Marked as executed" });
       queryClient.invalidateQueries({ queryKey: ["/api/approvals"] });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const cancelMutation = useMutation({
@@ -242,7 +243,7 @@ export function ApprovalsPage({ currentUser }: Props) {
       queryClient.invalidateQueries({ queryKey: ["/api/approvals"] });
       queryClient.invalidateQueries({ queryKey: ["/api/approvals/my"] });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const handleAction = (r: ApprovalRequest, act: "approve" | "reject" | "execute" | "cancel") => {

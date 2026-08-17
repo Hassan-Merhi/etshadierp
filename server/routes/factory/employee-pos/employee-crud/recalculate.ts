@@ -19,10 +19,10 @@ export function registerFactoryEmployeeRecalculateRoutes(app: Express) {
   // Useful after deletions that didn't reverse balances (legacy bug).
   app.post("/api/factory/employees/recalculate-balances", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const role = ((req.session as any).currentRole || (req.session as any).role || "").toLowerCase();
+      const role = (req.session.currentRole || req.session.role || "").toLowerCase();
       if (role !== "admin" && role !== "owner" && role !== "developer") {
         return res.status(403).json({ message: "Only Admin or Owner can recalculate balances" });
       }
@@ -108,7 +108,7 @@ export function registerFactoryEmployeeRecalculateRoutes(app: Express) {
   // Rebuilds currentBalance, totalDeposits, totalWithdrawals for a single employee from surviving voucher entries.
   app.post("/api/factory/employees/:id/recalculate-balance", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const empId = parseInt(req.params.id);
 

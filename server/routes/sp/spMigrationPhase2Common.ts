@@ -69,8 +69,8 @@ async function getCompany(companyId: number): Promise<any | null> {
 }
 
 export async function validateMigrationPair(
-  req: any,
-  res: any,
+  req: import("express").Request,
+  res: import("express").Response,
   requireConfirmation = true
 ): Promise<{
   sourceId: number;

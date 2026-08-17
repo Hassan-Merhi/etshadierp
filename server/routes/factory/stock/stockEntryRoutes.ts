@@ -32,7 +32,7 @@ const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 export function registerFactoryStockEntryRoutes(app: Express) {
   app.post("/api/factory/stock-entry", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { items, erpLocationId, mixBatchId, entryDate } = req.body;
@@ -51,7 +51,7 @@ export function registerFactoryStockEntryRoutes(app: Express) {
         effectiveDateStr = entryDate;
       }
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         let mixBatch: any = null;
         if (mixBatchId) {
           const [mb] = await tx
@@ -111,10 +111,10 @@ export function registerFactoryStockEntryRoutes(app: Express) {
           productIds.length > 0
             ? await tx.select().from(factoryBaleProducts).where(inArray(factoryBaleProducts.id, productIds))
             : [];
-        const productMap = new Map<number, any>(factoryProducts.map((p: any) => [p.id, p]));
+        const productMap = new Map<number, any>(factoryProducts.map((p) => [p.id, p]));
 
         const categoryIdSet = new Set<number>();
-        factoryProducts.forEach((p: any) => {
+        factoryProducts.forEach((p) => {
           if (p.categoryId) categoryIdSet.add(p.categoryId);
         });
         const categoryIds = Array.from(categoryIdSet);
@@ -122,7 +122,7 @@ export function registerFactoryStockEntryRoutes(app: Express) {
           categoryIds.length > 0
             ? await tx.select().from(factoryCategories).where(inArray(factoryCategories.id, categoryIds))
             : [];
-        const categoryMap = new Map<number, any>(factoryCats.map((c: any) => [c.id, c]));
+        const categoryMap = new Map<number, any>(factoryCats.map((c) => [c.id, c]));
 
         // Resolve worker and production-position attribution against the exact
         // stock-entry date. This validates company scope and effective-dated
@@ -191,7 +191,7 @@ export function registerFactoryStockEntryRoutes(app: Express) {
         // with no configured production position and for unassigned bales.
         if (insertedBales.length > 0) {
           await tx.insert(factoryBaleProductionAttributions).values(
-            insertedBales.map((bale: any, idx: number) => {
+            insertedBales.map((bale, idx: number) => {
               const attribution = baleAttributionRefs[idx];
               return {
                 companyId,
@@ -206,7 +206,7 @@ export function registerFactoryStockEntryRoutes(app: Express) {
           );
         }
 
-        const bales: any[] = insertedBales.map((b: any, idx: number) => {
+        const bales: any[] = insertedBales.map((b, idx: number) => {
           const attribution = baleAttributionRefs[idx];
           return {
             ...b,
@@ -247,7 +247,7 @@ export function registerFactoryStockEntryRoutes(app: Express) {
             const cat = categoryMap.get(factoryProduct.categoryId);
             if (cat) {
               const catName = cat.name as string;
-              const catId = (cat as any).id as number;
+              const catId = cat.id as number;
               const cacheKey = String(catId || catName);
               const cached = stockGroupCache.get(cacheKey);
               if (cached) {
@@ -373,8 +373,8 @@ export function registerFactoryStockEntryRoutes(app: Express) {
       // Build a meaningful description with product names and reference codes
       const productGroups = new Map<string, string[]>();
       for (const bale of result.bales) {
-        const name = (bale as any).productName || (bale as any).articleCode || "Unknown";
-        const ref = (bale as any).referenceNumber || (bale as any).baleCode || "";
+        const name = bale.productName || bale.articleCode || "Unknown";
+        const ref = bale.referenceNumber || bale.baleCode || "";
         if (!productGroups.has(name)) productGroups.set(name, []);
         if (ref) productGroups.get(name)!.push(ref);
       }
@@ -420,7 +420,7 @@ export function registerFactoryStockEntryRoutes(app: Express) {
 
   app.post("/api/factory/bales/import", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { erpLocationId, bales } = req.body;
@@ -457,12 +457,12 @@ export function registerFactoryStockEntryRoutes(app: Express) {
           .json({ message: `Duplicate ref numbers within import file: ${Array.from(payloadDupes).join(", ")}` });
       }
 
-      const result = await db.transaction(async (tx: any) => {
+      const result = await db.transaction(async (tx) => {
         const existingBarcodes = await tx
           .select({ referenceNumber: factoryBales.referenceNumber })
           .from(factoryBales)
           .where(eq(factoryBales.companyId, companyId));
-        const existingRefSet = new Set(existingBarcodes.map((b: any) => b.referenceNumber));
+        const existingRefSet = new Set(existingBarcodes.map((b) => b.referenceNumber));
 
         const conflicting = allIntendedRefs.filter((ref) => existingRefSet.has(ref));
         if (conflicting.length > 0) {

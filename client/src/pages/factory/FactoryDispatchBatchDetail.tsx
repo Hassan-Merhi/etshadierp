@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { useLocation, useRoute } from "wouter";
@@ -143,7 +144,7 @@ export default function FactoryDispatchBatchDetail() {
       setRideForm({ truckPlate: "", driverName: "", destination: "", notes: "" });
       if (d.id) navigate(`/factory/dispatch-batches/${batchId}/rides/${d.id}/scan`);
     },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: ClientErrorLike) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const cancelMutation = useMutation({
@@ -158,7 +159,7 @@ export default function FactoryDispatchBatchDetail() {
       toast({ title: "Batch cancelled", description: "All bales have been returned to stock." });
       setCancelOpen(false);
     },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: ClientErrorLike) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const generateMutation = useMutation({
@@ -180,7 +181,7 @@ export default function FactoryDispatchBatchDetail() {
       setPreviewOpen(false);
       refetch();
     },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: ClientErrorLike) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const reopenRideMutation = useMutation({
@@ -195,7 +196,7 @@ export default function FactoryDispatchBatchDetail() {
       setReopenRideId(null);
       setReopenReason("");
     },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    onError: (err: ClientErrorLike) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   if (!batchId) return null;
@@ -227,7 +228,7 @@ export default function FactoryDispatchBatchDetail() {
       <div className="p-6">
         <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
           <AlertTriangle className="w-8 h-8" />
-          <p>{(error as any)?.message || "Failed to load dispatch batch"}</p>
+          <p>{error?.message || "Failed to load dispatch batch"}</p>
           <Button variant="outline" onClick={() => navigate("/factory/dispatch-batches")}>
             <ArrowLeft className="w-4 h-4 mr-1" /> Back to list
           </Button>

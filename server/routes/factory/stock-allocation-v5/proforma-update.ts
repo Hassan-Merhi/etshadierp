@@ -23,7 +23,7 @@ export function registerV5ProformaUpdateRoutes(app: Express) {
   // V5 guard: proformaIdUsed IS NOT NULL (proforma.isActive is V5-specific concept)
   app.patch("/api/factory/v5/proforma/:proformaId/close", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const proformaId = parseInt(req.params.proformaId);
@@ -78,7 +78,7 @@ export function registerV5ProformaUpdateRoutes(app: Express) {
     requireAuth,
     async (req: Request, res: Response) => {
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 
         const proformaId = parseInt(req.params.proformaId);
@@ -133,7 +133,7 @@ export function registerV5ProformaUpdateRoutes(app: Express) {
         // LOADING / PENDING / VERIFIED / FINALIZED / CANCELLED orders are not in eligibleIds,
         // so their expected lines are guaranteed to remain unchanged.
         let totalUpdated = 0;
-        await db.transaction(async (tx: any) => {
+        await db.transaction(async (tx) => {
           for (const update of updates) {
             const qty = Math.round(Number(update.expectedQty));
             for (const orderId of eligibleIds) {
@@ -144,7 +144,7 @@ export function registerV5ProformaUpdateRoutes(app: Express) {
                     AND article_code = ${update.articleCode}
                     AND company_id = ${companyId}`
               );
-              totalUpdated += (result as any).rowCount ?? 0;
+              totalUpdated += result.rowCount ?? 0;
             }
           }
         });

@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -121,7 +122,7 @@ export default function FactoryInsurance() {
       setEcDate(new Date().toISOString().slice(0, 10));
       toast({ title: "Extra charge posted", description: "Voucher created and visible in Daybook & Accounts." });
     },
-    onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
+    onError: (e: ClientErrorLike) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
   });
 
   // Close account dropdowns on outside click
@@ -162,7 +163,7 @@ export default function FactoryInsurance() {
       queryClient.invalidateQueries({ queryKey: ["/api/insurance/members"] });
       toast({ title: "Status updated" });
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       toast({ title: "Failed", description: e.message, variant: "destructive" });
     },
   });
@@ -176,7 +177,7 @@ export default function FactoryInsurance() {
       toast({ title: "Member deleted" });
       setDeleteMember(null);
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       toast({ title: "Failed to delete", description: e.message, variant: "destructive" });
     },
   });
@@ -200,10 +201,10 @@ export default function FactoryInsurance() {
               View in Daybook
             </button>
           </span>
-        ) as any,
+        ),
       });
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       toast({ title: "Generation failed", description: e.message, variant: "destructive" });
     },
   });

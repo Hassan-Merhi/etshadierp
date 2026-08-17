@@ -51,7 +51,7 @@ interface GroupedStockItem {
 function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boolean; onToggleCombined: () => void }) {
   const { formatAmount } = useCurrencyContext();
   const appMode = useAppMode();
-  const modeApiRequest = getApiRequest(appMode);
+  const _modeApiRequest = getApiRequest(appMode);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedGrade, setSelectedGrade] = useState<string>("all");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
@@ -196,7 +196,7 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
   const totalValue = filteredItems.reduce((sum, item) => sum + item.totalCost, 0);
   const uniqueItemCount = filteredItems.length;
 
-  const containerGrandTotal = otwContainers.reduce((sum, c) => sum + parseFloat((c as any).grandTotal || "0"), 0);
+  const containerGrandTotal = otwContainers.reduce((sum, c) => sum + parseFloat(c.grandTotal || "0"), 0);
   const isFiltered =
     searchTerm.trim() !== "" || selectedGrade !== "all" || selectedCategory !== "all" || selectedSupplier !== "all";
   const displayTotal = isFiltered ? totalValue : containerGrandTotal;

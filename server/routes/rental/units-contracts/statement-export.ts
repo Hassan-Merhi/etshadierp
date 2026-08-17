@@ -67,7 +67,7 @@ export function registerRentalStatementExportRoutes(app: Express, ctx: RentalRou
       );
 
       const monthNames = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-      const fmtNum = (v: any) => Number(v || 0);
+      const fmtNum = (v: unknown) => Number(v || 0);
 
       const ExcelJS = (await import("exceljs")).default;
       const wb = new ExcelJS.Workbook();
@@ -121,7 +121,7 @@ export function registerRentalStatementExportRoutes(app: Express, ctx: RentalRou
       addInfo(
         "Start Date",
         contract.startDate
-          ? new Date(contract.startDate as any).toLocaleDateString("en-GB", {
+          ? new Date(contract.startDate).toLocaleDateString("en-GB", {
               day: "2-digit",
               month: "short",
               year: "numeric",
@@ -228,7 +228,7 @@ export function registerRentalStatementExportRoutes(app: Express, ctx: RentalRou
 
         for (const p of rows) {
           const r = ws.addRow([
-            new Date(p.paymentDate as any).toLocaleDateString("en-GB", {
+            new Date(p.paymentDate).toLocaleDateString("en-GB", {
               day: "2-digit",
               month: "short",
               year: "numeric",

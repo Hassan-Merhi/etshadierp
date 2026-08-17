@@ -11,10 +11,7 @@ import {
   stockItems,
   vouchers,
 } from "@shared/schema";
-import type {
-  CompanyIsolationLookupAdapter,
-  CompanyScopedResourceType,
-} from "./companyIsolationPolicy";
+import type { CompanyIsolationLookupAdapter, CompanyScopedResourceType } from "./companyIsolationPolicy";
 
 async function lookupCompany(
   tx: any,
@@ -26,11 +23,7 @@ async function lookupCompany(
   const numericId = typeof resourceId === "number" ? resourceId : Number(resourceId);
   if (!Number.isSafeInteger(numericId) || numericId <= 0) return null;
 
-  const [row] = await tx
-    .select({ companyId: companyColumn })
-    .from(table)
-    .where(eq(idColumn, numericId))
-    .limit(1);
+  const [row] = await tx.select({ companyId: companyColumn }).from(table).where(eq(idColumn, numericId)).limit(1);
 
   return row?.companyId ?? null;
 }
@@ -38,14 +31,9 @@ async function lookupCompany(
 export function createDatabaseCompanyIsolationAdapter(): CompanyIsolationLookupAdapter {
   return {
     async loadResourceCompany({ tx, resourceType, resourceId }) {
-      const database = tx as any;
+      const database = tx;
 
-      const lookups: Partial<
-        Record<
-          CompanyScopedResourceType,
-          { table: any; idColumn: any; companyColumn: any }
-        >
-      > = {
+      const lookups: Partial<Record<CompanyScopedResourceType, { table: unknown; idColumn: unknown; companyColumn: unknown }>> = {
         voucher: {
           table: vouchers,
           idColumn: vouchers.id,
@@ -101,13 +89,7 @@ export function createDatabaseCompanyIsolationAdapter(): CompanyIsolationLookupA
       const lookup = lookups[resourceType];
       if (!lookup) return null;
 
-      return lookupCompany(
-        database,
-        lookup.table,
-        lookup.idColumn,
-        lookup.companyColumn,
-        resourceId
-      );
+      return lookupCompany(database, lookup.table, lookup.idColumn, lookup.companyColumn, resourceId);
     },
   };
 }

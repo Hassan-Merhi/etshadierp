@@ -42,7 +42,7 @@ export function registerRawStockRecalcApplyAllRoutes(app: Express) {
     requireAuth,
     requireRole(...ADMIN_ROLES),
     async (req: any, res: any) => {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       // DEFECT 13 FIX: Supplier-priced source rows must be corrected through Historical
       // Replay (timeline-based rates), not this endpoint (container rate). Route 410.
@@ -64,7 +64,7 @@ export function registerRawStockRecalcApplyAllRoutes(app: Express) {
     requireAuth,
     requireRole(...ADMIN_ROLES),
     async (req: any, res: any) => {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { confirm, confirmationToken, includeHistoricalContainers, includeCompletedBatches } = req.body;

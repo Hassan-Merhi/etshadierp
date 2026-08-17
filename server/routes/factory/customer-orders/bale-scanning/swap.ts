@@ -26,7 +26,7 @@ export function registerOrderBaleSwapRoutes(app: Express) {
   // GET /api/factory/bales/:id/order-info — get the order a bale is allocated to (for the confirmation dialog)
   app.get("/api/factory/bales/:id/order-info", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const baleId = parseId(req.params.id);
@@ -70,7 +70,7 @@ export function registerOrderBaleSwapRoutes(app: Express) {
   // The current bale is returned to stock; the replacement bale takes its place in the order.
   app.post("/api/factory/bales/swap", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { currentBaleRef, replacementBaleRef } = req.body;

@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { settingsApi } from "@/api/settingsApi";
@@ -69,7 +70,7 @@ export function ActiveSessionsTab({ isAdmin }: { isAdmin: boolean }) {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
       toast({ title: "Session revoked" });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Failed to revoke session", description: err.message, variant: "destructive" });
     },
   });
@@ -82,7 +83,7 @@ export function ActiveSessionsTab({ isAdmin }: { isAdmin: boolean }) {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
       toast({ title: "All other sessions signed out" });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Failed to sign out sessions", description: err.message, variant: "destructive" });
     },
   });

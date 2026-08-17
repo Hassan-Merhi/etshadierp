@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { getErrorDetails } from "@shared/errorUtils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -150,7 +151,7 @@ export default function FactoryInvoices() {
     onSuccess: () => {
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
@@ -170,7 +171,7 @@ export default function FactoryInvoices() {
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
       invalidateCustomerBalances();
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
@@ -193,7 +194,7 @@ export default function FactoryInvoices() {
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
       invalidateCustomerBalances();
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Cannot Revert", description: error.message, variant: "destructive" });
     },

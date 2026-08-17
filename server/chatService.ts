@@ -659,7 +659,7 @@ If the intent is unclear or amounts/accounts are too ambiguous to resolve, respo
                       AND v.company_id = ${companyId}
                     WHERE ve.ledger_account_id = ${entry.accountId}
                   `);
-                  entry.balanceBefore = parseFloat((balResult.rows[0] as any)?.net || "0");
+                  entry.balanceBefore = parseFloat((balResult.rows[0] as { net: string })?.net || "0");
                 }
               }
             } catch (_) {
@@ -755,7 +755,7 @@ If intent is unclear, respond with exactly: null`;
                         AND location_id = ${parsedAdj.locationId}
                         AND company_id = ${companyId}
                     `);
-                    const currentStock = parseFloat((invResult.rows[0] as any)?.qty || "0");
+                    const currentStock = parseFloat((invResult.rows[0] as { qty: string })?.qty || "0");
                     item.currentStock = parseFloat(currentStock.toFixed(3));
                     const delta = item.type === "PRODUCE" ? item.quantity : -item.quantity;
                     item.projectedStock = parseFloat((currentStock + delta).toFixed(3));
@@ -1569,7 +1569,7 @@ If intent is unclear or this is not a stock transfer request, respond with exact
                     AND location_id = ${parsedTf.sourceLocationId}
                     AND company_id = ${companyId}
                 `);
-                  item.currentStock = parseFloat((invResult.rows[0] as any)?.qty || "0");
+                  item.currentStock = parseFloat((invResult.rows[0] as { qty: string })?.qty || "0");
                 }
               }
               stockTransferDraft = parsedTf;

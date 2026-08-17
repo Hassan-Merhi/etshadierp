@@ -53,12 +53,12 @@ export function registerRentalContractRoutes(app: Express, ctx: RentalRoutesCont
 
       const [created] = await db
         .insert(propertyContracts)
-        .values({ ...data, module } as any)
+        .values({ ...data, module })
         .returning();
       await ensureMonthlyLedgerRows(created.id);
       await logAudit({
         userId: req.session.userId!,
-        username: (req.session as any).username || "unknown",
+        username: req.session.username || "unknown",
         companyId,
         action: "create",
         tableName: "property_contracts",
@@ -128,7 +128,7 @@ export function registerRentalContractRoutes(app: Express, ctx: RentalRoutesCont
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId,
           action: "update",
           tableName: "property_contracts",
@@ -179,7 +179,7 @@ export function registerRentalContractRoutes(app: Express, ctx: RentalRoutesCont
           )
         );
       if (!contract) return res.status(404).json({ message: "Contract not found" });
-      const contractUpdates: any = { tenantName, startDate: startDate as any };
+      const contractUpdates: any = { tenantName, startDate: startDate };
       if (guaranteeAmount !== undefined) contractUpdates.guaranteeAmount = guaranteeAmount;
       if (guaranteePeriod !== undefined) contractUpdates.guaranteePeriod = guaranteePeriod;
       if (isInternal !== undefined) contractUpdates.isInternal = isInternal;
@@ -225,7 +225,7 @@ export function registerRentalContractRoutes(app: Express, ctx: RentalRoutesCont
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId,
           action: "update",
           tableName: "property_contracts",
@@ -235,8 +235,8 @@ export function registerRentalContractRoutes(app: Express, ctx: RentalRoutesCont
             ...(tenantName !== contract.tenantName
               ? { tenantName: { old: contract.tenantName ?? null, new: tenantName } }
               : {}),
-            ...(startDate !== (contract.startDate as any)
-              ? { startDate: { old: (contract.startDate as any) ?? null, new: startDate } }
+            ...(startDate !== contract.startDate
+              ? { startDate: { old: contract.startDate ?? null, new: startDate } }
               : {}),
             ...(guaranteeAmount !== undefined
               ? { guaranteeAmount: { old: contract.guaranteeAmount ?? null, new: guaranteeAmount } }

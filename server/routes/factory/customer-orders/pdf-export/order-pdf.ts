@@ -29,7 +29,7 @@ import { buildExportFilename } from "../orderHelpers";
 export function registerOrderPdfRoutes(app: Express) {
   app.get("/api/factory/customer-orders/:id/export-pdf", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseId(req.params.id);
@@ -192,7 +192,11 @@ export function registerOrderPdfRoutes(app: Express) {
         totalAmt = 0;
 
       for (let idx = 0; idx < sortedLines.length; idx++) {
-        const line = sortedLines[idx] as any;
+        const line = sortedLines[idx] as unknown as { qty: string } & { weightPerBale: string } & {
+          totalWeight: string;
+        } & { pricePerBale: string } & { totalPrice: string } & { articleCode: string } & { baleName: unknown } & {
+          articleCode: unknown;
+        };
         const qty = parseFloat(line.qty || "0");
         const wtBale = parseFloat(line.weightPerBale || "0");
         const totWt = parseFloat(line.totalWeight || "0") || qty * wtBale;
@@ -307,12 +311,12 @@ export function registerOrderPdfRoutes(app: Express) {
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || req.session.userId!,
+          username: req.session.username || req.session.userId!,
           companyId,
           action: "export",
           tableName: "factory_customer_orders",
           recordId: orderId,
-          recordIdentifier: `Customer Order #${(order as any).invoiceNumber || orderId} PDF`,
+          recordIdentifier: `Customer Order #${order.invoiceNumber || orderId} PDF`,
           changes: { format: { old: null, new: "pdf" }, orderId: { old: null, new: orderId } },
         });
       } catch (auditErr) {

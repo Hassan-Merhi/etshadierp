@@ -23,10 +23,7 @@ function wantsPagination(req: Request): boolean {
 }
 
 function parsePagination(req: Request): { page: number; limit: number; offset: number } {
-  const limit = Math.min(
-    MAX_PAGE_SIZE,
-    parsePositiveInt(req.query.limit ?? req.query.pageSize, DEFAULT_PAGE_SIZE)
-  );
+  const limit = Math.min(MAX_PAGE_SIZE, parsePositiveInt(req.query.limit ?? req.query.pageSize, DEFAULT_PAGE_SIZE));
   if (req.query.offset !== undefined) {
     const offset = Math.max(0, Number.parseInt(String(req.query.offset), 10) || 0);
     return { page: Math.floor(offset / limit) + 1, limit, offset };
@@ -73,45 +70,40 @@ interface ProformaDetail {
 }
 
 export function registerFactoryStockAllocationV5PaginationRoutes(app: Express): void {
-  app.get(
-    "/api/factory/v5/stock-allocation",
-    requireAuth,
-    async (req: Request, res: Response, next: NextFunction) => {
-      if (!wantsPagination(req)) return next();
+  app.get("/api/factory/v5/stock-allocation", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+    if (!wantsPagination(req)) return next();
 
-      try {
-        const session = req.session as any;
-        const companyId = session.factoryCompanyId || session.currentCompanyId;
-        if (!companyId) return res.status(400).json({ message: "No company selected" });
+    try {
+      const session = req.session;
+      const companyId = session.factoryCompanyId || session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-        const productFilter = queryText(req.query.productFilter);
-        const customerFilter = queryText(req.query.customerFilter);
-        const proformaFilter = queryText(req.query.proformaFilter);
-        const containerFilter = queryText(req.query.containerFilter);
-        const statusFilter = queryText(req.query.statusFilter).toUpperCase();
-        const search = queryText(req.query.search);
-        const fromDate = queryText(req.query.fromDate);
-        const toDate = queryText(req.query.toDate);
-        const hideZero = req.query.hideZero === "true";
-        const { page, limit, offset } = parsePagination(req);
+      const productFilter = queryText(req.query.productFilter);
+      const customerFilter = queryText(req.query.customerFilter);
+      const proformaFilter = queryText(req.query.proformaFilter);
+      const containerFilter = queryText(req.query.containerFilter);
+      const statusFilter = queryText(req.query.statusFilter).toUpperCase();
+      const search = queryText(req.query.search);
+      const fromDate = queryText(req.query.fromDate);
+      const toDate = queryText(req.query.toDate);
+      const hideZero = req.query.hideZero === "true";
+      const { page, limit, offset } = parsePagination(req);
 
-        const values: unknown[] = [];
-        const bind = (value: unknown): string => {
-          values.push(value);
-          return `$${values.length}`;
-        };
+      const values: unknown[] = [];
+      const bind = (value: unknown): string => {
+        values.push(value);
+        return `$${values.length}`;
+      };
 
-        const companyParam = bind(companyId);
-        const activeProformaConditions = [
-          `cp.company_id = ${companyParam}`,
-          `cp.is_active = true`,
-        ];
-        if (fromDate) activeProformaConditions.push(`cp.created_at >= ${bind(fromDate)}::date`);
-        if (toDate) activeProformaConditions.push(`cp.created_at < (${bind(toDate)}::date + INTERVAL '1 day')`);
+      const companyParam = bind(companyId);
+      const activeProformaConditions = [`cp.company_id = ${companyParam}`, `cp.is_active = true`];
+      if (fromDate) activeProformaConditions.push(`cp.created_at >= ${bind(fromDate)}::date`);
+      if (toDate) activeProformaConditions.push(`cp.created_at < (${bind(toDate)}::date + INTERVAL '1 day')`);
 
-        // Preserve the existing idempotent GET backfill before reading expected quantities.
-        // It inserts only missing rows and retains the unique-key race safety net.
-        await pool.query(
+      // Preserve the existing idempotent GET backfill before reading expected quantities.
+      // It inserts only missing rows and retains the unique-key race safety net.
+      await pool
+        .query(
           `
             WITH active_proformas AS (
               SELECT cp.id
@@ -136,17 +128,18 @@ export function registerFactoryStockAllocationV5PaginationRoutes(app: Express): 
             ON CONFLICT (order_id, article_code) DO NOTHING
           `,
           values
-        ).catch(() => undefined);
+        )
+        .catch(() => undefined);
 
-        const filterConditions: string[] = [];
-        const effectiveProductFilter = productFilter || search;
-        if (effectiveProductFilter) {
-          const param = bind(`%${effectiveProductFilter}%`);
-          filterConditions.push(`(ab.article_code ILIKE ${param} OR ab.product_name ILIKE ${param})`);
-        }
-        if (customerFilter) {
-          const param = bind(`%${customerFilter}%`);
-          filterConditions.push(`EXISTS (
+      const filterConditions: string[] = [];
+      const effectiveProductFilter = productFilter || search;
+      if (effectiveProductFilter) {
+        const param = bind(`%${effectiveProductFilter}%`);
+        filterConditions.push(`(ab.article_code ILIKE ${param} OR ab.product_name ILIKE ${param})`);
+      }
+      if (customerFilter) {
+        const param = bind(`%${customerFilter}%`);
+        filterConditions.push(`EXISTS (
             SELECT 1
             FROM active_proformas apf
             JOIN customer_proforma_lines cplf ON cplf.proforma_id = apf.id
@@ -154,38 +147,38 @@ export function registerFactoryStockAllocationV5PaginationRoutes(app: Express): 
             WHERE cplf.article_code = ab.article_code
               AND COALESCE(cf.legal_name, '') ILIKE ${param}
           )`);
-        }
-        if (proformaFilter) {
-          const param = bind(`%${proformaFilter}%`);
-          filterConditions.push(`EXISTS (
+      }
+      if (proformaFilter) {
+        const param = bind(`%${proformaFilter}%`);
+        filterConditions.push(`EXISTS (
             SELECT 1
             FROM active_proformas apf
             JOIN customer_proforma_lines cplf ON cplf.proforma_id = apf.id
             WHERE cplf.article_code = ab.article_code
               AND apf.name ILIKE ${param}
           )`);
-        }
-        if (containerFilter) {
-          const param = bind(`%${containerFilter}%`);
-          filterConditions.push(`EXISTS (
+      }
+      if (containerFilter) {
+        const param = bind(`%${containerFilter}%`);
+        filterConditions.push(`EXISTS (
             SELECT 1
             FROM active_orders aof
             JOIN customer_proforma_lines cplf ON cplf.proforma_id = aof.proforma_id
             WHERE cplf.article_code = ab.article_code
               AND COALESCE(aof.container_number, 'Order #' || aof.id::text) ILIKE ${param}
           )`);
-        }
-        if (statusFilter) {
-          const param = bind(statusFilter);
-          filterConditions.push(`EXISTS (
+      }
+      if (statusFilter) {
+        const param = bind(statusFilter);
+        filterConditions.push(`EXISTS (
             SELECT 1
             FROM active_orders aof
             JOIN customer_proforma_lines cplf ON cplf.proforma_id = aof.proforma_id
             WHERE cplf.article_code = ab.article_code AND aof.status = ${param}
           )`);
-        }
-        if (hideZero) {
-          filterConditions.push(`(
+      }
+      if (hideZero) {
+        filterConditions.push(`(
             ab.stock_available <> 0
             OR ab.total_loaded <> 0
             OR ab.expected_to_load <> 0
@@ -196,13 +189,13 @@ export function registerFactoryStockAllocationV5PaginationRoutes(app: Express): 
               WHERE cplf.article_code = ab.article_code
             )
           )`);
-        }
+      }
 
-        const limitParam = bind(limit);
-        const offsetParam = bind(offset);
-        const filteredWhere = filterConditions.length > 0 ? `WHERE ${filterConditions.join(" AND ")}` : "";
+      const limitParam = bind(limit);
+      const offsetParam = bind(offset);
+      const filteredWhere = filterConditions.length > 0 ? `WHERE ${filterConditions.join(" AND ")}` : "";
 
-        const aggregateQuery = `
+      const aggregateQuery = `
           WITH active_proformas AS (
             SELECT cp.id, cp.customer_id, cp.name, cp.created_at
             FROM customer_proformas cp
@@ -348,36 +341,36 @@ export function registerFactoryStockAllocationV5PaginationRoutes(app: Express): 
             ) AS rows
         `;
 
-        const aggregateResult = await pool.query(aggregateQuery, values);
-        const aggregate = aggregateResult.rows[0] ?? {};
-        const pageRows: PageRow[] = (Array.isArray(aggregate.rows) ? aggregate.rows : []).map((row: any) => ({
-          articleCode: String(row.articleCode),
-          productName: String(row.productName || row.articleCode),
-          categoryName: String(row.categoryName || ""),
-          stockAvailable: Number(row.stockAvailable || 0),
-          totalLoaded: Number(row.totalLoaded || 0),
-          expectedToLoad: Number(row.expectedToLoad || 0),
-          freeToPromise: Number(row.freeToPromise || 0),
-          totalKg: Number(row.totalKg || 0),
-          isGarbageOrWipers: Boolean(row.isGarbageOrWipers),
-          proformaDetails: [],
-        }));
+      const aggregateResult = await pool.query(aggregateQuery, values);
+      const aggregate = aggregateResult.rows[0] ?? {};
+      const pageRows: PageRow[] = (Array.isArray(aggregate.rows) ? aggregate.rows : []).map((row: any) => ({
+        articleCode: String(row.articleCode),
+        productName: String(row.productName || row.articleCode),
+        categoryName: String(row.categoryName || ""),
+        stockAvailable: Number(row.stockAvailable || 0),
+        totalLoaded: Number(row.totalLoaded || 0),
+        expectedToLoad: Number(row.expectedToLoad || 0),
+        freeToPromise: Number(row.freeToPromise || 0),
+        totalKg: Number(row.totalKg || 0),
+        isGarbageOrWipers: Boolean(row.isGarbageOrWipers),
+        proformaDetails: [],
+      }));
 
-        const pageCodes = pageRows.map((row) => row.articleCode);
-        if (pageCodes.length > 0) {
-          const detailValues: unknown[] = [companyId, pageCodes, ACTIVE_ORDER_STATUSES];
-          const detailConditions = [`cp.company_id = $1`, `cp.is_active = true`];
-          if (fromDate) {
-            detailValues.push(fromDate);
-            detailConditions.push(`cp.created_at >= $${detailValues.length}::date`);
-          }
-          if (toDate) {
-            detailValues.push(toDate);
-            detailConditions.push(`cp.created_at < ($${detailValues.length}::date + INTERVAL '1 day')`);
-          }
+      const pageCodes = pageRows.map((row) => row.articleCode);
+      if (pageCodes.length > 0) {
+        const detailValues: unknown[] = [companyId, pageCodes, ACTIVE_ORDER_STATUSES];
+        const detailConditions = [`cp.company_id = $1`, `cp.is_active = true`];
+        if (fromDate) {
+          detailValues.push(fromDate);
+          detailConditions.push(`cp.created_at >= $${detailValues.length}::date`);
+        }
+        if (toDate) {
+          detailValues.push(toDate);
+          detailConditions.push(`cp.created_at < ($${detailValues.length}::date + INTERVAL '1 day')`);
+        }
 
-          const detailsResult = await pool.query(
-            `
+        const detailsResult = await pool.query(
+          `
               WITH active_proformas AS (
                 SELECT cp.id, cp.customer_id, cp.name
                 FROM customer_proformas cp
@@ -426,90 +419,89 @@ export function registerFactoryStockAllocationV5PaginationRoutes(app: Express): 
               WHERE cpl.article_code = ANY($2::text[])
               ORDER BY cpl.article_code, ap.id, ao.id
             `,
-            detailValues
-          );
+          detailValues
+        );
 
-          const pageMap = new Map(pageRows.map((row) => [row.articleCode, row]));
-          const proformaMaps = new Map<string, Map<number, ProformaDetail>>();
+        const pageMap = new Map(pageRows.map((row) => [row.articleCode, row]));
+        const proformaMaps = new Map<string, Map<number, ProformaDetail>>();
 
-          for (const detail of detailsResult.rows as any[]) {
-            const articleCode = String(detail.articleCode);
-            const target = pageMap.get(articleCode);
-            if (!target) continue;
+        for (const detail of detailsResult.rows as any[]) {
+          const articleCode = String(detail.articleCode);
+          const target = pageMap.get(articleCode);
+          if (!target) continue;
 
-            let articleMap = proformaMaps.get(articleCode);
-            if (!articleMap) {
-              articleMap = new Map<number, ProformaDetail>();
-              proformaMaps.set(articleCode, articleMap);
-            }
+          let articleMap = proformaMaps.get(articleCode);
+          if (!articleMap) {
+            articleMap = new Map<number, ProformaDetail>();
+            proformaMaps.set(articleCode, articleMap);
+          }
 
-            const proformaId = Number(detail.proformaId);
-            let proforma = articleMap.get(proformaId);
-            if (!proforma) {
-              proforma = {
-                proformaId,
-                proformaName: String(detail.proformaName || `Proforma #${proformaId}`),
-                customerId: Number(detail.customerId),
-                customerName: String(detail.customerName || `Customer #${detail.customerId}`),
-                lineQty: Number(detail.lineQty || 0),
-                containerCount: 0,
-                totalExpected: 0,
-                containers: [],
-              };
-              articleMap.set(proformaId, proforma);
-              target.proformaDetails.push(proforma);
-            }
+          const proformaId = Number(detail.proformaId);
+          let proforma = articleMap.get(proformaId);
+          if (!proforma) {
+            proforma = {
+              proformaId,
+              proformaName: String(detail.proformaName || `Proforma #${proformaId}`),
+              customerId: Number(detail.customerId),
+              customerName: String(detail.customerName || `Customer #${detail.customerId}`),
+              lineQty: Number(detail.lineQty || 0),
+              containerCount: 0,
+              totalExpected: 0,
+              containers: [],
+            };
+            articleMap.set(proformaId, proforma);
+            target.proformaDetails.push(proforma);
+          }
 
-            if (detail.orderId != null) {
-              const expectedQty = Number(detail.expectedQty || 0);
-              const loadedQty = Number(detail.loadedQty || 0);
-              proforma.containers.push({
-                orderId: Number(detail.orderId),
-                containerName: String(detail.containerNumber || `Order #${detail.orderId}`),
-                status: String(detail.status),
-                expectedQty,
-                loadedQty,
-                remainingQty: Math.max(expectedQty - loadedQty, 0),
-              });
-              proforma.totalExpected += expectedQty;
-              proforma.containerCount += 1;
-            }
+          if (detail.orderId != null) {
+            const expectedQty = Number(detail.expectedQty || 0);
+            const loadedQty = Number(detail.loadedQty || 0);
+            proforma.containers.push({
+              orderId: Number(detail.orderId),
+              containerName: String(detail.containerNumber || `Order #${detail.orderId}`),
+              status: String(detail.status),
+              expectedQty,
+              loadedQty,
+              remainingQty: Math.max(expectedQty - loadedQty, 0),
+            });
+            proforma.totalExpected += expectedQty;
+            proforma.containerCount += 1;
           }
         }
-
-        const total = Number(aggregate.total || 0);
-        const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
-        const productNames = Object.fromEntries(pageRows.map((row) => [row.articleCode, row.productName]));
-        const totals = {
-          stockAvailable: Number(aggregate.stockAvailable || 0),
-          totalLoaded: Number(aggregate.totalLoaded || 0),
-          expectedToLoad: Number(aggregate.expectedToLoad || 0),
-          freeToPromise: Number(aggregate.freeToPromise || 0),
-          totalKg: Number(aggregate.totalKg || 0),
-          shortageCount: Number(aggregate.shortageCount || 0),
-        };
-
-        res.setHeader("Cache-Control", "private, max-age=60");
-        res.setHeader("X-Total-Count", String(total));
-        res.setHeader("X-Page", String(page));
-        res.setHeader("X-Page-Size", String(limit));
-        res.setHeader("X-Total-Pages", String(totalPages));
-        res.setHeader("Access-Control-Expose-Headers", "X-Total-Count, X-Page, X-Page-Size, X-Total-Pages");
-
-        return res.json({
-          rows: pageRows,
-          totals,
-          productNames,
-          total,
-          page,
-          limit,
-          totalPages,
-          hasNextPage: page < totalPages,
-          hasPreviousPage: page > 1 && totalPages > 0,
-        });
-      } catch (error: unknown) {
-        return res.status(500).json({ message: getErrorMessage(error) });
       }
+
+      const total = Number(aggregate.total || 0);
+      const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
+      const productNames = Object.fromEntries(pageRows.map((row) => [row.articleCode, row.productName]));
+      const totals = {
+        stockAvailable: Number(aggregate.stockAvailable || 0),
+        totalLoaded: Number(aggregate.totalLoaded || 0),
+        expectedToLoad: Number(aggregate.expectedToLoad || 0),
+        freeToPromise: Number(aggregate.freeToPromise || 0),
+        totalKg: Number(aggregate.totalKg || 0),
+        shortageCount: Number(aggregate.shortageCount || 0),
+      };
+
+      res.setHeader("Cache-Control", "private, max-age=60");
+      res.setHeader("X-Total-Count", String(total));
+      res.setHeader("X-Page", String(page));
+      res.setHeader("X-Page-Size", String(limit));
+      res.setHeader("X-Total-Pages", String(totalPages));
+      res.setHeader("Access-Control-Expose-Headers", "X-Total-Count, X-Page, X-Page-Size, X-Total-Pages");
+
+      return res.json({
+        rows: pageRows,
+        totals,
+        productNames,
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1 && totalPages > 0,
+      });
+    } catch (error: unknown) {
+      return res.status(500).json({ message: getErrorMessage(error) });
     }
-  );
+  });
 }

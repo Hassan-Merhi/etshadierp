@@ -94,7 +94,7 @@ export function registerFactoryChatRoutes(app: Express) {
       const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
 
       const usersWithUnread = await Promise.all(
-        filtered.map(async (u: any) => {
+        filtered.map(async (u) => {
           const [unreadResult] = await db
             .select({ count: sql<number>`count(*)::int` })
             .from(directMessages)

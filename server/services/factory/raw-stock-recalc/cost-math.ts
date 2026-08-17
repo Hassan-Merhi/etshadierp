@@ -90,8 +90,8 @@ export function computeRecalcFingerprint(inputs: RecalcFingerprintInputs): strin
   const canonical = {
     containerId: c.id,
     status: c.status,
-    updatedAt: toIso((c as any).updatedAt),
-    totalKg: (c as any).totalKg,
+    updatedAt: toIso(c.updatedAt),
+    totalKg: c.totalKg,
     declaredKg: c.declaredKg,
     actualReceivedKg: c.actualReceivedKg,
     ratePerKg: c.ratePerKg,
@@ -105,18 +105,18 @@ export function computeRecalcFingerprint(inputs: RecalcFingerprintInputs): strin
     dutyStatus: c.dutyStatus,
     commissionAmount: c.commissionAmount,
     commissionCurrencyCode: c.commissionCurrencyCode,
-    commissionFxRateToUsd: (c as any).commissionFxRateToUsd,
-    commissionFxRateConfirmed: (c as any).commissionFxRateConfirmed,
-    commissionFxRateDate: (c as any).commissionFxRateDate,
+    commissionFxRateToUsd: c.commissionFxRateToUsd,
+    commissionFxRateConfirmed: c.commissionFxRateConfirmed,
+    commissionFxRateDate: c.commissionFxRateDate,
     otherCharges: c.otherCharges,
-    otherChargesCurrencyCode: (c as any).otherChargesCurrencyCode,
+    otherChargesCurrencyCode: c.otherChargesCurrencyCode,
     additionalCharges: [...inputs.additionalCharges]
       .map((a) => ({
         id: a.id,
         amount: a.amount,
         currencyCode: a.currencyCode,
         fxRateToUsd: a.fxRateToUsd,
-        version: toIso((a as any).updatedAt) ?? toIso(a.createdAt),
+        version: toIso(a.updatedAt) ?? toIso(a.createdAt),
       }))
       .sort((a, b) => a.id - b.id),
     otherChargesRows: [...inputs.otherChargesRows]
@@ -126,7 +126,24 @@ export function computeRecalcFingerprint(inputs: RecalcFingerprintInputs): strin
         currencyCode: oc.currencyCode,
         fxRateToUsd: oc.fxRateToUsd,
         fxRateConfirmed: oc.fxRateConfirmed,
-        version: toIso((oc as any).updatedAt) ?? toIso(oc.createdAt),
+        version:
+          toIso(
+            (
+              oc as unknown as {
+                id: number;
+                companyId: number;
+                ledgerAccountId: number | null;
+                createdAt: Date;
+                description: string;
+                amount: string;
+                currencyCode: string | null;
+                containerId: number;
+                fxRateToUsd: string | null;
+                fxRateConfirmed: boolean;
+                fxRateDate: string | null;
+              } & { updatedAt: string | Date | null | undefined }
+            ).updatedAt
+          ) ?? toIso(oc.createdAt),
       }))
       .sort((a, b) => a.id - b.id),
     commissionRecord: inputs.commissionRecord
@@ -135,8 +152,27 @@ export function computeRecalcFingerprint(inputs: RecalcFingerprintInputs): strin
           commissionTotal: inputs.commissionRecord.commissionTotal,
           currencyCode: inputs.commissionRecord.currencyCode,
           fxRateToUsd: inputs.commissionRecord.fxRateToUsd,
-          fxRateConfirmed: (inputs.commissionRecord as any).fxRateConfirmed,
-          version: toIso((inputs.commissionRecord as any).updatedAt) ?? toIso(inputs.commissionRecord.createdAt),
+          fxRateConfirmed: inputs.commissionRecord.fxRateConfirmed,
+          version:
+            toIso(
+              (
+                inputs.commissionRecord as unknown as {
+                  id: number;
+                  companyId: number;
+                  ledgerAccountId: number | null;
+                  createdAt: Date;
+                  currencyCode: string;
+                  containerId: number;
+                  fxRateToUsd: string;
+                  fxRateConfirmed: boolean;
+                  personName: string;
+                  commissionType: string;
+                  commissionRate: string;
+                  commissionTotal: string;
+                  commissionTotalUsd: string | null;
+                } & { updatedAt: string | Date | null | undefined }
+              ).updatedAt
+            ) ?? toIso(inputs.commissionRecord.createdAt),
         }
       : null,
     currentCostPerKg: inputs.rawStock?.costPerKg ?? null,

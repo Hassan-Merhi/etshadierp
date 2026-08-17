@@ -37,7 +37,7 @@ export function registerRawStockPartialOffloadScanRoutes(app: Express) {
     requireRole(...ADMIN_ROLES),
     async (req: Request, res: Response) => {
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
         const rows = await getRawStockRecalcPreview(companyId);
         // Include partial receipts (received < declared) AND fully-consumed containers
@@ -60,7 +60,7 @@ export function registerRawStockPartialOffloadScanRoutes(app: Express) {
     requireRole(...ADMIN_ROLES),
     async (req: Request, res: Response) => {
       try {
-        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
         const { confirm, confirmationToken } = req.body || {};
 

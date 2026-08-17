@@ -84,9 +84,12 @@ async function enforceCredentialAwareSession(
   options: { requireCompanyContext: boolean; requireRecentPasswordConfirmation?: boolean }
 ) {
   if (req.session.userId) {
-    await hydrateActiveCredentialVersion(db, req.session as any);
+    await hydrateActiveCredentialVersion(
+      db,
+      req.session as unknown as Parameters<typeof hydrateActiveCredentialVersion>[1]
+    );
   }
-  return enforceRuntimeSession(req.session as any, options);
+  return enforceRuntimeSession(req.session as unknown as Parameters<typeof enforceRuntimeSession>[0], options);
 }
 
 function authorizeExplicitCompanyScope(req: Request, res: Response): boolean {
@@ -125,7 +128,7 @@ function authorizeExplicitCompanyScope(req: Request, res: Response): boolean {
 
   if (req.method === "GET" && ["Admin", "Owner", "Manager"].includes(role ?? "")) return true;
 
-  const companyId = (req.session as any).currentCompanyId ?? null;
+  const companyId = req.session.currentCompanyId ?? null;
 
   try {
     assertRequestCompanyMatchesSession(
@@ -191,11 +194,42 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       canSellNegativeStock: ["Admin", "Owner", "Manager", "Developer"].includes(role)
         ? true
         : (req.session.canSellNegativeStock ?? false),
-      posViewOnly: (req.session as any).posViewOnly ?? false,
+      posViewOnly: req.session.posViewOnly ?? false,
       daybookEditDays: req.session.daybookEditDays ?? 0,
       canAccessCustomers: req.session.canAccessCustomers ?? false,
       canDeleteRecords: req.session.canDeleteRecords ?? false,
-    } as any;
+    } as unknown as {
+      id: string | undefined;
+      username: string | undefined;
+      role: string;
+      assignedLocationId: number | null;
+      posStation: number | null;
+      cashAccountId: number | null;
+      canSellNegativeStock: boolean;
+      posViewOnly: boolean;
+      daybookEditDays: number;
+      canAccessCustomers: boolean;
+      canDeleteRecords: boolean;
+    } & (
+      | ({
+          id: string;
+          active: boolean;
+          createdAt: Date;
+          username: string;
+          password: string;
+          chatbotEnabled: boolean;
+          hiddenErpCostFields: string[];
+        } & {
+          role?: string;
+          assignedLocationId?: number | null;
+          posStation?: number | null;
+          cashAccountId?: number | null;
+          canSellNegativeStock?: boolean;
+          daybookEditDays?: number;
+          canAccessCustomers?: boolean;
+        })
+      | undefined
+    );
 
     next();
   } catch (error) {
@@ -403,7 +437,7 @@ export function blockViewOnlyWrites(req: Request, res: Response, next: NextFunct
   if (req.path.startsWith("/api/auth/")) return next();
   if (isViewOnlyPassiveLifecycleWrite(req)) return next();
 
-  const role = (req.session as any)?.currentRole;
+  const role = req.session?.currentRole;
   if (role === "View Only") {
     logDenied({
       userId: req.session.userId ?? null,

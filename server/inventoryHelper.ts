@@ -76,7 +76,7 @@ async function createNegativeLayer(
   sourceVoucherType?: string,
   sourceVoucherId?: number
 ): Promise<void> {
-  await (tx as any).execute(sql`
+  await tx.execute(sql`
     INSERT INTO inventory_negative_layers
       (company_id, location_id, stock_item_id, qty, provisional_rate, source_voucher_type, source_voucher_id)
     VALUES
@@ -114,7 +114,7 @@ async function settleNegativeLayers(
   incomingQty: Decimal,
   incomingRate: Decimal
 ): Promise<{ settled: Decimal; remaining: Decimal }> {
-  const result = await (tx as any).execute(sql`
+  const result = await tx.execute(sql`
     SELECT id, qty, provisional_rate
     FROM inventory_negative_layers
     WHERE location_id = ${locationId} AND stock_item_id = ${stockItemId}
@@ -143,9 +143,9 @@ async function settleNegativeLayers(
 
     const layerRemainder = layerQty.minus(consume);
     if (layerRemainder.lt(QTY_EPSILON)) {
-      await (tx as any).execute(sql`DELETE FROM inventory_negative_layers WHERE id = ${layer.id}`);
+      await tx.execute(sql`DELETE FROM inventory_negative_layers WHERE id = ${layer.id}`);
     } else {
-      await (tx as any).execute(sql`
+      await tx.execute(sql`
         UPDATE inventory_negative_layers
         SET qty = ${layerRemainder.toFixed(QTY_DP)}, updated_at = NOW()
         WHERE id = ${layer.id}
@@ -180,7 +180,7 @@ export async function adjustInventory(
   sourceVoucherType?: string,
   sourceVoucherId?: number
 ): Promise<AdjustInventoryResult> {
-  const lockResult = await (tx as any).execute(sql`
+  const lockResult = await tx.execute(sql`
     SELECT id, quantity, average_rate, total_value
     FROM inventory
     WHERE location_id = ${locationId} AND stock_item_id = ${stockItemId}
@@ -260,7 +260,7 @@ export async function adjustInventory(
     }
     if (newQty.lte(ZERO)) newTotalValue = ZERO;
 
-    await (tx as any).execute(sql`
+    await tx.execute(sql`
       UPDATE inventory
       SET quantity     = ${newQty.toFixed(QTY_DP)},
           average_rate = ${newRate.toFixed(RATE_DP)},
@@ -311,7 +311,7 @@ export async function adjustInventory(
     const qtyText = qty.toFixed(QTY_DP);
     const totalValueText = totalValue.toFixed(VALUE_DP);
 
-    await (tx as any).execute(sql`
+    await tx.execute(sql`
       INSERT INTO inventory (company_id, location_id, stock_item_id, quantity, average_rate, total_value, last_updated)
       VALUES (${companyId}, ${locationId}, ${stockItemId}, ${qtyText}, ${safeRate.toFixed(RATE_DP)}, ${totalValueText}, NOW())
       ON CONFLICT (location_id, stock_item_id) DO UPDATE
@@ -360,7 +360,7 @@ export async function reverseInventoryByExactValue(
   sourceVoucherType?: string,
   sourceVoucherId?: number
 ): Promise<void> {
-  const lockResult = await (tx as any).execute(sql`
+  const lockResult = await tx.execute(sql`
     SELECT id, quantity, average_rate, total_value
     FROM inventory
     WHERE location_id = ${locationId} AND stock_item_id = ${stockItemId}
@@ -416,7 +416,7 @@ export async function reverseInventoryByExactValue(
 
   if (newRate.lt(ZERO)) newRate = ZERO;
 
-  await (tx as any).execute(sql`
+  await tx.execute(sql`
     UPDATE inventory
     SET quantity     = ${newQty.toFixed(QTY_DP)},
         average_rate = ${newRate.toFixed(RATE_DP)},

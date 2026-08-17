@@ -17,15 +17,18 @@
  */
 
 export const CAPACITOR_API_BASE: string =
-  (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_API_BASE_URL) || "";
+  (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_BASE_URL) || "";
 
-export const CAPACITOR_WS_URL: string =
-  (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_WS_URL) || "";
+export const CAPACITOR_WS_URL: string = (typeof import.meta !== "undefined" && import.meta.env?.VITE_WS_URL) || "";
 
 /**
  * Returns true when the app is running inside a Capacitor WebView.
  * Safe to call anywhere — returns false in Node / SSR / regular browser.
  */
 export function isCapacitor(): boolean {
-  return typeof window !== "undefined" && (window.location.protocol === "capacitor:" || !!(window as any).Capacitor);
+  return (
+    typeof window !== "undefined" &&
+    (window.location.protocol === "capacitor:" ||
+      !!(window as unknown as (Window & typeof globalThis) & { Capacitor: number }).Capacitor)
+  );
 }

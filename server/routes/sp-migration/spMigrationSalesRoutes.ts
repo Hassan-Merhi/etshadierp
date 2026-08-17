@@ -88,7 +88,7 @@ export function registerSpMigrationSalesRoutes(app: Express) {
           await db.execute(
             sql`SELECT id FROM ledger_accounts WHERE company_id = ${targetId} AND sub_type = 'gc_mig_suspense' AND deleted_at IS NULL LIMIT 1`
           )
-        ).rows[0] as any;
+        ).rows[0];
         if (existingSuspense) {
           suspenseAccountId = pn(existingSuspense.id);
         } else {
@@ -151,7 +151,7 @@ export function registerSpMigrationSalesRoutes(app: Express) {
             await db.execute(
               sql`SELECT id FROM vouchers WHERE voucher_number = ${newVoucherNumber} AND company_id = ${targetId} LIMIT 1`
             )
-          ).rows[0] as any;
+          ).rows[0];
           if (alreadyMig) {
             vouchersSkipped++;
             continue;
@@ -357,7 +357,7 @@ export function registerSpMigrationSalesRoutes(app: Express) {
           SELECT target_id FROM sp_migration_source_links
           WHERE source_table = 'containers' AND source_id = ${srcContainerId} AND target_table = 'sp_containers' LIMIT 1
         `)
-          ).rows[0] as any;
+          ).rows[0];
           if (alreadyLinked) {
             containersSkipped++;
             continue;
@@ -366,14 +366,14 @@ export function registerSpMigrationSalesRoutes(app: Express) {
           // Supplier name lookup (best-effort — supplier match by name in target is a manual step, so supplierId stays null)
           const supplierRow = (
             await db.execute(sql`SELECT legal_name FROM suppliers WHERE id = ${pn(c.supplier_id)} LIMIT 1`)
-          ).rows[0] as any;
+          ).rows[0];
           const supplierName = supplierRow?.legal_name ?? "Unknown Supplier (GC migration)";
 
           const poRow = (
             await db.execute(sql`
           SELECT id, po_number, freight FROM purchase_orders WHERE container_id = ${srcContainerId} LIMIT 1
         `)
-          ).rows[0] as any;
+          ).rows[0];
 
           const status = c.status === "OTW" || c.status === "Open" ? "open" : "offloaded";
 
@@ -419,7 +419,7 @@ export function registerSpMigrationSalesRoutes(app: Express) {
                 await db.execute(
                   sql`SELECT id FROM vouchers WHERE company_id = ${targetId} AND voucher_number = ${otwVoucherNumber} LIMIT 1`
                 )
-              ).rows[0] as any;
+              ).rows[0];
               if (existingOtwV) {
                 otwVouchersSkipped++;
               } else {
@@ -640,7 +640,7 @@ export function registerSpMigrationSalesRoutes(app: Express) {
           await db.execute(
             sql`SELECT id FROM vouchers WHERE company_id = ${targetId} AND voucher_number = ${voucherNumber} LIMIT 1`
           )
-        ).rows[0] as any;
+        ).rows[0];
         if (existing) {
           await db
             .execute(
@@ -672,7 +672,7 @@ export function registerSpMigrationSalesRoutes(app: Express) {
           VALUES (${voucherId}, ${clrAcctId}, ${profit.toFixed(2)}, '0.00', 'Accumulated profit clearing')
           RETURNING id
         `)
-        ).rows[0] as any;
+        ).rows[0];
         await trackRow(runId, "voucher_entries", pn(clrEntry.id));
 
         const ourEntry = (
@@ -681,7 +681,7 @@ export function registerSpMigrationSalesRoutes(app: Express) {
           VALUES (${voucherId}, ${ourAcctId}, '0.00', ${ourShare.toFixed(2)}, 'Our profit share opening balance')
           RETURNING id
         `)
-        ).rows[0] as any;
+        ).rows[0];
         await trackRow(runId, "voucher_entries", pn(ourEntry.id));
 
         const supEntry = (
@@ -690,7 +690,7 @@ export function registerSpMigrationSalesRoutes(app: Express) {
           VALUES (${voucherId}, ${supAcctId}, '0.00', ${supplierShare.toFixed(2)}, 'Supplier profit share opening balance')
           RETURNING id
         `)
-        ).rows[0] as any;
+        ).rows[0];
         await trackRow(runId, "voucher_entries", pn(supEntry.id));
 
         await db.execute(sql`

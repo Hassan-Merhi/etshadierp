@@ -27,11 +27,11 @@ export function registerRentalUnitsWriteRoutes(app: Express, ctx: RentalRoutesCo
       const data = insertPropertyUnitSchema.parse({ ...req.body, companyId });
       const [created] = await db
         .insert(propertyUnits)
-        .values({ ...data, module } as any)
+        .values({ ...data, module })
         .returning();
       await logAudit({
         userId: req.session.userId!,
-        username: (req.session as any).username || "unknown",
+        username: req.session.username || "unknown",
         companyId,
         action: "create",
         tableName: "property_units",
@@ -71,13 +71,13 @@ export function registerRentalUnitsWriteRoutes(app: Express, ctx: RentalRoutesCo
         .returning();
 
       try {
-        const changes: Record<string, { old: any; new: any }> = {};
+        const changes: Record<string, { old: unknown; new: unknown }> = {};
         for (const k of Object.keys(updates)) {
-          changes[k] = { old: (existing as any)[k] ?? null, new: updates[k] };
+          changes[k] = { old: (existing as { [key: string]: unknown })[k] ?? null, new: updates[k] };
         }
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId,
           action: "update",
           tableName: "property_units",
@@ -129,7 +129,7 @@ export function registerRentalUnitsWriteRoutes(app: Express, ctx: RentalRoutesCo
       try {
         await logAudit({
           userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
+          username: req.session.username || "unknown",
           companyId,
           action: "delete",
           tableName: "property_units",

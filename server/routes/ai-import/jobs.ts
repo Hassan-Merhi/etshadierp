@@ -22,7 +22,7 @@ export function registerAiImportJobRoutes(app: Express) {
     try {
       const companyId = req.session.currentCompanyId;
       const userId = req.session.userId;
-      const username = req.session.username || "Unknown";
+      const _username = req.session.username || "Unknown";
 
       if (!companyId || !userId) return res.status(400).json({ message: "No company selected" });
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
@@ -39,7 +39,7 @@ export function registerAiImportJobRoutes(app: Express) {
       const sheetName = workbook.SheetNames[0];
       if (!sheetName) return res.status(400).json({ message: "Excel file has no sheets" });
 
-      const rawRows: Record<string, any>[] = sheetToJson(workbook.Sheets[sheetName]);
+      const rawRows: Record<string, unknown>[] = sheetToJson(workbook.Sheets[sheetName]);
       if (!rawRows.length) return res.status(400).json({ message: "Excel file has no data rows" });
 
       // Create the job
@@ -68,7 +68,7 @@ export function registerAiImportJobRoutes(app: Express) {
         warnings: [],
       }));
 
-      await db.insert(aiImportRows).values(rowValues as any);
+      await db.insert(aiImportRows).values(rowValues);
 
       res.json({
         jobId: job.id,
@@ -96,7 +96,7 @@ export function registerAiImportJobRoutes(app: Express) {
       const job = await assertJobOwnership(jobId, companyId);
       res.json(job);
     } catch (error: unknown) {
-      res.status((error as any).status ?? 500).json({ message: getErrorMessage(error) });
+      res.status((error as { status: number }).status ?? 500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -124,7 +124,7 @@ export function registerAiImportJobRoutes(app: Express) {
 
       res.json(rows);
     } catch (error: unknown) {
-      res.status((error as any).status ?? 500).json({ message: getErrorMessage(error) });
+      res.status((error as { status: number }).status ?? 500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -197,7 +197,7 @@ export function registerAiImportJobRoutes(app: Express) {
       });
     } catch (error: unknown) {
       logger.error("[AI Import] validate error:", { error: getErrorMessage(error) });
-      res.status((error as any).status ?? 500).json({ message: getErrorMessage(error) });
+      res.status((error as { status: number }).status ?? 500).json({ message: getErrorMessage(error) });
     }
   });
 }

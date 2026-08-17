@@ -55,39 +55,39 @@ export interface RepairExecutionResult {
 }
 
 export interface ReconciliationRepairAdapter extends ReconciliationAdapter {
-  findExistingReport(input: { tx: any; companyId: number; runKey: string }): Promise<ReconciliationReport | null>;
-  persistReport(input: { tx: any; report: ReconciliationReport }): Promise<void>;
+  findExistingReport(input: { tx: unknown; companyId: number; runKey: string }): Promise<ReconciliationReport | null>;
+  persistReport(input: { tx: unknown; report: ReconciliationReport }): Promise<void>;
   classifyRepair(input: {
-    tx: any;
+    tx: unknown;
     result: ReconciliationResult;
   }): Promise<{ disposition: RepairDisposition; reason: string }>;
   assertApprovalToken(input: {
-    tx: any;
+    tx: unknown;
     companyId: number;
     reportRunKey: string;
     approvalToken: string;
   }): Promise<void>;
   findExistingRepair(input: {
-    tx: any;
+    tx: unknown;
     companyId: number;
     idempotencyKey: string;
   }): Promise<RepairExecutionResult | null>;
-  lockRepairTarget(input: { tx: any; target: ReconciliationTarget }): Promise<void>;
-  assertPeriodOpen(input: { tx: any; target: ReconciliationTarget; actor: RepairActor }): Promise<void>;
+  lockRepairTarget(input: { tx: unknown; target: ReconciliationTarget }): Promise<void>;
+  assertPeriodOpen(input: { tx: unknown; target: ReconciliationTarget; actor: RepairActor }): Promise<void>;
   rebuildProjectionFromCanonical(input: {
-    tx: any;
+    tx: unknown;
     item: RepairPlanItem;
     actor: RepairActor;
   }): Promise<void>;
   recordRepair(input: {
-    tx: any;
+    tx: unknown;
     companyId: number;
     idempotencyKey: string;
     result: RepairExecutionResult;
     actor: RepairActor;
   }): Promise<void>;
   recordAudit(input: {
-    tx: any;
+    tx: unknown;
     companyId: number;
     reportRunKey: string;
     idempotencyKey: string;
@@ -143,7 +143,7 @@ function validateRun(request: ReconciliationRunRequest): void {
 
 /** Generates and persists an immutable, repeat-safe reconciliation report. */
 export async function generateReconciliationReportTx(
-  tx: any,
+  tx: unknown,
   request: ReconciliationRunRequest,
   adapter: ReconciliationRepairAdapter,
   now = new Date()
@@ -200,7 +200,7 @@ export async function generateReconciliationReportTx(
  * repair adapters must rebuild the operational projection from canonical ledger truth.
  */
 export async function executeApprovedRepairsTx(
-  tx: any,
+  tx: unknown,
   request: RepairExecutionRequest,
   adapter: ReconciliationRepairAdapter
 ): Promise<RepairExecutionResult> {

@@ -386,15 +386,12 @@ async function runPhase2Report(ctx: DataQueryContext): Promise<DataQueryResult> 
           WHERE la.company_id = ${companyId}
             AND CAST(v.voucher_date AS text) BETWEEN ${from} AND ${to}
         `);
-        const row = r.rows[0] as any;
+        const row = r.rows[0] as unknown as { revenue: string } & { expenses: string };
         const rev = parseFloat(row?.revenue || "0");
         const exp = parseFloat(row?.expenses || "0");
         return { revenue: rev, expenses: exp, net: rev - exp };
       };
-      const [thisM, lastM] = await Promise.all([
-        runPL(thisMonthStart, todayStr),
-        runPL(lastMonthStart, lastMonthEnd),
-      ]);
+      const [thisM, lastM] = await Promise.all([runPL(thisMonthStart, todayStr), runPL(lastMonthStart, lastMonthEnd)]);
       const diff = (a: number, b: number) => {
         if (b === 0) return a > 0 ? "+100%" : "—";
         const pct = ((a - b) / Math.abs(b)) * 100;

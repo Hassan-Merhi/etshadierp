@@ -19,7 +19,7 @@ export function registerSupplierDirectContainerRoutes(app: Express) {
   // Used by the Broker Overview Panel to show unassigned / direct containers.
   app.get("/api/factory/suppliers/:id/direct-containers", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const brokerId = parseId(req.params.id);
       if (brokerId === null) return res.status(400).json({ message: "Invalid id" });

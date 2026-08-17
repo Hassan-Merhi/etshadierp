@@ -19,7 +19,7 @@ export function registerV5ProformaCreateRoutes(app: Express) {
   // Body: { customerId, name, isActive, lines[], sendToLoading, containerNames[] }
   app.post("/api/factory/v5/proforma-with-loading", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { customerId, name, isActive, lines, sendToLoading, containerNames } = req.body;
@@ -112,7 +112,7 @@ export function registerV5ProformaCreateRoutes(app: Express) {
   // V5 guard: proformaIdUsed IS NOT NULL (all created orders are V5 by construction)
   app.post("/api/factory/v5/proforma/:proformaId/add-containers", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const proformaId = parseInt(req.params.proformaId);
@@ -124,7 +124,7 @@ export function registerV5ProformaCreateRoutes(app: Express) {
       }
 
       // Trim names
-      containerNames = (containerNames as any[]).map((n) => String(n ?? "").trim());
+      containerNames = (containerNames as unknown[]).map((n) => String(n ?? "").trim());
 
       // Reject empty names
       if (containerNames.some((n: string) => !n)) {

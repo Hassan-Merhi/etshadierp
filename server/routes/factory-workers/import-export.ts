@@ -63,7 +63,7 @@ export function registerFactoryWorkerImportExportRoutes(app: Express, requireAut
       ];
       const headerRow = sheet.addRow(headers);
       headerRow.font = { bold: true };
-      headerRow.eachCell((cell: any) => {
+      headerRow.eachCell((cell) => {
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "1F4E79" } };
         cell.font = { bold: true, color: { argb: "FFFFFF" } };
       });
@@ -109,7 +109,7 @@ export function registerFactoryWorkerImportExportRoutes(app: Express, requireAut
         "",
       ];
       const hintRow = sheet.addRow(hintValues);
-      hintRow.eachCell((cell: any) => {
+      hintRow.eachCell((cell) => {
         if (cell.value) {
           cell.font = { italic: true, color: { argb: "888888" }, size: 9 };
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "F5F5F5" } };
@@ -156,7 +156,7 @@ export function registerFactoryWorkerImportExportRoutes(app: Express, requireAut
         "Bank",
         "Example row — delete before importing",
       ]);
-      exampleRow.eachCell((cell: any) => {
+      exampleRow.eachCell((cell) => {
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDE7" } };
         cell.font = { italic: true, color: { argb: "5D4037" } };
       });
@@ -351,7 +351,7 @@ export function registerFactoryWorkerImportExportRoutes(app: Express, requireAut
           txDate: today,
           txType: "WORKER_IMPORT",
           description: `Worker import: ${created} created, ${updated} updated, ${skipped} skipped`,
-          createdBy: (req.session as any).userId ?? undefined,
+          createdBy: req.session.userId ?? undefined,
         });
 
         res.json({ created, updated, skipped, errors });

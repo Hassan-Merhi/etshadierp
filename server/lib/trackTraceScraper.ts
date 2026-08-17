@@ -128,8 +128,8 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
   }, SCRAPER_TIMEOUT_MS);
 
   try {
-    const puppeteerExtra = _require("puppeteer-extra") as any;
-    const StealthPlugin = _require("puppeteer-extra-plugin-stealth") as any;
+    const puppeteerExtra = _require("puppeteer-extra");
+    const StealthPlugin = _require("puppeteer-extra-plugin-stealth");
     puppeteerExtra.use(StealthPlugin());
 
     const chromePath = getChromiumPath();

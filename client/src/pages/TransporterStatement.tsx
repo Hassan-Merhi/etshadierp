@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -76,7 +77,7 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
         queryKey: ["/api/transporter-statement", selectedAccountId, "statement"],
       });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Failed to save due date", description: err?.message, variant: "destructive" });
     },
   });
@@ -312,7 +313,7 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
         queryKey: ["/api/transporter-statement", selectedAccountId, "statement"],
       });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Reallocation failed", description: err?.message, variant: "destructive" });
     },
   });
@@ -538,7 +539,7 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
           ) : statementError ? (
             <div className="flex flex-col items-center justify-center h-48 gap-2 text-destructive print:hidden">
               <p className="text-sm font-medium">Failed to load statement</p>
-              <p className="text-xs text-muted-foreground">{(statementErrorObj as any)?.message ?? "Unknown error"}</p>
+              <p className="text-xs text-muted-foreground">{statementErrorObj?.message ?? "Unknown error"}</p>
             </div>
           ) : (
             <Table>

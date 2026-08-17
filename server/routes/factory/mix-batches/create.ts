@@ -21,7 +21,7 @@ import Decimal from "decimal.js";
 export function registerFactoryMixBatchCreateRoutes(app: Express) {
   app.post("/api/factory/mix-batches", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const {
@@ -293,7 +293,7 @@ export function registerFactoryMixBatchCreateRoutes(app: Express) {
             operatorUser: operatorUser || null,
             batchDate: batchDate || null,
             status: "COMPLETED",
-          } as any)
+          })
           .returning();
 
         for (const sr of sourceRecords) {
@@ -336,7 +336,7 @@ export function registerFactoryMixBatchCreateRoutes(app: Express) {
 
       await logAudit({
         userId: req.session.userId!,
-        username: (req.session as any).username || req.session.userId!,
+        username: req.session.username || req.session.userId!,
         companyId,
         action: "create",
         tableName: "factory_mix_batches",

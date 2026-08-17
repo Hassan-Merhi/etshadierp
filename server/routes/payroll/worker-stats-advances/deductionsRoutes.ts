@@ -54,7 +54,7 @@ export function registerWorkerDeductionsRoutes(app: Express) {
           reason: reason || null,
           deductionDate,
           applied: false,
-        } as any)
+        })
         .returning();
       res.json(deduction);
     } catch (error: unknown) {
@@ -150,7 +150,7 @@ export function registerWorkerDeductionsRoutes(app: Express) {
           reason: reason || null,
           deductionDate,
           applied: false,
-        } as any)
+        })
         .returning();
       res.json(deduction);
     } catch (error: unknown) {

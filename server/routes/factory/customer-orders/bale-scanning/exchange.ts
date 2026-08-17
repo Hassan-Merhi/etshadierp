@@ -26,7 +26,7 @@ export function registerOrderBaleExchangeRoutes(app: Express) {
   // POST /api/factory/customer-orders/:id/bales/exchange — swap one bale for another on a FINALIZED order
   app.post("/api/factory/customer-orders/:id/bales/exchange", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseId(req.params.id);
@@ -37,7 +37,7 @@ export function registerOrderBaleExchangeRoutes(app: Express) {
         return res.status(400).json({ message: "orderBaleId and newBaleReference are required" });
       }
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         const [order] = await tx
           .select()
           .from(customerOrders)
@@ -127,7 +127,7 @@ export function registerOrderBaleExchangeRoutes(app: Express) {
   // GET removal log for a specific order/loading
   app.get("/api/factory/customer-orders/:id/bale-removals", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const orderId = parseId(req.params.id);
       if (orderId === null) return res.status(400).json({ message: "Invalid id" });

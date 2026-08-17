@@ -97,7 +97,7 @@ function registerWriteInvalidationSignal(app: Express): void {
       // Read the company off the session before the handler runs: a write that
       // changes the session (set-company, logout) would otherwise be attributed
       // to whichever company the session ended up in.
-      const companyId = Number((req.session as any)?.currentCompanyId) || null;
+      const companyId = Number(req.session?.currentCompanyId) || null;
       res.on("finish", () => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           // A write only concerns the company it happened in. Clients elsewhere

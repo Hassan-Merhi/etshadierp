@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -71,7 +72,7 @@ export default function Settings() {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       setUserToDelete(null);
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       toast({ title: "Error", description: error.message || "Failed to delete user", variant: "destructive" });
     },
   });

@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useRef } from "react";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -27,7 +28,7 @@ export default function Bales() {
   const [scanMode, setScanMode] = useState<"quick" | "review">("quick");
   const [barcodeInput, setBarcodeInput] = useState("");
   const [showBaleDialog, setShowBaleDialog] = useState(false);
-  const [scannedBale, setScannedBale] = useState<Partial<InsertBale> | null>(null);
+  const [_scannedBale, setScannedBale] = useState<Partial<InsertBale> | null>(null);
   const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [pendingBarcodeToMark, setPendingBarcodeToMark] = useState<number | null>(null);
@@ -78,8 +79,8 @@ export default function Bales() {
         barcodeInputRef.current.focus();
       }
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Error creating bale",
         description: error.message,
@@ -97,8 +98,8 @@ export default function Bales() {
       queryClient.invalidateQueries({ queryKey: ["/api/bales", selectedCompany?.id] });
       toast({ title: "Bale deleted successfully" });
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Error deleting bale",
         description: error.message,
@@ -176,7 +177,7 @@ export default function Bales() {
         setShowBaleDialog(true);
         setBarcodeInput("");
       }
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: "Error checking barcode",
         description: "Please try again",

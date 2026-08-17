@@ -87,10 +87,10 @@ export function registerCoreAuthRoutes(app: Express) {
       const clientIpForSession =
         (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || null;
       const userAgentForSession = req.headers["user-agent"] || null;
-      (req.session as any).ip = clientIpForSession;
-      (req.session as any).userAgent = userAgentForSession;
-      (req.session as any).loginAt = new Date().toISOString();
-      (req.session as any).csrfToken = randomBytes(32).toString("hex");
+      req.session.ip = clientIpForSession;
+      req.session.userAgent = userAgentForSession;
+      req.session.loginAt = new Date().toISOString();
+      req.session.csrfToken = randomBytes(32).toString("hex");
 
       if (userCompanies.length > 0) {
         const firstCompany = userCompanies[0];
@@ -104,7 +104,7 @@ export function registerCoreAuthRoutes(app: Express) {
         req.session.daybookEditDays = firstCompany.daybookEditDays;
         req.session.canAccessCustomers = firstCompany.canAccessCustomers;
         req.session.canDeleteRecords = firstCompany.canDeleteRecords;
-        (req.session as any).currentCompanyName = (firstCompany as any).companyName || null;
+        req.session.currentCompanyName = (firstCompany as any).companyName || null;
       }
 
       const clientIp =
@@ -172,7 +172,7 @@ export function registerCoreAuthRoutes(app: Express) {
 
   app.get("/api/auth/me", requireAuth, async (req, res) => {
     if (!req.user) return res.status(401).json({ message: "Unauthorized" });
-    let username = (req.user as any).username || req.session.username;
+    let username = req.user.username || req.session.username;
     if (!username && req.session.userId) {
       try {
         const dbUser = await storage.getUser(req.session.userId);
@@ -184,7 +184,7 @@ export function registerCoreAuthRoutes(app: Express) {
         logger.warn("[auth/me] Could not hydrate username from DB:", { error: getErrorMessage(error) });
       }
     }
-    const { password: _password, ...userWithoutPassword } = req.user as any;
+    const { password: _password, ...userWithoutPassword } = req.user;
     res.json({
       ...userWithoutPassword,
       username,

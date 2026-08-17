@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -96,8 +97,8 @@ export function StockItemEditDialog({ open, onOpenChange, stockItemId }: StockIt
       });
       onOpenChange(false);
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Update Failed",
         description: error.message || "Failed to update stock item",
@@ -121,8 +122,8 @@ export function StockItemEditDialog({ open, onOpenChange, stockItemId }: StockIt
       setShowDeleteDialog(false);
       onOpenChange(false);
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Delete Failed",
         description: error.message || "Failed to delete stock item",

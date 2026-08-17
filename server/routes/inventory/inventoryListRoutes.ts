@@ -4,10 +4,7 @@ import { requireAuth } from "../../auth";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { getInventoryPage } from "./inventoryQueryService";
-import {
-  getActiveInventoryCompanyId,
-  parseInventoryListFilters,
-} from "./inventoryRequestContext";
+import { getActiveInventoryCompanyId, parseInventoryListFilters } from "./inventoryRequestContext";
 
 export function registerInventoryListRoutes(app: Express) {
   app.get("/api/inventory", requireAuth, async (req, res) => {
@@ -22,7 +19,7 @@ export function registerInventoryListRoutes(app: Express) {
         companyId: req.session.currentCompanyId,
         error,
       });
-      const status = error instanceof Error && "statusCode" in error ? Number((error as any).statusCode) || 500 : 500;
+      const status = error instanceof Error && "statusCode" in error ? Number(error.statusCode) || 500 : 500;
       return res.status(status).json({ message: getErrorMessage(error) });
     }
   });

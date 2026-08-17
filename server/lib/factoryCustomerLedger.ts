@@ -76,7 +76,7 @@ export async function buildFactoryCustomerLedgerEntries(
   const out: FactoryCustomerLedgerEntry[] = [];
 
   for (const o of orderRows) {
-    const dt = (o.orderDate as any)?.toString?.() ?? String(o.orderDate ?? "");
+    const dt = o.orderDate?.toString?.() ?? String(o.orderDate ?? "");
     if (startDate && dt < startDate) continue;
     if (endDate && dt > endDate) continue;
     out.push({
@@ -105,7 +105,7 @@ export async function buildFactoryCustomerLedgerEntries(
     );
 
   for (const b of balRows) {
-    const dt = (b.transactionDate as any)?.toString?.() ?? String(b.transactionDate ?? "");
+    const dt = b.transactionDate?.toString?.() ?? String(b.transactionDate ?? "");
     if (startDate && dt < startDate) continue;
     if (endDate && dt > endDate) continue;
     out.push({
@@ -179,7 +179,7 @@ export async function buildFactoryCustomerLedgerEntries(
       voucherId: v.voucherId as number,
       voucherNumber: v.voucherNumber || "",
       voucherType: v.voucherType || "Voucher",
-      voucherDate: (v.voucherDate as any)?.toString?.() ?? String(v.voucherDate ?? ""),
+      voucherDate: v.voucherDate?.toString?.() ?? String(v.voucherDate ?? ""),
       voucherDescription: v.description || "",
       narration: v.narration || v.description || "",
       debitAmount: v.debitAmount ?? "0",

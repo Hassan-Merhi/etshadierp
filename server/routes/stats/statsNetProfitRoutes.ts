@@ -80,7 +80,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
       // SP formula: What We Have = Cash + Stock (from inventory table); What We Owe = Supplier Cash Payable only.
       // All other SP ledger accounts (OTW, prepaid, intercompany, clearing accounts, etc.) are excluded.
       // For non-SP: exclude sp_stock (inventory table is authoritative) and sp_cost_clearing (double-counts).
-      const isSupplierPartner = (companyRecord as any)?.companyType === "supplier_partner";
+      const isSupplierPartner = companyRecord?.companyType === "supplier_partner";
       const accountsForClassify = isSupplierPartner
         ? companyAccounts.filter((a) => a.accountType === "Cash" || a.subType === "sp_payable")
         : companyAccounts.filter((a) => a.subType !== "sp_stock" && a.subType !== "sp_cost_clearing");
@@ -97,7 +97,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
       // (expected − paid up to asOf) is always more accurate than the accrual-
       // scheduler-dependent ledger account. Strip it here before any totals are used.
       for (let i = onUsAccounts.length - 1; i >= 0; i--) {
-        const a = onUsAccounts[i] as any;
+        const a = onUsAccounts[i];
         const nameLower = (a.name || "").toLowerCase();
         const code = (a.code || "").toUpperCase();
         if (nameLower.includes("accrued rent") || code === "ACCR-RENT-PAY" || code === "ACCRUED_RENT_PAYABLE") {
@@ -110,7 +110,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
       // below (propertyContracts: paid − expected) is always the authoritative source
       // for prepaid rent. Keeping both would double-count it.
       for (let i = forUsAccounts.length - 1; i >= 0; i--) {
-        const a = forUsAccounts[i] as any;
+        const a = forUsAccounts[i];
         const nameLower = (a.name || "").toLowerCase();
         if (nameLower.includes("prepaid rent")) {
           forUsTotal = round2(forUsTotal - a.value);
@@ -239,7 +239,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
       {
         let i = forUsAccounts.length - 1;
         while (i >= 0) {
-          const acc = forUsAccounts[i] as any;
+          const acc = forUsAccounts[i];
           const code = (acc.code || "").toUpperCase();
           const nameLower = (acc.name || "").toLowerCase();
           if (factoryLedgerCodesToStrip.has(code) || factoryLedgerNamesToStrip.some((p) => nameLower.includes(p))) {
@@ -283,7 +283,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
       // salaryAdvances.remainingBalance below to match the Payroll → Advances "Outstanding" card.
       let workerLiabilities = 0;
       for (const emp of companyEmployees) {
-        const opening = parseFloat((emp as any).openingBalance || "0");
+        const opening = parseFloat(emp.openingBalance || "0");
         // employees table has no openingBalanceSide — convention is Cr (we owe them), so negate.
         const signedOpening = opening * -1;
         const balance = employeeBalances.get(emp.id) || { debit: 0, credit: 0 };
@@ -304,7 +304,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
       {
         let i = forUsAccounts.length - 1;
         while (i >= 0) {
-          const acc = forUsAccounts[i] as any;
+          const acc = forUsAccounts[i];
           if (advanceLedgerPattern.test(acc.name || "")) {
             forUsTotal = round2(forUsTotal - acc.value);
             const catKey = `asset_${acc.category || acc.name}`;
@@ -326,7 +326,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
           .select({ total: sql<string>`COALESCE(SUM(CAST(${salaryAdvances.remainingBalance} AS numeric)), 0)` })
           .from(salaryAdvances)
           .where(and(eq(salaryAdvances.companyId, companyId), eq(salaryAdvances.fullyPaid, false)));
-        rawSalaryAdvances = round2(parseFloat((saRow as any)?.total || "0"));
+        rawSalaryAdvances = round2(parseFloat(saRow?.total || "0"));
       } catch (saErr: unknown) {
         // Fallback: column may be absent on old production schemas. Dashboard still loads.
         logger.warn("[/api/stats/net-profit] salary_advances query skipped (schema gap):", {
@@ -559,7 +559,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
         };
         const stockEntries = forUsAccounts.filter(isStockEntry);
         if (stockEntries.length > 1) {
-          const combined = round2(stockEntries.reduce((s: number, a: any) => s + (a.value || 0), 0));
+          const combined = round2(stockEntries.reduce((s: number, a) => s + (a.value || 0), 0));
           for (let i = forUsAccounts.length - 1; i >= 0; i--) {
             if (isStockEntry(forUsAccounts[i])) forUsAccounts.splice(i, 1);
           }

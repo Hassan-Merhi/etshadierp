@@ -4,11 +4,11 @@ import { logger } from "../../lib/logger";
 import { pool } from "../../db";
 import { requireAuth } from "../../auth";
 
-function getFactoryCompanyId(req: any): number | undefined {
-  return (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+function getFactoryCompanyId(req: import("express").Request): number | undefined {
+  return req.session.factoryCompanyId || req.session.currentCompanyId;
 }
 
-async function hasWriteAccess(req: any, companyId: number): Promise<boolean> {
+async function hasWriteAccess(req: import("express").Request, companyId: number): Promise<boolean> {
   const role = req.user?.role;
   if (role === "Admin" || role === "Owner" || role === "Developer") return true;
   const userId = req.user?.id;
@@ -66,7 +66,7 @@ export function registerFactorySheetsAndSacksRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { from, to, action, itemId, limit } = req.query;
-      const params: any[] = [companyId];
+      const params: unknown[] = [companyId];
       const conditions: string[] = ["company_id = $1"];
 
       if (from) {

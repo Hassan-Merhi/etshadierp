@@ -18,7 +18,7 @@ import { eq, and, or, sql, inArray, ilike } from "drizzle-orm";
 export function registerFactoryProductBulkRoutes(app: Express) {
   app.delete("/api/factory/bale-products/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
@@ -41,7 +41,7 @@ export function registerFactoryProductBulkRoutes(app: Express) {
   app.post("/api/factory/bale-products/bulk-toggle-active", requireAuth, async (req: Request, res: Response) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { ids, active } = req.body;
@@ -61,7 +61,7 @@ export function registerFactoryProductBulkRoutes(app: Express) {
 
   app.post("/api/factory/bale-products/bulk-rename-preview", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { codePrefix, find, replace } = req.body;
@@ -102,7 +102,7 @@ export function registerFactoryProductBulkRoutes(app: Express) {
   app.post("/api/factory/bale-products/bulk-rename-apply", requireAuth, async (req: Request, res: Response) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { items } = req.body;
@@ -131,7 +131,7 @@ export function registerFactoryProductBulkRoutes(app: Express) {
   app.post("/api/factory/bale-products/merge", requireAuth, async (req: Request, res: Response) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { targetId, sourceIds } = req.body;
@@ -167,7 +167,7 @@ export function registerFactoryProductBulkRoutes(app: Express) {
           WHERE product_id = ANY(${sqlArray(sourceIds)})
             AND company_id = ${companyId}
         `);
-        movedBales = (updateResult as any).rowCount ?? 0;
+        movedBales = updateResult.rowCount ?? 0;
 
         // Update factory_pressing_batches: reassign product
         await tx.execute(sql`
@@ -205,7 +205,7 @@ export function registerFactoryProductBulkRoutes(app: Express) {
 
   app.post("/api/factory/bale-products/bulk-update-prices", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { prices } = req.body;
@@ -223,7 +223,7 @@ export function registerFactoryProductBulkRoutes(app: Express) {
           continue;
         }
 
-        const updates: Record<string, any> = { updatedAt: new Date() };
+        const updates: Record<string, unknown> = { updatedAt: new Date() };
 
         if (row.sellingPrice !== undefined && row.sellingPrice !== null && String(row.sellingPrice).trim() !== "") {
           const sp = parseFloat(String(row.sellingPrice));

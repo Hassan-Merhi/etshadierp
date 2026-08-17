@@ -15,7 +15,7 @@ import { sqlArray } from "../../../../lib/sqlArray";
 export function registerFactoryEmployeeAttendanceRoutes(app: Express) {
   app.get("/api/factory/employee-attendance", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { date } = req.query as { date?: string };
       if (!date) return res.status(400).json({ message: "date is required" });
@@ -48,7 +48,7 @@ export function registerFactoryEmployeeAttendanceRoutes(app: Express) {
         AND employee_id = ANY(${sqlArray(empIds)})
       `);
       // Map snake_case raw SQL rows to camelCase for the frontend
-      const attendance = (existing.rows as any[]).map((r) => ({
+      const attendance = ((existing.rows)).map((r) => ({
         id: r.id,
         employeeId: r.employee_id,
         attendanceDate: r.attendance_date,
@@ -63,7 +63,7 @@ export function registerFactoryEmployeeAttendanceRoutes(app: Express) {
 
   app.post("/api/factory/employee-attendance/bulk", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { records } = req.body as {
         records: Array<{ employeeId: number; attendanceDate: string; status: string; notes?: string }>;
@@ -87,7 +87,7 @@ export function registerFactoryEmployeeAttendanceRoutes(app: Express) {
   // GET /api/factory/employee-attendance/employee/:id — per-employee attendance for a date range
   app.get("/api/factory/employee-attendance/employee/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const empId = parseInt(req.params.id);
       if (isNaN(empId)) return res.status(400).json({ message: "Invalid employee ID" });
@@ -100,7 +100,7 @@ export function registerFactoryEmployeeAttendanceRoutes(app: Express) {
         ORDER BY attendance_date
       `);
       // Map snake_case raw SQL rows to camelCase for the frontend
-      const attendance = (rows.rows as any[]).map((r) => ({
+      const attendance = ((rows.rows)).map((r) => ({
         id: r.id,
         employeeId: r.employee_id,
         attendanceDate: r.attendance_date,

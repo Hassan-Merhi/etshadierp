@@ -25,7 +25,7 @@ import { resultRows } from "../../../lib/queryResult";
 export function registerOrderCrudRoutes(app: Express) {
   app.get("/api/factory/customer-orders", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const conditions: any[] = [eq(customerOrders.companyId, companyId), isNull(customerOrders.deletedAt)];
@@ -117,7 +117,7 @@ export function registerOrderCrudRoutes(app: Express) {
 
   app.get("/api/factory/customer-orders/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
@@ -205,7 +205,7 @@ export function registerOrderCrudRoutes(app: Express) {
 
   app.patch("/api/factory/customer-orders/:id/hidden", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
@@ -223,7 +223,7 @@ export function registerOrderCrudRoutes(app: Express) {
 
   app.get("/api/factory/customer-orders/:id/profitability", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
@@ -334,19 +334,50 @@ export function registerOrderCrudRoutes(app: Express) {
 
   app.post("/api/factory/customer-orders", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const parsed = insertCustomerOrderSchema.parse({ ...req.body, companyId, status: "DRAFT" });
       const [order] = await db.insert(customerOrders).values(parsed).returning();
       await logAudit({
         userId: req.session.userId!,
-        username: (req.session as any).username || req.session.userId!,
+        username: req.session.username || req.session.userId!,
         companyId,
         action: "create",
         tableName: "factory_customer_orders",
         recordId: order.id,
-        recordIdentifier: (order as any).orderNumber || `Order #${order.id}`,
+        recordIdentifier:
+          (
+            order as unknown as {
+              id: number;
+              companyId: number;
+              deletedAt: Date | null;
+              createdAt: Date;
+              updatedAt: Date;
+              isHidden: boolean;
+              containerNumber: string | null;
+              status: string;
+              grandTotal: string;
+              customerId: number;
+              invoiceNumber: string | null;
+              orderDate: string;
+              proformaIdUsed: number | null;
+              subtotalBales: string;
+              freightAmount: string;
+              otherChargesTotal: string;
+              totalQtyBales: number;
+              shippingCompany: string | null;
+              containerNotes: string | null;
+              destination: string | null;
+              verifiedByUserId: number | null;
+              verifiedAt: Date | null;
+              loadingStartedAt: Date | null;
+              loadingFinalizedAt: Date | null;
+              finalizedAt: Date | null;
+              locationId: number | null;
+              dispatchBatchId: number | null;
+            } & { orderNumber: string | null | undefined }
+          ).orderNumber || `Order #${order.id}`,
         changes: null,
       });
       res.json(order);
@@ -358,7 +389,7 @@ export function registerOrderCrudRoutes(app: Express) {
 
   app.patch("/api/factory/customer-orders/:id/link-proforma", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseId(req.params.id);
@@ -446,7 +477,7 @@ export function registerOrderCrudRoutes(app: Express) {
   // can add or edit notes at any point during the loading lifecycle).
   app.patch("/api/factory/customer-orders/:id/loading-note", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseId(req.params.id);
@@ -468,12 +499,43 @@ export function registerOrderCrudRoutes(app: Express) {
 
       await logAudit({
         userId: req.session.userId!,
-        username: (req.session as any).username || req.session.userId!,
+        username: req.session.username || req.session.userId!,
         companyId,
         action: "update",
         tableName: "factory_customer_orders",
         recordId: orderId,
-        recordIdentifier: (order as any).orderNumber || `Order #${orderId}`,
+        recordIdentifier:
+          (
+            order as unknown as {
+              id: number;
+              companyId: number;
+              customerId: number;
+              invoiceNumber: string | null;
+              orderDate: string;
+              proformaIdUsed: number | null;
+              status: string;
+              subtotalBales: string;
+              freightAmount: string;
+              otherChargesTotal: string;
+              grandTotal: string;
+              totalQtyBales: number;
+              containerNumber: string | null;
+              shippingCompany: string | null;
+              containerNotes: string | null;
+              destination: string | null;
+              verifiedByUserId: number | null;
+              verifiedAt: Date | null;
+              loadingStartedAt: Date | null;
+              loadingFinalizedAt: Date | null;
+              finalizedAt: Date | null;
+              locationId: number | null;
+              dispatchBatchId: number | null;
+              isHidden: boolean;
+              deletedAt: Date | null;
+              createdAt: Date;
+              updatedAt: Date;
+            } & { orderNumber: string | null | undefined }
+          ).orderNumber || `Order #${orderId}`,
         changes: { loadingNote: { old: order.containerNotes ?? null, new: note?.trim() || null } },
       });
       res.json({ success: true, order: updated });
@@ -485,14 +547,14 @@ export function registerOrderCrudRoutes(app: Express) {
 
   app.delete("/api/factory/customer-orders/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseId(req.params.id);
 
       if (orderId === null) return res.status(400).json({ message: "Invalid id" });
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         const [order] = await tx
           .select()
           .from(customerOrders)
@@ -529,7 +591,7 @@ export function registerOrderCrudRoutes(app: Express) {
 
       await logAudit({
         userId: req.session.userId!,
-        username: (req.session as any).username || req.session.userId!,
+        username: req.session.username || req.session.userId!,
         companyId,
         action: "delete",
         tableName: "factory_customer_orders",
@@ -546,7 +608,7 @@ export function registerOrderCrudRoutes(app: Express) {
 
   app.patch("/api/factory/customer-orders/:id/date", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseId(req.params.id);
@@ -571,12 +633,43 @@ export function registerOrderCrudRoutes(app: Express) {
 
       await logAudit({
         userId: req.session.userId!,
-        username: (req.session as any).username || req.session.userId!,
+        username: req.session.username || req.session.userId!,
         companyId,
         action: "update",
         tableName: "factory_customer_orders",
         recordId: orderId,
-        recordIdentifier: (order as any).orderNumber || `Order #${orderId}`,
+        recordIdentifier:
+          (
+            order as unknown as {
+              id: number;
+              companyId: number;
+              customerId: number;
+              invoiceNumber: string | null;
+              orderDate: string;
+              proformaIdUsed: number | null;
+              status: string;
+              subtotalBales: string;
+              freightAmount: string;
+              otherChargesTotal: string;
+              grandTotal: string;
+              totalQtyBales: number;
+              containerNumber: string | null;
+              shippingCompany: string | null;
+              containerNotes: string | null;
+              destination: string | null;
+              verifiedByUserId: number | null;
+              verifiedAt: Date | null;
+              loadingStartedAt: Date | null;
+              loadingFinalizedAt: Date | null;
+              finalizedAt: Date | null;
+              locationId: number | null;
+              dispatchBatchId: number | null;
+              isHidden: boolean;
+              deletedAt: Date | null;
+              createdAt: Date;
+              updatedAt: Date;
+            } & { orderNumber: string | null | undefined }
+          ).orderNumber || `Order #${orderId}`,
         changes: { orderDate: { old: order.orderDate ?? null, new: orderDate } },
       });
       res.json(updated);
@@ -588,7 +681,7 @@ export function registerOrderCrudRoutes(app: Express) {
 
   app.post("/api/factory/customer-orders/:id/assign-container", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseId(req.params.id);
@@ -619,21 +712,52 @@ export function registerOrderCrudRoutes(app: Express) {
 
       await logAudit({
         userId: req.session.userId!,
-        username: (req.session as any).username || req.session.userId!,
+        username: req.session.username || req.session.userId!,
         companyId,
         action: "update",
         tableName: "factory_customer_orders",
         recordId: orderId,
-        recordIdentifier: (order as any).orderNumber || `Order #${orderId}`,
+        recordIdentifier:
+          (
+            order as unknown as {
+              id: number;
+              companyId: number;
+              customerId: number;
+              invoiceNumber: string | null;
+              orderDate: string;
+              proformaIdUsed: number | null;
+              status: string;
+              subtotalBales: string;
+              freightAmount: string;
+              otherChargesTotal: string;
+              grandTotal: string;
+              totalQtyBales: number;
+              containerNumber: string | null;
+              shippingCompany: string | null;
+              containerNotes: string | null;
+              destination: string | null;
+              verifiedByUserId: number | null;
+              verifiedAt: Date | null;
+              loadingStartedAt: Date | null;
+              loadingFinalizedAt: Date | null;
+              finalizedAt: Date | null;
+              locationId: number | null;
+              dispatchBatchId: number | null;
+              isHidden: boolean;
+              deletedAt: Date | null;
+              createdAt: Date;
+              updatedAt: Date;
+            } & { orderNumber: string | null | undefined }
+          ).orderNumber || `Order #${orderId}`,
         changes: {
           ...(containerNumber !== undefined
             ? { containerNumber: { old: order.containerNumber ?? null, new: containerNumber } }
             : {}),
           ...(destination !== undefined
-            ? { destination: { old: (order as any).destination ?? null, new: destination || null } }
+            ? { destination: { old: order.destination ?? null, new: destination || null } }
             : {}),
           ...(shippingCompany !== undefined
-            ? { shippingCompany: { old: (order as any).shippingCompany ?? null, new: shippingCompany } }
+            ? { shippingCompany: { old: order.shippingCompany ?? null, new: shippingCompany } }
             : {}),
         },
       });
@@ -650,7 +774,7 @@ export function registerOrderCrudRoutes(app: Express) {
 
   app.get("/api/factory/bale-lookup", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const code = req.query.code as string;

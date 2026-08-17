@@ -137,8 +137,8 @@ export const simpleCompanyTransferService = {
 
       const existingTransfer = await transferRepository.findTransferByVoucherIdsTx(
         tx,
-        Number((fromPosted.voucher as any).id),
-        Number((toPosted.voucher as any).id)
+        Number((fromPosted.voucher as { id: unknown }).id),
+        Number((toPosted.voucher as { id: unknown }).id)
       );
       if (existingTransfer) return existingTransfer;
 
@@ -150,8 +150,8 @@ export const simpleCompanyTransferService = {
         amount: fromBuilt.amount,
         fromLedgerAccountId: parsed.fromLedgerAccountId,
         toLedgerAccountId: parsed.toLedgerAccountId,
-        fromVoucherId: (fromPosted.voucher as any).id,
-        toVoucherId: (toPosted.voucher as any).id,
+        fromVoucherId: (fromPosted.voucher as { id: unknown }).id,
+        toVoucherId: (toPosted.voucher as { id: unknown }).id,
         description,
       });
     });
@@ -214,7 +214,10 @@ export const simpleCompanyTransferService = {
       return {
         success: true,
         replayed: fromReversal.replayed && toReversal.replayed,
-        reversalVoucherIds: [Number((fromReversal.voucher as any).id), Number((toReversal.voucher as any).id)],
+        reversalVoucherIds: [
+          Number((fromReversal.voucher as { id: unknown }).id),
+          Number((toReversal.voucher as { id: unknown }).id),
+        ],
       };
     });
   },

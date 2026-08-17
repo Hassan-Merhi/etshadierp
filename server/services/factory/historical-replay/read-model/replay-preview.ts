@@ -162,7 +162,7 @@ export async function previewHistoricalCostReplayWithExecutor(
       !timeline.reasons.includes("ADJUSTMENT_VALUATION_UNCLASSIFIED")
     ) {
       timeline.reasons.push("ADJUSTMENT_VALUATION_UNCLASSIFIED");
-      (timeline as any).safeToRepair = false;
+      timeline.safeToRepair = false;
     }
     timelineResults.push(timeline);
     for (const [batchId, rate] of timeline.expectedRateAtBatch) {

@@ -64,7 +64,21 @@ export async function getAccessibleCompanyIds(userId: string): Promise<Set<numbe
   let isDeveloper = roles.some((entry) => entry.role === "Developer");
   if (!isDeveloper) {
     const user = await storage.getUser(userId);
-    isDeveloper = (user as any)?.role === "Developer";
+    isDeveloper =
+      (
+        user as unknown as (
+          | {
+              id: string;
+              active: boolean;
+              createdAt: Date;
+              username: string;
+              password: string;
+              chatbotEnabled: boolean;
+              hiddenErpCostFields: string[];
+            }
+          | undefined
+        ) & { role: "Developer" }
+      )?.role === "Developer";
   }
 
   if (isDeveloper) {

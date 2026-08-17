@@ -31,7 +31,7 @@ export function registerOrderUnfinalizeRoutes(app: Express) {
     requireAuth,
     async (req: Request, res: Response) => {
       try {
-        const session = req.session as any;
+        const session = req.session;
         const companyId = session.factoryCompanyId || session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 
@@ -87,14 +87,14 @@ export function registerOrderUnfinalizeRoutes(app: Express) {
 
   app.post("/api/factory/customer-orders/:id/unfinalize", requireAuth, async (req: Request, res: Response) => {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const orderId = parseId(req.params.id);
 
       if (orderId === null) return res.status(400).json({ message: "Invalid id" });
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx) => {
         const [order] = await tx
           .select()
           .from(customerOrders)

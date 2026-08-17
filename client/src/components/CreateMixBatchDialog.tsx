@@ -151,7 +151,7 @@ export function CreateMixBatchDialog({ open, onOpenChange, onCreated }: CreateMi
       onCreated?.(result);
       handleClose();
       const batchId = result.id;
-      const batchCode = (result as any).batchCode || `#${batchId}`;
+      const batchCode = result.batchCode || `#${batchId}`;
       toast({
         title: "Batch created",
         description: `${batchCode} created successfully`,
@@ -176,7 +176,7 @@ export function CreateMixBatchDialog({ open, onOpenChange, onCreated }: CreateMi
       });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -223,14 +223,14 @@ export function CreateMixBatchDialog({ open, onOpenChange, onCreated }: CreateMi
       queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
       handleClose();
-      const batchCode = (result as any).batchCode || `#${result.id}`;
+      const batchCode = result.batchCode || `#${result.id}`;
       toast({
         title: "Added to batch",
         description: `${formatNumber(selectedSources.reduce((s, x) => s + x.weightKg, 0))} kg added to ${batchCode}`,
       });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });

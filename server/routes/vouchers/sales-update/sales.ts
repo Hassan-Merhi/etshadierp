@@ -242,7 +242,7 @@ export function registerVoucherSalesLineUpdateRoutes(app: Express) {
         } else {
           // No targetLocationId — still try to add configuredPrice if we know it
           for (const newItem of salesItemsData) {
-            (newItem as any).configuredPrice = null;
+            newItem.configuredPrice = null;
           }
         }
 

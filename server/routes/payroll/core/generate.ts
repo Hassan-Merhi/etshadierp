@@ -72,7 +72,7 @@ export function registerPayrollGenerateRoutes(app: Express) {
       };
 
       // Fetch all attendance records for the period (for monthly attendance-based calculation)
-      const workerIdList = targetWorkers.map((w: any) => w.id);
+      const workerIdList = targetWorkers.map((w) => w.id);
       const attendanceRecords = workerIdList.length
         ? await db
             .select()
@@ -147,7 +147,7 @@ export function registerPayrollGenerateRoutes(app: Express) {
         workerAccCache.set(worker.id, { salaryId: sa.id, bonusId: ba.id });
       }
 
-      const created = await db.transaction(async (tx: any) => {
+      const created = await db.transaction(async (tx) => {
         let count = 0;
         let totalNet = 0;
         let totalAdvanceDeductions = 0;
@@ -155,11 +155,10 @@ export function registerPayrollGenerateRoutes(app: Express) {
         const workerExpenses: { workerId: number; workerName: string; salAmt: number; bonAmt: number }[] = [];
         for (const worker of targetWorkers) {
           const baseSal = parseFloat(worker.baseSalary || "0");
-          const freq = (worker as any).payFrequency || worker.salaryType || "Monthly";
+          const freq = worker.payFrequency || worker.salaryType || "Monthly";
           let base: number;
-          if (freq === "Weekly") base = (days / 7) * parseFloat((worker as any).weeklySalary || baseSal.toString());
-          else if (freq === "Bi-Weekly")
-            base = (days / 14) * parseFloat((worker as any).biWeeklySalary || baseSal.toString());
+          if (freq === "Weekly") base = (days / 7) * parseFloat(worker.weeklySalary || baseSal.toString());
+          else if (freq === "Bi-Weekly") base = (days / 14) * parseFloat(worker.biWeeklySalary || baseSal.toString());
           else if (freq === "Daily" || worker.salaryType === "Daily") base = days * baseSal;
           else {
             // Monthly: use attendance-based calculation if records exist
@@ -181,7 +180,7 @@ export function registerPayrollGenerateRoutes(app: Express) {
           }
 
           const monthDaysForTransport = daysInMonth(periodStart);
-          const workerTransportDefault2 = parseFloat((worker as any).transportAllowance || "0");
+          const workerTransportDefault2 = parseFloat(worker.transportAllowance || "0");
           const transportOverrideAmt2 = transportOverrides
             ? parseFloat(transportOverrides[String(worker.id)] ?? "-1")
             : -1;
@@ -235,13 +234,13 @@ export function registerPayrollGenerateRoutes(app: Express) {
               status: "DRAFT",
               notes: notes || null,
               cashAccountId: cashAccountId ? parseInt(cashAccountId) : null,
-            } as any)
+            })
             .returning({ id: factoryPayrolls.id });
           // Mark pending deductions as applied
           if (deductionByWorker[worker.id]?.length) {
             await tx
               .update(factoryWorkerDeductions)
-              .set({ applied: true, payrollId: newPayroll.id } as any)
+              .set({ applied: true, payrollId: newPayroll.id })
               .where(inArray(factoryWorkerDeductions.id, deductionByWorker[worker.id]));
           }
           // Settle advances immediately at generate time so remaining balance updates right away
@@ -267,7 +266,7 @@ export function registerPayrollGenerateRoutes(app: Express) {
               )
             );
           if (staleGenVouchers.length > 0) {
-            const vIds = staleGenVouchers.map((v: any) => v.id);
+            const vIds = staleGenVouchers.map((v) => v.id);
             await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
             await tx.delete(vouchers).where(inArray(vouchers.id, vIds));
           }

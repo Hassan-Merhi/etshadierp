@@ -11,7 +11,7 @@ const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.s
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024, files: 1 } });
 
 function factoryCompanyId(req: Request): number | null {
-  const value = Number((req.session as any)?.factoryCompanyId);
+  const value = Number(req.session?.factoryCompanyId);
   return Number.isSafeInteger(value) && value > 0 ? value : null;
 }
 
@@ -157,7 +157,7 @@ export function registerFactoryFrenchTranslationRoutes(app: Express) {
       if (!req.file) return res.status(400).json({ message: "Excel file is required" });
       await ensureFrenchColumns();
       const workbook = new ExcelJS.Workbook();
-      await workbook.xlsx.load(req.file.buffer as any);
+      await workbook.xlsx.load(req.file.buffer as unknown as Buffer<ArrayBufferLike> & ExcelJS.Buffer);
       const sheet = workbook.worksheets[0];
       if (!sheet) return res.status(400).json({ message: "Workbook has no worksheet" });
       const headers = new Map<string, number>();
@@ -197,7 +197,7 @@ export function registerFactoryFrenchTranslationRoutes(app: Express) {
             LEFT JOIN factory_categories c ON c.id = p.category_id AND c.company_id = p.company_id
             WHERE p.company_id = ${companyId} AND UPPER(BTRIM(p.article_code)) = ANY(${codes})
           `)
-        : { rows: [] as any[] };
+        : { rows: ([]) };
       const byCode = new Map(catalog.rows.map((row: any) => [row.articleCode, row]));
       const preview = rows.map((row) => {
         const match = byCode.get(String(row.articleCode));
@@ -238,7 +238,7 @@ export function registerFactoryFrenchTranslationRoutes(app: Express) {
             WHERE company_id = ${companyId} AND UPPER(BTRIM(article_code)) = ${articleCode} AND deleted_at IS NULL
             RETURNING category_id AS "categoryId"
           `);
-          const categoryId = Number((product.rows[0] as any)?.categoryId);
+          const categoryId = Number(product.rows[0]?.categoryId);
           if (!product.rows[0]) continue;
           updatedProducts += 1;
           if (

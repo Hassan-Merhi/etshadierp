@@ -85,7 +85,32 @@ export function WorkerProfilesTab({
         worker={selectedWorkerProfile as any}
         onBack={() => setSelectedWorkerProfileId(null)}
         onEdit={(w) => {
-          setSelectedWorkerForEdit(w as any);
+          setSelectedWorkerForEdit(
+            w as {
+              id: number;
+              companyId: number;
+              code: string;
+              phone: string | null;
+              openingBalance: string | null;
+              active: boolean;
+              deletedAt: Date | null;
+              createdAt: Date;
+              email: string | null;
+              firstName: string;
+              lastName: string;
+              joinDate: string;
+              department: string | null;
+              employeeType: string;
+              monthlySalary: string;
+              currentBalance: string;
+              totalDeposits: string;
+              totalWithdrawals: string;
+              salesBonusPct: string | null;
+              salesBonusPctSourceCompanyId: number | null;
+              salesBonusPctLocationId: number | null;
+              balesBonusRate: string | null;
+            } | null
+          );
           setEditWorkerDialogOpen(true);
         }}
       />
@@ -245,7 +270,7 @@ export function WorkerProfilesTab({
                       variant="ghost"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setWorkerDeductionTarget(worker as any);
+                        setWorkerDeductionTarget(worker);
                       }}
                       data-testid={`button-deduction-worker-${worker.id}`}
                       title="Add deduction"
