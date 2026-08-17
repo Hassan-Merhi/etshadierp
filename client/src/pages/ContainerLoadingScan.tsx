@@ -36,7 +36,6 @@ import type {
   CreateLoadingOrderResponse,
   Customer,
   Location,
-  OrderBale,
   OrderDetail,
   Proforma,
 } from "./containerloadingscan/types";

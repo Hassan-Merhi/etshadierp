@@ -48,7 +48,6 @@ import type {
   BaleRemoval,
   Customer,
   Location,
-  OrderBale,
   OrderDetail,
   Proforma,
   AddLoadingBaleInput,

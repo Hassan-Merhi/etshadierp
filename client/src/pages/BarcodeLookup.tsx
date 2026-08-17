@@ -41,7 +41,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useAdminOverride } from "@/hooks/use-admin-override";
-import type { BaleProduct, BaleLabelPrint } from "@shared/schema";
+import type { BaleProduct } from "@shared/schema";
 import { BaleWeightEditDialog, type WeightEditBale } from "@/components/BaleWeightEditDialog";
 
 import type { ArticleLookupResult, ReferenceLookupResult, SearchMode } from "./barcodelookup/types";
