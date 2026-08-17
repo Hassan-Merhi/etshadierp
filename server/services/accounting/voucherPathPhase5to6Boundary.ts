@@ -42,7 +42,9 @@ function canonicalize(value: unknown): unknown {
 }
 
 function sha256(value: unknown): string {
-  return createHash("sha256").update(JSON.stringify(canonicalize(value))).digest("hex");
+  return createHash("sha256")
+    .update(JSON.stringify(canonicalize(value)))
+    .digest("hex");
 }
 
 function normalizedPath(req: Request): string {
@@ -315,17 +317,19 @@ async function voucherPathPhase5to6Boundary(req: Request, res: Response, next: N
 
   const captured = captureResponse(res);
   res.on("finish", () => {
-    void completeVoucherPathRequest(companyId, idempotencyKey, res.statusCode, captured.read(), phase6).catch((error) => {
-      // The successful handler result has already been sent. Leaving the row
-      // processing is intentionally fail-closed: a future retry cannot execute
-      // the financial handler again after an uncertain guard-write outcome.
-      logger.error("Voucher request boundary completion persistence failed", {
-        module: "voucher-path-request-boundary",
-        path: pathname,
-        companyId,
-        error,
-      });
-    });
+    void completeVoucherPathRequest(companyId, idempotencyKey, res.statusCode, captured.read(), phase6).catch(
+      (error) => {
+        // The successful handler result has already been sent. Leaving the row
+        // processing is intentionally fail-closed: a future retry cannot execute
+        // the financial handler again after an uncertain guard-write outcome.
+        logger.error("Voucher request boundary completion persistence failed", {
+          module: "voucher-path-request-boundary",
+          path: pathname,
+          companyId,
+          error,
+        });
+      }
+    );
   });
   next();
 }

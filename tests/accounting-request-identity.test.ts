@@ -85,16 +85,14 @@ describe("accounting request identity", () => {
   });
 
   it("protects active Payment/Receipt creation and reuses its uncertain retry identity", () => {
-    const first = attachAccountingRequestIdentity(
-      "POST",
-      PAYMENT_RECEIPT_URL,
-      paymentReceiptPayload()
-    ) as Record<string, unknown>;
-    const retry = attachAccountingRequestIdentity(
-      "POST",
-      PAYMENT_RECEIPT_URL,
-      paymentReceiptPayload()
-    ) as Record<string, unknown>;
+    const first = attachAccountingRequestIdentity("POST", PAYMENT_RECEIPT_URL, paymentReceiptPayload()) as Record<
+      string,
+      unknown
+    >;
+    const retry = attachAccountingRequestIdentity("POST", PAYMENT_RECEIPT_URL, paymentReceiptPayload()) as Record<
+      string,
+      unknown
+    >;
 
     expect(isProtectedAccountingRequest("POST", PAYMENT_RECEIPT_URL, first)).toBe(true);
     expect(typeof first.clientRequestId).toBe("string");

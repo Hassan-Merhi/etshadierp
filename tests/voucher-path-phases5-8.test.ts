@@ -124,9 +124,7 @@ describe("Voucher path review phases 5-8", () => {
   it("classifies all 11 special-purpose writers as deterministic or intrinsically replay-safe", () => {
     expect(voucherReview.summary.migrationImportRepair).toBe(0);
     expect(voucherReview.summary.phase6SpecialPurposeCompleted).toBe(11);
-    expect(voucherReview.completed["phase-6-deterministic-source-writers"].files).toEqual(
-      PHASE6_DETERMINISTIC_WRITERS
-    );
+    expect(voucherReview.completed["phase-6-deterministic-source-writers"].files).toEqual(PHASE6_DETERMINISTIC_WRITERS);
     expect(voucherReview.completed["phase-6-intrinsic-replay-safe-writers"].files).toEqual(PHASE6_INTRINSIC_WRITERS);
     expect(PHASE6_INTRINSIC_REPLAY_SAFE_WRITERS).toEqual(PHASE6_INTRINSIC_WRITERS);
     expect([...PHASE6_SPECIAL_PURPOSE_COMPLETED_WRITERS].sort()).toEqual(

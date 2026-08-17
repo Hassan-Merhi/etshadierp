@@ -103,15 +103,13 @@ describePostgres("voucher path request boundary PostgreSQL regression", () => {
       items: [{ barcode: "SKU-1", quantity: 2, rate: 10 }],
     });
 
-    await expect(
-      claimVoucherPathRequest(companyA, key, "deterministic-source", path, fingerprint)
-    ).resolves.toEqual({ kind: "owner" });
+    await expect(claimVoucherPathRequest(companyA, key, "deterministic-source", path, fingerprint)).resolves.toEqual({
+      kind: "owner",
+    });
     await completeVoucherPathRequest(companyA, key, 200, { imported: 1, voucherCount: 1 }, true);
 
     // A later call reads the persisted row; no in-memory ownership token is used.
-    await expect(
-      claimVoucherPathRequest(companyA, key, "deterministic-source", path, fingerprint)
-    ).resolves.toEqual({
+    await expect(claimVoucherPathRequest(companyA, key, "deterministic-source", path, fingerprint)).resolves.toEqual({
       kind: "replay",
       status: 200,
       body: { imported: 1, voucherCount: 1 },
@@ -126,9 +124,9 @@ describePostgres("voucher path request boundary PostgreSQL regression", () => {
       items: [{ barcode: "SKU-X", quantity: 1 }],
     });
 
-    await expect(
-      claimVoucherPathRequest(companyA, key, "deterministic-source", path, fingerprint)
-    ).resolves.toEqual({ kind: "owner" });
+    await expect(claimVoucherPathRequest(companyA, key, "deterministic-source", path, fingerprint)).resolves.toEqual({
+      kind: "owner",
+    });
     await completeVoucherPathRequest(companyA, key, 500, { error: "response lost" }, true);
 
     const started = Date.now();

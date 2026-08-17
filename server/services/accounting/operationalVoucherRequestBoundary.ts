@@ -276,7 +276,8 @@ async function operationalVoucherBoundary(req: Request, res: Response, next: Nex
     if (stored.requestPath !== req.path || stored.requestFingerprint !== fingerprint) {
       res.status(409).json({
         code: "POSTING_IDEMPOTENCY_CONFLICT",
-        message: "This request identity was already used for a different accounting operation, payload, or authorization context.",
+        message:
+          "This request identity was already used for a different accounting operation, payload, or authorization context.",
       });
       return;
     }
