@@ -8,7 +8,7 @@ those splits verifiable rather than hopeful.
 Phases 0, 1 and 2 are complete. Phases 3 and 4 are in progress; 3b and 5 have
 not been started.
 
-**Backlog: 49 files, 25,437 lines over the limit** (from 162 and 102,337).
+**Backlog: 44 files, 21,648 lines over the limit** (from 162 and 102,337).
 `npm run audit:god-files` prints the current figure; the ceiling is asserted in
 `tests/god-file-boundaries.test.ts` and is lowered with each split. This line is
 bound to the audit in `config/doc-index.json`, so it now fails the build instead
