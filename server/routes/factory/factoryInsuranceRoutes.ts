@@ -323,9 +323,10 @@ export function registerFactoryInsuranceRoutes(app: Express) {
         )
       );
 
+      const postedVoucher = result.voucher as { id: number; voucherNumber: string };
       res.json({
-        voucherId: result.voucher.id,
-        voucherNumber: result.voucher.voucherNumber,
+        voucherId: postedVoucher.id,
+        voucherNumber: postedVoucher.voucherNumber,
         totalAmount,
         membersCount: eligibleMembers.length,
         period: monthLabel,
