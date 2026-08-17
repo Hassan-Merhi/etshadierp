@@ -8,7 +8,6 @@ import {
  * PHASE 19 structural split — moved (unchanged) from server/routes/pos/posSalesRoutes.ts.
  * Inserts the Sales voucher row for a POS sale.
  */
-import { vouchers } from "@shared/schema";
 
 export async function insertSaleVoucher(
   tx: any,
