@@ -1,6 +1,7 @@
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "../db";
 import { adjustInventory } from "../inventoryHelper";
+import { journalStockTransferLeg, nextStockTransferRevision } from "./inventory/stockTransferJournal";
 import {
   inventory,
   locations,
@@ -591,6 +592,8 @@ export async function approveImmutableStockTransferRevision(
       }
     }
 
+    const canonicalRevision = await nextStockTransferRevision(tx, companyId, transferId);
+
     for (const change of changes) {
       if (change.existing) {
         if (change.newQuantity <= 0) {
@@ -618,6 +621,21 @@ export async function approveImmutableStockTransferRevision(
       if (inventoryApplied && Math.abs(change.delta) >= 0.0005) {
         await adjustInventory(tx, change.sourceLocationId, change.stockItemId, -change.delta, companyId, change.rate);
         await adjustInventory(tx, destinationLocationId, change.stockItemId, change.delta, companyId, change.rate);
+
+        // A revision applies a delta, not a whole quantity: positive moves more
+        // stock out to the destination, negative brings some of it back. The
+        // journal records the direction the stock actually travelled, so the
+        // legs are swapped for a negative delta rather than logged as a
+        // negative issue nobody would read correctly.
+        await journalStockTransferLeg(tx, {
+          companyId,
+          transferId,
+          revision: canonicalRevision,
+          phase: change.delta > 0 ? "issue" : "reverse",
+          fromLocationId: change.delta > 0 ? change.sourceLocationId : destinationLocationId,
+          toLocationId: change.delta > 0 ? destinationLocationId : change.sourceLocationId,
+          leg: { stockItemId: change.stockItemId, quantity: change.delta, rate: change.rate },
+        });
       }
     }
 

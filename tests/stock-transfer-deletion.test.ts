@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "../server/db";
 import {
   companies,
@@ -136,6 +136,7 @@ afterAll(async () => {
   await db.delete(vouchers).where(eq(vouchers.id, appliedVoucherId));
   await db.delete(vouchers).where(eq(vouchers.id, draftVoucherId));
   await db.delete(inventory).where(eq(inventory.companyId, companyId));
+  await db.execute(sql`DELETE FROM canonical_stock_movements WHERE stock_item_id = ${itemId}`);
   await db.delete(stockItems).where(eq(stockItems.id, itemId));
   await db.delete(locations).where(eq(locations.companyId, companyId));
   await db.delete(companies).where(eq(companies.id, companyId));

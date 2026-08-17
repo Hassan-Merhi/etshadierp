@@ -1,0 +1,121 @@
+{
+  "version": 1,
+  "reviewState": "REVIEWED FILE BY FILE",
+  "scope": "Voucher creation sites detected by scripts/audit-write-evidence.mjs after excluding updates/deletes/restores/moves of existing voucher rows.",
+  "summary": {
+    "totalReviewed": 81,
+    "explicitReplayGuard": 15,
+    "migrationImportRepair": 11,
+    "infrastructureWriter": 11,
+    "operationalWithoutRequestIdentity": 44,
+    "unreviewed": 0
+  },
+  "reviewed": {
+    "explicit-replay-guard": {
+      "verdict": "not a request-identity defect at this creation site",
+      "reason": "The creation is protected by an explicit existing-voucher/source-row check, an atomic state claim, conflict handling, or replace-in-transaction semantics. A sequential retry does not leave a second live voucher even though the file bypasses the central posting engine.",
+      "files": [
+        "server/routes/balance-repair/undo.ts",
+        "server/routes/containers/containerFreightWriteRoutes.ts",
+        "server/routes/containers/containerHelpers.ts",
+        "server/routes/factory/containers/other-charges-currency-admin.ts",
+        "server/routes/factory/customer-orders/finalize-loading/finalize.ts",
+        "server/routes/helpers/intercompanyHelpers.ts",
+        "server/routes/intercompanyNotificationRoutes.ts",
+        "server/routes/offloadRoutes.ts",
+        "server/routes/payroll/advanceManagementRoutes.ts",
+        "server/routes/payroll/core/generate.ts",
+        "server/routes/payroll/core/migrations.ts",
+        "server/routes/sp-migration/spMigrationSalesRoutes.ts",
+        "server/routes/sp/spContainerRoutes.ts",
+        "server/routes/sp/spMigrationPhase2Containers.ts",
+        "server/routes/sp/spMigrationPhase2Sales.ts"
+      ]
+    },
+    "migration-import-repair": {
+      "verdict": "reviewed special-purpose path; still outside request-identity enforcement",
+      "reason": "These are migration, import, repair, revaluation, backfill, or administrative conversion paths rather than ordinary posting endpoints. They were reviewed separately because client-request identity is not always the right key; rerunnable ones need a deterministic source/run identity instead.",
+      "files": [
+        "server/routes/admin/adminPoFixRoutes.ts",
+        "server/routes/creditSalesImportRoutes.ts",
+        "server/routes/erp-payroll/runs-migration.ts",
+        "server/routes/exchangeRateRoutes.ts",
+        "server/routes/factory/docs-users/companyImportRoutes.ts",
+        "server/routes/payroll/worker-statement/backfill.ts",
+        "server/routes/posImportRoutes.ts",
+        "server/routes/rental/rentalAccrualConfigRoutes.ts",
+        "server/routes/sp-migration/spMigrationSetupRoutes.ts",
+        "server/routes/stockTransferImportRoutes.ts",
+        "server/services/rental/reclassifyDeferredRentService.ts"
+      ]
+    },
+    "infrastructure-writer": {
+      "verdict": "reviewed lower-level writer; caller/source identity is not enforced here",
+      "reason": "These helpers, services, and storage primitives create voucher rows below the HTTP request boundary. The file itself cannot supply a client request id reliably, but the API currently does not force callers to provide a deterministic source identity, so safety depends on each caller.",
+      "files": [
+        "server/routes/payroll/_payrollAccountingHelper.ts",
+        "server/services/accounting/voucherPostingService.ts",
+        "server/services/containers/offload-lifecycle/charge-vouchers.ts",
+        "server/services/containers/offload-lifecycle/sp-journals.ts",
+        "server/services/factory/post-offload-charge/apply.ts",
+        "server/services/pos/createSaleVoucher.ts",
+        "server/services/rental/rentalPaymentPostingService.ts",
+        "server/storage/accounting/fiscal-periods.ts",
+        "server/storage/accounting/vouchers.ts",
+        "server/storage/containers-store/offload.ts",
+        "server/storage/containers-store/purchase-orders.ts"
+      ]
+    },
+    "operational-without-request-identity": {
+      "verdict": "genuine backlog",
+      "reason": "These operational creation paths still insert vouchers directly without the central posting engine and without an explicit request-id/idempotency mechanism at the creation site. Many generate voucher numbers with Date.now()/random suffixes, so a retry can produce a distinct second voucher unless a higher-level state transition happens to block it. They should be migrated to canonical source/request identity with regression tests.",
+      "files": [
+        "server/routes/containers/offload/create.ts",
+        "server/routes/creditNoteRoutes.ts",
+        "server/routes/employees/salaryAdvanceRoutes.ts",
+        "server/routes/erp-payroll/bonuses.ts",
+        "server/routes/erp-payroll/bulk-adjustments.ts",
+        "server/routes/erp-payroll/employee-deposits.ts",
+        "server/routes/erp-payroll/runs.ts",
+        "server/routes/erp-payroll/withdrawals.ts",
+        "server/routes/erp-payroll/worker-payments.ts",
+        "server/routes/factory/containers/create.ts",
+        "server/routes/factory/containers/delete.ts",
+        "server/routes/factory/containers/other-charges.ts",
+        "server/routes/factory/containers/update.ts",
+        "server/routes/factory/customer-orders/orderChargesRoutes.ts",
+        "server/routes/factory/employee-pos/employee-crud/bulk-payroll.ts",
+        "server/routes/factory/employee-pos/employee-crud/bulk-withdraw.ts",
+        "server/routes/factory/employee-pos/employee-crud/cash.ts",
+        "server/routes/factory/employee-pos/employeeAdvancesBonusRoutes.ts",
+        "server/routes/factory/employee-pos/pos-financial/sale-write.ts",
+        "server/routes/factory/factoryTransporterRoutes.ts",
+        "server/routes/factory/raw-stock/rawStockAdjRoutes.ts",
+        "server/routes/factory/raw-stock/rawStockOffloadRoutes.ts",
+        "server/routes/factory/raw-stock/rawStockReverseOffloadRoute.ts",
+        "server/routes/factory/suppliers/crud/payments.ts",
+        "server/routes/payroll/advance-accounting/bulk-repay.ts",
+        "server/routes/payroll/advance-accounting/cash.ts",
+        "server/routes/payroll/advance-accounting/repay-by-month.ts",
+        "server/routes/payroll/advance-accounting/repayment-audit.ts",
+        "server/routes/payroll/advance-accounting/repayments.ts",
+        "server/routes/payroll/core/mark-paid.ts",
+        "server/routes/payroll/worker-stats-advances/advanceAdminRoutes.ts",
+        "server/routes/payroll/worker-stats-advances/advancesRoutes.ts",
+        "server/routes/rental/shared/accrual.ts",
+        "server/routes/rental/shared/auto-transfer.ts",
+        "server/routes/rental/units-contracts/contract-end.ts",
+        "server/routes/rental/units-contracts/guarantees.ts",
+        "server/routes/sp/spLifecycleRoutes.ts",
+        "server/routes/sp/spOffloadLifecycleRoutes.ts",
+        "server/routes/sp/spOffloadRoutes.ts",
+        "server/routes/sp/spOpeningStockRoutes.ts",
+        "server/routes/sp/spSalesRoutes.ts",
+        "server/routes/vouchers/voucherCreateRoutes.ts",
+        "server/routes/vouchers/voucherJournalRoutes.ts",
+        "server/routes/vouchers/voucherPaymentRoutes.ts"
+      ]
+    }
+  },
+  "unreviewed": []
+}
