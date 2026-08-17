@@ -92,16 +92,18 @@ function assertStoredIdentityMatches(input: {
  * still build voucher entries themselves. The durable identity lives in the
  * same accounting_posting_requests table used by the Phase 2 central engine.
  *
- * On replay inside an existing transaction we clear the old voucher-entry rows
- * before returning the same voucher. The caller then rebuilds those rows using
- * its existing logic. If rebuilding fails, the surrounding transaction rolls
- * back and restores the prior rows, so retries cannot accumulate duplicates.
+ * Transaction-owned writers default to replace-in-transaction on replay: the
+ * same voucher row is reused, old entry rows are cleared, and the caller's
+ * existing code rebuilds them. If rebuilding fails, rollback restores the old
+ * rows. Shell-only storage APIs can disable replacement until later phases move
+ * their entry writes into the same transaction.
  */
 export async function insertInfrastructureVoucherTx(
   tx: any,
   voucher: VoucherInsert,
   sourceInput: PostingSourceIdentity,
-  fingerprintPayload?: unknown
+  fingerprintPayload?: unknown,
+  options: { replaceEntriesOnReplay?: boolean } = {}
 ): Promise<{ voucher: VoucherRow; replayed: boolean }> {
   const source = assertPostingSourceIdentity(sourceInput);
   const companyId = Number(voucher.companyId);
@@ -143,7 +145,9 @@ export async function insertInfrastructureVoucherTx(
         `Idempotency marker ${source.idempotencyKey} references a missing voucher`
       );
     }
-    await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, existing.id));
+    if (options.replaceEntriesOnReplay !== false) {
+      await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, existing.id));
+    }
     return { voucher: existing, replayed: true };
   }
 
@@ -178,19 +182,15 @@ export async function insertInfrastructureVoucherTx(
   return { voucher: created, replayed: false };
 }
 
-/**
- * Non-nested convenience wrapper for storage APIs that currently create only
- * the voucher row. It still guarantees one voucher row per source identity;
- * operational phases will move those callers to the fully transaction-owned
- * balanced posting boundary.
- */
 export async function insertInfrastructureVoucher(
   database: DatabaseLike,
   voucher: VoucherInsert,
   source: PostingSourceIdentity,
   fingerprintPayload?: unknown
 ): Promise<{ voucher: VoucherRow; replayed: boolean }> {
-  return database.transaction((tx) => insertInfrastructureVoucherTx(tx, voucher, source, fingerprintPayload));
+  return database.transaction((tx) =>
+    insertInfrastructureVoucherTx(tx, voucher, source, fingerprintPayload, { replaceEntriesOnReplay: false })
+  );
 }
 
 /** Remove the durable marker before an intentional hard delete/rebuild. */
