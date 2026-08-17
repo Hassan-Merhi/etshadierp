@@ -33,7 +33,20 @@ jobs:
             2c61c7139
           do
             echo "CHERRY_PICK=$commit"
-            git cherry-pick "$commit"
+            if git cherry-pick -X theirs "$commit"; then
+              continue
+            fi
+
+            # An already-integrated/empty repair is safe to skip. Any real
+            # unresolved conflict remains a hard failure and is never pushed.
+            if git diff --cached --quiet && git diff --quiet; then
+              git cherry-pick --skip
+              continue
+            fi
+
+            echo "Unresolved conflict while integrating $commit"
+            git status --short
+            exit 1
           done
       - run: npm ci
       - name: Require compiler-green integrated head
