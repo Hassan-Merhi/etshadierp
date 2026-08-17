@@ -342,7 +342,7 @@ export default function SpreadsheetEditor() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (payload: { name: string; data: any }) => {
+    mutationFn: async (payload: { name: string; data: unknown }) => {
       const res = await apiRequest("POST", "/api/spreadsheets", payload);
       return res.json();
     },
@@ -360,7 +360,7 @@ export default function SpreadsheetEditor() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, fields }: { id: number; fields: { name?: string; data?: any } }) => {
+    mutationFn: async ({ id, fields }: { id: number; fields: { name?: string; data?: unknown } }) => {
       const res = await apiRequest("PATCH", `/api/spreadsheets/${id}`, fields);
       return res.json();
     },

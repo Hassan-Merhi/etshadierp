@@ -45,8 +45,8 @@ export interface ApiSheet {
   companyId: number;
   name: string;
   orderIndex: number;
-  columns: any[];
-  rows: any[];
+  columns: unknown[];
+  rows: unknown[];
   updatedAt: string;
 }
 

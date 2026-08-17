@@ -20,7 +20,7 @@ export interface NetPositionInventoryContext {
   getConfigFx: (cc: string) => number;
   configFxRates: Record<string, number>;
   supplierLockedRateMapNp: Map<number, number>;
-  allContainersF: any[];
+  allContainersF: unknown[];
 }
 
 export interface NetPositionInventory {

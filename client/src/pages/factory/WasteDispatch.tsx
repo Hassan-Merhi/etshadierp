@@ -51,7 +51,7 @@ export default function WasteDispatch() {
   const printRef = useRef<HTMLDivElement>(null);
 
   // ── Dispatch queries ───────────────────────────────────────────
-  const { data, isLoading } = useQuery<{ bales: Bale[]; categories: any[] }>({
+  const { data, isLoading } = useQuery<{ bales: Bale[]; categories: unknown[] }>({
     queryKey: ["/api/factory/waste-dispatch/bales", search],
     queryFn: async () => {
       const params = new URLSearchParams();

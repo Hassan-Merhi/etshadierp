@@ -102,7 +102,7 @@ export function registerStockItemWriteRoutes(app: Express) {
 
       const updated = await storage.updateStockItem(stockItemId, updates);
       try {
-        const _stockChanges: Record<string, { old?: any; new?: any }> = {};
+        const _stockChanges: Record<string, { old?: unknown; new?: unknown }> = {};
         for (const _f of ["name", "code", "uom", "barcode", "sellingPrice", "active"] as const) {
           if (
             String((existingItem as { [key: string]: unknown })[_f] ?? "") !==

@@ -41,7 +41,7 @@ export function useVoucherEditMutations({
   const [_location, navigate] = useLocation();
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { voucherUpdates: any; entries: any[] }) => {
+    mutationFn: async (data: { voucherUpdates: unknown; entries: unknown[] }) => {
       return await modeApiRequest("PUT", `/api/vouchers/${id}/with-entries`, {
         voucher: data.voucherUpdates,
         entries: data.entries,

@@ -5,7 +5,7 @@ import type { APIInventoryItem, Location } from "../pos-components/posTypes";
 import { buildPosInventory, type SpMovement } from "./posInventory";
 
 interface PosQueriesParams {
-  posUser: any;
+  posUser: unknown;
   activeLocation: Location | null;
   isCreditSale: boolean;
   editVoucherId?: string;

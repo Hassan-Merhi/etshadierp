@@ -130,7 +130,7 @@ export const utils = {
 
   sheet_to_json: <T = Record<string, any>>(
     worksheet: ExcelJS.Worksheet,
-    options?: { header?: number | string; defval?: any }
+    options?: { header?: number | string; defval?: unknown }
   ): T[] => {
     const data: any[] = [];
     const headers: string[] = [];

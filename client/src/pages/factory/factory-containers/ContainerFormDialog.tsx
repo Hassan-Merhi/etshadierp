@@ -90,7 +90,7 @@ interface ContainerFormDialogProps {
   open: boolean;
   editingContainer: ContainerWithSupplier | null;
   suppliers: FactorySupplier[] | undefined;
-  ledgerAccounts: any[];
+  ledgerAccounts: unknown[];
   onClose: () => void;
 }
 

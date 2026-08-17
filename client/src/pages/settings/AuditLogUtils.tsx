@@ -93,7 +93,7 @@ export const BUSINESS_FIELD_LABELS: Record<string, string> = {
   metadata: "Additional Details",
 };
 
-export type AuditChangePair = { old?: any; new?: any };
+export type AuditChangePair = { old?: unknown; new?: unknown };
 
 /**
  * Audit rows come from two historical formats:

@@ -13,7 +13,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 // ── STATUS sheet helpers ───────────────────────────────────────────────────────
 type CellVal = number | string | null;
 type SRow = { id?: string; label: string; cells: number[] };
-type SSheet = { id?: number; name: string; columns: any[]; rows: SRow[]; orderIndex?: number };
+type SSheet = { id?: number; name: string; columns: unknown[]; rows: SRow[]; orderIndex?: number };
 
 const STATUS_NAME = "STATUS";
 
