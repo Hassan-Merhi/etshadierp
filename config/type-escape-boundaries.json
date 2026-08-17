@@ -18,9 +18,4580 @@
     ],
     "excludeFiles": [],
     "ratchetBucket": 1,
-    "baseline": {}
+    "baseline": {
+      "client/src/app/authenticatedAppRouteGuard.ts": [
+        1,
+        0,
+        0
+      ],
+      "client/src/app/factoryAccessGuard.ts": [
+        1,
+        0,
+        0
+      ],
+      "client/src/app/useAuthenticatedAppData.ts": [
+        2,
+        0,
+        0
+      ],
+      "client/src/app/usePosNavigationItems.ts": [
+        1,
+        0,
+        0
+      ],
+      "client/src/components/AddContainerDialog.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/components/AdvancedRestrictionsPanel.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/components/AppSidebar.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/components/ChatWidget.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/components/CombinedImportDialog.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/components/CommandPalette.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/components/DailyRateModal.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/components/EditMixBatchDialog.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/components/ErrorBoundary.tsx": [
+        0,
+        3,
+        0
+      ],
+      "client/src/components/ExchangeRateSettings.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/components/FactoryRoutes.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/components/FactorySidebar.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/components/FiscalPeriodTab.tsx": [
+        5,
+        0,
+        0
+      ],
+      "client/src/components/NotificationsCenter.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/components/OffloadDialog.tsx": [
+        12,
+        0,
+        0
+      ],
+      "client/src/components/PropertiesSidebar.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/components/SpOffloadDialog.tsx": [
+        31,
+        0,
+        0
+      ],
+      "client/src/components/StockItemCreateDialog.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/components/StockItemDetailsDialog.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/components/chat-widget/useChatActions.ts": [
+        8,
+        0,
+        0
+      ],
+      "client/src/components/sidebar/sidebarPrimitives.tsx": [
+        5,
+        0,
+        0
+      ],
+      "client/src/components/vouchers/AccountCombobox.tsx": [
+        0,
+        2,
+        0
+      ],
+      "client/src/components/vouchers/PaymentReceiptTab.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/components/vouchers/PrintTemplate.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/components/vouchers/VoucherEntriesTable.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/contexts/ConnectivityContext.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/contexts/CurrencyContext.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/hooks/use-admin-override.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/hooks/useLabelDesignColors.ts": [
+        1,
+        0,
+        0
+      ],
+      "client/src/hooks/useVoucherEntries.ts": [
+        1,
+        0,
+        0
+      ],
+      "client/src/lib/db.ts": [
+        2,
+        0,
+        0
+      ],
+      "client/src/lib/erp-navigation-history.ts": [
+        2,
+        0,
+        0
+      ],
+      "client/src/lib/excelHelper.ts": [
+        19,
+        0,
+        0
+      ],
+      "client/src/lib/excelImport.ts": [
+        18,
+        2,
+        0
+      ],
+      "client/src/lib/excelSync.ts": [
+        5,
+        1,
+        0
+      ],
+      "client/src/lib/factoryApi.ts": [
+        3,
+        0,
+        0
+      ],
+      "client/src/lib/lazyRetry.ts": [
+        1,
+        0,
+        0
+      ],
+      "client/src/lib/offlinePrep.ts": [
+        24,
+        0,
+        0
+      ],
+      "client/src/lib/queryClient.ts": [
+        3,
+        0,
+        0
+      ],
+      "client/src/lib/referenceMutationCache.ts": [
+        1,
+        0,
+        0
+      ],
+      "client/src/lib/whatsapp-prompt.ts": [
+        1,
+        0,
+        0
+      ],
+      "client/src/lib/zebraPrint.ts": [
+        2,
+        1,
+        0
+      ],
+      "client/src/pages/AICommandCenter.tsx": [
+        5,
+        0,
+        0
+      ],
+      "client/src/pages/AccountGroups.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/AccountTransfer.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/AccountsLegacy.tsx": [
+        9,
+        0,
+        0
+      ],
+      "client/src/pages/Agents.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/AiValidationPage.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/BalanceRepair.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/BaleProducts.tsx": [
+        9,
+        0,
+        0
+      ],
+      "client/src/pages/BarcodeLookup.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/BarcodeManager.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/BatchDetail.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/CombinedInventory.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/CompanyDataReset.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/ContainerDetail.tsx": [
+        41,
+        0,
+        0
+      ],
+      "client/src/pages/ContainerDetailPage.tsx": [
+        7,
+        0,
+        0
+      ],
+      "client/src/pages/ContainerLoadingScan.tsx": [
+        7,
+        0,
+        0
+      ],
+      "client/src/pages/ContainerVerification.tsx": [
+        8,
+        0,
+        0
+      ],
+      "client/src/pages/CustomerInvoiceCreate.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/Customers.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/Daybook.tsx": [
+        5,
+        1,
+        0
+      ],
+      "client/src/pages/DeletedItems.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/EditSupplier.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/ImportStockItems.tsx": [
+        5,
+        1,
+        0
+      ],
+      "client/src/pages/IntercompanyLinks.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/IntercompanyRequests.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/LiveSheets.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/LocationInventory.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/LocationMonthlySummary.tsx": [
+        5,
+        0,
+        0
+      ],
+      "client/src/pages/LocationVouchers.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/MixBatches.tsx": [
+        5,
+        0,
+        0
+      ],
+      "client/src/pages/NetProfitDetails.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/NetProfitReport.tsx": [
+        5,
+        0,
+        0
+      ],
+      "client/src/pages/OptionalVouchers.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/OrphanedRecords.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/POImport.tsx": [
+        10,
+        0,
+        0
+      ],
+      "client/src/pages/PressingBales.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/ProductionBales.tsx": [
+        20,
+        0,
+        0
+      ],
+      "client/src/pages/PurchaseOrderEdit.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/SalesReportLegacy.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/SalesToolsHub.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/Settings.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/SpreadsheetEditor.tsx": [
+        18,
+        0,
+        0
+      ],
+      "client/src/pages/StockEntryHistory.tsx": [
+        15,
+        0,
+        0
+      ],
+      "client/src/pages/StockItems.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/StockTransferImport.tsx": [
+        9,
+        0,
+        0
+      ],
+      "client/src/pages/StockTransferOrder.tsx": [
+        15,
+        0,
+        0
+      ],
+      "client/src/pages/SupplierProfitCheck.tsx": [
+        12,
+        0,
+        0
+      ],
+      "client/src/pages/SupplierProformas.tsx": [
+        5,
+        0,
+        0
+      ],
+      "client/src/pages/Suppliers.tsx": [
+        13,
+        0,
+        0
+      ],
+      "client/src/pages/TransactionJournal.tsx": [
+        6,
+        0,
+        0
+      ],
+      "client/src/pages/TransporterStatement.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/Vouchers.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/accountingcreate/components/EmployeeForm.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/accountingcreate/components/EntityFormWrapper.tsx": [
+        3,
+        2,
+        0
+      ],
+      "client/src/pages/accountingcreate/components/LedgerAccountForm.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/accountingcreate/components/LocationForm.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/accountingcreate/components/StockGroupForm.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/accountingcreate/components/StockItemForm.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/accountingcreate/components/SupplierForm.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/accounts/AccountTable.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/accounts/AccountTransactionRows.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/accounts/accountTypes.ts": [
+        32,
+        0,
+        0
+      ],
+      "client/src/pages/analytics/ContainerReportPanel.tsx": [
+        5,
+        0,
+        0
+      ],
+      "client/src/pages/analytics/SalesReportPanel.tsx": [
+        8,
+        0,
+        0
+      ],
+      "client/src/pages/analyticslegacy/components/ContainersSectionPanel.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/analyticslegacy/components/SalesSectionPanel.tsx": [
+        6,
+        0,
+        0
+      ],
+      "client/src/pages/analyticslegacy/types.ts": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/analyticslegacy/useAnalyticsLegacy.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/bales/BaleFormDialog.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/bales/useBales.ts": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/barcodelookup/components/BaleStatusBadge.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/containers/ContainerSpView.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/containers/OtwContainersTable.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/containers/containerExcel.ts": [
+        6,
+        0,
+        0
+      ],
+      "client/src/pages/containers/useContainerQueries.ts": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/containers/useContainerSyncAll.ts": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/containers/useContainerTracking.ts": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/dashboard/types.ts": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/daybook/DaybookFilters.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/daybook/DaybookTable.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/daybook/VoucherDetailsDialog.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/daybook/VoucherEditDialog.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/daybook/voucherdetailsdialog/types.ts": [
+        5,
+        0,
+        0
+      ],
+      "client/src/pages/factory/BaleStockEntry.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/factory/BalesHistory.tsx": [
+        18,
+        0,
+        0
+      ],
+      "client/src/pages/factory/CustomerLogosSettings.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/factory/EditProformaV5Drawer.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryAdvancesTab.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryAttendance.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryBaleRelabeling.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryBalesHub.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryBrokerVisualStatement.tsx": [
+        9,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryContainerCreate.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryContainerLoadingScan.tsx": [
+        11,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryContainers.tsx": [
+        5,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryCustomerStatement.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryCustomers.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryDaybook.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryDispatchBatchScan.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryDispatchBatches.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryEmployeeAttendanceTab.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryEmployeeDetail.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryInsurance.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryInvoiceCreate.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryInvoiceDetail.tsx": [
+        5,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryInvoiceLoadingScan.tsx": [
+        6,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryInvoices.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryInvoicing.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryKpis.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryLoadingsHub.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryLocationInventory.tsx": [
+        14,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryNetPosition.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryNetPositionDetails.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryNetProfitAnalytics.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryOpeningBalanceEdit.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryOtwTrackingTab.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryPOS.tsx": [
+        20,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryPayrollHub.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryPendingInvoiceVerify.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryPendingInvoices.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryProfitability.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryProformas.tsx": [
+        5,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactorySettings.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryShippingContainers.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryStockAllocationV5.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactorySupplierReport.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactorySupplierStatement.tsx": [
+        15,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactorySuppliers.tsx": [
+        11,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryUsers.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryWaste.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/FactoryWorkersHub.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/factory/GroundScan.tsx": [
+        6,
+        0,
+        0
+      ],
+      "client/src/pages/factory/ProductionRawStock.tsx": [
+        15,
+        0,
+        0
+      ],
+      "client/src/pages/factory/ProductionSummary.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/factory/ProformaAddLine.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/factory/WasteDispatch.tsx": [
+        12,
+        0,
+        0
+      ],
+      "client/src/pages/factory/WipersReEntry.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/factory/bale-stock-entry/BaleLogoPickerPopover.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/factory/bale-stock-entry/DailyStockSummary.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/bale-stock-entry/ImportBalesTab.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/factory/bale-stock-entry/RemoveFromStockDialogs.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/bale-stock-entry/RemoveFromStockTab.tsx": [
+        8,
+        0,
+        0
+      ],
+      "client/src/pages/factory/bale-stock-entry/RemoveFromStockTable.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/factory/bale-stock-entry/StockEntryCart.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/factory/bale-stock-entry/StockEntryDialogs.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/bale-stock-entry/StockEntryPrinting.ts": [
+        5,
+        0,
+        0
+      ],
+      "client/src/pages/factory/bale-stock-entry/StockEntryProductionPositions.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/bale-stock-entry/StockEntrySidebar.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/factory/bale-stock-entry/StockEntryTab.tsx": [
+        9,
+        0,
+        0
+      ],
+      "client/src/pages/factory/bale-stock-entry/WorkerCategoriesTab.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/factory/daybook/ViewEntryModal.tsx": [
+        13,
+        0,
+        0
+      ],
+      "client/src/pages/factory/daybook/entry-views/ContainerImportView.tsx": [
+        6,
+        0,
+        0
+      ],
+      "client/src/pages/factory/daybook/entry-views/LoadingCreatedView.tsx": [
+        14,
+        0,
+        0
+      ],
+      "client/src/pages/factory/daybook/entry-views/MixBatchView.tsx": [
+        9,
+        0,
+        0
+      ],
+      "client/src/pages/factory/daybook/entry-views/PayrollPaymentView.tsx": [
+        6,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-containers/ContainerDetailDialog.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-containers/ContainerDialogs.tsx": [
+        5,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-containers/ContainerFormBody.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-containers/ContainerFormDialog.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-containers/ContainerListView.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-containers/OtwTrackingPanel.tsx": [
+        0,
+        3,
+        0
+      ],
+      "client/src/pages/factory/factory-containers/PostOffloadDialog.tsx": [
+        5,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-containers/postoffloaddialog/types.ts": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-location-inventory/dialogs/FinalizeProformaDialog.tsx": [
+        30,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-location-inventory/dialogs/PrintBarcodesDialog.tsx": [
+        10,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-location-inventory/dialogs/RemoveBalesDialog.tsx": [
+        14,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-location-inventory/dialogs/RenameLocationDialog.tsx": [
+        6,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-location-inventory/dialogs/StockOverloadWarningDialog.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-proformas/dialogs/AddPriceLineDialog.tsx": [
+        18,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-proformas/dialogs/CreatePendingLoadingDialog.tsx": [
+        7,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-proformas/dialogs/EditPriceLineDialog.tsx": [
+        6,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-proformas/dialogs/ImportProformaExcelDialog.tsx": [
+        19,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-proformas/dialogs/RenameProformaDialog.tsx": [
+        5,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-proformas/dialogs/TransferProformaDialog.tsx": [
+        6,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-suppliers/BrokerOverviewPanel.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-suppliers/CurrencyPools.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-suppliers/SupplierDialogs.tsx": [
+        41,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-suppliers/SupplierFormDialog.tsx": [
+        9,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-suppliers/SupplierOtherDialogs.tsx": [
+        16,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-suppliers/SupplierPaymentFxDialogs.tsx": [
+        24,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-suppliers/SupplierStatement.tsx": [
+        7,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-suppliers/SupplierStatementRows.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-suppliers/factorySupplierTypes.ts": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-worker-detail/dialogs/DocumentPreviewDialog.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-worker-detail/dialogs/EndContractDialog.tsx": [
+        21,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-worker-detail/dialogs/GenerateMissingAccountingEntryDialog.tsx": [
+        10,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-worker-detail/dialogs/MarkPayrollPaidDialog.tsx": [
+        10,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factory-worker-detail/dialogs/PayrollDetailDialog.tsx": [
+        5,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factoryadvancestab/dialogs/BulkAdvanceDialog.tsx": [
+        22,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factoryadvancestab/dialogs/CashAccountAdjustmentDialog.tsx": [
+        13,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factoryadvancestab/dialogs/ConfirmRepaymentDialog.tsx": [
+        8,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factoryadvancestab/dialogs/PostAccountingPreviewDialog.tsx": [
+        18,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factoryadvancestab/dialogs/ReconcileBalancesDialog.tsx": [
+        12,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factoryadvancestab/dialogs/RecordAdvanceDialog.tsx": [
+        9,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factoryadvancestab/dialogs/RepayByMonthDialog.tsx": [
+        17,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factoryadvancestab/dialogs/RepaymentAuditDialog.tsx": [
+        23,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factoryadvancestab/dialogs/ReverseAdvanceDialog.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factorydispatchbatchdetail/types.ts": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factoryfinancialsnapshot/components/KpiCard.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factoryimport/components/BaleImport.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factoryimport/components/OpeningStockImport.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factoryimport/components/RawStockImport.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factoryimport/components/SupplierImport.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factoryimport/components/SupplierObEdit.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factoryinsurance/components/MemberFormDialog.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factorypayrolltab/useFactoryPayroll.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factorypendinginvoiceverify/types.ts": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factorysettings/components/MigrateVoucherDescriptionsCard.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factorysettings/components/RecalculateBaleCostsCard.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factorysheetsandsacks/components/ItemFormDialog.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factorystatusbuilder/types.ts": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factorystatusbuilder/utils.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factorystockallocationv3/components/ScanningPanel.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factoryworkerdetail/components/AdvanceRow.tsx": [
+        5,
+        0,
+        0
+      ],
+      "client/src/pages/factory/production-raw-stock/AddToBatchDialog.tsx": [
+        5,
+        0,
+        0
+      ],
+      "client/src/pages/factory/production-raw-stock/DeductStockDialog.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/factory/production-raw-stock/MixBatchList.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/factory/production-raw-stock/OffloadDialog.tsx": [
+        8,
+        0,
+        0
+      ],
+      "client/src/pages/factory/production-raw-stock/OpeningBalanceDialog.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/factory/production-raw-stock/ProductionRawStockHelpers.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/production-raw-stock/StockAdjustmentDialog.tsx": [
+        5,
+        0,
+        0
+      ],
+      "client/src/pages/factory/wipersreentry/utils.ts": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/git-containers/ContainerDrawer.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/git-containers/ContainerDrawerForm.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/git-containers/ContainerDrawerTracking.tsx": [
+        6,
+        0,
+        0
+      ],
+      "client/src/pages/git-containers/ImportResultBanner.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/git-containers/useGITContainersData.ts": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/git-mockup/TabAgentDuty.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/git-mockup/agentCardWaSend.ts": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/location-inventory/AllItemsView.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/location-inventory/CombinedStockView.tsx": [
+        7,
+        0,
+        0
+      ],
+      "client/src/pages/location-inventory/InventoryTable.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/location-inventory/LocationDialogs.tsx": [
+        11,
+        0,
+        0
+      ],
+      "client/src/pages/location-inventory/LocationGrid.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/location-inventory/LocationInventoryDialogs.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/location-inventory/LocationInventoryHeader.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/location-inventory/LocationWhatsappDeliveryHistoryDialog.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/location-inventory/StockGroupItemsView.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/location-inventory/StockGroupsView.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/location-inventory/StockMovementDialog.tsx": [
+        10,
+        0,
+        0
+      ],
+      "client/src/pages/location-inventory/useCombinedStockRows.ts": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/location-inventory/useLocationInventoryExports.ts": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/location-inventory/useLocationInventoryMutations.ts": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/location-inventory/useLocationInventoryQueries.ts": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/location-inventory/useLocationInventoryState.ts": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/location-inventory/useStockGroupSummaries.ts": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/payroll/AdvanceDialogs.tsx": [
+        8,
+        0,
+        0
+      ],
+      "client/src/pages/payroll/AdvancesTab.tsx": [
+        7,
+        0,
+        0
+      ],
+      "client/src/pages/payroll/BonusDialog.tsx": [
+        8,
+        0,
+        0
+      ],
+      "client/src/pages/payroll/BulkDialogs.tsx": [
+        12,
+        0,
+        0
+      ],
+      "client/src/pages/payroll/BulkPaymentDialog.tsx": [
+        6,
+        0,
+        0
+      ],
+      "client/src/pages/payroll/DepositDialog.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/payroll/EditEmployeeDialog.tsx": [
+        16,
+        0,
+        0
+      ],
+      "client/src/pages/payroll/EmployeeCrudDialogs.tsx": [
+        12,
+        0,
+        0
+      ],
+      "client/src/pages/payroll/EmployeeStatementDialog.tsx": [
+        9,
+        0,
+        0
+      ],
+      "client/src/pages/payroll/EmployeesTab.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/payroll/PayrollDialogs.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/payroll/WithdrawalDialog.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/payroll/WorkerDialogs.tsx": [
+        15,
+        0,
+        0
+      ],
+      "client/src/pages/payroll/WorkerProfilesTab.tsx": [
+        7,
+        1,
+        0
+      ],
+      "client/src/pages/payroll/WorkersTab.tsx": [
+        12,
+        0,
+        0
+      ],
+      "client/src/pages/payroll/WorkersTable.tsx": [
+        4,
+        3,
+        0
+      ],
+      "client/src/pages/pendinginvoiceverify/types.ts": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/pos/POS.tsx": [
+        7,
+        0,
+        0
+      ],
+      "client/src/pages/pos/POSDashboard.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/pos/POSDaybook.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/pos/POSImport.tsx": [
+        15,
+        0,
+        0
+      ],
+      "client/src/pages/pos/POSPriceList.tsx": [
+        11,
+        0,
+        0
+      ],
+      "client/src/pages/pos/hooks/usePosCheckout.ts": [
+        6,
+        0,
+        0
+      ],
+      "client/src/pages/pos/hooks/usePosHandlers.ts": [
+        5,
+        0,
+        0
+      ],
+      "client/src/pages/pos/hooks/usePosMutations.ts": [
+        8,
+        0,
+        0
+      ],
+      "client/src/pages/pos/hooks/usePosQueries.ts": [
+        10,
+        0,
+        0
+      ],
+      "client/src/pages/pos/hooks/usePosRowCalculations.ts": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/pos/hooks/usePosWhatsApp.ts": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/pos/pos-components/CheckoutSidebar.tsx": [
+        8,
+        0,
+        0
+      ],
+      "client/src/pages/pos/pos-components/InvoiceTemplate.tsx": [
+        10,
+        0,
+        0
+      ],
+      "client/src/pages/pos/pos-components/POSDialogs.tsx": [
+        5,
+        0,
+        0
+      ],
+      "client/src/pages/pos/pos-components/POSHeader.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/pos/pos-components/PosCheckoutStrip.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/pos/pos-components/PosMobileLayout.tsx": [
+        7,
+        0,
+        0
+      ],
+      "client/src/pages/pos/pos-components/SaleGrid.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/pos/pospricelist/types.ts": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/pos/postransferorders/components/CreateTransferDialog.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/pos/postransferorders/components/EditableTransferDetail.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/properties/PropertiesDashboard.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/properties/PropertyRentalPage.tsx": [
+        0,
+        1,
+        0
+      ],
+      "client/src/pages/properties/property-rental/components/BulkPaymentDialog.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/properties/property-rental/components/GuaranteeForm.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/properties/property-rental/components/LedgerView.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/properties/property-rental/components/PaymentForm.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/settings/AccountingRepairDialogs.tsx": [
+        11,
+        0,
+        0
+      ],
+      "client/src/pages/settings/ActiveUsersSection.tsx": [
+        9,
+        0,
+        0
+      ],
+      "client/src/pages/settings/AuditLog.tsx": [
+        5,
+        0,
+        0
+      ],
+      "client/src/pages/settings/AuditLogDialog.tsx": [
+        14,
+        0,
+        0
+      ],
+      "client/src/pages/settings/AuditLogUtils.tsx": [
+        10,
+        0,
+        0
+      ],
+      "client/src/pages/settings/BulkRenameTab.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/settings/CleanEmptyAccountsDialog.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/settings/CompaniesTab.tsx": [
+        5,
+        0,
+        0
+      ],
+      "client/src/pages/settings/CompaniesTable.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/settings/DailyAutoSendSection.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/settings/DailyExportSection.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/settings/DailyExportTab.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/settings/DataToolsTab.tsx": [
+        37,
+        0,
+        0
+      ],
+      "client/src/pages/settings/DiagnosticsSection.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/settings/EditLogTab.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/settings/ExportAccountsSection.tsx": [
+        5,
+        0,
+        0
+      ],
+      "client/src/pages/settings/ExportCenter.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/settings/ExportImportSection.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/settings/FileStorageDialogs.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/settings/FileStorageTab.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/settings/IntercompanyPosTab.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/settings/LoginHistoryTab.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/settings/ModuleAccessSection.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/settings/NetPositionAdjustmentCard.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/settings/NetPositionExportSection.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/settings/OfflineSyncPanel.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/settings/POSReceiptSettings.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/settings/PageVisibilityTree.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/settings/ParentCreditAccountSelect.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/settings/PasswordResetDialog.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/settings/PosSettingsTab.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/settings/RemoteSupportWatchDialog.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/settings/StockReportSection.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/settings/SystemMaintenanceDialogs.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/settings/SystemToolsTab.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/settings/UserDialog.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/settings/UsersTable.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/settings/WatchUserDialog.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/settings/datatoolstab/components/BulkMergeStockItemsCard.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/settings/users/AdvancedRestrictions.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/settings/users/InlineRoleEditor.tsx": [
+        5,
+        0,
+        0
+      ],
+      "client/src/pages/settings/users/PosLocationManager.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/settings/users/RoleSummaryRow.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/settings/users/UserListTable.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/settings/users/UserManagementDrawer.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/settings/users/UserManagementForm.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/settings/users/UserRoleDialog.tsx": [
+        6,
+        0,
+        0
+      ],
+      "client/src/pages/settings/users/UserRolesCard.tsx": [
+        6,
+        0,
+        0
+      ],
+      "client/src/pages/settings/users/UsersSection.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/sp/GcLshiMigration.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/sp/SpAliases.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/sp/SpOpeningStock.tsx": [
+        5,
+        0,
+        0
+      ],
+      "client/src/pages/sp/SpOverview.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/sp/SpReports.tsx": [
+        11,
+        0,
+        0
+      ],
+      "client/src/pages/sp/SpSetup.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/sp/SpSetupPanel.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/sp/gclshimigration/components/ProfitOpeningRunner.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/sp/gclshimigration/components/Stage2StepRunner.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/stock-transfer-order/dialogs/DetailDialog.tsx": [
+        13,
+        0,
+        0
+      ],
+      "client/src/pages/stock-transfer-order/dialogs/ImportDialog.tsx": [
+        19,
+        0,
+        0
+      ],
+      "client/src/pages/stock-transfer-order/dialogs/QuantityPickerDialog.tsx": [
+        7,
+        0,
+        0
+      ],
+      "client/src/pages/stock-transfer-order/dialogs/RevisionDialog.tsx": [
+        10,
+        0,
+        0
+      ],
+      "client/src/pages/stock-transfer-order/dialogs/StockMovementDialog.tsx": [
+        18,
+        0,
+        0
+      ],
+      "client/src/pages/supplierprofitcheck/components/StatCard.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/voucher-edit/AdjustmentEditForm.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/voucher-edit/AdjustmentEditFormRows.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/voucher-edit/JournalEditForm.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/voucher-edit/PaymentReceiptEditForm.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/voucher-edit/PurchaseAdjustmentEditForm.tsx": [
+        10,
+        0,
+        0
+      ],
+      "client/src/pages/voucher-edit/PurchaseEditForm.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/voucher-edit/PurchaseEditFormTable.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/voucher-edit/SalesEditForm.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/voucher-edit/TransferEditForm.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/voucher-edit/VoucherAccountHelpers.ts": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/voucher-edit/useFormInitialization.ts": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/voucher-edit/useVoucherEditMutations.ts": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/vouchers/ApproveRevisionDialog.tsx": [
+        6,
+        0,
+        0
+      ],
+      "client/src/pages/vouchers/JournalForm.tsx": [
+        6,
+        0,
+        0
+      ],
+      "client/src/pages/vouchers/SaveRevisionDialog.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/vouchers/StockAdjustmentForm.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/vouchers/StockTransferForm.tsx": [
+        26,
+        0,
+        0
+      ],
+      "client/src/pages/vouchers/StockTransferImportDialog.tsx": [
+        6,
+        0,
+        0
+      ],
+      "client/src/pages/vouchers/StockTransferRevisionHistory.tsx": [
+        6,
+        0,
+        0
+      ],
+      "client/src/pages/vouchers/VoucherForm.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/vouchers/VoucherFormHeader.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/vouchers/VoucherListPanel.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/vouchers/VoucherTabNav.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/vouchers/keyboardHandlers.ts": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/vouchers/stock-transfer-form/dialogs/ApproveRevisionDialog.tsx": [
+        7,
+        0,
+        0
+      ],
+      "client/src/pages/vouchers/stock-transfer-form/dialogs/ImportTransferExcelDialog.tsx": [
+        25,
+        0,
+        0
+      ],
+      "client/src/pages/vouchers/stock-transfer-form/dialogs/SaveAsRevisionDialog.tsx": [
+        10,
+        0,
+        0
+      ],
+      "client/src/pages/vouchers/stock-transfer-form/useTransferFormDerived.ts": [
+        7,
+        0,
+        0
+      ],
+      "client/src/pages/vouchers/useAccountBalance.ts": [
+        7,
+        0,
+        0
+      ],
+      "client/src/pages/vouchers/useSidebarSync.ts": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/vouchers/useVoucherHandlers.ts": [
+        5,
+        0,
+        0
+      ],
+      "client/src/pages/vouchers/useVoucherHydration.ts": [
+        12,
+        0,
+        0
+      ],
+      "client/src/pages/vouchers/useVoucherQueries.ts": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/vouchers/voucherActions.ts": [
+        5,
+        0,
+        0
+      ],
+      "client/src/routes/AppRoutes.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/routes/ErpRoutes.tsx": [
+        6,
+        0,
+        0
+      ],
+      "client/src/routes/PosRoutes.tsx": [
+        1,
+        0,
+        0
+      ],
+      "server/chat/erpContext.ts": [
+        36,
+        0,
+        0
+      ],
+      "server/chat/persistence.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/chat/prompts.ts": [
+        22,
+        0,
+        0
+      ],
+      "server/chat/reports/implementations/phase1ReportShard.ts": [
+        13,
+        0,
+        0
+      ],
+      "server/chat/reports/implementations/phase2ReportShard.ts": [
+        9,
+        0,
+        0
+      ],
+      "server/chat/reports/implementations/phase3ReportShard.ts": [
+        10,
+        0,
+        0
+      ],
+      "server/chat/reports/implementations/phase4ReportShard.ts": [
+        10,
+        0,
+        0
+      ],
+      "server/chat/reports/implementations/phase5ReportShard.ts": [
+        10,
+        0,
+        0
+      ],
+      "server/chat/reports/implementations/phase6ReportShard.ts": [
+        10,
+        0,
+        0
+      ],
+      "server/chat/reports/implementations/phase7ReportShard.ts": [
+        9,
+        0,
+        0
+      ],
+      "server/chat/reports/types.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/chatService.ts": [
+        32,
+        0,
+        0
+      ],
+      "server/helpers/buildFullExportZip.ts": [
+        5,
+        0,
+        0
+      ],
+      "server/helpers/calculateNetPositionAsOf.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/helpers/exportRunTracker.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/helpers/generateAllCompaniesNetPositionExcel.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/helpers/generateInvoicePdf.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/helpers/generateNetPositionExcel.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/helpers/generateStockPdf.ts": [
+        0,
+        1,
+        0
+      ],
+      "server/helpers/scheduledExportArtifact.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/index.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/lib/accountStatementPdfGenerator.ts": [
+        5,
+        0,
+        0
+      ],
+      "server/lib/aiSnapshots.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/lib/httpTrackingScraper.ts": [
+        12,
+        0,
+        0
+      ],
+      "server/lib/maerskDirectScraper.ts": [
+        17,
+        0,
+        0
+      ],
+      "server/lib/observabilityBootstrap.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/lib/parcelsAppScraper.ts": [
+        5,
+        0,
+        0
+      ],
+      "server/lib/trackTraceScraper.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/lib/trackingProviders/cmaPublicProvider.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/lib/trackingProviders/maerskProvider.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/lib/trackingProviders/maerskPublicProvider.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/lib/workerBalesBilingualPdfGenerator.ts": [
+        0,
+        2,
+        0
+      ],
+      "server/middleware/activityAudit.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/middleware/companyUserRoleScope.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/middleware/deletedItemCompanyScope.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/middleware/requestLogger.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/accountCurrencyRoutes.ts": [
+        6,
+        0,
+        0
+      ],
+      "server/routes/accountStatementRoutes.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/accountTransactionPaginationRoutes.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/accounts/voucher-sidebar.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/admin/accountMigrationControlReferences.ts": [
+        9,
+        0,
+        0
+      ],
+      "server/routes/admin/accountMigrationSafeRoutes.ts": [
+        9,
+        0,
+        0
+      ],
+      "server/routes/admin/companySettingsRoutes.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/admin/deleted-items/list.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/admin/dependentDeletedItemPermanentRoutes.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/admin/import-export/account-migration.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/admin/import-export/files.ts": [
+        11,
+        0,
+        0
+      ],
+      "server/routes/admin/import-export/spreadsheets.ts": [
+        9,
+        0,
+        0
+      ],
+      "server/routes/admin/repair/inventory-values.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/admin/schemaDiagnosticRoutes.ts": [
+        0,
+        2,
+        0
+      ],
+      "server/routes/admin/securityPermissionRoutes.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/ai-import/_helpers.ts": [
+        22,
+        3,
+        0
+      ],
+      "server/routes/aiAgentRoutes.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/auth/auditLogRoutes.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/auth/coreAuthRoutes.ts": [
+        2,
+        2,
+        0
+      ],
+      "server/routes/auth/sessionRepository.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/auth/userAccessRoutes.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/balance-repair/_helpers.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/baleLookupRoutes.ts": [
+        7,
+        0,
+        0
+      ],
+      "server/routes/baleProductRoutes.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/baleRoutes.ts": [
+        2,
+        0,
+        1
+      ],
+      "server/routes/baleTransferRoutes.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/bankAssetRoutes.ts": [
+        9,
+        0,
+        0
+      ],
+      "server/routes/barcodeImageBandwidthMiddleware.ts": [
+        6,
+        0,
+        0
+      ],
+      "server/routes/businessAlertsRoutes.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/chatbot/transactions.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/chatbotPoImportRoutes.ts": [
+        10,
+        0,
+        0
+      ],
+      "server/routes/container-loaded-items/crud.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/container-loaded-items/import.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/container-loaded-items/reports.ts": [
+        16,
+        0,
+        0
+      ],
+      "server/routes/container-loaded-items/summary.ts": [
+        10,
+        0,
+        0
+      ],
+      "server/routes/containers/containerFreightReadRoutes.ts": [
+        0,
+        1,
+        0
+      ],
+      "server/routes/containers/containerFreightWriteRoutes.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/containers/containerHelpers.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/containers/containerSalesService.ts": [
+        0,
+        1,
+        0
+      ],
+      "server/routes/containers/containerTrackingRoutes.ts": [
+        5,
+        1,
+        0
+      ],
+      "server/routes/containers/offload/charges.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/containers/offload/create.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/creditNoteRoutes.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/routes/creditSalesImportRoutes.ts": [
+        5,
+        0,
+        0
+      ],
+      "server/routes/customers/customerBalanceQuery.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/routes/customers/customerService.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/employeeGroupRoutes.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/erp-payroll/bonuses.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/erp-payroll/bulk-adjustments.ts": [
+        8,
+        0,
+        0
+      ],
+      "server/routes/erp-payroll/employee-deposits.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/erp-payroll/runs-migration.ts": [
+        6,
+        0,
+        0
+      ],
+      "server/routes/erp-payroll/runs.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/erp-payroll/withdrawals.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/erp-payroll/worker-payments.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/factory-intelligence/alerts.ts": [
+        9,
+        0,
+        0
+      ],
+      "server/routes/factory-intelligence/bale-trace-photos.ts": [
+        9,
+        0,
+        0
+      ],
+      "server/routes/factory-intelligence/cashflow.ts": [
+        6,
+        0,
+        0
+      ],
+      "server/routes/factory-intelligence/dashboard-waste.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/factory-intelligence/kpis.ts": [
+        12,
+        0,
+        0
+      ],
+      "server/routes/factory-intelligence/mix-optimize.ts": [
+        16,
+        0,
+        0
+      ],
+      "server/routes/factory-intelligence/profitability.ts": [
+        19,
+        0,
+        0
+      ],
+      "server/routes/factory-intelligence/settings.ts": [
+        5,
+        0,
+        0
+      ],
+      "server/routes/factory-intelligence/supplier-score.ts": [
+        11,
+        0,
+        0
+      ],
+      "server/routes/factory-payroll/_helpers.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/factory-payroll/delete.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/routes/factory-payroll/exports.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/factory-payroll/generate.ts": [
+        7,
+        0,
+        0
+      ],
+      "server/routes/factory-payroll/production-bonuses.ts": [
+        5,
+        0,
+        0
+      ],
+      "server/routes/factory-payroll/reads.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/factory-payroll/update.ts": [
+        6,
+        0,
+        0
+      ],
+      "server/routes/factory-reports/_helpers.ts": [
+        11,
+        0,
+        0
+      ],
+      "server/routes/factory-reports/mix-batches.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/factory-reports/supplier-usage.ts": [
+        14,
+        0,
+        0
+      ],
+      "server/routes/factory-reports/whatsapp.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/factory-workers/_helpers.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/factory-workers/bales-settle.ts": [
+        6,
+        0,
+        0
+      ],
+      "server/routes/factory-workers/crud.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/factory-workers/documents.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/factory-workers/import-export.ts": [
+        15,
+        0,
+        0
+      ],
+      "server/routes/factory-workers/lists.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/routes/factory-workers/photos.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/factory/_helpers.ts": [
+        13,
+        0,
+        0
+      ],
+      "server/routes/factory/bale-exports/_helpers.ts": [
+        1,
+        1,
+        0
+      ],
+      "server/routes/factory/bale-exports/daily-report.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/routes/factory/bale-exports/production-value-report.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/routes/factory/bale-exports/weekly-report.ts": [
+        1,
+        1,
+        0
+      ],
+      "server/routes/factory/bales/balesCrudRoutes.ts": [
+        11,
+        0,
+        0
+      ],
+      "server/routes/factory/bales/balesExportRoutes.ts": [
+        6,
+        0,
+        0
+      ],
+      "server/routes/factory/bales/balesFinalizeRoutes.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/factory/bales/balesImportRoutes.ts": [
+        16,
+        0,
+        0
+      ],
+      "server/routes/factory/bales/balesReimportRoutes.ts": [
+        11,
+        0,
+        0
+      ],
+      "server/routes/factory/bales/balesReportRoutes.ts": [
+        8,
+        0,
+        0
+      ],
+      "server/routes/factory/containers/create.ts": [
+        0,
+        1,
+        0
+      ],
+      "server/routes/factory/containers/other-charges-currency-admin.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/routes/factory/containers/update.ts": [
+        5,
+        0,
+        0
+      ],
+      "server/routes/factory/customer-orders/bale-scanning/remove.ts": [
+        5,
+        0,
+        0
+      ],
+      "server/routes/factory/customer-orders/bale-scanning/scan.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/factory/customer-orders/bale-scanning/swap.ts": [
+        5,
+        0,
+        0
+      ],
+      "server/routes/factory/customer-orders/finalize-loading/finalize.ts": [
+        5,
+        0,
+        0
+      ],
+      "server/routes/factory/customer-orders/finalize-loading/unfinalize.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/factory/customer-orders/orderChargesRoutes.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/factory/customer-orders/orderCrudRoutes.ts": [
+        26,
+        0,
+        0
+      ],
+      "server/routes/factory/customer-orders/orderExcelExportRoutes.ts": [
+        26,
+        0,
+        0
+      ],
+      "server/routes/factory/customer-orders/orderHelpers.ts": [
+        15,
+        0,
+        0
+      ],
+      "server/routes/factory/customer-orders/pdf-export/loading-status.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/factory/customer-orders/pdf-export/order-pdf.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/factory/customer-orders/pdf-export/pending.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/factory/customer-orders/verify-recover/recover.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/factory/customer-orders/verify-recover/verification-summary.ts": [
+        5,
+        0,
+        0
+      ],
+      "server/routes/factory/customer-proformas/create-loading.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/factory/customer-proformas/lines.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/factory/customer-proformas/proformas.ts": [
+        10,
+        5,
+        0
+      ],
+      "server/routes/factory/customer-proformas/stock-allocation.ts": [
+        35,
+        0,
+        0
+      ],
+      "server/routes/factory/customers-core/logos.ts": [
+        10,
+        0,
+        0
+      ],
+      "server/routes/factory/customers-core/statement-excel.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/routes/factory/customers-core/statement-pdf.ts": [
+        6,
+        0,
+        0
+      ],
+      "server/routes/factory/dispatch-batches/_helpers.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/factory/dispatch-batches/bale-scans.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/routes/factory/dispatch-batches/batches.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/factory/dispatch-batches/invoicing.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/factory/dispatch-batches/truck-rides.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/factory/docs-users/baleRelabelRoutes.ts": [
+        9,
+        0,
+        0
+      ],
+      "server/routes/factory/docs-users/chatRoutes.ts": [
+        2,
+        8,
+        0
+      ],
+      "server/routes/factory/docs-users/companyExportRoutes.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/factory/docs-users/companyImportRoutes.ts": [
+        10,
+        0,
+        0
+      ],
+      "server/routes/factory/docs-users/daybookEditRoutes.ts": [
+        4,
+        6,
+        0
+      ],
+      "server/routes/factory/docs-users/docsRoutes.ts": [
+        15,
+        0,
+        0
+      ],
+      "server/routes/factory/docs-users/freightRoutes.ts": [
+        1,
+        17,
+        0
+      ],
+      "server/routes/factory/docs-users/usersAccessRoutes.ts": [
+        12,
+        0,
+        0
+      ],
+      "server/routes/factory/employee-pos/employee-crud/bulk-payroll.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/routes/factory/employee-pos/employee-crud/bulk-withdraw.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/factory/employee-pos/employee-crud/crud.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/factory/employee-pos/employee-crud/payroll-preview.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/factory/employee-pos/employeeAdvancesBonusRoutes.ts": [
+        1,
+        5,
+        0
+      ],
+      "server/routes/factory/employee-pos/employeeAttendanceRoutes.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/factory/employee-pos/employeeLedgerWasteRoutes.ts": [
+        20,
+        0,
+        0
+      ],
+      "server/routes/factory/employee-pos/employeeNetPositionRoutes.ts": [
+        25,
+        0,
+        0
+      ],
+      "server/routes/factory/employee-pos/netPositionInventory.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/factory/employee-pos/pos-financial/financial-snapshot.ts": [
+        7,
+        0,
+        0
+      ],
+      "server/routes/factory/employee-pos/pos-financial/production-positions.ts": [
+        5,
+        0,
+        0
+      ],
+      "server/routes/factory/employee-pos/pos-financial/sale-write.ts": [
+        7,
+        0,
+        0
+      ],
+      "server/routes/factory/endProductionRoutes.ts": [
+        2,
+        1,
+        0
+      ],
+      "server/routes/factory/factoryBilingualCatalogRoutes.ts": [
+        17,
+        0,
+        0
+      ],
+      "server/routes/factory/factoryContainerReadAccessRoutes.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/factory/factoryContainerTrackingRoutes.ts": [
+        0,
+        1,
+        0
+      ],
+      "server/routes/factory/factoryDaybookPaginationRoutes.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/factory/factoryDaybookRoutes.ts": [
+        10,
+        0,
+        0
+      ],
+      "server/routes/factory/factoryFrenchTranslationRoutes.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/factory/factorySheetsAndSacksRoutes.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/factory/factorySheetsRoutes.ts": [
+        6,
+        0,
+        0
+      ],
+      "server/routes/factory/factoryStatusBuilderSheetsRoutes.ts": [
+        12,
+        0,
+        0
+      ],
+      "server/routes/factory/factoryStockAllocationV2Routes.ts": [
+        17,
+        0,
+        0
+      ],
+      "server/routes/factory/factoryStockAllocationV3Routes.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/factory/factoryStockAllocationV5PaginationRoutes.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/factory/invoice-loading/_helpers.ts": [
+        7,
+        0,
+        0
+      ],
+      "server/routes/factory/invoice-loading/scanning.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/factory/labelBannersRoutes.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/factory/mix-batches/consume.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/factory/mix-batches/create.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/factory/mix-batches/reads.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/factory/mix-batches/top-up.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/factory/mix-batches/update.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/routes/factory/productionPositionPlannerRoutes.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/factory/products/productCascadeRoutes.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/factory/products/productHistoryRoutes.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/routes/factory/products/productImageRoutes.ts": [
+        10,
+        0,
+        0
+      ],
+      "server/routes/factory/products/productImportRoutes.ts": [
+        13,
+        0,
+        0
+      ],
+      "server/routes/factory/products/productReadRoutes.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/factory/raw-stock/historicalReplayFullCompanyScopeRoutes.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/routes/factory/raw-stock/historicalReplayPhase6GuardRoutes.ts": [
+        8,
+        0,
+        0
+      ],
+      "server/routes/factory/raw-stock/historicalReplayPhase8ReadinessRoutes.ts": [
+        5,
+        0,
+        0
+      ],
+      "server/routes/factory/raw-stock/historicalReplayRoutesV4.ts": [
+        7,
+        0,
+        0
+      ],
+      "server/routes/factory/raw-stock/offloadCosting.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/routes/factory/raw-stock/opening-balance/crud.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/routes/factory/raw-stock/opening-balance/recalculate.ts": [
+        7,
+        1,
+        0
+      ],
+      "server/routes/factory/raw-stock/postOffloadHistoricalReplayMiddleware.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/factory/raw-stock/postOffloadReconciliationMiddleware.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/factory/raw-stock/rawStockAdjRoutes.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/factory/raw-stock/rawStockContainerRoutes.ts": [
+        11,
+        0,
+        0
+      ],
+      "server/routes/factory/raw-stock/rawStockOffloadRoutes.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/routes/factory/raw-stock/rawStockRecalcRoutes.ts": [
+        1,
+        1,
+        0
+      ],
+      "server/routes/factory/raw-stock/rawStockReceiptRoutes.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/routes/factory/raw-stock/recalc/auto-apply-fx.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/factory/raw-stock/recalc/fix-and-apply-all.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/factory/raw-stock/recalc/partial-offload-scan.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/factory/raw-stock/recalc/preview.ts": [
+        7,
+        0,
+        0
+      ],
+      "server/routes/factory/raw-stock/recalc/supplier-rate.ts": [
+        6,
+        0,
+        0
+      ],
+      "server/routes/factory/raw-stock/recalc/zero-cost-sources.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/factory/raw-stock/registerRawStockRecalcRoutes.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/factory/shipping-containers/_helpers.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/factory/shipping-containers/documents.ts": [
+        0,
+        3,
+        0
+      ],
+      "server/routes/factory/shipping-containers/rows.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/routes/factory/stock-allocation-v5/allocation.ts": [
+        10,
+        0,
+        0
+      ],
+      "server/routes/factory/stock-allocation-v5/cancelled-containers.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/factory/stock-allocation-v5/location-summary.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/factory/stock-allocation-v5/proforma-create.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/factory/stock/locationInventoryExportRoutes.ts": [
+        15,
+        0,
+        0
+      ],
+      "server/routes/factory/stock/locationInventoryRoutes.ts": [
+        15,
+        0,
+        0
+      ],
+      "server/routes/factory/stock/stockEntryRoutes.ts": [
+        11,
+        0,
+        0
+      ],
+      "server/routes/factory/stock/stockRemovalRoutes.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/factory/suppliers/_supplierStatementHelpers.ts": [
+        11,
+        0,
+        0
+      ],
+      "server/routes/factory/suppliers/balance/_helpers.ts": [
+        11,
+        0,
+        0
+      ],
+      "server/routes/factory/suppliers/balance/with-balances.ts": [
+        49,
+        0,
+        0
+      ],
+      "server/routes/factory/suppliers/broker/_helpers.ts": [
+        10,
+        0,
+        0
+      ],
+      "server/routes/factory/suppliers/broker/visual-statement.ts": [
+        5,
+        0,
+        0
+      ],
+      "server/routes/factory/suppliers/fx/_helpers.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/factory/suppliers/fx/bulk-settlement.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/routes/factory/suppliers/fxDiagnosticRoutes.ts": [
+        8,
+        0,
+        0
+      ],
+      "server/routes/factory/suppliers/linkedSupplierGroups.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/factory/suppliers/supplierStatementRoutes.ts": [
+        25,
+        0,
+        0
+      ],
+      "server/routes/factoryAttendanceRoutes.ts": [
+        10,
+        0,
+        0
+      ],
+      "server/routes/factoryRoutes.ts": [
+        8,
+        0,
+        0
+      ],
+      "server/routes/factoryWhatsappRoutes.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/fiscal-transfers/create.ts": [
+        7,
+        0,
+        0
+      ],
+      "server/routes/fiscal-transfers/revisions-write.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/git/gitAgentRoutes.ts": [
+        7,
+        0,
+        0
+      ],
+      "server/routes/git/gitImportRoutes.ts": [
+        17,
+        0,
+        0
+      ],
+      "server/routes/global/centralGlobalTransactionRoutes.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/globalTransactionRoutes.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/helpers/auditHelpers.ts": [
+        12,
+        0,
+        0
+      ],
+      "server/routes/helpers/inventoryHistoryHelpers.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/helpers/supplierBalanceHelpers.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/routes/import/po-import.ts": [
+        7,
+        0,
+        0
+      ],
+      "server/routes/import/silent-transfer.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/inventory-movement/_helpers.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/inventory-movement/location-imports.ts": [
+        5,
+        0,
+        0
+      ],
+      "server/routes/inventory/inventoryQueryService.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/ledger/initialize-balances.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/ledgerAccountPaginationRoutes.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/location/commonInventoryPerformanceRoutes.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/location/locationCrudRoutes.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/location/locationWhatsappScheduleRoutes.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/routes/netProfitExcelRoute.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/netProfitExcelSheets.ts": [
+        22,
+        0,
+        0
+      ],
+      "server/routes/notificationRoutes.ts": [
+        14,
+        0,
+        0
+      ],
+      "server/routes/offloadRoutes.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/passkeyRoutes.ts": [
+        7,
+        0,
+        0
+      ],
+      "server/routes/payroll/_payrollAccountingHelper.ts": [
+        5,
+        0,
+        0
+      ],
+      "server/routes/payroll/advance-accounting/_helpers.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/payroll/advance-accounting/bulk-repay.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/payroll/advance-accounting/cash.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/payroll/advance-accounting/repay-by-month.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/payroll/advance-accounting/repayment-audit.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/payroll/advance-accounting/repayments.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/payroll/advanceManagementRoutes.ts": [
+        18,
+        0,
+        0
+      ],
+      "server/routes/payroll/centralFactoryPayrollGenerationRoute.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/payroll/core/_helpers.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/payroll/core/generate.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/payroll/core/migrations.ts": [
+        8,
+        2,
+        0
+      ],
+      "server/routes/payroll/core/preview.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/payroll/worker-statement/_helpers.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/payroll/worker-statement/backfill.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/payroll/worker-statement/repair.ts": [
+        0,
+        1,
+        0
+      ],
+      "server/routes/payroll/worker-statement/statement.ts": [
+        6,
+        0,
+        0
+      ],
+      "server/routes/payroll/worker-stats-advances/advanceAdminRoutes.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/payroll/worker-stats-advances/advancesRoutes.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/payroll/worker-stats-advances/helpers.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/performance/bandwidthPhase3FactoryReads.ts": [
+        10,
+        0,
+        0
+      ],
+      "server/routes/performance/supplierVoucherEntryBatcher.ts": [
+        6,
+        0,
+        0
+      ],
+      "server/routes/posImportRoutes.ts": [
+        6,
+        0,
+        0
+      ],
+      "server/routes/productionBaleRoutes.ts": [
+        5,
+        1,
+        1
+      ],
+      "server/routes/rental/rentalPaymentsAccrualRoutes.ts": [
+        5,
+        0,
+        0
+      ],
+      "server/routes/rental/shared/ledger.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/rental/units-contracts/contracts.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/rental/units-contracts/units-write.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/reportsContainerTrackingRoutes.ts": [
+        7,
+        0,
+        0
+      ],
+      "server/routes/screenFeedTransportHardening.ts": [
+        5,
+        0,
+        0
+      ],
+      "server/routes/sp-migration/_helpers.ts": [
+        20,
+        0,
+        0
+      ],
+      "server/routes/sp-migration/spMigrationReconciliationRoutes.ts": [
+        9,
+        0,
+        0
+      ],
+      "server/routes/sp-migration/spMigrationRunRoutes.ts": [
+        14,
+        0,
+        0
+      ],
+      "server/routes/sp-migration/spMigrationSalesRoutes.ts": [
+        20,
+        0,
+        0
+      ],
+      "server/routes/sp-migration/spMigrationStockRoutes.ts": [
+        5,
+        0,
+        0
+      ],
+      "server/routes/sp/spChargeReconciliationRoutes.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/sp/spContainerRoutes.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/routes/sp/spFullReconciliationRoutes.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/sp/spLifecycleRoutes.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/routes/sp/spMigrationCutoverHardening.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/sp/spMigrationCutoverReadiness.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/sp/spMigrationCutoverRoutes.ts": [
+        20,
+        0,
+        0
+      ],
+      "server/routes/sp/spMigrationCutoverState.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/sp/spMigrationCutoverUsers.ts": [
+        5,
+        0,
+        0
+      ],
+      "server/routes/sp/spMigrationFinalVerification.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/sp/spMigrationPhase2Charges.ts": [
+        6,
+        0,
+        0
+      ],
+      "server/routes/sp/spMigrationPhase2Common.ts": [
+        13,
+        0,
+        0
+      ],
+      "server/routes/sp/spMigrationPhase2Containers.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/sp/spMigrationPhase2Sales.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/sp/spMigrationPhase4Inventory.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/sp/spMigrationPhase4Reconcile.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/routes/sp/spMigrationPhase4Routes.ts": [
+        26,
+        0,
+        0
+      ],
+      "server/routes/sp/spMigrationPhase4Users.ts": [
+        22,
+        0,
+        0
+      ],
+      "server/routes/sp/spMigrationPhase4Verification.ts": [
+        5,
+        0,
+        0
+      ],
+      "server/routes/sp/spOffloadConcurrencyGuard.ts": [
+        9,
+        0,
+        0
+      ],
+      "server/routes/sp/spOffloadLifecycleRoutes.ts": [
+        5,
+        0,
+        0
+      ],
+      "server/routes/sp/spOffloadRoutes.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/routes/sp/spProductionClosureRoutes.ts": [
+        5,
+        0,
+        0
+      ],
+      "server/routes/sp/spReportRoutes.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/sp/spSalesRoutes.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/stats/netProfitDataLoad.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/stats/statsCountryActivityRoutes.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/stats/statsMultiCurrencyRoutes.ts": [
+        11,
+        0,
+        0
+      ],
+      "server/routes/stats/statsNetPositionRoutes.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/stats/statsNetProfitRoutes.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/stats/statsReportsRoutes.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/stock-summary-location/monthly-detail.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/stock/groups-items/bulk-ops.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/stock/groups-items/categories.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/stock/groups-items/grades.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/stock/groups-items/items.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/stock/merge/bulk-merge.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/stock/merge/item-edits.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/stock/merge/merge-logs.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/stock/merge/merge.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/stock/stockItemManageRoutes.ts": [
+        5,
+        0,
+        0
+      ],
+      "server/routes/stock/stockPriceListImportRoutes.ts": [
+        10,
+        0,
+        0
+      ],
+      "server/routes/stock/transfer-adj/item-write.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/stock/transfer-adj/price-list.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/stockAdjustmentWasteRoutes.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/stockTransferImportRoutes.ts": [
+        8,
+        0,
+        0
+      ],
+      "server/routes/supplier-profit-check/add-stock-item.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/supplier-profit-check/analyze.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/supplier-profit-check/export.ts": [
+        6,
+        0,
+        0
+      ],
+      "server/routes/supplier-profit-check/import-by-codes.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/supplier-profit-check/lookups.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/supplier-profit-check/po-overrides.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/supplier-profit-check/proforma.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/supplierProformaRoutes.ts": [
+        6,
+        0,
+        0
+      ],
+      "server/routes/suppliers/supplierRepository.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/suppliers/supplierService.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/transfers/interCompanyTransferService.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/transfers/simpleCompanyTransferService.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/transfers/transferRepository.ts": [
+        8,
+        0,
+        0
+      ],
+      "server/routes/transporterStatementRoutes.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/routes/voucher-entries/reads.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/routes/voucher-entries/write.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/vouchers/centralGenericVoucherCreateRoute.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/routes/vouchers/centralJournalCreateRoute.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/routes/vouchers/centralJournalLifecycleRoute.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/vouchers/centralPaymentReceiptCreateRoute.ts": [
+        6,
+        0,
+        0
+      ],
+      "server/routes/vouchers/centralPaymentReceiptDeleteRoute.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/vouchers/centralPaymentReceiptLifecycleRoute.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/routes/vouchers/sales-update/sales.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/vouchers/sales-update/update.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/vouchers/transfer/transfer.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/vouchers/transfer/with-entries.ts": [
+        5,
+        0,
+        0
+      ],
+      "server/routes/vouchers/voucherCreateRoutes.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/routes/vouchers/voucherDetailBatching.ts": [
+        3,
+        4,
+        0
+      ],
+      "server/routes/vouchers/voucherJournalRoutes.ts": [
+        6,
+        0,
+        0
+      ],
+      "server/routes/vouchers/voucherListPaging.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/routes/vouchers/voucherPaginationRoutes.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/routes/vouchers/voucherPaymentRoutes.ts": [
+        8,
+        0,
+        0
+      ],
+      "server/routes/vouchers/voucherPurchaseUpdateRoutes.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/vouchers/voucherQueryRoutes.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/routes/whatsappRoutes.ts": [
+        6,
+        0,
+        0
+      ],
+      "server/seedDev.ts": [
+        0,
+        1,
+        0
+      ],
+      "server/services/accounting/centralPostingEngine.ts": [
+        5,
+        0,
+        0
+      ],
+      "server/services/accounting/customerLinkedLedgerValidation.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/services/accounting/databasePostingDependencies.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/services/accounting/employeeBalancePosting.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/services/accounting/voucherPostingService.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/services/containers/offload-lifecycle/charge-accounts.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/services/containers/offload-lifecycle/charge-vouchers.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/services/containers/offload-lifecycle/execute.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/services/containers/offload-lifecycle/reverse.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/services/containers/offload-lifecycle/sp-journals.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/services/export-excel/sheet-helpers.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/services/export-excel/summary-sheet.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/services/export-excel/workbook.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/services/factory/daybookSourceIntegrity.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/services/factory/fxResolutionRepair.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/services/factory/historical-replay/exactInvariants.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/services/factory/historical-replay/read-model/replay-preview.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/services/factory/historical-replay/read-model/universe-costs.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/services/factory/historical-replay/types.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/services/factory/post-offload-charge/apply.ts": [
+        7,
+        0,
+        0
+      ],
+      "server/services/factory/post-offload-charge/legacy-links.ts": [
+        6,
+        0,
+        0
+      ],
+      "server/services/factory/post-offload-charge/loaders.ts": [
+        5,
+        0,
+        0
+      ],
+      "server/services/factory/postOffloadImpactPreview.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/services/factory/raw-stock-recalc/apply.ts": [
+        6,
+        0,
+        0
+      ],
+      "server/services/factory/raw-stock-recalc/fingerprint.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/services/factory/raw-stock-recalc/source-mismatches.ts": [
+        7,
+        0,
+        0
+      ],
+      "server/services/factory/rawMaterialReconciliation.ts": [
+        11,
+        0,
+        0
+      ],
+      "server/services/factory/rawStockCostCascade.ts": [
+        7,
+        0,
+        0
+      ],
+      "server/services/factory/rawStockLockedRate.ts": [
+        6,
+        0,
+        0
+      ],
+      "server/services/factory/rawStockLockedRateBulk.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/services/factory/rawStockStableCost.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/services/factory/repairToken.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/services/factory/stockEntryProductionAttribution.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/services/factoryDocumentLanguage.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/services/heavyExportCoordinator.ts": [
+        0,
+        2,
+        0
+      ],
+      "server/services/immutableStockTransferRevisionLifecycle.ts": [
+        23,
+        0,
+        0
+      ],
+      "server/services/payroll/productionBonusPayrollService.ts": [
+        10,
+        0,
+        0
+      ],
+      "server/services/pos/buildSaleItems.ts": [
+        5,
+        0,
+        0
+      ],
+      "server/services/pos/createSaleService.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/services/pos/createSaleVoucher.ts": [
+        7,
+        0,
+        0
+      ],
+      "server/services/pos/deductSaleInventory.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/services/pos/edit/posEditSaleHelpers.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/services/pos/edit/rebuildSaleAccounting.ts": [
+        5,
+        0,
+        0
+      ],
+      "server/services/pos/edit/rebuildSaleItems.ts": [
+        5,
+        0,
+        0
+      ],
+      "server/services/pos/edit/reverseOriginalSaleInventory.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/services/pos/edit/updateSaleService.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/services/pos/edit/updateSaleVoucher.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/services/pos/edit/validateEditSaleRequest.ts": [
+        5,
+        0,
+        0
+      ],
+      "server/services/pos/posSaleIdempotency.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/services/pos/posSaleTypes.ts": [
+        16,
+        0,
+        0
+      ],
+      "server/services/pos/postSaleAccounting.ts": [
+        8,
+        0,
+        0
+      ],
+      "server/services/pos/updateCustomerBalance.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/services/pos/validateSaleRequest.ts": [
+        9,
+        0,
+        0
+      ],
+      "server/services/rental/rentalPaymentPostingService.ts": [
+        11,
+        0,
+        0
+      ],
+      "server/services/scheduler/daily-export.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/services/security/companyContextEnforcementAdapter.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/services/security/credentialVersionService.ts": [
+        8,
+        0,
+        0
+      ],
+      "server/services/security/databaseCompanyIsolationAdapter.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/services/security/namedPermissionService.ts": [
+        9,
+        0,
+        0
+      ],
+      "server/services/security/protectedAssetDownloadAdapter.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/services/security/securityAuditRuntime.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/services/shared/ttlCache.ts": [
+        3,
+        0,
+        0
+      ],
+      "server/services/smartTransferFeedback.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/services/sp-sales-form/generate.ts": [
+        0,
+        8,
+        0
+      ],
+      "server/services/sp/spInventoryIntegrity.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/services/stockTransferDeletion.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/services/stockTransferLifecycle.ts": [
+        7,
+        0,
+        0
+      ],
+      "server/services/whatsappService.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/storage/accounting/customers.ts": [
+        0,
+        2,
+        0
+      ],
+      "server/storage/accounting/ledger-accounts.ts": [
+        0,
+        1,
+        0
+      ],
+      "server/storage/accounting/spreadsheets.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/storage/accounting/stock-transactions.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/storage/accounting/vouchers.ts": [
+        14,
+        0,
+        0
+      ],
+      "server/storage/auth.ts": [
+        1,
+        0,
+        0
+      ],
+      "server/storage/containers-store/containers.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/storage/containers-store/offload.ts": [
+        0,
+        2,
+        0
+      ],
+      "server/storage/employees.ts": [
+        3,
+        1,
+        0
+      ],
+      "server/storage/factory/production.ts": [
+        4,
+        0,
+        0
+      ],
+      "server/storage/inventory/locationInventoryStorage.ts": [
+        6,
+        0,
+        0
+      ],
+      "server/storage/pos/drafts.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/storage/stock-ops/cost-prices.ts": [
+        2,
+        1,
+        0
+      ],
+      "server/storage/stock-ops/item-history.ts": [
+        8,
+        0,
+        0
+      ],
+      "server/storage/stock-ops/lookups-by-voucher.ts": [
+        2,
+        0,
+        0
+      ],
+      "server/storage/stock-ops/transfers-create.ts": [
+        2,
+        3,
+        0
+      ],
+      "server/storage/stock-ops/transfers-update.ts": [
+        1,
+        2,
+        0
+      ],
+      "server/storage/suppliers.ts": [
+        0,
+        2,
+        0
+      ],
+      "server/wsServer.ts": [
+        0,
+        3,
+        0
+      ]
+    }
   },
   "totals": {
-    "typeEscapeCeiling": 0
+    "typeEscapeCeiling": 4753
   }
 }
