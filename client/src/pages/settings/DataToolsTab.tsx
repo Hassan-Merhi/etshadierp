@@ -50,21 +50,17 @@ import { formatNumber } from "@/lib/formatNumber";
 import type { SilentImportRow } from "./datatoolstab/types";
 import { ReconcileOTWNamesCard } from "./datatoolstab/components/ReconcileOTWNamesCard";
 import { MergeStockItemsLauncher } from "./datatoolstab/components/MergeStockItemsLauncher";
+import {
+  LocationCostPriceOverride,
+  type DataToolsLocationOption,
+} from "./datatoolstab/components/LocationCostPriceOverride";
 export function DataToolsTab() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
-  // Separate location selection for each import operation
-  const [costPriceLocationId, setCostPriceLocationId] = useState<string>("");
+  // Stock import location selection
   const [stockLocationId, setStockLocationId] = useState<string>("");
-  // Cost price import state
-  const [costPriceImportOpen, setCostPriceImportOpen] = useState(false);
-  const [costPriceFile, setCostPriceFile] = useState<File | null>(null);
-  const [costPricePreview, setCostPricePreview] = useState<Array<{ barcode: string; costPrice: number }>>([]);
-  const [costPriceErrors, setCostPriceErrors] = useState<string[]>([]);
-  const [isImportingCostPrice, setIsImportingCostPrice] = useState(false);
-  const [costPriceImportComplete, setCostPriceImportComplete] = useState(false);
   // Stock import state
   const [stockImportOpen, setStockImportOpen] = useState(false);
   const [stockFile, setStockFile] = useState<File | null>(null);
@@ -108,7 +104,7 @@ export function DataToolsTab() {
   // Bulk rename dialog state
   const [bulkRenameOpen, setBulkRenameOpen] = useState(false);
   // Fetch locations for the current company
-  const { data: locations = [] } = useQuery<any[]>({
+  const { data: locations = [] } = useQuery<DataToolsLocationOption[]>({
     queryKey: ["/api/locations", selectedCompany?.id],
     enabled: !!selectedCompany,
   });
@@ -160,108 +156,6 @@ export function DataToolsTab() {
       });
     },
   });
-  // Cost price import functions
-  const downloadCostPriceTemplate = async () => {
-    const template = [
-      { barcode: "ITEM001", costPrice: "125.50" },
-      { barcode: "ITEM002", costPrice: "95.75" },
-    ];
-    const ws = utils.json_to_sheet(template);
-    const wb = utils.book_new();
-    utils.book_append_sheet(wb, ws, "Cost Price Import");
-    await writeFile(wb, "cost_price_import_template.xlsx");
-    toast({
-      title: "Template Downloaded",
-      description: "Use this template to update cost prices",
-    });
-  };
-  const handleCostPriceFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (!selectedFile) return;
-    setCostPriceFile(selectedFile);
-    setCostPriceErrors([]);
-    setCostPricePreview([]);
-    setCostPriceImportComplete(false);
-    try {
-      const data = await selectedFile.arrayBuffer();
-      const workbook = await read(data);
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = utils.sheet_to_json<any>(worksheet);
-      if (jsonData.length === 0) {
-        toast({ title: "Empty File", description: "The Excel file is empty.", variant: "destructive" });
-        return;
-      }
-      const headerRow = utils.sheet_to_json<string[]>(worksheet, { header: 1 })[0] || [];
-      const columns = headerRow.map((h) => String(h || "").trim());
-      const requiredCols = ["barcode", "costPrice"];
-      const missingCols = requiredCols.filter((col) => !columns.includes(col));
-      if (missingCols.length > 0) {
-        toast({
-          title: "Missing Required Columns",
-          description: `Expected: ${requiredCols.join(", ")}. Download template for format.`,
-          variant: "destructive",
-        });
-        return;
-      }
-      const errors: string[] = [];
-      const rows: Array<{ barcode: string; costPrice: number }> = [];
-      jsonData.forEach((row: any, index: number) => {
-        const rowNumber = index + 2;
-        if (!row.barcode || String(row.barcode).trim() === "") {
-          errors.push(`Row ${rowNumber}: Barcode is required`);
-          return;
-        }
-        const costPrice = parseFloat(row.costPrice || "0");
-        if (isNaN(costPrice) || costPrice <= 0) {
-          errors.push(`Row ${rowNumber}: Cost price must be > 0`);
-          return;
-        }
-        rows.push({ barcode: String(row.barcode).trim(), costPrice });
-      });
-      setCostPricePreview(rows);
-      setCostPriceErrors(errors);
-    } catch (error) {
-      toast({ title: "Error Reading File", description: "Please ensure valid Excel file.", variant: "destructive" });
-    }
-  };
-  const handleCostPriceImport = async () => {
-    if (!costPriceLocationId) {
-      toast({ title: "No Location Selected", description: "Please select a location first", variant: "destructive" });
-      return;
-    }
-    if (costPriceErrors.length > 0) {
-      toast({ title: "Cannot Import", description: "Please fix validation errors first", variant: "destructive" });
-      return;
-    }
-    setIsImportingCostPrice(true);
-    try {
-      const res = await modeApiRequest("POST", `/api/locations/${costPriceLocationId}/import-cost-prices`, {
-        updates: costPricePreview,
-      });
-      const response = await res.json();
-      queryClient.invalidateQueries({ queryKey: [`/api/locations/${costPriceLocationId}/inventory`] });
-      setCostPriceImportComplete(true);
-      toast({
-        title: "Import Successful",
-        description: `Updated ${response.updated} cost prices.`,
-      });
-    } catch (error) {
-      toast({
-        title: "Import Failed",
-        description: getErrorDetails(error).message || "Failed to import",
-        variant: "destructive",
-      });
-    } finally {
-      setIsImportingCostPrice(false);
-    }
-  };
-  const handleCostPriceDialogClose = async () => {
-    setCostPriceImportOpen(false);
-    setCostPriceFile(null);
-    setCostPricePreview([]);
-    setCostPriceErrors([]);
-    setCostPriceImportComplete(false);
-  };
   // Stock import functions
   const downloadStockTemplate = async () => {
     const template = [
@@ -627,7 +521,7 @@ export function DataToolsTab() {
                   <SelectValue placeholder="Choose location..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {locations.map((loc: any) => (
+                  {locations.map((loc) => (
                     <SelectItem key={loc.id} value={String(loc.id)}>
                       {loc.name}
                     </SelectItem>
@@ -671,53 +565,8 @@ export function DataToolsTab() {
           </CardContent>
         </Card>
 
-        {/* Direct Location Cost Override — Developer only, ERP mode only */}
         {dtCurrentUser?.role === "Developer" && appMode !== "factory" && (
-          <Card className="border-amber-500/40">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-amber-600" />
-                Location Cost Price Override
-              </CardTitle>
-              <CardDescription>
-                Directly replace the average cost for existing inventory at one location. Developer use only; no voucher or
-                daybook entry is created.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="space-y-2">
-                <Label>Select Location</Label>
-                <Select value={costPriceLocationId} onValueChange={setCostPriceLocationId}>
-                  <SelectTrigger data-testid="select-location-cost-price-import">
-                    <SelectValue placeholder="Choose location..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(locations as any[]).map((loc: any) => (
-                      <SelectItem key={loc.id} value={String(loc.id)}>
-                        {loc.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => {
-                  setCostPriceFile(null);
-                  setCostPricePreview([]);
-                  setCostPriceErrors([]);
-                  setCostPriceImportComplete(false);
-                  setCostPriceImportOpen(true);
-                }}
-                disabled={!costPriceLocationId}
-                data-testid="button-open-cost-price-import"
-              >
-                <FileSpreadsheet className="h-4 w-4 mr-2" />
-                Update Location Costs from Excel
-              </Button>
-            </CardContent>
-          </Card>
+          <LocationCostPriceOverride locations={locations} />
         )}
 
         {/* Silent Stock Transfer Card */}
@@ -849,149 +698,6 @@ export function DataToolsTab() {
         )}
       </div>
 
-      {/* Developer-only direct location cost override dialog */}
-      {dtCurrentUser?.role === "Developer" && appMode !== "factory" && (
-        <Dialog
-          open={costPriceImportOpen}
-          onOpenChange={(open) => {
-            if (!isImportingCostPrice) {
-              if (!open) handleCostPriceDialogClose();
-              setCostPriceImportOpen(open);
-            }
-          }}
-        >
-          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Location Cost Price Override</DialogTitle>
-              <DialogDescription>
-                Upload an Excel file with <strong>barcode</strong> and <strong>costPrice</strong> columns. This overwrites
-                the selected location&apos;s current average rate and total value directly.
-              </DialogDescription>
-            </DialogHeader>
-
-            {costPriceImportComplete ? (
-              <div className="space-y-4">
-                <Alert>
-                  <CheckCircle2 className="h-4 w-4 text-green-600" />
-                  <AlertDescription>Location cost prices were updated successfully.</AlertDescription>
-                </Alert>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    handleCostPriceDialogClose();
-                    setCostPriceImportOpen(false);
-                  }}
-                  data-testid="button-cost-price-import-close"
-                >
-                  Close
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <Alert className="border-amber-500/40">
-                  <AlertTriangle className="h-4 w-4 text-amber-600" />
-                  <AlertDescription>
-                    This is a direct valuation correction. It does not create accounting entries and should not be used for
-                    normal stock receipts or production.
-                  </AlertDescription>
-                </Alert>
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={downloadCostPriceTemplate}
-                    data-testid="button-download-cost-price-template"
-                  >
-                    <FileDown className="h-4 w-4 mr-1" />
-                    Download Template
-                  </Button>
-                  {costPriceFile && <span className="text-sm text-muted-foreground truncate">{costPriceFile.name}</span>}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="cost-price-import-file">Excel File</Label>
-                  <Input
-                    id="cost-price-import-file"
-                    type="file"
-                    accept=".xlsx,.xls"
-                    onChange={handleCostPriceFileChange}
-                    data-testid="input-cost-price-import-file"
-                  />
-                  <p className="text-xs text-muted-foreground">Each row must contain a matching item barcode and a costPrice greater than 0.</p>
-                </div>
-
-                {costPriceErrors.length > 0 && (
-                  <Alert variant="destructive">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertDescription>
-                      <ul className="list-disc pl-4 space-y-1">
-                        {costPriceErrors.map((error, index) => (
-                          <li key={index}>{error}</li>
-                        ))}
-                      </ul>
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                {costPricePreview.length > 0 && (
-                  <div className="border rounded-md overflow-hidden">
-                    <div className="max-h-[280px] overflow-y-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Barcode</TableHead>
-                            <TableHead className="text-right">New Cost</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {costPricePreview.map((row, index) => (
-                            <TableRow key={`${row.barcode}-${index}`}>
-                              <TableCell className="font-mono">{row.barcode}</TableCell>
-                              <TableCell className="text-right font-mono">{row.costPrice.toFixed(2)}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                    <div className="border-t px-3 py-2 text-xs text-muted-foreground">
-                      {costPricePreview.length} cost update{costPricePreview.length === 1 ? "" : "s"} ready
-                    </div>
-                  </div>
-                )}
-
-                <DialogFooter>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      handleCostPriceDialogClose();
-                      setCostPriceImportOpen(false);
-                    }}
-                    disabled={isImportingCostPrice}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handleCostPriceImport}
-                    disabled={isImportingCostPrice || costPricePreview.length === 0 || costPriceErrors.length > 0}
-                    data-testid="button-apply-cost-price-import"
-                  >
-                    {isImportingCostPrice ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Updating…
-                      </>
-                    ) : (
-                      "Apply Cost Updates"
-                    )}
-                  </Button>
-                </DialogFooter>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-      )}
-
       {/* Silent Production / Consumption Dialog */}
       {dtCurrentUser?.role === "Developer" && appMode !== "factory" && (
         <Dialog
@@ -1061,7 +767,7 @@ export function DataToolsTab() {
                       <SelectValue placeholder="Select location..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {(locations as any[]).map((loc: any) => (
+                      {locations.map((loc) => (
                         <SelectItem key={loc.id} value={String(loc.id)}>
                           {loc.name}
                         </SelectItem>
@@ -1574,7 +1280,7 @@ export function DataToolsTab() {
                       <SelectValue placeholder="From location..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {(locations as any[]).map((loc: any) => (
+                      {locations.map((loc) => (
                         <SelectItem key={loc.id} value={String(loc.id)}>
                           {loc.name}
                         </SelectItem>
