@@ -55,19 +55,62 @@ function writesTable(source, table, camel) {
 }
 
 /**
- * The canonical movement journal has exactly one writer. Naming the function
- * rather than the table is deliberate: postStockMovementTx is where the
- * validation, the locking and the idempotent replay live, and a file that
- * inserted journal rows around it would be evidence of the wrong thing.
+ * A new row in the named table. Request identity is about replay-safe creation:
+ * updating, soft-deleting, restoring, or moving an existing voucher cannot
+ * create a second voucher row, so those operations must not inflate the
+ * duplicate-posting backlog.
  */
-const JOURNAL_WRITER = /\bpostStockMovementTx\b/;
+function createsTableRow(source, table, camel) {
+  const drizzle = new RegExp(String.raw`\.insert\(\s*(?:schema\.)?(?:${table}|${camel})\s*[,)]`);
+  const raw = new RegExp(String.raw`\bINSERT\s+INTO\s+"?${table}"?\b`, "i");
+  return drizzle.test(source) || raw.test(source);
+}
+
+/**
+ * Stock also moves without any statement naming the table.
+ *
+ * server/inventoryHelper.ts owns the balance arithmetic, and most write paths
+ * call adjustInventory() rather than writing `inventory` themselves — then the
+ * ones that were converted call postStockMovementTx() beside it to record what
+ * moved. Matching only the table missed every caller of the helper: thirty
+ * files that move stock and journal nothing were invisible to this audit while
+ * it reported a tidy backlog of twenty-one.
+ *
+ * The helper itself is not a gap and is exempt below: it is the layer the
+ * journal sits above, and it has no idea which document is calling it.
+ */
+const STOCK_BALANCE_HELPER = /\b(?:adjustInventory|reverseInventoryByExactValue)\s*\(/;
+const STOCK_BALANCE_HELPER_MODULE = "server/inventoryHelper.ts";
+
+function mutatesStock(file, source) {
+  if (file === STOCK_BALANCE_HELPER_MODULE) return false;
+  return writesTable(source, "inventory", "inventory") || STOCK_BALANCE_HELPER.test(source);
+}
+
+/**
+ * Reaching the canonical movement journal, by whichever door.
+ *
+ * Naming functions rather than the journal table is deliberate:
+ * postStockMovementTx is where the validation, the locking and the idempotent
+ * replay live, and a file inserting journal rows around it would be evidence of
+ * the wrong thing. But crediting only that one name punishes the obvious
+ * refactor — moving a repeated journal call into a shared helper made a
+ * correctly journalled file look unjournalled the first time it was tried. Each
+ * wrapper that exists solely to call it is credited too.
+ */
+const JOURNAL_WRITER = /\b(?:postStockMovementTx|journalStockTransferLeg)\b/;
 
 /**
  * Any of the request-identity mechanisms. A route satisfies this by taking a
  * caller-supplied id (clientRequestId), by deriving one for a stock document,
- * or by holding the accounting idempotency marker directly.
+ * by holding the accounting idempotency marker directly — or by going through
+ * postBalancedVoucherTx, which validates `source.idempotencyKey` as required
+ * text and looks the key up before posting. A file that reaches the central
+ * engine cannot post a voucher without an identity, so crediting the literal
+ * strings alone was under-counting the paths that are already safe.
  */
-const REQUEST_IDENTITY = /\b(?:clientRequestId|resolveStockDocumentRequestId|stockDocumentIdempotencyKey)\b/;
+const REQUEST_IDENTITY =
+  /\b(?:clientRequestId|resolveStockDocumentRequestId|stockDocumentIdempotencyKey|postBalancedVoucherTx)\b/;
 
 function sourceFiles(directory, collected = []) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
@@ -99,11 +142,11 @@ export function auditWriteEvidence() {
   for (const file of files) {
     const source = fs.readFileSync(path.join(projectRoot, file), "utf8");
 
-    if (writesTable(source, "inventory", "inventory")) {
+    if (mutatesStock(file, source)) {
       if (JOURNAL_WRITER.test(source)) journalledStockWrites += 1;
       else unjournalledStockWrites.push(file);
     }
-    if (writesTable(source, "vouchers", "vouchers")) {
+    if (createsTableRow(source, "vouchers", "vouchers")) {
       if (REQUEST_IDENTITY.test(source)) voucherWritesWithRequestIdentity += 1;
       else voucherWritesWithoutRequestIdentity.push(file);
     }

@@ -27,8 +27,34 @@ import { auditWriteEvidence, compareBacklog } from "../scripts/audit-write-evide
 const baseline = JSON.parse(
   fs.readFileSync(path.join(process.cwd(), "config/write-evidence-baseline.json"), "utf8")
 ) as {
-  stockWritesWithoutJournalEvidence: { ceiling: number; files: string[]; rationale: string };
-  voucherWritesWithoutRequestIdentity: { ceiling: number; files: string[]; rationale: string };
+  stockWritesWithoutJournalEvidence: {
+    ceiling: number;
+    files: string[];
+    rationale: string;
+    reviewed: Record<string, { reason: string; files: string[] }>;
+    unreviewed: string[];
+  };
+  voucherWritesWithoutRequestIdentity: {
+    ceiling: number;
+    files: string[];
+    rationale: string;
+  };
+};
+
+const voucherReview = JSON.parse(
+  fs.readFileSync(path.join(process.cwd(), "config/voucher-write-evidence-review.json"), "utf8")
+) as {
+  reviewState: string;
+  summary: {
+    totalReviewed: number;
+    explicitReplayGuard: number;
+    migrationImportRepair: number;
+    infrastructureWriter: number;
+    operationalWithoutRequestIdentity: number;
+    unreviewed: number;
+  };
+  reviewed: Record<string, { verdict: string; reason: string; files: string[] }>;
+  unreviewed: string[];
 };
 
 const measured = auditWriteEvidence() as {
@@ -89,6 +115,75 @@ describe("write evidence ratchet", () => {
     // the audit actually looks for rather than a vague description of it.
     expect(baseline.stockWritesWithoutJournalEvidence.rationale.includes("postStockMovementTx")).toBe(true);
     expect(baseline.voucherWritesWithoutRequestIdentity.rationale.includes("request id")).toBe(true);
+  });
+
+  it("accounts for every file in the stock backlog", () => {
+    const stock = baseline.stockWritesWithoutJournalEvidence;
+    const classified = Object.values(stock.reviewed).flatMap((group) => group.files);
+
+    expect([...classified, ...stock.unreviewed].sort()).toEqual([...stock.files].sort());
+    expect(new Set(classified).size, "a file is classified twice").toBe(classified.length);
+  });
+
+  it("keeps the stock unreviewed remainder empty", () => {
+    expect(baseline.stockWritesWithoutJournalEvidence.unreviewed).toEqual([]);
+  });
+
+  it("says why each stock category is not a defect, or that it is", () => {
+    for (const [category, group] of Object.entries(baseline.stockWritesWithoutJournalEvidence.reviewed)) {
+      expect(group.files.length, `${category} classifies no files`).toBeGreaterThan(0);
+      expect(group.reason.length, `${category} has no stated reason`).toBeGreaterThan(120);
+    }
+
+    expect(Object.keys(baseline.stockWritesWithoutJournalEvidence.reviewed)).toContain("unjournalled");
+    expect(baseline.stockWritesWithoutJournalEvidence.reviewed.unjournalled.files.length).toBeGreaterThan(0);
+  });
+
+  it("accounts for every voucher creation path in the file-by-file review", () => {
+    const classified = Object.values(voucherReview.reviewed).flatMap((group) => group.files);
+
+    expect(voucherReview.reviewState).toBe("REVIEWED FILE BY FILE");
+    expect([...classified, ...voucherReview.unreviewed].sort()).toEqual(
+      [...baseline.voucherWritesWithoutRequestIdentity.files].sort()
+    );
+    expect(new Set(classified).size, "a voucher file is classified twice").toBe(classified.length);
+    expect(voucherReview.summary.totalReviewed).toBe(baseline.voucherWritesWithoutRequestIdentity.files.length);
+  });
+
+  it("keeps the voucher unreviewed remainder empty", () => {
+    expect(voucherReview.unreviewed).toEqual([]);
+    expect(voucherReview.summary.unreviewed).toBe(0);
+  });
+
+  it("keeps the real voucher backlog explicit rather than hiding it in review labels", () => {
+    const realBacklog = voucherReview.reviewed["operational-without-request-identity"];
+    expect(realBacklog.verdict).toBe("genuine backlog");
+    expect(realBacklog.files.length).toBe(voucherReview.summary.operationalWithoutRequestIdentity);
+    expect(realBacklog.files.length).toBeGreaterThan(0);
+
+    for (const [category, group] of Object.entries(voucherReview.reviewed)) {
+      expect(group.files.length, `${category} classifies no files`).toBeGreaterThan(0);
+      expect(group.reason.length, `${category} has no stated reason`).toBeGreaterThan(120);
+      expect(group.verdict.length, `${category} has no verdict`).toBeGreaterThan(10);
+    }
+  });
+
+  it("keeps voucher review summary counts honest", () => {
+    expect(voucherReview.summary.explicitReplayGuard).toBe(
+      voucherReview.reviewed["explicit-replay-guard"].files.length
+    );
+    expect(voucherReview.summary.migrationImportRepair).toBe(
+      voucherReview.reviewed["migration-import-repair"].files.length
+    );
+    expect(voucherReview.summary.infrastructureWriter).toBe(
+      voucherReview.reviewed["infrastructure-writer"].files.length
+    );
+    expect(
+      voucherReview.summary.explicitReplayGuard +
+        voucherReview.summary.migrationImportRepair +
+        voucherReview.summary.infrastructureWriter +
+        voucherReview.summary.operationalWithoutRequestIdentity
+    ).toBe(voucherReview.summary.totalReviewed);
   });
 
   it("credits the write paths that do carry evidence", () => {
