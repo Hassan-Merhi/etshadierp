@@ -54,7 +54,7 @@ jobs:
       - name: Set up Node.js 22.14
         uses: actions/setup-node@v6
         with:
-          node-version: "22.14"
+          node-version: "22.14.0"
           cache: npm
 
       - name: Normalize package registry URLs
@@ -194,7 +194,7 @@ jobs:
       - name: Set up Node.js 22.14
         uses: actions/setup-node@v6
         with:
-          node-version: "22.14"
+          node-version: "22.14.0"
           cache: npm
 
       - name: Normalize package registry URLs
@@ -277,7 +277,7 @@ jobs:
       - name: Set up Node.js 22.14
         uses: actions/setup-node@v6
         with:
-          node-version: "22.14"
+          node-version: "22.14.0"
           cache: npm
 
       - name: Normalize package registry URLs
