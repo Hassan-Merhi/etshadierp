@@ -129,9 +129,10 @@ describe("Phase 4 operational voucher retry boundary", () => {
 
   it("protects the same exact route matrix at the browser request boundary", () => {
     for (const route of PHASE4_VOUCHER_CREATION_ROUTES) {
-      expect(isProtectedAccountingRequest(route.method, route.url, route.data), `${route.method} ${route.url}`).toBe(
-        true
-      );
+      expect(
+        isProtectedAccountingRequest(route.method, route.url, route.data),
+        `${route.method} ${route.url}`
+      ).toBe(true);
     }
   });
 
@@ -148,10 +149,13 @@ describe("Phase 4 operational voucher retry boundary", () => {
     ] as const;
 
     for (const route of nonVoucherCases) {
-      expect(isPhase4OperationalVoucherRequest(route.method, route.url, route.data), `${route.method} ${route.url}`).toBe(
+      expect(
+        isPhase4OperationalVoucherRequest(route.method, route.url, route.data),
+        `${route.method} ${route.url}`
+      ).toBe(false);
+      expect(isProtectedAccountingRequest(route.method, route.url, route.data), `${route.method} ${route.url}`).toBe(
         false
       );
-      expect(isProtectedAccountingRequest(route.method, route.url, route.data), `${route.method} ${route.url}`).toBe(false);
     }
   });
 
