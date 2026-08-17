@@ -34,7 +34,12 @@ export function isPhase5OperationalVoucherRequest(method: string, pathname: stri
   // Raw-stock receipts, corrections and reversals all share one accounting family.
   if (path.startsWith("/api/factory/raw-stock/") && STATE_CHANGING_METHODS.has(verb)) return true;
 
-  if (/^\/api\/factory\/customer-orders\/[^/]+\/charges$/.test(path) && verb === "POST") return true;
+  if (
+    /^\/api\/factory\/customer-orders\/[^/]+\/charges(?:\/relink-vouchers)?$/.test(path) &&
+    verb === "POST"
+  ) {
+    return true;
+  }
   if (/^\/api\/factory\/transporters\/[^/]+\/(?:charges|payments)$/.test(path) && verb === "POST") return true;
 
   // Factory worker advance creation/repayment accounting. Phase 4's
