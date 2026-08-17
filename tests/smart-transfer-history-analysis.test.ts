@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { and, eq, inArray, like } from "drizzle-orm";
+import { inArray, like } from "drizzle-orm";
 import { db } from "../server/db";
 import * as schema from "../shared/schema";
 import { analyzeLastTwoMultiSourceTransfers } from "../server/services/smartTransferHistoryAnalysis";

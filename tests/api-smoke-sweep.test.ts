@@ -168,7 +168,7 @@ export function selectSweepablePaths(manifest: SerializedRouteManifest): string[
 
 let ctx: TestContext;
 let agent: request.SuperAgentTest;
-let failures: SweepFailure[] = [];
+const failures: SweepFailure[] = [];
 let sweptPaths: string[] = [];
 const observed: Record<string, SweptResponse> = {};
 

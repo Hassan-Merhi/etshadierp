@@ -22,7 +22,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import request from "supertest";
 import { seedTestData, cleanupTestData, closeTestServer, type TestContext } from "./setup";
 import { db, pool } from "../server/db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import * as schema from "../shared/schema";
 import { computeCorrectContainerCost } from "../server/services/factory/raw-stock-recalc";
 

@@ -13,7 +13,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import request from "supertest";
 import { seedTestData, cleanupTestData, closeTestServer, type TestContext } from "./setup";
 import { db, pool } from "../server/db";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import * as schema from "../shared/schema";
 import {
   computeCorrectContainerCost,
