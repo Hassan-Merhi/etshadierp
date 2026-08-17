@@ -1,0 +1,122 @@
+name: Phase 18 Container Loading Split v2
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+env:
+  CI: true
+jobs:
+  refactor:
+    if: contains(github.event.head_commit.message, '[phase18-container-loading-v2]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v7
+        with: {ref: main, fetch-depth: 0}
+      - uses: actions/setup-node@v6
+        with: {node-version: '22.14.0', cache: npm}
+      - run: npm ci
+      - name: Extract typed contracts and success audio
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          cat >> client/src/pages/containerloadingscan/types.ts <<'TS'
+
+          export interface CreateLoadingOrderInput {
+            customerId: number;
+            proformaIdUsed: number | null;
+            locationId: number;
+            orderDate: string;
+            containerNotes?: string;
+          }
+          export interface CreateLoadingOrderResponse { id: number }
+          export interface AddLoadingBaleInput {
+            scanCode: string;
+            locationId: number;
+            allowBypassProforma?: boolean;
+            allowBypassOverload?: boolean;
+          }
+          export interface AddLoadingBaleResponse { bales?: OrderBale[] }
+          TS
+          cat > client/src/pages/containerloadingscan/audio.ts <<'TS'
+          function createAudioContext(): AudioContext {
+            const WebkitAudioContext = (window as unknown as Window & typeof globalThis & {
+              webkitAudioContext: typeof AudioContext;
+            }).webkitAudioContext;
+            const AudioContextConstructor = window.AudioContext || WebkitAudioContext;
+            return new AudioContextConstructor();
+          }
+
+          export function playLoadingScanSuccessTone(): void {
+            try {
+              const context = createAudioContext();
+              const oscillator = context.createOscillator();
+              oscillator.connect(context.destination);
+              oscillator.frequency.value = 1000;
+              void context.resume().then(() => {
+                oscillator.start();
+                setTimeout(() => {
+                  oscillator.stop();
+                  void context.close();
+                }, 120);
+              });
+            } catch {
+              // Scanning works without audio feedback when Web Audio is unavailable.
+            }
+          }
+          TS
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('client/src/pages/ContainerLoadingScan.tsx'); s=p.read_text()
+          old='import type { Customer, Location, OrderBale, OrderDetail, Proforma } from "./containerloadingscan/types";'
+          new='''import type {
+            AddLoadingBaleInput,
+            AddLoadingBaleResponse,
+            CreateLoadingOrderInput,
+            CreateLoadingOrderResponse,
+            Customer,
+            Location,
+            OrderBale,
+            OrderDetail,
+            Proforma,
+          } from "./containerloadingscan/types";
+          import { playLoadingScanSuccessTone } from "./containerloadingscan/audio";'''
+          if old not in s: raise SystemExit('types import not found')
+          s=s.replace(old,new,1)
+          s,n=re.subn(r'mutationFn: async \(data: \{\s*customerId: number;\s*proformaIdUsed: number \| null;\s*locationId: number;\s*orderDate: string;\s*containerNotes\?: string;\s*\}\) => \{','mutationFn: async (data: CreateLoadingOrderInput) => {',s,count=1)
+          if n!=1: raise SystemExit('create input not replaced')
+          s=s.replace('onSuccess: (data: any) => {','onSuccess: (data: CreateLoadingOrderResponse) => {',1)
+          s,n=re.subn(r'mutationFn: async \(data: \{\s*scanCode: string;\s*locationId: number;\s*allowBypassProforma\?: boolean;\s*allowBypassOverload\?: boolean;\s*\}\) => \{','mutationFn: async (data: AddLoadingBaleInput) => {',s,count=1)
+          if n!=1: raise SystemExit('bale input not replaced')
+          s,n=re.subn(r'onSuccess: \(\s*data: any,\s*variables: \{ scanCode: string; locationId: number; allowBypassProforma\?: boolean; allowBypassOverload\?: boolean \}\s*\) => \{','onSuccess: (data: AddLoadingBaleResponse, variables: AddLoadingBaleInput) => {',s,count=1)
+          if n!=1: raise SystemExit('bale success signature not replaced')
+          s=s.replace('const _speechMsg = variables.allowBypassProforma ? "Bypass confirmed. Item added." : "Scanned successfully";\n','',1)
+          success=re.compile(r'''\s*try \{\s*const ctx = new \(\s*window\.AudioContext \|\|\s*\(\s*window as unknown as \(Window & typeof globalThis\) & \{\s*webkitAudioContext: \{ new \(contextOptions\?: AudioContextOptions\): AudioContext; prototype: AudioContext \};\s*\}\s*\)\.webkitAudioContext\s*\)\(\);\s*const osc = ctx\.createOscillator\(\);\s*osc\.connect\(ctx\.destination\);\s*osc\.frequency\.value = 1000;\s*ctx\.resume\(\)\.then\(\(\) => \{\s*osc\.start\(\);\s*setTimeout\(\(\) => \{\s*osc\.stop\(\);\s*ctx\.close\(\);\s*\}, 120\);\s*\}\);\s*\} catch \{\s*/\* no audio support \*/\s*\}''',re.S)
+          s,n=success.subn('\n      playLoadingScanSuccessTone();',s,count=1)
+          if n!=1: raise SystemExit('success audio not replaced')
+          s=s.replace('[...(data?.bales || [])].sort((a: any, b: any) => b.id - a.id)[0]','[...(data.bales || [])].sort((a, b) => b.id - a.id)[0]')
+          s=s.replace('onError: (error: Error, variables: any) => {','onError: (error: Error, variables: AddLoadingBaleInput) => {',1)
+          p.write_text(s)
+          PY
+          npx prettier --write client/src/pages/ContainerLoadingScan.tsx client/src/pages/containerloadingscan/types.ts client/src/pages/containerloadingscan/audio.ts
+      - name: Verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run check
+          set +e; npm run audit:god-files >/tmp/god.log 2>&1; rc=$?; set -e
+          cat /tmp/god.log
+          if grep -Fq 'client/src/pages/ContainerLoadingScan.tsx has ' /tmp/god.log; then exit 1; fi
+          echo OTHER_GOD_FILE_FAILURES_REMAIN=$rc
+      - name: Commit and push
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add client/src/pages/ContainerLoadingScan.tsx client/src/pages/containerloadingscan/types.ts client/src/pages/containerloadingscan/audio.ts
+          git commit -m 'refactor: split Container Loading contracts and feedback [phase18-container-loading] [skip ci]'
+          for attempt in 1 2 3 4 5; do git fetch origin main; git rebase origin/main; npm run check; if git push origin HEAD:main; then exit 0; fi; done
+          exit 1
