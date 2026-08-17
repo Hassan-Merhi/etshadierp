@@ -193,6 +193,13 @@ export async function cleanupTestData(prefix: string): Promise<void> {
       `DELETE FROM stock_adjustment_vouchers WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = $1)`,
       [company.id]
     );
+    // Posting request rows intentionally retain a restricting FK to their
+    // voucher. Tests create them through the canonical posting engine, so the
+    // fixture teardown must remove those children before deleting vouchers.
+    await pool.query(
+      `DELETE FROM accounting_posting_requests WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = $1)`,
+      [company.id]
+    );
     await db.delete(schema.vouchers).where(eq(schema.vouchers.companyId, company.id));
     // stock_adjustment_items.stock_item_id is a foreign key against stock_items,
     // so any adjustment line left by a test blocks the stock_items delete below
