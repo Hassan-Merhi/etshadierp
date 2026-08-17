@@ -190,7 +190,7 @@ export function ContainerFormDialog({
         );
       })
       .catch(() => setOtherChargeLines([]));
-  }, [editingContainer?.id]);
+  }, [editingContainer]);
 
   useEffect(() => {
     if (currency === "USD") {

@@ -158,7 +158,7 @@ export default function IntercompanyLinks() {
     if (recipientsDialogLink && recipientsData.length >= 0) {
       setRecipientForm(recipientsData.map((r) => r.userId));
     }
-  }, [recipientsData, recipientsDialogLink?.id]);
+  }, [recipientsData, recipientsDialogLink]);
 
   // Mutations
   const createMutation = useMutation({

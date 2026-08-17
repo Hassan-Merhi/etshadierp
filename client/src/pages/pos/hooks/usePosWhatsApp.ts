@@ -89,7 +89,7 @@ export function usePosWhatsApp({
       }
     };
     doSend();
-  }, [pendingStockSend]);
+  }, [activeLocation, pendingStockSend, setPendingStockSend, setStockWaStatus, toast]);
 
   // ISSUE 4: Real invoice WhatsApp send
   const handleSendInvoiceWhatsApp = async () => {
