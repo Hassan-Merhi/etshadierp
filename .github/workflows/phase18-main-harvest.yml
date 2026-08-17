@@ -1,0 +1,142 @@
+name: Phase 18 Main Type Harvest
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+env:
+  CI: true
+
+jobs:
+  harvest:
+    if: contains(github.event.head_commit.message, '[phase18-main-harvest]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.14.0'
+          cache: npm
+      - run: npm ci
+      - name: Configure bot and baseline
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          npm run check
+      - name: Install transforms
+        shell: bash
+        run: |
+          cat >.phase18-transform.cjs <<'NODE'
+          const ts=require('typescript'),fs=require('fs'),path=require('path');
+          const mode=process.argv[2],root=process.cwd();
+          const cp=ts.findConfigFile(root,ts.sys.fileExists,'tsconfig.json');
+          const cf=ts.readConfigFile(cp,ts.sys.readFile);
+          const pc=ts.parseJsonConfigFileContent(cf.config,ts.sys,path.dirname(cp));
+          const program=ts.createProgram(pc.fileNames,pc.options),checker=program.getTypeChecker();
+          const fmt=ts.TypeFormatFlags.NoTruncation|ts.TypeFormatFlags.UseAliasDefinedOutsideCurrentScope|ts.TypeFormatFlags.WriteArrayAsGenericType;
+          const edits=new Map();
+          const rel=sf=>path.relative(root,sf.fileName).replaceAll('\\','/');
+          const ok=sf=>!sf.isDeclarationFile&&/^(client\/src|server|shared)\//.test(rel(sf))&&/\.(ts|tsx)$/.test(rel(sf));
+          function hasAny(n){let y=false;const v=x=>{if(x.kind===ts.SyntaxKind.AnyKeyword)y=true;else if(!y)ts.forEachChild(x,v)};if(n)v(n);return y}
+          function concrete(t){if(!t||t.flags&(ts.TypeFlags.Any|ts.TypeFlags.Unknown|ts.TypeFlags.Never))return false;let s;try{s=checker.typeToString(t)}catch{return false}return !!s&&s!=='{}'&&!/(^|\W)any(\W|$)/.test(s)}
+          function text(t,ctx){if(!concrete(t))return null;let s;try{s=checker.typeToString(t,ctx,fmt)}catch{return null}if(!s||s.length>1200||/(^|\W)any(\W|$)/.test(s)||s.includes('/home/runner/')||s.includes('__type'))return null;return s}
+          function add(sf,start,end,repl){const r=rel(sf),a=edits.get(r)||[];a.push({start,end,repl});edits.set(r,a)}
+          function replace(node,typeNode,t){const s=text(t,node);if(s)add(node.getSourceFile(),typeNode.getStart(node.getSourceFile()),typeNode.end,s)}
+          function ret(fn){try{const sig=checker.getSignatureFromDeclaration(fn);return sig&&checker.getReturnTypeOfSignature(sig)}catch{return null}}
+          for(const sf of program.getSourceFiles())if(ok(sf)){
+            const visit=n=>{
+              if(mode==='contextual'&&(ts.isArrowFunction(n)||ts.isFunctionExpression(n))){
+                const ct=checker.getContextualType(n),sig=ct?.getCallSignatures?.()[0];
+                if(sig){const ps=sig.getParameters();for(let i=0;i<n.parameters.length;i++){const p=n.parameters[i];if(!p.type||!hasAny(p.type))continue;const sym=ps[Math.min(i,ps.length-1)];if(sym)replace(p,p.type,checker.getTypeOfSymbolAtLocation(sym,p));}}
+                if(n.type&&hasAny(n.type)){const t=ret(n);if(t)replace(n,n.type,t)}
+              }
+              if(mode==='declarations'){
+                if(ts.isParameter(n)&&n.type&&hasAny(n.type)&&n.initializer)replace(n,n.type,checker.getTypeAtLocation(n.initializer));
+                if(ts.isVariableDeclaration(n)&&n.type&&hasAny(n.type)&&n.initializer)replace(n,n.type,checker.getTypeAtLocation(n.initializer));
+                if(ts.isPropertyDeclaration(n)&&n.type&&hasAny(n.type)&&n.initializer)replace(n,n.type,checker.getTypeAtLocation(n.initializer));
+                if((ts.isFunctionDeclaration(n)||ts.isMethodDeclaration(n)||ts.isGetAccessorDeclaration(n))&&n.type&&hasAny(n.type)){const t=ret(n);if(t)replace(n,n.type,t)}
+              }
+              if(mode==='casts'&&(ts.isAsExpression(n)||ts.isTypeAssertionExpression(n))&&hasAny(n.type)){
+                const t=checker.getTypeAtLocation(n.expression);if(concrete(t))add(sf,n.getStart(sf),n.end,`(${n.expression.getText(sf)})`);
+              }
+              if(mode==='typeargs'&&(ts.isCallExpression(n)||ts.isNewExpression(n))&&n.typeArguments?.length&&n.typeArguments.some(hasAny)){
+                const start=n.typeArguments.pos-1,end=n.typeArguments.end+1,raw=sf.text.slice(start,end);if(raw.startsWith('<')&&raw.endsWith('>'))add(sf,start,end,'');
+              }
+              if(mode==='catch'&&ts.isCatchClause(n)&&n.variableDeclaration?.type&&hasAny(n.variableDeclaration.type))add(sf,n.variableDeclaration.type.getStart(sf),n.variableDeclaration.type.end,'unknown');
+              if(mode==='arrays'&&ts.isArrayTypeNode(n)&&hasAny(n.elementType)){
+                const p=n.parent;if((ts.isVariableDeclaration(p)||ts.isParameter(p)||ts.isPropertyDeclaration(p))&&p.initializer)replace(p,n,checker.getTypeAtLocation(p.initializer));
+              }
+              ts.forEachChild(n,visit);
+            };visit(sf);
+          }
+          for(const [r,a] of edits){const f=path.join(root,r);let s=fs.readFileSync(f,'utf8');a.sort((x,y)=>y.start-x.start);let last=Infinity;for(const e of a){if(e.end>last)continue;s=s.slice(0,e.start)+e.repl+s.slice(e.end);last=e.start;}fs.writeFileSync(f,s)}
+          fs.writeFileSync(`.phase18-${mode}.files`,[...edits.keys()].sort().join('\n')+(edits.size?'\n':''));
+          console.log(`MODE=${mode} FILES=${edits.size} EDITS=${[...edits.values()].reduce((n,a)=>n+a.length,0)}`);
+          NODE
+          cat >.phase18-gate.cjs <<'NODE'
+          const ts=require('typescript'),fs=require('fs'),path=require('path'),cp=require('child_process');
+          const list=process.argv[2],logf=process.argv[3],root=process.cwd();
+          const changed=new Set(fs.existsSync(list)?fs.readFileSync(list,'utf8').trim().split(/\n/).filter(Boolean):[]);
+          const log=fs.readFileSync(logf,'utf8');
+          const errors=new Set([...log.matchAll(/^(.+?\.(?:ts|tsx))\(\d+,\d+\):\s+error\s+TS\d+:/gm)].map(m=>m[1].replaceAll('\\','/')));
+          const revert=new Set([...errors].filter(f=>changed.has(f)));
+          if(errors.size&&revert.size===0){
+            const cp0=ts.findConfigFile(root,ts.sys.fileExists,'tsconfig.json'),cf=ts.readConfigFile(cp0,ts.sys.readFile),pc=ts.parseJsonConfigFileContent(cf.config,ts.sys,root),deps=new Map();
+            for(const file of pc.fileNames){const r=path.relative(root,file).replaceAll('\\','/');if(!/^(client\/src|server|shared)\//.test(r)||!fs.existsSync(file))continue;const sf=ts.createSourceFile(file,fs.readFileSync(file,'utf8'),ts.ScriptTarget.Latest,true,file.endsWith('x')?ts.ScriptKind.TSX:ts.ScriptKind.TS),set=new Set();for(const st of sf.statements){if((ts.isImportDeclaration(st)||ts.isExportDeclaration(st))&&st.moduleSpecifier&&ts.isStringLiteral(st.moduleSpecifier)){const q=ts.resolveModuleName(st.moduleSpecifier.text,file,pc.options,ts.sys).resolvedModule?.resolvedFileName;if(q){const rr=path.relative(root,q).replaceAll('\\','/');if(!rr.startsWith('..'))set.add(rr)}}}deps.set(r,set)}
+            for(const e of errors){const q=[[e,0]],seen=new Set();while(q.length){const [f,d]=q.shift();if(seen.has(f)||d>10)continue;seen.add(f);for(const dep of deps.get(f)||[]){if(changed.has(dep))revert.add(dep);else q.push([dep,d+1]);}}}
+          }
+          console.log(`ERROR_FILES=${errors.size} REVERT_FILES=${revert.size} CHANGED=${changed.size}`);
+          if(errors.size&&!revert.size){fs.writeFileSync('.phase18-unresolved','1');process.exit(0)}
+          for(const f of revert){try{cp.execFileSync('git',['restore','--source=HEAD','--staged','--worktree','--',f])}catch{}changed.delete(f)}
+          fs.writeFileSync(list,[...changed].sort().join('\n')+(changed.size?'\n':''));
+          NODE
+      - name: Harvest compiler-safe edits
+        shell: bash
+        run: |
+          set -euo pipefail
+          harvest(){
+            mode="$1"; echo "=== $mode ==="; node .phase18-transform.cjs "$mode"; list=".phase18-${mode}.files"; [ -s "$list" ] || return 0
+            green=0
+            for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
+              set +e; npm run check >".phase18-${mode}.check" 2>&1; rc=$?; set -e
+              if [ "$rc" -eq 0 ]; then green=1; echo "${mode}_GREEN_ATTEMPT=$attempt"; break; fi
+              rm -f .phase18-unresolved
+              node .phase18-gate.cjs "$list" ".phase18-${mode}.check"
+              if [ -f .phase18-unresolved ]; then echo "${mode}_UNRESOLVED"; tail -n 120 ".phase18-${mode}.check"; git reset --hard HEAD; rm -f "$list" ".phase18-${mode}.check" .phase18-unresolved; return 0; fi
+              [ -s "$list" ] || { git reset --hard HEAD; rm -f "$list" ".phase18-${mode}.check"; return 0; }
+            done
+            if [ "$green" != 1 ]; then git reset --hard HEAD; rm -f "$list" ".phase18-${mode}.check"; return 0; fi
+            rm -f "$list" ".phase18-${mode}.check" .phase18-unresolved
+            git add client/src server shared
+            if ! git diff --cached --quiet; then git commit -m "refactor: compiler-safe ${mode} typing [phase18-${mode}] [skip ci]"; fi
+          }
+          harvest contextual
+          harvest declarations
+          harvest casts
+          harvest typeargs
+          harvest catch
+          harvest arrays
+          npm run check
+      - name: Measure and push
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .phase18-transform.cjs .phase18-gate.cjs .phase18-* || true
+          set +e
+          node scripts/audit-type-escapes.mjs --json >/tmp/type.json
+          echo "TYPE_AUDIT_EXIT=$?"
+          npm run lint >/tmp/lint.txt 2>&1
+          echo "LINT_EXIT=$?"
+          set -e
+          tail -n 60 /tmp/lint.txt || true
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
