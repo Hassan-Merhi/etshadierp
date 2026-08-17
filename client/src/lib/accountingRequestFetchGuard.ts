@@ -1,6 +1,7 @@
 import "./bandwidthPhase1HotspotGuard";
 import "./bandwidthPhase2PayloadGuard";
 import {
+  accountingResponseCode,
   attachAccountingRequestIdentity,
   isProtectedAccountingRequest,
   releaseAccountingRequestIdentity,
@@ -31,8 +32,8 @@ function parseJsonBody(init?: RequestInit): Record<string, unknown> | null {
 /**
  * Adds retry-stable identity to protected accounting JSON writes, including
  * callers that use apiRequest directly instead of the factory request wrapper.
- * Network and 5xx outcomes retain the identity because the commit result may be
- * uncertain. Successful and definite 4xx responses release it.
+ * Network, 5xx, and fail-closed uncertain outcomes retain the identity. Only a
+ * successful response or a definite client rejection releases it.
  */
 export function installAccountingRequestFetchGuard(): void {
   if (
@@ -63,7 +64,8 @@ export function installAccountingRequestFetchGuard(): void {
     };
 
     const response = await originalFetch(input, outboundInit);
-    if (shouldReleaseAccountingRequestIdentity(response.status)) {
+    const responseCode = await accountingResponseCode(response);
+    if (shouldReleaseAccountingRequestIdentity(response.status, responseCode)) {
       releaseAccountingRequestIdentity(method, pathname, outboundBody);
     }
     return response;
