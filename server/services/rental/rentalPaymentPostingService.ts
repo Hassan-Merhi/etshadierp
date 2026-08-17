@@ -1,3 +1,7 @@
+import {
+  infrastructurePostingIdentity,
+  insertInfrastructureVoucherTx,
+} from "../accounting/infrastructureVoucherIdentity";
 /**
  * rentalPaymentPostingService.ts
  *
@@ -181,9 +185,9 @@ async function postGroupCore(
     }
 
     const voucherNum = `RENT-${paymentDate.replace(/-/g, "")}-${groupId.slice(-6)}`;
-    const [v] = await tx
-      .insert(vouchers)
-      .values({
+    const { voucher: v } = await insertInfrastructureVoucherTx(
+      tx,
+      {
         companyId,
         voucherNumber: voucherNum,
         voucherType: "Payment",
@@ -192,8 +196,10 @@ async function postGroupCore(
         totalAmount: totalAmountStr,
         currency,
         sourceModule: "ERP",
-      })
-      .returning();
+      },
+      infrastructurePostingIdentity("rental-payment", String(companyId) + ":" + String(groupId), "payment"),
+      { allocs, totalAmountStr, cashAccountId, currency, exchangeRate }
+    );
 
     const payEntries: any[] = [
       { voucherId: v.id, ledgerAccountId: cashAccountId, ...normEntry("0", totalAmountStr), narration },
@@ -240,9 +246,9 @@ async function postGroupCore(
     let recognitionVoucherId: number | null = null;
     if (advanceAmt.gt(0.005)) {
       const recNarr = `Advance rent recognition - ${narration}`;
-      const [rv] = await tx
-        .insert(vouchers)
-        .values({
+      const { voucher: rv } = await insertInfrastructureVoucherTx(
+        tx,
+        {
           companyId,
           voucherNumber: `ADV-REC-${paymentDate.replace(/-/g, "")}-${groupId.slice(-6)}`,
           voucherType: "Journal",
@@ -251,8 +257,14 @@ async function postGroupCore(
           totalAmount: advanceAmt.toFixed(2),
           currency,
           sourceModule: "ERP",
-        })
-        .returning();
+        },
+        infrastructurePostingIdentity(
+          "rental-payment",
+          String(companyId) + ":" + String(groupId),
+          "advance-recognition"
+        ),
+        { allocs, totalAmountStr, cashAccountId, currency, exchangeRate }
+      );
       recognitionVoucherId = rv.id;
 
       const expId = await findOrCreateLedgerAccount(
@@ -315,9 +327,9 @@ async function postGroupCore(
 
     if (mod === "PROPERTIES") {
       const voucherNum = `RENT-${paymentDate.replace(/-/g, "")}-${groupId.slice(-6)}`;
-      const [v] = await tx
-        .insert(vouchers)
-        .values({
+      const { voucher: v } = await insertInfrastructureVoucherTx(
+        tx,
+        {
           companyId,
           voucherNumber: voucherNum,
           voucherType: "Receipt",
@@ -326,8 +338,10 @@ async function postGroupCore(
           totalAmount: totalAmountStr,
           currency,
           sourceModule: "ERP",
-        })
-        .returning();
+        },
+        infrastructurePostingIdentity("rental-payment", String(companyId) + ":" + String(groupId), "payment"),
+        { allocs, totalAmountStr, cashAccountId, currency, exchangeRate }
+      );
 
       await tx.insert(voucherEntries).values([
         {
@@ -364,9 +378,9 @@ async function postGroupCore(
     const earnedChunk = totalAmountNum - deferredChunk;
 
     const voucherNum = `RENT-${paymentDate.replace(/-/g, "")}-${groupId.slice(-6)}`;
-    const [v] = await tx
-      .insert(vouchers)
-      .values({
+    const { voucher: v } = await insertInfrastructureVoucherTx(
+      tx,
+      {
         companyId,
         voucherNumber: voucherNum,
         voucherType: "Receipt",
@@ -375,8 +389,10 @@ async function postGroupCore(
         totalAmount: totalAmountStr,
         currency,
         sourceModule: "ERP",
-      })
-      .returning();
+      },
+      infrastructurePostingIdentity("rental-payment", String(companyId) + ":" + String(groupId), "payment"),
+      { allocs, totalAmountStr, cashAccountId, currency, exchangeRate }
+    );
 
     const lEntries: any[] = [
       {

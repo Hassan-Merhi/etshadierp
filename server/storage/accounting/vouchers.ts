@@ -1,3 +1,7 @@
+import {
+  infrastructurePostingIdentity,
+  insertInfrastructureVoucher,
+} from "../../services/accounting/infrastructureVoucherIdentity";
 import { eq, and, isNull, asc, sql } from "drizzle-orm";
 import { db, pool } from "../../db";
 import * as schema from "@shared/schema";
@@ -336,7 +340,12 @@ export async function getVoucherEntriesByEmployee(
 }
 
 export async function createVoucher(voucher: InsertVoucher): Promise<Voucher> {
-  const [created] = await db.insert(schema.vouchers).values(voucher).returning();
+  const { voucher: created } = await insertInfrastructureVoucher(
+    db,
+    voucher,
+    infrastructurePostingIdentity("storage-voucher", `${voucher.companyId}:${voucher.voucherNumber}`, "create"),
+    voucher
+  );
   return created;
 }
 

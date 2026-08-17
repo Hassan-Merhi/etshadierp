@@ -1,3 +1,7 @@
+import {
+  infrastructurePostingIdentity,
+  insertInfrastructureVoucherTx,
+} from "../accounting/infrastructureVoucherIdentity";
 /**
  * server/services/pos/createSaleVoucher.ts
  *
@@ -40,9 +44,9 @@ export async function insertSaleVoucher(
     exchangeRate,
   } = params;
 
-  const [txVoucher] = await tx
-    .insert(vouchers)
-    .values({
+  const { voucher: txVoucher } = await insertInfrastructureVoucherTx(
+    tx,
+    {
       companyId,
       locationId,
       locationName,
@@ -50,15 +54,20 @@ export async function insertSaleVoucher(
       voucherType: "Sales",
       voucherDate,
       description:
-        notes || (isCreditSale ? `Credit Invoice Sale at ${locationName} - ${customerAccountName}` : `POS Sale at ${locationName}`),
+        notes ||
+        (isCreditSale
+          ? `Credit Invoice Sale at ${locationName} - ${customerAccountName}`
+          : `POS Sale at ${locationName}`),
       totalAmount: grandTotal.toFixed(2),
       shiftId: effectiveShiftId,
       clientSaleId: clientSaleId || null,
       currency: currency || "USD",
       exchangeRate: exchangeRate || null,
       isCreditSale: !!isCreditSale,
-    })
-    .returning();
+    },
+    infrastructurePostingIdentity("pos-sale", `${companyId}:${clientSaleId || voucherNumber}`, "sales-voucher"),
+    params
+  );
 
   return txVoucher;
 }

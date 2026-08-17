@@ -1,3 +1,8 @@
+import {
+  deleteInfrastructurePostingIdentityForVoucher,
+  infrastructurePostingIdentity,
+  insertInfrastructureVoucher,
+} from "../../services/accounting/infrastructureVoucherIdentity";
 import { eq, and, isNull, sql } from "drizzle-orm";
 import { db } from "../../db";
 import * as schema from "@shared/schema";
@@ -121,9 +126,9 @@ export async function createPurchaseOrder(
       }
 
       const subsidiaryVoucherNumber = `PURCH-${created.poNumber}-${Date.now()}`;
-      const [subsidiaryVoucher] = await db
-        .insert(schema.vouchers)
-        .values({
+      const { voucher: subsidiaryVoucher } = await insertInfrastructureVoucher(
+        db,
+        {
           companyId: po.companyId,
           voucherNumber: subsidiaryVoucherNumber,
           voucherType: "Purchase",
@@ -131,8 +136,14 @@ export async function createPurchaseOrder(
           description: descBase || `Purchase for PO ${created.poNumber} (${parentCompany.name} paid supplier)`,
           totalAmount: poTotal.toFixed(2),
           optional: false,
-        })
-        .returning();
+        },
+        infrastructurePostingIdentity(
+          "purchase-order",
+          String(po.companyId) + ":" + String(created.poNumber),
+          "purchase"
+        ),
+        po
+      );
 
       await db.insert(schema.voucherEntries).values({
         voucherId: subsidiaryVoucher.id,
@@ -198,9 +209,9 @@ export async function createPurchaseOrder(
       }
 
       const parentVoucherNumber = `INTERCO-PARENT-${created.poNumber}-${Date.now()}`;
-      const [parentVoucher] = await db
-        .insert(schema.vouchers)
-        .values({
+      const { voucher: parentVoucher } = await insertInfrastructureVoucher(
+        db,
+        {
           companyId: parentCompany.id,
           voucherNumber: parentVoucherNumber,
           voucherType: "Journal",
@@ -210,8 +221,14 @@ export async function createPurchaseOrder(
             : `Inter-company PO ${created.poNumber} - ${currentCompany?.name || "Subsidiary"}`,
           totalAmount: poTotal.toFixed(2),
           optional: false,
-        })
-        .returning();
+        },
+        infrastructurePostingIdentity(
+          "purchase-order",
+          String(po.companyId) + ":" + String(created.poNumber),
+          "purchase"
+        ),
+        po
+      );
 
       const intercoNarration = containerNum
         ? `${currentCompany?.name || "Subsidiary"} PO ${created.poNumber} - Container ${containerNum}`
@@ -248,9 +265,9 @@ export async function createPurchaseOrder(
       }
     } else {
       const voucherNumber = `PURCH-${created.poNumber}-${Date.now()}`;
-      const [purchaseVoucher] = await db
-        .insert(schema.vouchers)
-        .values({
+      const { voucher: purchaseVoucher } = await insertInfrastructureVoucher(
+        db,
+        {
           companyId: po.companyId,
           voucherNumber,
           voucherType: "Purchase",
@@ -258,8 +275,14 @@ export async function createPurchaseOrder(
           description: descBase || `Purchase for PO ${created.poNumber}`,
           totalAmount: poTotal.toFixed(2),
           optional: false,
-        })
-        .returning();
+        },
+        infrastructurePostingIdentity(
+          "purchase-order",
+          String(po.companyId) + ":" + String(created.poNumber),
+          "purchase"
+        ),
+        po
+      );
 
       await db.insert(schema.voucherEntries).values({
         voucherId: purchaseVoucher.id,
@@ -319,6 +342,7 @@ export async function deletePurchaseOrder(id: number): Promise<void> {
 
   if (po.voucherId) {
     try {
+      await deleteInfrastructurePostingIdentityForVoucher(db, po.voucherId);
       await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, po.voucherId));
       await db.delete(schema.vouchers).where(eq(schema.vouchers.id, po.voucherId));
     } catch (_hardDeleteErr) {

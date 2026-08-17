@@ -1,3 +1,7 @@
+import {
+  infrastructurePostingIdentity,
+  insertInfrastructureVoucherTx,
+} from "../../services/accounting/infrastructureVoucherIdentity";
 import { eq, and, or, isNull, sql } from "drizzle-orm";
 import { db } from "../../db";
 import * as schema from "@shared/schema";
@@ -95,9 +99,9 @@ export async function closeFiscalPeriod(
 
     const netIncome = totalIncome - totalExpense;
     const voucherNumber = `FISCAL-CLOSE-${periodEndDate}-${Date.now()}`;
-    const [closingVoucher] = await tx
-      .insert(schema.vouchers)
-      .values({
+    const { voucher: closingVoucher } = await insertInfrastructureVoucherTx(
+      tx,
+      {
         companyId,
         voucherNumber,
         voucherType: "Journal",
@@ -105,8 +109,10 @@ export async function closeFiscalPeriod(
         description: `Fiscal Period Close: ${periodStartDate} to ${periodEndDate}${notes ? ` - ${notes}` : ""}`,
         totalAmount: Math.abs(netIncome).toFixed(2),
         optional: false,
-      })
-      .returning();
+      },
+      infrastructurePostingIdentity("fiscal-period", `${companyId}:${periodStartDate}:${periodEndDate}`, "close"),
+      { retainedEarningsAccountId, accountBalances, netIncome }
+    );
 
     for (const account of accountBalances) {
       if (account.balance === 0) continue;
