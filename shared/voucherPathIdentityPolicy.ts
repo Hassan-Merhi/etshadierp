@@ -37,10 +37,11 @@ export function isPhase5OperationalVoucherRequest(method: string, pathname: stri
   if (/^\/api\/factory\/customer-orders\/[^/]+\/charges$/.test(path) && verb === "POST") return true;
   if (/^\/api\/factory\/transporters\/[^/]+\/(?:charges|payments)$/.test(path) && verb === "POST") return true;
 
-  // Factory worker advance CRUD/repayment accounting.
+  // Factory worker advance creation/repayment accounting. Phase 4's
+  // cash-adjustment/repay-by-month endpoints intentionally remain outside this
+  // matcher so one request is not claimed by two boundaries.
   if (path === "/api/factory/advances/bulk" && verb === "POST") return true;
   if (path.startsWith("/api/factory/advance-repayments") && STATE_CHANGING_METHODS.has(verb)) return true;
-  if (/^\/api\/factory\/advances\/[^/]+/.test(path) && STATE_CHANGING_METHODS.has(verb)) return true;
   if (/^\/api\/factory\/workers\/[^/]+\/advances(?:\/.*)?$/.test(path) && STATE_CHANGING_METHODS.has(verb)) return true;
 
   // All three rental shells use the same shared accounting implementation.
