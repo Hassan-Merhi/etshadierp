@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import type { Express, NextFunction, Request, Response } from "express";
 import { sql } from "drizzle-orm";
+
+import { requireAuth } from "../../auth";
 import { db } from "../../db";
 
 const REQUEST_KEY_MAX = 180;
@@ -234,16 +236,6 @@ function sendStoredResponse(res: Response, stored: StoredOperationalRequest): Re
 }
 
 async function operationalVoucherBoundary(req: Request, res: Response, next: NextFunction): Promise<void> {
-  if (!isPhase4OperationalVoucherRequest(req.method, req.path, req.body) || isOptionalVoucherRequest(req)) {
-    next();
-    return;
-  }
-
-  // The tenant isolation boundary runs before this middleware and validates the
-  // server-owned session/company context. Route-local requireAuth hydrates
-  // req.user later, so relying on req.user here would silently bypass every
-  // protected request. Keep route auth responsible for the final auth response,
-  // while using the already-validated session identity for request reservation.
   const companyId = resolvePhase4OperationalVoucherCompanyId(req);
   if (!companyId) {
     next();
@@ -327,6 +319,17 @@ async function operationalVoucherBoundary(req: Request, res: Response, next: Nex
 export function registerOperationalVoucherRequestBoundary(app: Express): void {
   void ensureOperationalVoucherRequestTable();
   app.use((req, res, next) => {
-    void operationalVoucherBoundary(req, res, next).catch(next);
+    if (!isPhase4OperationalVoucherRequest(req.method, req.path, req.body) || isOptionalVoucherRequest(req)) {
+      next();
+      return;
+    }
+
+    void requireAuth(req, res, (authError?: unknown) => {
+      if (authError) {
+        next(authError);
+        return;
+      }
+      void operationalVoucherBoundary(req, res, next).catch(next);
+    });
   });
 }
