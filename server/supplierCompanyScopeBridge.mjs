@@ -73,8 +73,28 @@ if (!globalThis[INSTALL_KEY]) {
     allowExitOnIdle: true,
   });
 
+  // The INSTALL_KEY guard above is per-process, and Vitest gives every test
+  // file its own worker. So N processes reach this migration at once, each
+  // taking the same table locks in whatever order their statements happen to
+  // interleave, and Postgres resolves the tie by killing one with
+  // "deadlock detected" — which this bridge rethrows, failing a test file that
+  // has nothing to do with suppliers. A session-level advisory lock makes the
+  // processes queue instead of collide; the first applies the migration and the
+  // rest re-run it against a schema that already has everything, which the
+  // migration is written to tolerate.
+  const MIGRATION_LOCK_KEY = 8142690331;
+
   try {
-    await pool.query(migrationSql);
+    const client = await pool.connect();
+    try {
+      await client.query("SELECT pg_advisory_lock($1)", [MIGRATION_LOCK_KEY]);
+      await client.query(migrationSql);
+    } finally {
+      // Session-scoped, so pool.end() would release it anyway; unlocking here
+      // frees the next waiter without waiting for the pool to drain.
+      await client.query("SELECT pg_advisory_unlock($1)", [MIGRATION_LOCK_KEY]).catch(() => {});
+      client.release();
+    }
     console.log(
       JSON.stringify({
         timestamp: new Date().toISOString(),
