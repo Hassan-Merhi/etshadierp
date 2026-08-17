@@ -18,9 +18,12 @@
 --     rehearsed migration after all write paths carry transaction-local scope.
 --   * No UPDATE, DELETE, repair, backfill, or historical data rewrite occurs.
 --
--- This versioned migration must not be applied automatically. Use the repository
--- migration approval/recovery process with a reviewed backup and explicit owner
--- approval when deployment is eventually authorized.
+-- Wave G startup cutover:
+--   * server/companyScopeRlsBridge.mjs applies this reviewed migration at startup,
+--     including when the legacy bulk startup migration pass is disabled.
+--   * The bridge wraps execution in a transaction, serializes concurrent startup
+--     attempts with an advisory lock, verifies the installed functions/policies,
+--     and aborts startup if the migration or verification fails.
 
 CREATE OR REPLACE FUNCTION erp_current_company_id()
 RETURNS integer
