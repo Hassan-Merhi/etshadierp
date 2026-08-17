@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { resolveDatabaseSsl } from "../server/lib/databaseSsl.mjs";
 
 const databaseUrl = process.env.DATABASE_URL;
 const describeDatabase = databaseUrl ? describe : describe.skip;
@@ -24,7 +25,7 @@ describeDatabase("company-scope RLS runtime", () => {
   let client: Client;
 
   beforeAll(async () => {
-    client = new Client({ connectionString: databaseUrl, ssl: false });
+    client = new Client({ connectionString: databaseUrl, ssl: resolveDatabaseSsl(databaseUrl) });
     await client.connect();
 
     // The migration must be safely replayable: startup can execute on every boot.
