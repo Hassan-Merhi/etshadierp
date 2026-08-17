@@ -1,0 +1,97 @@
+name: Phase 18 Bales History Split
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+env:
+  CI: true
+jobs:
+  refactor:
+    if: contains(github.event.head_commit.message, '[phase18-bales-history-split]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with: {ref: main, fetch-depth: 0}
+      - uses: actions/setup-node@v6
+        with: {node-version: '22.14.0', cache: npm}
+      - run: npm ci
+      - name: Extract status policy and date keyboard navigation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          mkdir -p client/src/pages/factory/baleshistory
+          cat > client/src/pages/factory/baleshistory/pagePolicies.ts <<'TS'
+          import { useEffect, type Dispatch, type SetStateAction } from "react";
+          import { addDays, format } from "date-fns";
+
+          export const BALE_STATUS_COLORS: Readonly<Record<string, string>> = {
+            PENDING_PRESSING: "outline",
+            LABEL_PRINTED: "secondary",
+            PRESSED: "default",
+            FINALIZED: "default",
+            IN_STOCK: "default",
+            RESERVED: "outline",
+            SOLD: "destructive",
+            REPACKED: "secondary",
+          };
+
+          export function useBalesHistoryDateKeyboard(setDateFilter: Dispatch<SetStateAction<string>>): void {
+            useEffect(() => {
+              const dateFormat = "yyyy-MM-dd";
+              const handleKeyDown = (event: KeyboardEvent) => {
+                const tag = (event.target as HTMLElement | null)?.tagName?.toLowerCase();
+                if (tag === "input" || tag === "textarea" || tag === "select") return;
+                if (event.key === "-") {
+                  event.preventDefault();
+                  setDateFilter((previous) =>
+                    previous ? format(addDays(new Date(`${previous}T00:00:00`), -1), dateFormat) : previous
+                  );
+                } else if (event.key === "+" || (event.key === "=" && event.shiftKey)) {
+                  event.preventDefault();
+                  setDateFilter((previous) =>
+                    previous ? format(addDays(new Date(`${previous}T00:00:00`), 1), dateFormat) : previous
+                  );
+                }
+              };
+              window.addEventListener("keydown", handleKeyDown);
+              return () => window.removeEventListener("keydown", handleKeyDown);
+            }, [setDateFilter]);
+          }
+          TS
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('client/src/pages/factory/BalesHistory.tsx'); s=p.read_text()
+          s=s.replace('import { addDays, format } from "date-fns";\n','')
+          anchor='import { BaleWeightEditDialog, type WeightEditBale } from "@/components/BaleWeightEditDialog";\n'
+          s=s.replace(anchor,anchor+'import { BALE_STATUS_COLORS, useBalesHistoryDateKeyboard } from "./baleshistory/pagePolicies";\n')
+          s,n=re.subn(r'const STATUS_COLORS: Record<string, string> = \{.*?\};\n\n','',s,count=1,flags=re.S)
+          if n!=1: raise SystemExit('status constant not found')
+          start=s.index('  // Keyboard +/- date navigation')
+          end=s.index('  // Debounce search term',start)
+          s=s[:start]+'  useBalesHistoryDateKeyboard(setDateFilter);\n\n'+s[end:]
+          s=s.replace('STATUS_COLORS','BALE_STATUS_COLORS')
+          p.write_text(s)
+          PY
+          npx prettier --write client/src/pages/factory/BalesHistory.tsx client/src/pages/factory/baleshistory/pagePolicies.ts
+      - name: Verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run check
+          set +e; npm run audit:god-files >/tmp/god.log 2>&1; rc=$?; set -e
+          cat /tmp/god.log
+          if grep -Fq 'client/src/pages/factory/BalesHistory.tsx has ' /tmp/god.log; then exit 1; fi
+          echo OTHER_GOD_FILE_FAILURES_REMAIN=$rc
+      - name: Commit and push
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add client/src/pages/factory/BalesHistory.tsx client/src/pages/factory/baleshistory/pagePolicies.ts
+          git commit -m 'refactor: split Bales History page policies [phase18-bales-history] [skip ci]'
+          for attempt in 1 2 3 4 5; do git fetch origin main; git rebase origin/main; npm run check; if git push origin HEAD:main; then exit 0; fi; done
+          exit 1
