@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { insertVoucherWithEntries, insertVoucherWithEntriesTx } from "./voucherPostingService";
 
+const SOURCE = {
+  sourceType: "voucher-posting-service-test",
+  sourceId: "fixture",
+  idempotencyKey: "voucher-posting-service-test:fixture",
+};
+
 function makeTransaction() {
   const calls: unknown[] = [];
   const returning = vi
@@ -32,7 +38,8 @@ describe("voucherPostingService", () => {
       [
         { ledgerAccountId: 10, debitAmount: "25.00", creditAmount: "0" },
         { ledgerAccountId: 11, debitAmount: "0", creditAmount: "25.00" },
-      ]
+      ],
+      SOURCE
     );
 
     expect(result.voucher).toMatchObject({ id: 91 });
@@ -59,7 +66,8 @@ describe("voucherPostingService", () => {
         exchangeRate: "0.92",
         effectiveDate: "2026-07-19",
       },
-      []
+      [],
+      SOURCE
     );
 
     expect(result.entries).toEqual([]);
@@ -86,11 +94,32 @@ describe("voucherPostingService", () => {
         voucherDate: "2026-07-21",
         totalAmount: "0",
       },
-      []
+      [],
+      SOURCE
     );
 
     expect(transaction).toHaveBeenCalledOnce();
     expect(result).toMatchObject({ voucher: { id: 91 }, entries: [] });
+  });
+
+  it("rejects a caller that does not supply a complete source identity", async () => {
+    const { tx, insert } = makeTransaction();
+
+    await expect(
+      insertVoucherWithEntriesTx(
+        tx,
+        {
+          companyId: 4,
+          voucherNumber: "JV-NO-SOURCE",
+          voucherType: "Journal",
+          voucherDate: "2026-07-21",
+          totalAmount: "0",
+        },
+        [],
+        { sourceType: "test", sourceId: "", idempotencyKey: "missing-source-id" }
+      )
+    ).rejects.toThrow(/sourceId is required/);
+    expect(insert).not.toHaveBeenCalled();
   });
 
   it.each([undefined, { id: 0 }])("rejects an invalid persisted voucher result", async (voucher) => {
@@ -110,7 +139,8 @@ describe("voucherPostingService", () => {
           voucherDate: "2026-07-21",
           totalAmount: "0",
         },
-        []
+        [],
+        SOURCE
       )
     ).rejects.toThrow(/voucher/i);
   });
