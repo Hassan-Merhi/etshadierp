@@ -18,7 +18,7 @@ jobs:
           ref: agent/lint-phase-4-fast
       - uses: actions/setup-node@v4
         with:
-          node-version: '22.14'
+          node-version: '22.14.0'
           cache: npm
       - name: Integrate only proven source-result commits
         shell: bash

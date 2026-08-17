@@ -20,13 +20,13 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v6
         with:
-          node-version: 22.14
+          node-version: 22.14.0
           cache: npm
       - name: Normalize registry
         run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
       - name: Upgrade vulnerable Puppeteer chain
         env:
-          PUPPETEER_SKIP_DOWNLOAD: "true"
+          PUPETEER_SKIP_DOWNLOAD: "true"
         run: |
           npm install --ignore-scripts --save-exact puppeteer@25.6.0
           npm ci --ignore-scripts --no-audit
