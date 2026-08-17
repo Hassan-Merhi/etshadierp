@@ -133,7 +133,17 @@ const utilityItems: NavItem[] = [
 export const ERP_PINNED_ITEMS = defaultPinnedItems;
 export const ERP_UTILITY_ITEMS = utilityItems;
 
-export function useErpVisibleSections(user?: any): {
+interface SidebarUser {
+  username?: string | null;
+  currentRole?: string | null;
+  role?: string | null;
+}
+
+interface SidebarCompanySettings {
+  posExcelImportEnabled?: boolean;
+}
+
+export function useErpVisibleSections(user?: SidebarUser): {
   sections: NavSection[];
   isItemVisible: (item: NavItem) => boolean;
   visibleUtilityItems: NavItem[];
@@ -147,7 +157,7 @@ export function useErpVisibleSections(user?: any): {
     enabled: !!user && !!selectedCompany?.id,
   });
 
-  const { data: companySettings } = useQuery<any>({
+  const { data: companySettings } = useQuery<SidebarCompanySettings>({
     queryKey: companyQueryKey("/api/company-settings", selectedCompany?.id),
     ...stableSettingsQueryPolicy,
     enabled: !!selectedCompany?.id,
@@ -208,7 +218,7 @@ export function useErpVisibleSections(user?: any): {
   };
 }
 
-export function AppSidebar({ user }: { user?: any }) {
+export function AppSidebar({ user }: { user?: SidebarUser }) {
   const { toast } = useToast();
   const { conflictCount } = useConnectivity();
   const { selectedCompany } = useCompany();
@@ -374,7 +384,7 @@ export function AppSidebar({ user }: { user?: any }) {
         </div>
       </SidebarContent>
 
-      <ModuleFooter user={user} accent={MODULE_ACCENT.erp} />
+      <ModuleFooter user={user ? { username: user.username ?? undefined, role: user.role ?? undefined } : undefined} accent={MODULE_ACCENT.erp} />
     </Sidebar>
   );
 }
