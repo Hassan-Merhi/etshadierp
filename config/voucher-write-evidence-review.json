@@ -12,7 +12,8 @@
     "phase4OperationalCompleted": 22,
     "phase5OperationalCompleted": 22,
     "phase6SpecialPurposeCompleted": 11,
-    "unreviewed": 0
+    "unreviewed": 0,
+    "phase7PostReviewSafeWriters": 1
   },
   "reviewed": {
     "explicit-replay-guard": {
@@ -132,6 +133,13 @@
         "server/routes/payroll/worker-statement/backfill.ts",
         "server/routes/rental/rentalAccrualConfigRoutes.ts",
         "server/services/rental/reclassifyDeferredRentService.ts"
+      ]
+    },
+    "phase-7-post-review-safe-writers": {
+      "verdict": "post-review creator already protected by durable stock-document request identity",
+      "reason": "This stock-transfer creator entered the live tree after the original 81-file voucher review. Its create-from-scratch branch already consumes clientRequestId, uses the stock-document idempotency key/marker inside the transfer transaction, replays the existing transfer on retry, and is protected by the global accounting request identity client path. Phase 7 records it explicitly so the direct-creation audit can distinguish reviewed growth from an unprotected escape hatch.",
+      "files": [
+        "server/routes/fiscal-transfers/create.ts"
       ]
     }
   },

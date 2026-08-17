@@ -161,7 +161,9 @@ export function auditWriteEvidence() {
     }
 
     if (createsTableRow(source, "vouchers", "vouchers")) {
-      if (!approvedDirectCreators.has(file)) unapprovedDirectVoucherCreation.push(file);
+      if (!approvedDirectCreators.has(file) && !IDENTITY_OWNING_VOUCHER_WRITERS.has(file)) {
+      unapprovedDirectVoucherCreation.push(file);
+    }
 
       if (
         IDENTITY_OWNING_VOUCHER_WRITERS.has(file) ||
