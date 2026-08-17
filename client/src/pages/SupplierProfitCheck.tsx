@@ -412,36 +412,6 @@ export default function SupplierProfitCheck() {
     setAutosaveStatus("idle");
     // Don't bump qtyVersion here — initialization should not trigger autosave
   }, [rows]);
-  // ─── Autosave effect ─────────────────────────────────────────────────────
-  useEffect(() => {
-    if (qtyVersion === 0) return; // skip initial render / initialization
-    const targetId = sourceType === "proforma" && proformaId ? Number(proformaId) : (savedProforma?.id ?? null);
-    if (!targetId) return; // no proforma to save to yet
-    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
-    setAutosaveStatus("saving");
-    autosaveTimerRef.current = setTimeout(async () => {
-      try {
-        const items = computedRows
-          .filter((r) => Number(qtyMap[r.stockItemId]) > 0)
-          .map((r) => ({
-            barcode: r.code,
-            code: r.code,
-            name: r.name,
-            itemName: r.name,
-            qty: Number(qtyMap[r.stockItemId]) || 0,
-            supplierPrice: r.poPrice ?? r.nCost,
-            weight: 0,
-          }));
-        const res = await apiRequest("PUT", `/api/supplier-profit-check/proforma/${targetId}/update-items`, { items });
-        if (!res.ok) throw new Error("Save failed");
-        setAutosaveStatus("saved");
-        setTimeout(() => setAutosaveStatus("idle"), 2500);
-      } catch {
-        setAutosaveStatus("error");
-        setTimeout(() => setAutosaveStatus("idle"), 3000);
-      }
-    }, 1200);
-  }, [qtyVersion]);
   const loaded = queryEnabled && !isLoading && rows.length >= 0;
   // ─── Charge math ─────────────────────────────────────────────────────────
   const totalBales = useMemo(() => {
@@ -480,6 +450,36 @@ export default function SupplierProfitCheck() {
       return { ...row, landingCost, costProfit, costProfitPct, computedStatus, hassanProfit };
     });
   }, [rows, importedRows, extraCostPerBale, manualPoPrices, manualAvgPrices, sellPriceSource]);
+
+useEffect(() => {
+    if (qtyVersion === 0) return; // skip initial render / initialization
+    const targetId = sourceType === "proforma" && proformaId ? Number(proformaId) : (savedProforma?.id ?? null);
+    if (!targetId) return; // no proforma to save to yet
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    setAutosaveStatus("saving");
+    autosaveTimerRef.current = setTimeout(async () => {
+      try {
+        const items = computedRows
+          .filter((r) => Number(qtyMap[r.stockItemId]) > 0)
+          .map((r) => ({
+            barcode: r.code,
+            code: r.code,
+            name: r.name,
+            itemName: r.name,
+            qty: Number(qtyMap[r.stockItemId]) || 0,
+            supplierPrice: r.poPrice ?? r.nCost,
+            weight: 0,
+          }));
+        const res = await apiRequest("PUT", `/api/supplier-profit-check/proforma/${targetId}/update-items`, { items });
+        if (!res.ok) throw new Error("Save failed");
+        setAutosaveStatus("saved");
+        setTimeout(() => setAutosaveStatus("idle"), 2500);
+      } catch {
+        setAutosaveStatus("error");
+        setTimeout(() => setAutosaveStatus("idle"), 3000);
+      }
+    }, 1200);
+  }, [computedRows, proformaId, qtyMap, qtyVersion, savedProforma?.id, sourceType]);
   // ─── Multi-status filter ──────────────────────────────────────────────────
   const toggleStatus = useCallback((val: string) => {
     setActiveStatuses((prev) => (prev.includes(val) ? prev.filter((s) => s !== val) : [...prev, val]));

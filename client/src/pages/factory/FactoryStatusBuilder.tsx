@@ -89,21 +89,6 @@ export default function FactoryStatusBuilder() {
     enabled: viewMode === "history" && !!activeSheet?.id,
   });
 
-  // ── Autosave ───────────────────────────────────────────────────────────────
-  useEffect(() => {
-    const hasSaveable = localSheets.some((s) => s.dirty && s.id !== null);
-    if (!hasSaveable) return;
-    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
-    autosaveTimerRef.current = setTimeout(() => {
-      silentSaveRef.current = true;
-      saveMutation.mutate(localSheets);
-    }, 2000);
-    return () => {
-      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
-    };
-    
-  }, [localSheets]);
-
   // ── Helpers ────────────────────────────────────────────────────────────────
   const updateSheet = useCallback(
     (fn: (s: StatusBuilderSheet) => StatusBuilderSheet) => {
@@ -239,6 +224,20 @@ export default function FactoryStatusBuilder() {
     },
   });
 
+useEffect(() => {
+    const hasSaveable = localSheets.some((s) => s.dirty && s.id !== null);
+    if (!hasSaveable) return;
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = setTimeout(() => {
+      silentSaveRef.current = true;
+      saveMutation.mutate(localSheets);
+    }, 2000);
+    return () => {
+      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    };
+    
+  }, [localSheets, saveMutation]);
+
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/factory/status-builder/sheets/${id}`),
     onSuccess: (_data, id) => {
@@ -300,13 +299,13 @@ export default function FactoryStatusBuilder() {
   };
 
   // ── Column operations ──────────────────────────────────────────────────────
-  const addColumn = () => {
+  const addColumn = useCallback(() => {
     updateSheet((s) => ({
       ...s,
       columns: [...s.columns, { id: `col_${makeId()}`, label: `Col ${s.columns.length + 1}` }],
       rows: s.rows.map((r) => ({ ...r, cells: [...r.cells, { value: null }] })),
     }));
-  };
+  }, [updateSheet]);
 
   const removeColumn = (colIdx: number) => {
     updateSheet((s) => ({
