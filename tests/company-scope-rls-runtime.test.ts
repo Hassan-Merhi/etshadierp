@@ -34,7 +34,9 @@ describeDatabase("company-scope RLS runtime", () => {
     await client.query(`DROP TABLE IF EXISTS ${probeTable}`);
     await client.query(`DROP ROLE IF EXISTS ${roleName}`);
     await client.query(`CREATE ROLE ${roleName} NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS`);
-    await client.query(`CREATE TABLE ${probeTable} (id serial PRIMARY KEY, company_id integer NOT NULL, marker text NOT NULL)`);
+    await client.query(
+      `CREATE TABLE ${probeTable} (id serial PRIMARY KEY, company_id integer NOT NULL, marker text NOT NULL)`
+    );
     await client.query(`ALTER TABLE ${probeTable} ENABLE ROW LEVEL SECURITY`);
     await client.query(`CREATE POLICY ${probeTable}_company_scope_policy ON ${probeTable}
       USING (erp_company_scope_matches(company_id))
