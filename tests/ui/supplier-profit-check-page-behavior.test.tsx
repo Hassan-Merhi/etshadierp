@@ -78,6 +78,16 @@ vi.mock("@/components/ui/period-filter", () => ({
 vi.mock("@/pages/supplierprofitcheck/utils", () => ({
   STORAGE_KEY_COLS: "supplier-profit-columns",
   fmt: (value: number, digits = 2) => Number(value || 0).toFixed(digits),
+  isSupplierProfitQueryEnabled: (
+    supplierId: string,
+    sourceType: "all" | "proforma" | "otw_containers",
+    proformaId: string,
+    otwContainerIds: readonly number[]
+  ) =>
+    Boolean(supplierId) &&
+    (sourceType === "all" ||
+      (sourceType === "proforma" && Boolean(proformaId)) ||
+      (sourceType === "otw_containers" && otwContainerIds.length > 0)),
   STATUS_OPTIONS: [
     { value: "gaining", label: "Gaining", dot: "green" },
     { value: "losing", label: "Losing", dot: "red" },
