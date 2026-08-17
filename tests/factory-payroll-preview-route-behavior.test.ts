@@ -89,6 +89,7 @@ describe("factory payroll preview route behavior", () => {
       [
         {
           id: 1,
+          employeeCode: "FAC-001",
           fullName: "Monthly Worker",
           position: "Pressing",
           baseSalary: "1000",
@@ -185,6 +186,7 @@ describe("factory payroll preview route behavior", () => {
 
     expect(rows[0]).toMatchObject({
       id: 1,
+      employeeCode: "FAC-001",
       base: 600,
       bonus: 50,
       transport: 4.5,
