@@ -46,14 +46,16 @@ const voucherReview = JSON.parse(
 ) as {
   reviewState: string;
   summary: {
-    totalReviewed: number;
+    initialReviewed: number;
+    activeReviewed: number;
     explicitReplayGuard: number;
     migrationImportRepair: number;
-    infrastructureWriter: number;
     operationalWithoutRequestIdentity: number;
+    phase3InfrastructureCompleted: number;
     unreviewed: number;
   };
   reviewed: Record<string, { verdict: string; reason: string; files: string[] }>;
+  completed: Record<string, { verdict: string; reason: string; files: string[] }>;
   unreviewed: string[];
 };
 
@@ -87,8 +89,6 @@ describe("write evidence ratchet", () => {
     const pinned = { ceiling: 2, files: ["first-writer", "second-writer"] };
     const { errors } = compareBacklog("probe", ["first-writer", "replacement-writer"], pinned);
 
-    // Two files before, two after — a pure count check passes this, and a new
-    // write path with no evidence ships behind an unchanged number.
     expect(errors).toHaveLength(1);
     expect(errors[0].includes("replacement-writer")).toBe(true);
   });
@@ -102,17 +102,12 @@ describe("write evidence ratchet", () => {
   });
 
   it("is measuring something, so an empty backlog cannot pass as success", () => {
-    // A detector that matched nothing would report zero of each and satisfy
-    // every ceiling above. These floors mean the audit has to keep finding the
-    // write paths it was built to find.
     expect(measured.scannedFiles).toBeGreaterThan(500);
     expect(measured.unjournalledStockWrites.length).toBeGreaterThan(0);
     expect(measured.voucherWritesWithoutRequestIdentity.length).toBeGreaterThan(0);
   });
 
   it("records why each backlog exists so a reviewer can judge a new entry", () => {
-    // Named mechanisms, so the rationale a reviewer reads points at the thing
-    // the audit actually looks for rather than a vague description of it.
     expect(baseline.stockWritesWithoutJournalEvidence.rationale.includes("postStockMovementTx")).toBe(true);
     expect(baseline.voucherWritesWithoutRequestIdentity.rationale.includes("request id")).toBe(true);
   });
@@ -139,7 +134,7 @@ describe("write evidence ratchet", () => {
     expect(baseline.stockWritesWithoutJournalEvidence.reviewed.unjournalled.files.length).toBeGreaterThan(0);
   });
 
-  it("accounts for every voucher creation path in the file-by-file review", () => {
+  it("accounts for every active voucher creation path in the file-by-file review", () => {
     const classified = Object.values(voucherReview.reviewed).flatMap((group) => group.files);
 
     expect(voucherReview.reviewState).toBe("REVIEWED FILE BY FILE");
@@ -147,7 +142,8 @@ describe("write evidence ratchet", () => {
       [...baseline.voucherWritesWithoutRequestIdentity.files].sort()
     );
     expect(new Set(classified).size, "a voucher file is classified twice").toBe(classified.length);
-    expect(voucherReview.summary.totalReviewed).toBe(baseline.voucherWritesWithoutRequestIdentity.files.length);
+    expect(voucherReview.summary.activeReviewed).toBe(baseline.voucherWritesWithoutRequestIdentity.files.length);
+    expect(baseline.voucherWritesWithoutRequestIdentity.ceiling).toBe(70);
   });
 
   it("keeps the voucher unreviewed remainder empty", () => {
@@ -175,23 +171,31 @@ describe("write evidence ratchet", () => {
     expect(voucherReview.summary.migrationImportRepair).toBe(
       voucherReview.reviewed["migration-import-repair"].files.length
     );
-    expect(voucherReview.summary.infrastructureWriter).toBe(
-      voucherReview.reviewed["infrastructure-writer"].files.length
-    );
     expect(
       voucherReview.summary.explicitReplayGuard +
         voucherReview.summary.migrationImportRepair +
-        voucherReview.summary.infrastructureWriter +
         voucherReview.summary.operationalWithoutRequestIdentity
-    ).toBe(voucherReview.summary.totalReviewed);
+    ).toBe(voucherReview.summary.activeReviewed);
+  });
+
+  it("locks the 11 Phase 3 infrastructure writers as completed and out of the active backlog", () => {
+    const completed = voucherReview.completed["phase-3-infrastructure-writers"];
+    const active = new Set(baseline.voucherWritesWithoutRequestIdentity.files);
+    const measuredBacklog = new Set(measured.voucherWritesWithoutRequestIdentity);
+
+    expect(completed.verdict).toContain("phase 3 completed");
+    expect(completed.reason.length).toBeGreaterThan(120);
+    expect(completed.files).toHaveLength(11);
+    expect(completed.files.length).toBe(voucherReview.summary.phase3InfrastructureCompleted);
+    expect(completed.files.filter((file) => active.has(file))).toEqual([]);
+    expect(completed.files.filter((file) => measuredBacklog.has(file))).toEqual([]);
+    expect(new Set(completed.files).size).toBe(completed.files.length);
+    expect(voucherReview.summary.initialReviewed).toBe(
+      voucherReview.summary.activeReviewed + voucherReview.summary.phase3InfrastructureCompleted
+    );
   });
 
   it("credits the write paths that do carry evidence", () => {
-    // The audit is only as honest as its positive signal. A detector that
-    // credited nothing would report every write path as backlog and still
-    // satisfy a ceiling set from its own output; one that credited everything
-    // would report an empty backlog, which reads as success. Both sides have to
-    // be non-empty for the measurement to mean anything.
     expect(measured.journalledStockWrites).toBeGreaterThan(0);
     expect(measured.voucherWritesWithRequestIdentity).toBeGreaterThan(0);
   });
