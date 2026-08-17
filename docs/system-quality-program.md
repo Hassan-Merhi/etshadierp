@@ -17,22 +17,31 @@ audit fails instead of allowing the reference to drift.
 
 | Signal | Now | Command |
 |---|---|---|
-| Type escapes (AST) | 0 total | `npm run audit:type-escapes` |
-| ESLint warnings | 33 total | `npm run lint` |
+| Type escapes (AST) | 4,755 total | `npm run audit:type-escapes` |
+| ESLint warnings | 5,235 total | `npm run lint` |
 | Startup migration failures | 0 on a fresh database | `npm run verify:startup-migrations` |
 | Backend coverage floor (lines) | 29% | `config/coverage-thresholds.json` |
 | Write routes with no test at all | 0 of 328 | `npm run audit:write-routes` |
 | Write routes covered only by the guard sweep | 0 of 328 | `npm run audit:write-routes` |
 | Registered routes | 1,903 | `config/route-manifest.json` |
-| God-file backlog | 44 files, 21,648 excess lines | `npm run audit:god-files` |
+| God-file backlog | 43 files, 20,723 excess lines | `npm run audit:god-files` |
 
-The type-escape and ESLint rows are the **ceilings** those gates enforce, read
-from their config. Since the Phase 4–17 lint programme landed, they are not what
-the tree currently measures: `npm run audit:type-escapes` reports 4,753 escapes
-against a ceiling of 0, and `npm run lint` reports 5,254 warnings against a
-ceiling of 33. The ceilings were lowered ahead of the cleanup that pays for them,
-so both gates fail on `main` until Phase 18 closes the gap. Raising either
-ceiling back is not the remedy.
+The type-escape and ESLint rows are the **ceilings** those gates enforce, and
+they now equal what the tree measures.
+
+They briefly did not. The Phase 4–17 lint programme recorded ceilings of 0 and
+33 as the outcome of a fully cleaned tree; that tree did not land, and PR #684
+merged the numbers without the cleanup and with its own CI run cancelled. Every
+build afterwards failed both gates by thousands, and `config/type-escape-boundaries.json`
+had its per-file baseline emptied outright, so no individual file was frozen at
+all. A gate that always fails gates nothing — it cannot tell a regression from
+the backlog drowning it.
+
+Both are re-pinned to the measured tree: 4,755 escapes across 914 individually
+frozen files, and 5,235 warnings with each rule frozen at its own count. Against
+8,646 and 9,270 — the last values either ratchet took from a real run — those
+are drawdowns of 45% and 43%. Phase 18 continues from the measured number.
+Neither ceiling may rise again.
 
 The schema layer remains the type source of truth. New code is not allowed to
 increase the type-escape ceiling, and sensitive write routes are not allowed to
