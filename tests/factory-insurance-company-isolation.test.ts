@@ -4,7 +4,7 @@ import { resolveRequestCompanyId } from "../server/services/security/requestComp
 
 const routeSource = readFileSync(
   new URL("../server/routes/factory/factoryInsuranceRoutes.ts", import.meta.url),
-  "utf8",
+  "utf8"
 );
 
 describe("factory insurance company isolation", () => {

@@ -60,7 +60,7 @@ function paymentReceiptBody(
   voucherType: "Payment" | "Receipt",
   amount: number,
   paymentAccountId: number,
-  entryAccountId: number,
+  entryAccountId: number
 ) {
   return {
     voucherType,
@@ -86,10 +86,7 @@ function voucherIdFrom(body: any): number | undefined {
 }
 
 async function assertVoucherBalanced(voucherId: number) {
-  const entries = await db
-    .select()
-    .from(schema.voucherEntries)
-    .where(eq(schema.voucherEntries.voucherId, voucherId));
+  const entries = await db.select().from(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, voucherId));
   expect(entries.length).toBeGreaterThan(0);
   const totalDebit = entries.reduce((sum, entry) => sum + parseFloat(entry.debitAmount ?? "0"), 0);
   const totalCredit = entries.reduce((sum, entry) => sum + parseFloat(entry.creditAmount ?? "0"), 0);
@@ -252,7 +249,7 @@ describe("Accounting — Ledger Transactions", () => {
 
     const txRes = await agent.get(`/api/accounts/ledger/${ctx.cashAccountId}/transactions`);
     expect(txRes.status).toBe(200);
-    const txBody = Array.isArray(txRes.body) ? txRes.body : txRes.body?.transactions ?? [];
+    const txBody = Array.isArray(txRes.body) ? txRes.body : (txRes.body?.transactions ?? []);
     expect(txBody.length).toBeGreaterThan(0);
   });
 
@@ -329,7 +326,7 @@ describe("Accounting — Company Isolation", () => {
     try {
       const res = await agent.get("/api/vouchers");
       expect(res.status).toBe(200);
-      const vouchers = Array.isArray(res.body) ? res.body : res.body?.vouchers ?? [];
+      const vouchers = Array.isArray(res.body) ? res.body : (res.body?.vouchers ?? []);
       expect(vouchers.some((voucher: any) => voucher.id === otherVoucher.id)).toBe(false);
     } finally {
       await db.delete(schema.vouchers).where(eq(schema.vouchers.id, otherVoucher.id));

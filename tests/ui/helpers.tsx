@@ -20,9 +20,7 @@ function makeTestClient(): QueryClient {
 
 export function renderWithProviders(ui: React.ReactElement): RenderResult {
   const client = makeTestClient();
-  return render(
-    <QueryClientProvider client={client}>{ui}</QueryClientProvider>
-  );
+  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
 }
 
 /** Stub fetch so any useQuery that actually fires returns an empty payload. */
