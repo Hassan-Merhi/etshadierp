@@ -34,8 +34,8 @@ export function registerFactoryEmployeeBulkPayrollRoutes(app: Express) {
         return res.status(400).json({ message: "No valid deposit amounts provided" });
       }
 
-      const totalSalary = validDeposits.reduce((sum: number, d: any) => sum + (parseFloat(d.amount) || 0), 0);
-      const totalDeduction = validDeposits.reduce((sum: number, d: any) => sum + (parseFloat(d.deduction) || 0), 0);
+      const totalSalary = validDeposits.reduce((sum: number, d) => sum + (parseFloat(d.amount) || 0), 0);
+      const totalDeduction = validDeposits.reduce((sum: number, d) => sum + (parseFloat(d.deduction) || 0), 0);
       const totalNet = totalSalary - totalDeduction;
       const voucherNumber = `EMP-PAY-${Date.now()}`;
 

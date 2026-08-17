@@ -32,8 +32,8 @@ export function AdvanceRow({ adv, isLoan, isExpanded, onToggleExpand, onRepay, f
 
   const repaymentsWithRunningBalance = (repayments || [])
     .slice()
-    .sort((a: any, b: any) => new Date(a.repaymentDate).getTime() - new Date(b.repaymentDate).getTime())
-    .reduce((acc: any[], r: any) => {
+    .sort((a, b) => new Date(a.repaymentDate).getTime() - new Date(b.repaymentDate).getTime())
+    .reduce((acc: any[], r) => {
       const prevBal = acc.length > 0 ? acc[acc.length - 1].balanceAfter : parseFloat(adv.amount || "0");
       const balAfter = prevBal - parseFloat(r.amount || "0");
       acc.push({ ...r, balanceAfter: Math.max(0, balAfter) });

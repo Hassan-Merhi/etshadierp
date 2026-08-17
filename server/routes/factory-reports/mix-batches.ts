@@ -66,7 +66,7 @@ export function registerFactoryMixBatchesByDateRoutes(app: Express, requireAuth:
       // Apply the same fallback cost enrichment as /api/factory/mix-batches/:id/sources
       // When costPerKg is 0 in the DB, look up the weighted-average from factoryRawStock.
       const enrichedSources = await Promise.all(
-        sources.map(async (s: any) => {
+        sources.map(async (s) => {
           const storedCost = parseFloat(s.cost_per_kg) || 0;
           if (storedCost > 0) return s;
 
@@ -119,7 +119,7 @@ export function registerFactoryMixBatchesByDateRoutes(app: Express, requireAuth:
       const enriched = batches.map((b) => {
         const batchSources = enrichedSources.filter((s) => s.mix_batch_id === b.id);
         const totalWeight = parseFloat(b.total_weight_kg) || 0;
-        const totalCost = batchSources.reduce((sum: number, s: any) => sum + (parseFloat(s.total_cost) || 0), 0);
+        const totalCost = batchSources.reduce((sum: number, s) => sum + (parseFloat(s.total_cost) || 0), 0);
         const costPerKg = totalWeight > 0 ? totalCost / totalWeight : 0;
         return {
           id: b.id,

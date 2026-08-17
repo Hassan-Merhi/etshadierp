@@ -167,7 +167,7 @@ export default function FactoryInvoiceCreate() {
       const res = await modeApiRequest("POST", "/api/factory/customer-orders", data);
       return await res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       setOrderId(data.id);
       toast({ title: "Draft order created", description: "You can now start scanning bales" });
       setTimeout(() => scannerRef.current?.focus(), 100);
@@ -220,7 +220,7 @@ export default function FactoryInvoiceCreate() {
       const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/charges`, data);
       return await res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
       setChargeName("");
       setChargeAmount("");
@@ -256,7 +256,7 @@ export default function FactoryInvoiceCreate() {
       const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/charges/relink-vouchers`, {});
       return await res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
       toast({ title: data.linked > 0 ? "Ledger entries created" : "Nothing to relink", description: data.message });
     },
@@ -320,7 +320,7 @@ export default function FactoryInvoiceCreate() {
       }
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
       toast({ title: "Prices updated", description: `Applied current prices to ${data.repriced} bale(s)` });
     },

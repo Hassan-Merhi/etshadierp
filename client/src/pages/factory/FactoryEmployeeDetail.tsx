@@ -228,7 +228,7 @@ export default function FactoryEmployeeDetail() {
       }
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employees", employeeId] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employees"] });
       toast({ title: "Balance recalculated", description: `New balance: $${data.newBalance?.toFixed(2)}` });
@@ -320,7 +320,7 @@ export default function FactoryEmployeeDetail() {
       }
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employees"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employees", employeeId] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employees", employeeId, "statement"] });

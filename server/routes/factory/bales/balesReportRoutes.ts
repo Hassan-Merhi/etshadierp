@@ -311,8 +311,8 @@ export function registerBalesReportRoutes(app: Express) {
       `);
 
       const groups: any[] = rows.rows;
-      const totalBales = groups.reduce((s: number, g: any) => s + (g.baleCount || 0), 0);
-      const totalWeight = groups.reduce((s: number, g: any) => s + parseFloat(g.totalWeight || "0"), 0);
+      const totalBales = groups.reduce((s: number, g) => s + (g.baleCount || 0), 0);
+      const totalWeight = groups.reduce((s: number, g) => s + parseFloat(g.totalWeight || "0"), 0);
 
       const PDFDocument = (await import("pdfkit")).default;
       const doc = new PDFDocument({ margin: 40, size: "A4" });

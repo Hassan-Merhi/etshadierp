@@ -33,7 +33,7 @@ export function ProfitOpeningRunner({ targetCompanyId, onDone }: { targetCompany
         accumulatedProfit,
         ...(useManualSplit ? { ourShareAmount, supplierShareAmount } : { ourSplitPct }),
       }),
-    onSuccess: async (data: any) => {
+    onSuccess: async (data) => {
       const r = await data.json();
       setResult(r);
       toast({ title: "Profit-share opening balance posted", description: `Voucher ${r.voucherNumber}` });

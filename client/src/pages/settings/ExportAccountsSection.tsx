@@ -75,7 +75,7 @@ export function ExportAccountsSection() {
 
   const filtered = allAccounts.filter((a) => a.name.toLowerCase().includes(search.toLowerCase()));
 
-  const grouped = filtered.reduce<Record<string, any[]>>((acc, account: any) => {
+  const grouped = filtered.reduce<Record<string, any[]>>((acc, account) => {
     const type = account.type || "ledger";
     if (!acc[type]) acc[type] = [];
     acc[type].push(account);

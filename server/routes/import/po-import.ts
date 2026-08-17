@@ -338,7 +338,7 @@ export function registerPoImportRoutes(app: Express) {
         containerOtherCharges > 0;
 
       // Calculate total items value across all POs for pro-rating charges
-      const totalAllItemsValue = Object.values(poGroups).reduce((sum: number, items: any) => {
+      const totalAllItemsValue = Object.values(poGroups).reduce((sum: number, items) => {
         return sum + (items as any[]).reduce((s, item) => s + item.lineTotal, 0);
       }, 0);
 

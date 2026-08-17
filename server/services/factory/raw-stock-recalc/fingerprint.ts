@@ -12,7 +12,7 @@ import { RecalcFingerprintInputs } from "./cost-math";
 export async function loadRecalcFingerprintInputs(
   companyId: number,
   containerId: number,
-  dbOrTx: any = db
+  dbOrTx = db
 ): Promise<RecalcFingerprintInputs | null> {
   const [container] = await dbOrTx
     .select()
@@ -59,7 +59,7 @@ export async function loadRecalcFingerprintInputs(
         )
       ),
   ]);
-  const commissionRecord = commissionRecords.sort((a: any, b: any) => b.id - a.id)[0] || null;
+  const commissionRecord = commissionRecords.sort((a, b) => b.id - a.id)[0] || null;
 
   return {
     container,

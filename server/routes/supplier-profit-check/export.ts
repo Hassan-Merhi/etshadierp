@@ -319,19 +319,19 @@ export function registerSupplierProfitExportRoutes(app: Express, requireAuth: an
 
       // Summary totals
       const hasQty = rows.filter((r) => Number(r.qty) > 0);
-      const totalQtyOrdered = hasQty.reduce((s: number, r: any) => s + (Number(r.qty) || 0), 0);
+      const totalQtyOrdered = hasQty.reduce((s: number, r) => s + (Number(r.qty) || 0), 0);
       const totalAvgCostSum = hasQty.reduce(
-        (s: number, r: any) => s + (Number(r.qty) || 0) * (Number(r.offloadingCost) || 0),
+        (s: number, r) => s + (Number(r.qty) || 0) * (Number(r.offloadingCost) || 0),
         0
       );
-      const totalEstSales = hasQty.reduce((s: number, r: any) => {
+      const totalEstSales = hasQty.reduce((s: number, r) => {
         return r.avgSellingPrice != null ? s + (Number(r.qty) || 0) * Number(r.avgSellingPrice) : s;
       }, 0);
-      const totalEstHassansProfit = hasQty.reduce((s: number, r: any) => {
+      const totalEstHassansProfit = hasQty.reduce((s: number, r) => {
         const hp = (Number(r.configPrice) || 0) - (Number(r.offloadingCost) || 0);
         return s + (Number(r.qty) || 0) * hp;
       }, 0);
-      const totalEstCostProfit = hasQty.reduce((s: number, r: any) => {
+      const totalEstCostProfit = hasQty.reduce((s: number, r) => {
         const sell = r.avgSellingPrice != null ? Number(r.avgSellingPrice) : null;
         const p = sell != null ? sell - (Number(r.offloadingCost) || 0) : null;
         return p != null ? s + (Number(r.qty) || 0) * p : s;

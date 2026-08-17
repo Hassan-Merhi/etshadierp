@@ -426,7 +426,7 @@ export function registerContainerLoadedItemReportRoutes(app: Express, requireAut
               "",
               ...columns.slice(2).map((c) => {
                 const sum = data.reduce(
-                  (s: number, item: any) => s + (typeof item[c.key] === "number" ? item[c.key] : 0),
+                  (s: number, item) => s + (typeof item[c.key] === "number" ? item[c.key] : 0),
                   0
                 );
                 return sum;
@@ -467,7 +467,7 @@ export function registerContainerLoadedItemReportRoutes(app: Express, requireAut
             { header: "Status", key: "status", width: 16 },
           ],
           fullComparison,
-          (item: any) => {
+          (item) => {
             if (item.status === "OVERLOADED") return colors.overloadedBg;
             if (item.status === "SHORT" || item.status === "MISSING") return colors.shortBg;
             if (item.status === "NOT REQUESTED") return colors.notRequestedBg;

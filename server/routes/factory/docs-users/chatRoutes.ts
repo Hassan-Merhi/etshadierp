@@ -118,7 +118,7 @@ export function registerFactoryChatRoutes(app: Express) {
           // Find most recent presence record for this user
           const userPresenceRecords = presenceRecords.filter((p) => p.userId === u.id);
           const latestPresence = userPresenceRecords.sort(
-            (a: any, b: any) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime()
+            (a, b) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime()
           )[0];
           const isOnline = latestPresence ? new Date(latestPresence.lastSeen) > twoMinutesAgo : false;
           const lastSeen = latestPresence ? latestPresence.lastSeen : null;

@@ -222,7 +222,7 @@ export async function sendAgentCardToWhatsApp(params: SendAgentDutyWaParams): Pr
     if (waTransitRows.length > 0) {
       const transitTotal = waTransitRows.reduce((s: number, r) => s + r.dutyFee, 0);
       let transitRowsHtml = "";
-      const sortedWaTransitRows = [...waTransitRows].sort((a: any, b: any) => {
+      const sortedWaTransitRows = [...waTransitRows].sort((a, b) => {
         const tA = (a.transporter ?? "").toLowerCase(),
           tB = (b.transporter ?? "").toLowerCase();
         if (tA !== tB) return tA < tB ? -1 : 1;

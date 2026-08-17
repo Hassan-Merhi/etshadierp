@@ -45,7 +45,7 @@ export function computeStats(
 ) {
   // Direct Incomes (non-sales income accounts)
   const directIncAccounts = ctx.companyAccounts.filter(
-    (acc: any) =>
+    (acc) =>
       acc.accountType === "Income" &&
       acc.subType === "Direct Income" &&
       !acc.code?.includes("SALES") &&
@@ -65,7 +65,7 @@ export function computeStats(
 
   // Purchases
   const purchaseAccounts = ctx.companyAccounts.filter(
-    (acc: any) => acc.code === "PURCHASES" || acc.code?.startsWith("PURCHASES-")
+    (acc) => acc.code === "PURCHASES" || acc.code?.startsWith("PURCHASES-")
   );
   let purchaseTotal = 0;
   const purchaseDetails = purchaseAccounts
@@ -79,7 +79,7 @@ export function computeStats(
 
   // Direct Expenses
   const directExpAccounts = ctx.companyAccounts.filter(
-    (acc: any) =>
+    (acc) =>
       acc.code !== "PURCHASES" &&
       !acc.code?.startsWith("PURCHASES") &&
       (acc.accountType === "Direct Expense" ||
@@ -98,7 +98,7 @@ export function computeStats(
 
   // Indirect Expenses
   const indirectExpAccounts = ctx.companyAccounts.filter(
-    (acc: any) =>
+    (acc) =>
       acc.accountType === "Indirect Expense" &&
       acc.code !== "PRODUCTION_ADJUSTMENT" &&
       acc.code !== "CONSUMPTION_EXPENSE" &&

@@ -118,7 +118,7 @@ export function registerBaleTransferRoutes(app: Express) {
       try {
         const [fSetting] = await db.select().from(fSettings).where(eq(fSettings.companyId, companyId));
         if (fSetting) {
-          const totalCost = items.reduce((s: number, it: any) => s + parseFloat(it.totalCost || "0"), 0);
+          const totalCost = items.reduce((s: number, it) => s + parseFloat(it.totalCost || "0"), 0);
           await db.insert(fde).values({
             companyId,
             txDate: transferDate,

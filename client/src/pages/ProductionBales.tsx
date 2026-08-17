@@ -665,8 +665,8 @@ export default function ProductionBales() {
     queryKey: ["/api/factory/pressing-batches"],
   });
 
-  const pendingBatches = pressingBatches?.filter((b: any) => b.pendingCount > 0) || [];
-  const selectedBatch = pressingBatches?.find((b: any) => b.id === selectedBatchId);
+  const pendingBatches = pressingBatches?.filter((b) => b.pendingCount > 0) || [];
+  const selectedBatch = pressingBatches?.find((b) => b.id === selectedBatchId);
 
   if (batchesLoading) {
     return (
@@ -707,7 +707,7 @@ export default function ProductionBales() {
 
       {pendingBatches.length > 0 && (
         <div className="grid gap-3">
-          {pendingBatches.map((batch: any) => {
+          {pendingBatches.map((batch) => {
             const batchBales = batch.bales?.filter((b: any) => b.status === "PENDING_PRESSING") || [];
             const productGroups = new Map<string, number>();
             batchBales.forEach((b: any) => {

@@ -347,7 +347,7 @@ async function updateActiveJournal(req: Request, res: Response, next: NextFuncti
       let accountType = mainAccountType ? String(mainAccountType) : "ledger";
       if (!accountId) {
         const firstLedgerDebit = entries.find(
-          (entry: any) => entry.accountType === "ledger" && entry.type === "DR" && Number(entry.accountId) > 0
+          (entry) => entry.accountType === "ledger" && entry.type === "DR" && Number(entry.accountId) > 0
         );
         if (firstLedgerDebit) {
           accountId = Number(firstLedgerDebit.accountId);

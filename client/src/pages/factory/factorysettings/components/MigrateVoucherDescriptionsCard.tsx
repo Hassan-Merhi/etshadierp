@@ -20,7 +20,7 @@ export function MigrateVoucherDescriptionsCard() {
       const res = await apiRequest("POST", "/api/factory/migrate-voucher-descriptions");
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       setResult(data);
       toast({
         title: "Update complete",

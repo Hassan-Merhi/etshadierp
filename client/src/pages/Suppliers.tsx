@@ -234,10 +234,10 @@ export default function Suppliers() {
               });
 
   const txCount = filteredLedgerRows.length;
-  const totalPurchases = filteredLedgerRows.reduce((s: number, t: any) => s + (parseFloat(t.credit) || 0), 0);
-  const totalPayments = filteredLedgerRows.reduce((s: number, t: any) => s + (parseFloat(t.debit) || 0), 0);
+  const totalPurchases = filteredLedgerRows.reduce((s: number, t) => s + (parseFloat(t.credit) || 0), 0);
+  const totalPayments = filteredLedgerRows.reduce((s: number, t) => s + (parseFloat(t.debit) || 0), 0);
   const totalPurchasesQty = filteredLedgerRows.filter(
-    (t: any) => t.voucherType === "Purchase" || (t.voucherType === "Journal" && (parseFloat(t.credit) || 0) > 0)
+    (t) => t.voucherType === "Purchase" || (t.voucherType === "Journal" && (parseFloat(t.credit) || 0) > 0)
   ).length;
   const currentBalance = unifiedLedger.length > 0 ? (unifiedLedger[unifiedLedger.length - 1]?.balance ?? 0) : 0;
 
@@ -772,7 +772,7 @@ export default function Suppliers() {
                 (() => {
                   const sortedPOs = [...purchaseOrders]
                     .sort(
-                      (a: any, b: any) =>
+                      (a, b) =>
                         new Date(b.importDate || b.createdAt).getTime() -
                         new Date(a.importDate || a.createdAt).getTime()
                     )
@@ -788,7 +788,7 @@ export default function Suppliers() {
                         itemsTotal + freight + surcharge + fumigation + documentCharges - discount + otherCharges;
                       return { ...po, totalAmount };
                     });
-                  const grandTotal = sortedPOs.reduce((sum: number, po: any) => sum + po.totalAmount, 0);
+                  const grandTotal = sortedPOs.reduce((sum: number, po) => sum + po.totalAmount, 0);
 
                   return (
                     <div className="space-y-2">

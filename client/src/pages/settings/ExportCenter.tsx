@@ -129,7 +129,7 @@ export function ExportCenter() {
       if (toDate) body.toDate = toDate;
       return (await apiRequest("POST", "/api/daily-export/trigger-whatsapp", body)).json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       toast({ title: "WhatsApp export started", description: data.message });
       [5, 20, 45, 75, 120].forEach((s) => setTimeout(() => refetchBackup(), s * 1000));
     },

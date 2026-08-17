@@ -74,8 +74,8 @@ export function registerVoucherCreateRoutes(app: Express) {
       }
 
       // Validate that debits equal credits (only for non-optional vouchers)
-      const totalDebits = entries.reduce((sum: number, entry: any) => sum + parseFloat(entry.debitAmount || "0"), 0);
-      const totalCredits = entries.reduce((sum: number, entry: any) => sum + parseFloat(entry.creditAmount || "0"), 0);
+      const totalDebits = entries.reduce((sum: number, entry) => sum + parseFloat(entry.debitAmount || "0"), 0);
+      const totalCredits = entries.reduce((sum: number, entry) => sum + parseFloat(entry.creditAmount || "0"), 0);
 
       // For active (non-optional) vouchers, enforce debit=credit balance
       if (!voucher.optional && Math.abs(totalDebits - totalCredits) >= 0.01) {

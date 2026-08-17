@@ -152,8 +152,8 @@ export function registerFactoryCustomerStatementExcelRoutes(app: Express) {
         return true;
       });
 
-      const totalDr = rows.reduce((s: number, r: any) => s + r.debit, 0);
-      const totalCr = rows.reduce((s: number, r: any) => s + r.credit, 0);
+      const totalDr = rows.reduce((s: number, r) => s + r.debit, 0);
+      const totalCr = rows.reduce((s: number, r) => s + r.credit, 0);
       const closingRawXlsx = bfRunningXlsx + (totalDr - totalCr);
       const closingBalance = Math.abs(closingRawXlsx);
       const closingBalanceSide = closingRawXlsx >= 0 ? "Dr" : "Cr";

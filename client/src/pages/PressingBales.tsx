@@ -167,7 +167,7 @@ export default function PressingBales() {
 
   const printBaleLabels = async (bales: any[], products: FactoryBaleProduct[], weights: string[]) => {
     try {
-      const labelData = bales.map((bale: any, idx: number) => ({
+      const labelData = bales.map((bale, idx: number) => ({
         productionBaleId: bale.id,
         productId: products[idx].id,
         articleCode: products[idx].articleCode || products[idx].code,

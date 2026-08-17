@@ -120,7 +120,7 @@ export default function OptionalVouchers() {
     }
   };
 
-  const grandTotal = vouchers.reduce((sum, v: any) => sum + parseFloat(v.totalAmount || "0"), 0);
+  const grandTotal = vouchers.reduce((sum, v) => sum + parseFloat(v.totalAmount || "0"), 0);
 
   const handleEdit = (v: any) => {
     const voucherTypeMap: Record<string, string> = {

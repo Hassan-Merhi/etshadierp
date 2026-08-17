@@ -30,7 +30,7 @@ export function registerSpReportRoutes(app: Express) {
 
       const entries = resultRows(rows);
       let runningBalance = 0;
-      const movements = entries.map((e: any) => {
+      const movements = entries.map((e) => {
         const credit = parseNum(e.credit_amount);
         const debit = parseNum(e.debit_amount);
         runningBalance += credit - debit;
@@ -248,7 +248,7 @@ export function registerSpReportRoutes(app: Express) {
       const stockMap = new Map();
       for (const s of stockArr) stockMap.set(s.article_code, s);
 
-      const rows = salesArr.map((r: any) => {
+      const rows = salesArr.map((r) => {
         const stk = stockMap.get(r.article_code) || {};
         const soldQty = parseNum(r.sold_qty);
         const salesTotal = parseNum(r.sales_total);

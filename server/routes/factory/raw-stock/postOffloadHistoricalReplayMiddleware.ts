@@ -56,7 +56,7 @@ export function postOffloadHistoricalReplayMiddleware(req: Request, res: Respons
   const originalJson = res.json.bind(res);
   let responseHandled = false;
 
-  res.json = ((body: any) => {
+  res.json = ((body) => {
     if (responseHandled) return originalJson(body);
     responseHandled = true;
 

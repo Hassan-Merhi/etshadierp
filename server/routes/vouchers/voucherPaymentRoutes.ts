@@ -69,7 +69,7 @@ export function registerVoucherPaymentRoutes(app: Express) {
       const vCurrency = (currency as string | undefined) || "USD";
       const vRateRaw = (exchangeRate as string | number | undefined) || null;
       const cfaPerUsd = vCurrency !== "USD" && vRateRaw ? parseFloat(String(vRateRaw)) : 1;
-      const transactionTotal = entries.reduce((sum: number, entry: any) => sum + parseFloat(entry.amount || "0"), 0);
+      const transactionTotal = entries.reduce((sum: number, entry) => sum + parseFloat(entry.amount || "0"), 0);
       // For CFA vouchers: baseTotal = transactionTotal / cfaPerUsd (CFA ÷ rate = USD)
       // For USD vouchers: baseTotal = transactionTotal (no conversion)
       const baseTotal = vCurrency !== "USD" && cfaPerUsd > 0 ? transactionTotal / cfaPerUsd : transactionTotal;
@@ -485,7 +485,7 @@ export function registerVoucherPaymentRoutes(app: Express) {
       const pRateRaw = (exchangeRate as string | number | undefined) || null;
       const pCfaPerUsd = pCurrency !== "USD" && pRateRaw ? parseFloat(String(pRateRaw)) : 1;
       // Transaction total (voucher currency, e.g. CFA)
-      const pTransactionTotal = entries.reduce((sum: number, e: any) => sum + parseFloat(e.amount || "0"), 0);
+      const pTransactionTotal = entries.reduce((sum: number, e) => sum + parseFloat(e.amount || "0"), 0);
       // Base total (historical USD) — stored in vouchers.totalAmount
       const pBaseTotal = pCurrency !== "USD" && pCfaPerUsd > 0 ? pTransactionTotal / pCfaPerUsd : pTransactionTotal;
 

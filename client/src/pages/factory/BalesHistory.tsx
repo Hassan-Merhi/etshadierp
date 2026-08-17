@@ -182,7 +182,7 @@ export default function BalesHistory() {
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     refetchOnMount: false,
-    placeholderData: (prev: any) => prev,
+    placeholderData: (prev) => prev,
   });
 
   // Extract flat items + pagination metadata from the paginated response.
@@ -299,7 +299,7 @@ export default function BalesHistory() {
     mutationFn: async (id: number) => {
       return await modeApiRequest("POST", `/api/factory/bales/${id}/repack`, {});
     },
-    onSuccess: async (response: any) => {
+    onSuccess: async (response) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
       setRepackConfirm(null);
       const data = await response.json();
@@ -578,8 +578,8 @@ export default function BalesHistory() {
     return true;
   });
 
-  const totalWeight = filtered.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
-  const totalBales = filtered.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
+  const totalWeight = filtered.reduce((sum: number, row) => sum + parseFloat(row.bale.weightKg || "0"), 0);
+  const totalBales = filtered.reduce((sum: number, row) => sum + (row.bale.quantity || 1), 0);
 
   const groupedFiltered = useMemo(() => {
     const map = new Map<
@@ -657,12 +657,12 @@ export default function BalesHistory() {
   const todayGarbage = todayInStock.filter((row) => getBaleClassification(row) === "garbage");
   const todayWipers = todayInStock.filter((row) => getBaleClassification(row) === "wipers");
   const todayRegular = todayInStock.filter((row) => getBaleClassification(row) === "regular");
-  const regularQty = todayRegular.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
-  const regularKg = todayRegular.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
-  const garbageQty = todayGarbage.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
-  const garbageKg = todayGarbage.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
-  const wipersQty = todayWipers.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
-  const wipersKg = todayWipers.reduce((sum: number, row: any) => sum + parseFloat(row.bale.weightKg || "0"), 0);
+  const regularQty = todayRegular.reduce((sum: number, row) => sum + (row.bale.quantity || 1), 0);
+  const regularKg = todayRegular.reduce((sum: number, row) => sum + parseFloat(row.bale.weightKg || "0"), 0);
+  const garbageQty = todayGarbage.reduce((sum: number, row) => sum + (row.bale.quantity || 1), 0);
+  const garbageKg = todayGarbage.reduce((sum: number, row) => sum + parseFloat(row.bale.weightKg || "0"), 0);
+  const wipersQty = todayWipers.reduce((sum: number, row) => sum + (row.bale.quantity || 1), 0);
+  const wipersKg = todayWipers.reduce((sum: number, row) => sum + parseFloat(row.bale.weightKg || "0"), 0);
 
   if (isLoading) {
     return (

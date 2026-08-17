@@ -240,7 +240,7 @@ export default function SupplierProfitCheck() {
           return;
         }
         // Detect header row — first row is headers (case-insensitive)
-        const headers = (raw[0] as any[]).map((h: any) => String(h).toLowerCase().trim());
+        const headers = (raw[0] as any[]).map((h) => String(h).toLowerCase().trim());
         const colCode = headers.findIndex((h) => h.includes("code") || h === "item" || h === "barcode");
         const colCost = headers.findIndex((h) => h.includes("cost") || h.includes("dubai") || h.includes("po"));
         const colSell = headers.findIndex((h) => h.includes("sell") || h.includes("price") || h.includes("avg"));
@@ -1658,7 +1658,7 @@ export default function SupplierProfitCheck() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No group</SelectItem>
-                  {(stockGroups as any[]).map((g: any) => (
+                  {(stockGroups as any[]).map((g) => (
                     <SelectItem key={g.id} value={String(g.id)}>
                       {g.name}
                     </SelectItem>

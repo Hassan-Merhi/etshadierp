@@ -147,7 +147,7 @@ export default function FactorySupplierStatement() {
                     <SelectValue placeholder="Select company" />
                   </SelectTrigger>
                   <SelectContent>
-                    {companies.map((c: any) => (
+                    {companies.map((c) => (
                       <SelectItem key={c.id} value={String(c.id)}>
                         {c.name}
                       </SelectItem>
@@ -168,7 +168,7 @@ export default function FactorySupplierStatement() {
                   <SelectValue placeholder="Select supplier..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {suppliers.map((s: any) => (
+                  {suppliers.map((s) => (
                     <SelectItem key={s.id} value={String(s.id)}>
                       {s.name}
                     </SelectItem>

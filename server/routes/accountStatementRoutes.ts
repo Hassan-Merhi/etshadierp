@@ -453,8 +453,8 @@ export function registerAccountStatementRoutes(app: Express) {
         return { ...r, dr, cr, runBal };
       });
 
-      const totalDr = enrichedRows.reduce((s: number, r: any) => s + r.dr, 0);
-      const totalCr = enrichedRows.reduce((s: number, r: any) => s + r.cr, 0);
+      const totalDr = enrichedRows.reduce((s: number, r) => s + r.dr, 0);
+      const totalCr = enrichedRows.reduce((s: number, r) => s + r.cr, 0);
       const closingRaw = runBal;
       const closingBalance2 = Math.abs(closingRaw);
       const closingBalanceSide2 = closingRaw >= 0 ? "Dr" : "Cr";

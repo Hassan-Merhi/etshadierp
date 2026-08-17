@@ -43,7 +43,7 @@ export function registerPasskeyRoutes(app: Express) {
       );
 
       const excludeCredentials: { id: string; type: "public-key" }[] = (existingCreds.rows as any[]).map(
-        (row: any) => ({
+        (row) => ({
           id: row.credential_id as string,
           type: "public-key" as const,
         })

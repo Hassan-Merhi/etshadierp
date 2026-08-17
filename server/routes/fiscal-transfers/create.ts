@@ -106,7 +106,7 @@ export function registerStockTransferCreateRoutes(app: Express) {
         }
 
         // Compute multi-source detection
-        const uniqueSourceIds = new Set(items.map((i: any) => i.sourceLocationId || sourceLocationId).filter(Boolean));
+        const uniqueSourceIds = new Set(items.map((i) => i.sourceLocationId || sourceLocationId).filter(Boolean));
         const resolvedHeaderSourceId = uniqueSourceIds.size === 1 ? Array.from(uniqueSourceIds)[0] : null;
 
         // Validate source/dest not the same (only for single-source mode)
@@ -411,7 +411,7 @@ export function registerStockTransferCreateRoutes(app: Express) {
 
       // Auto-fill rate from inventory for items with no rate (e.g. POS users who don't see cost)
       const itemsWithRate = await Promise.all(
-        items.map(async (item: any) => {
+        items.map(async (item) => {
           if (!item.rate || parseFloat(item.rate) === 0) {
             const [invRow] = await db
               .select({ averageRate: inventory.averageRate })
@@ -428,7 +428,7 @@ export function registerStockTransferCreateRoutes(app: Express) {
       const transfer = await storage.createStockTransfer(voucherId, destinationLocationId, notes || "", itemsWithRate);
 
       // Update voucher totalAmount based on actual rates (important for POS transfers where rate starts at 0)
-      const actualTotal = itemsWithRate.reduce((sum: number, item: any) => {
+      const actualTotal = itemsWithRate.reduce((sum: number, item) => {
         return sum + parseFloat(item.quantity) * parseFloat(item.rate);
       }, 0);
       if (actualTotal > 0) {
@@ -465,7 +465,7 @@ export function registerStockTransferCreateRoutes(app: Express) {
               return;
             }
             const uniqueSrcIds = [
-              ...new Set(itemsWithRate.map((i: any) => Number(i.sourceLocationId)).filter(Boolean)),
+              ...new Set(itemsWithRate.map((i) => Number(i.sourceLocationId)).filter(Boolean)),
             ];
             let sourceName = "Multiple Sources";
             if (uniqueSrcIds.length === 1) {

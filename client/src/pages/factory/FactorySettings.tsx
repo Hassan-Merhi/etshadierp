@@ -226,7 +226,7 @@ export default function FactorySettings() {
       }
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       setBaleValidationResult(data);
       setBaleImportResult(null);
       if (data.validRows.length === 0) {

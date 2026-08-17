@@ -81,11 +81,11 @@ export default function EditSupplier() {
   }, [supplier]);
 
   const updateMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data) => {
       const res = await apiRequest("PATCH", `/api/suppliers/${supplierId}`, data);
       return await res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       toast({
         title: "Success",
         description: `Supplier "${data.legalName}" updated successfully`,

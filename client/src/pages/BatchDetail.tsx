@@ -158,10 +158,10 @@ export default function BatchDetail({ batchId, onBack, onDeleted }: BatchDetailP
 
   const bales = balesData || [];
   const totalBalesCount = bales.length;
-  const totalBalesWeight = bales.reduce((sum: number, row: any) => sum + parseFloat(row.bale?.weightKg || "0"), 0);
+  const totalBalesWeight = bales.reduce((sum: number, row) => sum + parseFloat(row.bale?.weightKg || "0"), 0);
   const avgCost =
     totalBalesCount > 0
-      ? bales.reduce((sum: number, row: any) => sum + parseFloat(row.bale?.costPerKg || "0"), 0) / totalBalesCount
+      ? bales.reduce((sum: number, row) => sum + parseFloat(row.bale?.costPerKg || "0"), 0) / totalBalesCount
       : 0;
 
   const getStatusVariant = (status: string) => {

@@ -142,7 +142,7 @@ export default function FactoryInvoiceDetail() {
       if (!res.ok) throw new Error((await res.json()).message || "Failed to add charge");
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
       setShowAddCharge(false);
       setNewChargeName("");
@@ -164,7 +164,7 @@ export default function FactoryInvoiceDetail() {
       if (!res.ok) throw new Error((await res.json()).message || "Failed to relink");
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
       toast({ title: data.linked > 0 ? "Ledger entries created" : "Nothing to relink", description: data.message });
     },
@@ -309,7 +309,7 @@ export default function FactoryInvoiceDetail() {
       }
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       if (data.repriced === 0) {
         toast({
           title: "Prices already current",
@@ -385,7 +385,7 @@ export default function FactoryInvoiceDetail() {
       }
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       if (data.repriced === 0) {
         toast({
           title: "Already at production prices",
@@ -416,7 +416,7 @@ export default function FactoryInvoiceDetail() {
       }
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       const repriced = data?.repriced ?? 0;
       if (repriced === 0) {
         toast({

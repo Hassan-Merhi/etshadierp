@@ -32,9 +32,9 @@ export function LoadingCreatedView({
   const balesList: any[] = lo?.bales ?? [];
   const n = (v: any) => parseFloat(v || "0");
 
-  const expectedBalesTotal = lines.reduce((s: number, l: any) => s + (parseInt(l.quantity || "0") || 0), 0);
+  const expectedBalesTotal = lines.reduce((s: number, l) => s + (parseInt(l.quantity || "0") || 0), 0);
   const scannedBales = balesList.length;
-  const totalWeightKg = balesList.reduce((s: number, b: any) => s + n(b.weight), 0);
+  const totalWeightKg = balesList.reduce((s: number, b) => s + n(b.weight), 0);
   const grandTotal = lo ? n(lo.grandTotal) : 0;
   const subtotalBales = lo ? n(lo.subtotalBales) : 0;
   const freightAmount = lo ? n(lo.freightAmount) : 0;
@@ -202,7 +202,7 @@ export function LoadingCreatedView({
                     </thead>
                     <tbody>
                       {Object.entries(
-                        balesList.reduce((acc: Record<string, { count: number; weight: number }>, b: any) => {
+                        balesList.reduce((acc: Record<string, { count: number; weight: number }>, b) => {
                           const key = b.productName || b.baleName || b.articleCode || "Unknown";
                           if (!acc[key]) acc[key] = { count: 0, weight: 0 };
                           acc[key].count += 1;
@@ -228,7 +228,7 @@ export function LoadingCreatedView({
                         <td className="px-3 py-2 text-right font-mono text-muted-foreground">
                           {formatNumber(
                             balesList.reduce(
-                              (sum: number, b: any) => sum + parseFloat(b.weight || b.weightKg || "0"),
+                              (sum: number, b) => sum + parseFloat(b.weight || b.weightKg || "0"),
                               0
                             )
                           )}

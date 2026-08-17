@@ -54,7 +54,7 @@ export function ApproveRevisionDialog({
               : "The following quantity changes will be applied to the transfer. This action cannot be undone."}
           </DialogDescription>
         </DialogHeader>
-        {revisionsToApply.map((revision: any) => (
+        {revisionsToApply.map((revision) => (
           <div key={revision.id} className="space-y-1">
             {multiple && (
               <p className="text-xs font-medium text-muted-foreground">

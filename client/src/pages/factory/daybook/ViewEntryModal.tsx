@@ -164,7 +164,7 @@ export function ViewEntryModal({
       // Per-entry balances
       const results: Record<number, string> = {};
       await Promise.all(
-        display.map(async (e: any) => {
+        display.map(async (e) => {
           const url = resolveUrl(e);
           if (!url) return;
           try {
@@ -218,9 +218,9 @@ export function ViewEntryModal({
 
     // Total = opposite side of source for Payment/Receipt
     const totalAmount = isPayment
-      ? viewEntries.reduce((s: number, e: any) => s + parseFloat(e.debitAmount || "0"), 0)
+      ? viewEntries.reduce((s: number, e) => s + parseFloat(e.debitAmount || "0"), 0)
       : isReceipt
-        ? viewEntries.reduce((s: number, e: any) => s + parseFloat(e.creditAmount || "0"), 0)
+        ? viewEntries.reduce((s: number, e) => s + parseFloat(e.creditAmount || "0"), 0)
         : Math.max(totalDebit, totalCredit);
 
     // Display entries: Payment = debit side only, Receipt = credit side only, Journal = all

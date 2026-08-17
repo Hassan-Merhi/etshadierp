@@ -20,7 +20,7 @@ export function RecalculateBaleCostsCard() {
       const res = await factoryApiRequest("POST", "/api/factory/raw-stock/recalculate-bale-costs");
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       setResult(data);
       toast({ title: "Done", description: data.message });
     },

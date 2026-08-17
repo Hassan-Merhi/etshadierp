@@ -66,7 +66,7 @@ export default function MixBatches() {
   const selectedKg =
     unlinkedBales
       ?.filter((b) => selectedBaleIds.has(b.id))
-      .reduce((sum: number, b: any) => sum + parseFloat(b.weightKg || "0"), 0) ?? 0;
+      .reduce((sum: number, b) => sum + parseFloat(b.weightKg || "0"), 0) ?? 0;
 
   const overLimit = selectedKg > availableKg + 0.001;
 

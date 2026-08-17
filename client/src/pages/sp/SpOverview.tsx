@@ -104,7 +104,7 @@ export default function SpOverview() {
       const response = await apiRequest("POST", `/api/sp/sales/${selectedSale.id}/reverse`, { reason });
       return response.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({
         predicate: (query) => {
           const key = String(query.queryKey[0] ?? "");

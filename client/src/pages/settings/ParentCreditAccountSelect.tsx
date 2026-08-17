@@ -69,7 +69,7 @@ export function ParentCreditAccountSelect({ company }: { company: any }) {
   });
 
   const liabilityAccounts = ledgerAccounts.filter(
-    (acc: any) => acc.accountType === "Liability" && acc.active && !acc.deletedAt
+    (acc) => acc.accountType === "Liability" && acc.active && !acc.deletedAt
   );
 
   const updateSettingsMutation = useMutation({

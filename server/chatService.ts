@@ -560,7 +560,7 @@ Rules:
                 newContent: p.newContent ?? "",
               }));
             if (filePatchDrafts && filePatchDrafts.length > 0) {
-              const fileList = filePatchDrafts.map((p: any) => `- \`${p.filePath}\``).join("\n");
+              const fileList = filePatchDrafts.map((p) => `- \`${p.filePath}\``).join("\n");
               finalResponse = `I've prepared changes for **${filePatchDrafts.length} file${filePatchDrafts.length > 1 ? "s" : ""}**.\n\n${parsed.description || "Review the diffs below."}\n\n${fileList}\n\nClick **Apply** on each diff, or **Apply All** to write all changes at once.`;
             }
           } else if (parsed && parsed.filePath && "newContent" in parsed) {

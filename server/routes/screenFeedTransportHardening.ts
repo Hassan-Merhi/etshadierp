@@ -56,7 +56,7 @@ function matchesEtag(header: string | string[] | undefined, etag: string): boole
 function installReconnectJitter(res: Response): void {
   const originalWrite = res.write.bind(res) as (...args: any[]) => boolean;
   let retryRewritten = false;
-  res.write = ((chunk: any, ...args) => {
+  res.write = ((chunk, ...args) => {
     if (!retryRewritten && typeof chunk === "string" && chunk.includes("retry: 3000")) {
       retryRewritten = true;
       chunk = chunk.replace("retry: 3000", `retry: ${reconnectDelay()}`);
@@ -67,7 +67,7 @@ function installReconnectJitter(res: Response): void {
 
 function installConditionalFrameResponse(req: Request, res: Response, watchedUserId: string): void {
   const originalJson = res.json.bind(res);
-  res.json = ((body: any) => {
+  res.json = ((body) => {
     const fastEnabled = isRemoteSupportEnabled("fastScreenFeed");
     res.setHeader("X-Screen-Feed-Transport", fastEnabled ? "fast" : "legacy");
 

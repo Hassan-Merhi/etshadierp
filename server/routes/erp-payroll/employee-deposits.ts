@@ -173,7 +173,7 @@ export function registerPayrollEmployeeDepositRoutes(app: Express) {
       }
 
       // Calculate total amount
-      const totalAmount = deposits.reduce((sum: number, d: any) => sum + parseFloat(d.amount), 0);
+      const totalAmount = deposits.reduce((sum: number, d) => sum + parseFloat(d.amount), 0);
 
       // Create single voucher for all deposits
       const voucherNumber = `SAL-DEP-BULK-${Date.now()}`;

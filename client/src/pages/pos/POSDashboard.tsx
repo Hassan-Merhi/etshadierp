@@ -146,7 +146,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
   // Calculate today's sales from vouchers
   const todaySales = (() => {
     const salesVouchers = todayVouchers?.filter((v) => v.voucherType === "Sales") || [];
-    const totalRaw = salesVouchers.reduce((sum: number, v: any) => sum + parseFloat(v.totalAmount || "0"), 0);
+    const totalRaw = salesVouchers.reduce((sum: number, v) => sum + parseFloat(v.totalAmount || "0"), 0);
     return {
       count: salesVouchers.length,
       total: totalRaw,

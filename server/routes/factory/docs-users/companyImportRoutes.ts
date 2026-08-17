@@ -66,7 +66,7 @@ export function registerFactoryCompanyImportRoutes(app: Express) {
       const multer = (await import("multer")).default;
       const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
 
-      upload.single("file")(req, res, async (err: any) => {
+      upload.single("file")(req, res, async (err) => {
         if (err) return res.status(400).json({ message: "File upload error: " + err.message });
         if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 

@@ -188,7 +188,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     if (currentDraftId !== null) return;
     if (!Array.isArray(drafts) || drafts.length === 0) return;
     const todayUTC = new Date().toISOString().slice(0, 10);
-    const todayDraft = drafts.find((d: any) => {
+    const todayDraft = drafts.find((d) => {
       const rawDate = d.updatedAt || d.createdAt;
       if (!rawDate) return false;
       const dateObj = new Date(rawDate);
@@ -225,8 +225,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       Array.isArray(editVoucher?.salesItems) && editVoucher.salesItems.length > 0
         ? editVoucher.salesItems
         : (editVoucherViewEntries ?? [])
-            .filter((e: any) => e.isStockItem || e.stockItemId)
-            .map((e: any) => ({
+            .filter((e) => e.isStockItem || e.stockItemId)
+            .map((e) => ({
               id: e.id,
               stockItemId: e.stockItemId,
               stockItemName: e.stockItemName || e.accountName || "",
@@ -286,7 +286,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       setPaymentAccountId(String(debitEntry.bankAccountId));
       setIsCreditSale(false);
     } else if (debitEntry.ledgerAccountId) {
-      const ledgerAccount = allLedgerAccounts.find((acc: any) => acc.id === debitEntry.ledgerAccountId);
+      const ledgerAccount = allLedgerAccounts.find((acc) => acc.id === debitEntry.ledgerAccountId);
       if (ledgerAccount) {
         if (ledgerAccount.accountType === "Cash") {
           setPaymentAccountType("cash");

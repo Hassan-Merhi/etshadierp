@@ -538,7 +538,7 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
                             />
                             {mobileAdjItems.length > 0 && (
                               <div className="border rounded-md bg-popover shadow-md max-h-40 overflow-y-auto z-20 relative">
-                                {mobileAdjItems.map((item: any) => (
+                                {mobileAdjItems.map((item) => (
                                   <button
                                     key={item.stockItemId}
                                     type="button"

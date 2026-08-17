@@ -176,7 +176,7 @@ export default function PurchaseOrderEdit() {
       const res = await apiRequest("POST", `/api/purchase-orders/${poId}/sync-parent-voucher`, {});
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [`/api/purchase-orders/${poId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });

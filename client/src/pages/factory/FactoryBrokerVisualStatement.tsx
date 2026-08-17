@@ -476,7 +476,7 @@ export default function FactoryBrokerVisualStatement() {
                           ))}
                       </TableCell>
                       <TableCell className="py-2 text-right tabular-nums font-bold">
-                        {fmt((statement.payments as any[]).reduce((s: number, p: any) => s + p.usdAmount, 0))}
+                        {fmt((statement.payments as any[]).reduce((s: number, p) => s + p.usdAmount, 0))}
                       </TableCell>
                       <TableCell />
                     </TableRow>

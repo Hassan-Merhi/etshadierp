@@ -135,7 +135,7 @@ export function registerRawStockContainerRoutes(app: Express) {
               eq(factoryContainerCommissions.companyId, companyId)
             )
           );
-        const commissionRecord = commissionRows.sort((a: any, b: any) => b.id - a.id)[0] || null;
+        const commissionRecord = commissionRows.sort((a, b) => b.id - a.id)[0] || null;
 
         // 3. Build in-memory snapshot with the confirmed duty so the helper sees the
         //    correct, complete cost picture without a second round-trip.
@@ -230,7 +230,7 @@ export function registerRawStockContainerRoutes(app: Express) {
         return res.status(400).json({ message: "At least one charge is required" });
       }
 
-      const validCharges = charges.filter((c: any) => parseFloat(c.amount || "0") > 0);
+      const validCharges = charges.filter((c) => parseFloat(c.amount || "0") > 0);
       if (validCharges.length === 0) {
         return res.status(400).json({ message: "All charge amounts are zero" });
       }

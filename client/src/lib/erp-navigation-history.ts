@@ -120,7 +120,7 @@ export function installErpNavigationHistory(): () => void {
   originalReplaceState = window.history.replaceState.bind(window.history);
   markCurrentEntry();
 
-  window.history.pushState = (data: any, unused: string, url?: string | URL | null) => {
+  window.history.pushState = (data, unused: string, url?: string | URL | null) => {
     const from = currentRelativeUrl();
     persistCurrentEntryScroll();
 
@@ -136,7 +136,7 @@ export function installErpNavigationHistory(): () => void {
     originalPushState?.(withMeta(data, meta), unused, url);
   };
 
-  window.history.replaceState = (data: any, unused: string, url?: string | URL | null) => {
+  window.history.replaceState = (data, unused: string, url?: string | URL | null) => {
     const existing = readMeta();
     const entryUrl = resolveRelativeUrl(url);
     const meta: ErpHistoryMeta = {

@@ -193,7 +193,7 @@ export function registerSupplierBulkFxSettlementRoutes(app: Express) {
       // Sort suppliers by their oldest (or newest) container date
       supplierData.sort((a, b) => {
         const dateOf = (sd: typeof a) =>
-          sd.containers.reduce((best: string | null, c: any) => {
+          sd.containers.reduce((best: string | null, c) => {
             const d = c.arrivalDate || c.createdAt;
             if (!best) return d;
             return order === "newest"

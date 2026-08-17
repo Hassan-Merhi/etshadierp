@@ -304,7 +304,7 @@ export default function NetProfitDetails() {
       const end = toDate || toInput || today;
       return apiRequest("POST", "/api/whatsapp/send-net-position", { startDate: start, endDate: end });
     },
-    onSuccess: async (res: any) => {
+    onSuccess: async (res) => {
       const body = await res.json();
       toast({ title: "Sent via WhatsApp", description: body.message });
     },

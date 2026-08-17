@@ -64,7 +64,7 @@ export function registerFactoryStockEntryRoutes(app: Express) {
         }
 
         const totalExpected = items.reduce(
-          (sum: number, item: any) => sum + parseInt(item.quantity || item.qty || "1"),
+          (sum: number, item) => sum + parseInt(item.quantity || item.qty || "1"),
           0
         );
 
@@ -380,12 +380,12 @@ export function registerFactoryStockEntryRoutes(app: Express) {
       }
       const descParts = Array.from(productGroups.keys());
       const stockEntryDesc = `${result.bales.length} bale${result.bales.length !== 1 ? "s" : ""} - ${descParts.join(" | ")}`;
-      const totalBaleValue = result.bales.reduce((sum: number, b: any) => {
+      const totalBaleValue = result.bales.reduce((sum: number, b) => {
         const prodPrice = parseFloat(b._product?.productionPrice || "0");
         return sum + prodPrice;
       }, 0);
       const baleMetaJson = JSON.stringify({
-        bales: result.bales.map((b: any) => ({
+        bales: result.bales.map((b) => ({
           id: b.id,
           ref: b.referenceNumber,
           productName: b.productName || b.articleCode || "Unknown",

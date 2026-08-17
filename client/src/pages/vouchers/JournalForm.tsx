@@ -437,7 +437,7 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
         return await res.json();
       }
     },
-    onSuccess: async (data: any) => {
+    onSuccess: async (data) => {
       const isEditMode = !!voucherIdToEdit;
       toast({ title: "Success", description: `Journal voucher ${isEditMode ? "updated" : "created"} successfully` });
       const waPrompt = resolveWhatsAppPrompt(data);
@@ -481,7 +481,7 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
           optional: formData.optional || false,
           createdAt: new Date().toISOString(),
         };
-        queryClient.setQueriesData({ queryKey: ["/api/vouchers"] }, (old: any) =>
+        queryClient.setQueriesData({ queryKey: ["/api/vouchers"] }, (old) =>
           Array.isArray(old) ? [syntheticVoucher, ...old] : old
         );
         discardJournalDraft();

@@ -76,7 +76,7 @@ export function registerOrderPdfRoutes(app: Express) {
           if (p.articleCode) invNameMap.set(p.articleCode, p.name);
         }
       }
-      const sortedLines = lines.sort((a: any, b: any) => {
+      const sortedLines = lines.sort((a, b) => {
         const na = invNameMap.get(a.articleCode) || a.baleName || "";
         const nb = invNameMap.get(b.articleCode) || b.baleName || "";
         return na.localeCompare(nb);

@@ -635,7 +635,7 @@ export default function WasteDispatch() {
               <p className="text-sm text-muted-foreground p-4">No dispatches yet.</p>
             ) : (
               <div className="divide-y">
-                {(showAllHistory ? history : history.slice(0, 10)).map((d: any) => {
+                {(showAllHistory ? history : history.slice(0, 10)).map((d) => {
                   const isOpen = expandedHistoryIds.has(d.id);
                   const dispatchBales = d.bales || [];
                   return (

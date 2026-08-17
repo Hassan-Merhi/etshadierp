@@ -344,7 +344,7 @@ export function CompaniesTab() {
         (() => {
           const q = companySearch.toLowerCase();
           const filtered = companies.filter(
-            (c: any) => !q || c.name?.toLowerCase().includes(q) || c.code?.toLowerCase().includes(q)
+            (c) => !q || c.name?.toLowerCase().includes(q) || c.code?.toLowerCase().includes(q)
           );
 
           if (filtered.length === 0) {

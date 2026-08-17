@@ -5,7 +5,7 @@ import { pool } from "../../db";
 import { requireAuth } from "../../auth";
 
 export function registerStatsCountryActivityRoutes(app: Express) {
-  app.get("/api/stats/country-activity", requireAuth, async (_req: any, res: any) => {
+  app.get("/api/stats/country-activity", requireAuth, async (_req, res) => {
     try {
       let startDateStr: string;
       let endDateStr: string;

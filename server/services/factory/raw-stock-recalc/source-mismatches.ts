@@ -391,7 +391,7 @@ export async function applyZeroCostMixBatchSourcesFix(
                   )
                 ),
             ]);
-            const comm = comms.sort((a: any, b: any) => b.id - a.id)[0] || null;
+            const comm = comms.sort((a, b) => b.id - a.id)[0] || null;
             const computed = computeCorrectContainerCost(container, addl, comm, ocs);
             if (!computed.fxUnresolved && computed.costPerKgUsd > 0) {
               correctedCostPerKgUsd = computed.costPerKgUsd;

@@ -92,7 +92,7 @@ export function registerWorkerStatementReadRoutes(app: Express) {
         });
       }
 
-      entries.sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      entries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
       let runningBalance = 0;
       for (const entry of entries) {

@@ -21,7 +21,7 @@ export function registerFactoryProductImportRoutes(app: Express) {
       const multer = (await import("multer")).default;
       const upload = multer({ storage: multer.memoryStorage() });
 
-      upload.single("file")(req, res, async (err: any) => {
+      upload.single("file")(req, res, async (err) => {
         try {
           if (err) return res.status(400).json({ message: getErrorMessage(err) });
 
@@ -226,7 +226,7 @@ export function registerFactoryProductImportRoutes(app: Express) {
       const multer = (await import("multer")).default;
       const upload = multer({ storage: multer.memoryStorage() });
 
-      upload.single("file")(req, res, async (err: any) => {
+      upload.single("file")(req, res, async (err) => {
         try {
           if (err) return res.status(400).json({ message: getErrorMessage(err) });
 
@@ -367,7 +367,7 @@ export function registerFactoryProductImportRoutes(app: Express) {
       const multer = (await import("multer")).default;
       const upload = multer({ storage: multer.memoryStorage() });
 
-      upload.single("file")(req, res, async (err: any) => {
+      upload.single("file")(req, res, async (err) => {
         try {
           if (err) return res.status(400).json({ message: getErrorMessage(err) });
 

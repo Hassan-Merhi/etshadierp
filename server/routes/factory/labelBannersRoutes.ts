@@ -109,7 +109,7 @@ export function registerLabelBannersRoutes(app: any, requireAuth: any) {
 
   // ── POST /api/factory/label-design-colors — create new color (+ image) ─────
   app.post("/api/factory/label-design-colors", requireAuth, requireNonPOS, (req: Request, res: Response) => {
-    upload.single("image")(req, res, async (err: any) => {
+    upload.single("image")(req, res, async (err) => {
       if (err) return res.status(400).json({ message: err.message });
 
       const { label, colorHex, slug: slugOverride } = req.body;
@@ -216,7 +216,7 @@ export function registerLabelBannersRoutes(app: any, requireAuth: any) {
     const { slug } = req.params;
     if (!/^[a-z0-9-]+$/.test(slug)) return res.status(400).json({ message: "Invalid slug" });
 
-    upload.single("image")(req, res, async (err: any) => {
+    upload.single("image")(req, res, async (err) => {
       if (err) return res.status(400).json({ message: err.message });
       if (!req.file) return res.status(400).json({ message: "No image uploaded" });
 

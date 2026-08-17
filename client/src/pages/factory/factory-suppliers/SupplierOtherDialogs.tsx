@@ -198,7 +198,7 @@ export function SupplierOtherDialogs({
               <div className="rounded-md border divide-y text-sm">
                 {(dueDialogSupplier?.containers || [])
                   .slice()
-                  .sort((a: any, b: any) => new Date(a.offloadDate).getTime() - new Date(b.offloadDate).getTime())
+                  .sort((a, b) => new Date(a.offloadDate).getTime() - new Date(b.offloadDate).getTime())
                   .map((c) => (
                     <div key={c.id} className="flex items-center justify-between px-3 py-2.5 gap-3">
                       <div>

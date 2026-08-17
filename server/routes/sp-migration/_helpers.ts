@@ -522,8 +522,8 @@ export async function buildGcMigrationPreview(sourceId: number, targetId: number
   ).rows as any[];
   const existingGcSubTypes = new Map(gcAcctRows.map((r) => [r.sub_type, r.name]));
 
-  const totalQty = stockItems.reduce((s: number, i: any) => s + i.quantity, 0);
-  const totalValue = stockItems.reduce((s: number, i: any) => s + i.totalValueUsd, 0);
+  const totalQty = stockItems.reduce((s: number, i) => s + i.quantity, 0);
+  const totalValue = stockItems.reduce((s: number, i) => s + i.totalValueUsd, 0);
   const alreadyMapped = mappedSourceIds.size;
 
   const warnings: string[] = [];

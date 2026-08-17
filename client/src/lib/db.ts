@@ -191,7 +191,7 @@ class ERPDatabase extends Dexie {
         tx
           .table("syncQueue")
           .toCollection()
-          .modify((item: any) => {
+          .modify((item) => {
             if (item.nextRetryAt === undefined) item.nextRetryAt = 0;
           })
       );
@@ -201,7 +201,7 @@ class ERPDatabase extends Dexie {
       tx
         .table("conflicts")
         .toCollection()
-        .modify((c: any) => {
+        .modify((c) => {
           if (c.url === undefined) c.url = "";
           if (c.method === undefined) c.method = "POST";
           if (c.localPayload === undefined && c.payload !== undefined) {

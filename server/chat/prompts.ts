@@ -771,7 +771,7 @@ function buildToolSystemPrompt(
         prompt +=
           (supplierBalances as any[])
             .slice(0, 15)
-            .map((s: any) => `- ${s.supplierName} (${s.supplierCode}): balance=${s.balance} [${s.status}]`)
+            .map((s) => `- ${s.supplierName} (${s.supplierCode}): balance=${s.balance} [${s.status}]`)
             .join("\n") + "\n";
       }
       break;

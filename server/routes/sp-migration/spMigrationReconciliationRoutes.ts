@@ -214,7 +214,7 @@ export function registerSpMigrationReconciliationRoutes(app: Express) {
               ? "All migrated vouchers are balanced."
               : `${unbalancedRows.length} migrated voucher(s) are unbalanced.`,
           mismatches: unbalancedRows.map(
-            (r: any) => `${r.voucher_number} — Dr ${pn(r.d).toFixed(2)} vs Cr ${pn(r.c).toFixed(2)}`
+            (r) => `${r.voucher_number} — Dr ${pn(r.d).toFixed(2)} vs Cr ${pn(r.c).toFixed(2)}`
           ),
         });
 

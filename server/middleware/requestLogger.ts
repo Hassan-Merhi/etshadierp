@@ -165,12 +165,12 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
   res.setHeader("X-Request-Id", requestId);
 
   const originalWrite = res.write.bind(res);
-  (res as typeof res & { write: typeof res.write }).write = function (chunk: any, ...args: any[]): boolean {
+  (res as typeof res & { write: typeof res.write }).write = function (chunk, ...args: any[]): boolean {
     if (chunk != null) responseBytes += Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(String(chunk));
     return originalWrite(chunk, ...args);
   };
   const originalEnd = res.end.bind(res);
-  (res as typeof res & { end: typeof res.end }).end = function (chunk?: any, ...args: any[]): Response {
+  (res as typeof res & { end: typeof res.end }).end = function (chunk?, ...args: any[]): Response {
     if (chunk != null && typeof chunk !== "function")
       responseBytes += Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(String(chunk));
     return originalEnd(chunk, ...args);

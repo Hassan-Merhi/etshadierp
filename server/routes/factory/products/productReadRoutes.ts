@@ -264,8 +264,8 @@ export function registerFactoryProductReadRoutes(app: Express) {
             }
           }
 
-          sales.sort((a: any, b: any) => b.orderDate.localeCompare(a.orderDate));
-          loaded.sort((a: any, b: any) => b.orderDate.localeCompare(a.orderDate));
+          sales.sort((a, b) => b.orderDate.localeCompare(a.orderDate));
+          loaded.sort((a, b) => b.orderDate.localeCompare(a.orderDate));
         }
       }
 

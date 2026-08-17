@@ -241,7 +241,7 @@ export function registerHistoricalReplayRoutesV4(app: Express): void {
     "/api/factory/raw-stock/recalc/undo",
     requireAuth,
     requireRole(...ADMIN_ROLES),
-    async (req: any, res: any, next) => {
+    async (req, res, next) => {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const undoLogId = Number.parseInt(String(req.body?.undoLogId ?? ""), 10);
@@ -372,7 +372,7 @@ export function registerHistoricalReplayRoutesV4(app: Express): void {
     "/api/factory/raw-stock/recalc/historical-replay",
     requireAuth,
     requireRole(...ADMIN_ROLES),
-    async (req: any, res: any) => {
+    async (req, res) => {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       try {
@@ -389,7 +389,7 @@ export function registerHistoricalReplayRoutesV4(app: Express): void {
     "/api/factory/raw-stock/recalc/historical-replay/apply",
     requireAuth,
     requireRole(...ADMIN_ROLES),
-    async (req: any, res: any) => {
+    async (req, res) => {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       const userId = String(req.session.userId ?? "");
       const username = req.session.username ?? null;

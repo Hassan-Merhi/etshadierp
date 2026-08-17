@@ -474,7 +474,7 @@ export function OffloadDialog({ open, onOpenChange, containerId, containerNumber
                             <SelectValue placeholder="Select agent" />
                           </SelectTrigger>
                           <SelectContent>
-                            {(parentAgents as any[]).map((a: any) => (
+                            {(parentAgents as any[]).map((a) => (
                               <SelectItem key={a.ledger_account_id} value={String(a.ledger_account_id)}>
                                 {a.account_name}
                               </SelectItem>
@@ -529,7 +529,7 @@ export function OffloadDialog({ open, onOpenChange, containerId, containerNumber
                             <SelectValue placeholder="Select agent" />
                           </SelectTrigger>
                           <SelectContent>
-                            {(parentAgents as any[]).map((a: any) => (
+                            {(parentAgents as any[]).map((a) => (
                               <SelectItem key={a.ledger_account_id} value={String(a.ledger_account_id)}>
                                 {a.account_name}
                               </SelectItem>

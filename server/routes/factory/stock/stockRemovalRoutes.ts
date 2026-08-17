@@ -117,7 +117,7 @@ export function registerFactoryStockRemovalRoutes(app: Express) {
 
       const today = getClientDate(req);
       const removalMetaJson = JSON.stringify({
-        bales: result.removed.map((b: any) => ({
+        bales: result.removed.map((b) => ({
           id: b.id,
           ref: b.referenceNumber,
           productName: b.productName || "Unknown",

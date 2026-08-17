@@ -17,7 +17,7 @@ export function POSReceiptSettings() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (newSettings: any) => {
+    mutationFn: async (newSettings) => {
       const res = await apiRequest("POST", `/api/settings/pos-receipt/${selectedCompany?.id}`, newSettings);
       return res.json();
     },

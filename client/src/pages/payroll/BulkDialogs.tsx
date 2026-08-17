@@ -276,7 +276,7 @@ export function BulkDialogs({
                 <Label>Account Type</Label>
                 <Select
                   value={bulkWithdrawalAccountType}
-                  onValueChange={(val: any) => {
+                  onValueChange={(val) => {
                     setBulkWithdrawalAccountType(val);
                     setBulkWithdrawalAccountId("");
                   }}

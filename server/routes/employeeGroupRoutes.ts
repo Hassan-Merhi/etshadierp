@@ -152,11 +152,11 @@ export function registerEmployeeGroupRoutes(app: Express) {
 
       // Get members for each group, filtering by company for security
       const groupsWithMembers = await Promise.all(
-        workerGroups.map(async (group: any) => {
+        workerGroups.map(async (group) => {
           const memberRecords = await storage.getEmployeeGroupMembers(group.id);
           // Get full worker details for each member, ensuring they belong to the same company
           const members = await Promise.all(
-            memberRecords.map(async (m: any) => {
+            memberRecords.map(async (m) => {
               const [worker] = await db
                 .select()
                 .from(employees)

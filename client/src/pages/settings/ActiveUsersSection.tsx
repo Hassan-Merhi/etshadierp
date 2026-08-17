@@ -64,7 +64,7 @@ export function ActiveUsersSection() {
 
   const getCompanyName = (companyId: number | null) => {
     if (!companyId || !companies) return "—";
-    const company = companies.find((c: any) => c.id === companyId);
+    const company = companies.find((c) => c.id === companyId);
     return company?.name || "Unknown";
   };
 
@@ -72,7 +72,7 @@ export function ActiveUsersSection() {
   const safePresenceData = Array.isArray(presenceData) ? presenceData : [];
   const groupedUsers =
     safePresenceData.reduce(
-      (acc: any, presence: any) => {
+      (acc, presence) => {
         const companyId = presence.companyId || "unassigned";
         if (!acc[companyId]) {
           acc[companyId] = [];

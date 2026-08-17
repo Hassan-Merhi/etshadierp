@@ -30,7 +30,7 @@ export function registerHistoricalReplayFullCompanyScopeRoutes(app: Express): vo
     APPLY_PATH,
     requireAuth,
     requireRole(...ADMIN_ROLES),
-    async (req: any, res: any, next) => {
+    async (req, res, next) => {
       const hasToken = typeof req.body?.confirmationToken === "string"
         && req.body.confirmationToken.length > 0;
       if (hasToken) return next();
@@ -91,7 +91,7 @@ export function registerHistoricalReplayFullCompanyScopeRoutes(app: Express): vo
         }
 
         const originalJson = res.json.bind(res);
-        res.json = (payload: any) => {
+        res.json = (payload) => {
           if (!payload?.dryRun) return originalJson(payload);
           return originalJson({
             ...payload,

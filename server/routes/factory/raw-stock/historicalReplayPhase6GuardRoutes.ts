@@ -194,7 +194,7 @@ function scopeFinancialImpact(
  * - Historical adjustment valuation is explicitly classifiable with an audit row.
  */
 export function registerHistoricalReplayPhase6GuardRoutes(app: Express): void {
-  app.get(PREVIEW_PATH, requireAuth, requireRole(...ADMIN_ROLES), async (req: any, res: any) => {
+  app.get(PREVIEW_PATH, requireAuth, requireRole(...ADMIN_ROLES), async (req, res) => {
     const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
     if (!companyId) return res.status(400).json({ message: "No company selected" });
     try {
@@ -221,7 +221,7 @@ export function registerHistoricalReplayPhase6GuardRoutes(app: Express): void {
     }
   });
 
-  app.patch(ADJUSTMENT_CLASSIFICATION_PATH, requireAuth, requireRole(...ADMIN_ROLES), async (req: any, res: any) => {
+  app.patch(ADJUSTMENT_CLASSIFICATION_PATH, requireAuth, requireRole(...ADMIN_ROLES), async (req, res) => {
     const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
     if (!companyId) return res.status(400).json({ message: "No company selected" });
     const adjustmentId = Number(req.params.id);
@@ -317,7 +317,7 @@ export function registerHistoricalReplayPhase6GuardRoutes(app: Express): void {
     }
   });
 
-  app.post(APPLY_PATH, requireAuth, requireRole(...ADMIN_ROLES), async (req: any, res: any, next) => {
+  app.post(APPLY_PATH, requireAuth, requireRole(...ADMIN_ROLES), async (req, res, next) => {
     const hasToken = typeof req.body?.confirmationToken === "string" && req.body.confirmationToken.length > 0;
 
     if (req.body?.includeFinalizedBales === true) {
@@ -364,7 +364,7 @@ export function registerHistoricalReplayPhase6GuardRoutes(app: Express): void {
         loadBalanceProjectionBase(companyId, preview),
       ]);
       const originalJson = res.json.bind(res);
-      res.json = (payload: any) => {
+      res.json = (payload) => {
         if (!payload?.dryRun) return originalJson(payload);
         const expandedSupplierIds = parsePositiveIntegerIds(payload.safeSupplierIds) ?? supplierIds;
         let batchIds: number[];

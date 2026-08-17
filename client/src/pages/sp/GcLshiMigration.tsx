@@ -138,7 +138,7 @@ export default function GcLshiMigration() {
   const createCompanyMutation = useMutation({
     mutationFn: (body: { name: string; code: string }) =>
       apiRequest("POST", "/api/sp/migration/create-sp-company", body),
-    onSuccess: async (data: any) => {
+    onSuccess: async (data) => {
       const result = await data.json();
       toast({
         title: "Company created",
@@ -153,7 +153,7 @@ export default function GcLshiMigration() {
 
   const openingBalanceMutation = useMutation({
     mutationFn: (body: object) => apiRequest("POST", "/api/sp/migration/opening-balance", body),
-    onSuccess: async (data: any) => {
+    onSuccess: async (data) => {
       const result = await data.json();
       toast({ title: "Opening balance created", description: `Voucher ${result.voucherNumber} for $${result.amount}` });
       setObAmount("");
@@ -163,7 +163,7 @@ export default function GcLshiMigration() {
 
   const createAccountsMutation = useMutation({
     mutationFn: (body: object) => apiRequest("POST", "/api/sp/migration/gc-create-accounts", body),
-    onSuccess: async (data: any) => {
+    onSuccess: async (data) => {
       const result = await data.json();
       toast({
         title: "Accounts created",

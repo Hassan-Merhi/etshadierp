@@ -173,7 +173,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                 <SelectValue placeholder="Select a location…" />
               </SelectTrigger>
               <SelectContent>
-                {(locationsList as any[]).map((l: any) => (
+                {(locationsList as any[]).map((l) => (
                   <SelectItem key={l.id} value={String(l.id)}>
                     {l.name}
                   </SelectItem>
@@ -315,7 +315,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                           <SelectValue placeholder="Select account" />
                         </SelectTrigger>
                         <SelectContent>
-                          {(ledgerAccounts as any[]).map((a: any) => (
+                          {(ledgerAccounts as any[]).map((a) => (
                             <SelectItem key={a.id} value={String(a.id)}>
                               {a.code} — {a.name}
                             </SelectItem>
@@ -331,7 +331,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                           <SelectValue placeholder="Select agent" />
                         </SelectTrigger>
                         <SelectContent>
-                          {(parentAgents as any[]).map((a: any) => (
+                          {(parentAgents as any[]).map((a) => (
                             <SelectItem key={a.ledger_account_id} value={String(a.ledger_account_id)}>
                               {a.account_name}
                             </SelectItem>
@@ -468,12 +468,12 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                     const b = (statusData?.bankAccounts || []).find((x: any) => String(x.id) === c.creditBankAccountId);
                     creditLabel = b ? b.bankName : "Bank Account";
                   } else if (c.chargeType === "unpaid_payable" || c.chargeType === "other") {
-                    const a = (ledgerAccounts as any[]).find((x: any) => String(x.id) === c.creditLedgerAccountId);
+                    const a = (ledgerAccounts as any[]).find((x) => String(x.id) === c.creditLedgerAccountId);
                     creditLabel = a ? `${a.name}` : "Ledger Account";
                   } else if (c.chargeType === "parent_agent") {
                     creditLabel = prepaidExpAcct?.name ?? "Prepaid Expenses";
                     const agent = (parentAgents as any[]).find(
-                      (x: any) => String(x.ledger_account_id) === c.parentAgentAccountId
+                      (x) => String(x.ledger_account_id) === c.parentAgentAccountId
                     );
                     if (agent) creditLabel += ` (via ${agent.account_name})`;
                   } else {
@@ -513,7 +513,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                   </div>
                   {agentCharges.map((c, idx) => {
                     const agent = (parentAgents as any[]).find(
-                      (x: any) => String(x.ledger_account_id) === c.parentAgentAccountId
+                      (x) => String(x.ledger_account_id) === c.parentAgentAccountId
                     );
                     return (
                       <div key={idx} className="grid grid-cols-3 text-xs py-0.5">

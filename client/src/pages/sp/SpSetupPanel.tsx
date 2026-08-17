@@ -20,7 +20,7 @@ export default function SpSetupPanel() {
       const response = await apiRequest("POST", "/api/sp/setup");
       return response.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sp/setup/status"] });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
 

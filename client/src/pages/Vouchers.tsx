@@ -337,7 +337,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         return await res.json();
       }
     },
-    onSuccess: async (data: any) => {
+    onSuccess: async (data) => {
       const isEditMode = !!voucherIdToEdit;
       toast({
         title: "Success",
@@ -386,7 +386,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           optional: formData.optional || false,
           createdAt: new Date().toISOString(),
         };
-        queryClient.setQueriesData({ queryKey: ["/api/vouchers"] }, (old: any) =>
+        queryClient.setQueriesData({ queryKey: ["/api/vouchers"] }, (old) =>
           Array.isArray(old) ? [syntheticVoucher, ...old] : old
         );
         discardPaymentDraft();

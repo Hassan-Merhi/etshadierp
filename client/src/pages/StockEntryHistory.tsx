@@ -223,12 +223,12 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
         ids.add(Number(id));
       }
     }
-    return workers.filter((w: any) => w.active && ids.has(w.id)).map((w: any) => w.id);
+    return workers.filter((w) => w.active && ids.has(w.id)).map((w) => w.id);
   }, [categoryFilter, categories, workers]);
 
   const filteredWorkers = useMemo(() => {
     if (!selectedCategoryWorkerIds) return workers;
-    return workers.filter((w: any) => selectedCategoryWorkerIds.includes(w.id));
+    return workers.filter((w) => selectedCategoryWorkerIds.includes(w.id));
   }, [workers, selectedCategoryWorkerIds]);
 
   // Every history filter is applied by the API, so the screen, totals, and exports share one dataset.
@@ -271,7 +271,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     // Add zero-bale entries for workers in the production plan who haven't made any bales yet
     if (Object.keys(workerTargets).length > 0) {
       const workerNameById = new Map<number, string>(
-        (workers as any[]).map((w: any) => [w.id, w.fullName ?? w.full_name ?? ""])
+        (workers as any[]).map((w) => [w.id, w.fullName ?? w.full_name ?? ""])
       );
       const selectedWorkerIds = new Set(workerIdFilter.map(Number));
       const categoryWorkerIds = selectedCategoryWorkerIds ? new Set(selectedCategoryWorkerIds) : null;
@@ -966,7 +966,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
               Bale Category
             </div>
             <MultiSelectFilter
-              options={productCategories.map((c: any) => ({ value: String(c.id), label: c.name }))}
+              options={productCategories.map((c) => ({ value: String(c.id), label: c.name }))}
               selected={productCategoryFilter}
               onChange={setProductCategoryFilter}
               placeholder="Bale categories"
@@ -981,7 +981,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
               Worker Group
             </div>
             <MultiSelectFilter
-              options={categories.map((c: any) => ({ value: String(c.id), label: c.name }))}
+              options={categories.map((c) => ({ value: String(c.id), label: c.name }))}
               selected={categoryFilter}
               onChange={(next) => {
                 setCategoryFilter(next);
@@ -1008,7 +1008,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
               Worker
             </div>
             <MultiSelectFilter
-              options={filteredWorkers.map((w: any) => ({
+              options={filteredWorkers.map((w) => ({
                 value: String(w.id),
                 label: w.fullName || w.full_name || w.name || String(w.id),
               }))}
@@ -1026,7 +1026,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
               Product
             </div>
             <MultiSelectFilter
-              options={products.map((p: any) => ({ value: String(p.id), label: p.name }))}
+              options={products.map((p) => ({ value: String(p.id), label: p.name }))}
               selected={productIdFilter}
               onChange={setProductIdFilter}
               placeholder="Products"
@@ -1331,8 +1331,8 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                                       </SelectTrigger>
                                       <SelectContent>
                                         {workers
-                                          .filter((w: any) => w.active)
-                                          .map((w: any) => (
+                                          .filter((w) => w.active)
+                                          .map((w) => (
                                             <SelectItem key={w.id} value={String(w.id)}>
                                               {w.fullName || w.full_name || w.name}
                                             </SelectItem>

@@ -167,7 +167,7 @@ export default function FactoryInvoiceLoadingScan() {
       queryClient.invalidateQueries({ queryKey: [`/api/factory/invoices/${invoiceId}/loading-summary`] });
       toast({ title: "Session started", description: `Loading session #${data.session.id} is now open.` });
     },
-    onError: (err: any) => {
+    onError: (err) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -189,7 +189,7 @@ export default function FactoryInvoiceLoadingScan() {
       flashFeedback("success", `Scanned: ${data.bale?.referenceNumber || data.loadingBale?.baleReference}`);
       setTimeout(() => scanRef.current?.focus(), 50);
     },
-    onError: (err: any) => {
+    onError: (err) => {
       setScanInput("");
       flashFeedback("error", err.message);
       setTimeout(() => scanRef.current?.focus(), 50);
@@ -206,7 +206,7 @@ export default function FactoryInvoiceLoadingScan() {
       queryClient.invalidateQueries({ queryKey: [`/api/factory/invoices/${invoiceId}/loading-summary`] });
       toast({ title: "Removed", description: "Bale removed and returned to unloaded." });
     },
-    onError: (err: any) => {
+    onError: (err) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -222,7 +222,7 @@ export default function FactoryInvoiceLoadingScan() {
       queryClient.invalidateQueries({ queryKey: [`/api/factory/invoices/${invoiceId}/loading-summary`] });
       toast({ title: "Completed", description: "Loading session completed successfully." });
     },
-    onError: (err: any) => {
+    onError: (err) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -238,7 +238,7 @@ export default function FactoryInvoiceLoadingScan() {
       queryClient.invalidateQueries({ queryKey: [`/api/factory/invoices/${invoiceId}/loading-summary`] });
       toast({ title: "Cancelled", description: "Loading session cancelled." });
     },
-    onError: (err: any) => {
+    onError: (err) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -253,7 +253,7 @@ export default function FactoryInvoiceLoadingScan() {
       toast({ title: "Proforma created", description: `"${data.proformaName}" is ready. Opening now…` });
       navigate(`/factory/sales/proformas/${data.proformaId}`);
     },
-    onError: (err: any) => {
+    onError: (err) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });

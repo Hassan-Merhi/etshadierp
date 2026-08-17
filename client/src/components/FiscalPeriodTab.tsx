@@ -241,7 +241,7 @@ export function FiscalPeriodTab({ currentCompanyId, userRole }: FiscalPeriodTabP
                           No equity accounts found
                         </SelectItem>
                       ) : (
-                        equityAccounts.map((account: any) => (
+                        equityAccounts.map((account) => (
                           <SelectItem key={account.id} value={account.id.toString()}>
                             {account.name} ({account.code})
                           </SelectItem>
@@ -308,7 +308,7 @@ export function FiscalPeriodTab({ currentCompanyId, userRole }: FiscalPeriodTabP
               </TableRow>
             </TableHeader>
             <TableBody>
-              {closures.map((closure: any) => {
+              {closures.map((closure) => {
                 const netIncome = parseFloat(closure.netIncome || "0");
                 const isProfit = netIncome > 0;
 

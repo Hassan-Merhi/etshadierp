@@ -311,7 +311,7 @@ export function registerAccountMigrationSafeRoutes(app: Express) {
     "/api/admin/account-migration/undo",
     requireAuth,
     requireRole("Admin", "Developer"),
-    async (req: any, res: any, next) => {
+    async (req, res, next) => {
       const accountIds = idArray(
         Array.isArray(req.body?.accounts) ? req.body.accounts.map((account: any) => account?.accountId) : null
       );

@@ -56,7 +56,7 @@ export function ContainerSpView({
       const response = await apiRequest("POST", `/api/sp/containers/${selectedContainer.id}/cancel`, { reason });
       return response.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sp/containers"] });
       queryClient.invalidateQueries({ queryKey: [`/api/sp/containers/${selectedContainer?.id}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/sp/report/payable"] });

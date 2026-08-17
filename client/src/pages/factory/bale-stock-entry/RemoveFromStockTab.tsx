@@ -265,7 +265,7 @@ export function RemoveFromStockTab() {
     enabled: true,
   });
 
-  const filteredBales = inStockBales?.filter((bale: any) => {
+  const filteredBales = inStockBales?.filter((bale) => {
     if (!dateFilter) return true;
     const baleDate = bale.finalizedAt ? new Date(bale.finalizedAt).toLocaleDateString("en-CA") : null;
     return baleDate === dateFilter;
@@ -304,7 +304,7 @@ export function RemoveFromStockTab() {
   })();
 
   const totalQty = filteredBales?.length || 0;
-  const totalWeight = filteredBales?.reduce((sum: number, b: any) => sum + parseFloat(b.weightKg || "0"), 0) || 0;
+  const totalWeight = filteredBales?.reduce((sum: number, b) => sum + parseFloat(b.weightKg || "0"), 0) || 0;
 
   const toggleBale = (baleId: number) => {
     setSelectedBaleIds((prev) => {
@@ -330,7 +330,7 @@ export function RemoveFromStockTab() {
 
   const selectAll = () => {
     if (!filteredBales) return;
-    const allIds = new Set(filteredBales.map((b: any) => b.id));
+    const allIds = new Set(filteredBales.map((b) => b.id));
     setSelectedBaleIds(allIds);
   };
 

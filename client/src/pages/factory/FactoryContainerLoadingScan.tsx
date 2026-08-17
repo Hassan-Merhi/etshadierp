@@ -421,7 +421,7 @@ export default function FactoryContainerLoadingScan() {
       const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/bales/bulk-import`, body);
       return await res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries(
         { queryKey: ["/api/factory/customer-orders", orderId], exact: true, refetchType: "active" },
         { cancelRefetch: false }

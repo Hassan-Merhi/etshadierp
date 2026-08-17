@@ -114,7 +114,7 @@ export default function ProformaAddLine() {
 
   const { data: proforma } = useQuery<Proforma>({
     queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
-    select: (data: any) => {
+    select: (data) => {
       if (Array.isArray(data)) return data.find((p: Proforma) => p.id === numericProformaId) ?? null;
       return null;
     },

@@ -136,7 +136,7 @@ export default function CustomerInvoiceCreate() {
       const res = await modeApiRequest("POST", "/api/factory/customer-orders", data);
       return await res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       setOrderId(data.id);
       toast({ title: "Draft order created", description: "You can now start scanning bales" });
       setTimeout(() => scannerRef.current?.focus(), 100);

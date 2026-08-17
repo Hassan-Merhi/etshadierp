@@ -35,7 +35,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
         return res.status(400).json({ message: "rows array is required" });
       }
 
-      const refCodes: string[] = rows.map((r: any) => String(r.currentRef || "").trim()).filter(Boolean);
+      const refCodes: string[] = rows.map((r) => String(r.currentRef || "").trim()).filter(Boolean);
       if (refCodes.length === 0) return res.status(400).json({ message: "No reference codes provided" });
 
       // fetch all bales in one query
@@ -60,7 +60,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
         seen.add(ref);
       }
 
-      const results = rows.map((r: any) => {
+      const results = rows.map((r) => {
         const ref = String(r.currentRef || "").trim();
         if (!ref) return { currentRef: ref, valid: false, error: "Empty reference code" };
         if (dupes.has(ref)) return { currentRef: ref, valid: false, error: "Duplicate in upload" };
@@ -76,7 +76,7 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
         };
       });
 
-      const validCount = results.filter((r: any) => r.valid).length;
+      const validCount = results.filter((r) => r.valid).length;
       const invalidCount = results.length - validCount;
       res.json({ results, validCount, invalidCount });
     } catch (error: unknown) {
@@ -98,12 +98,12 @@ export function registerFactoryBaleRelabelRoutes(app: Express) {
         return res.status(400).json({ message: "rows array is required" });
       }
 
-      const validRows = rows.filter((r: any) => String(r.currentRef || "").trim());
+      const validRows = rows.filter((r) => String(r.currentRef || "").trim());
       if (validRows.length === 0) return res.status(400).json({ message: "No valid rows to apply" });
 
       const result = await db.transaction(async (tx) => {
         // 1. Fetch bales to recode
-        const refCodes = validRows.map((r: any) => String(r.currentRef).trim());
+        const refCodes = validRows.map((r) => String(r.currentRef).trim());
         const baleRows = await tx
           .select({
             id: factoryBales.id,

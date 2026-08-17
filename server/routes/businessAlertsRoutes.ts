@@ -155,7 +155,7 @@ export async function runAlertChecks(companyId: number): Promise<void> {
     [companyId]
   );
   if (importErrorRes.rows.length > 0) {
-    const total = importErrorRes.rows.reduce((s: number, r: any) => s + parseInt(r.invalid_rows, 10), 0);
+    const total = importErrorRes.rows.reduce((s: number, r) => s + parseInt(r.invalid_rows, 10), 0);
     await upsertAlert({
       companyId,
       alertType: "import_errors",

@@ -75,7 +75,7 @@ export function UserRolesCard({ userId, companies }: UserRolesCardProps) {
       const posRoles = companyRoles.filter((r) => r.role === "POS");
       const result: Record<number, number[]> = {};
       await Promise.all(
-        posRoles.map(async (r: any) => {
+        posRoles.map(async (r) => {
           const res = await fetch(`/api/user-locations/${userId}/${r.companyId}`, { credentials: "include" });
           if (res.ok) {
             const locs = await res.json();

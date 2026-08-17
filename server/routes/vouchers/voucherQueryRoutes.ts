@@ -77,7 +77,7 @@ export function registerVoucherQueryRoutes(app: Express) {
         const allowedLocIds = assignedLocs.map((l) => l.locationId);
         if (allowedLocIds.length > 0) {
           sanitizedVouchers = sanitizedVouchers.filter(
-            (v: any) => v.locationId === null || allowedLocIds.includes(v.locationId)
+            (v) => v.locationId === null || allowedLocIds.includes(v.locationId)
           );
         }
       }

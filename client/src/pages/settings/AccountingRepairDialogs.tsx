@@ -64,7 +64,7 @@ export function ZeroBalancesDialog({ open, onOpenChange, companyId }: ZeroBalanc
   });
 
   const nonZeroAccounts = accounts.filter(
-    (a: any) => !a.deletedAt && a.active && parseFloat(a.openingBalance || "0") !== 0
+    (a) => !a.deletedAt && a.active && parseFloat(a.openingBalance || "0") !== 0
   );
 
   return (
@@ -87,7 +87,7 @@ export function ZeroBalancesDialog({ open, onOpenChange, companyId }: ZeroBalanc
                   <Checkbox
                     checked={nonZeroAccounts.length > 0 && selected.length === nonZeroAccounts.length}
                     onCheckedChange={(checked) => {
-                      if (checked) setSelected(nonZeroAccounts.map((a: any) => a.id));
+                      if (checked) setSelected(nonZeroAccounts.map((a) => a.id));
                       else setSelected([]);
                     }}
                   />
@@ -108,11 +108,11 @@ export function ZeroBalancesDialog({ open, onOpenChange, companyId }: ZeroBalanc
                   </TableHeader>
                   <TableBody>
                     {accounts
-                      .filter((account: any) => !account.deletedAt && account.active)
+                      .filter((account) => !account.deletedAt && account.active)
                       .sort(
-                        (a: any, b: any) => a.accountType.localeCompare(b.accountType) || a.name.localeCompare(b.name)
+                        (a, b) => a.accountType.localeCompare(b.accountType) || a.name.localeCompare(b.name)
                       )
-                      .map((account: any) => {
+                      .map((account) => {
                         const balance = parseFloat(account.openingBalance || "0");
                         const hasBalance = balance !== 0;
                         return (

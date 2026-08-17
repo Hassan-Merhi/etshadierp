@@ -139,7 +139,7 @@ export function registerPayrollWorkerPaymentRoutes(app: Express) {
       }
 
       // Calculate total amount
-      const totalAmount = payments.reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+      const totalAmount = payments.reduce((sum: number, p) => sum + parseFloat(p.amount), 0);
 
       // Create single voucher for all payments
       const voucherNumber = `SAL-BULK-${Date.now()}`;
