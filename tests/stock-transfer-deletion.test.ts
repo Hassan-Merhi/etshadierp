@@ -136,7 +136,13 @@ afterAll(async () => {
   await db.delete(vouchers).where(eq(vouchers.id, appliedVoucherId));
   await db.delete(vouchers).where(eq(vouchers.id, draftVoucherId));
   await db.delete(inventory).where(eq(inventory.companyId, companyId));
-  await db.execute(sql`DELETE FROM canonical_stock_movements WHERE stock_item_id = ${itemId}`);
+  // The journal keeps three tables and all of them key back to the company, so
+  // clearing only the movements leaves the requests and audit rows holding the
+  // company row open. Company-scoped, because that is the grain the foreign
+  // keys use.
+  await db.execute(sql`DELETE FROM canonical_stock_movement_audit WHERE company_id = ${companyId}`);
+  await db.execute(sql`DELETE FROM canonical_stock_movement_requests WHERE company_id = ${companyId}`);
+  await db.execute(sql`DELETE FROM canonical_stock_movements WHERE company_id = ${companyId}`);
   await db.delete(stockItems).where(eq(stockItems.id, itemId));
   await db.delete(locations).where(eq(locations.companyId, companyId));
   await db.delete(companies).where(eq(companies.id, companyId));

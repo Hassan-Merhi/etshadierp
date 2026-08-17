@@ -153,7 +153,11 @@ afterAll(async () => {
   await db.delete(stockTransferVouchers).where(eq(stockTransferVouchers.id, transferId));
   await db.delete(vouchers).where(eq(vouchers.id, voucherId));
   await db.delete(inventory).where(eq(inventory.companyId, companyId));
-  await db.execute(sql`DELETE FROM canonical_stock_movements WHERE stock_item_id IN (${itemAId}, ${itemBId})`);
+  // All three journal tables key back to the company; clearing only the
+  // movements leaves the requests and audit rows holding the company row open.
+  await db.execute(sql`DELETE FROM canonical_stock_movement_audit WHERE company_id = ${companyId}`);
+  await db.execute(sql`DELETE FROM canonical_stock_movement_requests WHERE company_id = ${companyId}`);
+  await db.execute(sql`DELETE FROM canonical_stock_movements WHERE company_id = ${companyId}`);
   await db.delete(stockItems).where(eq(stockItems.companyId, companyId));
   await db.delete(locations).where(eq(locations.companyId, companyId));
   await db.delete(companies).where(eq(companies.id, companyId));

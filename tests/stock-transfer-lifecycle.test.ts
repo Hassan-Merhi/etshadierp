@@ -47,7 +47,6 @@ async function cleanup() {
   await db.delete(vouchers).where(eq(vouchers.id, voucherId));
   await db.delete(inventory).where(eq(inventory.companyId, companyId));
   await db.execute(sql`DELETE FROM inventory_negative_layers WHERE stock_item_id = ${itemId}`);
-  await db.execute(sql`DELETE FROM canonical_stock_movements WHERE stock_item_id = ${itemId}`);
   await db.delete(stockItems).where(eq(stockItems.companyId, companyId));
   await db.delete(locations).where(eq(locations.companyId, companyId));
   await db.delete(companies).where(eq(companies.id, companyId));
