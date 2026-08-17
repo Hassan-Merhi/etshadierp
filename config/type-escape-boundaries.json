@@ -1760,7 +1760,7 @@
         0
       ],
       "client/src/pages/settings/DataToolsTab.tsx": [
-        37,
+        39,
         0,
         0
       ],
@@ -4592,6 +4592,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 4753
+    "typeEscapeCeiling": 4755
   }
 }

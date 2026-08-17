@@ -647,7 +647,9 @@ export default function StockInSalesReportDetail() {
                           <TableCell colSpan={4} className="uppercase tracking-wide">
                             Total
                           </TableCell>
-                          <TableCell className="text-right font-mono">{formatNumber(stockInTotals.quantity, 0)}</TableCell>
+                          <TableCell className="text-right font-mono">
+                            {formatNumber(stockInTotals.quantity, 0)}
+                          </TableCell>
                           <TableCell className="text-right text-muted-foreground">—</TableCell>
                           <TableCell className="text-right font-mono">{formatAmount(stockInTotals.value)}</TableCell>
                         </TableRow>
@@ -722,10 +724,14 @@ export default function StockInSalesReportDetail() {
                             <TableCell className="text-right font-mono">{formatNumber(row.quantity, 0)}</TableCell>
                             <TableCell className="text-right font-mono">{rate(row.avgRate)}</TableCell>
                             <TableCell className="text-right font-mono">{formatAmount(row.totalValue)}</TableCell>
-                            <TableCell className={`text-right font-mono font-medium ${profitClassName(row.profitPerBale)}`}>
+                            <TableCell
+                              className={`text-right font-mono font-medium ${profitClassName(row.profitPerBale)}`}
+                            >
                               {rate(row.profitPerBale)}
                             </TableCell>
-                            <TableCell className={`text-right font-mono font-medium ${profitClassName(row.totalProfit)}`}>
+                            <TableCell
+                              className={`text-right font-mono font-medium ${profitClassName(row.totalProfit)}`}
+                            >
                               {formatAmount(row.totalProfit)}
                             </TableCell>
                           </TableRow>
@@ -734,7 +740,9 @@ export default function StockInSalesReportDetail() {
                           <TableCell colSpan={3} className="uppercase tracking-wide">
                             Total
                           </TableCell>
-                          <TableCell className="text-right font-mono">{formatNumber(salesTotals.quantity, 0)}</TableCell>
+                          <TableCell className="text-right font-mono">
+                            {formatNumber(salesTotals.quantity, 0)}
+                          </TableCell>
                           <TableCell className="text-right text-muted-foreground">—</TableCell>
                           <TableCell className="text-right font-mono">{formatAmount(salesTotals.value)}</TableCell>
                           <TableCell className="text-right text-muted-foreground">—</TableCell>

@@ -680,8 +680,8 @@ export function DataToolsTab() {
                 Location Cost Price Override
               </CardTitle>
               <CardDescription>
-                Directly replace the average cost for existing inventory at one location. Developer use only; no voucher or
-                daybook entry is created.
+                Directly replace the average cost for existing inventory at one location. Developer use only; no voucher
+                or daybook entry is created.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -864,8 +864,8 @@ export function DataToolsTab() {
             <DialogHeader>
               <DialogTitle>Location Cost Price Override</DialogTitle>
               <DialogDescription>
-                Upload an Excel file with <strong>barcode</strong> and <strong>costPrice</strong> columns. This overwrites
-                the selected location&apos;s current average rate and total value directly.
+                Upload an Excel file with <strong>barcode</strong> and <strong>costPrice</strong> columns. This
+                overwrites the selected location&apos;s current average rate and total value directly.
               </DialogDescription>
             </DialogHeader>
 
@@ -891,8 +891,8 @@ export function DataToolsTab() {
                 <Alert className="border-amber-500/40">
                   <AlertTriangle className="h-4 w-4 text-amber-600" />
                   <AlertDescription>
-                    This is a direct valuation correction. It does not create accounting entries and should not be used for
-                    normal stock receipts or production.
+                    This is a direct valuation correction. It does not create accounting entries and should not be used
+                    for normal stock receipts or production.
                   </AlertDescription>
                 </Alert>
 
@@ -906,7 +906,9 @@ export function DataToolsTab() {
                     <FileDown className="h-4 w-4 mr-1" />
                     Download Template
                   </Button>
-                  {costPriceFile && <span className="text-sm text-muted-foreground truncate">{costPriceFile.name}</span>}
+                  {costPriceFile && (
+                    <span className="text-sm text-muted-foreground truncate">{costPriceFile.name}</span>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -918,7 +920,9 @@ export function DataToolsTab() {
                     onChange={handleCostPriceFileChange}
                     data-testid="input-cost-price-import-file"
                   />
-                  <p className="text-xs text-muted-foreground">Each row must contain a matching item barcode and a costPrice greater than 0.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Each row must contain a matching item barcode and a costPrice greater than 0.
+                  </p>
                 </div>
 
                 {costPriceErrors.length > 0 && (

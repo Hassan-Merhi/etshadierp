@@ -20,38 +20,38 @@ export function registerLocationImportRoutes(app: Express) {
     requireRole("Developer"),
     checkPOSLocation,
     async (req, res) => {
-    try {
-      const locationId = parseInt(req.params.locationId);
-      if (isNaN(locationId)) {
-        return res.status(400).json({ message: "Invalid location ID" });
-      }
+      try {
+        const locationId = parseInt(req.params.locationId);
+        if (isNaN(locationId)) {
+          return res.status(400).json({ message: "Invalid location ID" });
+        }
 
-      if (!req.session.currentCompanyId) {
-        return res.status(400).json({ message: "No company selected" });
-      }
+        if (!req.session.currentCompanyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
 
-      const location = await storage.getLocationById(locationId);
-      if (!location) {
-        return res.status(404).json({ message: "Location not found" });
-      }
+        const location = await storage.getLocationById(locationId);
+        if (!location) {
+          return res.status(404).json({ message: "Location not found" });
+        }
 
-      if (location.companyId !== req.session.currentCompanyId) {
-        return res.status(403).json({
-          message: "Access denied: Location belongs to a different company",
-        });
-      }
+        if (location.companyId !== req.session.currentCompanyId) {
+          return res.status(403).json({
+            message: "Access denied: Location belongs to a different company",
+          });
+        }
 
-      const { updates } = req.body;
-      if (!Array.isArray(updates)) {
-        return res.status(400).json({ message: "Updates must be an array" });
-      }
+        const { updates } = req.body;
+        if (!Array.isArray(updates)) {
+          return res.status(400).json({ message: "Updates must be an array" });
+        }
 
-      const result = await storage.updateCostPricesByBarcode(locationId, req.session.currentCompanyId, updates);
-      res.json(result);
-    } catch (error: unknown) {
-      logger.error("Error updating cost prices:", { error: error });
-      res.status(500).json({ message: getErrorMessage(error) });
-    }
+        const result = await storage.updateCostPricesByBarcode(locationId, req.session.currentCompanyId, updates);
+        res.json(result);
+      } catch (error: unknown) {
+        logger.error("Error updating cost prices:", { error: error });
+        res.status(500).json({ message: getErrorMessage(error) });
+      }
     }
   );
 
