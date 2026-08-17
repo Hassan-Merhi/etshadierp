@@ -65,7 +65,10 @@ export async function insertSaleVoucher(
       exchangeRate: exchangeRate || null,
       isCreditSale: !!isCreditSale,
     },
-    infrastructurePostingIdentity("pos-sale", `${companyId}:${clientSaleId || voucherNumber}`, "sales-voucher"),
+    // clientSaleId is the caller's stable retry identity. Do not fall back to
+    // voucherNumber: POS display voucher numbers intentionally contain
+    // Date.now()/randomUUID and would turn a retry into a new posting key.
+    infrastructurePostingIdentity("pos-sale", clientSaleId, "sales-voucher"),
     params
   );
 
