@@ -4,6 +4,7 @@ import {
   accountingResponseCode,
   attachAccountingRequestIdentity,
   isProtectedAccountingRequest,
+  markAccountingRequestOutcomeUncertain,
   releaseAccountingRequestIdentity,
   shouldReleaseAccountingRequestIdentity,
 } from "./accountingRequestIdentity";
@@ -66,7 +67,11 @@ export function installAccountingRequestFetchGuard(): void {
     const response = await originalFetch(input, outboundInit);
     const responseCode = await accountingResponseCode(response);
     if (shouldReleaseAccountingRequestIdentity(response.status, responseCode)) {
-      releaseAccountingRequestIdentity(method, pathname, outboundBody);
+      releaseAccountingRequestIdentity(method, pathname, outboundBody, true);
+    } else if (response.status === 409 || response.status >= 500) {
+      // Mark the key before returning the response so outer legacy wrappers
+      // cannot accidentally release it while the commit outcome is uncertain.
+      markAccountingRequestOutcomeUncertain(method, pathname, outboundBody);
     }
     return response;
   };
