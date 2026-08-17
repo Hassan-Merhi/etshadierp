@@ -14,3 +14,4 @@ Never use `db.execute(sql`...`)` for complex multi-join queries in storage funct
 - Use `$1`, `$2` etc. for parameters in the SQL string.
 - The diagnostic query in `locationRoutes.ts` (a simple single-subquery SELECT with lowercase aliases) worked with `db.execute()` — confirming the issue is query-shape-specific.
 - This was confirmed in `server/storage/inventory.ts` `getLocationInventory()`: switching both `includeZero=false` and `includeZero=true` paths from `db.execute(sql`...`)` to `pool.query()` fixed the crash and returned 185 rows correctly.
+- Related gotcha: a "Failed query" toast on Stock Allocation v5 was actually a plain SQL error — adding a LEFT JOIN to an existing raw query made an unqualified column (`name`) ambiguous. When adding a join to raw SQL, qualify every selected/ordered column, and reproduce the exact SQL via psql before assuming the Drizzle bug.
