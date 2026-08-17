@@ -41,7 +41,9 @@ describe("factory insurance company isolation", () => {
   });
 
   it("routes insurance voucher creation through the central posting service", () => {
-    expect(routeSource).toContain("insertVoucherWithEntriesTx");
+    expect(routeSource).toContain("postBalancedVoucherTx");
+    expect(routeSource).toContain('from "../../services/accounting/centralPostingEngine"');
+    expect(routeSource).toContain("createDatabasePostingDependencies()");
     expect(routeSource).toContain('sourceModule: "ERP"');
     expect(routeSource).not.toContain("tx.insert(vouchers)");
     expect(routeSource).not.toContain("tx.insert(voucherEntries)");
