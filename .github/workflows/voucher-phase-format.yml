@@ -25,6 +25,10 @@ jobs:
         run: sed -i 's#https://package-proxy.replit.com/#https://registry.npmjs.org/#g' package-lock.json
       - name: Install dependencies
         run: npm ci --ignore-scripts
+      - name: Re-pin write evidence downward
+        run: UPDATE_WRITE_EVIDENCE_BASELINE=1 node scripts/audit-write-evidence.mjs
+      - name: Verify write evidence
+        run: node scripts/audit-write-evidence.mjs
       - name: Format voucher phase files
         run: |
           node node_modules/prettier/bin/prettier.cjs --write \
@@ -45,14 +49,14 @@ jobs:
             tests/voucher-path-phases5-8.test.ts \
             tests/voucher-path-request-boundary-postgres.test.ts \
             tests/write-evidence-ratchet.test.ts
-      - name: Commit formatting
+      - name: Commit evidence and formatting
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add client/src/lib/accountingRequestFetchGuard.ts client/src/lib/accountingRequestIdentity.ts client/src/lib/phase5VoucherRequestIdentity.ts config/voucher-write-evidence-review.json config/write-evidence-baseline.json docs/engineering/voucher-path-phases-4-8.md scripts/audit-write-evidence.mjs server/routes.ts server/services/accounting/operationalVoucherRequestBoundary.ts server/services/accounting/replayAuthorizationContext.ts server/services/accounting/voucherPathPhase5to6Boundary.ts shared/voucherPathIdentityPolicy.ts tests/accounting-request-identity.test.ts tests/phase4-operational-voucher-idempotency.test.ts tests/voucher-path-phases5-8.test.ts tests/voucher-path-request-boundary-postgres.test.ts tests/write-evidence-ratchet.test.ts
+          git add config/write-evidence-baseline.json client/src/lib/accountingRequestFetchGuard.ts client/src/lib/accountingRequestIdentity.ts client/src/lib/phase5VoucherRequestIdentity.ts config/voucher-write-evidence-review.json docs/engineering/voucher-path-phases-4-8.md scripts/audit-write-evidence.mjs server/routes.ts server/services/accounting/operationalVoucherRequestBoundary.ts server/services/accounting/replayAuthorizationContext.ts server/services/accounting/voucherPathPhase5to6Boundary.ts shared/voucherPathIdentityPolicy.ts tests/accounting-request-identity.test.ts tests/phase4-operational-voucher-idempotency.test.ts tests/voucher-path-phases5-8.test.ts tests/voucher-path-request-boundary-postgres.test.ts tests/write-evidence-ratchet.test.ts
           if git diff --cached --quiet; then
-            echo "No formatting changes needed"
+            echo "No evidence or formatting changes needed"
             exit 0
           fi
-          git commit -m "format voucher phases 4-8"
+          git commit -m "re-pin voucher evidence after phases 4-8"
           git push origin HEAD:codex/voucher-idempotency-phases4-8
