@@ -964,7 +964,7 @@ export default function TransactionJournal() {
                     if (isNaN(n)) return "—";
                     return formatCashAmount(n);
                   };
-                  const fmtNum = (v: any) => {
+                  const fmtNum = (v: string) => {
                     const n = typeof v === "number" ? v : parseFloat(v || "0");
                     if (isNaN(n)) return "0";
                     return Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: 3 });

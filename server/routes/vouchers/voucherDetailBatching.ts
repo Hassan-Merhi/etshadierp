@@ -80,7 +80,7 @@ async function loadSalesData(voucherId: number, locationId: number | null | unde
   });
 }
 
-async function loadAdjustmentData(voucher: any) {
+async function loadAdjustmentData(voucher: { id: number; description: string | null; createdAt: Date; companyId: number; locationId: number | null; optional: boolean; exchangeRate: string | null; currency: string; effectiveDate: string | null; deletedAt: Date | null; locationName: string | null; voucherNumber: string; voucherType: string; voucherDate: string; totalAmount: string; shiftId: number | null; sourceModule: string | null; isCreditSale: boolean | null; clientSaleId: string | null; }) {
   const [adjustment] = await db
     .select()
     .from(schema.stockAdjustmentVouchers)
@@ -123,7 +123,7 @@ async function loadAdjustmentData(voucher: any) {
   };
 }
 
-async function loadTransferData(voucher: any) {
+async function loadTransferData(voucher: { id: number; description: string | null; createdAt: Date; companyId: number; locationId: number | null; optional: boolean; exchangeRate: string | null; currency: string; effectiveDate: string | null; deletedAt: Date | null; locationName: string | null; voucherNumber: string; voucherType: string; voucherDate: string; totalAmount: string; shiftId: number | null; sourceModule: string | null; isCreditSale: boolean | null; clientSaleId: string | null; }) {
   const [transfer] = await db
     .select()
     .from(schema.stockTransferVouchers)

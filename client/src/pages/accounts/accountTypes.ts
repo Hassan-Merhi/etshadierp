@@ -61,20 +61,20 @@ export interface WaChat {
 
 export interface AccountDialogsProps {
   bankToEdit: any | null;
-  setBankToEdit: (bank: any | null) => void;
+  setBankToEdit: (bank: null) => void;
   bankForm: any;
   onBankSubmit: (data: any) => void;
   updateBankMutation: any;
   deleteBankMutation: any;
   handleDeleteBankAccount: () => void;
   accountToEdit: any | null;
-  setAccountToEdit: (acc: any | null) => void;
+  setAccountToEdit: (acc: null) => void;
   supplierToEdit: any | null;
-  setSupplierToEdit: (acc: any | null) => void;
+  setSupplierToEdit: (acc: null) => void;
   customerToEdit: any | null;
-  setCustomerToEdit: (acc: any | null) => void;
+  setCustomerToEdit: (acc: null) => void;
   employeeToEdit: any | null;
-  setEmployeeToEdit: (acc: any | null) => void;
+  setEmployeeToEdit: (acc: null) => void;
   editForm: any;
   onEditSubmit: (data: any) => void;
   updateLedgerMutation: any;
@@ -108,7 +108,7 @@ export interface AccountStatementViewProps {
   filterCurrency: string;
   setFilterCurrency: (updater: any) => void;
   showDeletedVouchers: boolean;
-  setShowDeletedVouchers: (updater: any) => void;
+  setShowDeletedVouchers: (updater: (p: boolean) => boolean) => void;
   currentUser: any;
   formatAmount: (amt: number) => string;
   hideBalances: boolean;

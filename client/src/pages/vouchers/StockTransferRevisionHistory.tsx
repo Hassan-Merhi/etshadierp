@@ -41,7 +41,7 @@ interface StockTransferRevisionHistoryProps {
   modeApiRequest: unknown;
   queryClient: unknown;
   lastKnownTransferIdRef: unknown;
-  formatNumber: (num: any, decimals?: number) => string;
+  formatNumber: (num: number, decimals?: number) => string;
 }
 
 export function StockTransferRevisionHistory({

@@ -9,9 +9,9 @@ interface UseGITContainersDataProps {
   isAllowed: boolean;
   refetch: () => void;
   toast: any;
-  setImportResult: (v: any) => void;
+  setImportResult: (v: ({ updated: number; skipped: number; notFound: number; errors: string[]; importId: string | null; }) | null) => void;
   setShowProgressBanner: (v: boolean) => void;
-  setBulkProgress: (v: any) => void;
+  setBulkProgress: (v: BulkProgress) => void;
   queryClient: any;
   showProgressBanner: boolean;
 }

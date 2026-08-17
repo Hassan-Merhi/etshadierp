@@ -128,7 +128,7 @@ export async function moveUsersToTarget(
     const existingTarget = firstRow(existingTargetResult) ?? null;
     let targetRoleId: number;
     let createdTargetRole = false;
-    let effectiveTargetRole: any;
+    let effectiveTargetRole: CutoverRoleSnapshot;
 
     if (existingTarget) {
       targetRoleId = pn(existingTarget.id);

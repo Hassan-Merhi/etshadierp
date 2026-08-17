@@ -49,7 +49,7 @@ export function registerFactoryDaybookEditRoutes(app: Express) {
       const canEdit = ["admin", "owner", "developer"].includes(currentRole) || session.daybookEditDays > 0;
       if (!canEdit) return res.status(403).json({ message: "You do not have permission to edit daybook entries" });
 
-      let existing: any;
+      let existing: ({ id: number; companyId: number; createdAt: Date; currencyCode: string; fxRateToUsd: string; description: string; effectiveDate: string | null; createdBy: string | null; referenceId: number | null; amountUsd: string; txDate: string; txType: string; referenceTable: string | null; metaJson: string | null; amountCurrency: string; }) | ({ id: number; companyId: number; txDate: string; txType: string; referenceId: number | null; referenceTable: string | null; description: string; metaJson: string | null; currencyCode: string; amountCurrency: string; fxRateToUsd: string; amountUsd: string; effectiveDate: string | null; createdAt: Date; createdBy: string | null; });
       let realEntryId: number;
 
       if (rawEntryId < 0) {

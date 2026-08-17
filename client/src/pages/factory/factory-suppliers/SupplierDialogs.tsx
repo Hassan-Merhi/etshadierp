@@ -296,7 +296,7 @@ export function SupplierDialogs({
                   <Input
                     value={bulkFxForm.fromCurrencyCode}
                     onChange={(e) =>
-                      setBulkFxForm((f: any) => ({ ...f, fromCurrencyCode: e.target.value.toUpperCase() }))
+                      setBulkFxForm((f: { fromCurrencyCode: string; totalAmount: string; fxRateToUsd: string; date: string; notes: string; order: "oldest" | "newest"; }) => ({ ...f, fromCurrencyCode: e.target.value.toUpperCase() }))
                     }
                     maxLength={10}
                     placeholder="EUR"
@@ -308,7 +308,7 @@ export function SupplierDialogs({
                     type="number"
                     step="0.01"
                     value={bulkFxForm.totalAmount}
-                    onChange={(e) => setBulkFxForm((f: any) => ({ ...f, totalAmount: e.target.value }))}
+                    onChange={(e) => setBulkFxForm((f: { fromCurrencyCode: string; totalAmount: string; fxRateToUsd: string; date: string; notes: string; order: "oldest" | "newest"; }) => ({ ...f, totalAmount: e.target.value }))}
                     placeholder="e.g. 50000"
                   />
                 </div>
@@ -320,7 +320,7 @@ export function SupplierDialogs({
                     type="number"
                     step="0.0001"
                     value={bulkFxForm.fxRateToUsd}
-                    onChange={(e) => setBulkFxForm((f: any) => ({ ...f, fxRateToUsd: e.target.value }))}
+                    onChange={(e) => setBulkFxForm((f: { fromCurrencyCode: string; totalAmount: string; fxRateToUsd: string; date: string; notes: string; order: "oldest" | "newest"; }) => ({ ...f, fxRateToUsd: e.target.value }))}
                     placeholder="e.g. 1.08"
                   />
                 </div>
@@ -329,7 +329,7 @@ export function SupplierDialogs({
                   <Input
                     type="date"
                     value={bulkFxForm.date}
-                    onChange={(e) => setBulkFxForm((f: any) => ({ ...f, date: e.target.value }))}
+                    onChange={(e) => setBulkFxForm((f: { fromCurrencyCode: string; totalAmount: string; fxRateToUsd: string; date: string; notes: string; order: "oldest" | "newest"; }) => ({ ...f, date: e.target.value }))}
                   />
                 </div>
               </div>

@@ -30,7 +30,7 @@ export function LoadingCreatedView({
   const lo = loadingOrder;
   const lines: any[] = lo?.lines ?? [];
   const balesList: any[] = lo?.bales ?? [];
-  const n = (v: any) => parseFloat(v || "0");
+  const n = (v: string) => parseFloat(v || "0");
 
   const expectedBalesTotal = lines.reduce((s: number, l) => s + (parseInt(l.quantity || "0") || 0), 0);
   const scannedBales = balesList.length;

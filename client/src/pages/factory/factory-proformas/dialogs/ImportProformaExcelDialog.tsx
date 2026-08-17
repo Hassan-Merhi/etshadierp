@@ -143,7 +143,7 @@ export function ImportProformaExcelDialog({
                   {excelImportLines.length > 0 ? "Some rows were skipped:" : "Could not parse file:"}
                 </p>
               </div>
-              {excelImportErrors.map((err: any, i: any) => (
+              {excelImportErrors.map((err: React.ReactNode, i: React.Key | null | undefined) => (
                 <p key={i} className="text-xs text-muted-foreground pl-6">
                   {err}
                 </p>
@@ -169,7 +169,7 @@ export function ImportProformaExcelDialog({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {excelImportLines.map((row: any, i: any) => (
+                      {excelImportLines.map((row: any, i: React.Key | null | undefined) => (
                         <TableRow key={i} data-testid={`row-excel-preview-${i}`}>
                           <TableCell className="font-mono text-xs py-1.5">{row.articleCode}</TableCell>
                           <TableCell className="text-xs py-1.5">{row.productName}</TableCell>
