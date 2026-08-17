@@ -2,9 +2,9 @@
   "schemaVersion": 2,
   "detectorVersion": 9,
   "policyDigest": "c26178dd9bc7d71d34976e5bb87aa946cc5d59e6db54b7415f9e363514809f8f",
-  "reviewedAt": "2026-08-10",
-  "reviewedHead": "claude/system-rating-n9dczd@93afb5f97730c8272c71c1accc772ae3744a8896",
-  "description": "Re-pinned after splitting AnalyticsLegacy.tsx (2,614 lines) into a shell, a hook and five section panels. No string was added: total actionable text FELL 12,441 -> 12,423. The i18n policy classifies by PATH, so literals that counted as other-client inside a monolith named AnalyticsLegacy.tsx move once the panels carry accurate names — SalesSectionPanel matches \"sales\", ContainersSectionPanel matches \"container\". sales-pos and container-purchasing rise for that reason alone and other-client falls to match. reports-exports would have gone 0 -> 3 on the same mechanism; rather than weaken that zero invariant or rename a panel to dodge the classifier, the three literals (\"Particulars\" twice and \"Adjust your filters and try again\") were translated into client/src/i18n/sharedUiPhase3Translations.part6.ts, which is why the overall total falls. Re-pinned after merging origin/main (52 commits) into the quality branch. The single additional actionable literal is factory-module text introduced on main, not by this branch; every other module is unchanged from the post-split baseline. Re-pinned after the Phase 4 god-file split of FactoryPayrollTab, DailyProductionReport, FactoryBaleProductHistory and workerStatsAdvancesRoutes. No untranslated string was added: total actionable text FELL from 12,468 to 12,440. The accounting module rises 1,351 -> 1,368 purely because the bale-ledger tab panel now lives in a file whose path contains \"ledger\", which config/i18n-audit-policy.json classifies as accounting — the same rule that already classified the LedgerSection component beside it. Factory falls 5,409 -> 5,386 and inventory-logistics 1,488 -> 1,474 for the same reason, so the accounting rise is a reclassification and is more than offset. Detector and policy digest are unchanged and unclassified findings remain at zero.",
+  "reviewedAt": "2026-08-17",
+  "reviewedHead": "claude/erp-90-phases-3-6-handoff-9ctee7@15521dfabdfd2df86a6d1f36652b22b96aa56b73",
+  "description": "Re-pinned after translating Administration > Settings > Data Tools. The page merged untranslated in dce992de1 and took the administration module from 1153 to 1158 actionable literals, failing the reviewed ceiling. Raising the ceiling to absorb it would have made the gate record a regression as the new normal, so its 62 visible strings were added to the shared UI catalogue instead: administration FELL 1153 -> 1074. Every other module is re-pinned down to what the tree now measures as well - total actionable 12,423 -> 11,927. No module ceiling rises in this change.",
   "reviewedTotals": {
     "candidates": 22918,
     "actionable": 12423,
@@ -12,31 +12,31 @@
     "compatibilityCovered": 9381,
     "unclassified": 0
   },
-  "maxActionable": 12423,
+  "maxActionable": 11927,
   "modules": {
     "accounting": {
-      "maxActionable": 1365
+      "maxActionable": 1342
     },
     "administration": {
-      "maxActionable": 1153
+      "maxActionable": 1074
     },
     "backend-messages": {
-      "maxActionable": 2
+      "maxActionable": 1
     },
     "container-purchasing": {
-      "maxActionable": 865
+      "maxActionable": 852
     },
     "factory": {
-      "maxActionable": 5387
+      "maxActionable": 5316
     },
     "inventory-logistics": {
-      "maxActionable": 1468
+      "maxActionable": 1274
     },
     "other-client": {
-      "maxActionable": 791
+      "maxActionable": 775
     },
     "payroll": {
-      "maxActionable": 548
+      "maxActionable": 534
     },
     "properties-rentals": {
       "maxActionable": 0
@@ -45,16 +45,16 @@
       "maxActionable": 0
     },
     "sales-pos": {
-      "maxActionable": 805
+      "maxActionable": 754
     },
     "shared-contracts": {
       "maxActionable": 4
     },
     "shared-ui": {
-      "maxActionable": 1
+      "maxActionable": 0
     },
     "supplier-partner": {
-      "maxActionable": 34
+      "maxActionable": 1
     }
   },
   "maxUnclassified": 0
