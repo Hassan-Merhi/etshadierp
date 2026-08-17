@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import request from "supertest";
 import { seedTestData, cleanupTestData, closeTestServer, type TestContext } from "./setup";
-import { db } from "../server/db";
+import { db, pool } from "../server/db";
 import { eq } from "drizzle-orm";
 import * as schema from "../shared/schema";
 
@@ -38,6 +38,10 @@ async function cleanupVouchers() {
     await db.delete(schema.salesItems).where(eq(schema.salesItems.voucherId, voucher.id));
     await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, voucher.id));
   }
+  await pool.query(
+    `DELETE FROM accounting_posting_requests WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = $1)`,
+    [ctx.companyId]
+  );
   await db.delete(schema.vouchers).where(eq(schema.vouchers.companyId, ctx.companyId));
 }
 
