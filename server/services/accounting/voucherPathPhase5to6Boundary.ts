@@ -1,0 +1,310 @@
+import { createHash } from "node:crypto";
+import type { Express, NextFunction, Request, Response } from "express";
+import { sql } from "drizzle-orm";
+
+import { db } from "../../db";
+import { logger } from "../../lib/logger";
+import {
+  isPhase5OperationalVoucherRequest,
+  isPhase6DeterministicSpecialRequest,
+  isVoucherRequestPayload,
+  phase6DeterministicSourcePrefix,
+  type VoucherRequestPayload,
+} from "@shared/voucherPathIdentityPolicy";
+
+type GuardRow = {
+  id: number | string;
+  request_fingerprint: string;
+  state: "processing" | "completed";
+  response_status: number | null;
+  response_body: unknown;
+};
+
+type ClaimResult =
+  | { kind: "owner" }
+  | { kind: "replay"; status: number; body: unknown }
+  | { kind: "conflict" }
+  | { kind: "uncertain" };
+
+let ensureTablePromise: Promise<void> | null = null;
+
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([key]) => key !== "clientRequestId")
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, child]) => [key, canonicalize(child)])
+  );
+}
+
+function sha256(value: unknown): string {
+  return createHash("sha256").update(JSON.stringify(canonicalize(value))).digest("hex");
+}
+
+function normalizedPath(req: Request): string {
+  return (req.path || req.originalUrl || "").split("?")[0];
+}
+
+function positiveInteger(value: unknown): number | null {
+  const parsed = typeof value === "number" ? value : Number.parseInt(String(value ?? ""), 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+export function resolveVoucherPathCompanyId(req: Request): number | null {
+  if (!req.session?.userId) return null;
+  const path = normalizedPath(req);
+  const body = isVoucherRequestPayload(req.body) ? req.body : {};
+
+  if (path === "/api/sp/migration/opening-balance") {
+    return positiveInteger(body.targetCompanyId);
+  }
+  if (path === "/api/fix-old-po-credits") {
+    return positiveInteger(body.companyId) ?? positiveInteger(req.session.currentCompanyId);
+  }
+  if (path.startsWith("/api/factory/")) {
+    return positiveInteger(req.session.factoryCompanyId) ?? positiveInteger(req.session.currentCompanyId);
+  }
+  return positiveInteger(req.session.currentCompanyId);
+}
+
+function phase5RequestIdentity(req: Request, body: VoucherRequestPayload): string | null {
+  const header = req.get("X-Idempotency-Key")?.trim();
+  if (header) return header;
+  const fromBody = typeof body.clientRequestId === "string" ? body.clientRequestId.trim() : "";
+  return fromBody || null;
+}
+
+export function deterministicPhase6RequestIdentity(
+  method: string,
+  pathname: string,
+  companyId: number,
+  body: VoucherRequestPayload
+): string | null {
+  const prefix = phase6DeterministicSourcePrefix(method, pathname);
+  if (!prefix) return null;
+  const explicitRunId =
+    typeof body.sourceRunId === "string" && body.sourceRunId.trim()
+      ? body.sourceRunId.trim()
+      : typeof body.importBatchId === "string" && body.importBatchId.trim()
+        ? body.importBatchId.trim()
+        : null;
+  const source = explicitRunId || sha256({ method: method.toUpperCase(), pathname, body });
+  return `${prefix}:${companyId}:${source}`;
+}
+
+function requestFingerprint(method: string, pathname: string, body: VoucherRequestPayload): string {
+  return sha256({ method: method.toUpperCase(), pathname, body });
+}
+
+async function ensureGuardTable(): Promise<void> {
+  if (!ensureTablePromise) {
+    ensureTablePromise = (async () => {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS voucher_path_request_guards (
+          id BIGSERIAL PRIMARY KEY,
+          company_id INTEGER NOT NULL,
+          idempotency_key TEXT NOT NULL,
+          request_kind TEXT NOT NULL,
+          request_path TEXT NOT NULL,
+          request_fingerprint TEXT NOT NULL,
+          state TEXT NOT NULL DEFAULT 'processing',
+          response_status INTEGER,
+          response_body JSONB,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          CONSTRAINT voucher_path_request_guards_state_check CHECK (state IN ('processing', 'completed')),
+          CONSTRAINT voucher_path_request_guards_company_key_unique UNIQUE (company_id, idempotency_key)
+        )
+      `);
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS voucher_path_request_guards_lookup_idx
+        ON voucher_path_request_guards (company_id, idempotency_key, state)
+      `);
+    })().catch((error) => {
+      ensureTablePromise = null;
+      throw error;
+    });
+  }
+  return ensureTablePromise;
+}
+
+async function readGuard(companyId: number, idempotencyKey: string): Promise<GuardRow | null> {
+  const result = await db.execute(sql`
+    SELECT id, request_fingerprint, state, response_status, response_body
+    FROM voucher_path_request_guards
+    WHERE company_id = ${companyId} AND idempotency_key = ${idempotencyKey}
+    LIMIT 1
+  `);
+  return (result.rows[0] as GuardRow | undefined) ?? null;
+}
+
+async function waitForCompletion(companyId: number, idempotencyKey: string, fingerprint: string): Promise<ClaimResult> {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const row = await readGuard(companyId, idempotencyKey);
+    if (!row) return { kind: "uncertain" };
+    if (row.request_fingerprint !== fingerprint) return { kind: "conflict" };
+    if (row.state === "completed" && row.response_status !== null) {
+      return { kind: "replay", status: row.response_status, body: row.response_body };
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  return { kind: "uncertain" };
+}
+
+async function claimRequest(
+  companyId: number,
+  idempotencyKey: string,
+  requestKind: "operational" | "deterministic-source",
+  pathname: string,
+  fingerprint: string
+): Promise<ClaimResult> {
+  await ensureGuardTable();
+
+  const inserted = await db.execute(sql`
+    INSERT INTO voucher_path_request_guards
+      (company_id, idempotency_key, request_kind, request_path, request_fingerprint, state)
+    VALUES
+      (${companyId}, ${idempotencyKey}, ${requestKind}, ${pathname}, ${fingerprint}, 'processing')
+    ON CONFLICT (company_id, idempotency_key) DO NOTHING
+    RETURNING id
+  `);
+  if (inserted.rows.length > 0) return { kind: "owner" };
+
+  const existing = await readGuard(companyId, idempotencyKey);
+  if (!existing) return { kind: "uncertain" };
+  if (existing.request_fingerprint !== fingerprint) return { kind: "conflict" };
+  if (existing.state === "completed" && existing.response_status !== null) {
+    return { kind: "replay", status: existing.response_status, body: existing.response_body };
+  }
+  return waitForCompletion(companyId, idempotencyKey, fingerprint);
+}
+
+async function completeRequest(
+  companyId: number,
+  idempotencyKey: string,
+  status: number,
+  body: unknown,
+  deterministicSource: boolean
+): Promise<void> {
+  // Validation/permission failures are not durable job outcomes. Deleting their
+  // reservation lets a corrected rerun use the same deterministic source input.
+  if (deterministicSource && status >= 400 && status < 500) {
+    await db.execute(sql`
+      DELETE FROM voucher_path_request_guards
+      WHERE company_id = ${companyId} AND idempotency_key = ${idempotencyKey} AND state = 'processing'
+    `);
+    return;
+  }
+
+  // A 5xx/connection-loss outcome is deliberately left in `processing`.
+  // Re-executing an accounting/import handler after an unknown commit outcome
+  // would be less safe than failing closed. Operators can reconcile the source
+  // marker before deliberately starting a new sourceRunId.
+  if (status >= 500) return;
+
+  await db.execute(sql`
+    UPDATE voucher_path_request_guards
+    SET state = 'completed', response_status = ${status}, response_body = ${JSON.stringify(body ?? null)}::jsonb,
+        updated_at = NOW()
+    WHERE company_id = ${companyId} AND idempotency_key = ${idempotencyKey} AND state = 'processing'
+  `);
+}
+
+function captureResponse(res: Response): { read: () => unknown } {
+  let body: unknown = null;
+  const originalJson = res.json.bind(res);
+  const originalSend = res.send.bind(res);
+
+  res.json = ((value: unknown) => {
+    body = value;
+    return originalJson(value);
+  }) as Response["json"];
+
+  res.send = ((value: unknown) => {
+    body = value;
+    return originalSend(value as never);
+  }) as Response["send"];
+
+  return { read: () => body };
+}
+
+export function registerVoucherPathPhase5to6Boundary(app: Express): void {
+  app.use(async (req: Request, res: Response, next: NextFunction) => {
+    const pathname = normalizedPath(req);
+    const phase5 = isPhase5OperationalVoucherRequest(req.method, pathname);
+    const phase6 = isPhase6DeterministicSpecialRequest(req.method, pathname);
+    if (!phase5 && !phase6) return next();
+
+    const companyId = resolveVoucherPathCompanyId(req);
+    if (!companyId) return next();
+
+    const body = isVoucherRequestPayload(req.body) ? req.body : {};
+    const idempotencyKey = phase6
+      ? deterministicPhase6RequestIdentity(req.method, pathname, companyId, body)
+      : phase5RequestIdentity(req, body);
+
+    if (!idempotencyKey) {
+      return res.status(400).json({
+        code: "ACCOUNTING_REQUEST_ID_REQUIRED",
+        message: "A stable request identity is required for this accounting operation.",
+      });
+    }
+
+    const fingerprint = requestFingerprint(req.method, pathname, body);
+    let claim: ClaimResult;
+    try {
+      claim = await claimRequest(
+        companyId,
+        idempotencyKey,
+        phase6 ? "deterministic-source" : "operational",
+        pathname,
+        fingerprint
+      );
+    } catch (error) {
+      logger.error("Voucher request boundary claim failed", {
+        module: "voucher-path-request-boundary",
+        path: pathname,
+        companyId,
+        error,
+      });
+      return res.status(503).json({
+        code: "ACCOUNTING_REQUEST_GUARD_UNAVAILABLE",
+        message: "Accounting request protection is temporarily unavailable. The operation was not started.",
+      });
+    }
+
+    if (claim.kind === "conflict") {
+      return res.status(409).json({
+        code: "POSTING_IDEMPOTENCY_CONFLICT",
+        message: "This request identity was already used for different accounting data.",
+      });
+    }
+    if (claim.kind === "uncertain") {
+      return res.status(409).json({
+        code: "ACCOUNTING_REQUEST_OUTCOME_UNCERTAIN",
+        message: "The original accounting request may still have completed. Reconcile its result before retrying.",
+      });
+    }
+    if (claim.kind === "replay") {
+      return res.status(claim.status).json(claim.body ?? null);
+    }
+
+    const captured = captureResponse(res);
+    res.on("finish", () => {
+      void completeRequest(companyId, idempotencyKey, res.statusCode, captured.read(), phase6).catch((error) => {
+        // The successful handler result has already been sent. Leaving the row
+        // processing is intentionally fail-closed: a future retry cannot execute
+        // the financial handler again after an uncertain guard-write outcome.
+        logger.error("Voucher request boundary completion persistence failed", {
+          module: "voucher-path-request-boundary",
+          path: pathname,
+          companyId,
+          error,
+        });
+      });
+    });
+    return next();
+  });
+}
