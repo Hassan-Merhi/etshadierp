@@ -2,7 +2,32 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "../../db";
 import * as schema from "@shared/schema";
 
-export async function getAllDraftPosSales(userId: string, locationId?: number): Promise<any[]> {
+export interface DraftPosSaleSummary {
+  id: number;
+  location_id: number;
+  locationId: number;
+  created_at: Date | string;
+  createdAt: Date | string;
+  updated_at: Date | string | null;
+  updatedAt: Date | string | null;
+  item_count: number;
+  total_qty: string | number;
+  total_amount: string | number;
+}
+
+export interface DraftPosSaleDetail extends schema.DraftPosSale {
+  items: Array<{
+    id: number;
+    stockItemId: number;
+    stockItemName: string | null;
+    stockItemCode: string | null;
+    quantity: string;
+    rate: string;
+    amount: string;
+  }>;
+}
+
+export async function getAllDraftPosSales(userId: string, locationId?: number): Promise<DraftPosSaleSummary[]> {
   const { pool } = await import("../../db");
   const locationFilter = locationId ? "AND d.location_id = $2" : "";
   const params = locationId ? [userId, locationId] : [userId];
@@ -33,7 +58,7 @@ export async function getAllDraftPosSales(userId: string, locationId?: number): 
   return rows;
 }
 
-export async function getDraftPosSaleById(id: number): Promise<any | undefined> {
+export async function getDraftPosSaleById(id: number): Promise<DraftPosSaleDetail | undefined> {
   const [draft] = await db.select().from(schema.draftPosSales).where(eq(schema.draftPosSales.id, id));
   if (!draft) return undefined;
 
