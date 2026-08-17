@@ -27,7 +27,7 @@ function getFactoryCompanyId(req: import("express").Request): number | undefined
 
 /** Write a single daybook entry (factory audit log). */
 async function writeDaybookEntry(
-  dbOrTx: any,
+  dbOrTx: typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0],
   opts: {
     companyId: number;
     txDate: string;
@@ -226,7 +226,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
       }
 
       let updatedCount = 0;
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
         for (const [workerId, advances] of advancesByWorker) {
           // Step 1: Reset each advance to its original amount minus manual repayments
           const balances: { id: number; bal: number }[] = [];
@@ -294,7 +294,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
 
       const today = getClientDate(req);
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
         const repayments = await tx
           .select()
           .from(factoryAdvanceRepayments)
@@ -393,7 +393,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
 
       const today = getClientDate(req);
 
-      await db.transaction(async (tx: any) => {
+      await db.transaction(async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
         // Delete all repayment records for this advance
         const repayments = await tx
           .select()

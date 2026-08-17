@@ -109,7 +109,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
     enabled: !!containerId && !isSupplierPartner,
   });
 
-  const { data: spContainerData, isLoading: spDetailLoading } = useQuery<any>({
+  const { data: spContainerData, isLoading: spDetailLoading } = useQuery({
     queryKey: [`/api/sp/containers/${containerId}`],
     queryFn: () => fetch(`/api/sp/containers/${containerId}`, { credentials: "include" }).then((r) => r.json()),
     enabled: !!containerId && isSupplierPartner,

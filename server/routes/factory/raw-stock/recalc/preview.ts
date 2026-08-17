@@ -39,7 +39,7 @@ export function registerRawStockRecalcPreviewRoutes(app: Express) {
     "/api/factory/raw-stock/recalc/preview",
     requireAuth,
     requireRole(...ADMIN_ROLES),
-    async (req: any, res: any) => {
+    async (req: import("express").Request, res: import("express").Response) => {
       try {
         const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -60,7 +60,7 @@ export function registerRawStockRecalcPreviewRoutes(app: Express) {
     "/api/factory/raw-stock/recalc/mix-batches-preview",
     requireAuth,
     requireRole(...ADMIN_ROLES),
-    async (req: any, res: any) => {
+    async (req: import("express").Request, res: import("express").Response) => {
       try {
         const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -91,7 +91,7 @@ export function registerRawStockRecalcPreviewRoutes(app: Express) {
     "/api/factory/raw-stock/recalc/apply",
     requireAuth,
     requireRole(...ADMIN_ROLES),
-    async (req: any, res: any) => {
+    async (req: any, res: import("express").Response) => {
       try {
         const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });

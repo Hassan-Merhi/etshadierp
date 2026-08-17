@@ -11,7 +11,7 @@ import {DeductionsView} from "./factoryadvancestab/components/DeductionsView";
 export default function FactoryAdvancesTab() {
   const [subTab, setSubTab] = useState("advances");
 
-  const { data: settings } = useQuery<any>({
+  const { data: settings } = useQuery({
     queryKey: ["/api/factory/settings"],
     queryFn: async () => {
       const r = await fetch("/api/factory/settings");

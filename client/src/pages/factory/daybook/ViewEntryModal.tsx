@@ -67,17 +67,17 @@ export function ViewEntryModal({
     enabled: isContainerImport,
   });
 
-  const { data: supplierBalance } = useQuery<any>({
+  const { data: supplierBalance } = useQuery({
     queryKey: [`/api/factory/suppliers/${containerDetail?.supplierId}/balance`],
     enabled: isContainerImport && !!containerDetail?.supplierId,
   });
 
-  const { data: payrollSummary } = useQuery<any>({
+  const { data: payrollSummary } = useQuery({
     queryKey: [`/api/factory/payroll/${entry.referenceId}/summary`],
     enabled: isPayrollPayment,
   });
 
-  const { data: mixBatchDetail } = useQuery<any>({
+  const { data: mixBatchDetail } = useQuery({
     queryKey: [`/api/factory/mix-batches/${entry.referenceId}`],
     enabled: isMixBatchCreated,
   });
@@ -87,7 +87,7 @@ export function ViewEntryModal({
     enabled: isMixBatchCreated,
   });
 
-  const { data: loadingOrder } = useQuery<any>({
+  const { data: loadingOrder } = useQuery({
     queryKey: [`/api/factory/customer-orders/${entry.referenceId}`],
     enabled: isLoadingCreated,
   });

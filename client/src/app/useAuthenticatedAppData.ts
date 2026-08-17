@@ -15,6 +15,11 @@ export interface FactoryAccess {
   hiddenCostFields?: string[];
 }
 
+interface CompanySettings {
+  timezone?: string;
+  posExcelImportEnabled?: boolean;
+}
+
 interface UseAuthenticatedAppDataOptions {
   selectedCompanyId?: number;
   userPresent: boolean;
@@ -44,7 +49,7 @@ export function useAuthenticatedAppData({ selectedCompanyId, userPresent, isPOS 
     prevUnreadRef.current = count;
   }, [chatUnread?.count, isPOS, toast]);
 
-  const { data: companySettings } = useQuery<any>({
+  const { data: companySettings } = useQuery<CompanySettings>({
     queryKey: companyQueryKey("/api/company-settings", selectedCompanyId),
     ...stableSettingsQueryPolicy,
     enabled: userPresent && !!selectedCompanyId,

@@ -115,7 +115,7 @@ async function lockTransferByVoucher(tx: any, voucherId: number) {
   return result.rows?.[0] ?? result[0];
 }
 
-async function loadTransferItems(tx: any, transferId: number) {
+async function loadTransferItems(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], transferId: number) {
   return tx.select().from(stockTransferItems).where(eq(stockTransferItems.transferId, transferId));
 }
 
@@ -140,7 +140,7 @@ function persistedRowsToItems(
 }
 
 async function assertCompanyScope(
-  tx: any,
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   companyId: number,
   destinationLocationId: number,
   items: StockTransferLifecycleItem[]
@@ -172,7 +172,7 @@ async function assertCompanyScope(
 }
 
 async function reverseAppliedItems(
-  tx: any,
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   companyId: number,
   destinationLocationId: number,
   items: StockTransferLifecycleItem[],
@@ -197,7 +197,7 @@ async function reverseAppliedItems(
 }
 
 async function validateAndApplyItems(
-  tx: any,
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   companyId: number,
   destinationLocationId: number,
   items: StockTransferLifecycleItem[],
@@ -226,7 +226,7 @@ async function validateAndApplyItems(
   }
 }
 
-async function replaceTransferItems(tx: any, transferId: number, items: StockTransferLifecycleItem[]) {
+async function replaceTransferItems(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], transferId: number, items: StockTransferLifecycleItem[]) {
   await tx.delete(stockTransferItems).where(eq(stockTransferItems.transferId, transferId));
   return tx
     .insert(stockTransferItems)

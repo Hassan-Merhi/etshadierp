@@ -202,7 +202,7 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
   });
 
   // ── Change history log ─────────────────────────────────────────────────────
-  app.get("/api/factory/status-builder/log", requireAuth, async (req: any, res) => {
+  app.get("/api/factory/status-builder/log", requireAuth, async (req: import("express").Request, res) => {
     try {
       const companyId = req.session.currentCompanyId!;
       const sheetId = parseOptionalId(req.query.sheetId as string | undefined);

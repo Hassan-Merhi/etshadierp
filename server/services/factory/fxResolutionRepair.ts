@@ -194,7 +194,7 @@ export interface ApplyFxResolutionRepairOptions {
   /** Called with the transaction handle AFTER the FX row update but BEFORE
    * commit, so an audit-log insert here is atomic with the update: if this
    * throws, the entire transaction (including the FX update) rolls back. */
-  onAudit?: (tx: any, result: FxResolutionApplyResult) => Promise<void>;
+  onAudit?: (tx: Parameters<Parameters<typeof db.transaction>[0]>[0], result: FxResolutionApplyResult) => Promise<void>;
 }
 
 /**

@@ -43,6 +43,12 @@ import { useFactoryVisibleSections } from "@/components/FactorySidebar";
 import { PROPERTIES_NAV_SECTIONS } from "@/components/PropertiesSidebar";
 import type { NavItem, NavSection } from "@/components/sidebar/sidebarPrimitives";
 
+interface CommandPaletteUser {
+  username?: string | null;
+  currentRole?: string | null;
+  role?: string | null;
+}
+
 interface CommandPaletteProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -51,7 +57,7 @@ interface CommandPaletteProps {
   hasFactoryAccess?: boolean;
   hasPropertiesAccess?: boolean;
   isAdminOwner?: boolean;
-  user?: any;
+  user?: CommandPaletteUser;
 }
 
 interface PageEntry {
@@ -488,7 +494,9 @@ export function CommandPalette({
   );
 
   const erpVis = useErpVisibleSections(hasErpAccess && !isPOS ? user : undefined);
-  const factoryVis = useFactoryVisibleSections(hasFactoryAccess && !isPOS ? user : undefined);
+  const factoryVis = useFactoryVisibleSections(
+    hasFactoryAccess && !isPOS && user ? { role: user.role ?? undefined } : undefined
+  );
 
   const erpPages = useMemo(
     () =>

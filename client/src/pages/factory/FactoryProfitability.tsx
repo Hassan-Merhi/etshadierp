@@ -86,7 +86,7 @@ export default function FactoryProfitability() {
   const [from, setFrom] = useState(defaults.from);
   const [to, setTo] = useState(defaults.to);
 
-  const { data: settings } = useQuery<any>({
+  const { data: settings } = useQuery({
     queryKey: ["/api/factory/settings"],
     queryFn: async () => {
       const r = await fetch("/api/factory/settings");

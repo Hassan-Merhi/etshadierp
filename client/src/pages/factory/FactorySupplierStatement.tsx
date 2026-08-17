@@ -88,7 +88,7 @@ export default function FactorySupplierStatement() {
     enabled: !!companyId,
   });
 
-  const { data: statement, isLoading: statementLoading } = useQuery<any>({
+  const { data: statement, isLoading: statementLoading } = useQuery({
     queryKey: ["/api/factory/suppliers", supplierId, "statement"],
     queryFn: async () => {
       const res = await fetch(`/api/factory/suppliers/${supplierId}/statement`, { credentials: "include" });

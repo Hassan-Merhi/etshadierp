@@ -469,7 +469,7 @@ export default function Accounts() {
     data: rawTransactionData,
     isLoading: transactionsLoading,
     error: transactionsQueryError,
-  } = useQuery<any>({
+  } = useQuery({
     queryKey: selectedAccount
       ? [
           "account-statement",

@@ -110,7 +110,7 @@ export function normalizePendingRevisionItems(items: PendingRevisionItemInput[])
   return normalized;
 }
 
-async function lockTransferScope(tx: any, transferId: number) {
+async function lockTransferScope(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], transferId: number) {
   const result = await tx.execute(sql`
     SELECT
       stv.id,
@@ -141,7 +141,7 @@ function assertLockedTransfer(locked: any, companyId: number): asserts locked {
 }
 
 async function assertCompanyScope(
-  tx: any,
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   companyId: number,
   destinationLocationId: number,
   items: Array<{ sourceLocationId: number; stockItemId: number }>

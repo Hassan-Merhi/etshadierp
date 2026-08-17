@@ -14,6 +14,10 @@ import type { Location } from "@shared/schema";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { StockNameUpdateImport } from "@/components/StockNameUpdateImport";
 
+interface OpeningBalanceImportResult {
+  message?: string;
+}
+
 interface CombinedImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -64,9 +68,10 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
     mutationFn: async (
       data: Array<{ barcode: string; openingQty: string; openingRate: string; openingValue: string }>
     ) => {
-      return await apiRequest("POST", "/api/stock-items/import-opening-balances", { openingBalances: data });
+      const response = await apiRequest("POST", "/api/stock-items/import-opening-balances", { openingBalances: data });
+      return response.json() as Promise<OpeningBalanceImportResult>;
     },
-    onSuccess: (result: any) => {
+    onSuccess: (result) => {
       toast({
         title: "Success",
         description: result.message || "Opening balances imported successfully",

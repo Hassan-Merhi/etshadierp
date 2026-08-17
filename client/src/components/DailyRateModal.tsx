@@ -25,6 +25,16 @@ const rateFormSchema = z.object({
 
 type RateFormData = z.infer<typeof rateFormSchema>;
 
+interface DailyRateCompany {
+  baseCurrency?: string | null;
+  displayCurrency?: string | null;
+}
+
+interface DailyExchangeRate {
+  rate?: string | number | null;
+  effectiveDate?: string | Date | null;
+}
+
 interface DailyRateModalProps {
   companyId: number;
 }
@@ -75,14 +85,14 @@ export function DailyRateModal({ companyId }: DailyRateModalProps) {
     },
   });
 
-  const { data: company } = useQuery<any>({
+  const { data: company } = useQuery<DailyRateCompany>({
     queryKey: [`/api/companies/${companyId}`],
     enabled: !!companyId,
   });
 
   const { data: todayRateCheck, isLoading: isCheckingRate } = useQuery<{
     hasRate: boolean;
-    latestRate?: any;
+    latestRate?: DailyExchangeRate;
     today: string;
   }>({
     queryKey: ["/api/exchange-rates/check-today", companyId],
@@ -101,7 +111,7 @@ export function DailyRateModal({ companyId }: DailyRateModalProps) {
   });
 
   const previousRate = todayRateCheck?.latestRate;
-  const previousRateValue = previousRate?.rate ? parseFloat(previousRate.rate) : null;
+  const previousRateValue = previousRate?.rate ? parseFloat(String(previousRate.rate)) : null;
   const previousRateDate = previousRate?.effectiveDate
     ? new Date(previousRate.effectiveDate).toLocaleDateString()
     : null;

@@ -23,8 +23,13 @@ export interface PosNavItem {
   badge?: number;
 }
 
+interface PosNavigationUser {
+  canAccessCustomers?: boolean;
+  role?: string | null;
+}
+
 interface UsePosNavigationItemsParams {
-  user: any;
+  user: PosNavigationUser;
   posImportEnabled: boolean;
   chatUnread: { count: number } | undefined;
 }

@@ -33,6 +33,10 @@ import {
   POImportResult,
   FilePatchDraft,
   PushResult,
+  VoucherSearchResult,
+  AccountQueryResult,
+  VerifyContainerDraft,
+  DataQueryResult,
 } from "./chat-widget/chatWidgetTypes";
 
 import { AlertsDigest } from "./chat-widget/AlertsDigest";
@@ -61,19 +65,19 @@ export function ChatWidget() {
   const [voucherSubmitting, setVoucherSubmitting] = useState(false);
   const [pendingStockAdj, setPendingStockAdj] = useState<StockAdjustmentDraft | null>(null);
   const [stockAdjSubmitting, setStockAdjSubmitting] = useState(false);
-  const [voucherSearchResults, setVoucherSearchResults] = useState<any[] | null>(null);
+  const [voucherSearchResults, setVoucherSearchResults] = useState<VoucherSearchResult[] | null>(null);
   const [pendingStockItem, setPendingStockItem] = useState<StockItemDraft | null>(null);
   const [stockItemSubmitting, setStockItemSubmitting] = useState(false);
   const [pendingPriceUpdate, setPendingPriceUpdate] = useState<PriceUpdateDraft | null>(null);
   const [priceUpdateSubmitting, setPriceUpdateSubmitting] = useState(false);
-  const [accountQueryResult, setAccountQueryResult] = useState<any>(null);
+  const [accountQueryResult, setAccountQueryResult] = useState<AccountQueryResult | null>(null);
   const [poDraft, setPoDraft] = useState<POImportDraft | null>(null);
   const [poDraftUploading, setPoDraftUploading] = useState(false);
   const [poDraftSubmitting, setPoDraftSubmitting] = useState(false);
   const [poDraftResult, setPoDraftResult] = useState<POImportResult | null>(null);
   const [poDraftError, setPoDraftError] = useState<string | null>(null);
-  const [verifyContainerDraft, setVerifyContainerDraft] = useState<any>(null);
-  const [dataQueryResult, setDataQueryResult] = useState<any>(null);
+  const [verifyContainerDraft, setVerifyContainerDraft] = useState<VerifyContainerDraft | null>(null);
+  const [dataQueryResult, setDataQueryResult] = useState<DataQueryResult | null>(null);
   const [pendingStockTransfer, setPendingStockTransfer] = useState<StockTransferDraft | null>(null);
   const [pendingStockTransferBatch, setPendingStockTransferBatch] = useState<StockTransferDraft[] | null>(null);
   const [stockTransferSubmitting, setStockTransferSubmitting] = useState(false);

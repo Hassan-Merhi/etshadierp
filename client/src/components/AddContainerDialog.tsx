@@ -61,6 +61,11 @@ function fmt2(v: unknown) {
   return isNaN(n) ? "$0.00" : `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+interface ErpSupplierOption {
+  id: number;
+  legalName: string;
+}
+
 interface AddContainerDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -71,7 +76,7 @@ interface AddContainerDialogProps {
 function ErpContainerForm({ onOpenChange }: { onOpenChange: (open: boolean) => void }) {
   const { toast } = useToast();
 
-  const { data: suppliers } = useQuery<any[]>({
+  const { data: suppliers } = useQuery<ErpSupplierOption[]>({
     queryKey: ["/api/suppliers"],
   });
 

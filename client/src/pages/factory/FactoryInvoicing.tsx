@@ -28,7 +28,7 @@ export default function FactoryInvoicing() {
     myAccess.pageKeys.includes("factory/sales/loadings");
 
   // ── Pending loadings — mirrors FactoryLoadingsHub restrictions ───────────
-  const { data: settings } = useQuery<any>({
+  const { data: settings } = useQuery({
     queryKey: ["/api/factory/settings"],
     queryFn: async () => {
       const r = await fetch("/api/factory/settings");

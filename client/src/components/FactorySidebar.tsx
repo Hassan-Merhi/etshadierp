@@ -174,7 +174,12 @@ const FACTORY_PINNED_DEFAULTS: NavItem[] = [
   { title: "Vouchers", url: "/factory/vouchers", icon: FileText },
 ];
 
-export function useFactoryVisibleSections(user?: { role?: string | undefined }): {
+interface FactorySidebarUser {
+  username?: string | null;
+  role?: string | null;
+}
+
+export function useFactoryVisibleSections(user?: FactorySidebarUser): {
   sections: FactoryNavSection[];
   isPinnedVisible: (item: NavItem) => boolean;
   isAdmin: boolean;
@@ -262,7 +267,7 @@ export function useFactoryVisibleSections(user?: { role?: string | undefined }):
   return { sections, isPinnedVisible, isAdmin, isDeveloper, isPrivileged };
 }
 
-export function FactorySidebar({ user }: { user?: any }) {
+export function FactorySidebar({ user }: { user?: FactorySidebarUser }) {
   const { toast } = useToast();
   const { conflictCount } = useConnectivity();
   const { selectedCompany } = useCompany();
@@ -387,7 +392,7 @@ export function FactorySidebar({ user }: { user?: any }) {
               </Badge>
             </a>
           )}
-          {!["Admin", "Owner", "Developer"].includes(user?.role) && (
+          {!["Admin", "Owner", "Developer"].includes(user?.role ?? "") && (
             <SidebarFlatLink
               href="/my-settings"
               icon={KeyRound}
@@ -410,7 +415,7 @@ export function FactorySidebar({ user }: { user?: any }) {
         </div>
       </SidebarContent>
 
-      <ModuleFooter user={user} accent={MODULE_ACCENT.factory} />
+      <ModuleFooter user={user ? { username: user.username ?? undefined, role: user.role ?? undefined } : undefined} accent={MODULE_ACCENT.factory} />
     </Sidebar>
   );
 }

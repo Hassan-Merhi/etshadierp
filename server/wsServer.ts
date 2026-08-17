@@ -12,6 +12,7 @@ let resolveSession: SessionResolver | null = null;
 
 /** Runs the app's session middleware over a bare upgrade request. */
 type SessionResolver = (request: IncomingMessage) => Promise<number | null>;
+type SessionUpgradeRequest = IncomingMessage & { session?: { currentCompanyId?: unknown } };
 
 /**
  * Every client used to receive every broadcast, so a sale in one company woke
@@ -56,11 +57,15 @@ function sessionCompanyResolver(sessionMiddleware: RequestHandler): SessionResol
       try {
         // The upgrade request carries the session cookie, and express-session
         // reads it from the same store the HTTP routes use.
-        sessionMiddleware(request as any, upgradeResponseStub() as any, () => {
-          const session = (request as any).session;
+        sessionMiddleware(
+          request as unknown as Parameters<RequestHandler>[0],
+          upgradeResponseStub() as unknown as Parameters<RequestHandler>[1],
+          () => {
+          const session = (request as SessionUpgradeRequest).session;
           const companyId = Number(session?.currentCompanyId);
           finish(Number.isInteger(companyId) && companyId > 0 ? companyId : null);
-        });
+          },
+        );
       } catch (error) {
         logger.warn("[WS] Could not resolve the session for a socket; it will receive every broadcast.", { error });
         finish(null);

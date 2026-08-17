@@ -179,7 +179,7 @@ export function DataToolsTab() {
       const data = await selectedFile.arrayBuffer();
       const workbook = await read(data);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = utils.sheet_to_json<any>(worksheet);
+      const jsonData = utils.sheet_to_json(worksheet);
       if (jsonData.length === 0) {
         toast({ title: "Empty File", description: "The Excel file is empty.", variant: "destructive" });
         return;

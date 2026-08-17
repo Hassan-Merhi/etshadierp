@@ -10,7 +10,7 @@ import { firstRow } from "../../../lib/queryResult";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-export function getCompanyId(req: any): number | null {
+export function getCompanyId(req: import("express").Request): number | null {
   return req.session.factoryCompanyId || req.session.currentCompanyId || null;
 }
 
@@ -18,7 +18,7 @@ export function getUsername(req: any): string {
   return req.session.username || req.session.user?.username || "unknown";
 }
 
-export async function isAdmin(req: any, companyId: number): Promise<boolean> {
+export async function isAdmin(req: import("express").Request, companyId: number): Promise<boolean> {
   try {
     const userId = req.session.userId;
     if (!userId) return false;
@@ -34,7 +34,7 @@ export async function isAdmin(req: any, companyId: number): Promise<boolean> {
 
 // Recalculate and update the batch totals — not needed for batches themselves
 // but we do need to update batch status to LOADING when first ride is created
-export async function ensureBatchStatus(tx: any, batchId: number, companyId: number, status: string) {
+export async function ensureBatchStatus(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], batchId: number, companyId: number, status: string) {
   await tx
     .update(customerDispatchBatches)
     .set({ status, updatedAt: new Date() })
