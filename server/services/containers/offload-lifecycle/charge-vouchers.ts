@@ -2,6 +2,10 @@ import {
   infrastructurePostingIdentity,
   insertInfrastructureVoucherTx,
 } from "../../accounting/infrastructureVoucherIdentity";
+import {
+  infrastructurePostingIdentity,
+  insertInfrastructureVoucherTx,
+} from "../../accounting/infrastructureVoucherIdentity";
 import { and, eq, isNull } from "drizzle-orm";
 import * as schema from "@shared/schema";
 
