@@ -22,7 +22,13 @@ const PHASE4_OPERATIONAL_POST_PATHS = new Set([
   "/api/factory/payrolls/mark-paid-bulk",
 ]);
 
-const pendingAccountingRequestIds = new Map<string, { requestId: string; createdAt: number }>();
+type PendingAccountingRequestIdentity = {
+  requestId: string;
+  createdAt: number;
+  outcomeUncertain?: boolean;
+};
+
+const pendingAccountingRequestIds = new Map<string, PendingAccountingRequestIdentity>();
 
 type AccountingRequestPayload = Record<string, unknown>;
 
@@ -156,7 +162,11 @@ function hydratePendingAccountingIdentities(): void {
       const [key, value] = entry;
       if (typeof key !== "string" || !isRecord(value)) continue;
       if (typeof value.requestId !== "string" || typeof value.createdAt !== "number") continue;
-      pendingAccountingRequestIds.set(key, { requestId: value.requestId, createdAt: value.createdAt });
+      pendingAccountingRequestIds.set(key, {
+        requestId: value.requestId,
+        createdAt: value.createdAt,
+        outcomeUncertain: value.outcomeUncertain === true,
+      });
     }
   } catch {
     // Ignore corrupt browser storage and start with the in-memory set.
@@ -188,9 +198,26 @@ export function attachAccountingRequestIdentity(method: string, url: string, dat
   return { ...data, clientRequestId: requestId };
 }
 
-export function releaseAccountingRequestIdentity(method: string, url: string, data: unknown): void {
+export function markAccountingRequestOutcomeUncertain(method: string, url: string, data: unknown): void {
   if (!isProtectedAccountingRequest(method, url, data)) return;
-  pendingAccountingRequestIds.delete(accountingPayloadKey(method, url, data));
+  const key = accountingPayloadKey(method, url, data);
+  const existing = pendingAccountingRequestIds.get(key);
+  if (!existing) return;
+  pendingAccountingRequestIds.set(key, { ...existing, outcomeUncertain: true });
+  persistPendingAccountingIdentities();
+}
+
+export function releaseAccountingRequestIdentity(
+  method: string,
+  url: string,
+  data: unknown,
+  definiteOutcome = false
+): void {
+  if (!isProtectedAccountingRequest(method, url, data)) return;
+  const key = accountingPayloadKey(method, url, data);
+  const existing = pendingAccountingRequestIds.get(key);
+  if (existing?.outcomeUncertain && !definiteOutcome) return;
+  pendingAccountingRequestIds.delete(key);
   persistPendingAccountingIdentities();
 }
 
