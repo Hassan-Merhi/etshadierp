@@ -2,21 +2,10 @@
  * The evidence ratchet holds, and holds against the ways ratchets usually fail.
  *
  * The repository already gates whether a sensitive write route is *tested*
- * (audit-write-route-coverage.mjs, at zero). Nothing gated whether a write
- * leaves the trail the rest of the system reconciles against: a file can change
- * inventory without a canonical movement journal row, or create a voucher with
- * no idempotency key, and every existing gate stays green.
- *
- * Both are backlogs rather than zeros, so this is the lint-warning pattern —
- * measure, pin, forbid growth. Two failure modes matter more than the count:
- *
- *   A file joining the backlog while another leaves it. The count is unchanged
- *   and the ratchet, if it only counted, would pass — while a brand new write
- *   path silently ships with no evidence behind it.
- *
- *   The measurement quietly matching nothing. A detector that stopped finding
- *   inventory writes would report a backlog of zero, which reads as a clean
- *   bill of health and is indistinguishable from success.
+ * (audit-write-route-coverage.mjs, at zero). This audit asks whether a write
+ * leaves the trail the rest of the system reconciles against. Stock evidence
+ * remains a reviewed backlog; voucher request identity is now closed except for
+ * the exact compatibility set whose replay/source guards were reviewed.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -53,6 +42,9 @@ const voucherReview = JSON.parse(
     operationalWithoutRequestIdentity: number;
     phase3InfrastructureCompleted: number;
     phase4OperationalCompleted: number;
+    phase5OperationalCompleted: number;
+    phase6SpecialPurposeCompleted: number;
+    phase7PostReviewSafeWriters: number;
     unreviewed: number;
   };
   reviewed: Record<string, { verdict: string; reason: string; files: string[] }>;
@@ -64,6 +56,7 @@ const measured = auditWriteEvidence() as {
   scannedFiles: number;
   unjournalledStockWrites: string[];
   voucherWritesWithoutRequestIdentity: string[];
+  unapprovedDirectVoucherCreation: string[];
   journalledStockWrites: number;
   voucherWritesWithRequestIdentity: number;
 };
@@ -102,7 +95,7 @@ describe("write evidence ratchet", () => {
     expect(notes.join(" ").includes("second-writer")).toBe(true);
   });
 
-  it("is measuring something, so an empty backlog cannot pass as success", () => {
+  it("is measuring something, so an empty detector cannot pass as success", () => {
     expect(measured.scannedFiles).toBeGreaterThan(500);
     expect(measured.unjournalledStockWrites.length).toBeGreaterThan(0);
     expect(measured.voucherWritesWithoutRequestIdentity.length).toBeGreaterThan(0);
@@ -135,16 +128,22 @@ describe("write evidence ratchet", () => {
     expect(baseline.stockWritesWithoutJournalEvidence.reviewed.unjournalled.files.length).toBeGreaterThan(0);
   });
 
-  it("accounts for every active voucher creation path in the file-by-file review", () => {
+  it("keeps only the exact 15 reviewed compatibility writers in the active voucher backlog", () => {
     const classified = Object.values(voucherReview.reviewed).flatMap((group) => group.files);
 
     expect(voucherReview.reviewState).toBe("REVIEWED FILE BY FILE");
+    expect(voucherReview.summary.activeReviewed).toBe(15);
+    expect(voucherReview.summary.explicitReplayGuard).toBe(15);
+    expect(voucherReview.summary.migrationImportRepair).toBe(0);
+    expect(voucherReview.summary.operationalWithoutRequestIdentity).toBe(0);
+    expect(baseline.voucherWritesWithoutRequestIdentity.ceiling).toBe(15);
     expect([...classified, ...voucherReview.unreviewed].sort()).toEqual(
       [...baseline.voucherWritesWithoutRequestIdentity.files].sort()
     );
+    expect(measured.voucherWritesWithoutRequestIdentity.sort()).toEqual(
+      [...baseline.voucherWritesWithoutRequestIdentity.files].sort()
+    );
     expect(new Set(classified).size, "a voucher file is classified twice").toBe(classified.length);
-    expect(voucherReview.summary.activeReviewed).toBe(baseline.voucherWritesWithoutRequestIdentity.files.length);
-    expect(baseline.voucherWritesWithoutRequestIdentity.ceiling).toBe(48);
   });
 
   it("keeps the voucher unreviewed remainder empty", () => {
@@ -152,12 +151,8 @@ describe("write evidence ratchet", () => {
     expect(voucherReview.summary.unreviewed).toBe(0);
   });
 
-  it("keeps the real voucher backlog explicit rather than hiding it in review labels", () => {
-    const realBacklog = voucherReview.reviewed["operational-without-request-identity"];
-    expect(realBacklog.verdict).toBe("genuine Phase 5 backlog");
-    expect(realBacklog.files.length).toBe(voucherReview.summary.operationalWithoutRequestIdentity);
-    expect(realBacklog.files.length).toBeGreaterThan(0);
-
+  it("keeps every active compatibility classification explicit and documented", () => {
+    expect(Object.keys(voucherReview.reviewed)).toEqual(["explicit-replay-guard"]);
     for (const [category, group] of Object.entries(voucherReview.reviewed)) {
       expect(group.files.length, `${category} classifies no files`).toBeGreaterThan(0);
       expect(group.reason.length, `${category} has no stated reason`).toBeGreaterThan(120);
@@ -165,37 +160,48 @@ describe("write evidence ratchet", () => {
     }
   });
 
-  it("keeps voucher review summary counts honest", () => {
-    expect(voucherReview.summary.explicitReplayGuard).toBe(
-      voucherReview.reviewed["explicit-replay-guard"].files.length
-    );
-    expect(voucherReview.summary.migrationImportRepair).toBe(
-      voucherReview.reviewed["migration-import-repair"].files.length
-    );
-    expect(
-      voucherReview.summary.explicitReplayGuard +
-        voucherReview.summary.migrationImportRepair +
-        voucherReview.summary.operationalWithoutRequestIdentity
-    ).toBe(voucherReview.summary.activeReviewed);
-  });
-
-  it("locks the 11 Phase 3 infrastructure writers as completed and out of the active backlog", () => {
-    const completed = voucherReview.completed["phase-3-infrastructure-writers"];
+  it("locks all completed voucher cohorts out of the active and measured backlog", () => {
     const active = new Set(baseline.voucherWritesWithoutRequestIdentity.files);
     const measuredBacklog = new Set(measured.voucherWritesWithoutRequestIdentity);
+    const expectedCounts: Record<string, number> = {
+      "phase-3-infrastructure-writers": 11,
+      "phase-4-operational-writers": 22,
+      "phase-5-operational-writers": 22,
+      "phase-6-deterministic-source-writers": 6,
+      "phase-6-intrinsic-replay-safe-writers": 5,
+      "phase-7-post-review-safe-writers": 1,
+    };
 
-    expect(completed.verdict).toContain("phase 3 completed");
-    expect(completed.reason.length).toBeGreaterThan(120);
-    expect(completed.files).toHaveLength(11);
-    expect(completed.files.length).toBe(voucherReview.summary.phase3InfrastructureCompleted);
-    expect(completed.files.filter((file) => active.has(file))).toEqual([]);
-    expect(completed.files.filter((file) => measuredBacklog.has(file))).toEqual([]);
-    expect(new Set(completed.files).size).toBe(completed.files.length);
-    expect(voucherReview.summary.initialReviewed).toBe(
+    for (const [groupName, expectedCount] of Object.entries(expectedCounts)) {
+      const completed = voucherReview.completed[groupName];
+      expect(completed, `${groupName} missing`).toBeTruthy();
+      expect(completed.reason.length, `${groupName} reason`).toBeGreaterThan(120);
+      expect(completed.files).toHaveLength(expectedCount);
+      expect(completed.files.filter((file) => active.has(file))).toEqual([]);
+      expect(completed.files.filter((file) => measuredBacklog.has(file))).toEqual([]);
+      expect(new Set(completed.files).size).toBe(completed.files.length);
+    }
+
+    expect(voucherReview.summary.phase3InfrastructureCompleted).toBe(11);
+    expect(voucherReview.summary.phase4OperationalCompleted).toBe(22);
+    expect(voucherReview.summary.phase5OperationalCompleted).toBe(22);
+    expect(voucherReview.summary.phase6SpecialPurposeCompleted).toBe(11);
+    expect(voucherReview.summary.phase7PostReviewSafeWriters).toBe(1);
+  });
+
+  it("keeps the original 81-path review accounting honest", () => {
+    expect(voucherReview.summary.initialReviewed).toBe(81);
+    expect(
       voucherReview.summary.activeReviewed +
         voucherReview.summary.phase3InfrastructureCompleted +
-        voucherReview.summary.phase4OperationalCompleted
-    );
+        voucherReview.summary.phase4OperationalCompleted +
+        voucherReview.summary.phase5OperationalCompleted +
+        voucherReview.summary.phase6SpecialPurposeCompleted
+    ).toBe(voucherReview.summary.initialReviewed);
+  });
+
+  it("rejects any new unreviewed direct voucher creator", () => {
+    expect(measured.unapprovedDirectVoucherCreation).toEqual([]);
   });
 
   it("credits the write paths that do carry evidence", () => {
