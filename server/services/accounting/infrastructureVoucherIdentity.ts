@@ -1,6 +1,6 @@
 import { createHash } from "crypto";
 import { and, eq, sql } from "drizzle-orm";
-import { accountingPostingRequests, auditLog, vouchers } from "@shared/schema";
+import { accountingPostingRequests, auditLog, voucherEntries, vouchers } from "@shared/schema";
 import { assertTransactionCompanyScope } from "../security/transactionCompanyScope";
 import { PostingValidationError, type PostingSourceIdentity } from "./centralPostingEngine";
 
@@ -92,8 +92,10 @@ function assertStoredIdentityMatches(input: {
  * still build voucher entries themselves. The durable identity lives in the
  * same accounting_posting_requests table used by the Phase 2 central engine.
  *
- * Later operational phases can migrate these callers to postBalancedVoucherTx
- * without changing their source identity contract.
+ * On replay inside an existing transaction we clear the old voucher-entry rows
+ * before returning the same voucher. The caller then rebuilds those rows using
+ * its existing logic. If rebuilding fails, the surrounding transaction rolls
+ * back and restores the prior rows, so retries cannot accumulate duplicates.
  */
 export async function insertInfrastructureVoucherTx(
   tx: any,
@@ -141,6 +143,7 @@ export async function insertInfrastructureVoucherTx(
         `Idempotency marker ${source.idempotencyKey} references a missing voucher`
       );
     }
+    await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, existing.id));
     return { voucher: existing, replayed: true };
   }
 
@@ -175,6 +178,12 @@ export async function insertInfrastructureVoucherTx(
   return { voucher: created, replayed: false };
 }
 
+/**
+ * Non-nested convenience wrapper for storage APIs that currently create only
+ * the voucher row. It still guarantees one voucher row per source identity;
+ * operational phases will move those callers to the fully transaction-owned
+ * balanced posting boundary.
+ */
 export async function insertInfrastructureVoucher(
   database: DatabaseLike,
   voucher: VoucherInsert,
