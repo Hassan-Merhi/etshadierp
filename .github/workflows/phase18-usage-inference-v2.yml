@@ -1,0 +1,57 @@
+name: Phase 18 Usage-derived Typing v2
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+env:
+  CI: true
+jobs:
+  infer:
+    if: contains(github.event.head_commit.message, '[phase18-usage-inference-v2]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v7
+        with: {ref: main, fetch-depth: 0}
+      - uses: actions/setup-node@v6
+        with: {node-version: '22.14.0', cache: npm}
+      - run: npm ci
+      - name: Derive concrete types from usage
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          npm run check
+          git show origin/agent/lint-phase18-inference2:scripts/phase18-usage-infer.cjs > .phase18-usage-infer.cjs
+          sed -i "s#/tmp/inference2.files#.phase18-usage.files#g" .phase18-usage-infer.cjs
+          node .phase18-usage-infer.cjs
+      - name: Compiler-gate inferred files
+        shell: bash
+        run: |
+          set -euo pipefail
+          green=0
+          for attempt in $(seq 1 20); do
+            set +e; npm run check >.phase18-usage-check.log 2>&1; rc=$?; set -e
+            if [ "$rc" -eq 0 ]; then green=1; echo "USAGE_GREEN_ATTEMPT=$attempt"; break; fi
+            mapfile -t errs < <(sed -nE 's#^(.+\.(ts|tsx))\([0-9]+,[0-9]+\): error TS[0-9]+:.*#\1#p' .phase18-usage-check.log | sort -u)
+            reverted=0
+            for f in "${errs[@]}"; do
+              if [ -f .phase18-usage.files ] && grep -Fxq "$f" .phase18-usage.files; then
+                git restore --source=HEAD --worktree -- "$f"
+                grep -Fxv "$f" .phase18-usage.files > .phase18-next || true
+                mv .phase18-next .phase18-usage.files
+                reverted=$((reverted+1))
+              fi
+            done
+            echo "USAGE_ROLLBACK attempt=$attempt errors=${#errs[@]} reverted=$reverted"
+            if [ "$reverted" -eq 0 ]; then tail -n 120 .phase18-usage-check.log; break; fi
+          done
+          [ "$green" = 1 ] || { git reset --hard HEAD; exit 0; }
+          rm -f .phase18-usage-infer.cjs .phase18-usage.files .phase18-usage-check.log
+          git add client/src server shared
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'refactor: infer concrete types from usage [phase18-usage-types] [skip ci]'
+          for attempt in 1 2 3 4 5; do git fetch origin main; git rebase origin/main; npm run check; if git push origin HEAD:main; then exit 0; fi; done
+          exit 1

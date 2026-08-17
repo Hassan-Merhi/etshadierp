@@ -36,7 +36,7 @@ export default function SpOpeningStock() {
     if (b > 0 || l > 0) setFinalUC(String((b + l).toFixed(6)));
   }, [baseUC, landedUC]);
 
-  const { data: past = [], isLoading: pastLoading } = useQuery<any[]>({
+  const { data: past = [], isLoading: pastLoading } = useQuery({
     queryKey: ["/api/sp/opening-stock"],
   });
 

@@ -44,7 +44,7 @@ import { useAdminOverride } from "@/hooks/use-admin-override";
 import type { BaleProduct, BaleLabelPrint } from "@shared/schema";
 import { BaleWeightEditDialog, type WeightEditBale } from "@/components/BaleWeightEditDialog";
 
-import type { SearchMode } from "./barcodelookup/types";
+import type { ArticleLookupResult, ReferenceLookupResult, SearchMode } from "./barcodelookup/types";
 import { BaleStatusBadge } from "./barcodelookup/components/BaleStatusBadge";
 import { InfoRow } from "./barcodelookup/components/InfoRow";
 export default function BarcodeLookup() {
@@ -54,10 +54,7 @@ export default function BarcodeLookup() {
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
 
-  const [articleResult, setArticleResult] = useState<{
-    product: BaleProduct | null;
-    labelPrints: BaleLabelPrint[];
-  } | null>(null);
+  const [articleResult, setArticleResult] = useState<ArticleLookupResult | null>(null);
 
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
 
@@ -79,81 +76,7 @@ export default function BarcodeLookup() {
 
   const [weightEditBale, setWeightEditBale] = useState<WeightEditBale | null>(null);
 
-  const [referenceResult, setReferenceResult] = useState<{
-    labelPrint: BaleLabelPrint | null;
-    product: BaleProduct | null;
-    baleInfo: {
-      id: number;
-      baleCode: string;
-      status: string;
-      weightKg: string;
-      costPerKg: string;
-      totalCost: string;
-      productName: string | null;
-      grade: string | null;
-      stockEntryDate: string | null;
-      pressedAt: string | null;
-      finalizedAt: string | null;
-      workerName: string | null;
-      createdAt: string | null;
-      updatedAt: string | null;
-      deletedAt: string | null;
-    } | null;
-    locationInfo: { id: number; name: string; city: string | null; state: string | null } | null;
-    pressingBatch: {
-      id: number;
-      status: string;
-      expectedCount: number;
-      finalizedAt: string | null;
-      notes: string | null;
-    } | null;
-    mixBatch: {
-      id: number;
-      batchCode: string;
-      batchNumber: string | null;
-      name: string | null;
-      batchDate: string | null;
-      totalWeightKg: string;
-      costPerKg: string;
-      status: string;
-      operatorUser: string | null;
-    } | null;
-    containers_used: Array<{
-      id: number;
-      containerNumber: string;
-      origin: string | null;
-      arrivalDate: string | null;
-      status: string;
-      supplierName: string | null;
-      weightKgUsed: string | null;
-      currencyCode: string;
-      ratePerKg: string | null;
-    }>;
-    loadedOnOrder: {
-      orderId: number;
-      invoiceNumber: string | null;
-      orderDate: string;
-      status: string;
-      containerNumber: string | null;
-      shippingCompany: string | null;
-      containerNotes: string | null;
-      loadingStartedAt: string | null;
-      loadingFinalizedAt: string | null;
-      grandTotal: string;
-      totalQtyBales: number;
-      customerName: string | null;
-      priceUsed: string;
-      baleWeight: string;
-      scannedBy: string | null;
-    } | null;
-    auditHistory: Array<{
-      id: number;
-      action: string;
-      username: string;
-      changes: Record<string, { old: any; new: any }> | null;
-      createdAt: string;
-    }>;
-  } | null>(null);
+  const [referenceResult, setReferenceResult] = useState<ReferenceLookupResult | null>(null);
 
   const referenceLookup = useMutation({
     mutationFn: async (refNum: string) => {
@@ -446,7 +369,7 @@ export default function BarcodeLookup() {
       setSearchValue(ref);
       setTimeout(() => referenceLookup.mutate(ref), 0);
     }
-  }, []); 
+  }, []);
 
   const handleSearch = () => {
     if (!searchValue.trim()) return;

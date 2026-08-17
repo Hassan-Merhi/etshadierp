@@ -47,7 +47,7 @@ export function RoleSummaryRow({ role, companyName, locationNames, isEditing, on
   const isPrivileged = ["Admin", "Owner", "Developer"].includes(role.role);
   const canShowRestrictions = !NON_RESTRICTABLE_ROLES.includes(role.role) && !!role.companyId;
 
-  const { data: allPermissions = [] } = useQuery<any[]>({
+  const { data: allPermissions = [] } = useQuery({
     queryKey: ["/api/settings/role-permissions", role.companyId],
     queryFn: async () => {
       const res = await fetch(`/api/settings/role-permissions?companyId=${role.companyId}`, { credentials: "include" });

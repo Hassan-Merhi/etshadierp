@@ -113,7 +113,7 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
   const displayAdjustmentTotal =
     currentAdjustmentType === "Mixed" ? productionTotal - consumptionTotal : consumptionTotal + productionTotal;
 
-  const { data: locationInventory = [] } = useQuery<any[]>({
+  const { data: locationInventory = [] } = useQuery({
     queryKey: ["/api/adjustment-location-inventory", adjustmentLocationId],
     enabled: adjustmentLocationId > 0,
     queryFn: async () => {

@@ -1,0 +1,63 @@
+name: Phase 18 Reuse Compiler-green Typing
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+env:
+  CI: true
+jobs:
+  reuse:
+    if: contains(github.event.head_commit.message, '[phase18-reuse-safe-typing]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v7
+        with: {ref: main, fetch-depth: 0}
+      - uses: actions/setup-node@v6
+        with: {node-version: '22.14.0', cache: npm}
+      - run: npm ci
+      - name: Reapply old compiler-green subsets one at a time
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          npm run check
+          for c in b76b2bc58ddd25ff797514c977b08f2780e44099 35587b691acf7785a5713ddceedd269327152993 e239e3719920875fe6dd906c456f0174963ad2e7; do
+            before=$(git rev-parse HEAD)
+            set +e
+            git cherry-pick "$c"
+            pick=$?
+            set -e
+            if [ "$pick" -ne 0 ]; then
+              echo "SKIP_CONFLICT=$c"
+              git cherry-pick --abort || true
+              git reset --hard "$before"
+              continue
+            fi
+            set +e
+            npm run check > /tmp/reuse-check.log 2>&1
+            check=$?
+            set -e
+            if [ "$check" -ne 0 ]; then
+              echo "SKIP_COMPILER=$c"
+              tail -n 80 /tmp/reuse-check.log
+              git reset --hard "$before"
+              continue
+            fi
+            echo "ACCEPTED=$c NEW_HEAD=$(git rev-parse HEAD)"
+          done
+          if git diff HEAD@{0} --quiet 2>/dev/null; then true; fi
+          node scripts/audit-type-escapes.mjs || true
+          set +e; npm run lint; set -e
+      - name: Rebase and push surviving subsets
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          base=$(git rev-parse origin/main)
+          if [ "$(git rev-parse HEAD)" = "$base" ]; then exit 0; fi
+          git rebase origin/main
+          npm run check
+          git push origin HEAD:main

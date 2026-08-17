@@ -58,3 +58,17 @@ function fmt(n: number | null | undefined, decimals = 2): string {
   if (n == null) return "-";
   return n.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
+
+export function isSupplierProfitQueryEnabled(
+  supplierId: string,
+  sourceType: "all" | "proforma" | "otw_containers",
+  proformaId: string,
+  otwContainerIds: readonly number[]
+): boolean {
+  return (
+    Boolean(supplierId) &&
+    (sourceType === "all" ||
+      (sourceType === "proforma" && Boolean(proformaId)) ||
+      (sourceType === "otw_containers" && otwContainerIds.length > 0))
+  );
+}

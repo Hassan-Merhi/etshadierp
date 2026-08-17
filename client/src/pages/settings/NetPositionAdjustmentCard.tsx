@@ -47,7 +47,7 @@ export function NetPositionAdjustmentCard() {
     queryKey: ["/api/auth/me"],
   });
 
-  const { data: companySettings } = useQuery<any>({
+  const { data: companySettings } = useQuery({
     queryKey: ["/api/company-settings", selectedCompany?.id],
     enabled: !!selectedCompany?.id,
     queryFn: async () => {

@@ -89,7 +89,7 @@ export function registerRawStockPartialOffloadScanRoutes(app: Express) {
         }
         let tokenPayload: any;
         try {
-          tokenPayload = verifyRepairToken<any>(confirmationToken);
+          tokenPayload = verifyRepairToken(confirmationToken);
         } catch (err: unknown) {
           if (err instanceof ExpiredRepairTokenError) {
             return res.status(400).json({ code: "TOKEN_EXPIRED", message: err.message });

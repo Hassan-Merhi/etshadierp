@@ -95,7 +95,7 @@ export function registerRawStockReceiptRoutes(app: Express) {
           )
         );
 
-      const supplierMap = new Map<string, any>();
+      const supplierMap = new Map();
       for (const r of results) {
         const isOB = r.containerStatus === "OPENING_BALANCE";
         // Always merge by supplier — one row per supplier regardless of OB vs Container

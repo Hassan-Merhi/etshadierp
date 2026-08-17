@@ -1,0 +1,121 @@
+name: Phase 18 Final Architecture Splits
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+env:
+  CI: true
+jobs:
+  split:
+    if: contains(github.event.head_commit.message, '[phase18-architecture-final]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with: {ref: main, fetch-depth: 0}
+      - uses: actions/setup-node@v6
+        with: {node-version: '22.14.0', cache: npm}
+      - run: npm ci
+      - name: Apply current-compatible page extractions
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          mkdir -p client/src/pages/factory/baleshistory
+          cat > client/src/pages/factory/baleshistory/pagePolicies.ts <<'TS'
+          import { useEffect, type Dispatch, type SetStateAction } from "react";
+          import { addDays, format } from "date-fns";
+          export const BALE_STATUS_COLORS: Readonly<Record<string, string>> = {
+            PENDING_PRESSING: "outline", LABEL_PRINTED: "secondary", PRESSED: "default", FINALIZED: "default",
+            IN_STOCK: "default", RESERVED: "outline", SOLD: "destructive", REPACKED: "secondary",
+          };
+          export function useBalesHistoryDateKeyboard(setDateFilter: Dispatch<SetStateAction<string>>): void {
+            useEffect(() => {
+              const onKeyDown=(event:KeyboardEvent)=>{const tag=(event.target as HTMLElement|null)?.tagName?.toLowerCase();if(tag==="input"||tag==="textarea"||tag==="select")return;if(event.key==="-"){event.preventDefault();setDateFilter(v=>v?format(addDays(new Date(`${v}T00:00:00`),-1),"yyyy-MM-dd"):v);}else if(event.key==="+"||(event.key==="="&&event.shiftKey)){event.preventDefault();setDateFilter(v=>v?format(addDays(new Date(`${v}T00:00:00`),1),"yyyy-MM-dd"):v);}};
+              window.addEventListener("keydown",onKeyDown);return()=>window.removeEventListener("keydown",onKeyDown);
+            },[setDateFilter]);
+          }
+          TS
+          cat > client/src/pages/containerloadingscan/utils.ts <<'TS'
+          import type { OrderBale } from "./types";
+          export interface LoadingBaleGroup { articleCode:string; baleName:string; bales:OrderBale[]; totalWeight:number }
+          export function groupLoadingBales(bales: readonly OrderBale[]): Record<string, LoadingBaleGroup> {
+            return bales.reduce<Record<string,LoadingBaleGroup>>((acc,bale)=>{const key=bale.articleCode;if(!acc[key])acc[key]={articleCode:bale.articleCode,baleName:bale.baleName,bales:[],totalWeight:0};acc[key].bales.push(bale);acc[key].totalWeight+=parseFloat(bale.weight||"0");return acc;},{});
+          }
+          export function orderLoadingGroups(groups: Record<string, LoadingBaleGroup>): LoadingBaleGroup[] {
+            return Object.values(groups).sort((a,b)=>Math.max(...b.bales.map(x=>x.id))-Math.max(...a.bales.map(x=>x.id)));
+          }
+          TS
+          cat > client/src/pages/containerloadingscan/audio.ts <<'TS'
+          function createAudioContext():AudioContext{const W=(window as unknown as Window&typeof globalThis&{webkitAudioContext:typeof AudioContext}).webkitAudioContext;return new (window.AudioContext||W)();}
+          export function playLoadingScanSuccessTone():void{try{const c=createAudioContext(),o=c.createOscillator();o.connect(c.destination);o.frequency.value=1000;void c.resume().then(()=>{o.start();setTimeout(()=>{o.stop();void c.close();},120);});}catch{/* optional */}}
+          TS
+          cat >> client/src/pages/containerloadingscan/types.ts <<'TS'
+
+          export interface CreateLoadingOrderInput { customerId:number; proformaIdUsed:number|null; locationId:number; orderDate:string; containerNotes?:string }
+          export interface CreateLoadingOrderResponse { id:number }
+          export interface AddLoadingBaleInput { scanCode:string; locationId:number; allowBypassProforma?:boolean; allowBypassOverload?:boolean }
+          export type AddLoadingBaleResponse = OrderDetail;
+          TS
+          cat > client/src/pages/factory/factorycontainerloadingscan/utils.ts <<'TS'
+          import type { OrderBale } from "./types";
+          export interface FactoryLoadingBaleGroup { articleCode:string; baleName:string; bales:OrderBale[]; totalWeight:number }
+          export function groupFactoryLoadingBales(bales: readonly OrderBale[]): Record<string, FactoryLoadingBaleGroup> {
+            return bales.reduce<Record<string,FactoryLoadingBaleGroup>>((acc,bale)=>{const key=bale.articleCode??"__unknown__";if(!acc[key])acc[key]={articleCode:bale.articleCode??"",baleName:bale.baleName,bales:[],totalWeight:0};acc[key].bales.push(bale);acc[key].totalWeight+=parseFloat(bale.weight||"0");return acc;},{});
+          }
+          export function orderFactoryLoadingGroups(groups: Record<string, FactoryLoadingBaleGroup>): FactoryLoadingBaleGroup[] {
+            return Object.values(groups).sort((a,b)=>Math.max(...b.bales.map(x=>x.id))-Math.max(...a.bales.map(x=>x.id)));
+          }
+          TS
+          cat > client/src/pages/factory/factorycontainerloadingscan/audio.ts <<'TS'
+          function createAudioContext():AudioContext{const W=(window as unknown as Window&typeof globalThis&{webkitAudioContext:typeof AudioContext}).webkitAudioContext;return new (window.AudioContext||W)();}
+          export function playFactoryLoadingSuccessTone():void{try{const c=createAudioContext(),o=c.createOscillator();o.connect(c.destination);o.frequency.value=1000;void c.resume().then(()=>{o.start();setTimeout(()=>{o.stop();void c.close();},120);});}catch{/* optional */}}
+          TS
+          cat >> client/src/pages/factory/factorycontainerloadingscan/types.ts <<'TS'
+
+          export interface CreateLoadingOrderInput { customerId:number; proformaIdUsed:number|null; locationId:number; orderDate:string; containerNotes?:string }
+          export interface CreateLoadingOrderResponse { id:number }
+          export interface AddLoadingBaleInput { scanCode:string; locationId:number; allowBypassProforma?:boolean; allowBypassOverload?:boolean }
+          export type AddLoadingBaleResponse = OrderDetail;
+          TS
+          cat > client/src/pages/payroll/advanceStats.ts <<'TS'
+          import type { SalaryAdvance } from "./payrollSchemas";
+          export function calculateAdvanceStats(advances: readonly SalaryAdvance[]){const total=advances.reduce((s,a)=>s+parseFloat(a.amount||"0"),0);const outstanding=advances.filter(a=>!a.fullyPaid).reduce((s,a)=>s+parseFloat(a.remainingBalance||"0"),0);const active=advances.filter(a=>!a.fullyPaid).length;return{total,outstanding,active};}
+          TS
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          # Bales History
+          p=Path('client/src/pages/factory/BalesHistory.tsx');s=p.read_text();anchor='import { BaleWeightEditDialog, type WeightEditBale } from "@/components/BaleWeightEditDialog";\n';imp='import { BALE_STATUS_COLORS, useBalesHistoryDateKeyboard } from "./baleshistory/pagePolicies";\n';s=s if imp in s else s.replace(anchor,anchor+imp);s=re.sub(r'const STATUS_COLORS: Record<string, string> = \{.*?\};\n\n','',s,count=1,flags=re.S)
+          if '  // Keyboard +/- date navigation' in s:
+            a=s.index('  // Keyboard +/- date navigation');b=s.index('  // Debounce search term',a);s=s[:a]+'  useBalesHistoryDateKeyboard(setDateFilter);\n\n'+s[b:]
+          s=s.replace('STATUS_COLORS','BALE_STATUS_COLORS').replace('BALE_BALE_STATUS_COLORS','BALE_STATUS_COLORS');p.write_text(s)
+          # Normal loading
+          p=Path('client/src/pages/ContainerLoadingScan.tsx');s=p.read_text();old='import type { Customer, Location, OrderBale, OrderDetail, Proforma } from "./containerloadingscan/types";';new='import type { AddLoadingBaleInput, AddLoadingBaleResponse, CreateLoadingOrderInput, CreateLoadingOrderResponse, Customer, Location, OrderBale, OrderDetail, Proforma } from "./containerloadingscan/types";\nimport { playLoadingScanSuccessTone } from "./containerloadingscan/audio";\nimport { groupLoadingBales, orderLoadingGroups } from "./containerloadingscan/utils";';s=s.replace(old,new,1)
+          s=re.sub(r'mutationFn: async \(data: \{\s*customerId: number;\s*proformaIdUsed: number \| null;\s*locationId: number;\s*orderDate: string;\s*containerNotes\?: string;\s*\}\) => \{','mutationFn: async (data: CreateLoadingOrderInput) => {',s,count=1);s=s.replace('onSuccess: (data: any) => {','onSuccess: (data: CreateLoadingOrderResponse) => {',1);s=re.sub(r'mutationFn: async \(data: \{\s*scanCode: string;\s*locationId: number;\s*allowBypassProforma\?: boolean;\s*allowBypassOverload\?: boolean;\s*\}\) => \{','mutationFn: async (data: AddLoadingBaleInput) => {',s,count=1);s=re.sub(r'onSuccess: \(\s*data: any,\s*variables: \{ scanCode: string; locationId: number; allowBypassProforma\?: boolean; allowBypassOverload\?: boolean \}\s*\) => \{','onSuccess: (data: AddLoadingBaleResponse, variables: AddLoadingBaleInput) => {',s,count=1);s=s.replace('onError: (error: Error, variables: any) => {','onError: (error: Error, variables: AddLoadingBaleInput) => {',1);s=s.replace('const _speechMsg = variables.allowBypassProforma ? "Bypass confirmed. Item added." : "Scanned successfully";\n','',1);s=re.sub(r'\s*try \{\s*const ctx = new \(.*?osc\.frequency\.value = 1000;.*?\} catch \{\s*/\* no audio support \*/\s*\}', '\n      playLoadingScanSuccessTone();',s,count=1,flags=re.S);s=s.replace('(a: any, b: any) => b.id - a.id','(a, b) => b.id - a.id');s=re.sub(r'  const groupedBalesMap = bales\.reduce<.*?\n  const orderedGroups = Object\.values\(groupedBalesMap\)\.sort\(\(a, b\) => \{.*?\n  \}\);','  const groupedBalesMap = groupLoadingBales(bales);\n  const orderedGroups = orderLoadingGroups(groupedBalesMap);',s,count=1,flags=re.S);p.write_text(s)
+          # Factory loading
+          p=Path('client/src/pages/factory/FactoryContainerLoadingScan.tsx');s=p.read_text();s=s.replace('} from "./factorycontainerloadingscan/types";','  AddLoadingBaleInput,\n  AddLoadingBaleResponse,\n  CreateLoadingOrderInput,\n  CreateLoadingOrderResponse,\n} from "./factorycontainerloadingscan/types";\nimport { playFactoryLoadingSuccessTone } from "./factorycontainerloadingscan/audio";\nimport { groupFactoryLoadingBales, orderFactoryLoadingGroups } from "./factorycontainerloadingscan/utils";',1);s=re.sub(r'mutationFn: async \(data: \{\s*customerId: number;\s*proformaIdUsed: number \| null;\s*locationId: number;\s*orderDate: string;\s*containerNotes\?: string;\s*\}\) => \{','mutationFn: async (data: CreateLoadingOrderInput) => {',s,count=1);s=s.replace('onSuccess: (data: any) => {','onSuccess: (data: CreateLoadingOrderResponse) => {',1);s=re.sub(r'mutationFn: async \(data: \{\s*scanCode: string;\s*locationId: number;\s*allowBypassProforma\?: boolean;\s*allowBypassOverload\?: boolean;\s*\}\) => \{','mutationFn: async (data: AddLoadingBaleInput) => {',s,count=1);s=re.sub(r'onSuccess: \(\s*data: any,\s*variables: \{ scanCode: string; locationId: number; allowBypassProforma\?: boolean; allowBypassOverload\?: boolean \}\s*\) => \{','onSuccess: (data: AddLoadingBaleResponse, variables: AddLoadingBaleInput) => {',s,count=1);s=s.replace('onError: (error: Error, variables: any) => {','onError: (error: Error, variables: AddLoadingBaleInput) => {',1);s=s.replace('const _speechMsg = variables.allowBypassProforma ? "Bypass confirmed. Item added." : "Scanned successfully";\n','',1);s=re.sub(r'\s*try \{\s*const ctx = new \(.*?osc\.frequency\.value = 1000;.*?\} catch \{\s*/\* no audio support \*/\s*\}', '\n      playFactoryLoadingSuccessTone();',s,count=1,flags=re.S);s=s.replace('(a: any, b: any) => b.id - a.id','(a, b) => b.id - a.id');s=re.sub(r'  const groupedBalesMap = bales\.reduce<.*?\n  const orderedGroups = Object\.values\(groupedBalesMap\)\.sort\(\(a, b\) => \{.*?\n  \}\);','  const groupedBalesMap = groupFactoryLoadingBales(bales);\n  const orderedGroups = orderFactoryLoadingGroups(groupedBalesMap);',s,count=1,flags=re.S);p.write_text(s)
+          # Advances stats only
+          p=Path('client/src/pages/payroll/AdvancesTab.tsx');s=p.read_text();anchor='} from "./payrollSchemas";\n';imp='import { calculateAdvanceStats } from "./advanceStats";\n';s=s if imp in s else s.replace(anchor,anchor+imp,1);m=re.search(r'  // Stats\n  const stats = useMemo\(\(\) => \{.*?\n  \}, \[salaryAdvances\]\);',s,re.S);s=s if not m else s[:m.start()]+'  const stats = useMemo(() => calculateAdvanceStats(salaryAdvances), [salaryAdvances]);'+s[m.end():];p.write_text(s)
+          PY
+          npx prettier --write client/src/pages/ContainerLoadingScan.tsx client/src/pages/containerloadingscan client/src/pages/factory/FactoryContainerLoadingScan.tsx client/src/pages/factory/factorycontainerloadingscan client/src/pages/factory/BalesHistory.tsx client/src/pages/factory/baleshistory client/src/pages/payroll/AdvancesTab.tsx client/src/pages/payroll/advanceStats.ts
+      - name: Verify compiler and line caps
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run check
+          test $(wc -l < client/src/pages/ContainerLoadingScan.tsx) -le 1133
+          test $(wc -l < client/src/pages/factory/FactoryContainerLoadingScan.tsx) -le 1906
+          test $(wc -l < client/src/pages/factory/BalesHistory.tsx) -le 1725
+          test $(wc -l < client/src/pages/payroll/AdvancesTab.tsx) -le 900
+          echo "LINES Container=$(wc -l < client/src/pages/ContainerLoadingScan.tsx) Factory=$(wc -l < client/src/pages/factory/FactoryContainerLoadingScan.tsx) Bales=$(wc -l < client/src/pages/factory/BalesHistory.tsx) Advances=$(wc -l < client/src/pages/payroll/AdvancesTab.tsx)"
+      - name: Commit and push
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add client/src/pages/ContainerLoadingScan.tsx client/src/pages/containerloadingscan client/src/pages/factory/FactoryContainerLoadingScan.tsx client/src/pages/factory/factorycontainerloadingscan client/src/pages/factory/BalesHistory.tsx client/src/pages/factory/baleshistory client/src/pages/payroll/AdvancesTab.tsx client/src/pages/payroll/advanceStats.ts
+          git commit -m 'refactor: finish Phase 18 loading and page splits [phase18-architecture] [skip ci]'
+          for attempt in 1 2 3 4 5; do git fetch origin main; git rebase origin/main; npm run check; if git push origin HEAD:main; then exit 0; fi; done
+          exit 1

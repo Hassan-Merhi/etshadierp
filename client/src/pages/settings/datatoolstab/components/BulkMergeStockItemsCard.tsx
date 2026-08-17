@@ -47,7 +47,7 @@ export function BulkMergeStockItemsCard({ embedded }: { embedded?: boolean }) {
       const wb = await readFile(file);
       const ws = wb.worksheets[0];
       if (!ws) throw new Error("No worksheet found in file");
-      const rows = utils.sheet_to_json<Record<string, any>>(ws);
+      const rows = utils.sheet_to_json(ws);
       const parsed: BulkMergePairRow[] = [];
       for (const row of rows) {
         const oldCode = String(row.old_code ?? row.Old_Code ?? row.OLD_CODE ?? "").trim();

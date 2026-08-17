@@ -84,7 +84,7 @@ function lifecycleError(message: string, code: string): Error {
 }
 
 async function lockTransfer(tx: any, transferId: number) {
-  return firstRow<any>(
+  return firstRow(
     await tx.execute(sql`
       SELECT
         stv.id,
@@ -209,7 +209,7 @@ export async function createImmutableStockTransferRevision(
     await assertSubmittedBaseline(tx, transferId, normalized);
 
     const previousPending = input.pending
-      ? rows<any>(
+      ? rows(
           await tx.execute(sql`
             SELECT id, payload_hash
             FROM stock_transfer_revisions
@@ -241,7 +241,7 @@ export async function createImmutableStockTransferRevision(
         .where(and(inArray(stockTransferRevisions.id, previousIds), eq(stockTransferRevisions.status, "pending")));
     }
 
-    const maxRow = firstRow<any>(
+    const maxRow = firstRow(
       await tx.execute(sql`
         SELECT COALESCE(MAX(revision_number), 0) AS max_revision
         FROM stock_transfer_revisions
@@ -251,7 +251,7 @@ export async function createImmutableStockTransferRevision(
     const revisionNumber = Number(maxRow?.max_revision ?? 0) + 1;
     const status: StockTransferRevisionStatus = input.pending ? "pending" : "approved";
 
-    const created = firstRow<any>(
+    const created = firstRow(
       await tx.execute(sql`
         INSERT INTO stock_transfer_revisions (
           transfer_id,
@@ -340,7 +340,7 @@ export async function createImmutableStockTransferRevision(
  * row would silently discard the others.
  */
 async function lockedPendingRevisions(tx: any, transferId: number) {
-  return rows<any>(
+  return rows(
     await tx.execute(sql`
       SELECT id, revision_number
       FROM stock_transfer_revisions
@@ -353,7 +353,7 @@ async function lockedPendingRevisions(tx: any, transferId: number) {
 }
 
 async function lockedRevision(tx: any, revisionId: number) {
-  return firstRow<any>(
+  return firstRow(
     await tx.execute(sql`
       SELECT
         revision.id AS revision_id,
@@ -543,7 +543,7 @@ export async function approveImmutableStockTransferRevision(
     if (inventoryApplied) {
       for (const change of changes) {
         if (change.delta > 0) {
-          const sourceInventory = firstRow<any>(
+          const sourceInventory = firstRow(
             await tx.execute(sql`
               SELECT quantity
               FROM inventory
@@ -566,7 +566,7 @@ export async function approveImmutableStockTransferRevision(
             throw error;
           }
         } else if (change.delta < 0) {
-          const destinationInventory = firstRow<any>(
+          const destinationInventory = firstRow(
             await tx.execute(sql`
               SELECT quantity
               FROM inventory
@@ -782,7 +782,7 @@ export async function resolveTransferIdByVoucher(
 ): Promise<number | null> {
   const companyId = positiveInteger(companyIdInput, "Company ID");
   const voucherId = positiveInteger(voucherIdInput, "Voucher ID");
-  const row = firstRow<any>(
+  const row = firstRow(
     await db.execute(sql`
       SELECT transfer.id
       FROM stock_transfer_vouchers transfer
@@ -799,7 +799,7 @@ export async function resolveTransferIdByVoucher(
 export async function listImmutableStockTransferRevisions(companyIdInput: number, transferIdInput: number) {
   const companyId = positiveInteger(companyIdInput, "Company ID");
   const transferId = positiveInteger(transferIdInput, "Transfer ID");
-  const revisionRows = rows<any>(
+  const revisionRows = rows(
     await db.execute(sql`
       SELECT
         revision.id,

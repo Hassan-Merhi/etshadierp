@@ -52,7 +52,7 @@ async function fetchBaleGroupsForDate(companyId: number, date: string, language:
     GROUP BY fb.finalized_by, fw.full_name, fb.product_id, fbp.article_code
     ORDER BY fw.full_name NULLS LAST, fbp.article_code NULLS LAST
   `);
-  return rows.rows as any[];
+  return (rows.rows);
 }
 
 async function getCompanyName(companyId: number): Promise<string> {

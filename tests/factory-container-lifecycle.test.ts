@@ -18,9 +18,7 @@ import * as schema from "../shared/schema";
 import {
   spContainerLines,
   spContainers,
-  spOffloadCharges,
   spOffloads,
-  spStockMovements,
 } from "../shared/schema/sp";
 
 const RUN_ID = Date.now().toString(36);

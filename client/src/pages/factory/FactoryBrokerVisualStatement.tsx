@@ -47,7 +47,7 @@ export default function FactoryBrokerVisualStatement() {
   const [to, setTo] = useState<string>("");
 
   // Suppliers for the current factory company (server reads company from session)
-  const { data: suppliers = [] } = useQuery<any[]>({
+  const { data: suppliers = [] } = useQuery({
     queryKey: ["/api/factory/suppliers"],
   });
 
@@ -73,7 +73,7 @@ export default function FactoryBrokerVisualStatement() {
     data: statement,
     isLoading,
     error,
-  } = useQuery<any>({
+  } = useQuery({
     queryKey: ["/api/factory/suppliers", brokerId, "broker-visual-statement", from, to],
     queryFn: async () => {
       const qs = queryParams ? `?${queryParams}` : "";

@@ -1,0 +1,37 @@
+name: Phase 18 Current Measurement
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+env:
+  CI: true
+jobs:
+  measure:
+    if: contains(github.event.head_commit.message, '[phase18-measure-now]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with: {ref: main}
+      - uses: actions/setup-node@v6
+        with: {node-version: '22.14.0', cache: npm}
+      - run: npm ci
+      - name: TypeScript
+        run: npm run check
+      - name: Lint
+        shell: bash
+        run: |
+          set +e; npm run lint; echo LINT_EXIT=$?; set -e
+      - name: Type escapes
+        shell: bash
+        run: |
+          set +e; node scripts/audit-type-escapes.mjs; echo TYPE_ESCAPE_EXIT=$?; set -e
+      - name: God files
+        shell: bash
+        run: |
+          set +e; npm run audit:god-files; echo GOD_FILE_EXIT=$?; set -e
+      - name: i18n
+        shell: bash
+        run: |
+          set +e; node scripts/audit-i18n-phase14.mjs --json-out /tmp/i18n.json --markdown-out /tmp/i18n.md; echo I18N_EXIT=$?; set -e

@@ -67,7 +67,7 @@ export function registerContainerLoadedItemReportRoutes(app: Express, requireAut
         ]);
         const aliasConflicts = allAliasConflicts.filter((c) => relevantRawCodes.has(c.aliasCode.trim().toLowerCase()));
 
-        const proformaByBarcode = new Map<string, any>();
+        const proformaByBarcode = new Map();
         for (const line of proformaLines) {
           const bc = resolveBarcode((line.barcode || "").trim(), aliasMap);
           if (proformaByBarcode.has(bc)) {
@@ -84,7 +84,7 @@ export function registerContainerLoadedItemReportRoutes(app: Express, requireAut
           }
         }
 
-        const loadedByBarcode = new Map<string, any>();
+        const loadedByBarcode = new Map();
         for (const item of loadedItems) {
           const bc = resolveBarcode((item.barcode || "").trim(), aliasMap);
           if (loadedByBarcode.has(bc)) {
@@ -208,7 +208,7 @@ export function registerContainerLoadedItemReportRoutes(app: Express, requireAut
 
         const { map: aliasMap } = await buildAliasMap(companyId);
 
-        const proformaByBarcode = new Map<string, any>();
+        const proformaByBarcode = new Map();
         for (const line of proformaLinesList) {
           const bc = resolveBarcode((line.barcode || "").trim(), aliasMap);
           if (proformaByBarcode.has(bc)) {
@@ -222,7 +222,7 @@ export function registerContainerLoadedItemReportRoutes(app: Express, requireAut
             });
           }
         }
-        const loadedByBarcode = new Map<string, any>();
+        const loadedByBarcode = new Map();
         for (const item of loadedItemsList) {
           const bc = resolveBarcode((item.barcode || "").trim(), aliasMap);
           if (loadedByBarcode.has(bc)) {

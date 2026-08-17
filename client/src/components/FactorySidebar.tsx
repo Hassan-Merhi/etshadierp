@@ -185,7 +185,7 @@ export function useFactoryVisibleSections(user?: any): {
   const isDeveloper = user?.role === "Developer";
   const isAdmin = user?.role === "Admin" || user?.role === "Owner" || isDeveloper;
 
-  const { data: settings } = useQuery<any>({
+  const { data: settings } = useQuery({
     queryKey: companyQueryKey("/api/factory/settings", selectedCompany?.id),
     queryFn: async () => {
       const r = await fetch("/api/factory/settings");

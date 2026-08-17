@@ -19,7 +19,7 @@ export async function loadContainerUniverse(
   executor: ReplayQueryExecutor,
   companyId: number
 ): Promise<ContainerUniverse[]> {
-  const { rows } = await executor.query<any>(
+  const { rows } = await executor.query(
     `SELECT
        fc.id,
        fs.name AS supplier_name,

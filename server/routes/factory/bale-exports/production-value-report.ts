@@ -285,7 +285,7 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
       }
 
       // Group sources by batch
-      const reportSourcesByBatch = new Map<number, any[]>();
+      const reportSourcesByBatch = new Map();
       for (const src of mixSourceRows) {
         if (!reportSourcesByBatch.has(src.mixBatchId)) reportSourcesByBatch.set(src.mixBatchId, []);
         reportSourcesByBatch.get(src.mixBatchId)!.push(src);

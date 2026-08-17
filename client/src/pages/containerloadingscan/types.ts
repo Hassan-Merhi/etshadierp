@@ -54,3 +54,21 @@ export interface OrderDetail {
   containerNotes: string | null;
   bales: OrderBale[];
 }
+
+export interface CreateLoadingOrderInput {
+  customerId: number;
+  proformaIdUsed: number | null;
+  locationId: number;
+  orderDate: string;
+  containerNotes?: string;
+}
+export interface CreateLoadingOrderResponse {
+  id: number;
+}
+export interface AddLoadingBaleInput {
+  scanCode: string;
+  locationId: number;
+  allowBypassProforma?: boolean;
+  allowBypassOverload?: boolean;
+}
+export type AddLoadingBaleResponse = OrderDetail;

@@ -21,8 +21,8 @@ function fmtEntryAmount(v: string | number | null | undefined): string {
 }
 
 function compareEntries(oldArr: any[], newArr: any[]) {
-  const oldMap = new Map<string, any>(oldArr.map((entry) => [String(entry.account || "Unknown account"), entry]));
-  const newMap = new Map<string, any>(newArr.map((entry) => [String(entry.account || "Unknown account"), entry]));
+  const oldMap = new Map(oldArr.map((entry) => [String(entry.account || "Unknown account"), entry]));
+  const newMap = new Map(newArr.map((entry) => [String(entry.account || "Unknown account"), entry]));
   const added = [];
   const removed = [];
   const changed: Array<{ account: string; old: any; new: any }> = [];

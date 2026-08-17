@@ -51,7 +51,13 @@ import type {
   OrderBale,
   OrderDetail,
   Proforma,
+  AddLoadingBaleInput,
+  AddLoadingBaleResponse,
+  CreateLoadingOrderInput,
+  CreateLoadingOrderResponse,
 } from "./factorycontainerloadingscan/types";
+import { playFactoryLoadingSuccessTone } from "./factorycontainerloadingscan/audio";
+import { groupFactoryLoadingBales, orderFactoryLoadingGroups } from "./factorycontainerloadingscan/utils";
 export default function FactoryContainerLoadingScan() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -198,17 +204,11 @@ export default function FactoryContainerLoadingScan() {
   }, [isResuming, orderDetail, selectedCustomerId]);
 
   const createOrderMutation = useMutation({
-    mutationFn: async (data: {
-      customerId: number;
-      proformaIdUsed: number | null;
-      locationId: number;
-      orderDate: string;
-      containerNotes?: string;
-    }) => {
+    mutationFn: async (data: CreateLoadingOrderInput) => {
       const res = await modeApiRequest("POST", "/api/factory/customer-orders-loading", data);
       return await res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: CreateLoadingOrderResponse) => {
       setOrderId(data.id);
       toast({
         title: "Loading order created",
@@ -227,53 +227,23 @@ export default function FactoryContainerLoadingScan() {
   });
 
   const addBaleMutation = useMutation({
-    mutationFn: async (data: {
-      scanCode: string;
-      locationId: number;
-      allowBypassProforma?: boolean;
-      allowBypassOverload?: boolean;
-    }) => {
+    mutationFn: async (data: AddLoadingBaleInput) => {
       const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/bales`, data);
       return await res.json();
     },
-    onSuccess: (
-      data: any,
-      variables: { scanCode: string; locationId: number; allowBypassProforma?: boolean; allowBypassOverload?: boolean }
-    ) => {
+    onSuccess: (data: AddLoadingBaleResponse, variables: AddLoadingBaleInput) => {
       setPendingBypassBaleRef(null);
       setPendingBypassOverloadRef(null);
       setScanFlash("success");
       setShowScanSuccessPopup(true);
-      const _speechMsg = variables.allowBypassProforma ? "Bypass confirmed. Item added." : "Scanned successfully";
-      try {
-        const ctx = new (
-          window.AudioContext ||
-          (
-            window as unknown as (Window & typeof globalThis) & {
-              webkitAudioContext: { new (contextOptions?: AudioContextOptions): AudioContext; prototype: AudioContext };
-            }
-          ).webkitAudioContext
-        )();
-        const osc = ctx.createOscillator();
-        osc.connect(ctx.destination);
-        osc.frequency.value = 1000;
-        ctx.resume().then(() => {
-          osc.start();
-          setTimeout(() => {
-            osc.stop();
-            ctx.close();
-          }, 120);
-        });
-      } catch {
-        /* no audio support */
-      }
+      playFactoryLoadingSuccessTone();
       setTimeout(() => {
         setScanFlash(null);
         setShowScanSuccessPopup(false);
       }, 500);
       if (orderId) {
         const scanned = variables.scanCode;
-        const newestForRef = [...(data?.bales || [])].sort((a: any, b: any) => b.id - a.id)[0];
+        const newestForRef = [...(data?.bales || [])].sort((a, b) => b.id - a.id)[0];
         const lastScanned = {
           baleReference: newestForRef?.baleReference || scanned,
           baleName: newestForRef?.baleName || "",
@@ -282,7 +252,7 @@ export default function FactoryContainerLoadingScan() {
         localStorage.setItem(`lastScannedBale_${orderId}`, JSON.stringify(lastScanned));
         setLastScannedRef(lastScanned);
       }
-      const newest = [...(data?.bales || [])].sort((a: any, b: any) => b.id - a.id)[0];
+      const newest = [...(data?.bales || [])].sort((a, b) => b.id - a.id)[0];
       if (newest?.articleCode) {
         setExpandedGroups((prev) => {
           const next = new Set(prev);
@@ -293,7 +263,7 @@ export default function FactoryContainerLoadingScan() {
       queryClient.setQueryData<OrderDetail>(["/api/factory/customer-orders", orderId], data);
       setScanCode("");
     },
-    onError: (error: Error, variables: any) => {
+    onError: (error: Error, variables: AddLoadingBaleInput) => {
       if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       if ((error as unknown as Error & { overloaded: unknown }).overloaded) {
         setPendingBypassOverloadRef(variables.scanCode);
@@ -687,36 +657,8 @@ export default function FactoryContainerLoadingScan() {
 
   const bales = orderDetail?.bales || [];
 
-  const groupedBalesMap = bales.reduce<
-    Record<
-      string,
-      {
-        articleCode: string;
-        baleName: string;
-        bales: OrderBale[];
-        totalWeight: number;
-      }
-    >
-  >((acc, bale) => {
-    const key = bale.articleCode ?? "__unknown__";
-    if (!acc[key]) {
-      acc[key] = {
-        articleCode: bale.articleCode ?? "",
-        baleName: bale.baleName,
-        bales: [],
-        totalWeight: 0,
-      };
-    }
-    acc[key].bales.push(bale);
-    acc[key].totalWeight += parseFloat(bale.weight || "0");
-    return acc;
-  }, {});
-
-  const orderedGroups = Object.values(groupedBalesMap).sort((a, b) => {
-    const maxA = Math.max(...a.bales.map((x) => x.id));
-    const maxB = Math.max(...b.bales.map((x) => x.id));
-    return maxB - maxA;
-  });
+  const groupedBalesMap = groupFactoryLoadingBales(bales);
+  const orderedGroups = orderFactoryLoadingGroups(groupedBalesMap);
 
   const totalWeight = bales.reduce((sum, b) => sum + parseFloat(b.weight || "0"), 0);
 

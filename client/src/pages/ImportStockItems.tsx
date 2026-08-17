@@ -74,7 +74,7 @@ function NewItemsTab() {
       const data = await selectedFile.arrayBuffer();
       const workbook = await read(data);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = utils.sheet_to_json<any>(worksheet);
+      const jsonData = utils.sheet_to_json(worksheet);
       if (jsonData.length === 0) {
         toast({ title: "Empty File", description: "The Excel file is empty.", variant: "destructive" });
         return;
@@ -331,7 +331,7 @@ function BarcodesTab() {
       const data = await f.arrayBuffer();
       const workbook = await read(data);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = utils.sheet_to_json<any>(worksheet);
+      const jsonData = utils.sheet_to_json(worksheet);
 
       if (jsonData.length === 0) {
         toast({ title: "Empty File", description: "The file has no data rows.", variant: "destructive" });
@@ -620,7 +620,7 @@ function UpdateCategoriesTab() {
       const data = await f.arrayBuffer();
       const workbook = await read(data);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = utils.sheet_to_json<any>(worksheet);
+      const jsonData = utils.sheet_to_json(worksheet);
       if (jsonData.length === 0) {
         toast({ title: "Empty File", variant: "destructive" });
         return;

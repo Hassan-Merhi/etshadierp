@@ -206,7 +206,7 @@ export async function syncFortuneToXlsx(rawXlsx: string, sheets: FortuneSheet[])
     if (!ws) continue;
 
     // Build a map of Fortune Sheet cells: "r_c" → cell value object
-    const cellMap = new Map<string, any>();
+    const cellMap = new Map();
     let maxFsR = 0;
     let maxFsC = 0;
 

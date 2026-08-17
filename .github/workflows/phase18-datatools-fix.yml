@@ -1,0 +1,481 @@
+name: Phase 18 Data Tools Architecture and i18n Fix
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+env:
+  CI: true
+
+jobs:
+  fix:
+    if: contains(github.event.head_commit.message, '[phase18-datatools-fix]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.14.0'
+          cache: npm
+      - run: npm ci
+      - name: Extract direct location-cost tool and translate it
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          cat > client/src/pages/settings/datatoolstab/components/LocationCostPriceOverride.tsx <<'TSX'
+          import { useState } from "react";
+          import { AlertTriangle, CheckCircle2, FileDown, FileSpreadsheet, Loader2 } from "lucide-react";
+          import { getErrorDetails } from "@shared/errorUtils";
+          import { Alert, AlertDescription } from "@/components/ui/alert";
+          import { Button } from "@/components/ui/button";
+          import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+          import {
+            Dialog,
+            DialogContent,
+            DialogDescription,
+            DialogFooter,
+            DialogHeader,
+            DialogTitle,
+          } from "@/components/ui/dialog";
+          import { Input } from "@/components/ui/input";
+          import { Label } from "@/components/ui/label";
+          import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+          import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+          import { useAppMode } from "@/contexts/AppModeContext";
+          import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
+          import { useToast } from "@/hooks/use-toast";
+          import { read, utils, writeFile } from "@/lib/excelHelper";
+          import { getApiRequest } from "@/lib/factoryApi";
+          import { queryClient } from "@/lib/queryClient";
+
+          export interface DataToolsLocationOption {
+            id: number | string;
+            name: string;
+          }
+
+          interface CostPriceSpreadsheetRow {
+            barcode?: unknown;
+            costPrice?: unknown;
+          }
+
+          interface CostPriceImportResponse {
+            updated?: number;
+          }
+
+          interface LocationCostPriceOverrideProps {
+            locations: DataToolsLocationOption[];
+          }
+
+          export function LocationCostPriceOverride({ locations }: LocationCostPriceOverrideProps) {
+            const { toast } = useToast();
+            const { t } = useApplicationLanguage();
+            const appMode = useAppMode();
+            const modeApiRequest = getApiRequest(appMode);
+            const [locationId, setLocationId] = useState("");
+            const [open, setOpen] = useState(false);
+            const [file, setFile] = useState<File | null>(null);
+            const [preview, setPreview] = useState<Array<{ barcode: string; costPrice: number }>>([]);
+            const [errors, setErrors] = useState<string[]>([]);
+            const [isImporting, setIsImporting] = useState(false);
+            const [isComplete, setIsComplete] = useState(false);
+
+            const resetDialog = () => {
+              setFile(null);
+              setPreview([]);
+              setErrors([]);
+              setIsComplete(false);
+            };
+
+            const downloadTemplate = async () => {
+              const template = [
+                { barcode: "ITEM001", costPrice: "125.50" },
+                { barcode: "ITEM002", costPrice: "95.75" },
+              ];
+              const ws = utils.json_to_sheet(template);
+              const wb = utils.book_new();
+              utils.book_append_sheet(wb, ws, "Cost Price Import");
+              await writeFile(wb, "cost_price_import_template.xlsx");
+              toast({
+                title: t("settings.dataTools.costOverride.templateDownloaded"),
+                description: t("settings.dataTools.costOverride.templateDownloadedDescription"),
+              });
+            };
+
+            const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+              const selectedFile = event.target.files?.[0];
+              if (!selectedFile) return;
+              setFile(selectedFile);
+              setErrors([]);
+              setPreview([]);
+              setIsComplete(false);
+              try {
+                const data = await selectedFile.arrayBuffer();
+                const workbook = await read(data);
+                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                const rows = utils.sheet_to_json<CostPriceSpreadsheetRow>(worksheet);
+                if (rows.length === 0) {
+                  toast({
+                    title: t("settings.dataTools.costOverride.emptyFile"),
+                    description: t("settings.dataTools.costOverride.emptyFileDescription"),
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                const headerRow = utils.sheet_to_json<string[]>(worksheet, { header: 1 })[0] || [];
+                const columns = headerRow.map((header) => String(header || "").trim());
+                const requiredColumns = ["barcode", "costPrice"];
+                const missingColumns = requiredColumns.filter((column) => !columns.includes(column));
+                if (missingColumns.length > 0) {
+                  toast({
+                    title: t("settings.dataTools.costOverride.missingColumns"),
+                    description: t("settings.dataTools.costOverride.missingColumnsDescription"),
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                const validationErrors: string[] = [];
+                const validRows: Array<{ barcode: string; costPrice: number }> = [];
+                rows.forEach((row, index) => {
+                  const rowNumber = index + 2;
+                  const barcode = String(row.barcode ?? "").trim();
+                  if (!barcode) {
+                    validationErrors.push(`${t("settings.dataTools.costOverride.row")} ${rowNumber}: ${t("settings.dataTools.costOverride.barcodeRequired")}`);
+                    return;
+                  }
+                  const numericCost = typeof row.costPrice === "number" ? row.costPrice : Number.parseFloat(String(row.costPrice ?? "0"));
+                  if (!Number.isFinite(numericCost) || numericCost <= 0) {
+                    validationErrors.push(`${t("settings.dataTools.costOverride.row")} ${rowNumber}: ${t("settings.dataTools.costOverride.costPositive")}`);
+                    return;
+                  }
+                  validRows.push({ barcode, costPrice: numericCost });
+                });
+                setPreview(validRows);
+                setErrors(validationErrors);
+              } catch {
+                toast({
+                  title: t("settings.dataTools.costOverride.readError"),
+                  description: t("settings.dataTools.costOverride.readErrorDescription"),
+                  variant: "destructive",
+                });
+              }
+            };
+
+            const applyImport = async () => {
+              if (!locationId) {
+                toast({
+                  title: t("settings.dataTools.costOverride.noLocation"),
+                  description: t("settings.dataTools.costOverride.noLocationDescription"),
+                  variant: "destructive",
+                });
+                return;
+              }
+              if (errors.length > 0) {
+                toast({
+                  title: t("settings.dataTools.costOverride.cannotImport"),
+                  description: t("settings.dataTools.costOverride.fixErrors"),
+                  variant: "destructive",
+                });
+                return;
+              }
+              setIsImporting(true);
+              try {
+                const response = await modeApiRequest("POST", `/api/locations/${locationId}/import-cost-prices`, {
+                  updates: preview,
+                });
+                const result = (await response.json()) as CostPriceImportResponse;
+                queryClient.invalidateQueries({ queryKey: [`/api/locations/${locationId}/inventory`] });
+                setIsComplete(true);
+                toast({
+                  title: t("settings.dataTools.costOverride.importSuccessful"),
+                  description: `${t("settings.dataTools.costOverride.updatedPrefix")} ${result.updated ?? 0}.`,
+                });
+              } catch (error: unknown) {
+                toast({
+                  title: t("settings.dataTools.costOverride.importFailed"),
+                  description: getErrorDetails(error).message || t("settings.dataTools.costOverride.importFailedDescription"),
+                  variant: "destructive",
+                });
+              } finally {
+                setIsImporting(false);
+              }
+            };
+
+            return (
+              <>
+                <Card className="border-amber-500/40">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-amber-600" />
+                      {t("settings.dataTools.costOverride.title")}
+                    </CardTitle>
+                    <CardDescription>{t("settings.dataTools.costOverride.description")}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="space-y-2">
+                      <Label>{t("settings.dataTools.costOverride.selectLocation")}</Label>
+                      <Select value={locationId} onValueChange={setLocationId}>
+                        <SelectTrigger data-testid="select-location-cost-price-import">
+                          <SelectValue placeholder={t("settings.dataTools.costOverride.chooseLocation")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {locations.map((location) => (
+                            <SelectItem key={location.id} value={String(location.id)}>
+                              {location.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => {
+                        resetDialog();
+                        setOpen(true);
+                      }}
+                      disabled={!locationId}
+                      data-testid="button-open-cost-price-import"
+                    >
+                      <FileSpreadsheet className="h-4 w-4 mr-2" />
+                      {t("settings.dataTools.costOverride.openButton")}
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Dialog
+                  open={open}
+                  onOpenChange={(nextOpen) => {
+                    if (!isImporting) {
+                      if (!nextOpen) resetDialog();
+                      setOpen(nextOpen);
+                    }
+                  }}
+                >
+                  <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>{t("settings.dataTools.costOverride.title")}</DialogTitle>
+                      <DialogDescription>{t("settings.dataTools.costOverride.dialogDescription")}</DialogDescription>
+                    </DialogHeader>
+                    {isComplete ? (
+                      <div className="space-y-4">
+                        <Alert>
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          <AlertDescription>{t("settings.dataTools.costOverride.success")}</AlertDescription>
+                        </Alert>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            resetDialog();
+                            setOpen(false);
+                          }}
+                          data-testid="button-cost-price-import-close"
+                        >
+                          {t("settings.dataTools.costOverride.close")}
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <Alert className="border-amber-500/40">
+                          <AlertTriangle className="h-4 w-4 text-amber-600" />
+                          <AlertDescription>{t("settings.dataTools.costOverride.warning")}</AlertDescription>
+                        </Alert>
+                        <div className="flex items-center gap-2">
+                          <Button variant="outline" size="sm" onClick={downloadTemplate} data-testid="button-download-cost-price-template">
+                            <FileDown className="h-4 w-4 mr-1" />
+                            {t("settings.dataTools.costOverride.downloadTemplate")}
+                          </Button>
+                          {file && <span className="text-sm text-muted-foreground truncate">{file.name}</span>}
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="cost-price-import-file">{t("settings.dataTools.costOverride.excelFile")}</Label>
+                          <Input
+                            id="cost-price-import-file"
+                            type="file"
+                            accept=".xlsx,.xls"
+                            onChange={handleFileChange}
+                            data-testid="input-cost-price-import-file"
+                          />
+                          <p className="text-xs text-muted-foreground">{t("settings.dataTools.costOverride.fileHint")}</p>
+                        </div>
+                        {errors.length > 0 && (
+                          <Alert variant="destructive">
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertDescription>
+                              <ul className="list-disc pl-4 space-y-1">
+                                {errors.map((error, index) => (
+                                  <li key={index}>{error}</li>
+                                ))}
+                              </ul>
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                        {preview.length > 0 && (
+                          <div className="border rounded-md overflow-hidden">
+                            <div className="max-h-[280px] overflow-y-auto">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>{t("settings.dataTools.costOverride.barcode")}</TableHead>
+                                    <TableHead className="text-right">{t("settings.dataTools.costOverride.newCost")}</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {preview.map((row, index) => (
+                                    <TableRow key={`${row.barcode}-${index}`}>
+                                      <TableCell className="font-mono">{row.barcode}</TableCell>
+                                      <TableCell className="text-right font-mono">{row.costPrice.toFixed(2)}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                            <div className="border-t px-3 py-2 text-xs text-muted-foreground">
+                              {preview.length} {t("settings.dataTools.costOverride.updatesReady")}
+                            </div>
+                          </div>
+                        )}
+                        <DialogFooter>
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              resetDialog();
+                              setOpen(false);
+                            }}
+                            disabled={isImporting}
+                          >
+                            {t("settings.dataTools.costOverride.cancel")}
+                          </Button>
+                          <Button
+                            onClick={applyImport}
+                            disabled={isImporting || preview.length === 0 || errors.length > 0}
+                            data-testid="button-apply-cost-price-import"
+                          >
+                            {isImporting ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                {t("settings.dataTools.costOverride.updating")}
+                              </>
+                            ) : (
+                              t("settings.dataTools.costOverride.apply")
+                            )}
+                          </Button>
+                        </DialogFooter>
+                      </div>
+                    )}
+                  </DialogContent>
+                </Dialog>
+              </>
+            );
+          }
+          TSX
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('client/src/pages/settings/DataToolsTab.tsx')
+          s=p.read_text()
+          imp='import { MergeStockItemsLauncher } from "./datatoolstab/components/MergeStockItemsLauncher";\n'
+          assert imp in s
+          s=s.replace(imp, imp+'import { LocationCostPriceOverride, type DataToolsLocationOption } from "./datatoolstab/components/LocationCostPriceOverride";\n')
+          start=s.index('  // Separate location selection for each import operation')
+          end=s.index('  // Stock import state', start)
+          s=s[:start]+'  // Stock import location selection\n  const [stockLocationId, setStockLocationId] = useState<string>("");\n'+s[end:]
+          start=s.index('  // Cost price import functions')
+          end=s.index('  // Stock import functions', start)
+          s=s[:start]+s[end:]
+          old='  const { data: locations = [] } = useQuery<any[]>({\n'
+          assert old in s
+          s=s.replace(old, '  const { data: locations = [] } = useQuery<DataToolsLocationOption[]>({\n', 1)
+          card_start=s.index('        {/* Direct Location Cost Override — Developer only, ERP mode only */}')
+          card_end=s.index('        {/* Silent Stock Transfer Card */}', card_start)
+          s=s[:card_start]+'        {dtCurrentUser?.role === "Developer" && appMode !== "factory" && (\n          <LocationCostPriceOverride locations={locations} />\n        )}\n\n'+s[card_end:]
+          dialog_start=s.index('      {/* Developer-only direct location cost override dialog */}')
+          dialog_end=s.index('      {/* Silent Production / Consumption Dialog */}', dialog_start)
+          s=s[:dialog_start]+s[dialog_end:]
+          s=s.replace('(locations as any[]).map((loc: any) =>', 'locations.map((loc) =>')
+          s=s.replace('locations.map((loc: any) =>', 'locations.map((loc) =>')
+          s=s.replace('  FileDown,\n', '')
+          p.write_text(s)
+
+          p=Path('client/src/i18n/applicationTranslations.ts')
+          s=p.read_text()
+          marker='  "common.search": { en: "Search...", ar: "بحث...", fr: "Rechercher..." },\n'
+          assert marker in s
+          block='''  "settings.dataTools.costOverride.title": { en: "Location Cost Price Override", ar: "تعديل تكلفة المخزون حسب الموقع", fr: "Remplacement du coût par emplacement" },
+          "settings.dataTools.costOverride.description": { en: "Directly replace the average cost for existing inventory at one location. Developer use only; no voucher or daybook entry is created.", ar: "استبدال متوسط تكلفة المخزون الحالي مباشرةً في موقع واحد. للمطور فقط، من دون إنشاء سند أو قيد يومية.", fr: "Remplace directement le coût moyen du stock existant dans un emplacement. Réservé au développeur, sans création de pièce ni d’écriture de journal." },
+          "settings.dataTools.costOverride.selectLocation": { en: "Select Location", ar: "اختر الموقع", fr: "Sélectionner l’emplacement" },
+          "settings.dataTools.costOverride.chooseLocation": { en: "Choose location...", ar: "اختر موقعاً...", fr: "Choisir un emplacement..." },
+          "settings.dataTools.costOverride.openButton": { en: "Update Location Costs from Excel", ar: "تحديث تكاليف الموقع من Excel", fr: "Mettre à jour les coûts depuis Excel" },
+          "settings.dataTools.costOverride.dialogDescription": { en: "Upload an Excel file with barcode and costPrice columns. This directly overwrites the selected location's current average rate and total value.", ar: "حمّل ملف Excel يحتوي على عمودي barcode و costPrice. سيستبدل ذلك مباشرةً متوسط السعر والقيمة الإجمالية الحالية للموقع المحدد.", fr: "Importez un fichier Excel avec les colonnes barcode et costPrice. Cette opération remplace directement le coût moyen et la valeur totale actuels de l’emplacement sélectionné." },
+          "settings.dataTools.costOverride.success": { en: "Location cost prices were updated successfully.", ar: "تم تحديث تكاليف الموقع بنجاح.", fr: "Les coûts de l’emplacement ont été mis à jour." },
+          "settings.dataTools.costOverride.close": { en: "Close", ar: "إغلاق", fr: "Fermer" },
+          "settings.dataTools.costOverride.warning": { en: "This is a direct valuation correction. It does not create accounting entries and should not be used for normal stock receipts or production.", ar: "هذا تصحيح مباشر للتقييم ولا ينشئ قيوداً محاسبية. لا تستخدمه لاستلامات المخزون أو الإنتاج العادي.", fr: "Il s’agit d’une correction directe de valorisation. Elle ne crée aucune écriture comptable et ne doit pas servir aux réceptions ou à la production normales." },
+          "settings.dataTools.costOverride.downloadTemplate": { en: "Download Template", ar: "تنزيل القالب", fr: "Télécharger le modèle" },
+          "settings.dataTools.costOverride.excelFile": { en: "Excel File", ar: "ملف Excel", fr: "Fichier Excel" },
+          "settings.dataTools.costOverride.fileHint": { en: "Each row must contain a matching item barcode and a costPrice greater than 0.", ar: "يجب أن يحتوي كل صف على باركود صنف مطابق وcostPrice أكبر من صفر.", fr: "Chaque ligne doit contenir un code-barres correspondant et un costPrice supérieur à 0." },
+          "settings.dataTools.costOverride.barcode": { en: "Barcode", ar: "الباركود", fr: "Code-barres" },
+          "settings.dataTools.costOverride.newCost": { en: "New Cost", ar: "التكلفة الجديدة", fr: "Nouveau coût" },
+          "settings.dataTools.costOverride.updatesReady": { en: "cost updates ready", ar: "تحديث تكلفة جاهز", fr: "mises à jour de coût prêtes" },
+          "settings.dataTools.costOverride.cancel": { en: "Cancel", ar: "إلغاء", fr: "Annuler" },
+          "settings.dataTools.costOverride.updating": { en: "Updating…", ar: "جارٍ التحديث…", fr: "Mise à jour…" },
+          "settings.dataTools.costOverride.apply": { en: "Apply Cost Updates", ar: "تطبيق تحديثات التكلفة", fr: "Appliquer les mises à jour" },
+          "settings.dataTools.costOverride.templateDownloaded": { en: "Template Downloaded", ar: "تم تنزيل القالب", fr: "Modèle téléchargé" },
+          "settings.dataTools.costOverride.templateDownloadedDescription": { en: "Use this template to update cost prices.", ar: "استخدم هذا القالب لتحديث تكاليف الأصناف.", fr: "Utilisez ce modèle pour mettre à jour les coûts." },
+          "settings.dataTools.costOverride.emptyFile": { en: "Empty File", ar: "ملف فارغ", fr: "Fichier vide" },
+          "settings.dataTools.costOverride.emptyFileDescription": { en: "The Excel file is empty.", ar: "ملف Excel فارغ.", fr: "Le fichier Excel est vide." },
+          "settings.dataTools.costOverride.missingColumns": { en: "Missing Required Columns", ar: "أعمدة مطلوبة مفقودة", fr: "Colonnes requises manquantes" },
+          "settings.dataTools.costOverride.missingColumnsDescription": { en: "Expected barcode and costPrice columns. Download the template for the required format.", ar: "يجب أن يتضمن الملف عمودي barcode وcostPrice. نزّل القالب لمعرفة التنسيق المطلوب.", fr: "Les colonnes barcode et costPrice sont requises. Téléchargez le modèle pour le format attendu." },
+          "settings.dataTools.costOverride.row": { en: "Row", ar: "الصف", fr: "Ligne" },
+          "settings.dataTools.costOverride.barcodeRequired": { en: "Barcode is required", ar: "الباركود مطلوب", fr: "Le code-barres est requis" },
+          "settings.dataTools.costOverride.costPositive": { en: "Cost price must be greater than 0", ar: "يجب أن تكون التكلفة أكبر من صفر", fr: "Le coût doit être supérieur à 0" },
+          "settings.dataTools.costOverride.readError": { en: "Error Reading File", ar: "خطأ في قراءة الملف", fr: "Erreur de lecture du fichier" },
+          "settings.dataTools.costOverride.readErrorDescription": { en: "Please ensure the file is a valid Excel file.", ar: "تأكد من أن الملف ملف Excel صالح.", fr: "Vérifiez que le fichier est un fichier Excel valide." },
+          "settings.dataTools.costOverride.noLocation": { en: "No Location Selected", ar: "لم يتم اختيار موقع", fr: "Aucun emplacement sélectionné" },
+          "settings.dataTools.costOverride.noLocationDescription": { en: "Please select a location first.", ar: "اختر موقعاً أولاً.", fr: "Sélectionnez d’abord un emplacement." },
+          "settings.dataTools.costOverride.cannotImport": { en: "Cannot Import", ar: "تعذر الاستيراد", fr: "Importation impossible" },
+          "settings.dataTools.costOverride.fixErrors": { en: "Please fix validation errors first.", ar: "صحح أخطاء التحقق أولاً.", fr: "Corrigez d’abord les erreurs de validation." },
+          "settings.dataTools.costOverride.importSuccessful": { en: "Import Successful", ar: "تم الاستيراد بنجاح", fr: "Importation réussie" },
+          "settings.dataTools.costOverride.updatedPrefix": { en: "Updated cost prices:", ar: "عدد التكاليف المحدّثة:", fr: "Coûts mis à jour :" },
+          "settings.dataTools.costOverride.importFailed": { en: "Import Failed", ar: "فشل الاستيراد", fr: "Échec de l’importation" },
+          "settings.dataTools.costOverride.importFailedDescription": { en: "Failed to import cost prices.", ar: "تعذر استيراد تكاليف الأصناف.", fr: "Impossible d’importer les coûts." },
+          '''
+          s=s.replace(marker, block+marker)
+          p.write_text(s)
+          PY
+          npx prettier --write client/src/pages/settings/DataToolsTab.tsx client/src/pages/settings/datatoolstab/components/LocationCostPriceOverride.tsx client/src/i18n/applicationTranslations.ts
+      - name: Verify TypeScript and Phase 18 ratchets
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run check
+          node scripts/verify-i18n-audit-classifier.mjs
+          node scripts/audit-i18n-phase14.mjs --json-out /tmp/i18n.json --markdown-out /tmp/i18n.md
+          set +e
+          npm run audit:god-files >/tmp/god-files.log 2>&1
+          god_rc=$?
+          set -e
+          cat /tmp/god-files.log
+          if grep -Fq 'client/src/pages/settings/DataToolsTab.tsx' /tmp/god-files.log; then
+            echo 'DataToolsTab remains over its architecture boundary.' >&2
+            exit 1
+          fi
+          echo "GOD_FILE_AUDIT_REMAINS_RED_FOR_OTHER_FILES=$god_rc"
+          node scripts/audit-type-escapes.mjs --json >/tmp/type.json || true
+      - name: Commit and push verified extraction
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add client/src/pages/settings/DataToolsTab.tsx client/src/pages/settings/datatoolstab/components/LocationCostPriceOverride.tsx client/src/i18n/applicationTranslations.ts
+          git commit -m 'refactor: extract and translate location cost override [phase18-datatools] [skip ci]'
+          git fetch origin main
+          git rebase origin/main
+          npm run check
+          node scripts/audit-i18n-phase14.mjs --json-out /tmp/i18n-rebase.json --markdown-out /tmp/i18n-rebase.md
+          git push origin HEAD:main

@@ -16,7 +16,7 @@ export default function SpAliases() {
   const [stockItemId, setStockItemId] = useState("");
   const [description, setDescription] = useState("");
 
-  const { data: aliases = [], isLoading } = useQuery<any[]>({
+  const { data: aliases = [], isLoading } = useQuery({
     queryKey: ["/api/sp/aliases"],
   });
 

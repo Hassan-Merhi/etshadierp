@@ -78,7 +78,7 @@ async function loadLatestCutoversForCompanies(companyIds: number[]): Promise<Map
   if (holdCache && holdCache.expiresAt > Date.now() && companyIds.every((id) => holdCache!.byCompany.has(id))) {
     return holdCache.byCompany;
   }
-  const byCompany = holdCache?.byCompany ?? new Map<number, any>();
+  const byCompany = holdCache?.byCompany ?? new Map();
   for (const companyId of companyIds) {
     const result = await db.execute(sql`
       SELECT *

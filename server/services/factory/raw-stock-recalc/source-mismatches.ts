@@ -112,17 +112,17 @@ export async function getMixBatchSourceCostMismatchPreview(
       ])
     : [[], [], []];
 
-  const chargesByContainer = new Map<number, any[]>();
+  const chargesByContainer = new Map();
   for (const c of allAdditionalCharges) {
     if (!chargesByContainer.has(c.containerId)) chargesByContainer.set(c.containerId, []);
     chargesByContainer.get(c.containerId)!.push(c);
   }
-  const commissionByContainer = new Map<number, any>();
+  const commissionByContainer = new Map();
   for (const c of allCommissions) {
     const ex = commissionByContainer.get(c.containerId);
     if (!ex || c.id > ex.id) commissionByContainer.set(c.containerId, c);
   }
-  const otherChargesByContainer = new Map<number, any[]>();
+  const otherChargesByContainer = new Map();
   for (const oc of allOtherCharges) {
     if (!otherChargesByContainer.has(oc.containerId)) otherChargesByContainer.set(oc.containerId, []);
     otherChargesByContainer.get(oc.containerId)!.push(oc);
@@ -130,7 +130,7 @@ export async function getMixBatchSourceCostMismatchPreview(
 
   // Compute corrected USD cost per container
   const correctedUsdByContainer = new Map<number, { costPerKgUsd: number; fxUnresolved: boolean }>();
-  const uniqueContainers = new Map<number, any>();
+  const uniqueContainers = new Map();
   for (const { container } of rows) {
     if (container && !uniqueContainers.has(container.id)) uniqueContainers.set(container.id, container);
   }

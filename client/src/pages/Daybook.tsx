@@ -64,21 +64,7 @@ import { DaybookTable } from "./daybook/DaybookTable";
 import { VoucherDetailsDialog } from "./daybook/VoucherDetailsDialog";
 import { VoucherEditDialog } from "./daybook/VoucherEditDialog";
 import { usePaginatedDaybookVouchers } from "./daybook/usePaginatedDaybookVouchers";
-
-const VOUCHER_TYPE_ORDER: Record<string, number> = {
-  Purchase: 0,
-  PurchaseOrder: 1,
-  Sales: 2,
-  POS: 3,
-  Payment: 4,
-  Receipt: 5,
-  Journal: 6,
-  Contra: 7,
-  StockTransfer: 8,
-  "Stock Transfer": 8,
-  "Credit Note": 9,
-  "Debit Note": 10,
-};
+import { VOUCHER_TYPE_ORDER } from "./daybook/constants";
 
 export default function Daybook({ user }: { user?: any } = {}) {
   const { toast } = useToast();

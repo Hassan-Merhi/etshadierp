@@ -1,0 +1,127 @@
+name: Phase 18 Advances Type and Model Split
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+env:
+  CI: true
+jobs:
+  refactor:
+    if: contains(github.event.head_commit.message, '[phase18-advances-types]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with: {ref: main, fetch-depth: 0}
+      - uses: actions/setup-node@v6
+        with: {node-version: '22.14.0', cache: npm}
+      - run: npm ci
+      - name: Extract typed Advances model
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          cat > client/src/pages/payroll/advancesTabModel.ts <<'TS'
+          import type { SalaryAdvance } from "./payrollSchemas";
+
+          export interface CashAccountOption {
+            id: number | string;
+            name: string;
+          }
+          export interface AdvancesTabProps { cashAccounts?: CashAccountOption[] }
+          export interface SalaryAdvanceRepayment {
+            id: number;
+            workerName?: string | null;
+            employeeId: number;
+            payrollMonth: string;
+            deductionAmount?: string | null;
+            advanceRemaining?: string | null;
+            createdAt?: string | null;
+          }
+          export interface WorkerDeduction {
+            id: number;
+            workerId: number;
+            workerName?: string | null;
+            deductionDate?: string | null;
+            reason?: string | null;
+            amount?: string | null;
+            applied?: boolean;
+          }
+          export interface AddWorkerDeductionFormData {
+            workerId: string;
+            amount: string;
+            reason: string;
+            deductionDate: string;
+          }
+          export function calculateAdvanceStats(advances: readonly SalaryAdvance[]) {
+            const total = advances.reduce((sum, advance) => sum + parseFloat(advance.amount || "0"), 0);
+            const outstanding = advances
+              .filter((advance) => !advance.fullyPaid)
+              .reduce((sum, advance) => sum + parseFloat(advance.remainingBalance || "0"), 0);
+            const active = advances.filter((advance) => !advance.fullyPaid).length;
+            return { total, outstanding, active };
+          }
+          TS
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('client/src/pages/payroll/AdvancesTab.tsx'); s=p.read_text()
+          s=s.replace('''interface AdvancesTabProps {
+            cashAccounts?: any[];
+          }
+
+          ''','')
+          anchor='''} from "./payrollSchemas";
+'''
+          imp='''import {
+            calculateAdvanceStats,
+            type AddWorkerDeductionFormData,
+            type AdvancesTabProps,
+            type SalaryAdvanceRepayment,
+            type WorkerDeduction,
+          } from "./advancesTabModel";
+'''
+          if imp not in s: s=s.replace(anchor,anchor+imp,1)
+          s=s.replace('select: (data: any[]) => data.filter((e) => e.employeeType === "Worker"),','select: (data) => data.filter((employee) => employee.employeeType === "Worker"),')
+          s=s.replace('useQuery<any[]>({\n    queryKey: ["/api/salary-advance-deductions", selectedCompany?.id],','useQuery<SalaryAdvanceRepayment[]>({\n    queryKey: ["/api/salary-advance-deductions", selectedCompany?.id],',1)
+          s=s.replace('useQuery<any[]>({\n    queryKey: [workerDeductionsBase, selectedCompany?.id],','useQuery<WorkerDeduction[]>({\n    queryKey: [workerDeductionsBase, selectedCompany?.id],',1)
+          s=s.replace('const addWorkerDeductionForm = useForm<any>({','const addWorkerDeductionForm = useForm<AddWorkerDeductionFormData>({',1)
+          s=s.replace('mutationFn: async (data: any) => {','mutationFn: async (data: AddWorkerDeductionFormData) => {',1)
+          s=s.replace('onSubmit={addWorkerDeductionForm.handleSubmit((data: any) => addWorkerDeductionMutation.mutate(data))}','onSubmit={addWorkerDeductionForm.handleSubmit((data) => addWorkerDeductionMutation.mutate(data))}',1)
+          old='''  // Stats
+            const stats = useMemo(() => {
+              const total = salaryAdvances.reduce((s, a) => s + parseFloat(a.amount || "0"), 0);
+              const outstanding = salaryAdvances
+                .filter((a) => !a.fullyPaid)
+                .reduce((s, a) => s + parseFloat(a.remainingBalance || "0"), 0);
+              const active = salaryAdvances.filter((a) => !a.fullyPaid).length;
+              return { total, outstanding, active };
+            }, [salaryAdvances]);'''
+          if old not in s:
+              old=re.search(r'  // Stats\n  const stats = useMemo\(\(\) => \{.*?\n  \}, \[salaryAdvances\]\);',s,re.S)
+              if not old: raise SystemExit('stats block not found')
+              s=s[:old.start()]+'  const stats = useMemo(() => calculateAdvanceStats(salaryAdvances), [salaryAdvances]);'+s[old.end():]
+          else:
+              s=s.replace(old,'  const stats = useMemo(() => calculateAdvanceStats(salaryAdvances), [salaryAdvances]);')
+          p.write_text(s)
+          PY
+          npx prettier --write client/src/pages/payroll/AdvancesTab.tsx client/src/pages/payroll/advancesTabModel.ts
+      - name: Verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run check
+          set +e; npm run audit:god-files >/tmp/god.log 2>&1; rc=$?; set -e
+          cat /tmp/god.log
+          if grep -Fq 'client/src/pages/payroll/AdvancesTab.tsx has ' /tmp/god.log; then exit 1; fi
+          echo OTHER_GOD_FILE_FAILURES_REMAIN=$rc
+      - name: Commit and push
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add client/src/pages/payroll/AdvancesTab.tsx client/src/pages/payroll/advancesTabModel.ts
+          git commit -m 'refactor: type and split payroll advances model [phase18-advances] [skip ci]'
+          for attempt in 1 2 3 4 5; do git fetch origin main; git rebase origin/main; npm run check; if git push origin HEAD:main; then exit 0; fi; done
+          exit 1

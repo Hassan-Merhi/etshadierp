@@ -39,6 +39,7 @@ import {
   type DeductionFormData,
   type SalaryAdvance,
 } from "./payrollSchemas";
+import { calculateAdvanceStats } from "./advanceStats";
 
 interface AdvancesTabProps {
   cashAccounts?: any[];
@@ -216,15 +217,7 @@ export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
     },
   });
 
-  // Stats
-  const stats = useMemo(() => {
-    const total = salaryAdvances.reduce((s, a) => s + parseFloat(a.amount || "0"), 0);
-    const outstanding = salaryAdvances
-      .filter((a) => !a.fullyPaid)
-      .reduce((s, a) => s + parseFloat(a.remainingBalance || "0"), 0);
-    const active = salaryAdvances.filter((a) => !a.fullyPaid).length;
-    return { total, outstanding, active };
-  }, [salaryAdvances]);
+  const stats = useMemo(() => calculateAdvanceStats(salaryAdvances), [salaryAdvances]);
 
   // Filtered list
   const filteredAdvances = useMemo(() => {
