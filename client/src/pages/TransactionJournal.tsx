@@ -959,7 +959,7 @@ export default function TransactionJournal() {
               ) : (
                 (() => {
                   const vtype = detailData.voucher.voucherType;
-                  const fmt = (v: any) => {
+                  const fmt = (v: string | number) => {
                     const n = typeof v === "number" ? v : parseFloat(v || "0");
                     if (isNaN(n)) return "—";
                     return formatCashAmount(n);

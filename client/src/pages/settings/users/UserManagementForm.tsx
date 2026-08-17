@@ -24,7 +24,7 @@ interface UserManagementFormProps {
   isPrivileged: boolean;
   isViewOnly: boolean;
   accessLabel: string;
-  companies: any[];
+  companies: unknown[];
   setConfirmDelete: (v: boolean) => void;
   pageAccess: Set<string>;
   hiddenCostFields: string[];

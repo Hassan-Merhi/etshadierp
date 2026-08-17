@@ -22,8 +22,8 @@ interface SupplierDialogsProps {
   setCreateOpen: (val: boolean) => void;
   editingSupplier: FactorySupplier | null;
   setEditingSupplier: (val: FactorySupplier | null) => void;
-  formData: any;
-  setFormData: (val: any) => void;
+  formData: { name: string; contactPerson: string; phone: string; email: string; address: string; notes: string; parentId: number | null; };
+  setFormData: React.Dispatch<React.SetStateAction<{ name: string; contactPerson: string; phone: string; email: string; address: string; notes: string; parentId: number | null; }>>;
   formRole: "broker" | "standalone" | "linked";
   setFormRole: (val: "broker" | "standalone" | "linked") => void;
   allSuppliers: SupplierWithBalance[];
@@ -35,9 +35,9 @@ interface SupplierDialogsProps {
 
   paymentDialogSupplier: SupplierWithBalance | null;
   setPaymentDialogSupplier: (val: SupplierWithBalance | null) => void;
-  paymentForm: any;
-  setPaymentForm: (val: any) => void;
-  ledgerAccounts: any[] | undefined;
+  paymentForm: { supplierId: number; date: string; amount: string; currencyCode: string; fxRateToUsd: string; paidFromAccountId: string; notes: string; effectiveDate: string; };
+  setPaymentForm: React.Dispatch<React.SetStateAction<{ supplierId: number; date: string; amount: string; currencyCode: string; fxRateToUsd: string; paidFromAccountId: string; notes: string; effectiveDate: string; }>>;
+  ledgerAccounts: NoInfer<{ id: number; name: string; code: string; }[]> | undefined;
   paymentMutation: UseMutationResult<any, any, any>;
   paymentAmtUsd: number;
   paymentBalanceUsd: number;
@@ -46,8 +46,8 @@ interface SupplierDialogsProps {
 
   fxConversionOpen: boolean;
   setFxConversionOpen: (val: boolean) => void;
-  fxConversionForm: any;
-  setFxConversionForm: (val: any) => void;
+  fxConversionForm: { fromSupplierId: number; toSupplierId: number; selectedCurrency: string; amount: string; availableBalance: string; supplierBalance: string; commissionBalance: string; fxRateToUsd: string; date: string; notes: string; effectiveDate: string; };
+  setFxConversionForm: React.Dispatch<React.SetStateAction<{ fromSupplierId: number; toSupplierId: number; selectedCurrency: string; amount: string; availableBalance: string; supplierBalance: string; commissionBalance: string; fxRateToUsd: string; date: string; notes: string; effectiveDate: string; }>>;
   fxSourceType: "supplier" | "commission" | "both";
   setFxSourceType: (val: "supplier" | "commission" | "both") => void;
   fxConversionMutation: UseMutationResult<any, any, any>;
@@ -57,26 +57,26 @@ interface SupplierDialogsProps {
   setBulkFxOpen: (val: boolean) => void;
   bulkFxBrokerId: number | null;
   bulkFxBrokerName: string;
-  bulkFxForm: any;
-  setBulkFxForm: (val: any) => void;
+  bulkFxForm: { fromCurrencyCode: string; totalAmount: string; fxRateToUsd: string; date: string; notes: string; order: "oldest" | "newest"; };
+  setBulkFxForm: React.Dispatch<React.SetStateAction<{ fromCurrencyCode: string; totalAmount: string; fxRateToUsd: string; date: string; notes: string; order: "oldest" | "newest"; }>>;
   bulkFxPreview: BulkFxPreview | null;
   setBulkFxPreview: (val: BulkFxPreview | null) => void;
-  bulkFxPreviewMutation: UseMutationResult<any, any, any>;
+  bulkFxPreviewMutation: UseMutationResult<BulkFxPreview, Error, void, unknown>;
   bulkFxMutation: UseMutationResult<any, any, any>;
 
   obEditSupplier: { id: number; name: string; currentBalance: string } | null;
-  setObEditSupplier: (val: any) => void;
+  setObEditSupplier: React.Dispatch<React.SetStateAction<{ id: number; name: string; currentBalance: string; } | null>>;
   obEditValue: string;
   setObEditValue: (val: string) => void;
   obEditMutation: UseMutationResult<any, any, any>;
 
-  dueDialogSupplier: { name: string; containers: any[] } | null;
-  setDueDialogSupplier: (val: any) => void;
+  dueDialogSupplier: null;
+  setDueDialogSupplier: React.Dispatch<React.SetStateAction<null>>;
   formatDate: (val: string) => string;
   formatNum: (val: string) => string;
 
   editObComm: null | { rawStockId: number; amount: string; currencyCode: string; personName: string; notes: string };
-  setEditObComm: (val: any) => void;
+  setEditObComm: React.Dispatch<React.SetStateAction<{ rawStockId: number; amount: string; currencyCode: string; personName: string; notes: string; } | null>>;
   updateObCommissionMutation: UseMutationResult<any, any, any>;
 }
 

@@ -14,7 +14,7 @@ interface StockGroupItemsViewProps {
   setItemSearchTerm: (v: string) => void;
   itemCategoryFilter: string[];
   setItemCategoryFilter: (v: string[]) => void;
-  categoriesList: any[];
+  categoriesList: { id: number; name: string; active: boolean; }[];
   filteredStockItems: InventoryItem[];
   showMovement: boolean;
   openingInventoryMap: Map<number, number>;

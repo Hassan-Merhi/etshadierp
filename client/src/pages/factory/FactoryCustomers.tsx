@@ -80,7 +80,7 @@ export default function FactoryCustomers() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+    mutationFn: async ({ id, data }: { id: number; data: { legalName: string; phone: string | null; paymentTermsDays: number | null; } }) => {
       return await factoryApiRequest("PUT", `/api/factory/customers/${id}`, data);
     },
     onSuccess: () => {

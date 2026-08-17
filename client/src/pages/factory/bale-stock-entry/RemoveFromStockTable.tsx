@@ -6,11 +6,11 @@ interface RemoveFromStockTableProps {
   viewMode: "condensed" | "detailed";
   loading: boolean;
   filteredBales: any[] | undefined;
-  condensedRows: any[];
+  condensedRows: { groupKey: string; articleCode: string; productName: string; qty: number; totalWeight: number; baleIds: number[]; }[];
   selectedBaleIds: Set<number>;
   onToggleBale: (id: number) => void;
   onToggleCondensedRow: (ids: number[]) => void;
-  formatDisplayDate: (date: any) => string;
+  formatDisplayDate: (date: Date | string) => string;
   onPrintBale: (bale: any) => void;
 }
 

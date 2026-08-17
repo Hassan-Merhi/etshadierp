@@ -19,8 +19,8 @@ export function StockOverloadWarningDialog({
   overloadWarning,
   setOverloadWarning,
 }: {
-  overloadWarning: any;
-  setOverloadWarning: any;
+  overloadWarning: { open: boolean; items: Array<{ articleCode: string; productName: string; requested: number; available: number; }>; pendingFn: (() => void) | null; };
+  setOverloadWarning: React.Dispatch<React.SetStateAction<{ open: boolean; items: Array<{ articleCode: string; productName: string; requested: number; available: number; }>; pendingFn: (() => void) | null; }>>;
 }) {
   return (
     <Dialog
