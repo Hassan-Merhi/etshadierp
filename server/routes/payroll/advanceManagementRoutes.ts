@@ -512,7 +512,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
           if (match) alreadyPostedIds.add(parseInt(match[1]));
         }
 
-        const eligible = allAdvances.filter((a: any) => !alreadyPostedIds.has(a.id) || a.cashAccountId === null);
+        const eligible = allAdvances.filter((a: { cashAccountId: null; id: number }) => !alreadyPostedIds.has(a.id) || a.cashAccountId === null);
         const eligibleIds = new Set(eligible.map((a: any) => a.id));
 
         if (eligibleIds.size === 0) {
@@ -727,7 +727,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
 
             const creditEntry = entries
               .filter((e: any) => parseFloat(e.creditAmount || "0") > 0)
-              .sort((a: any, b: any) => parseFloat(b.creditAmount) - parseFloat(a.creditAmount))[0];
+              .sort((a: { creditAmount: string }, b: { creditAmount: string }) => parseFloat(b.creditAmount) - parseFloat(a.creditAmount))[0];
 
             if (creditEntry) {
               await tx

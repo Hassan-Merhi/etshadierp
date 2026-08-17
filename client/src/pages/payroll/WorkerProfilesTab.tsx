@@ -143,7 +143,7 @@ export function WorkerProfilesTab({
             All Workers ({workerStaff.length})
           </button>
           {workerGroups.map((g) => {
-            const count = workerStaff.filter((w) => (g.members || []).some((m: any) => m.id === w.id)).length;
+            const count = workerStaff.filter((w) => (g.members || []).some((m: { id: number }) => m.id === w.id)).length;
             return (
               <button
                 key={g.id}
@@ -157,7 +157,7 @@ export function WorkerProfilesTab({
           })}
           {(() => {
             const ungroupedCount = workerStaff.filter(
-              (w) => !workerGroups.some((g) => (g.members || []).some((m: any) => m.id === w.id))
+              (w) => !workerGroups.some((g) => (g.members || []).some((m: { id: number }) => m.id === w.id))
             ).length;
             if (ungroupedCount === 0) return null;
             return (

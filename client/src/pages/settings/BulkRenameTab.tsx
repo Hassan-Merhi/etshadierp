@@ -88,7 +88,7 @@ export function BulkRenameTab() {
       const regex = buildRegex();
       if (!regex) return;
       const matches = allItems
-        .filter((item: any) => regex.test(item.name))
+        .filter((item: { name: string }) => regex.test(item.name))
         .map((item: any) => ({
           id: item.id,
           code: item.code || "",
@@ -161,7 +161,7 @@ export function BulkRenameTab() {
       if (data.failures && data.failures.length > 0) {
         toast({
           title: "Some items failed",
-          description: data.failures.map((f: any) => `${f.name}: ${f.reason}`).join(", "),
+          description: data.failures.map((f: { name: string | number | bigint | boolean | null | undefined; reason: string | number | bigint | boolean | null | undefined }) => `${f.name}: ${f.reason}`).join(", "),
           variant: "destructive",
         });
       }

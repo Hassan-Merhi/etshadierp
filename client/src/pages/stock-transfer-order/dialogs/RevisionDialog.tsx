@@ -62,7 +62,7 @@ export function RevisionDialog({
                     </tr>
                   </thead>
                   <tbody>
-                    {items.map((item: any, idx: any) => (
+                    {items.map((item, idx) => (
                       <tr key={idx} className="border-t">
                         <td className="p-2 font-medium truncate max-w-[120px]">{item.stockItemName}</td>
                         <td className="p-2 text-right font-mono text-muted-foreground">

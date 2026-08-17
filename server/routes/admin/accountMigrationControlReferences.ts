@@ -63,7 +63,7 @@ export async function detachAccountMigrationControlReferences(
 
   return {
     roleCashAccounts: roleRows
-      .filter((row: any) => row.cashAccountId !== null)
+      .filter((row: { cashAccountId: null }) => row.cashAccountId !== null)
       .map((row: any) => ({ roleId: row.id, accountId: row.cashAccountId })),
     locationCashAccounts: locationRows.map((row: any) => ({
       userId: row.userId,
@@ -134,7 +134,7 @@ export async function restoreAccountMigrationControlReferences(
       .from(userLocationCashAccounts)
       .where(eq(userLocationCashAccounts.companyId, sourceCompanyId));
     const occupied = new Set(
-      existing.map((row: any) => `${row.userId}:${row.companyId}:${row.locationId}`),
+      existing.map((row: { companyId: string | number | bigint | boolean | null | undefined; locationId: string | number | bigint | boolean | null | undefined; userId: string | number | bigint | boolean | null | undefined }) => `${row.userId}:${row.companyId}:${row.locationId}`),
     );
     const conflict = snapshot.locationCashAccounts.find((row) =>
       occupied.has(`${row.userId}:${row.companyId}:${row.locationId}`),

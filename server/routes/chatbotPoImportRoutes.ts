@@ -406,7 +406,7 @@ export function registerChatbotPoImportRoutes(app: Express) {
         }
       }
 
-      const itemsTotal = lines.reduce((s: number, l: any) => s + parseFloat(l.qty) * parseFloat(l.rate), 0);
+      const itemsTotal = lines.reduce((s: number, l: { qty: string; rate: string }) => s + parseFloat(l.qty) * parseFloat(l.rate), 0);
       const freightAmt = parseFloat(charges?.freight || "0") || 0;
       const surchargeAmt = parseFloat(charges?.surcharge || "0") || 0;
       const fumigationAmt = parseFloat(charges?.fumigation || "0") || 0;

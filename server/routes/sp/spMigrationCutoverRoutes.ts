@@ -38,7 +38,7 @@ async function ensureCutoverColumns(): Promise<void> {
   );
 }
 
-function exactConfirmation(req: any, expected: string, sourceName: string): string | null {
+function exactConfirmation(req: { body: { companyNameConfirm: string; confirmation?: string | undefined } }, expected: string, sourceName: string): string | null {
   if (req.body?.confirmation !== expected) return `Requires confirmation = "${expected}"`;
   if (!req.body?.companyNameConfirm || req.body.companyNameConfirm.trim() !== sourceName) {
     return `Company name confirmation must match exactly: "${sourceName}"`;
@@ -116,7 +116,7 @@ async function harmfulTargetActivity(targetId: number, activatedAt?: string | nu
 async function normalizedReadiness(sourceId: number, targetId: number): Promise<any> {
   const readiness = await buildCutoverReadiness(sourceId, targetId);
   const activity = await harmfulTargetActivity(targetId);
-  readiness.blockers = (readiness.blockers ?? []).filter((blocker: any) => blocker.code !== "TARGET_ALREADY_LIVE");
+  readiness.blockers = (readiness.blockers ?? []).filter((blocker: { code: string }) => blocker.code !== "TARGET_ALREADY_LIVE");
   readiness.counts.targetLiveActivity = activity.total;
   if (activity.total > 0) {
     readiness.blockers.push({

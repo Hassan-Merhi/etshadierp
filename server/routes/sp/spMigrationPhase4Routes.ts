@@ -300,7 +300,7 @@ async function targetLiveActivity(targetId: number, activatedAt?: string | null)
 
 async function normalizedVerification(sourceId: number, targetId: number, requireUnusedTarget = true): Promise<any> {
   const verification = await buildFinalMigrationVerification(sourceId, targetId);
-  verification.blockers = (verification.blockers ?? []).filter((issue: any) => issue.code !== "TARGET_ALREADY_LIVE");
+  verification.blockers = (verification.blockers ?? []).filter((issue: { code: string }) => issue.code !== "TARGET_ALREADY_LIVE");
   const activity = await targetLiveActivity(targetId);
   if (requireUnusedTarget && activity.total > 0) {
     verification.blockers.push({

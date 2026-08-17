@@ -121,7 +121,7 @@ export default function FactoryBrokerVisualStatement() {
   }, [containerTotals, paymentTotals]);
 
   // Per-container grand total by currency
-  function containerGrandTotal(c: any): Partial<Record<string, number>> {
+  function containerGrandTotal(c: { commissionAmount: number; commissionCurrency: string; freightAmount: number; freightCurrency: string; goodsAmount: number; goodsCurrency: string }): Partial<Record<string, number>> {
     const out: Record<string, number> = {};
     const add = (cc: string, amt: number) => {
       out[cc] = (out[cc] || 0) + amt;

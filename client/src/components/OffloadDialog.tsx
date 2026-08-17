@@ -235,8 +235,8 @@ export function OffloadDialog({ open, onOpenChange, containerId, containerNumber
   });
 
   // ── Derived SP accounts ───────────────────────────────────────────────────
-  const spPrepaidExpAcct = (spStatusData?.spAccounts || []).find((a: any) => a.subType === "sp_prepaid_expenses");
-  const spHadiIcAcct = (spStatusData?.spAccounts || []).find((a: any) => a.subType === "sp_hadi_intercompany");
+  const spPrepaidExpAcct = (spStatusData?.spAccounts || []).find((a: { subType: string }) => a.subType === "sp_prepaid_expenses");
+  const spHadiIcAcct = (spStatusData?.spAccounts || []).find((a: { subType: string }) => a.subType === "sp_hadi_intercompany");
 
   // ── Charge calculations ───────────────────────────────────────────────────
   let poChargesTotal = 0;

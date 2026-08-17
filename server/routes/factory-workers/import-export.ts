@@ -247,7 +247,7 @@ export function registerFactoryWorkerImportExportRoutes(app: Express, requireAut
 
         // Determine next HMD code number for auto-assignment during import
         const importPrefix = "HMD";
-        let nextHmdNum = existingWorkers.reduce((max: number, w: any) => {
+        let nextHmdNum = existingWorkers.reduce((max: number, w: { employeeCode: string }) => {
           if (!w.employeeCode) return max;
           const m = w.employeeCode.match(new RegExp(`^${importPrefix}(\\d+)$`));
           return m ? Math.max(max, parseInt(m[1], 10)) : max;

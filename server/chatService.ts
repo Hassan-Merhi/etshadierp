@@ -738,7 +738,7 @@ If intent is unclear, respond with exactly: null`;
                   and(eq(schema.inventory.locationId, parsedAdj.locationId), eq(schema.inventory.companyId, companyId))
                 );
               const rateMap = new Map(invRows.map((r) => [r.stockItemId, parseFloat(r.averageRate ?? "0")]));
-              parsedAdj.items = parsedAdj.items.map((item: any) => ({
+              parsedAdj.items = parsedAdj.items.map((item: { stockItemId: number }) => ({
                 ...item,
                 rate: rateMap.get(item.stockItemId) ?? 0,
               }));

@@ -169,7 +169,7 @@ export function ImportProformaExcelDialog({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {excelImportLines.map((row: any, i: React.Key | null | undefined) => (
+                      {excelImportLines.map((row, i: React.Key | null | undefined) => (
                         <TableRow key={i} data-testid={`row-excel-preview-${i}`}>
                           <TableCell className="font-mono text-xs py-1.5">{row.articleCode}</TableCell>
                           <TableCell className="text-xs py-1.5">{row.productName}</TableCell>

@@ -186,7 +186,7 @@ export function registerPayrollRunMigrationRoutes(app: Express) {
 
         // Determine if any old debit is truly wrong (PAYROLL_DEPOSIT_EXPENSE, or SALARY_EXPENSE without per-group)
         const hasPayrollDepExpense = debitRes.rows.some(
-          (e: any) => accCodeById.get(e.ledger_account_id) === "PAYROLL_DEPOSIT_EXPENSE"
+          (e: { ledger_account_id: number }) => accCodeById.get(e.ledger_account_id) === "PAYROLL_DEPOSIT_EXPENSE"
         );
 
         // Group employees from credit entries to determine new per-group debits
@@ -269,7 +269,7 @@ export function registerPayrollRunMigrationRoutes(app: Express) {
         // Determine what kind of debit entries exist on this voucher
         const hasOldOrGenericDebit = debitRes.rows.some((e) => oldBonusIds.has(e.ledger_account_id));
         const hasPerGroupDebit = debitRes.rows.some((e) => perGroupBonusIds.has(e.ledger_account_id));
-        const creditTotal = creditRes.rows.reduce((s: number, e: any) => s + parseFloat(e.credit_amount), 0);
+        const creditTotal = creditRes.rows.reduce((s: number, e: { credit_amount: string }) => s + parseFloat(e.credit_amount), 0);
 
         // Skip only when per-group debits exist AND no old/generic debit remains
         // (vouchers with NO debit entries at all must be processed — previous migration may have
@@ -292,7 +292,7 @@ export function registerPayrollRunMigrationRoutes(app: Express) {
         if (byGroup.size === 0) {
           const totalFromDebits = debitRes.rows
             .filter((e) => oldBonusIds.has(e.ledger_account_id))
-            .reduce((s: number, e: any) => s + parseFloat(e.debit_amount), 0);
+            .reduce((s: number, e: { debit_amount: string }) => s + parseFloat(e.debit_amount), 0);
           const fallbackTotal = totalFromDebits > 0 ? totalFromDebits : creditTotal;
           if (fallbackTotal > 0) byGroup.set("__default__", fallbackTotal);
         }

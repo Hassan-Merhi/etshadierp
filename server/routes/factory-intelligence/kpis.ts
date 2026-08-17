@@ -196,7 +196,7 @@ export function registerFactoryKpiRoutes(app: Express, requireAuth: any, db: any
         };
       });
 
-      result.sort((a: any, b: any) => a.wastePct - b.wastePct);
+      result.sort((a: { wastePct: number }, b: { wastePct: number }) => a.wastePct - b.wastePct);
       res.json(result);
     } catch (error: unknown) {
       logger.error("Error fetching mix KPIs:", { error: error });

@@ -238,10 +238,10 @@ export function registerFactoryAttendanceRoutes(app: Express, requireAuth: any, 
         status: attendanceMap[w.id] || "—",
       }));
 
-      const present = rows.filter((r: any) => r.status === "Present").length;
-      const absent = rows.filter((r: any) => r.status === "Absent").length;
-      const other = rows.filter((r: any) => r.status !== "Present" && r.status !== "Absent" && r.status !== "—").length;
-      const unmarked = rows.filter((r: any) => r.status === "—").length;
+      const present = rows.filter((r: { status: string }) => r.status === "Present").length;
+      const absent = rows.filter((r: { status: string }) => r.status === "Absent").length;
+      const other = rows.filter((r: { status: string }) => r.status !== "Present" && r.status !== "Absent" && r.status !== "—").length;
+      const unmarked = rows.filter((r: { status: string }) => r.status === "—").length;
 
       const doc = new PDFDocument({ margin: 40, size: "A4" });
       res.setHeader("Content-Type", "application/pdf");

@@ -135,7 +135,7 @@ export function ViewEntryModal({
           ? viewEntries.filter((e) => parseFloat(e.creditAmount || "0") > 0)
           : viewEntries;
 
-    const resolveUrl = (e: any): string | null => {
+    const resolveUrl = (e: { bankAccountId: string | number | bigint | boolean | null | undefined; customerId: string | number | bigint | boolean | null | undefined; employeeId: string | number | bigint | boolean | null | undefined; factorySupplierId: string | number | bigint | boolean | null | undefined; ledgerAccountId: string | number | bigint | boolean | null | undefined; supplierId: string | number | bigint | boolean | null | undefined }): string | null => {
       if (e.ledgerAccountId) return `/api/accounts/ledger/${e.ledgerAccountId}/balance`;
       if (e.bankAccountId) return `/api/accounts/ledger/${e.bankAccountId}/balance`;
       if (e.customerId) return `/api/customers/${e.customerId}/balance`;

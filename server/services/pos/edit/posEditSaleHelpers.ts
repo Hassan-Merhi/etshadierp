@@ -12,6 +12,8 @@ import { companies, ledgerAccounts, locations } from "@shared/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import type { HandlerErrorResult, SpEditAccountingContext } from "./posEditSaleTypes";
 
+type SelectConnection = Pick<typeof db, "select">;
+
 /** Detects supplier_partner company type and, if so, fetches/validates the SP POS accounts used for edit-sale accounting. */
 export async function fetchSpEditAccountingContext(
   companyId: number
@@ -89,7 +91,7 @@ export async function fetchSpEditAccountingContext(
 export async function fetchSpEditDeductionPerQty(
   isSpCompanyEdit: boolean,
   targetLocationId: number,
-  connection: any = db
+  connection: SelectConnection = db
 ): Promise<number> {
   if (!isSpCompanyEdit) return 0;
   const [editTargetLoc] = await connection

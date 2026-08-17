@@ -248,7 +248,7 @@ export function PurchaseEditForm({
                   <span className="text-sm font-medium">Total Quantity:</span>
                   <span className="font-mono font-medium">
                     {formatNumber(
-                      form.watch("items").reduce((sum: number, item: any) => sum + (parseFloat(item.quantity) || 0), 0)
+                      form.watch("items").reduce((sum: number, item: { quantity: string }) => sum + (parseFloat(item.quantity) || 0), 0)
                     )}
                   </span>
                 </div>

@@ -338,7 +338,7 @@ export function registerOrderFinalizeRoutes(app: Express) {
           : [];
       const locationMap = new Map(locationRecords.map((l: any) => [l.id, l.name]));
 
-      const availableBales = baleRows.filter((b: any) => ["IN_STOCK", "RESERVED_FOR_ORDER"].includes(b.status));
+      const availableBales = baleRows.filter((b: { status: string }) => ["IN_STOCK", "RESERVED_FOR_ORDER"].includes(b.status));
 
       res.json({
         baleCount: availableBales.length,
