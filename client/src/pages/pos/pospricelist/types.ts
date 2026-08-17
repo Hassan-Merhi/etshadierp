@@ -41,5 +41,5 @@ export interface MasterPriceListResponse {
 }
 
 export interface POSPriceListProps {
-  posUser?: any;
+  posUser?: unknown;
 }
