@@ -1,0 +1,17 @@
+name: Phase 18 Toolchain Audit Only
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  audit:
+    if: contains(github.event.head_commit.message, '[phase18-toolchain-audit-only]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.14.0'
+      - name: Report exact toolchain mismatches
+        run: node scripts/audit-toolchain-coherence.mjs --json
