@@ -18,7 +18,6 @@ import {
   propertyMonthlyLedger,
   propertyContracts,
   propertyUnits,
-  vouchers,
   voucherEntries,
 } from "@shared/schema";
 import { eq, and, sql, inArray } from "drizzle-orm";
