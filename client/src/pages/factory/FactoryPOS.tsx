@@ -101,7 +101,7 @@ export default function FactoryPOS() {
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   });
-  const cashAccounts = (ledgerAccounts || []).filter((a: any) => a.accountType === "Cash");
+  const cashAccounts = (ledgerAccounts || []).filter((a) => a.accountType === "Cash");
   const { data: sales, isLoading: salesLoading } = useQuery<any[]>({
     queryKey: ["/api/factory/pos/sales"],
     enabled: showHistory,
@@ -358,7 +358,7 @@ export default function FactoryPOS() {
       const snapshotExpenses = expenseRows
         .map((e) => ({
           ...e,
-          accountName: (ledgerAccounts || []).find((a: any) => String(a.id) === e.accountId)?.name || e.accountId,
+          accountName: (ledgerAccounts || []).find((a) => String(a.id) === e.accountId)?.name || e.accountId,
         }))
         .filter((e) => parseFloat(e.amount) > 0 && e.accountId);
       setSavedSale({
@@ -515,7 +515,7 @@ export default function FactoryPOS() {
               <SelectValue placeholder="Select location" />
             </SelectTrigger>
             <SelectContent>
-              {(locations || []).map((l: any) => (
+              {(locations || []).map((l) => (
                 <SelectItem key={l.id} value={String(l.id)}>
                   {l.name}
                 </SelectItem>
@@ -558,7 +558,7 @@ export default function FactoryPOS() {
               <SelectValue placeholder="Cash account" />
             </SelectTrigger>
             <SelectContent>
-              {cashAccounts.map((a: any) => (
+              {cashAccounts.map((a) => (
                 <SelectItem key={a.id} value={String(a.id)}>
                   {a.name}
                 </SelectItem>
@@ -614,7 +614,7 @@ export default function FactoryPOS() {
                 <SelectValue placeholder="Select customer *" />
               </SelectTrigger>
               <SelectContent>
-                {(allCustomers || []).map((c: any) => (
+                {(allCustomers || []).map((c) => (
                   <SelectItem key={c.id} value={String(c.id)}>
                     {c.legalName || c.name || `Customer #${c.id}`}
                   </SelectItem>
@@ -847,7 +847,7 @@ export default function FactoryPOS() {
                       <SelectValue placeholder="Expense account" />
                     </SelectTrigger>
                     <SelectContent>
-                      {(ledgerAccounts || []).map((a: any) => (
+                      {(ledgerAccounts || []).map((a) => (
                         <SelectItem key={a.id} value={String(a.id)}>
                           {a.name}
                         </SelectItem>
@@ -911,7 +911,7 @@ export default function FactoryPOS() {
                 )}
                 {paymentType === "CREDIT" &&
                   (() => {
-                    const custObj = (allCustomers || []).find((c: any) => String(c.id) === selectedCustomerId);
+                    const custObj = (allCustomers || []).find((c) => String(c.id) === selectedCustomerId);
                     const prevBal = custObj ? parseFloat(custObj.balance || "0") : 0;
                     const prevBalSide = custObj?.balanceSide || "Dr";
                     const prevNet = prevBalSide === "Dr" ? prevBal : -prevBal;
@@ -1074,7 +1074,7 @@ export default function FactoryPOS() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sales.map((sale: any) => {
+                  {sales.map((sale) => {
                     const pfx = sale.currencyCode !== "USD" ? `${sale.currencyCode} ` : "$";
                     return (
                       <TableRow key={sale.id} data-testid={`row-sale-${sale.id}`}>

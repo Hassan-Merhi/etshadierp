@@ -303,7 +303,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
         if (repayments.length > 0) {
           // Delete ADVANCE_REPAYMENT daybook entries for these repayments before
           // removing the repayment records so orphaned daybook rows don't linger.
-          const repaymentIds = repayments.map((r: any) => r.id);
+          const repaymentIds = repayments.map((r) => r.id);
           await tx
             .delete(factoryDaybookEntries)
             .where(
@@ -326,7 +326,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
             and(eq(vouchers.companyId, companyId), sql`${vouchers.voucherNumber} LIKE ${"PAYMENT-ADV-" + id + "-%"}`)
           );
         if (advanceVouchers.length > 0) {
-          const vIds = advanceVouchers.map((v: any) => v.id);
+          const vIds = advanceVouchers.map((v) => v.id);
           await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
           await tx.delete(vouchers).where(inArray(vouchers.id, vIds));
         }
@@ -640,7 +640,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
         .where(and(eq(ledgerAccounts.id, cashAccountId), eq(ledgerAccounts.companyId, companyId)));
       if (!acct) return res.status(400).json({ message: "Cash account not found for this company" });
 
-      const ids = advanceIds.map((x: any) => parseInt(x)).filter((x: number) => !isNaN(x));
+      const ids = advanceIds.map((x) => parseInt(x)).filter((x: number) => !isNaN(x));
       const today = getClientDate(req);
 
       const result = await db.transaction(async (tx: any) => {
@@ -819,7 +819,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
           )
         );
 
-      const totalBalance = outstanding.reduce((s: number, a: any) => s + parseFloat(a.remainingBalance || "0"), 0);
+      const totalBalance = outstanding.reduce((s: number, a) => s + parseFloat(a.remainingBalance || "0"), 0);
       res.json({ totalBalance: totalBalance.toFixed(2), count: outstanding.length });
     } catch (error: unknown) {
       logger.error("Error fetching advance balance:", { error: error });

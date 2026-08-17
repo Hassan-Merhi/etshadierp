@@ -119,7 +119,7 @@ export function usePosMutations({
       const res = await apiRequest("POST", "/api/pos/sales", saleData);
       return res.json();
     },
-    onSuccess: async (data: any) => {
+    onSuccess: async (data) => {
       clientSaleIdRef.current = crypto.randomUUID();
       setSavedSale(data);
       if (!editVoucherId) setSaleJustCompleted(true);
@@ -198,7 +198,7 @@ export function usePosMutations({
       const res = await apiRequest("POST", "/api/pos/drafts", draftData);
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       setCurrentDraftId(data.id);
       setLastAutosaved(new Date());
       const validItems = rows.filter((r) => r.stockItemId && r.quantity > 0 && r.rate > 0);

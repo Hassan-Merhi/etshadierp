@@ -246,7 +246,7 @@ export function registerGitImportRoutes(app: Express) {
     requireAuth,
     requireRole("Admin", "Owner", "Developer"),
     (req: Request, res: Response, next: NextFunction) => {
-      gitUpload.single("file")(req, res, (err: any) => {
+      gitUpload.single("file")(req, res, (err) => {
         if (!err) return next();
         if (err.code === "LIMIT_FILE_SIZE") {
           return res.status(413).json({ message: "File too large. Maximum allowed size is 10 MB." });

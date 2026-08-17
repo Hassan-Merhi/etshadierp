@@ -37,7 +37,7 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
         .where(eq(customerProformas.companyId, companyId))
         .orderBy(customerProformas.createdAt);
 
-      const proformaIds = allProformas.map((p: any) => p.id);
+      const proformaIds = allProformas.map((p) => p.id);
       let allLines: any[] = [];
       if (proformaIds.length > 0) {
         allLines = await db
@@ -57,7 +57,7 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
       const inStockCountsRaw = await db.execute(
         sql`SELECT article_code as "articleCode", COUNT(*)::int as count FROM factory_bales WHERE company_id = ${companyId} AND status = 'IN_STOCK' GROUP BY article_code`
       );
-      const inStockCounts = (inStockCountsRaw.rows || ((inStockCountsRaw as unknown))).map((r: any) => ({
+      const inStockCounts = (inStockCountsRaw.rows || ((inStockCountsRaw as unknown))).map((r) => ({
         articleCode: r.articleCode,
         count: Number(r.count),
       }));
@@ -77,7 +77,7 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
       const activeOrdersRaw = await db.execute(
         sql`SELECT id, proforma_id_used as "proformaIdUsed", status FROM customer_orders WHERE company_id = ${companyId} AND status IN ('LOADING','PENDING_VERIFICATION','VERIFIED')`
       );
-      const activeOrders = (activeOrdersRaw.rows || ((activeOrdersRaw as unknown))).map((o: any) => ({
+      const activeOrders = (activeOrdersRaw.rows || ((activeOrdersRaw as unknown))).map((o) => ({
         id: o.id,
         proformaIdUsed: o.proformaIdUsed,
         status: o.status,
@@ -90,7 +90,7 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
         const activeOrderBalesRaw = await db.execute(
           sql`SELECT order_id as "orderId", article_code as "articleCode", COUNT(*)::int as count FROM customer_order_bales WHERE order_id = ANY(${sqlArray(orderIds)}) GROUP BY order_id, article_code`
         );
-        activeOrderBales = (activeOrderBalesRaw.rows || ((activeOrderBalesRaw as unknown))).map((b: any) => ({
+        activeOrderBales = (activeOrderBalesRaw.rows || ((activeOrderBalesRaw as unknown))).map((b) => ({
           orderId: b.orderId,
           articleCode: b.articleCode,
           count: Number(b.count),
@@ -98,7 +98,7 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
       }
 
       // 5. Customers lookup — use legalName (the customers table has no "name" column)
-      const allCustomerIds = [...new Set(allProformas.map((p: any) => p.customerId))].filter(
+      const allCustomerIds = [...new Set(allProformas.map((p) => p.customerId))].filter(
         (id): id is number => id != null && !isNaN(Number(id))
       );
       let customerRows: any[] = [];
@@ -108,11 +108,11 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
           .from(customers)
           .where(inArray(customers.id, allCustomerIds));
       }
-      const customerMap = new Map(customerRows.map((c: any) => [c.id, c.legalName]));
+      const customerMap = new Map(customerRows.map((c) => [c.id, c.legalName]));
 
       // 6. Product names for all in-stock article codes (fills in names for codes not in any proforma)
       const allArticleCodes = [
-        ...new Set([...inStockCounts.map((s: any) => s.articleCode), ...allLines.map((l: any) => l.articleCode)]),
+        ...new Set([...inStockCounts.map((s) => s.articleCode), ...allLines.map((l) => l.articleCode)]),
       ];
       const productNamesMap: Record<string, string> = {};
       if (allArticleCodes.length > 0) {
@@ -129,7 +129,7 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
       }
 
       res.json({
-        proformas: allProformas.map((p: any) => ({
+        proformas: allProformas.map((p) => ({
           id: p.id,
           companyId: p.companyId,
           customerId: p.customerId,
@@ -137,18 +137,18 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
           isActive: p.isActive,
           createdAt: p.createdAt,
           customerName: customerMap.get(p.customerId) || `Customer #${p.customerId}`,
-          lines: allLines.filter((l: any) => l.proformaId === p.id),
+          lines: allLines.filter((l) => l.proformaId === p.id),
         })),
         inStockCounts,
         productNames: productNamesMap,
         reservations,
-        activeOrders: activeOrders.map((o: any) => ({
+        activeOrders: activeOrders.map((o) => ({
           id: o.id,
           proformaIdUsed: o.proformaIdUsed,
           status: o.status,
           balesByArticle: activeOrderBales
-            .filter((b: any) => b.orderId === o.id)
-            .map((b: any) => ({ articleCode: b.articleCode, count: b.count })),
+            .filter((b) => b.orderId === o.id)
+            .map((b) => ({ articleCode: b.articleCode, count: b.count })),
         })),
       });
     } catch (error: unknown) {
@@ -203,7 +203,7 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
       // 3. Bale counts per loading per article code
       let loadingBales: { orderId: number; articleCode: string; count: number }[] = [];
       if (loadings.length > 0) {
-        const ids = loadings.map((l: any) => l.id);
+        const ids = loadings.map((l) => l.id);
         const balesRaw = await db.execute(
           sql`SELECT cob.order_id as "orderId", fb.article_code as "articleCode", COUNT(*)::int as count
               FROM customer_order_bales cob
@@ -219,7 +219,7 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
       }
 
       // 3b. Proforma target quantities for each loading (via proformaIdUsed)
-      const proformaIds = [...new Set(loadings.map((l: any) => l.proformaIdUsed))].filter(
+      const proformaIds = [...new Set(loadings.map((l) => l.proformaIdUsed))].filter(
         (id): id is number => id != null
       );
       let proformaLines: { proformaId: number; articleCode: string; quantity: number }[] = [];
@@ -232,7 +232,7 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
           })
           .from(customerProformaLines)
           .where(inArray(customerProformaLines.proformaId, proformaIds));
-        proformaLines = plRaw.map((r: any) => ({
+        proformaLines = plRaw.map((r) => ({
           proformaId: r.proformaId,
           articleCode: r.articleCode,
           quantity: Number(r.quantity),
@@ -240,14 +240,14 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
       }
 
       // 4. Customer names
-      const customerIds = [...new Set(loadings.map((l: any) => l.customerId))].filter((id): id is number => id != null);
+      const customerIds = [...new Set(loadings.map((l) => l.customerId))].filter((id): id is number => id != null);
       const customerMap = new Map<number, string>();
       if (customerIds.length > 0) {
         const custRows = await db
           .select({ id: customers.id, legalName: customers.legalName })
           .from(customers)
           .where(inArray(customers.id, customerIds));
-        custRows.forEach((c: any) => customerMap.set(c.id, c.legalName));
+        custRows.forEach((c) => customerMap.set(c.id, c.legalName));
       }
 
       // 5. Build total stock counts = free IN_STOCK + reserved in active loadings per article
@@ -264,9 +264,9 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
       //    Include all article codes: free stock, scanned bales, AND proforma targets.
       //    Filter by company_id to prevent name bleed-in from other companies.
       const articleCodeSet = new Set<string>([
-        ...freeStockCounts.map((s: any) => s.articleCode),
-        ...loadingBales.map((b: any) => b.articleCode),
-        ...proformaLines.map((pl: any) => pl.articleCode),
+        ...freeStockCounts.map((s) => s.articleCode),
+        ...loadingBales.map((b) => b.articleCode),
+        ...proformaLines.map((pl) => pl.articleCode),
       ]);
       const productNameByCode = new Map<string, string>();
       if (articleCodeSet.size > 0) {
@@ -288,7 +288,7 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
         inStockCounts: totalStockCounts,
         // freeStockCounts: truly free bales — used to compute Remaining on the frontend
         freeStockCounts: freeStockCounts,
-        loadings: loadings.map((l: any) => ({
+        loadings: loadings.map((l) => ({
           id: l.id,
           customerId: l.customerId,
           customerName: customerMap.get(l.customerId) || `Customer #${l.customerId}`,
@@ -296,13 +296,13 @@ export function registerFactoryStockAllocationRoutes(app: Express) {
           status: l.status,
           // balesByArticle: actual bales already scanned into this order
           balesByArticle: loadingBales
-            .filter((b: any) => b.orderId === l.id)
-            .map((b: any) => ({ articleCode: b.articleCode, count: b.count })),
+            .filter((b) => b.orderId === l.id)
+            .map((b) => ({ articleCode: b.articleCode, count: b.count })),
           // proformaTargets: proforma line quantities (the target to load)
           proformaTargets: l.proformaIdUsed
             ? proformaLines
-                .filter((pl: any) => pl.proformaId === l.proformaIdUsed)
-                .map((pl: any) => ({ articleCode: pl.articleCode, quantity: pl.quantity }))
+                .filter((pl) => pl.proformaId === l.proformaIdUsed)
+                .map((pl) => ({ articleCode: pl.articleCode, quantity: pl.quantity }))
             : [],
         })),
         productNames: Object.fromEntries(productNameByCode),

@@ -341,7 +341,7 @@ export default function FactorySuppliers() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: any) => factoryApiRequest("POST", "/api/factory/suppliers", data),
+    mutationFn: async (data) => factoryApiRequest("POST", "/api/factory/suppliers", data),
     onSuccess: () => {
       setCreateOpen(false);
       resetForm();

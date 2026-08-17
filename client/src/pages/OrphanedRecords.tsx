@@ -144,7 +144,7 @@ export default function OrphanedRecordsPage() {
       const res = await modeApiRequest("DELETE", "/api/orphaned-records/delete-all");
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       toast({
         title: "Deleted",
         description: `${data.deleted} orphaned vouchers permanently deleted`,

@@ -239,7 +239,7 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
   ]);
   hdrRow.height = 24;
   try {
-    hdrRow.eachCell((cell: any) => {
+    hdrRow.eachCell((cell) => {
       cell.font = { bold: true, color: { argb: WHITE }, size: 11 };
       setFill(cell, DARK_BLUE);
       cell.alignment = { horizontal: "center", vertical: "middle" };
@@ -287,11 +287,11 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
     const dr = sheet.addRow(rowCells);
     dr.height = 20;
     try {
-      dr.eachCell((cell: any) => {
+      dr.eachCell((cell) => {
         cell.font = { size: 11 };
       });
       if (idx % 2 === 1) {
-        dr.eachCell((cell: any) => setFill(cell, LIGHT_GRAY));
+        dr.eachCell((cell) => setFill(cell, LIGHT_GRAY));
       }
       dr.getCell(1).alignment = { horizontal: "center" };
       dr.getCell(4).alignment = { horizontal: "right" };
@@ -316,7 +316,7 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
   const totRow = sheet.addRow(totRowCells);
   totRow.height = 22;
   try {
-    totRow.eachCell((cell: any) => {
+    totRow.eachCell((cell) => {
       cell.font = { bold: true, size: 11, color: { argb: WHITE } };
       setFill(cell, DARK_BLUE);
       cell.alignment = { horizontal: "right" };
@@ -447,7 +447,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
       const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
 
       const baleLinks = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
-      const baleIds = baleLinks.map((b: any) => b.baleId).filter(Boolean);
+      const baleIds = baleLinks.map((b) => b.baleId).filter(Boolean);
       const baleRows: Array<{ id: number; companyId: number; mixBatchId: number | null; productId: number | null; pressingBatchId: number | null; erpLocationId: number | null; baleCode: string; referenceNumber: string; articleCode: string | null; productName: string | null; productNameAr: string | null; category: string | null; categoryAr: string | null; grade: string | null; quantity: number; weightKg: string; costPerKg: string; totalCost: string; status: string; pressedAt: Date | null; finalizedAt: Date | null; finalizedBy: number | null; workerName: string | null; stockEntryDate: string | null; importBatchId: number | null; deletedAt: Date | null; createdAt: Date; updatedAt: Date; }> =
         baleIds.length > 0 ? await db.select().from(factoryBales).where(inArray(factoryBales.id, baleIds)) : [];
       const orderCharges = await db
@@ -455,7 +455,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
         .from(customerOrderCharges)
         .where(eq(customerOrderCharges.orderId, orderId));
 
-      const productIds = [...new Set(baleRows.map((b: any) => b.productId).filter((id: any) => id != null))];
+      const productIds = [...new Set(baleRows.map((b) => b.productId).filter((id) => id != null))];
       const productRecords: Array<{ id: number; companyId: number; code: string; articleCode: string | null; name: string; nameAr: string | null; description: string | null; descriptionAr: string | null; weightPerBaleKg: string | null; categoryId: number | null; sellingPrice: string | null; productionPrice: string | null; labelDesignColor: string | null; active: boolean; deletedAt: Date | null; createdAt: Date; updatedAt: Date; }> =
         productIds.length > 0
           ? await db
@@ -465,7 +465,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
           : [];
       const productMap = new Map(productRecords.map((p: any) => [p.id, p]));
       const balePriceMap = new Map<number, number>(
-        baleLinks.map((l: any) => [l.baleId, parseFloat(l.priceUsed || "0")])
+        baleLinks.map((l) => [l.baleId, parseFloat(l.priceUsed || "0")])
       );
 
       // Also read order lines for pricing mode metadata
@@ -545,7 +545,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
           pricingMode: g.pricingMode,
           pricePerKg: g.pricePerKg,
         })),
-        charges: orderCharges.map((ch: any) => ({
+        charges: orderCharges.map((ch) => ({
           name: ch.name ?? null,
           amount: ch.amount ?? null,
           chargeType: ch.chargeType || "",
@@ -629,7 +629,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
       const rawLines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
 
       // Canonical product names from factoryBaleProducts
-      const articleCodes = [...new Set(rawLines.map((l: any) => l.articleCode).filter(Boolean))];
+      const articleCodes = [...new Set(rawLines.map((l) => l.articleCode).filter(Boolean))];
       const productNameMap = new Map<string, string>();
       const wtPerBaleMap = new Map<string, number>();
       if (articleCodes.length > 0) {
@@ -663,7 +663,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
           pricingMode: (l.pricingMode as string) || "per_bale",
           pricePerKg: parseFloat(l.pricePerKg || "0"),
         }))
-        .sort((a: any, b: any) => a.articleCode.localeCompare(b.articleCode));
+        .sort((a, b) => a.articleCode.localeCompare(b.articleCode));
 
       const fileName = buildExportFilename([order.containerNumber, order.customerName, order.destination], "xlsx");
       const xlsBuffer = await buildInvoiceWorkbookBuffer({
@@ -674,7 +674,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
         containerNumber: order.containerNumber ?? null,
         customerName: order.customerName ?? null,
         baseCurrency: company?.baseCurrency || "USD",
-        lines: lines.map((l: any) => ({
+        lines: lines.map((l) => ({
           articleCode: l.articleCode,
           productName: l.productName,
           qty: l.qty,
@@ -685,7 +685,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
           pricingMode: l.pricingMode,
           pricePerKg: l.pricePerKg,
         })),
-        charges: orderCharges2.map((ch: any) => ({
+        charges: orderCharges2.map((ch) => ({
           name: ch.name ?? null,
           amount: ch.amount ?? null,
           chargeType: ch.chargeType || "",

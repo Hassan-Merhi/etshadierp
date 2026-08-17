@@ -186,7 +186,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
 
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return locationPricedList.filter((item: any) => {
+    return locationPricedList.filter((item) => {
       const matchesSearch =
         !q ||
         item.name.toLowerCase().includes(q) ||
@@ -257,7 +257,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
     const current = editingItemRef.current;
     if (!current) return;
     const items = filteredItems;
-    const idx = items.findIndex((i: any) => i.stockItemId === current.stockItemId);
+    const idx = items.findIndex((i) => i.stockItemId === current.stockItemId);
     if (idx === -1) return;
     const nextIdx = direction === "up" ? idx - 1 : idx + 1;
     if (nextIdx < 0 || nextIdx >= items.length) return;
@@ -282,7 +282,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       return;
     }
     const items = filteredItems;
-    const idx = items.findIndex((i: any) => i.stockItemId === current.stockItemId);
+    const idx = items.findIndex((i) => i.stockItemId === current.stockItemId);
     if (idx === -1) return;
     const masterIdx = visibleMasters.findIndex((m) => m.id === current.locationId);
     if (masterIdx === -1) return;
@@ -534,7 +534,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
     try {
       const XLSX = await import("@/lib/excelHelper");
 
-      const rows = filteredItems.map((item: any) => {
+      const rows = filteredItems.map((item) => {
         const row: Record<string, unknown> = {
           Code: item.code || "",
           "Item Name": item.name,
@@ -1091,7 +1091,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredItems.map((item: any) => (
+                        {filteredItems.map((item) => (
                           <TableRow
                             key={item.stockItemId}
                             data-testid={`row-price-${item.stockItemId}`}

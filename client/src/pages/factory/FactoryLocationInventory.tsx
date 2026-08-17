@@ -217,7 +217,7 @@ export default function FactoryLocationInventory() {
 
   const handleDoPrint = async () => {
     if (reprintBales.length === 0) return;
-    const labels: LabelData[] = reprintBales.map((row: any) => ({
+    const labels: LabelData[] = reprintBales.map((row) => ({
       referenceNumber: row.bale.referenceNumber || row.bale.baleCode,
       articleCode: row.product?.articleCode || row.bale.articleCode || row.bale.category || "",
       pieces: row.bale.quantity || 1,
@@ -405,7 +405,7 @@ export default function FactoryLocationInventory() {
       const res = await modeApiRequest("POST", "/api/factory/customer-proformas/bulk", data);
       return await res.json();
     },
-    onSuccess: (result: any) => {
+    onSuccess: (result) => {
       setSavedProformaId(result.id);
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-proformas") });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/location-inventory"] });
@@ -423,7 +423,7 @@ export default function FactoryLocationInventory() {
       });
       return await res.json();
     },
-    onSuccess: (result: any) => {
+    onSuccess: (result) => {
       const silent = isSilentAutoSaveRef.current;
       isSilentAutoSaveRef.current = false;
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-proformas") });
@@ -540,7 +540,7 @@ export default function FactoryLocationInventory() {
     )
       return;
     const productByArticleCode = new Map<string, any>();
-    ((inventoryData)).forEach((prod: any) => {
+    ((inventoryData)).forEach((prod) => {
       productByArticleCode.set((prod.articleCode || "").toLowerCase(), prod);
     });
     const newSelections = new Map<number, ProformaSelection>();

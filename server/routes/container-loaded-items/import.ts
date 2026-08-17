@@ -30,7 +30,7 @@ export function registerContainerLoadedItemImportRoutes(app: Express, requireAut
       // Resolve alias codes → primary stock-item codes before saving so that
       // items imported with different (supplier) codes match the proforma.
       const { map: aliasMap } = await buildAliasMap(companyId);
-      const values = items.map((l: any) => ({
+      const values = items.map((l) => ({
         containerId,
         barcode: resolveBarcode(String(l.barcode || l.Barcode || "").trim(), aliasMap),
         itemName: String(l.itemName || l["Item Name"] || "").trim() || null,
@@ -95,7 +95,7 @@ export function registerContainerLoadedItemImportRoutes(app: Express, requireAut
         }
 
         const itemsWithBarcode = lineItems.filter(
-          (item: any) => item.stockItemCode && item.stockItemCode.trim() !== ""
+          (item) => item.stockItemCode && item.stockItemCode.trim() !== ""
         );
         const skippedCount = lineItems.length - itemsWithBarcode.length;
 

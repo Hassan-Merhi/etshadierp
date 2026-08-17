@@ -253,7 +253,7 @@ export function registerContainerLoadedItemSummaryRoutes(app: Express, requireAu
             const totalValues = columns.map((c, i) => {
               if (i === 0) return "TOTAL";
               const sum = data.reduce(
-                (s: number, item: any) => s + (typeof item[c.key] === "number" ? item[c.key] : 0),
+                (s: number, item) => s + (typeof item[c.key] === "number" ? item[c.key] : 0),
                 0
               );
               return typeof data[0]?.[c.key] === "number" ? sum : "";
@@ -289,7 +289,7 @@ export function registerContainerLoadedItemSummaryRoutes(app: Express, requireAu
             { header: "Status", key: "status", width: 16 },
           ],
           fullComparison,
-          (item: any) => {
+          (item) => {
             if (item.status === "OVERLOADED") return sc.overloadedBg;
             if (item.status === "SHORT" || item.status === "MISSING") return sc.shortBg;
             if (item.status === "NOT REQUESTED") return sc.notRequestedBg;

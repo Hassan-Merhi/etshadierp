@@ -388,8 +388,8 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
       }
 
       const details = allBales
-        .filter((bale: any) => classify(bale) === section)
-        .map((bale: any) => ({
+        .filter((bale) => classify(bale) === section)
+        .map((bale) => ({
           id: bale.id,
           ref: bale.referenceNumber || "",
           weightKg: parseFloat(bale.weightKg) || 0,

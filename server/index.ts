@@ -1461,7 +1461,7 @@ END $mig$`;
       }
       setTimeout(() => {
         server.removeAllListeners("error");
-        server.on("error", (e: any) => {
+        server.on("error", (e) => {
           logger.error("Server error:", { error: e });
         });
         doListen();

@@ -204,7 +204,7 @@ export function DataToolsTab() {
         rate: string;
         value: string;
       }> = [];
-      jsonData.forEach((row: any, index: number) => {
+      jsonData.forEach((row, index: number) => {
         const rowNumber = index + 2;
         if (!row.Item_barcode || String(row.Item_barcode).trim() === "") {
           errors.push(`Row ${rowNumber}: Item_barcode is required`);
@@ -326,10 +326,10 @@ export function DataToolsTab() {
           const rate = parseFloat(String(row.Rate ?? "0")) || 0;
 
           let matched: any = code
-            ? (allStockItems as any[]).find((s: any) => s.code?.toLowerCase() === code.toLowerCase())
+            ? (allStockItems as any[]).find((s) => s.code?.toLowerCase() === code.toLowerCase())
             : undefined;
           if (!matched && name)
-            matched = (allStockItems as any[]).find((s: any) => s.name.toLowerCase() === name.toLowerCase());
+            matched = (allStockItems as any[]).find((s) => s.name.toLowerCase() === name.toLowerCase());
 
           if (!matched) {
             return {
@@ -394,7 +394,7 @@ export function DataToolsTab() {
     doc.text("Silent Adjustment Preview", 14, 18);
     doc.setFontSize(10);
     doc.text(
-      `Location: ${(locations as any[]).find((l: any) => String(l.id) === silentProdLocId)?.name || ""}   Date: ${new Date().toLocaleDateString()}`,
+      `Location: ${(locations as any[]).find((l) => String(l.id) === silentProdLocId)?.name || ""}   Date: ${new Date().toLocaleDateString()}`,
       14,
       25
     );
@@ -830,7 +830,7 @@ export function DataToolsTab() {
                                 );
                               }
                               const filtered = (allStockItems as any[]).filter(
-                                (si: any) =>
+                                (si) =>
                                   si.name.toLowerCase().includes(term) ||
                                   (si.code && si.code.toLowerCase().includes(term))
                               );
@@ -838,7 +838,7 @@ export function DataToolsTab() {
                                 return (
                                   <div className="text-center text-sm text-muted-foreground py-4">No items found</div>
                                 );
-                              return filtered.map((si: any) => {
+                              return filtered.map((si) => {
                                 const locRow = silentLocInventory.find((inv) => inv.stockItemId === si.id);
                                 const currentQty = locRow ? parseFloat(locRow.quantity || "0") : 0;
                                 return (
@@ -1296,8 +1296,8 @@ export function DataToolsTab() {
                     </SelectTrigger>
                     <SelectContent>
                       {(locations as any[])
-                        .filter((l: any) => String(l.id) !== silentSrcId)
-                        .map((loc: any) => (
+                        .filter((l) => String(l.id) !== silentSrcId)
+                        .map((loc) => (
                           <SelectItem key={loc.id} value={String(loc.id)}>
                             {loc.name}
                           </SelectItem>
@@ -1431,7 +1431,7 @@ export function DataToolsTab() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {silentErrorLines.map((e: any, i: number) => (
+                              {silentErrorLines.map((e, i: number) => (
                                 <TableRow key={i} className="bg-red-50/60 dark:bg-red-950/20">
                                   <TableCell className="text-xs py-1.5 text-muted-foreground">{e.rowNum}</TableCell>
                                   <TableCell className="text-xs py-1.5 font-mono">{e.barcode || "—"}</TableCell>
@@ -1475,7 +1475,7 @@ export function DataToolsTab() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {silentWarnItems.map((item: any, i: number) => (
+                              {silentWarnItems.map((item, i: number) => (
                                 <TableRow
                                   key={i}
                                   className={silentIncludeWarnings ? "bg-yellow-50/60 dark:bg-yellow-950/20" : ""}
@@ -1519,7 +1519,7 @@ export function DataToolsTab() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {silentValidItems.map((item: any, i: number) => (
+                              {silentValidItems.map((item, i: number) => (
                                 <TableRow key={i} className="bg-green-50/40 dark:bg-green-950/10">
                                   <TableCell className="py-1.5">
                                     <div className="text-xs font-medium">{item.stockItemName}</div>

@@ -302,7 +302,7 @@ export function extractFromJson(
 
         // Priority 1: expected Arrived / Discharged event at the last location
         const arrivalEv = lastLocEvents.find(
-          (ev: any) =>
+          (ev) =>
             ev.event_time_type === "EXPECTED" &&
             ev.event_time &&
             /arrived|discharged|discharge|arrival|delivered|delivery/i.test(ev.activity ?? "")
@@ -313,7 +313,7 @@ export function extractFromJson(
           // Priority 2: latest (by event_time) expected event at the last location
           const expectedAtDest = lastLocEvents
             .filter((ev) => ev.event_time_type === "EXPECTED" && ev.event_time)
-            .sort((a: any, b: any) => new Date(b.event_time).getTime() - new Date(a.event_time).getTime());
+            .sort((a, b) => new Date(b.event_time).getTime() - new Date(a.event_time).getTime());
           if (expectedAtDest.length > 0) {
             // Pick the earliest future expected event as the true ETA
             const futureExpected = expectedAtDest

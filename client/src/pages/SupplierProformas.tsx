@@ -235,7 +235,7 @@ export default function SupplierProformas() {
       });
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers", supplierId, "proformas", selectedProformaId] });
       toast({ title: "Import complete", description: `${data.imported} lines imported` });
     },

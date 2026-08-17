@@ -350,7 +350,7 @@ export default function SpReports() {
           {!splitsLoading && splits.length > 0 && (
             <div className="space-y-1">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Finalized Splits</h3>
-              {splits.map((s: any) => (
+              {splits.map((s) => (
                 <div
                   key={s.id}
                   className="flex items-center justify-between text-xs py-1.5 border-b border-border/30"
@@ -409,7 +409,7 @@ export default function SpReports() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All locations</SelectItem>
-                      {locations.map((l: any) => (
+                      {locations.map((l) => (
                         <SelectItem key={l.id} value={String(l.id)} data-testid={`option-location-${l.id}`}>
                           {l.name}
                         </SelectItem>
@@ -429,7 +429,7 @@ export default function SpReports() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">No account (manual entry)</SelectItem>
-                      {accounts.map((a: any) => (
+                      {accounts.map((a) => (
                         <SelectItem key={a.id} value={String(a.id)} data-testid={`option-cash-account-${a.id}`}>
                           {a.name}
                         </SelectItem>

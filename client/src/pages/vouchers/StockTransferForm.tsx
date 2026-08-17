@@ -1001,7 +1001,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                   const mobileFilteredItems =
                     activeTransferRow === index && activeFieldType === "item"
                       ? transferInventory
-                          .filter((item: any) => {
+                          .filter((item) => {
                             if (!transferSearchTerm.trim()) return true;
                             const term = transferSearchTerm.toLowerCase();
                             return (
@@ -1009,7 +1009,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                               item.stockItemCode?.toLowerCase().includes(term)
                             );
                           })
-                          .sort((a: any, b: any) => (a.stockItemName || "").localeCompare(b.stockItemName || ""))
+                          .sort((a, b) => (a.stockItemName || "").localeCompare(b.stockItemName || ""))
                           .slice(0, 10)
                       : [];
                   const mobileFilteredLocs =
@@ -1020,7 +1020,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                             const term = transferSourceSearchTerm.toLowerCase();
                             return (loc.name || "").toLowerCase().includes(term);
                           })
-                          .sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""))
+                          .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
                           .slice(0, 8)
                       : [];
                   return (
@@ -1147,7 +1147,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                         />
                         {mobileFilteredItems.length > 0 && (
                           <div className="border rounded-md bg-popover shadow-md max-h-40 overflow-y-auto z-20 relative">
-                            {mobileFilteredItems.map((item: any) => (
+                            {mobileFilteredItems.map((item) => (
                               <button
                                 key={item.stockItemId}
                                 type="button"
@@ -1917,7 +1917,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                         const filteredInventory = filteredTransferInventory;
                         if (filteredInventory.length === 0)
                           return <div className="text-center py-8 text-sm text-muted-foreground">No items found</div>;
-                        return filteredInventory.map((item: any, idx: number) => {
+                        return filteredInventory.map((item, idx: number) => {
                           const stock = parseFloat(item.quantity || "0");
                           const isHighlighted = idx === transferHighlightedIndex && activeTransferRow !== null;
                           return (
@@ -2219,7 +2219,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                   description='Use "Save as Revision" to record tracked changes to this transfer.'
                 />
               ) : (
-                transferRevisions.map((rev: any) => (
+                transferRevisions.map((rev) => (
                   <div key={rev.id} className="border rounded-md overflow-hidden">
                     {rev.optional && (
                       <div className="flex items-center justify-between gap-3 px-3 py-2 status-warning border-b">

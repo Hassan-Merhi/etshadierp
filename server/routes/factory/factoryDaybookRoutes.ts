@@ -408,7 +408,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
       // ── 3. Merge + sort ────────────────────────────────────────────────────
       // If ownOnly, exclude synthetic rows (voucher-derived rows with no createdBy)
       const effectiveSyntheticRows = ownOnly ? [] : syntheticRows;
-      const merged = [...deduplicatedRows, ...effectiveSyntheticRows].sort((a: any, b: any) => {
+      const merged = [...deduplicatedRows, ...effectiveSyntheticRows].sort((a, b) => {
         if (b.txDate > a.txDate) return 1;
         if (b.txDate < a.txDate) return -1;
         return Math.abs(b.id) - Math.abs(a.id);

@@ -128,7 +128,7 @@ export function registerEmployeeAttendanceRoutes(app: Express) {
         });
       }
 
-      const workerIds = workers.map((w: any) => w.id);
+      const workerIds = workers.map((w) => w.id);
 
       // Attendance rows for this date range
       const attRows = await db.execute(
@@ -186,7 +186,7 @@ export function registerEmployeeAttendanceRoutes(app: Express) {
       let totalPresent = 0;
       let totalAbsent = 0;
 
-      const workerResults = workers.map((w: any) => {
+      const workerResults = workers.map((w) => {
         const dayMap = workerAttMap.get(w.id) || new Map<string, string>();
         const attendance: Record<string, string> = {};
         for (const [d, s] of dayMap) attendance[d] = s;

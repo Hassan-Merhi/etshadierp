@@ -81,7 +81,7 @@ export default function ProductionRawStock() {
 
   // Mutations
   const offloadMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data) => {
       const res = await modeApiRequest("POST", "/api/factory/raw-stock/offload", data);
       if (!res.ok) throw new Error((await res.json()).message || "Failed to offload");
       return res.json();
@@ -103,7 +103,7 @@ export default function ProductionRawStock() {
   });
 
   const openingBalanceMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data) => {
       const res = await modeApiRequest("POST", "/api/factory/raw-stock/opening-balance", data);
       if (!res.ok) throw new Error((await res.json()).message || "Failed to add OB");
       return res.json();
@@ -116,7 +116,7 @@ export default function ProductionRawStock() {
   });
 
   const createAdjustmentMutation = useMutation({
-    mutationFn: async (payload: any) => {
+    mutationFn: async (payload) => {
       const res = await modeApiRequest("POST", "/api/factory/raw-stock/adjustment", payload);
       if (!res.ok) throw new Error((await res.json()).message || "Failed to save adjustment");
       return res.json();
@@ -129,7 +129,7 @@ export default function ProductionRawStock() {
   });
 
   const deductReceivedMutation = useMutation({
-    mutationFn: async (payload: any) => {
+    mutationFn: async (payload) => {
       const res = await modeApiRequest("POST", "/api/factory/raw-stock/deduct-received", payload);
       if (!res.ok) throw new Error((await res.json()).message || "Failed to deduct");
       return res.json();
@@ -142,7 +142,7 @@ export default function ProductionRawStock() {
   });
 
   const updateCostMutation = useMutation({
-    mutationFn: async (payload: any) => {
+    mutationFn: async (payload) => {
       const res = await modeApiRequest("POST", "/api/factory/raw-stock/update-cost", payload);
       if (!res.ok) throw new Error((await res.json()).message || "Failed to update cost");
       return res.json();

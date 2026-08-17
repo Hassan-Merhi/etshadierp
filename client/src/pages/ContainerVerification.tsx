@@ -149,7 +149,7 @@ export default function ContainerVerification() {
       const res = await apiRequest("POST", `/api/containers/${containerId}/auto-populate-loaded-items`);
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/containers", containerId, "loaded-items"] });
       const skippedMsg = data.skipped > 0 ? ` (${data.skipped} skipped - missing barcodes)` : "";
       toast({
@@ -169,7 +169,7 @@ export default function ContainerVerification() {
       const res = await apiRequest("POST", `/api/containers/${containerId}/import-loaded-items`, { items });
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/containers", containerId, "loaded-items"] });
       toast({ title: "Import complete", description: `${data.imported} items imported` });
       if (verificationResult) generateComparison();

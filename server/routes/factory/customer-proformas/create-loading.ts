@@ -108,7 +108,7 @@ export function registerFactoryCustomerProformaLoadingRoutes(app: Express) {
       }
 
       // Pre-fetch product names for all article codes in this proforma
-      const proformaArticleCodes = [...new Set(lines.map((l: any) => l.articleCode).filter(Boolean))];
+      const proformaArticleCodes = [...new Set(lines.map((l) => l.articleCode).filter(Boolean))];
       const proformaProductNameMap = new Map<string, string>();
       if (proformaArticleCodes.length > 0) {
         const proformaProducts = await db

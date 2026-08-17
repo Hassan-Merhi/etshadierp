@@ -742,7 +742,7 @@ export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
           <Form {...addWorkerDeductionForm}>
             <form
               noValidate
-              onSubmit={addWorkerDeductionForm.handleSubmit((data: any) => addWorkerDeductionMutation.mutate(data))}
+              onSubmit={addWorkerDeductionForm.handleSubmit((data) => addWorkerDeductionMutation.mutate(data))}
               className="space-y-4"
             >
               <FormField

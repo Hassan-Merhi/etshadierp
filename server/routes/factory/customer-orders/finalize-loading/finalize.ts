@@ -315,7 +315,7 @@ export function registerOrderFinalizeRoutes(app: Express) {
       const orderBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
       if (orderBales.length === 0) return res.json({ baleCount: 0, bales: [] });
 
-      const baleIds = orderBales.map((b: any) => b.baleId);
+      const baleIds = orderBales.map((b) => b.baleId);
       const baleRows = await db
         .select({
           id: factoryBales.id,
@@ -336,7 +336,7 @@ export function registerOrderFinalizeRoutes(app: Express) {
               .from(locations)
               .where(inArray(locations.id, locIds as number[]))
           : [];
-      const locationMap = new Map(locationRecords.map((l: any) => [l.id, l.name]));
+      const locationMap = new Map(locationRecords.map((l) => [l.id, l.name]));
 
       const availableBales = baleRows.filter((b: { status: string }) => ["IN_STOCK", "RESERVED_FOR_ORDER"].includes(b.status));
 

@@ -198,7 +198,7 @@ export function useVoucherQueries({
         openingBalance: c.openingBalance,
       })),
       ...customerSearchResults
-        .filter((c: any) => !customers.find((p: any) => p.id === c.id))
+        .filter((c) => !customers.find((p) => p.id === c.id))
         .map((c: any) => ({
           type: "customer" as const,
           id: c.id,

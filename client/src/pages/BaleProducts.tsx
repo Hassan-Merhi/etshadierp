@@ -525,7 +525,7 @@ export default function BaleProducts() {
         "Total",
       ]);
       hdrRow.height = 22;
-      hdrRow.eachCell((cell: any) => {
+      hdrRow.eachCell((cell) => {
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C_BLUE } };
         cell.font = { bold: true, color: { argb: C_WHITE }, size: 11 };
         cell.alignment = { horizontal: "center", vertical: "middle" };
@@ -705,7 +705,7 @@ export default function BaleProducts() {
 
       const hdrRow = ws.addRow(["#", "Article Code", "Name of Item", "Category", "Weight (kg)", "Bales"]);
       hdrRow.height = 22;
-      hdrRow.eachCell((cell: any) => {
+      hdrRow.eachCell((cell) => {
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C_BLUE } };
         cell.font = { bold: true, color: { argb: C_WHITE }, size: 11 };
         cell.alignment = { horizontal: "center", vertical: "middle" };

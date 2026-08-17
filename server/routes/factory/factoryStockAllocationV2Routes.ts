@@ -104,7 +104,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
       const activeProformaIds = await db.execute(
         sql`SELECT id FROM customer_proformas WHERE company_id = ${companyId} AND is_active = true`
       );
-      const idsToSync: number[] = activeProformaIds.rows.map((r: any) => Number(r.id));
+      const idsToSync: number[] = activeProformaIds.rows.map((r) => Number(r.id));
       for (const pid of idsToSync) {
         await syncProformaReservations(db, companyId, pid);
       }
@@ -117,7 +117,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
             WHERE company_id = ${companyId} AND active = false`
       );
       const inactiveArticleCodes = new Set<string>(
-        resultRows(inactiveProductsRaw).flatMap((r: any) => {
+        resultRows(inactiveProductsRaw).flatMap((r) => {
           const vals: string[] = [];
           if (r.code) vals.push(r.code as string);
           if (r.article_code) vals.push(r.article_code as string);
@@ -187,7 +187,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
           .select({ id: customers.id, legalName: customers.legalName })
           .from(customers)
           .where(inArray(customers.id, customerIds));
-        rows.forEach((c: any) => customerMap.set(c.id, c.legalName));
+        rows.forEach((c) => customerMap.set(c.id, c.legalName));
       }
 
       // Filter proforma lines that reference inactive products
@@ -284,7 +284,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
             WHERE company_id = ${companyId} AND status IN ('LOADING','PENDING_VERIFICATION')
             ORDER BY id`
       );
-      const loadings: any[] = (loadingsRaw.rows || ((loadingsRaw as unknown))).map((r: any) => ({
+      const loadings: any[] = (loadingsRaw.rows || ((loadingsRaw as unknown))).map((r) => ({
         id: r.id,
         customerId: r.customerId,
         containerNumber: r.containerNumber || null,
@@ -320,7 +320,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
           })
           .from(customerProformaLines)
           .where(inArray(customerProformaLines.proformaId, proformaIds));
-        proformaLines = plRaw.map((r: any) => ({
+        proformaLines = plRaw.map((r) => ({
           proformaId: r.proformaId,
           articleCode: r.articleCode,
           quantity: Number(r.quantity),
@@ -334,7 +334,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
           .select({ id: customers.id, legalName: customers.legalName })
           .from(customers)
           .where(inArray(customers.id, customerIds));
-        rows.forEach((c: any) => customerMap.set(c.id, c.legalName));
+        rows.forEach((c) => customerMap.set(c.id, c.legalName));
       }
 
       const totalStockMap = new Map(freeStockMap);
@@ -348,7 +348,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
             WHERE company_id = ${companyId} AND active = false`
       );
       const inactiveCodes2 = new Set<string>(
-        inactiveRaw2.rows.flatMap((r: any) => {
+        inactiveRaw2.rows.flatMap((r) => {
           const vals: string[] = [];
           if (r.code) vals.push(r.code as string);
           if (r.article_code) vals.push(r.article_code as string);

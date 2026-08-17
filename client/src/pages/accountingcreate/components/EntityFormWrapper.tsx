@@ -59,7 +59,7 @@ function EntityFormWrapper({
       const res = await modeApiRequest("POST", config.endpoint, payload);
       return await res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       toast({
         title: "Success",
         description: `${config.label} "${data.name || data.legalName || data.code}" created successfully`,

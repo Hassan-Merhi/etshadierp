@@ -45,7 +45,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
         updatedAt: pr.updated_at ?? pr.created_at,
       };
       const rawLinesRes = await db.execute(sql`SELECT * FROM customer_proforma_lines WHERE proforma_id = ${id}`);
-      const lines = ((rawLinesRes).rows ?? (rawLinesRes as unknown as unknown[])).map((l: any) => ({
+      const lines = ((rawLinesRes).rows ?? (rawLinesRes as unknown as unknown[])).map((l) => ({
         id: l.id,
         proformaId: l.proforma_id,
         articleCode: l.article_code ?? "",
@@ -58,7 +58,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
         pricePerKg: l.price_per_kg ?? null,
         createdAt: l.created_at,
       }));
-      const articleCodes = [...new Set(lines.map((l: any) => l.articleCode).filter(Boolean))];
+      const articleCodes = [...new Set(lines.map((l) => l.articleCode).filter(Boolean))];
       const weightMap = new Map<string, string>();
       if (articleCodes.length > 0) {
         const baleProds = await db
@@ -138,7 +138,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
           ORDER BY cp.name ASC
         `);
         const summaryRows = (rawSummary).rows ?? (rawSummary as unknown as unknown[]);
-        const summaries = summaryRows.map((row: any) => ({
+        const summaries = summaryRows.map((row) => ({
           id: row.id,
           companyId: row.company_id,
           customerId: row.customer_id,
@@ -166,7 +166,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
               AND deleted_at IS NULL
             ORDER BY name ASC`
       );
-      const proformas = ((rawProformasRes).rows ?? (rawProformasRes as unknown as unknown[])).map((r: any) => ({
+      const proformas = ((rawProformasRes).rows ?? (rawProformasRes as unknown as unknown[])).map((r) => ({
         id: r.id,
         companyId: r.company_id,
         customerId: r.customer_id,

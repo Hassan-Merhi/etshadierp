@@ -183,7 +183,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       const res = await apiRequest("POST", `/api/containers/${containerId}/price-import/preview`, { rows });
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       setPriceImportPreview(data.preview || []);
     },
     onError: (e: ClientErrorLike) => {
@@ -196,7 +196,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       const res = await apiRequest("POST", `/api/containers/${containerId}/price-import/apply`, { rows });
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       toast({ title: "Prices updated", description: `${data.updated} line item(s) updated successfully.` });
       setShowPriceImportDialog(false);
       setPriceImportPreview(null);
@@ -224,7 +224,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       sheet.eachRow((row, rowNumber: number) => {
         const vals = row.values as any[];
         if (headerRow === -1) {
-          vals.forEach((cell: any, colIdx: number) => {
+          vals.forEach((cell, colIdx: number) => {
             const v = String(cell || "")
               .toLowerCase()
               .trim();
@@ -658,7 +658,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       const res = await apiRequest("POST", `/api/containers/${containerId}/sync-voucher`);
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
       toast({
         title: "Voucher Synced",
@@ -1028,12 +1028,12 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
 
   // Compute totals live from the actual PO and charges data so they are
   // always accurate, even when the stored container totals are stale.
-  const itemsTotal = pos.reduce((sum: number, po: any) => sum + parseFloat(po.itemsTotal || "0"), 0);
-  const chargesTotal = charges.reduce((sum: number, c: any) => sum + parseFloat(c.amount || "0"), 0);
+  const itemsTotal = pos.reduce((sum: number, po) => sum + parseFloat(po.itemsTotal || "0"), 0);
+  const chargesTotal = charges.reduce((sum: number, c) => sum + parseFloat(c.amount || "0"), 0);
   const grandTotal = itemsTotal + chargesTotal;
 
   // Calculate total bales from all line items
-  const totalBales = pos.reduce((total: number, po: any) => {
+  const totalBales = pos.reduce((total: number, po) => {
     return (
       total +
       po.items.reduce((sum: number, item: any) => {
@@ -1273,7 +1273,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
             {formatAmount(itemsTotal)}
           </p>
           <p className="text-xs text-muted-foreground">
-            {pos.reduce((sum: number, po: any) => sum + po.items.length, 0)} items in {pos.length} PO(s)
+            {pos.reduce((sum: number, po) => sum + po.items.length, 0)} items in {pos.length} PO(s)
           </p>
         </div>
 
@@ -1297,7 +1297,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
         </div>
       ) : (
         <div className="space-y-4">
-          {pos.map((po: any) => (
+          {pos.map((po) => (
             <div key={po.id} className="rounded-lg border bg-card overflow-hidden">
               {/* PO header bar */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-3 bg-muted/40 border-b">
@@ -1411,7 +1411,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
               </tr>
             </thead>
             <tbody>
-              {charges.map((c: any, i: number) => (
+              {charges.map((c, i: number) => (
                 <tr key={i} className="border-t first:border-t-0">
                   <td className="px-4 py-2.5 text-muted-foreground">{c.chargeType}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums font-medium">
@@ -1593,7 +1593,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
                   <SelectValue placeholder="Select document type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(docsData?.docTypes || []).map((dt: any) => (
+                  {(docsData?.docTypes || []).map((dt) => (
                     <SelectItem key={dt.id} value={String(dt.id)}>
                       {dt.label}
                       {dt.isRequired ? " *" : ""}
@@ -1863,7 +1863,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {priceImportPreview.map((row: any, i: number) => (
+                    {priceImportPreview.map((row, i: number) => (
                       <TableRow key={i} data-testid={`row-price-preview-${i}`}>
                         <TableCell className="font-mono text-xs">{row.barcode}</TableCell>
                         <TableCell className="text-sm">{row.itemName || "—"}</TableCell>
@@ -1917,20 +1917,20 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
             )}
           </div>
 
-          {priceImportPreview && priceImportPreview.some((r: any) => r.status === "will_update") && (
+          {priceImportPreview && priceImportPreview.some((r) => r.status === "will_update") && (
             <div className="flex justify-between items-center pt-2 border-t gap-2 flex-wrap">
               <p className="text-sm text-muted-foreground">
-                {priceImportPreview.filter((r: any) => r.status === "will_update").length} item(s) will be updated
-                {priceImportPreview.some((r: any) => r.status === "not_found") &&
-                  ` · ${priceImportPreview.filter((r: any) => r.status === "not_found").length} not found`}
-                {priceImportPreview.some((r: any) => r.status === "not_in_container") &&
-                  ` · ${priceImportPreview.filter((r: any) => r.status === "not_in_container").length} not in this container`}
+                {priceImportPreview.filter((r) => r.status === "will_update").length} item(s) will be updated
+                {priceImportPreview.some((r) => r.status === "not_found") &&
+                  ` · ${priceImportPreview.filter((r) => r.status === "not_found").length} not found`}
+                {priceImportPreview.some((r) => r.status === "not_in_container") &&
+                  ` · ${priceImportPreview.filter((r) => r.status === "not_in_container").length} not in this container`}
               </p>
               <Button
                 onClick={() => {
                   const rows = priceImportPreview
-                    .filter((r: any) => r.status === "will_update" && r.lineItemIds?.length)
-                    .map((r: any) => ({ lineItemIds: r.lineItemIds, newRate: r.newRate }));
+                    .filter((r) => r.status === "will_update" && r.lineItemIds?.length)
+                    .map((r) => ({ lineItemIds: r.lineItemIds, newRate: r.newRate }));
                   priceApplyMutation.mutate(rows);
                 }}
                 disabled={priceApplyMutation.isPending}

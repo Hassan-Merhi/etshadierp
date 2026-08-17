@@ -59,7 +59,7 @@ export function registerPosSaleWriteRoutes(app: Express) {
       const depositAmt = isCredit ? Math.max(0, parseFloat(depositAmount || "0")) : 0;
 
       const totalAmount = items.reduce(
-        (s: number, it: any) => s + parseFloat(it.unitPrice || "0") * parseInt(it.quantity || "1"),
+        (s: number, it) => s + parseFloat(it.unitPrice || "0") * parseInt(it.quantity || "1"),
         0
       );
 
@@ -338,7 +338,7 @@ export function registerPosSaleWriteRoutes(app: Express) {
       const parsedCustomerId = customerId ? parseInt(customerId) : null;
       const depositAmt = isCredit ? Math.max(0, parseFloat(depositAmount || "0")) : 0;
       const totalAmount = items.reduce(
-        (s: number, it: any) => s + parseFloat(it.unitPrice || "0") * parseInt(it.quantity || "1"),
+        (s: number, it) => s + parseFloat(it.unitPrice || "0") * parseInt(it.quantity || "1"),
         0
       );
 
@@ -373,7 +373,7 @@ export function registerPosSaleWriteRoutes(app: Express) {
               .orderBy(desc(factoryBales.id))
               .limit(oldItem.quantity)
               .for("update");
-            const baleIds = soldBales.map((b: any) => b.id);
+            const baleIds = soldBales.map((b) => b.id);
             if (baleIds.length > 0) {
               await tx
                 .update(factoryBales)
@@ -441,7 +441,7 @@ export function registerPosSaleWriteRoutes(app: Express) {
                 `INSUFFICIENT_BALE_STOCK: requested ${qty} bale(s) of "${item.productName || item.articleCode || item.productId}" at this location, only ${availableBales.length} available`
               );
             }
-            const baleIds = availableBales.map((b: any) => b.id);
+            const baleIds = availableBales.map((b) => b.id);
             await tx
               .update(factoryBales)
               .set({ status: "SOLD", updatedAt: new Date() })

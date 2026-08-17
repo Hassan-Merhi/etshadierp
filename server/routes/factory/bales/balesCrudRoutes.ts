@@ -127,10 +127,10 @@ export function registerBalesCrudRoutes(app: Express) {
             : await db.select().from(factoryMixBatches).where(inArray(factoryMixBatches.id, batchIds))
           : [];
 
-      const productMap = new Map(products.map((p: any) => [p.id, p]));
-      const batchMap = new Map(batches.map((b: any) => [b.id, b]));
+      const productMap = new Map(products.map((p) => [p.id, p]));
+      const batchMap = new Map(batches.map((b) => [b.id, b]));
 
-      const baleIds = bales.map((b: any) => b.id).filter(Boolean);
+      const baleIds = bales.map((b) => b.id).filter(Boolean);
       const lastPrintMap = new Map<number, string>();
       // In lite mode skip the print-history lookup; in full mode guard against huge IN-clauses.
       if (!lite && baleIds.length > 0 && baleIds.length <= 500) {
@@ -147,7 +147,7 @@ export function registerBalesCrudRoutes(app: Express) {
         }
       }
 
-      const results = bales.map((bale: any) => ({
+      const results = bales.map((bale) => ({
         bale,
         product: bale.productId ? productMap.get(bale.productId) || null : null,
         mixBatch: bale.mixBatchId ? batchMap.get(bale.mixBatchId) || null : null,
@@ -488,7 +488,7 @@ export function registerBalesCrudRoutes(app: Express) {
           .set({ finalizedBy: numericWorkerId, workerName: worker.fullName, updatedAt: new Date() })
           .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, numericIds)))
           .returning({ id: factoryBales.id });
-        const ids = updatedBales.map((bale: any) => bale.id);
+        const ids = updatedBales.map((bale) => bale.id);
         if (ids.length > 0) {
           await tx
             .update(factoryBaleProductionAttributions)

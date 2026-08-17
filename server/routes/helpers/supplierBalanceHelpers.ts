@@ -108,7 +108,7 @@ export async function getSupplierBalanceForContext(
   const openingBalance = openingBalanceD.toNumber();
   const entries = await getVoucherEntriesBySupplierBatched(supplier.id, companyId || undefined);
 
-  const balanceD = entries.reduce((sum: Decimal, entry: any) => {
+  const balanceD = entries.reduce((sum: Decimal, entry) => {
     const credit = new Decimal(entry.creditAmount || "0");
     const debit = new Decimal(entry.debitAmount || "0");
     if (credit.gt(0) && debit.eq(0)) return sum.plus(credit);

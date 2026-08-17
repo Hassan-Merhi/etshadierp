@@ -39,7 +39,7 @@ export function registerPayrollBulkAdjustmentRoutes(app: Express) {
       }
 
       // Filter out empty/zero amounts and validate
-      const validBonuses = bonuses.filter((b: any) => {
+      const validBonuses = bonuses.filter((b) => {
         const amount = parseFloat(b.amount);
         return !isNaN(amount) && amount > 0;
       });
@@ -62,7 +62,7 @@ export function registerPayrollBulkAdjustmentRoutes(app: Express) {
       const _allAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
 
       // Calculate total amount
-      const totalAmount = validBonuses.reduce((sum: number, b: any) => sum + parseFloat(b.amount), 0);
+      const totalAmount = validBonuses.reduce((sum: number, b) => sum + parseFloat(b.amount), 0);
 
       // Create single voucher for all bonuses
       const voucherNumber = `BONUS-BULK-${Date.now()}`;
@@ -94,7 +94,7 @@ export function registerPayrollBulkAdjustmentRoutes(app: Express) {
               .replace(/[^A-Z0-9]/g, "_")
               .substring(0, 25)}`;
         const bonusName = isDefault ? "Bonus Expense" : `Bonus Expense - ${grp}`;
-        let bonusAccount = freshAccounts.find((a: any) => a.code === bonusCode);
+        let bonusAccount = freshAccounts.find((a) => a.code === bonusCode);
         if (!bonusAccount) {
           bonusAccount = await storage.createLedgerAccount({
             companyId: req.session.currentCompanyId!,
@@ -200,7 +200,7 @@ export function registerPayrollBulkAdjustmentRoutes(app: Express) {
       }
 
       // Filter out empty/zero amounts and validate
-      const validWithdrawals = withdrawals.filter((w: any) => {
+      const validWithdrawals = withdrawals.filter((w) => {
         const amount = parseFloat(w.amount);
         return !isNaN(amount) && amount > 0;
       });
@@ -210,7 +210,7 @@ export function registerPayrollBulkAdjustmentRoutes(app: Express) {
       }
 
       // Calculate total amount
-      const totalAmount = validWithdrawals.reduce((sum: number, w: any) => sum + parseFloat(w.amount), 0);
+      const totalAmount = validWithdrawals.reduce((sum: number, w) => sum + parseFloat(w.amount), 0);
 
       // Get payment account (bank or cash)
       let paymentAccount;
@@ -221,7 +221,7 @@ export function registerPayrollBulkAdjustmentRoutes(app: Express) {
           .where(eq(bankAccounts.id, parseInt(paymentAccountId)));
       } else {
         const allAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
-        paymentAccount = allAccounts.find((a: any) => a.id === parseInt(paymentAccountId));
+        paymentAccount = allAccounts.find((a) => a.id === parseInt(paymentAccountId));
       }
 
       if (!paymentAccount) {
@@ -255,7 +255,7 @@ export function registerPayrollBulkAdjustmentRoutes(app: Express) {
         }
       } else {
         // For cash accounts (ledger accounts), find directly
-        paymentLedgerAccount = allAccounts.find((a: any) => a.id === paymentAccountId_num);
+        paymentLedgerAccount = allAccounts.find((a) => a.id === paymentAccountId_num);
         if (!paymentLedgerAccount) {
           return res.status(404).json({ message: "Cash account not found" });
         }

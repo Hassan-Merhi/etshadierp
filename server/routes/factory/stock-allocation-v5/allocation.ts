@@ -257,7 +257,7 @@ export function registerV5StockAllocationRoutes(app: Express) {
           .select({ id: customers.id, legalName: customers.legalName })
           .from(customers)
           .where(inArray(customers.id, customerIds));
-        rows.forEach((c: any) => customerMap.set(c.id, c.legalName));
+        rows.forEach((c) => customerMap.set(c.id, c.legalName));
       }
 
       // 7. ALL active factory_bale_products — so users can allocate to zero-stock items
