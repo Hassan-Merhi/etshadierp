@@ -15,7 +15,7 @@ import { eq, and, sql, inArray, isNull } from "drizzle-orm";
 
 const PAYABLE_CONTAINER_STATUSES = new Set(["OFFLOADED", "RECEIVED", "PARTIALLY_RECEIVED"]);
 
-const isPayableContainer = (c: Record<string, unknown>) => PAYABLE_CONTAINER_STATUSES.has(String(c.status || "").toUpperCase());
+const _isPayableContainer = (c: Record<string, unknown>) => PAYABLE_CONTAINER_STATUSES.has(String(c.status || "").toUpperCase());
 
 /** True when freight should be included in the supplier's payable balance.
  *  Explicit freightPaidBy flag takes priority.

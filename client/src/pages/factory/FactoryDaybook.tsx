@@ -72,7 +72,7 @@ import { ViewEntryModal } from "./daybook/ViewEntryModal";
 
 export default function FactoryDaybook() {
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
-  const { formatDisplayDate, formatDisplayTime } = useDateFormat();
+  const { formatDisplayDate, formatDisplayTime: _formatDisplayTime } = useDateFormat();
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const appMode = useAppMode();
@@ -100,7 +100,7 @@ export default function FactoryDaybook() {
   const [searchQuery, setSearchQuery] = useState(() => initialDaybookStateRef.current?.searchQuery || "");
   const [minAmount, setMinAmount] = useState(() => initialDaybookStateRef.current?.minAmount || "");
   const [maxAmount, setMaxAmount] = useState(() => initialDaybookStateRef.current?.maxAmount || "");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">(() => initialDaybookStateRef.current?.sortOrder || "desc");
+  const [sortOrder, _setSortOrder] = useState<"asc" | "desc">(() => initialDaybookStateRef.current?.sortOrder || "desc");
   // searchQuery filters client-side only (not part of the query key below), but debounce
   // it anyway so rapid typing doesn't thrash the derived filteredEntries memo on large lists.
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery);
@@ -111,7 +111,7 @@ export default function FactoryDaybook() {
 
   // ── View/UX state ─────────────────────────────────────────────────────────
   const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null);
-  const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
+  const [selectedRowId, _setSelectedRowId] = useState<string | null>(null);
   const scrollYRef = useRef(0);
 
   // ── Dialog state ──────────────────────────────────────────────────────────
@@ -531,7 +531,7 @@ export default function FactoryDaybook() {
       const fileName = `FactoryDaybook_Detailed_${format(new Date(), "yyyy-MM-dd")}.xlsx`;
       await writeFile(workbook, fileName);
       toast({ title: "Export successful", description: `Downloaded ${fileName} with ${detailedData.length} entries.` });
-    } catch (error) {
+    } catch (_error) {
       toast({ title: "Export failed", description: "An error occurred while exporting.", variant: "destructive" });
     } finally {
       setIsExportingDetailed(false);
@@ -598,7 +598,7 @@ export default function FactoryDaybook() {
 
   const CONTAINER_COST_TX_TYPES = new Set(["OFFLOAD_RAW_STOCK", "FREIGHT", "COMMISSION", "DUTY", "OTHER_CHARGE"]);
 
-  const isCostEditable = (entry: DaybookEntry) => {
+  const _isCostEditable = (entry: DaybookEntry) => {
     if (!isAdminOrOwner) return false;
     if (!CONTAINER_COST_TX_TYPES.has(entry.txType)) return false;
     if (entry.id < 0) return false; // synthetic/voucher rows
@@ -631,7 +631,7 @@ export default function FactoryDaybook() {
     },
   });
 
-  const openEditDialog = (entry: DaybookEntry) => {
+  const _openEditDialog = (entry: DaybookEntry) => {
     setEditEntry(entry);
     setEditDescription(entry.description);
     setEditAmountCurrency(entry.amountCurrency);

@@ -681,7 +681,7 @@ export function registerRawStockAdjRoutes(app: Express) {
       const enriched = results.map((r) => {
         const received = parseFloat(r.receivedKg) || 0;
         const used = parseFloat(r.usedKg) || 0;
-        const costPerKg = parseFloat(r.costPerKg) || 0;
+        const _costPerKg = parseFloat(r.costPerKg) || 0;
         const remainingKg = received - used;
         return { ...r, remainingKg: remainingKg.toFixed(3) };
       });

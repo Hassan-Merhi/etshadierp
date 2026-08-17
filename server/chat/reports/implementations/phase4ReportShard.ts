@@ -46,10 +46,10 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
       const t4 = totalsRow.rows[0] as unknown as { num_transactions: Parameters<typeof String>[0] } & {
         grand_total: string;
       };
-      let grandRev = 0;
+      let _grandRev = 0;
       const tableRows4 = (rows.rows as any[]).map((r) => {
         const rev = parseFloat(r.total_revenue || "0");
-        grandRev += rev;
+        _grandRev += rev;
         return [
           r.product_name,
           r.article_code || "—",
@@ -220,11 +220,11 @@ async function runPhase4Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         ORDER BY total_items DESC
         LIMIT ${rowLimit}
       `);
-      let grandItems = 0;
+      let _grandItems = 0;
       const tableRows4 = (rows.rows as any[]).map((r) => {
         const items = parseFloat(r.total_items || "0");
         const charges = parseFloat(r.total_charges || "0");
-        grandItems += items;
+        _grandItems += items;
         return [r.supplier, String(r.po_count), fmt(items), fmt(charges), fmt(items + charges), r.currency];
       });
       dataQueryResult = {

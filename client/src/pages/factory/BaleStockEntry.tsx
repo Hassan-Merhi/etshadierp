@@ -19,7 +19,7 @@ import { ProductionPositionsTab } from "./bale-stock-entry/ProductionPositionsTa
 
 export default function BaleStockEntry() {
   const todayStr = new Date().toLocaleDateString("en-CA");
-  const [summaryDate, setSummaryDate] = useState<string>(todayStr);
+  const [summaryDate, _setSummaryDate] = useState<string>(todayStr);
   const { toast } = useToast();
   // Track which tabs have ever been activated so we only mount heavy components on demand.
   const [mountedTabs, setMountedTabs] = useState<Set<string>>(() => new Set(["entry"]));
@@ -44,7 +44,7 @@ export default function BaleStockEntry() {
   const showGroundScan = !hiddenTabs.includes("hide_tab_stockentry_ground_scan");
   const showDailyScan = !hiddenTabs.includes("hide_tab_stockentry_daily_scan");
 
-  const { data: productionSession, refetch: refetchSession } = useQuery<any>({
+  const { data: _productionSession, refetch: refetchSession } = useQuery<any>({
     queryKey: ["/api/factory/stock-entry/production-session", todayStr],
     queryFn: async () => {
       const r = await fetch(`/api/factory/stock-entry/production-session?date=${todayStr}`);
@@ -53,7 +53,7 @@ export default function BaleStockEntry() {
     staleTime: 30000,
   });
 
-  const endProductionMutation = useMutation({
+  const _endProductionMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/factory/stock-entry/end-production", { date: todayStr });
       if (!res.ok) {

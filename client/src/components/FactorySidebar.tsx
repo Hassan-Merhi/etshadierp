@@ -295,7 +295,7 @@ export function FactorySidebar({ user }: { user?: any }) {
     isPinnedVisible,
     isAdmin,
     isDeveloper,
-    isPrivileged,
+    isPrivileged: _isPrivileged,
   } = useFactoryVisibleSections(user);
 
   const { openSections, toggleSection } = useOpenSections(visibleSections);

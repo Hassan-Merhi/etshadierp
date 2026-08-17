@@ -102,7 +102,7 @@ export function registerFactoryCustomerStatementPdfRoutes(app: Express) {
 
       const openingBalance = parseFloat(customer.openingBalance || "0");
       const openingSide = customer.openingBalanceSide || "Dr";
-      let runningBalance = openingSide === "Dr" ? openingBalance : -openingBalance;
+      let _runningBalance = openingSide === "Dr" ? openingBalance : -openingBalance;
 
       // Read filter params (forwarded from the frontend export button)
       const dateFromParam = ((req.query.dateFrom as string) || "").trim();
@@ -136,7 +136,7 @@ export function registerFactoryCustomerStatementPdfRoutes(app: Express) {
       const allEnrichedPdf = allRowsPdf.map((row) => {
         const debit = parseFloat(row.debitAmount || "0");
         const credit = parseFloat(row.creditAmount || "0");
-        runningBalance += debit - credit;
+        _runningBalance += debit - credit;
         let container = "";
         let particulars: string;
         if (row.referenceType === "INVOICE" && row.referenceId) {

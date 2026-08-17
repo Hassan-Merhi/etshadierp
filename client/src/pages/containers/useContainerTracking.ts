@@ -121,7 +121,7 @@ export function useContainerTracking(filteredOtwContainers: Container[]) {
           return (old as Container[]).map((c) => (c.id === id ? { ...c, ...updatedContainer } : c));
         });
         savedCount++;
-      } catch (e) {
+      } catch (_e) {
         errorCount++;
       }
     }

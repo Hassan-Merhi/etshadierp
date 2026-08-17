@@ -149,7 +149,7 @@ export function registerFactoryProductHistoryRoutes(app: Express) {
         );
 
       const realInStockCount = Number(inStockSnapshot?.balesNet ?? 0);
-      const realLoadingCount = Number(inStockSnapshot?.balesLoading ?? 0);
+      const _realLoadingCount = Number(inStockSnapshot?.balesLoading ?? 0);
       const realInStockWeightKg = Number(inStockSnapshot?.totalWeightNet ?? 0);
 
       const monthlyData = rows.map((r) => {

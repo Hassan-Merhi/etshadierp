@@ -256,7 +256,7 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
     tab: "payment" | "receipt" | "journal";
     rowIndex?: number;
   } | null>(null);
-  const [accountPickersActivated, setAccountPickersActivated] = useState(false);
+  const [_accountPickersActivated, setAccountPickersActivated] = useState(false);
 
   useEffect(() => {
     setLiveAccountSearch(journalAccountSearchTerm);
@@ -373,7 +373,7 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
         accountName = customers.find((c) => c.id === accountId)?.legalName || "";
       }
       const debitAmt = parseFloat(entry.debitAmount || "0");
-      const creditAmt = parseFloat(entry.creditAmount || "0");
+      const _creditAmt = parseFloat(entry.creditAmount || "0");
       const type: "DR" | "CR" = debitAmt > 0 ? "DR" : "CR";
       const amount = debitAmt > 0 ? entry.debitAmount : entry.creditAmount;
       return { type, accountType, accountId, accountName, amount, narration: entry.narration || "" };
@@ -679,7 +679,7 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
     }
   };
 
-  const handleAutoCreateAccount = async (name: string): Promise<Account | null> => {
+  const _handleAutoCreateAccount = async (name: string): Promise<Account | null> => {
     if (!selectedCompany?.id || !name.trim()) return null;
     setIsAutoCreating(true);
     try {

@@ -52,7 +52,7 @@ export function PaymentReceiptEditForm({
               <FormField
                 control={form.control}
                 name="paymentAccountId"
-                render={({ field }) => (
+                render={({ field: _field }) => (
                   <FormItem className="flex-1">
                     <FormLabel>{voucherType === "Payment" ? "Pay From" : "Receive In"}</FormLabel>
                     <FormControl>
@@ -154,7 +154,7 @@ export function PaymentReceiptEditForm({
                   <FormField
                     control={form.control}
                     name={`entries.${index}.accountId`}
-                    render={({ field: accountField }) => (
+                    render={({ field: _accountField }) => (
                       <FormItem>
                         <FormLabel className="text-xs">Account</FormLabel>
                         <FormControl>
@@ -245,7 +245,7 @@ export function PaymentReceiptEditForm({
                         <FormField
                           control={form.control}
                           name={`entries.${index}.accountId`}
-                          render={({ field: accountField }) => (
+                          render={({ field: _accountField }) => (
                             <FormItem>
                               <FormControl>
                                 <AccountAutocomplete

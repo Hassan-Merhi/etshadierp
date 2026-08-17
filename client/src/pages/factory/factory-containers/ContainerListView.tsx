@@ -45,7 +45,7 @@ interface ContainerListViewProps {
 export function ContainerListView({
   containers,
   filteredContainers,
-  suppliers,
+  suppliers: _suppliers,
   searchQuery,
   setSearchQuery,
   statusFilter,
@@ -70,7 +70,7 @@ export function ContainerListView({
     });
   };
 
-  const renderCharges = (c: any) => {
+  const _renderCharges = (c: any) => {
     const ccy = c.currencyCode || "USD";
     const freightAmt = parseFloat(c.freight || "0");
     const freightCcy = c.freightCurrencyCode || ccy;

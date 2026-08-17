@@ -47,7 +47,7 @@ export function registerFactoryPayrollGenerateRoutes(app: Express, requireAuth: 
         return res.status(400).json({ message: "No active workers found for this company" });
       }
 
-      const workerIds = workers.map((w: any) => w.id);
+      const _workerIds = workers.map((w: any) => w.id);
 
       const balesInRange = await db
         .select()
@@ -106,9 +106,9 @@ export function registerFactoryPayrollGenerateRoutes(app: Express, requireAuth: 
         advancesByWorker.set(adv.workerId, existing);
       }
 
-      const periodDays = daysInPeriod(startDate, endDate);
+      const _periodDays = daysInPeriod(startDate, endDate);
       const weekdays = countWeekdays(startDate, endDate);
-      const monthDays = daysInMonth(startDate);
+      const _monthDays = daysInMonth(startDate);
       const payrollRecords = [];
 
       for (const worker of workers) {

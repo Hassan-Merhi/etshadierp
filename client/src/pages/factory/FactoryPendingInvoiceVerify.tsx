@@ -56,7 +56,7 @@ import type {
 import { fmtNum } from "./factorypendinginvoiceverify/utils";
 export default function FactoryPendingInvoiceVerify() {
   const { toast } = useToast();
-  const { selectedCompany } = useCompany();
+  const { selectedCompany: _selectedCompany } = useCompany();
   const [, navigate] = useLocation();
   useEscapeToParent("/factory/invoicing?tab=invoices");
   const appMode = useAppMode();
@@ -458,7 +458,7 @@ export default function FactoryPendingInvoiceVerify() {
     });
   };
 
-  const getComparisonRowClass = (status: ComparisonItem["status"]) => {
+  const _getComparisonRowClass = (status: ComparisonItem["status"]) => {
     switch (status) {
       case "LOADED_NOT_IN_PROFORMA":
       case "MISSING_FROM_LOADED":

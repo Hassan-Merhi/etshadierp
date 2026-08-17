@@ -65,7 +65,7 @@ export default function Accounts() {
   const hideBalances = (myErpPages?.hiddenErpCostFields ?? []).includes("accounts_balances");
   const appMode = useAppMode();
   const modePrefix = useModePrefix();
-  const modeApiRequest = getApiRequest(appMode);
+  const _modeApiRequest = getApiRequest(appMode);
   const [, navigate] = useLocation();
   const searchString = useSearch();
 
@@ -300,7 +300,7 @@ export default function Accounts() {
   const { data: currentUser } = useQuery<{ role?: string }>({ queryKey: ["/api/auth/me"] });
   const [exportLang, setExportLang] = useState<"en" | "fr" | "ar">("en");
 
-  const fixPayrollAccountsMutation = useMutation({
+  const _fixPayrollAccountsMutation = useMutation({
     mutationFn: () =>
       apiRequest("POST", "/api/factory/payroll/migrate-worker-names", {
         companyId: selectedCompany?.id,

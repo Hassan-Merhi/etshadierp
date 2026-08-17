@@ -61,7 +61,7 @@ export default function BaleProducts() {
   const [importPreview, setImportPreview] = useState<ImportPreviewRow[]>([]);
   const [importError, setImportError] = useState("");
   const [importFile, setImportFile] = useState<File | null>(null);
-  const [condensedView, setCondensedView] = useState(false);
+  const [condensedView, _setCondensedView] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [showCategories, setShowCategories] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
@@ -79,7 +79,7 @@ export default function BaleProducts() {
     sellingPrice: "",
     labelDesignColor: "",
   });
-  const [isGeneratingCode, setIsGeneratingCode] = useState(false);
+  const [_isGeneratingCode, setIsGeneratingCode] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showHidden, setShowHidden] = useState(false);
@@ -399,7 +399,7 @@ export default function BaleProducts() {
     },
   });
 
-  const handleGradeChange = async (grade: string) => {
+  const _handleGradeChange = async (grade: string) => {
     setEditForm((f) => ({ ...f, grade }));
     if (!grade) return;
     setIsGeneratingCode(true);
@@ -594,7 +594,7 @@ export default function BaleProducts() {
       ]);
       totalRow.height = 22;
       const totalFill = { type: "pattern", pattern: "solid", fgColor: { argb: C_TOTAL } };
-      totalRow.eachCell((cell: any, colNum: number) => {
+      totalRow.eachCell((cell: any, _colNum: number) => {
         cell.fill = totalFill;
         cell.border = {
           top: { style: "medium", color: { argb: C_NAVY } },
@@ -823,7 +823,7 @@ export default function BaleProducts() {
       XLSX.utils.book_append_sheet(wb, ws, "Bale Products");
       await XLSX.writeFile(wb, "bale_products_template.xlsx");
       toast({ title: "Template downloaded" });
-    } catch (err) {
+    } catch (_err) {
       toast({ title: "Error", description: "Failed to generate template", variant: "destructive" });
     }
   };

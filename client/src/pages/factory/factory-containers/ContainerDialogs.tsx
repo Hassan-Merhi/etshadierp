@@ -24,9 +24,9 @@ interface ImportDialogProps {
 }
 
 export function ImportDialog({ open, onClose }: ImportDialogProps) {
-  const { toast } = useToast();
+  const { toast: _toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [importPreview, setImportPreview] = [([]), (v: any[]) => {}];
+  const [_importPreview, setImportPreview] = [([]), (_v: any[]) => {}];
 
   const handleClose = () => {
     setImportPreview([]);
@@ -501,11 +501,11 @@ interface FullImportDialogProps {
   onClose: () => void;
 }
 
-export function FullImportDialog({ open, onClose }: FullImportDialogProps) {
-  const { toast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [importPreview, setImportPreview] = [([]), (_v: any[]) => {}];
-  const [importResult, setImportResult] = [null, (_v: any) => {}];
+export function FullImportDialog({ open: _open, onClose: _onClose }: FullImportDialogProps) {
+  const { toast: _toast } = useToast();
+  const _fileInputRef = useRef<HTMLInputElement>(null);
+  const [_importPreview, _setImportPreview] = [([]), (_v: any[]) => {}];
+  const [_importResult, _setImportResult] = [null, (_v: any) => {}];
 
   // This component is intentionally kept simple since the import state
   // lives in the parent (FactoryContainers) for now.

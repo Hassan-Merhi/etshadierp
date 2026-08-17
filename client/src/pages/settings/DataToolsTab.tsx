@@ -231,7 +231,7 @@ export function DataToolsTab() {
       });
       setStockPreview(rows);
       setStockErrors(errors);
-    } catch (error) {
+    } catch (_error) {
       toast({ title: "Error Reading File", description: "Please ensure valid Excel file.", variant: "destructive" });
     }
   };

@@ -115,7 +115,7 @@ export function SupplierDialogs({
   wrapAdminAction,
   bulkFxOpen,
   setBulkFxOpen,
-  bulkFxBrokerId,
+  bulkFxBrokerId: _bulkFxBrokerId,
   bulkFxBrokerName,
   bulkFxForm,
   setBulkFxForm,

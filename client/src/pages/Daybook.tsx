@@ -156,7 +156,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const VOUCHER_PAGE_SIZE = 100;
   const [voucherPage, setVoucherPage] = useState(1);
   const [daybookRowLimit, setDaybookRowLimit] = useState(DAYBOOK_PAGE_SIZE);
-  const scrollYRef = useRef(0);
+  const _scrollYRef = useRef(0);
   const [viewMode, setViewMode] = useState<"detailed" | "condensed">(() => loadDaybookState()?.viewMode ?? "detailed");
   const [expandedVoucherId, setExpandedVoucherId] = useState<number | null>(null);
   const [expandedCondensedGroups, setExpandedCondensedGroups] = useState<Set<string>>(new Set());
@@ -514,7 +514,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
       }),
     [periodFilter.fromDate, periodFilter.toDate]
   );
-  const { data: offloads = [], isLoading: offloadsLoading } = useQuery<OffloadListItem[]>({
+  const { data: offloads = [], isLoading: _offloadsLoading } = useQuery<OffloadListItem[]>({
     queryKey: companyDataKey(offloadsUrl, selectedCompany?.id, "daybook-offloads"),
     queryFn: async ({ signal }) => {
       const response = await fetch(offloadsUrl, { credentials: "include", signal });

@@ -61,7 +61,7 @@ const EMPTY_FORM = {
 };
 
 export default function IntercompanyLinks() {
-  const [, navigate] = useLocation();
+  const [, _navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 

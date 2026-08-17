@@ -72,7 +72,7 @@ export default function CombinedInventory() {
   const [includeZero, setIncludeZero] = useState(false);
   const { formatAmount } = useCurrencyContext();
   const appMode = useAppMode();
-  const modeApiRequest = getApiRequest(appMode);
+  const _modeApiRequest = getApiRequest(appMode);
   const { selectedCompany } = useCompany();
 
   const { data: containers = [], isLoading: loadingContainers } = useQuery<Container[]>({
@@ -536,7 +536,7 @@ function GroupsView({
   groups,
   onSelectGroup,
   formatAmount,
-  isLoadingOtw,
+  isLoadingOtw: _isLoadingOtw,
 }: {
   groups: StockGroupSummary[];
   onSelectGroup: (id: number | null) => void;

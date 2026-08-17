@@ -406,7 +406,7 @@ export function registerOrderLoadingStatusExportRoutes(app: Express) {
           });
         });
 
-        const fileDateStr = getClientDate(req);
+        const _fileDateStr = getClientDate(req);
         const xlsBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         res.setHeader(

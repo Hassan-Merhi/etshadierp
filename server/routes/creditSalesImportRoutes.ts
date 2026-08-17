@@ -271,11 +271,11 @@ export function registerCreditSalesImportRoutes(app: Express) {
             .limit(1);
 
           let costPrice = 0;
-          let currentQty = 0;
+          let _currentQty = 0;
 
           if (inventoryRecord) {
             costPrice = parseFloat(inventoryRecord.averageRate || "0");
-            currentQty = parseFloat(inventoryRecord.quantity);
+            _currentQty = parseFloat(inventoryRecord.quantity);
           }
 
           const itemSales = item.quantity * item.rate;

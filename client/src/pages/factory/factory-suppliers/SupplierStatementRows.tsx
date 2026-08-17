@@ -26,7 +26,7 @@ interface SupplierStatementRowsProps {
 }
 
 export function SupplierStatementRows({
-  statementData,
+  statementData: _statementData,
   primaryCc,
   sfTotalPurchases,
   sfTotalPayments,
@@ -42,8 +42,8 @@ export function SupplierStatementRows({
   typeBadge,
   statusColor,
   statusDisplayLabel,
-  onEditPayment,
-  onDeletePayment,
+  onEditPayment: _onEditPayment,
+  onDeletePayment: _onDeletePayment,
 }: SupplierStatementRowsProps) {
   if (displayedRows.length === 0)
     return (

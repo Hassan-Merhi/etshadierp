@@ -393,7 +393,7 @@ export async function runOfflinePrep(companyId: number, onProgress: (p: PrepProg
         const items = dataset.extractItems(raw, companyId);
 
         if (dataset.tableKey && db[dataset.tableKey]) {
-          const table = db[dataset.tableKey] as ReturnType<typeof db.users.toCollection>["db"]["table"];
+          const _table = db[dataset.tableKey] as ReturnType<typeof db.users.toCollection>["db"]["table"];
           // Clear existing data for this company, then bulk-insert
           await (
             db as unknown as {

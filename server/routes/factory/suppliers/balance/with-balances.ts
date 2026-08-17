@@ -161,7 +161,7 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
           const containerCc = c.currencyCode || "USD";
           const fx = resolveDisplayFx(containerCc, configuredFxRates[containerCc], c.fxRateToUsd, c.fxRateConfirmed);
           const freightCc = c.freightCurrencyCode || containerCc;
-          const freightFx = configuredFxRates[freightCc] ?? fx;
+          const _freightFx = configuredFxRates[freightCc] ?? fx;
           const freightInContainerCurr = freightCc === containerCc ? freight : 0;
           const freightDirectUsd = freightCc === "USD" && freightCc !== containerCc ? freight : 0;
           return sum + (kg * rate + freightInContainerCurr) * fx + freightDirectUsd;
@@ -203,22 +203,22 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
         const supplierPayments = allPayments.filter((p: { id: number; companyId: number; supplierId: number; date: string; amount: string; currencyCode: string; fxRateToUsd: string; amountUsd: string; paidFromAccountId: number | null; notes: string | null; createdAt: Date; }) => p.supplierId === s.id);
         const totalPaid = supplierPayments.reduce((sum: number, p: { id: number; companyId: number; supplierId: number; date: string; amount: string; currencyCode: string; fxRateToUsd: string; amountUsd: string; paidFromAccountId: number | null; notes: string | null; createdAt: Date; }) => sum + parseFloat(p.amountUsd || "0"), 0);
         // Include voucher-based payments (payment vouchers) in the balance
-        const voucherPaidUsd = voucherPaidBySupplier[s.id] || 0;
+        const _voucherPaidUsd = voucherPaidBySupplier[s.id] || 0;
         // FX net (USD): FX-in transfers received minus FX-out transfers sent (in USD equivalent)
         // This is critical for brokers that accumulate balance via explicit FX settlements from linked suppliers.
         // Always use toAmountUsd as the USD amount — it reflects the actual settled USD value.
-        let fxNetUsd = 0;
+        let _fxNetUsd = 0;
         for (const t of allFxTransfers) {
           if (t.toSupplierId === s.id) {
-            fxNetUsd += parseFloat(t.toAmountUsd || "0");
+            _fxNetUsd += parseFloat(t.toAmountUsd || "0");
           }
           if (t.fromSupplierId === s.id) {
-            fxNetUsd -= parseFloat(t.toAmountUsd || "0");
+            _fxNetUsd -= parseFloat(t.toAmountUsd || "0");
           }
         }
         // Other charges from containers where this supplier is the charge recipient.
         // Linked suppliers: USD other charges flow to the parent broker — exclude from own balance.
-        const otherChargesValue = containers.filter(isPayableContainer).reduce((sum: number, c) => {
+        const _otherChargesValue = containers.filter(isPayableContainer).reduce((sum: number, c) => {
           if (c.otherChargesSupplierId !== s.id) return sum;
           const oc = parseFloat(c.otherCharges || "0");
           if (oc <= 0) return sum;
@@ -362,7 +362,7 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
             return { currencyCode, balance: native, fxRateToUsd: displayFx };
           })
           .filter(({ balance: bal }) => Math.abs(bal) > 0.001)
-          .sort((a, b) => (a.currencyCode === "USD" ? 1 : -1)); // non-USD first
+          .sort((a, _b) => (a.currencyCode === "USD" ? 1 : -1)); // non-USD first
 
         // Due containers: offloaded >30 days ago and supplier still has a positive balance
         const now = new Date();
@@ -564,7 +564,7 @@ export function registerSupplierWithBalancesRoutes(app: Express) {
                 : 1,
           }))
           .filter(({ balance: bal }) => bal > 0.001)
-          .sort((a, b) => (a.currencyCode === "USD" ? 1 : -1));
+          .sort((a, _b) => (a.currencyCode === "USD" ? 1 : -1));
 
         // Use broker-statement KPIs so the list card total matches the detail page.
         // Formula: USD_pool + EUR × configuredRate + AUD × configuredRate = totalValue

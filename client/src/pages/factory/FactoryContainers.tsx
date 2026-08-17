@@ -60,7 +60,7 @@ import {
 
 export default function FactoryContainers() {
   const [viewMode, setViewMode] = useState<"list" | "summary" | "tracking">("tracking");
-  const [trackingNowId, setTrackingNowId] = useState<number | null>(null);
+  const [_trackingNowId, _setTrackingNowId] = useState<number | null>(null);
   const [openOtwGroups, setOpenOtwGroups] = useState<Set<string>>(new Set());
   const [createOpen, setCreateOpen] = useState(false);
   const [editingContainer, setEditingContainer] = useState<ContainerWithSupplier | null>(null);

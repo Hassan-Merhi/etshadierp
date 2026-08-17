@@ -135,7 +135,7 @@ function ProfitPct({ value }: { value: number | null }) {
 export default function CustomerInvoiceDetail() {
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
-  const { selectedCompany } = useCompany();
+  const { selectedCompany: _selectedCompany } = useCompany();
   const [, navigate] = useLocation();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);

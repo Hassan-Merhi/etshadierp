@@ -54,7 +54,7 @@ export function useHubQueryState<T extends string>(options: HubQueryStateOptions
     
   }, [options.key, options.defaultValue, allowedValuesKey, options.omitDefault, options]);
 
-  const clearKeysKey = (options.clearKeys ?? []).join(",");
+  const _clearKeysKey = (options.clearKeys ?? []).join(",");
 
   const updateValue = useCallback(
     (nextValue: T) => {

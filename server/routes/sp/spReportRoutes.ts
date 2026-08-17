@@ -70,8 +70,8 @@ export function registerSpReportRoutes(app: Express) {
         LIMIT 1
       `);
       const settingsRow = resultRows(settingsRows)[0];
-      const spPosProfitAccountId = settingsRow?.sp_pos_profit_account_id ?? null;
-      const spPosPayableAccountId = settingsRow?.sp_pos_payable_account_id ?? null;
+      const _spPosProfitAccountId = settingsRow?.sp_pos_profit_account_id ?? null;
+      const _spPosPayableAccountId = settingsRow?.sp_pos_payable_account_id ?? null;
 
       let totalRevenue = 0;
       let totalCogs = 0;

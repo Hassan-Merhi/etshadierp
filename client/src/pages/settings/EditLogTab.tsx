@@ -6,7 +6,7 @@ interface EditLogTabProps {
   selectedCompany: any;
 }
 
-export function EditLogTab({ selectedCompany }: EditLogTabProps) {
+export function EditLogTab({ selectedCompany: _selectedCompany }: EditLogTabProps) {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">

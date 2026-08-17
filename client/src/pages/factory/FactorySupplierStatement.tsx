@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatNumber } from "@/lib/formatNumber";
 
-const CURRENCIES = ["USD", "EUR", "GBP", "AUD", "LBP", "XOF", "XAF"];
+const _CURRENCIES = ["USD", "EUR", "GBP", "AUD", "LBP", "XOF", "XAF"];
 
 // ─── Row-total helpers ───────────────────────────────────────────────────────
 

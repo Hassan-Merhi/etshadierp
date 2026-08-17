@@ -38,7 +38,7 @@ export function registerVoucherPaymentRoutes(app: Express) {
         voucherDate,
         paymentAccountType, // "ledger", "bank", "supplier", "employee", "fixedAsset"
         paymentAccountId,
-        paymentAccountName,
+        paymentAccountName: _paymentAccountName,
         entries, // Array of { accountType, accountId, accountName, amount }
         notes,
         optional,
@@ -455,7 +455,7 @@ export function registerVoucherPaymentRoutes(app: Express) {
         voucherDate,
         paymentAccountType,
         paymentAccountId,
-        paymentAccountName,
+        paymentAccountName: _paymentAccountName,
         entries,
         notes,
         optional,

@@ -54,7 +54,7 @@ export default function Settings() {
   const [activeSection, setActiveSection] = useState("users-permissions");
   const [userToDelete, setUserToDelete] = useState<any>(null);
 
-  const { data: companies = [], isLoading: isLoadingCompanies } = useQuery<any[]>({
+  const { data: companies = [], isLoading: _isLoadingCompanies } = useQuery<any[]>({
     queryKey: ["/api/companies"],
   });
 

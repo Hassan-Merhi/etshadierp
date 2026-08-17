@@ -35,7 +35,7 @@ export function registerGlobalTransactionRoutes(app: Express, requireAuth: any) 
       const userId = req.session.userId as string;
       const userRole = req.session.currentRole as string;
       const isAdmin = userRole === "Admin" || userRole === "Developer";
-      const isPrivileged = ["Admin", "Owner", "Manager", "Developer"].includes(userRole);
+      const _isPrivileged = ["Admin", "Owner", "Manager", "Developer"].includes(userRole);
 
       const {
         startDate,

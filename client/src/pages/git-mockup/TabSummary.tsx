@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { fmt, gitContainersUrl, parseNum, COMPANY_COLORS } from "./helpers";
 import type { GitContainersResponse, EnrichedContainerApi, CompanyViewMode } from "./types";
 
-function StatCard({
+function _StatCard({
   label,
   value,
   sub,

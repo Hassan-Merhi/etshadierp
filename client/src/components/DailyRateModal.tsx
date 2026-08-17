@@ -65,7 +65,7 @@ function markDoneToday(companyId: number, date: string): void {
 
 export function DailyRateModal({ companyId }: DailyRateModalProps) {
   const { toast } = useToast();
-  const { selectedCompany } = useCompany();
+  const { selectedCompany: _selectedCompany } = useCompany();
   const [isOpen, setIsOpen] = useState(false);
 
   const form = useForm<RateFormData>({

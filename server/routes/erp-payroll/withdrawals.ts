@@ -43,7 +43,7 @@ export function registerPayrollWithdrawalRoutes(app: Express) {
         return res.status(404).json({ message: "Employee not found" });
       }
 
-      const currentBalance = parseFloat(employee.currentBalance);
+      const _currentBalance = parseFloat(employee.currentBalance);
 
       // Create voucher
       const voucherNumber = `SAL-WD-${Date.now()}`;

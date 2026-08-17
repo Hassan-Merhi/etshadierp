@@ -15,7 +15,7 @@ interface ExchangeRateInputProps {
 export function ExchangeRateInput({
   value,
   onChange,
-  selectedCurrency,
+  selectedCurrency: _selectedCurrency,
   disabled = false,
   showLabel = true,
   className = "",
@@ -83,7 +83,7 @@ export function ExchangeRateInput({
   );
 }
 
-export function formatRateDisplay(canonicalRate: number | null, selectedCurrency: Currency): string {
+export function formatRateDisplay(canonicalRate: number | null, _selectedCurrency: Currency): string {
   if (!canonicalRate || canonicalRate <= 0) return "";
 
   return `1 USD = ${Math.round(canonicalRate).toLocaleString()} CFA`;

@@ -212,7 +212,7 @@ export async function createStockAdjustment(
   adjustmentType: "Production" | "Consumption" | "Mixed",
   notes: string,
   items: Array<{ stockItemId: number; quantity: string; rate: string }>,
-  consumptionAccountOverride?: { code: string; name: string }
+  _consumptionAccountOverride?: { code: string; name: string }
 ): Promise<any> {
   return await db.transaction(async (tx) => {
     // Locking the voucher row serialises everyone who wants to adjust it, so the

@@ -31,7 +31,7 @@ export function registerFactoryCustomerStatementExcelRoutes(app: Express) {
         .where(and(eq(customers.id, customerId), eq(customers.companyId, companyId)));
       if (!customer) return res.status(404).json({ message: "Customer not found" });
 
-      const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
+      const [_company] = await db.select().from(companies).where(eq(companies.id, companyId));
 
       const balanceRows = await db
         .select()
@@ -111,7 +111,7 @@ export function registerFactoryCustomerStatementExcelRoutes(app: Express) {
 
       const openingBalance = parseFloat(customer.openingBalance || "0");
       const openingSide = customer.openingBalanceSide || "Dr";
-      let runningBalance = openingSide === "Dr" ? openingBalance : -openingBalance;
+      let _runningBalance = openingSide === "Dr" ? openingBalance : -openingBalance;
 
       // Read filter params (forwarded from frontend export button)
       const dateFromXlsx = ((req.query.dateFrom as string) || "").trim();
@@ -122,7 +122,7 @@ export function registerFactoryCustomerStatementExcelRoutes(app: Express) {
       const allEnrichedXlsx = allRowsXlsx.map((row) => {
         const debit = parseFloat(row.debitAmount || "0");
         const credit = parseFloat(row.creditAmount || "0");
-        runningBalance += debit - credit;
+        _runningBalance += debit - credit;
         const destination =
           row.referenceType === "INVOICE" && row.referenceId ? destinationMapXlsx.get(row.referenceId) || "" : "";
         return { ...row, debit, credit, destination };

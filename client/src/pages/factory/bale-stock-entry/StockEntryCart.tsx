@@ -29,8 +29,8 @@ interface CartItem {
 
 export function StockEntryCart({
   cart,
-  workers,
-  workerCategoryFilter,
+  workers: _workers,
+  workerCategoryFilter: _workerCategoryFilter,
   onUpdateQty,
   onSetQty,
   onUpdateWeight,

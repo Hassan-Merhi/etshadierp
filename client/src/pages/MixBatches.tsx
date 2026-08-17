@@ -127,7 +127,7 @@ export default function MixBatches() {
       return remaining > 0.001;
     }) ?? [];
 
-  const getStatusIcon = (status: string) => {
+  const _getStatusIcon = (status: string) => {
     switch (status) {
       case "ACTIVE":
         return <PlayCircle className="h-4 w-4" />;
@@ -138,7 +138,7 @@ export default function MixBatches() {
     }
   };
 
-  const getStatusVariant = (status: string) => {
+  const _getStatusVariant = (status: string) => {
     switch (status) {
       case "ACTIVE":
         return "default";

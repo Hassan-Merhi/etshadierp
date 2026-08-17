@@ -179,7 +179,7 @@ export function registerVoucherCreateRoutes(app: Express) {
                   rateConvention: norm.rateConvention,
                 };
               }
-            } catch (normErr) {
+            } catch (_normErr) {
               // Non-fatal: normalization can fail for entries without a rate (USD-only companies).
               // Entry is still inserted with legacy debitAmount/creditAmount only.
             }

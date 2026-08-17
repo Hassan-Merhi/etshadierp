@@ -275,7 +275,7 @@ export function registerNetProfitExcelRoute(app: Express) {
       // Account exclusion rules matching dashboard
       const npExcludedTypes = ["Income", "Profit", "Equity", "EQUITY", "Fixed Asset"];
       const npExpenseTypes = ["Expense", "Direct Expense", "Indirect Expense"];
-      const npLiabilityTypes = ["Liability", "Duty Agent", "Transporter Agent", "Loan"];
+      const _npLiabilityTypes = ["Liability", "Duty Agent", "Transporter Agent", "Loan"];
       const npAssetTypes = ["Asset", "Current Asset", "Fixed Asset", "Bank", "Cash"];
       const npStockPatterns = [
         "closing stock",

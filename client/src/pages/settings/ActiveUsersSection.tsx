@@ -10,9 +10,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Building2, Loader2, Eye } from "lucide-react";
 import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema } from "@shared/schema";
 
-const userFormSchema = insertUserSchema;
-const companyFormSchema = insertCompanySchema;
-const roleAssignmentSchema = insertUserCompanyRoleSchema.refine(
+const _userFormSchema = insertUserSchema;
+const _companyFormSchema = insertCompanySchema;
+const _roleAssignmentSchema = insertUserCompanyRoleSchema.refine(
   (data) => {
     // If role is POS, assignedLocationId must be present
     if (data.role === "POS" && !data.assignedLocationId) {
@@ -26,9 +26,9 @@ const roleAssignmentSchema = insertUserCompanyRoleSchema.refine(
   }
 );
 
-type UserFormData = z.infer<typeof userFormSchema>;
-type CompanyFormData = z.infer<typeof companyFormSchema>;
-type RoleAssignmentData = z.infer<typeof roleAssignmentSchema>;
+type _UserFormData = z.infer<typeof _userFormSchema>;
+type _CompanyFormData = z.infer<typeof _companyFormSchema>;
+type _RoleAssignmentData = z.infer<typeof _roleAssignmentSchema>;
 
 import { getPageLabel } from "./WatchUserDialog";
 import { RemoteSupportWatchDialog } from "./RemoteSupportWatchDialog";

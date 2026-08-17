@@ -657,7 +657,7 @@ function BatchDetailView({ batch, onBack }: { batch: any; onBack: () => void }) 
 export default function ProductionBales() {
   const { formatDisplayDate } = useDateFormat();
   const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null);
-  const { toast } = useToast();
+  const { toast: _toast } = useToast();
 
   useEscapeBack(selectedBatchId !== null ? () => setSelectedBatchId(null) : null);
 

@@ -93,7 +93,7 @@ export function registerFactoryMixBatchUpdateRoutes(app: Express) {
           .for("update");
         if (!batch) throw new Error("Mix batch not found");
 
-        const usedKg = parseFloat(batch.usedKg || "0");
+        const _usedKg = parseFloat(batch.usedKg || "0");
 
         // ── 1. Reverse all existing sources ──
         const oldSources = await tx

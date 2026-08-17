@@ -34,9 +34,9 @@ export function OffloadDialog({
   ledgerAccounts,
   offloadMutation,
   wrapAdminAction,
-  mixBatches,
+  mixBatches: _mixBatches,
 }: OffloadDialogProps) {
-  const { toast } = useToast();
+  const { toast: _toast } = useToast();
   // Idempotency key is generated lazily on first submit and reused on retries.
   // Reset when the dialog closes or when the user selects a different container.
   const idempotencyKeyRef = useRef<string | null>(null);
@@ -44,7 +44,7 @@ export function OffloadDialog({
     if (!open) idempotencyKeyRef.current = null;
   }, [open]);
   const [offloadDate, setOffloadDate] = useState<string>(new Date().toLocaleDateString("en-CA"));
-  const [offloadDestination, setOffloadDestination] = useState("");
+  const [offloadDestination, _setOffloadDestination] = useState("");
   const [selectedContainerId, setSelectedContainerId] = useState("");
   const [containerComboOpen, setContainerComboOpen] = useState(false);
   const [actualReceivedKg, setActualReceivedKg] = useState("");
@@ -68,7 +68,7 @@ export function OffloadDialog({
   const [commissionPersonName, setCommissionPersonName] = useState("");
   const [commissionType, setCommissionType] = useState<"PER_KG" | "FIXED">("PER_KG");
   const [commissionRate, setCommissionRate] = useState("");
-  const [commissionLedgerAccountId, setCommissionLedgerAccountId] = useState("");
+  const [commissionLedgerAccountId, _setCommissionLedgerAccountId] = useState("");
   // Commission-specific FX rate — kept independent from the container's material FX so a
   // EUR commission on an AUD container uses EUR/USD (1.18), not AUD/USD (0.67).
   const [commissionFxRate, setCommissionFxRate] = useState("1");
@@ -77,9 +77,9 @@ export function OffloadDialog({
   const [dutyAmount, setDutyAmount] = useState("");
   const [dutyAccountId, setDutyAccountId] = useState("");
   const [dutyPending, setDutyPending] = useState(false);
-  const [dutyNotes, setDutyNotes] = useState("");
+  const [dutyNotes, _setDutyNotes] = useState("");
   const [additionalCharges, setAdditionalCharges] = useState<any[]>([]);
-  const [mixBatchAllocations, setMixBatchAllocations] = useState<any[]>([]);
+  const [mixBatchAllocations, _setMixBatchAllocations] = useState<any[]>([]);
 
   // ── Additional charge helpers ──────────────────────────────────────────────
   const handleAddAdditionalCharge = () => {

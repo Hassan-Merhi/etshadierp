@@ -129,7 +129,7 @@ export default function SupplierProfitCheck() {
     },
   });
   const selectedSupplier = suppliers.find((s: any) => String(s.id) === supplierId);
-  const linkStockGroupMutation = useMutation({
+  const _linkStockGroupMutation = useMutation({
     mutationFn: async (stockGroupId: number | null) => {
       const res = await apiRequest("PATCH", `/api/suppliers/${supplierId}/stock-group`, { stockGroupId });
       return res.json();

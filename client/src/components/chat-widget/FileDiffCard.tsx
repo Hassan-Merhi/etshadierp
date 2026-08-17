@@ -141,13 +141,13 @@ export interface FileDiffCardProps {
 
 export function FileDiffCard({
   draft,
-  onApply,
-  onCancel,
-  isApplying,
-  isApplied,
-  onGitPush,
-  isPushing,
-  pushResult,
+  onApply: _onApply,
+  onCancel: _onCancel,
+  isApplying: _isApplying,
+  isApplied: _isApplied,
+  onGitPush: _onGitPush,
+  isPushing: _isPushing,
+  pushResult: _pushResult,
 }: FileDiffCardProps) {
   const [showFullDiff, setShowFullDiff] = useState(false);
 

@@ -82,7 +82,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
 
       let vouchersUpdated = 0;
       for (const row of genVouchers.rows as any[]) {
-        const voucherDate = row.voucher_date as string;
+        const _voucherDate = row.voucher_date as string;
         // Parse period end from description: "Payroll expense: N workers (YYYY-MM-DD – YYYY-MM-DD)"
         const periodMatch = (row.description as string).match(/\((\d{4}-\d{2}-\d{2})\s*[–-]\s*(\d{4}-\d{2}-\d{2})\)/);
         if (!periodMatch) continue;

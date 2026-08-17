@@ -71,7 +71,7 @@ export default function POSImport() {
   const [saleCurrency, setSaleCurrency] = useState<"USD" | "CFA">("USD");
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [importedSale, setImportedSale] = useState<any>(null);
-  const [printTime, setPrintTime] = useState<string>("");
+  const [_printTime, setPrintTime] = useState<string>("");
   const printRef = useRef<HTMLDivElement>(null);
   const errorsRef = useRef<HTMLDivElement>(null);
 

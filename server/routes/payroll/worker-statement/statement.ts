@@ -188,8 +188,8 @@ export function registerWorkerStatementReadRoutes(app: Express) {
         .from(companySettings)
         .where(eq(companySettings.companyId, companyId))
         .catch(() => [null]);
-      const companyName = co?.name ?? "Company";
-      const logoUrl: string | null = sett?.logoUrl ?? null;
+      const _companyName = co?.name ?? "Company";
+      const _logoUrl: string | null = sett?.logoUrl ?? null;
       const baseCurrency = co?.baseCurrency ?? "USD";
       const currMap: Record<string, string> = { USD: "$ ", GBP: "£", EUR: "€", CFA: "CFA ", AED: "AED " };
       const sym = currMap[baseCurrency.toUpperCase()] ?? baseCurrency + " ";

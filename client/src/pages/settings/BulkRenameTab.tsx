@@ -34,9 +34,9 @@ import {
 } from "@shared/schema";
 import { FACTORY_NAV_PAGES } from "@/components/FactorySidebar";
 
-const userFormSchema = insertUserSchema;
-const companyFormSchema = insertCompanySchema;
-const roleAssignmentSchema = insertUserCompanyRoleSchema.refine(
+const _userFormSchema = insertUserSchema;
+const _companyFormSchema = insertCompanySchema;
+const _roleAssignmentSchema = insertUserCompanyRoleSchema.refine(
   (data) => {
     // If role is POS, assignedLocationId must be present
     if (data.role === "POS" && !data.assignedLocationId) {
@@ -50,9 +50,9 @@ const roleAssignmentSchema = insertUserCompanyRoleSchema.refine(
   }
 );
 
-type UserFormData = z.infer<typeof userFormSchema>;
-type CompanyFormData = z.infer<typeof companyFormSchema>;
-type RoleAssignmentData = z.infer<typeof roleAssignmentSchema>;
+type _UserFormData = z.infer<typeof _userFormSchema>;
+type _CompanyFormData = z.infer<typeof _companyFormSchema>;
+type _RoleAssignmentData = z.infer<typeof _roleAssignmentSchema>;
 
 export function BulkRenameTab() {
   const { toast } = useToast();
@@ -107,7 +107,7 @@ export function BulkRenameTab() {
     }
   };
 
-  const getPreviewName = (name: string) => {
+  const _getPreviewName = (name: string) => {
     const regex = buildRegex();
     if (!regex) return name;
     return name.replace(regex, replaceWith);
@@ -322,7 +322,7 @@ export function BulkRenameTab() {
 
 // Single source of truth: derived from FactorySidebar nav — new pages appear automatically
 const ALL_FACTORY_PAGES_SETTINGS = FACTORY_NAV_PAGES;
-const FACTORY_PAGE_GROUPS_SETTINGS = Array.from(new Set(ALL_FACTORY_PAGES_SETTINGS.map((p) => p.group)));
+const _FACTORY_PAGE_GROUPS_SETTINGS = Array.from(new Set(ALL_FACTORY_PAGES_SETTINGS.map((p) => p.group)));
 
 // Single source of truth: derived from FEATURE_KEYS + FEATURE_PAGE_INFO in shared/schema
 const ALL_ERP_PAGES: { key: string; label: string; group: string }[] = FEATURE_KEYS.map((key) => ({
@@ -331,7 +331,7 @@ const ALL_ERP_PAGES: { key: string; label: string; group: string }[] = FEATURE_K
   group: FEATURE_PAGE_INFO[key].group,
 }));
 
-const ERP_PAGE_GROUPS = Array.from(new Set(ALL_ERP_PAGES.map((p) => p.group)));
+const _ERP_PAGE_GROUPS = Array.from(new Set(ALL_ERP_PAGES.map((p) => p.group)));
 
 const ERP_COST_FIELDS = [
   { key: "daybook_amounts", label: "Transaction Amounts" },
@@ -352,7 +352,7 @@ const FACTORY_COST_FIELDS = [
   { key: "bales_list_cost_per_kg", label: "Cost/kg Column" },
 ];
 
-const PAGE_COST_FIELD_MAP: Record<string, { key: string; label: string }[]> = {
+const _PAGE_COST_FIELD_MAP: Record<string, { key: string; label: string }[]> = {
   daybook: [ERP_COST_FIELDS[0]],
   accounts: [ERP_COST_FIELDS[1]],
   containers: [ERP_COST_FIELDS[2]],

@@ -138,10 +138,10 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         WHERE pli.po_id = ${po5.id}
         ORDER BY pli.id
       `);
-      let lineTotal = 0;
+      let _lineTotal = 0;
       const tableRows5 = (lineRows.rows as any[]).map((r) => {
         const lt = parseFloat(r.line_total || "0");
-        lineTotal += lt;
+        _lineTotal += lt;
         return [r.item_name, r.code, `${fmtDec(parseFloat(r.qty))} ${r.uom}`, fmtDec(parseFloat(r.rate)), fmt(lt)];
       });
       const charges = [
@@ -299,7 +299,7 @@ async function runPhase5Report(ctx: DataQueryContext): Promise<DataQueryResult> 
         LIMIT ${rowLimit}
       `);
       const expired: string[] = [],
-        expiringSoon: string[] = [];
+        _expiringSoon: string[] = [];
       const tableRows5 = (rows.rows as any[]).map((r) => {
         const visaExp = r.visa_expiry ? String(r.visa_expiry).slice(0, 10) : "—";
         const wpExp = r.work_permit_expiry ? String(r.work_permit_expiry).slice(0, 10) : "—";

@@ -233,7 +233,7 @@ async function tryEvergreen(containerNumber: string): Promise<HttpScraperResult>
 
 // ── Maersk HTML page (Next.js embedded data) ──────────────────────────────────
 
-async function tryMaerskHtml(containerNumber: string): Promise<HttpScraperResult> {
+async function _tryMaerskHtml(containerNumber: string): Promise<HttpScraperResult> {
   try {
     const ctrl = abort(15_000);
     const resp = await fetch(`https://www.maersk.com/tracking/${encodeURIComponent(containerNumber)}`, {
@@ -316,7 +316,7 @@ async function tryMaerskHtml(containerNumber: string): Promise<HttpScraperResult
 
 // ── ParcelsApp page HTML fallback (for unknown carriers) ──────────────────────
 
-async function tryPageHtml(containerNumber: string): Promise<HttpScraperResult> {
+async function _tryPageHtml(containerNumber: string): Promise<HttpScraperResult> {
   try {
     const ctrl = abort(TIMEOUT_MS);
     const resp = await fetch(`https://parcelsapp.com/en/tracking/${encodeURIComponent(containerNumber)}`, {

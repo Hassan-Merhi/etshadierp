@@ -33,7 +33,7 @@ import type { Bale, ProductGroup } from "./wastedispatch/types";
 import { fmt, fmtKg, today } from "./wastedispatch/utils";
 export default function WasteDispatch() {
   const { toast } = useToast();
-  const [, navigate] = useLocation();
+  const [, _navigate] = useLocation();
 
   // ── Dispatch tab state ─────────────────────────────────────────
   const [search, setSearch] = useState("");
