@@ -401,7 +401,7 @@ export default function FactoryLocationInventory() {
   });
 
   const bulkCreateMutation = useMutation({
-    mutationFn: async (data: { customerId: number; name: string; isActive: boolean; lines: any[] }) => {
+    mutationFn: async (data: { customerId: number; name: string; isActive: boolean; lines: unknown[] }) => {
       const res = await modeApiRequest("POST", "/api/factory/customer-proformas/bulk", data);
       return await res.json();
     },
@@ -417,7 +417,7 @@ export default function FactoryLocationInventory() {
   });
 
   const replaceLinesMutation = useMutation({
-    mutationFn: async (data: { id: number; lines: any[] }) => {
+    mutationFn: async (data: { id: number; lines: unknown[] }) => {
       const res = await modeApiRequest("PUT", `/api/factory/customer-proformas/${data.id}/replace-lines`, {
         lines: data.lines,
       });

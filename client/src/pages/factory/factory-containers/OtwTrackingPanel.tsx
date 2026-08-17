@@ -42,7 +42,7 @@ export function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrac
 
   const today = new Date().toDateString();
   const _checkedToday = containers.filter((c) => {
-    const fc = c as any;
+    const fc = c;
     return fc.trackingLastCheckedAt && new Date(fc.trackingLastCheckedAt).toDateString() === today;
   }).length;
   const _withErrors = containers.filter((c) => !!(c as { trackingError: unknown }).trackingError).length;

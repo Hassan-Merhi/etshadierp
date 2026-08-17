@@ -309,12 +309,12 @@ export function DataToolsTab() {
         return;
       }
       const rows = utils.sheet_to_json<{
-        Code?: any;
-        Name?: any;
-        "Qty Change"?: any;
-        "Item Name"?: any;
-        Change?: any;
-        Rate?: any;
+        Code?: unknown;
+        Name?: unknown;
+        "Qty Change"?: unknown;
+        "Item Name"?: unknown;
+        Change?: unknown;
+        Rate?: unknown;
       }>(ws);
 
       const preview: SilentImportRow[] = rows

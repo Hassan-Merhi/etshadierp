@@ -125,7 +125,7 @@ export function registerBankAssetRoutes(app: Express) {
       const account = await storage.updateBankAccount(id, parsed, req.session.currentCompanyId);
       try {
         if (existingBankAcc) {
-          const _bankChanges: Record<string, { old?: any; new?: any }> = {};
+          const _bankChanges: Record<string, { old?: unknown; new?: unknown }> = {};
           for (const _f of ["name", "code", "openingBalance", "openingBalanceSide"] as const) {
             if (String(existingBankAcc[_f] ?? "") !== String(account[_f] ?? "")) {
               _bankChanges[_f] = { old: existingBankAcc[_f], new: account[_f] };

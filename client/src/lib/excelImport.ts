@@ -179,12 +179,12 @@ export async function excelToFortune(buf: ArrayBuffer): Promise<FortuneSheet[]> 
         const val = cell.value;
         if (val !== null && val !== undefined) {
           if (typeof val === "object" && "formula" in (val as object)) {
-            const fv = val as { formula: string; result?: any };
+            const fv = val as { formula: string; result?: unknown };
             v.f = fv.formula;
             v.v = fv.result ?? null;
             v.m = fv.result !== undefined && fv.result !== null ? String(fv.result) : "";
           } else if (typeof val === "object" && "sharedFormula" in (val as object)) {
-            const sfv = val as { sharedFormula: string; result?: any };
+            const sfv = val as { sharedFormula: string; result?: unknown };
             v.f = sfv.sharedFormula;
             v.v = sfv.result ?? null;
             v.m = sfv.result !== undefined && sfv.result !== null ? String(sfv.result) : "";
@@ -219,7 +219,7 @@ export async function excelToFortune(buf: ArrayBuffer): Promise<FortuneSheet[]> 
         }
 
         // Fill
-        const fill = cell.fill as any;
+        const fill = cell.fill;
         if (fill && fill.type === "pattern" && fill.pattern && fill.pattern !== "none") {
           const bg = argbToHex(fill.fgColor?.argb);
           if (bg && bg !== "#000000" && bg !== "#FFFFFF") v.bg = bg;

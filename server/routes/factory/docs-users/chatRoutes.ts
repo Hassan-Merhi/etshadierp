@@ -65,7 +65,7 @@ export function registerFactoryChatRoutes(app: Express) {
 
   app.get("/api/chat/typing/:userId", requireAuth, async (req: Request, res: Response) => {
     try {
-      const currentUserId = (req.session as any).userId;
+      const currentUserId = (req.session).userId;
       const otherUserId = req.params.userId;
       const record = typingStatus.get(otherUserId);
       const isTyping = !!record && record.receiverId === currentUserId && record.until > Date.now();

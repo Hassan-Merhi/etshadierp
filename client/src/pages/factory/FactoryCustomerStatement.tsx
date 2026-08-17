@@ -51,7 +51,7 @@ interface BalanceEntry {
 
 interface StatementData {
   customer: CustomerInfo;
-  invoices: any[];
+  invoices: unknown[];
   balanceHistory: BalanceEntry[];
   currentBalance: number;
   currentBalanceSide: string;

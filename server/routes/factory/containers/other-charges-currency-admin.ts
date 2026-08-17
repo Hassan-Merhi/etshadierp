@@ -73,7 +73,7 @@ export function registerFactoryContainerOtherChargesCurrencyAdminRoutes(app: Exp
 
         const grouped = new Map<
           number,
-          { containerId: number; containerNumber: string; currentCurrency: string; amount: string; charges: any[] }
+          { containerId: number; containerNumber: string; currentCurrency: string; amount: string; charges: unknown[] }
         >();
 
         for (const row of nonUsdContainerCharges as any[]) {

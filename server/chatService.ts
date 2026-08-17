@@ -60,8 +60,8 @@ async function tryBuildEarlyMultiSourceTargetTransfer(
   response: string;
   suggestions: string[];
   provider?: string;
-  stockTransferDraft?: any;
-  stockTransferDrafts?: any[];
+  stockTransferDraft?: unknown;
+  stockTransferDrafts?: unknown[];
 } | null> {
   const hasMultiSourceQtySignal =
     RE_MULTI_SOURCE_LOCATIONS.test(userMessage) ||
@@ -255,17 +255,17 @@ export async function chat(
   response: string;
   suggestions: string[];
   provider?: string;
-  voucherDraft?: any;
-  stockAdjustmentDraft?: any;
-  stockTransferDraft?: any;
-  stockTransferDrafts?: any[];
-  voucherSearchResults?: any[];
-  stockItemDraft?: any;
-  priceUpdateDraft?: any;
-  accountQueryResult?: any;
-  verifyContainerDraft?: any;
-  dataQueryResult?: any;
-  filePatchDrafts?: any[];
+  voucherDraft?: unknown;
+  stockAdjustmentDraft?: unknown;
+  stockTransferDraft?: unknown;
+  stockTransferDrafts?: unknown[];
+  voucherSearchResults?: unknown[];
+  stockItemDraft?: unknown;
+  priceUpdateDraft?: unknown;
+  accountQueryResult?: unknown;
+  verifyContainerDraft?: unknown;
+  dataQueryResult?: unknown;
+  filePatchDrafts?: unknown[];
   readFiles?: string[];
 }> {
   const available = getAvailableProviders();

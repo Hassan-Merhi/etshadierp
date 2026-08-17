@@ -57,7 +57,7 @@ export async function buildLinkedSupplierGroups(
         )
       );
 
-    const linkedByCurrency: Record<string, { containers: any[]; totalValue: number; totalCommission: number }> = {};
+    const linkedByCurrency: Record<string, { containers: unknown[]; totalValue: number; totalCommission: number }> = {};
     for (const c of linkedContainers) {
       const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0");
       const rate = parseFloat(c.ratePerKg || "0");

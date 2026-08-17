@@ -12,7 +12,7 @@ import { read as readExcel, utils as xlsxUtils, write as writeExcel, WorkBook } 
 const upload = multer({ storage: multer.memoryStorage() });
 
 type CellVal = number | string | null;
-type SRow = { id?: string; label: string; cells: any[] };
+type SRow = { id?: string; label: string; cells: unknown[] };
 
 function getColLabel(col: any): string {
   if (typeof col === "string") return col;

@@ -82,12 +82,12 @@ export async function upsertCorrection(params: {
 export async function validateRows(
   companyId: number,
   importType: string,
-  rows: { id: number; rowNumber: number; rawData: any }[]
+  rows: { id: number; rowNumber: number; rawData: unknown }[]
 ): Promise<
   {
     id: number;
     status: "valid" | "warning" | "error";
-    mappedData: any;
+    mappedData: unknown;
     errors: string[];
     warnings: string[];
   }[]
@@ -108,7 +108,7 @@ export async function validateRows(
 
 export async function validateStockItemRows(
   companyId: number,
-  rows: { id: number; rowNumber: number; rawData: any }[]
+  rows: { id: number; rowNumber: number; rawData: unknown }[]
 ) {
   // Pre-fetch lookup data (including correction memory for stock-group aliases)
   const [existingCodes, groups, itemCorrections] = await Promise.all([
@@ -196,7 +196,7 @@ export async function validateStockItemRows(
   });
 }
 
-export async function validateCustomerRows(companyId: number, rows: { id: number; rowNumber: number; rawData: any }[]) {
+export async function validateCustomerRows(companyId: number, rows: { id: number; rowNumber: number; rawData: unknown }[]) {
   const existingCodes = await db
     .select({ code: customers.code })
     .from(customers)
@@ -232,7 +232,7 @@ export async function validateCustomerRows(companyId: number, rows: { id: number
   });
 }
 
-export async function validateSupplierRows(companyId: number, rows: { id: number; rowNumber: number; rawData: any }[]) {
+export async function validateSupplierRows(companyId: number, rows: { id: number; rowNumber: number; rawData: unknown }[]) {
   const existingCodes = await db.select({ code: suppliers.code }).from(suppliers).where(isNull(suppliers.deletedAt));
   const existingCodeSet = new Set(existingCodes.map((r) => (r.code || "").toLowerCase()));
   const batchCodes = new Set<string>();
@@ -265,7 +265,7 @@ export async function validateSupplierRows(companyId: number, rows: { id: number
   });
 }
 
-export async function validateVoucherRows(companyId: number, rows: { id: number; rowNumber: number; rawData: any }[]) {
+export async function validateVoucherRows(companyId: number, rows: { id: number; rowNumber: number; rawData: unknown }[]) {
   const [accounts, ledgerCorrections] = await Promise.all([
     db
       .select({ id: ledgerAccounts.id, name: ledgerAccounts.name, code: ledgerAccounts.code })
@@ -347,7 +347,7 @@ export async function validateVoucherRows(companyId: number, rows: { id: number;
   });
 }
 
-export function validateGenericRows(rows: { id: number; rowNumber: number; rawData: any }[]) {
+export function validateGenericRows(rows: { id: number; rowNumber: number; rawData: unknown }[]) {
   return rows.map((row) => ({
     id: row.id,
     status: "valid" as const,
@@ -364,7 +364,7 @@ export async function postRows(
   userId: string,
   username: string,
   importType: string,
-  rows: { id: number; mappedData: any }[],
+  rows: { id: number; mappedData: unknown }[],
   tx: typeof db
 ): Promise<{ rowId: number; recordType: string; recordId: number }[]> {
   switch (importType) {
@@ -383,7 +383,7 @@ export async function postStockItemRows(
   companyId: number,
   userId: string,
   username: string,
-  rows: { id: number; mappedData: any }[],
+  rows: { id: number; mappedData: unknown }[],
   tx: typeof db
 ) {
   const results: { rowId: number; recordType: string; recordId: number }[] = [];
@@ -422,7 +422,7 @@ export async function postCustomerRows(
   companyId: number,
   userId: string,
   username: string,
-  rows: { id: number; mappedData: any }[],
+  rows: { id: number; mappedData: unknown }[],
   tx: typeof db
 ) {
   const results: { rowId: number; recordType: string; recordId: number }[] = [];
@@ -461,7 +461,7 @@ export async function postSupplierRows(
   companyId: number,
   userId: string,
   username: string,
-  rows: { id: number; mappedData: any }[],
+  rows: { id: number; mappedData: unknown }[],
   tx: typeof db
 ) {
   const results: { rowId: number; recordType: string; recordId: number }[] = [];

@@ -418,7 +418,7 @@ export default function FactoryProformas() {
   };
 
   const bulkImportMutation = useMutation({
-    mutationFn: async (data: { customerId: number; name: string; isActive: boolean; lines: any[] }) => {
+    mutationFn: async (data: { customerId: number; name: string; isActive: boolean; lines: unknown[] }) => {
       const res = await modeApiRequest("POST", "/api/factory/customer-proformas/bulk", data);
       if (!res.ok) {
         const e = await res.json();

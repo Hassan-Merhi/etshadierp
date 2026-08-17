@@ -186,7 +186,7 @@ export const PrintTemplate = ({
 };
 
 interface _VouchersProps {
-  posUser?: any;
+  posUser?: unknown;
 }
 
 export function parseDateLocal(dateStr: string): Date {

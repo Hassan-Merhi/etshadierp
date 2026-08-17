@@ -141,7 +141,7 @@ export function registerReportsContainerTrackingRoutes(app: Express) {
       const byRoute: Record<string, any[]> = {};
       const byAgent: Record<
         string,
-        { containers: any[]; offloadedContainers: any[]; total: number; offloadedTotal: number; balance: number }
+        { containers: unknown[]; offloadedContainers: unknown[]; total: number; offloadedTotal: number; balance: number }
       > = {};
       const byLocation: Record<string, { count: number; total: number }> = {};
       let totalAmount = 0;
@@ -191,7 +191,7 @@ export function registerReportsContainerTrackingRoutes(app: Express) {
         totalAmount += amount;
       }
 
-      const byTransporter: Record<string, { otw: any[]; offloaded: any[]; otwTotal: number; offloadedTotal: number }> =
+      const byTransporter: Record<string, { otw: unknown[]; offloaded: unknown[]; otwTotal: number; offloadedTotal: number }> =
         {};
 
       for (const container of otwContainers) {

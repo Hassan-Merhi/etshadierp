@@ -3,7 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { AuditLog } from "./AuditLog";
 
 interface EditLogTabProps {
-  selectedCompany: any;
+  selectedCompany: unknown;
 }
 
 export function EditLogTab({ selectedCompany: _selectedCompany }: EditLogTabProps) {
