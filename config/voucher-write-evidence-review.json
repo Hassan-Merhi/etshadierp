@@ -1,13 +1,14 @@
 {
-  "version": 1,
+  "version": 2,
   "reviewState": "REVIEWED FILE BY FILE",
-  "scope": "Voucher creation sites detected by scripts/audit-write-evidence.mjs after excluding updates/deletes/restores/moves of existing voucher rows.",
+  "scope": "Active voucher creation sites detected by scripts/audit-write-evidence.mjs after excluding updates/deletes/restores/moves of existing voucher rows. Completed phases are retained separately as historical evidence and must not re-enter the active backlog.",
   "summary": {
-    "totalReviewed": 81,
+    "initialReviewed": 81,
+    "activeReviewed": 70,
     "explicitReplayGuard": 15,
     "migrationImportRepair": 11,
-    "infrastructureWriter": 11,
     "operationalWithoutRequestIdentity": 44,
+    "phase3InfrastructureCompleted": 11,
     "unreviewed": 0
   },
   "reviewed": {
@@ -47,23 +48,6 @@
         "server/routes/sp-migration/spMigrationSetupRoutes.ts",
         "server/routes/stockTransferImportRoutes.ts",
         "server/services/rental/reclassifyDeferredRentService.ts"
-      ]
-    },
-    "infrastructure-writer": {
-      "verdict": "reviewed lower-level writer; caller/source identity is not enforced here",
-      "reason": "These helpers, services, and storage primitives create voucher rows below the HTTP request boundary. The file itself cannot supply a client request id reliably, but the API currently does not force callers to provide a deterministic source identity, so safety depends on each caller.",
-      "files": [
-        "server/routes/payroll/_payrollAccountingHelper.ts",
-        "server/services/accounting/voucherPostingService.ts",
-        "server/services/containers/offload-lifecycle/charge-vouchers.ts",
-        "server/services/containers/offload-lifecycle/sp-journals.ts",
-        "server/services/factory/post-offload-charge/apply.ts",
-        "server/services/pos/createSaleVoucher.ts",
-        "server/services/rental/rentalPaymentPostingService.ts",
-        "server/storage/accounting/fiscal-periods.ts",
-        "server/storage/accounting/vouchers.ts",
-        "server/storage/containers-store/offload.ts",
-        "server/storage/containers-store/purchase-orders.ts"
       ]
     },
     "operational-without-request-identity": {
@@ -114,6 +98,25 @@
         "server/routes/vouchers/voucherCreateRoutes.ts",
         "server/routes/vouchers/voucherJournalRoutes.ts",
         "server/routes/vouchers/voucherPaymentRoutes.ts"
+      ]
+    }
+  },
+  "completed": {
+    "phase-3-infrastructure-writers": {
+      "verdict": "phase 3 completed with required deterministic posting identity",
+      "reason": "These lower-level voucher writers now use the durable accounting posting request identity boundary. They require stable business/request source identity, serialize identical concurrent retries, reuse the existing voucher on a matching replay, reject a reused key with a changed financial payload, and clean the identity marker before intentional hard-delete/rebuild operations. Display voucher numbers are not used as retry identity; POS specifically requires clientSaleId rather than falling back to its Date.now/randomUUID voucher number.",
+      "files": [
+        "server/routes/payroll/_payrollAccountingHelper.ts",
+        "server/services/accounting/voucherPostingService.ts",
+        "server/services/containers/offload-lifecycle/charge-vouchers.ts",
+        "server/services/containers/offload-lifecycle/sp-journals.ts",
+        "server/services/factory/post-offload-charge/apply.ts",
+        "server/services/pos/createSaleVoucher.ts",
+        "server/services/rental/rentalPaymentPostingService.ts",
+        "server/storage/accounting/fiscal-periods.ts",
+        "server/storage/accounting/vouchers.ts",
+        "server/storage/containers-store/offload.ts",
+        "server/storage/containers-store/purchase-orders.ts"
       ]
     }
   },

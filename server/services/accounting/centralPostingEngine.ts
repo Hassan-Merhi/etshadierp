@@ -298,7 +298,7 @@ export async function postBalancedVoucherTx(
     entries: request.entries,
   });
 
-  const result = await insertVoucherWithEntriesTx(tx, request.voucher, request.entries);
+  const result = await insertVoucherWithEntriesTx(tx, request.voucher, request.entries, request.source);
 
   await dependencies.idempotency.record({
     tx,

@@ -1,3 +1,4 @@
+import { infrastructurePostingIdentity } from "../../services/accounting/infrastructureVoucherIdentity";
 import { parseId } from "../../lib/parseId";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { getClientDate } from "../../lib/dateUtils";
@@ -120,6 +121,11 @@ export function registerContainerCrudRoutes(app: Express) {
           // Create purchase voucher
           const voucher = await storage.createVoucher({
             companyId: req.session.currentCompanyId,
+            postingSource: infrastructurePostingIdentity(
+              "manual-container",
+              `${req.session.currentCompanyId}:${container.id}`,
+              "purchase"
+            ),
             currency: "USD",
             voucherNumber: `CONT-${container.containerNumber}-${Date.now()}`,
             voucherType: "Purchase",

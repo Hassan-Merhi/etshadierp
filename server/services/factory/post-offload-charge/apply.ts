@@ -1,3 +1,7 @@
+import {
+  infrastructurePostingIdentity,
+  insertInfrastructureVoucherTx,
+} from "../../accounting/infrastructureVoucherIdentity";
 import Decimal from "decimal.js";
 import { and, eq, isNull } from "drizzle-orm";
 import {
@@ -244,9 +248,9 @@ export async function applyPostOffloadChargeMutation(
     if (accountingCtx && accountingCtx.chargesPayableAcctId > 0) {
       const { voucherCompanyId, chargesPayableAcctId } = accountingCtx;
       const voucherNum = `FACTORY-POC-${containerId}-${inserted.id}-${Date.now()}`;
-      const [voucherRow] = await tx
-        .insert(vouchers)
-        .values({
+      const { voucher: voucherRow } = await insertInfrastructureVoucherTx(
+        tx,
+        {
           companyId: voucherCompanyId,
           voucherType: "Journal",
           voucherNumber: voucherNum,
@@ -256,8 +260,10 @@ export async function applyPostOffloadChargeMutation(
           currency: chargeData.currencyCode,
           exchangeRate: String(chargeData.fxRateToUsd),
           sourceModule: "FACTORY",
-        })
-        .returning();
+        },
+        infrastructurePostingIdentity("factory-post-offload-charge", `${companyId}:${containerId}`, "voucher"),
+        params
+      );
       voucherId = voucherRow.id;
 
       await tx.insert(voucherEntries).values({
@@ -552,9 +558,9 @@ export async function applyPostOffloadChargeMutation(
       // Create a new voucher for this charge that previously had none
       const { voucherCompanyId, chargesPayableAcctId } = accountingCtx;
       const voucherNum = `FACTORY-POC-${containerId}-${chargeId}-${Date.now()}`;
-      const [voucherRow] = await tx
-        .insert(vouchers)
-        .values({
+      const { voucher: voucherRow } = await insertInfrastructureVoucherTx(
+        tx,
+        {
           companyId: voucherCompanyId,
           voucherType: "Journal",
           voucherNumber: voucherNum,
@@ -564,8 +570,10 @@ export async function applyPostOffloadChargeMutation(
           currency: chargeData.currencyCode,
           exchangeRate: String(chargeData.fxRateToUsd),
           sourceModule: "FACTORY",
-        })
-        .returning();
+        },
+        infrastructurePostingIdentity("factory-post-offload-charge", `${companyId}:${containerId}`, "voucher"),
+        params
+      );
       newVoucherId = voucherRow.id;
       await tx.insert(voucherEntries).values({
         voucherId: voucherRow.id,

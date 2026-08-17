@@ -1,3 +1,7 @@
+import {
+  infrastructurePostingIdentity,
+  insertInfrastructureVoucherTx,
+} from "../../services/accounting/infrastructureVoucherIdentity";
 import { eq, and, isNull, sql } from "drizzle-orm";
 import type Decimal from "decimal.js";
 import { logger } from "../../lib/logger";
@@ -259,17 +263,23 @@ export async function offloadContainer(
       const dutiesExpenseAccountId = await findOrCreateExpenseAccount("DUTIES", "Duties", importChargesParentId);
       const voucherNumber = `DUTY-${container.containerNumber}-${Date.now()}`;
       const amount = inventoryMoney(duties);
-      const [voucher] = await tx
-        .insert(schema.vouchers)
-        .values({
+      const { voucher: voucher } = await insertInfrastructureVoucherTx(
+        tx,
+        {
           companyId: location.companyId,
           voucherNumber,
           voucherType: "Payment",
           voucherDate,
           description: `Duties for container ${container.containerNumber}`,
           totalAmount: amount,
-        })
-        .returning();
+        },
+        infrastructurePostingIdentity(
+          "container-offload",
+          String(location.companyId) + ":" + String(containerId),
+          "voucher"
+        ),
+        { duties, officeCharges, transferCharges, transportFees, additionalCharges }
+      );
       await tx.insert(schema.voucherEntries).values({
         voucherId: voucher.id,
         ledgerAccountId: dutiesExpenseAccountId,
@@ -309,17 +319,23 @@ export async function offloadContainer(
         );
       }
       const amount = inventoryMoney(officeCharges);
-      const [voucher] = await tx
-        .insert(schema.vouchers)
-        .values({
+      const { voucher: voucher } = await insertInfrastructureVoucherTx(
+        tx,
+        {
           companyId: location.companyId,
           voucherNumber: `OFFICE-${container.containerNumber}-${Date.now()}`,
           voucherType: "Payment",
           voucherDate,
           description: `Office charges for container ${container.containerNumber}`,
           totalAmount: amount,
-        })
-        .returning();
+        },
+        infrastructurePostingIdentity(
+          "container-offload",
+          String(location.companyId) + ":" + String(containerId),
+          "office"
+        ),
+        { duties, officeCharges, transferCharges, transportFees, additionalCharges }
+      );
       await tx.insert(schema.voucherEntries).values({
         voucherId: voucher.id,
         ledgerAccountId: officeChargesAccountId,
@@ -389,17 +405,23 @@ export async function offloadContainer(
       if (!creditAccountId) creditAccountId = await getTransportPayableAccount();
 
       const amount = inventoryMoney(transportFees);
-      const [voucher] = await tx
-        .insert(schema.vouchers)
-        .values({
+      const { voucher: voucher } = await insertInfrastructureVoucherTx(
+        tx,
+        {
           companyId: location.companyId,
           voucherNumber: `TRANS-${container.containerNumber}-${Date.now()}`,
           voucherType: "Payment",
           voucherDate,
           description: `Transport fees for container ${container.containerNumber}`,
           totalAmount: amount,
-        })
-        .returning();
+        },
+        infrastructurePostingIdentity(
+          "container-offload",
+          String(location.companyId) + ":" + String(containerId),
+          "transport"
+        ),
+        { duties, officeCharges, transferCharges, transportFees, additionalCharges }
+      );
       await tx.insert(schema.voucherEntries).values({
         voucherId: voucher.id,
         ledgerAccountId: transportExpenseAccountId,
@@ -449,17 +471,23 @@ export async function offloadContainer(
         transferPayableAccounts = [newAccount];
       }
       const amount = inventoryMoney(transferCharges);
-      const [voucher] = await tx
-        .insert(schema.vouchers)
-        .values({
+      const { voucher: voucher } = await insertInfrastructureVoucherTx(
+        tx,
+        {
           companyId: location.companyId,
           voucherNumber: `XFER-${container.containerNumber}-${Date.now()}`,
           voucherType: "Payment",
           voucherDate,
           description: `Transfer charges for container ${container.containerNumber}`,
           totalAmount: amount,
-        })
-        .returning();
+        },
+        infrastructurePostingIdentity(
+          "container-offload",
+          String(location.companyId) + ":" + String(containerId),
+          "transfer"
+        ),
+        { duties, officeCharges, transferCharges, transportFees, additionalCharges }
+      );
       await tx.insert(schema.voucherEntries).values({
         voucherId: voucher.id,
         ledgerAccountId: transferExpenseAccountId,
@@ -476,7 +504,7 @@ export async function offloadContainer(
       });
     }
 
-    for (const charge of additionalCharges) {
+    for (const [chargeIndex, charge] of additionalCharges.entries()) {
       if (!toInventoryDecimal(charge.amount).isPositive()) continue;
       const [creditAccount] = await tx
         .select({ accountType: schema.ledgerAccounts.accountType, name: schema.ledgerAccounts.name })
@@ -499,17 +527,23 @@ export async function offloadContainer(
         importChargesParentId
       );
       const amount = inventoryMoney(charge.amount);
-      const [voucher] = await tx
-        .insert(schema.vouchers)
-        .values({
+      const { voucher: voucher } = await insertInfrastructureVoucherTx(
+        tx,
+        {
           companyId: location.companyId,
           voucherNumber: `CHG-${container.containerNumber}-${Date.now()}`,
           voucherType: "Payment",
           voucherDate,
           description: `${charge.description} for container ${container.containerNumber}`,
           totalAmount: amount,
-        })
-        .returning();
+        },
+        infrastructurePostingIdentity(
+          "container-offload",
+          String(location.companyId) + ":" + String(containerId) + ":" + String(chargeIndex),
+          "additional"
+        ),
+        { duties, officeCharges, transferCharges, transportFees, additionalCharges }
+      );
       await tx.insert(schema.voucherEntries).values({
         voucherId: voucher.id,
         ledgerAccountId: expenseAccountId,

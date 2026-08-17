@@ -1,3 +1,7 @@
+import {
+  infrastructurePostingIdentity,
+  insertInfrastructureVoucherTx,
+} from "../../accounting/infrastructureVoucherIdentity";
 import { and, eq, isNull } from "drizzle-orm";
 import * as schema from "@shared/schema";
 
@@ -65,9 +69,9 @@ export async function postSupplierPartnerJournals(
   }
 
   if (totalOtw > 0) {
-    const [reversalVoucher] = await tx
-      .insert(schema.vouchers)
-      .values({
+    const { voucher: reversalVoucher } = await insertInfrastructureVoucherTx(
+      tx,
+      {
         companyId: container.companyId,
         voucherType: "Journal",
         voucherNumber: `SP-OTW-REV-ERP-${container.id}-${Date.now()}`,
@@ -77,8 +81,10 @@ export async function postSupplierPartnerJournals(
         currency: "USD",
         exchangeRate: "1",
         sourceModule: "SP",
-      })
-      .returning();
+      },
+      infrastructurePostingIdentity("sp-container-offload", `${container.companyId}:${container.id}`, "otw-reversal"),
+      { totalOtw, purchaseOrders }
+    );
 
     const poTotals = purchaseOrders
       .map((po) => ({
@@ -134,9 +140,9 @@ export async function postSupplierPartnerJournals(
       narration: `Goods OTW reversal — ERP container #${container.id}`,
     });
 
-    const [stockVoucher] = await tx
-      .insert(schema.vouchers)
-      .values({
+    const { voucher: stockVoucher } = await insertInfrastructureVoucherTx(
+      tx,
+      {
         companyId: container.companyId,
         voucherType: "Journal",
         voucherNumber: `SP-STOCK-ERP-${container.id}-${Date.now()}`,
@@ -146,8 +152,14 @@ export async function postSupplierPartnerJournals(
         currency: "USD",
         exchangeRate: "1",
         sourceModule: "SP",
-      })
-      .returning();
+      },
+      infrastructurePostingIdentity(
+        "sp-container-offload",
+        `${container.companyId}:${container.id}`,
+        "stock-recognition"
+      ),
+      { totalOtw }
+    );
     await tx.insert(schema.voucherEntries).values([
       {
         voucherId: stockVoucher.id,
@@ -167,9 +179,9 @@ export async function postSupplierPartnerJournals(
   }
 
   if (validAgentLines.length > 0 && parentIntercompany && spIntercompany && prepaidExpenses) {
-    const [settlement] = await tx
-      .insert(schema.vouchers)
-      .values({
+    const { voucher: settlement } = await insertInfrastructureVoucherTx(
+      tx,
+      {
         companyId: container.companyId,
         voucherType: "Journal",
         voucherNumber: `SP-AGENT-SETTLE-${container.id}-${Date.now()}`,
@@ -179,8 +191,14 @@ export async function postSupplierPartnerJournals(
         currency: "USD",
         exchangeRate: "1",
         sourceModule: "SP",
-      })
-      .returning();
+      },
+      infrastructurePostingIdentity(
+        "sp-container-offload",
+        `${container.companyId}:${container.id}`,
+        "agent-settlement"
+      ),
+      { validAgentLines, totalAgentAmount }
+    );
     await tx.insert(schema.voucherEntries).values([
       {
         voucherId: settlement.id,
@@ -198,9 +216,9 @@ export async function postSupplierPartnerJournals(
       },
     ]);
 
-    const [parentVoucher] = await tx
-      .insert(schema.vouchers)
-      .values({
+    const { voucher: parentVoucher } = await insertInfrastructureVoucherTx(
+      tx,
+      {
         companyId: parentCompanyId,
         voucherType: "Journal",
         voucherNumber: `SP-AGENT-ERP-${container.id}-${Date.now()}`,
@@ -210,8 +228,10 @@ export async function postSupplierPartnerJournals(
         currency: "USD",
         exchangeRate: "1",
         sourceModule: "SP",
-      })
-      .returning();
+      },
+      infrastructurePostingIdentity("sp-container-offload", `${container.companyId}:${container.id}`, "parent-agent"),
+      { validAgentLines, totalAgentAmount, parentCompanyId }
+    );
     await tx.insert(schema.voucherEntries).values({
       voucherId: parentVoucher.id,
       ledgerAccountId: parentIntercompany.id,

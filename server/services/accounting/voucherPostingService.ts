@@ -6,27 +6,38 @@
  * balance synchronization, stock movement, and daybook side effects remain
  * owned by the calling domain service.
  *
- * Phase 1 multi-currency update:
- * buildEntryValues now persists all dual-currency fields from NormalizedEntryAmounts
- * or raw VoucherEntryInsertFields. Backward-compatible debitAmount / creditAmount
- * are always written as the historical base-currency (USD) amounts.
+ * Phase 3 request-identity hardening:
+ * this low-level primitive now requires a validated source identity at its API
+ * boundary. The CentralPostingEngine owns the durable lookup/recording around
+ * this insert; requiring the identity here prevents future production callers
+ * from bypassing that contract accidentally.
  */
 
 import { vouchers, voucherEntries } from "@shared/schema";
+import type { PostingSourceIdentity } from "./centralPostingEngine";
 import type { VoucherInsertFields, VoucherEntryInsertFields, VoucherWithEntries } from "./accountingTypes";
 
 type VoucherRow = typeof vouchers.$inferSelect;
 type VoucherEntryRow = typeof voucherEntries.$inferSelect;
 
-// Method-syntax members (not property arrows) so parameters compare
-// bivariantly — this lets a concrete Drizzle PgTransaction satisfy the
-// structural contract without a cast at every call site.
 interface TransactionLike {
   insert(table: any): any;
 }
 
 interface DatabaseLike {
   transaction: <T>(callback: (tx: TransactionLike) => Promise<T>) => Promise<T>;
+}
+
+function requireSourceIdentity(source: PostingSourceIdentity): void {
+  for (const [field, value] of [
+    ["sourceType", source?.sourceType],
+    ["sourceId", source?.sourceId],
+    ["idempotencyKey", source?.idempotencyKey],
+  ] as const) {
+    if (!String(value ?? "").trim()) {
+      throw new Error(`${field} is required before a voucher can be inserted`);
+    }
+  }
 }
 
 function buildVoucherValues(voucher: VoucherInsertFields) {
@@ -61,7 +72,6 @@ function buildVoucherValues(voucher: VoucherInsertFields) {
 function buildEntryValues(voucherId: number, item: VoucherEntryInsertFields) {
   return {
     voucherId,
-    // ── Account linkage ──────────────────────────────────────────────────────
     ledgerAccountId: item.ledgerAccountId ?? null,
     bankAccountId: item.bankAccountId ?? null,
     fixedAssetId: item.fixedAssetId ?? null,
@@ -69,11 +79,9 @@ function buildEntryValues(voucherId: number, item: VoucherEntryInsertFields) {
     employeeId: item.employeeId ?? null,
     customerId: item.customerId ?? null,
     factorySupplierId: item.factorySupplierId ?? null,
-    // ── Backward-compatible amounts (always base/USD for new rows) ────────────
     debitAmount: item.debitAmount ?? "0",
     creditAmount: item.creditAmount ?? "0",
     narration: item.narration ?? null,
-    // ── Dual-currency fields ─────────────────────────────────────────────────
     transactionCurrency: item.transactionCurrency ?? null,
     transactionDebitAmount: item.transactionDebitAmount ?? null,
     transactionCreditAmount: item.transactionCreditAmount ?? null,
@@ -88,11 +96,11 @@ export async function insertVoucherWithEntriesTx(
   tx: TransactionLike,
   voucherFields: VoucherInsertFields,
   items: VoucherEntryInsertFields[],
+  source: PostingSourceIdentity
 ): Promise<VoucherWithEntries<VoucherRow, VoucherEntryRow>> {
-  const [voucher] = (await tx
-    .insert(vouchers)
-    .values(buildVoucherValues(voucherFields))
-    .returning()) as VoucherRow[];
+  requireSourceIdentity(source);
+
+  const [voucher] = (await tx.insert(vouchers).values(buildVoucherValues(voucherFields)).returning()) as VoucherRow[];
   if (!voucher || typeof voucher !== "object" || !("id" in voucher)) {
     throw new Error("Voucher insert did not return a persisted voucher");
   }
@@ -118,6 +126,8 @@ export async function insertVoucherWithEntries(
   db: DatabaseLike,
   voucherFields: VoucherInsertFields,
   items: VoucherEntryInsertFields[],
+  source: PostingSourceIdentity
 ): Promise<VoucherWithEntries> {
-  return db.transaction((tx) => insertVoucherWithEntriesTx(tx, voucherFields, items));
+  requireSourceIdentity(source);
+  return db.transaction((tx) => insertVoucherWithEntriesTx(tx, voucherFields, items, source));
 }

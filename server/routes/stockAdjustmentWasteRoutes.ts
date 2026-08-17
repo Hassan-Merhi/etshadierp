@@ -1,3 +1,4 @@
+import { infrastructurePostingIdentity } from "../services/accounting/infrastructureVoucherIdentity";
 /**
  * Stock-adjustment & waste-dispatch routes.
  *
@@ -212,6 +213,7 @@ export function registerStockAdjustmentWasteRoutes(app: Express) {
       // Create voucher with type "Consumption"
       const voucher = await storage.createVoucher({
         companyId,
+        postingSource: infrastructurePostingIdentity("waste-dispatch", `${companyId}:${dispatchNumber}`, "consumption"),
         voucherType: "Consumption",
         voucherNumber: dispatchNumber,
         voucherDate: dispatchDate,

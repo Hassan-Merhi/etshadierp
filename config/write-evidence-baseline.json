@@ -139,8 +139,8 @@
     "reviewNote": "Every file in `files` is classified under `reviewed`; `unreviewed` is empty and must stay that way. A file entering the backlog has to be read and classified, or fixed. `unreviewed` never means 'fine' — it means nobody has opened it."
   },
   "voucherWritesWithoutRequestIdentity": {
-    "rationale": "Files that create vouchers without resolving a client request id, so a retried submission posts the entries a second time. The retry need not be a user double-click: a proxy timeout, a mobile network handover, or an offline queue replay is enough. A file is credited if it carries a request id itself or reaches server/services/accounting/centralPostingEngine.ts, whose postBalancedVoucherTx validates source.idempotencyKey as required text and looks it up before posting — a path through the engine cannot post without an identity. The 81 below bypass the engine and insert voucher rows directly. Only creation counts: updating, soft-deleting, restoring or moving an existing voucher cannot produce a second voucher row, so those paths are not duplicate-posting risks and were removed from the measurement.",
-    "ceiling": 81,
+    "rationale": "Files that still create vouchers without a canonical stable posting identity. The retry need not be a user double-click: a proxy timeout, mobile network handover, or offline replay can submit the same operation again. A file is credited when it carries a stable request/source identity itself or reaches the central/infrastructure posting boundary that requires one. Phase 3 removed all 11 reviewed infrastructure writers from this measured backlog by requiring deterministic business/request source identity, advisory-locking identical concurrent retries, reusing matching postings, and rejecting changed payloads under the same key. The remaining active measured backlog is 70 creation paths. Only creation counts: updating, soft-deleting, restoring, or moving an existing voucher cannot produce a second voucher row.",
+    "ceiling": 70,
     "files": [
       "server/routes/admin/adminPoFixRoutes.ts",
       "server/routes/balance-repair/undo.ts",
@@ -179,7 +179,6 @@
       "server/routes/helpers/intercompanyHelpers.ts",
       "server/routes/intercompanyNotificationRoutes.ts",
       "server/routes/offloadRoutes.ts",
-      "server/routes/payroll/_payrollAccountingHelper.ts",
       "server/routes/payroll/advance-accounting/bulk-repay.ts",
       "server/routes/payroll/advance-accounting/cash.ts",
       "server/routes/payroll/advance-accounting/repay-by-month.ts",
@@ -212,26 +211,17 @@
       "server/routes/vouchers/voucherCreateRoutes.ts",
       "server/routes/vouchers/voucherJournalRoutes.ts",
       "server/routes/vouchers/voucherPaymentRoutes.ts",
-      "server/services/accounting/voucherPostingService.ts",
-      "server/services/containers/offload-lifecycle/charge-vouchers.ts",
-      "server/services/containers/offload-lifecycle/sp-journals.ts",
-      "server/services/factory/post-offload-charge/apply.ts",
-      "server/services/pos/createSaleVoucher.ts",
-      "server/services/rental/reclassifyDeferredRentService.ts",
-      "server/services/rental/rentalPaymentPostingService.ts",
-      "server/storage/accounting/fiscal-periods.ts",
-      "server/storage/accounting/vouchers.ts",
-      "server/storage/containers-store/offload.ts",
-      "server/storage/containers-store/purchase-orders.ts"
+      "server/services/rental/reclassifyDeferredRentService.ts"
     ],
-    "reviewState": "REVIEWED FILE BY FILE. Every current voucher creation file is classified in config/voucher-write-evidence-review.json; the unreviewed remainder is zero. The classification distinguishes explicit replay guards, migration/import/repair paths, lower-level writer APIs, and the operational paths that still lack request identity.",
+    "reviewState": "REVIEWED FILE BY FILE. The active 70 voucher creation paths are classified in config/voucher-write-evidence-review.json with zero unreviewed remainder. The 11 infrastructure writers completed in Phase 3 are retained separately in that review file and are forbidden from re-entering the measured backlog.",
     "reviewFile": "config/voucher-write-evidence-review.json",
     "reviewSummary": {
-      "totalReviewed": 81,
+      "initialReviewed": 81,
+      "activeReviewed": 70,
       "explicitReplayGuard": 15,
       "migrationImportRepair": 11,
-      "infrastructureWriter": 11,
       "operationalWithoutRequestIdentity": 44,
+      "phase3InfrastructureCompleted": 11,
       "unreviewed": 0
     }
   }

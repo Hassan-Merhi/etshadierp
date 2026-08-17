@@ -1,10 +1,13 @@
+import {
+  infrastructurePostingIdentity,
+  insertInfrastructureVoucherTx,
+} from "../accounting/infrastructureVoucherIdentity";
 /**
  * server/services/pos/createSaleVoucher.ts
  *
  * PHASE 19 structural split — moved (unchanged) from server/routes/pos/posSalesRoutes.ts.
  * Inserts the Sales voucher row for a POS sale.
  */
-import { vouchers } from "@shared/schema";
 
 export async function insertSaleVoucher(
   tx: any,
@@ -40,9 +43,9 @@ export async function insertSaleVoucher(
     exchangeRate,
   } = params;
 
-  const [txVoucher] = await tx
-    .insert(vouchers)
-    .values({
+  const { voucher: txVoucher } = await insertInfrastructureVoucherTx(
+    tx,
+    {
       companyId,
       locationId,
       locationName,
@@ -50,15 +53,23 @@ export async function insertSaleVoucher(
       voucherType: "Sales",
       voucherDate,
       description:
-        notes || (isCreditSale ? `Credit Invoice Sale at ${locationName} - ${customerAccountName}` : `POS Sale at ${locationName}`),
+        notes ||
+        (isCreditSale
+          ? `Credit Invoice Sale at ${locationName} - ${customerAccountName}`
+          : `POS Sale at ${locationName}`),
       totalAmount: grandTotal.toFixed(2),
       shiftId: effectiveShiftId,
       clientSaleId: clientSaleId || null,
       currency: currency || "USD",
       exchangeRate: exchangeRate || null,
       isCreditSale: !!isCreditSale,
-    })
-    .returning();
+    },
+    // clientSaleId is the caller's stable retry identity. Do not fall back to
+    // voucherNumber: POS display voucher numbers intentionally contain
+    // Date.now()/randomUUID and would turn a retry into a new posting key.
+    infrastructurePostingIdentity("pos-sale", clientSaleId, "sales-voucher"),
+    params
+  );
 
   return txVoucher;
 }

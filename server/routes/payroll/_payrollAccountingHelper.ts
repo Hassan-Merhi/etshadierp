@@ -1,3 +1,8 @@
+import {
+  deleteInfrastructurePostingIdentityForVoucherTx,
+  infrastructurePostingIdentity,
+  insertInfrastructureVoucherTx,
+} from "../../services/accounting/infrastructureVoucherIdentity";
 /**
  * Shared payroll accounting helpers.
  * Used by factoryPayrollRoutes (delete/undo) and workerStatementRoutes (repair utility)
@@ -133,6 +138,9 @@ export async function rebuildPayrollGenVoucher(
 
   if (existingGenVouchers.length > 0) {
     const vIds = existingGenVouchers.map((v: any) => v.id);
+    for (const voucherId of vIds) {
+      await deleteInfrastructurePostingIdentityForVoucherTx(tx, voucherId);
+    }
     await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
     await tx.delete(vouchers).where(inArray(vouchers.id, vIds));
   }
@@ -215,9 +223,9 @@ export async function rebuildPayrollGenVoucher(
   const count = remaining.length;
   const desc = `Payroll expense: ${count} worker${count !== 1 ? "s" : ""} (${periodStart} – ${periodEnd})`;
 
-  const [genVoucher] = await tx
-    .insert(vouchers)
-    .values({
+  const { voucher: genVoucher } = await insertInfrastructureVoucherTx(
+    tx,
+    {
       companyId,
       voucherNumber: `PAYROLL-GEN-${Date.now()}`,
       voucherType: "Journal",
@@ -226,8 +234,10 @@ export async function rebuildPayrollGenVoucher(
       totalAmount: totalGross.toFixed(2),
       currency: "USD",
       sourceModule: "FACTORY",
-    })
-    .returning();
+    },
+    infrastructurePostingIdentity("payroll-generation", `${companyId}:${periodStart}:${periodEnd}`, "rebuild"),
+    { workerRows, totalNet, totalAdvances }
+  );
 
   const journalEntries: any[] = [];
 

@@ -110,7 +110,12 @@ const JOURNAL_WRITER = /\b(?:postStockMovementTx|journalStockTransferLeg)\b/;
  * strings alone was under-counting the paths that are already safe.
  */
 const REQUEST_IDENTITY =
-  /\b(?:clientRequestId|resolveStockDocumentRequestId|stockDocumentIdempotencyKey|postBalancedVoucherTx)\b/;
+  /\b(?:clientRequestId|resolveStockDocumentRequestId|stockDocumentIdempotencyKey|postBalancedVoucherTx|insertInfrastructureVoucherTx|insertInfrastructureVoucher)\b/;
+
+const IDENTITY_OWNING_VOUCHER_WRITERS = new Set([
+  "server/services/accounting/voucherPostingService.ts",
+  "server/services/accounting/infrastructureVoucherIdentity.ts",
+]);
 
 function sourceFiles(directory, collected = []) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
@@ -147,8 +152,11 @@ export function auditWriteEvidence() {
       else unjournalledStockWrites.push(file);
     }
     if (createsTableRow(source, "vouchers", "vouchers")) {
-      if (REQUEST_IDENTITY.test(source)) voucherWritesWithRequestIdentity += 1;
-      else voucherWritesWithoutRequestIdentity.push(file);
+      if (IDENTITY_OWNING_VOUCHER_WRITERS.has(file) || REQUEST_IDENTITY.test(source)) {
+        voucherWritesWithRequestIdentity += 1;
+      } else {
+        voucherWritesWithoutRequestIdentity.push(file);
+      }
     }
   }
 

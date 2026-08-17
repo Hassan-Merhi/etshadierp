@@ -1,3 +1,7 @@
+import {
+  infrastructurePostingIdentity,
+  insertInfrastructureVoucherTx,
+} from "../../accounting/infrastructureVoucherIdentity";
 import { and, eq, isNull } from "drizzle-orm";
 import * as schema from "@shared/schema";
 
@@ -15,17 +19,19 @@ export async function postChargeVouchers(
 
   if (input.dutiesAccountId && amount(input.duties) > 0) {
     const expenseId = await accounts.expense("DUTIES", "Duties");
-    const [voucher] = await tx
-      .insert(schema.vouchers)
-      .values({
+    const { voucher: voucher } = await insertInfrastructureVoucherTx(
+      tx,
+      {
         companyId,
         voucherNumber: `DUTY-${container.containerNumber}-${Date.now()}`,
         voucherType: "Payment",
         voucherDate,
         description: `Duties for container ${container.containerNumber}`,
         totalAmount: input.duties,
-      })
-      .returning();
+      },
+      infrastructurePostingIdentity("container-offload-charge", `${companyId}:${container.id}`, "duties"),
+      { amount: input.duties, accountId: input.dutiesAccountId }
+    );
     await tx.insert(schema.voucherEntries).values([
       {
         voucherId: voucher.id,
@@ -74,17 +80,23 @@ export async function postChargeVouchers(
         "CONTAINER_OFFLOAD_OFFICE_ACCOUNT_INVALID"
       );
     }
-    const [voucher] = await tx
-      .insert(schema.vouchers)
-      .values({
+    const { voucher: voucher } = await insertInfrastructureVoucherTx(
+      tx,
+      {
         companyId,
         voucherNumber: `OFFICE-${container.containerNumber}-${Date.now()}`,
         voucherType: "Payment",
         voucherDate,
         description: `Office charges for container ${container.containerNumber}`,
         totalAmount: input.officeCharges,
-      })
-      .returning();
+      },
+      infrastructurePostingIdentity("container-offload-charge", `${companyId}:${container.id}`, "office"),
+      {
+        amount: input.officeCharges,
+        accountId: input.officeChargesAccountId,
+        cashAccountId: input.officeChargesCashAccountId,
+      }
+    );
     await tx.insert(schema.voucherEntries).values([
       {
         voucherId: voucher.id,
@@ -124,17 +136,19 @@ export async function postChargeVouchers(
     } else {
       creditAccountId = await accounts.payable("TRANSPORT_PAYABLE", "Transport Fees Payable");
     }
-    const [voucher] = await tx
-      .insert(schema.vouchers)
-      .values({
+    const { voucher: voucher } = await insertInfrastructureVoucherTx(
+      tx,
+      {
         companyId,
         voucherNumber: `TRANS-${container.containerNumber}-${Date.now()}`,
         voucherType: "Payment",
         voucherDate,
         description: `Transport fees for container ${container.containerNumber}`,
         totalAmount: input.transportFees,
-      })
-      .returning();
+      },
+      infrastructurePostingIdentity("container-offload-charge", `${companyId}:${container.id}`, "transport"),
+      { amount: input.transportFees, accountId: creditAccountId }
+    );
     await tx.insert(schema.voucherEntries).values([
       {
         voucherId: voucher.id,
@@ -156,17 +170,19 @@ export async function postChargeVouchers(
   if (amount(input.transferCharges) > 0) {
     const expenseId = await accounts.expense("TRANSFER_CHARGES", "Transfer Charges");
     const payableId = await accounts.payable("TRANSFER_PAYABLE", "Transfer Charges Payable");
-    const [voucher] = await tx
-      .insert(schema.vouchers)
-      .values({
+    const { voucher: voucher } = await insertInfrastructureVoucherTx(
+      tx,
+      {
         companyId,
         voucherNumber: `XFER-${container.containerNumber}-${Date.now()}`,
         voucherType: "Payment",
         voucherDate,
         description: `Transfer charges for container ${container.containerNumber}`,
         totalAmount: input.transferCharges,
-      })
-      .returning();
+      },
+      infrastructurePostingIdentity("container-offload-charge", `${companyId}:${container.id}`, "transfer"),
+      { amount: input.transferCharges, accountId: payableId }
+    );
     await tx.insert(schema.voucherEntries).values([
       {
         voucherId: voucher.id,
@@ -185,7 +201,7 @@ export async function postChargeVouchers(
     ]);
   }
 
-  for (const charge of input.additionalCharges ?? []) {
+  for (const [chargeIndex, charge] of (input.additionalCharges ?? []).entries()) {
     if (charge.amount <= 0) continue;
     const [creditAccount] = await tx
       .select({ accountType: schema.ledgerAccounts.accountType, name: schema.ledgerAccounts.name })
@@ -214,17 +230,23 @@ export async function postChargeVouchers(
     }
     const expenseId = await accounts.expense("ADDITIONAL_CHARGES", "Additional Container Charges");
     const amountText = charge.amount.toFixed(2);
-    const [voucher] = await tx
-      .insert(schema.vouchers)
-      .values({
+    const { voucher: voucher } = await insertInfrastructureVoucherTx(
+      tx,
+      {
         companyId,
         voucherNumber: `CHG-${container.containerNumber}-${Date.now()}`,
         voucherType: "Payment",
         voucherDate,
         description: `${charge.description} for container ${container.containerNumber}`,
         totalAmount: amountText,
-      })
-      .returning();
+      },
+      infrastructurePostingIdentity(
+        "container-offload-charge",
+        `${companyId}:${container.id}:${chargeIndex}`,
+        "additional"
+      ),
+      { charge }
+    );
     await tx.insert(schema.voucherEntries).values([
       {
         voucherId: voucher.id,
