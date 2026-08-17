@@ -53,7 +53,11 @@ const bundles = [
     parts: 11,
     translatorImport: "translatePhase7BackendMessageText",
     test: "tests/phase7-backend-messages-translations.test.ts",
-    expectedCount: 593,
+    // 593 -> 596 when Green API fallback messages were translated. The
+    // catalogue and its test moved together; this contract did not, and because
+    // Release Verification is dispatch-only it went unnoticed from 13 August
+    // until the workflow was first run.
+    expectedCount: 596,
   },
 ];
 
@@ -160,7 +164,7 @@ console.log(
       phases: [4, 5, 6, 7],
       status: "reconciled-on-current-main",
       languages: ["en", "ar", "fr"],
-      reviewedEntries: 230 + 182 + 251 + 593,
+      reviewedEntries: 230 + 182 + 251 + 596,
       storedBusinessValuesProtected: true,
       sqlRequired: false,
     },
