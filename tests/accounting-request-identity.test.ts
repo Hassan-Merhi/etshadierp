@@ -148,7 +148,10 @@ describe("accounting request identity", () => {
 
   it("releases only successful or definite client-error outcomes", () => {
     expect(shouldReleaseAccountingRequestIdentity(200)).toBe(true);
-    expect(shouldReleaseAccountingRequestIdentity(409)).toBe(true);
+    expect(shouldReleaseAccountingRequestIdentity(422, "VALIDATION_ERROR")).toBe(true);
+    expect(shouldReleaseAccountingRequestIdentity(409, "POSTING_IDEMPOTENCY_CONFLICT")).toBe(true);
+    expect(shouldReleaseAccountingRequestIdentity(409)).toBe(false);
+    expect(shouldReleaseAccountingRequestIdentity(409, "ACCOUNTING_REQUEST_OUTCOME_UNCERTAIN")).toBe(false);
     expect(shouldReleaseAccountingRequestIdentity(500)).toBe(false);
     expect(shouldReleaseAccountingRequestIdentity(503)).toBe(false);
   });
