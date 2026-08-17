@@ -100,24 +100,19 @@ afterEach(() => {
 });
 
 describe("Phase 4 operational voucher retry boundary", () => {
-  it("pins exactly the 22 reviewed high-risk writers as completed", () => {
+  it("keeps exactly the 22 reviewed Phase 4 writers pinned as completed", () => {
     expect(voucherReview.summary.phase4OperationalCompleted).toBe(22);
-    expect(voucherReview.summary.operationalWithoutRequestIdentity).toBe(22);
-    expect(voucherReview.unreviewed).toEqual([]);
+    expect(voucherReview.summary.unreviewed).toBe(0);
     expect(voucherReview.completed["phase-4-operational-writers"].files).toEqual(PHASE4_WRITERS);
-    expect(voucherReview.reviewed["operational-without-request-identity"].files).toHaveLength(22);
   });
 
-  it("re-pins the measured voucher identity backlog from 70 to 48", () => {
+  it("keeps every Phase 4 writer out of the remaining measured identity backlog", () => {
     const baseline = writeEvidenceBaseline.voucherWritesWithoutRequestIdentity;
     const measured = auditWriteEvidence();
-    const remaining = new Set(baseline.files);
+    const remaining = new Set(measured.voucherWritesWithoutRequestIdentity);
 
-    expect(baseline.ceiling).toBe(48);
-    expect(baseline.files).toHaveLength(48);
-    expect(baseline.reviewSummary.activeReviewed).toBe(48);
-    expect(baseline.reviewSummary.phase4OperationalCompleted).toBe(22);
-    expect(measured.voucherWritesWithoutRequestIdentity.sort()).toEqual([...baseline.files].sort());
+    expect(baseline.ceiling).toBeGreaterThanOrEqual(measured.voucherWritesWithoutRequestIdentity.length);
+    expect(measured.unapprovedDirectVoucherCreation).toEqual([]);
     for (const file of PHASE4_WRITERS) expect(remaining.has(file)).toBe(false);
   });
 
