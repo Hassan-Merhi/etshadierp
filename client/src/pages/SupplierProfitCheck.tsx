@@ -219,7 +219,7 @@ export default function SupplierProfitCheck() {
     if (sellPriceSource === "location_group" && locationGroups.length > 0 && !selectedLocationId) {
       setSelectedLocationId(String(locationGroups[0].id));
     }
-  }, [locationGroups, sellPriceSource]);
+  }, [locationGroups, selectedLocationId, sellPriceSource]);
   const saveOverrideMutation = useMutation({
     mutationFn: async (payload: { supplierId: number; stockItemId: number; poPrice?: number; avgPrice?: number }) => {
       const res = await apiRequest("PUT", "/api/supplier-profit-check/po-overrides", payload);

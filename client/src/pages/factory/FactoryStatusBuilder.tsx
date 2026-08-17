@@ -426,7 +426,7 @@ export default function FactoryStatusBuilder() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
     
-  }, [activeIdx, localSheets]);
+  }, [activeIdx, addColumn, localSheets]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
   if (isLoading) {

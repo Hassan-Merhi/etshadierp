@@ -157,7 +157,7 @@ export function usePayrollModel() {
         active: selectedWorkerForEdit.active ?? true,
       });
     }
-  }, [selectedWorkerForEdit]);
+  }, [editWorkerForm, selectedWorkerForEdit]);
   const createEmployeeForm = useForm<EmployeeFormData>();
   const editEmployeeForm = useForm<EmployeeFormData>();
 

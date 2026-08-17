@@ -167,7 +167,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
 
   const unpricedCount = useMemo(
     () => locationPricedList.filter(isItemUnpriced).length,
-    [locationPricedList, isAllMode]
+    [locationPricedList, isItemUnpriced]
   );
 
   // Groups that have at least one unpriced item, with their counts — used for the chip picker
@@ -182,7 +182,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
     return Array.from(map.entries())
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [locationPricedList, showUnpriced, isAllMode]);
+  }, [showUnpriced, locationPricedList, isItemUnpriced]);
 
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -198,7 +198,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       const matchesUnpriced = !showUnpriced || isItemUnpriced(item);
       return matchesSearch && matchesGroup && matchesUnpriced;
     });
-  }, [locationPricedList, search, groupFilter, showUnpriced, hiddenUnpricedGroups, isAllMode]);
+  }, [search, locationPricedList, showUnpriced, hiddenUnpricedGroups, groupFilter, isItemUnpriced]);
 
   const selectedLocation = locations.find((l) => l.id === selectedLocationId);
 

@@ -62,7 +62,7 @@ export function usePosWhatsApp({
       }
     };
     doSend();
-  }, [pendingAutoSend]);
+  }, [pendingAutoSend, setInvoiceWaStatus, setPendingAutoSend, setSendingInvoiceWhatsApp, toast]);
 
   // Deferred WhatsApp stock auto-send after sale saved
   useEffect(() => {

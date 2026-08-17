@@ -222,7 +222,7 @@ export function ContainerFormDialog({
     const sup = suppliers?.find((s) => s.id === parseInt(formData.supplierId));
     if (sup?.parentId) setFormData((f) => ({ ...f, commissionSupplierId: String(sup.parentId) }));
     else if (!formData.commissionSupplierId) setFormData((f) => ({ ...f, commissionSupplierId: "" }));
-  }, [formData.supplierId, suppliers]);
+  }, [formData.commissionSupplierId, formData.supplierId, suppliers]);
 
   const activeSuppliers = suppliers?.filter((s) => s.isActive) ?? [];
   const brokerIdNum = formData.commissionSupplierId ? parseInt(formData.commissionSupplierId) : null;
