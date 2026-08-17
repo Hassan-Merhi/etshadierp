@@ -232,7 +232,7 @@ export function registerWorkerStatementReadRoutes(app: Express) {
       let wConvertArabic: ((t: string) => string) | null = null;
       let wBidiInst: {
         getEmbeddingLevels: (t: string, d: string) => any;
-        getReorderedString: (t: string, l: any) => string;
+        getReorderedString: (t: string, l: Record<string, unknown>) => string;
       } | null = null;
       try {
         const reshaperMod = require("arabic-reshaper") as { convertArabic: (t: string) => string };

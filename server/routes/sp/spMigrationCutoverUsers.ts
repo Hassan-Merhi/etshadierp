@@ -67,7 +67,7 @@ async function switchUserSessions(params: {
   return resultRows(result).length;
 }
 
-async function mapSourceRole(sourceId: number, targetId: number, sourceRole: any): Promise<any> {
+async function mapSourceRole(sourceId: number, targetId: number, sourceRole: Record<string, unknown>): Promise<any> {
   const location = sourceRole.assigned_location_id
     ? await resolveTargetLocation(sourceId, targetId, pn(sourceRole.assigned_location_id))
     : null;

@@ -17,7 +17,7 @@ function numericEqual(left: unknown, right: unknown, tolerance = 0.0001): boolea
 }
 
 function buildSalesAccountMap(
-  sourceAccounts: Map<number, any>,
+  sourceAccounts: Map<number, Record<string, unknown>>,
   targetAccounts: Awaited<ReturnType<typeof loadTargetAccounts>>
 ) {
   const suspense = targetAccounts.bySubType.get("gc_mig_suspense");

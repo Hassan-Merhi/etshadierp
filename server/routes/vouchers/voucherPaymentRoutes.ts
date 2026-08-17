@@ -590,7 +590,7 @@ export function registerVoucherPaymentRoutes(app: Express) {
             historicalRate: pRateRaw,
           });
 
-          const mkDR = (acctField: any) => ({
+          const mkDR = (acctField: Record<string, unknown>) => ({
             voucherId: updatedVoucher.id,
             ...acctField,
             debitAmount: normDR.debitAmount,
@@ -604,7 +604,7 @@ export function registerVoucherPaymentRoutes(app: Express) {
             rateConvention: normDR.rateConvention,
             narration,
           });
-          const mkCR = (acctField: any) => ({
+          const mkCR = (acctField: Record<string, unknown>) => ({
             voucherId: updatedVoucher.id,
             ...acctField,
             debitAmount: normCR.debitAmount,

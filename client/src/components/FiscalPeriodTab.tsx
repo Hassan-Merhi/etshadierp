@@ -69,7 +69,7 @@ export function FiscalPeriodTab({ currentCompanyId, userRole }: FiscalPeriodTabP
       const response = await fetch(`/api/ledger-accounts?accountType=Equity`);
       if (!response.ok) throw new Error("Failed to fetch equity accounts");
       const allAccounts = await response.json();
-      return allAccounts.filter((acc: any) => acc.companyId === currentCompanyId);
+      return allAccounts.filter((acc: Record<string, unknown>) => acc.companyId === currentCompanyId);
     },
     enabled: !!currentCompanyId,
   });

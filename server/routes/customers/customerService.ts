@@ -25,7 +25,7 @@ async function writeCustomerAudit(params: Parameters<typeof logAudit>[0]): Promi
   }
 }
 
-function customerChanges(existing: any, updated: any) {
+function customerChanges(existing: Record<string, unknown>, updated: Record<string, unknown>) {
   const changes: Record<string, { old?: unknown; new?: unknown }> = {};
   for (const field of [
     "legalName",

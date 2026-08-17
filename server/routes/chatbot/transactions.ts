@@ -123,7 +123,7 @@ export function registerChatbotTransactionRoutes(app: Express) {
           notes: notes || "",
           voucherDate: date || new Date().toISOString().split("T")[0],
           optional: isOptional,
-          items: items.map((i: any) => ({
+          items: items.map((i: Record<string, unknown>) => ({
             stockItemId: Number(i.stockItemId),
             quantity: String(i.quantity),
             sourceLocationId: Number(sourceLocationId),

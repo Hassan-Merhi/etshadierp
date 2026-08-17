@@ -122,7 +122,7 @@ function PageRow({
 }: {
   page: PageNode;
   depth: number;
-  rolePermissions: any[];
+  rolePermissions: Record<string, unknown>[];
   permissionMap: Map<string, boolean>;
   onToggle: (role: string, featureKey: string, enabled: boolean) => void;
   isPending: boolean;

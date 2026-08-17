@@ -16,7 +16,7 @@ interface RoleSummaryRowProps {
 
 const NON_RESTRICTABLE_ROLES = ["Developer", "Admin"];
 
-function countActivePermissions(role: string, permissions: any[]): number {
+function countActivePermissions(role: string, permissions: Record<string, unknown>[]): number {
   const isNormal = role === "Normal User";
   return permissions.filter((p) => {
     if (p.role !== role) return false;

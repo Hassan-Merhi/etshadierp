@@ -34,7 +34,7 @@ type UserFormData = z.infer<typeof userFormSchema>;
 type CompanyFormData = z.infer<typeof companyFormSchema>;
 type RoleAssignmentData = z.infer<typeof roleAssignmentSchema>;
 
-export function ParentCreditAccountSelect({ company }: { company: any }) {
+export function ParentCreditAccountSelect({ company }: { company: Record<string, unknown> }) {
   const { toast } = useToast();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);

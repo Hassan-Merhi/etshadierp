@@ -271,7 +271,7 @@ export async function loadSourceAccounts(sourceId: number): Promise<Map<number, 
 }
 
 export function mapTargetAccount(
-  sourceAccount: any | null,
+  sourceAccount: Record<string, unknown> | null,
   targetAccounts: Awaited<ReturnType<typeof loadTargetAccounts>>
 ): {
   targetAccountId: number | null;
