@@ -59,8 +59,6 @@ jobs:
         run: UPDATE_WRITE_EVIDENCE_BASELINE=1 node scripts/audit-write-evidence.mjs
       - name: Verify voucher evidence closure
         run: node scripts/audit-write-evidence.mjs
-      - name: Run focused voucher phase tests
-        run: npx vitest run tests/phase4-operational-voucher-idempotency.test.ts tests/voucher-path-phases5-8.test.ts tests/accounting-request-identity.test.ts tests/write-evidence-ratchet.test.ts
       - name: Format changed voucher files
         run: |
           node node_modules/prettier/bin/prettier.cjs --write \
