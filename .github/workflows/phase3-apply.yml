@@ -84,7 +84,8 @@ jobs:
                   return ('infrastructurePostingIdentity("pos-sale", `${companyId}:${clientSaleId || voucherNumber}`, "sales-voucher")', 'params')
               if path.endswith('rentalPaymentPostingService.ts'):
                   phase = 'advance-recognition' if 'ADV-REC-' in values else 'payment'
-                  return (f'infrastructurePostingIdentity("rental-payment", `${{companyId}}:${{groupId}}`, "{phase}")', '{ allocs, totalAmountStr, cashAccountId, currency, exchangeRate }')
+                  source_expr = 'String(companyId) + ":" + String(groupId)'
+                  return (f'infrastructurePostingIdentity("rental-payment", {source_expr}, "{phase}")', '{ allocs, totalAmountStr, cashAccountId, currency, exchangeRate }')
               if path.endswith('fiscal-periods.ts'):
                   return ('infrastructurePostingIdentity("fiscal-period", `${companyId}:${periodStartDate}:${periodEndDate}`, "close")', '{ retainedEarningsAccountId, accountBalances, netIncome }')
               if path.endswith('containers-store/offload.ts'):
@@ -100,20 +101,21 @@ jobs:
                       phase = 'additional'
                   else:
                       phase = 'voucher'
-                  suffix = ':${chargeIndex}' if phase == 'additional' else ''
-                  return (f'infrastructurePostingIdentity("container-offload", `${{location.companyId}}:${{containerId}}{suffix}`, "{phase}")', '{ duties, officeCharges, transferCharges, transportFees, additionalCharges }')
+                  source_expr = 'String(location.companyId) + ":" + String(containerId)'
+                  if phase == 'additional':
+                      source_expr += ' + ":" + String(chargeIndex)'
+                  return (f'infrastructurePostingIdentity("container-offload", {source_expr}, "{phase}")', '{ duties, officeCharges, transferCharges, transportFees, additionalCharges }')
               if path.endswith('purchase-orders.ts'):
                   phase = 'parent-intercompany' if 'INTERCO-PARENT-' in values else 'purchase'
                   company_expr = 'parentCompany.id' if phase == 'parent-intercompany' else 'po.companyId'
-                  return (f'infrastructurePostingIdentity("purchase-order", `${{{company_expr}}}:${{created.poNumber}}`, "{phase}")', 'po')
+                  source_expr = f'String({company_expr}) + ":" + String(created.poNumber)'
+                  return (f'infrastructurePostingIdentity("purchase-order", {source_expr}, "{phase}")', 'po')
               if path.endswith('accounting/vouchers.ts'):
                   return ('infrastructurePostingIdentity("storage-voucher", `${voucher.companyId}:${voucher.voucherNumber}`, "create")', 'voucher')
               raise RuntimeError(f'No identity rule for {path}: {values[:120]}')
 
           def migrate_inserts(path):
               text = read(path)
-              if 'insertInfrastructureVoucher' in text and not insert_re.search(text):
-                  return 0
               count = 0
               def repl(match):
                   nonlocal count
@@ -153,8 +155,6 @@ jobs:
           for path, line in imports.items():
               ensure_import(path, line)
 
-          # Additional-charge loops need a stable occurrence identifier when two
-          # lines share the same description/account.
           for path, old, new in [
               ('server/services/containers/offload-lifecycle/charge-vouchers.ts', 'for (const charge of input.additionalCharges ?? []) {', 'for (const [chargeIndex, charge] of (input.additionalCharges ?? []).entries()) {'),
               ('server/storage/containers-store/offload.ts', 'for (const charge of additionalCharges) {', 'for (const [chargeIndex, charge] of additionalCharges.entries()) {'),
@@ -167,7 +167,6 @@ jobs:
           for path in imports:
               totals[path] = migrate_inserts(path)
 
-          # Payroll intentionally hard-deletes the previous generated voucher.
           path = 'server/routes/payroll/_payrollAccountingHelper.ts'
           text = read(path)
           needle = '    const vIds = existingGenVouchers.map((v: any) => v.id);\n    await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));'
@@ -176,7 +175,6 @@ jobs:
               text = text.replace(needle, replacement, 1)
               write(path, text)
 
-          # PO deletion must release the identity marker before hard-delete.
           path = 'server/storage/containers-store/purchase-orders.ts'
           text = read(path)
           needle = '  if (po.voucherId) {\n    try {\n      await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, po.voucherId));'
