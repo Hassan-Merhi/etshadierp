@@ -244,6 +244,12 @@ function breakdownTitle(label: string, rows: Array<{ name: string; quantity: num
   return `${label}\n${rows.map((row) => `${row.name}: ${formatNumber(row.quantity, 0)}`).join("\n")}`;
 }
 
+function profitClassName(value: number): string {
+  if (value > 0) return "text-emerald-500";
+  if (value < 0) return "text-red-500";
+  return "text-muted-foreground";
+}
+
 export default function StockInSalesReportDetail() {
   const { selectedCompany } = useCompany();
   const { formatAmount, selectedCurrency, convertToDisplay } = useCurrencyContext();
@@ -281,6 +287,29 @@ export default function StockInSalesReportDetail() {
 
   const groupedStockIn = useMemo(() => groupStockInRows(data?.stockIn.rows || []), [data?.stockIn.rows]);
   const groupedSales = useMemo(() => groupSalesRows(data?.stockOut.rows || []), [data?.stockOut.rows]);
+  const stockInTotals = useMemo(
+    () =>
+      groupedStockIn.reduce(
+        (totals, row) => ({
+          quantity: totals.quantity + row.quantity,
+          value: totals.value + row.totalValue,
+        }),
+        { quantity: 0, value: 0 }
+      ),
+    [groupedStockIn]
+  );
+  const salesTotals = useMemo(
+    () =>
+      groupedSales.reduce(
+        (totals, row) => ({
+          quantity: totals.quantity + row.quantity,
+          value: totals.value + row.totalValue,
+          totalProfit: totals.totalProfit + row.totalProfit,
+        }),
+        { quantity: 0, value: 0, totalProfit: 0 }
+      ),
+    [groupedSales]
+  );
 
   const summary = data?.summary ?? EMPTY_METRICS;
   const roundedMoney = (value: number) =>
@@ -572,47 +601,57 @@ export default function StockInSalesReportDetail() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      groupedStockIn.map((row) => (
-                        <TableRow key={row.key}>
-                          <TableCell
-                            title={
-                              row.dates.length > 1
-                                ? `Offloaded on:\n${row.dates.map(displayDate).join("\n")}`
-                                : undefined
-                            }
-                            className={
-                              row.dates.length > 1 ? "cursor-help underline decoration-dotted underline-offset-4" : ""
-                            }
-                          >
-                            {row.dates.length === 1 ? displayDate(row.dates[0]) : `${row.dates.length} dates`}
+                      <>
+                        {groupedStockIn.map((row) => (
+                          <TableRow key={row.key}>
+                            <TableCell
+                              title={
+                                row.dates.length > 1
+                                  ? `Offloaded on:\n${row.dates.map(displayDate).join("\n")}`
+                                  : undefined
+                              }
+                              className={
+                                row.dates.length > 1 ? "cursor-help underline decoration-dotted underline-offset-4" : ""
+                              }
+                            >
+                              {row.dates.length === 1 ? displayDate(row.dates[0]) : `${row.dates.length} dates`}
+                            </TableCell>
+                            <TableCell
+                              className="cursor-help font-mono underline decoration-dotted underline-offset-4"
+                              title={breakdownTitle("Containers / Qty", row.containers)}
+                            >
+                              {formatNumber(row.containers.length, 0)}{" "}
+                              {row.containers.length === 1 ? "container" : "containers"}
+                            </TableCell>
+                            <TableCell
+                              className={
+                                row.locations.length > 1
+                                  ? "cursor-help underline decoration-dotted underline-offset-4"
+                                  : ""
+                              }
+                              title={
+                                row.locations.length > 1 ? breakdownTitle("Locations / Qty", row.locations) : undefined
+                              }
+                            >
+                              {row.locations.length === 1
+                                ? row.locations[0].name
+                                : `${formatNumber(row.locations.length, 0)} locations`}
+                            </TableCell>
+                            <TableCell className="font-medium">{row.stockItemName}</TableCell>
+                            <TableCell className="text-right font-mono">{formatNumber(row.quantity, 0)}</TableCell>
+                            <TableCell className="text-right font-mono">{rate(row.avgRate)}</TableCell>
+                            <TableCell className="text-right font-mono">{formatAmount(row.totalValue)}</TableCell>
+                          </TableRow>
+                        ))}
+                        <TableRow className="sticky bottom-0 z-10 border-t-2 bg-muted/95 font-semibold hover:bg-muted/95">
+                          <TableCell colSpan={4} className="uppercase tracking-wide">
+                            Total
                           </TableCell>
-                          <TableCell
-                            className="cursor-help font-mono underline decoration-dotted underline-offset-4"
-                            title={breakdownTitle("Containers / Qty", row.containers)}
-                          >
-                            {formatNumber(row.containers.length, 0)}{" "}
-                            {row.containers.length === 1 ? "container" : "containers"}
-                          </TableCell>
-                          <TableCell
-                            className={
-                              row.locations.length > 1
-                                ? "cursor-help underline decoration-dotted underline-offset-4"
-                                : ""
-                            }
-                            title={
-                              row.locations.length > 1 ? breakdownTitle("Locations / Qty", row.locations) : undefined
-                            }
-                          >
-                            {row.locations.length === 1
-                              ? row.locations[0].name
-                              : `${formatNumber(row.locations.length, 0)} locations`}
-                          </TableCell>
-                          <TableCell className="font-medium">{row.stockItemName}</TableCell>
-                          <TableCell className="text-right font-mono">{formatNumber(row.quantity, 0)}</TableCell>
-                          <TableCell className="text-right font-mono">{rate(row.avgRate)}</TableCell>
-                          <TableCell className="text-right font-mono">{formatAmount(row.totalValue)}</TableCell>
+                          <TableCell className="text-right font-mono">{formatNumber(stockInTotals.quantity, 0)}</TableCell>
+                          <TableCell className="text-right text-muted-foreground">—</TableCell>
+                          <TableCell className="text-right font-mono">{formatAmount(stockInTotals.value)}</TableCell>
                         </TableRow>
-                      ))
+                      </>
                     )}
                   </TableBody>
                 </Table>
@@ -659,33 +698,51 @@ export default function StockInSalesReportDetail() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      groupedSales.map((row) => (
-                        <TableRow key={row.key}>
-                          <TableCell>{displayDate(row.activityDate)}</TableCell>
-                          <TableCell
-                            className={
-                              row.locations.length > 1
-                                ? "cursor-help underline decoration-dotted underline-offset-4"
-                                : ""
-                            }
-                            title={
-                              row.locations.length > 1
-                                ? breakdownTitle("Locations / Qty Sold", row.locations)
-                                : undefined
-                            }
-                          >
-                            {row.locations.length === 1
-                              ? row.locations[0].name
-                              : `${formatNumber(row.locations.length, 0)} locations`}
+                      <>
+                        {groupedSales.map((row) => (
+                          <TableRow key={row.key}>
+                            <TableCell>{displayDate(row.activityDate)}</TableCell>
+                            <TableCell
+                              className={
+                                row.locations.length > 1
+                                  ? "cursor-help underline decoration-dotted underline-offset-4"
+                                  : ""
+                              }
+                              title={
+                                row.locations.length > 1
+                                  ? breakdownTitle("Locations / Qty Sold", row.locations)
+                                  : undefined
+                              }
+                            >
+                              {row.locations.length === 1
+                                ? row.locations[0].name
+                                : `${formatNumber(row.locations.length, 0)} locations`}
+                            </TableCell>
+                            <TableCell className="font-medium">{row.stockItemName}</TableCell>
+                            <TableCell className="text-right font-mono">{formatNumber(row.quantity, 0)}</TableCell>
+                            <TableCell className="text-right font-mono">{rate(row.avgRate)}</TableCell>
+                            <TableCell className="text-right font-mono">{formatAmount(row.totalValue)}</TableCell>
+                            <TableCell className={`text-right font-mono font-medium ${profitClassName(row.profitPerBale)}`}>
+                              {rate(row.profitPerBale)}
+                            </TableCell>
+                            <TableCell className={`text-right font-mono font-medium ${profitClassName(row.totalProfit)}`}>
+                              {formatAmount(row.totalProfit)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        <TableRow className="sticky bottom-0 z-10 border-t-2 bg-muted/95 font-semibold hover:bg-muted/95">
+                          <TableCell colSpan={3} className="uppercase tracking-wide">
+                            Total
                           </TableCell>
-                          <TableCell className="font-medium">{row.stockItemName}</TableCell>
-                          <TableCell className="text-right font-mono">{formatNumber(row.quantity, 0)}</TableCell>
-                          <TableCell className="text-right font-mono">{rate(row.avgRate)}</TableCell>
-                          <TableCell className="text-right font-mono">{formatAmount(row.totalValue)}</TableCell>
-                          <TableCell className="text-right font-mono">{rate(row.profitPerBale)}</TableCell>
-                          <TableCell className="text-right font-mono">{formatAmount(row.totalProfit)}</TableCell>
+                          <TableCell className="text-right font-mono">{formatNumber(salesTotals.quantity, 0)}</TableCell>
+                          <TableCell className="text-right text-muted-foreground">—</TableCell>
+                          <TableCell className="text-right font-mono">{formatAmount(salesTotals.value)}</TableCell>
+                          <TableCell className="text-right text-muted-foreground">—</TableCell>
+                          <TableCell className={`text-right font-mono ${profitClassName(salesTotals.totalProfit)}`}>
+                            {formatAmount(salesTotals.totalProfit)}
+                          </TableCell>
                         </TableRow>
-                      ))
+                      </>
                     )}
                   </TableBody>
                 </Table>
