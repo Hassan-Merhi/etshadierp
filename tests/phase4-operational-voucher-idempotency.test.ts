@@ -153,13 +153,14 @@ describe("Phase 4 operational voucher retry boundary", () => {
         isPhase4OperationalVoucherRequest(route.method, route.url, route.data),
         `${route.method} ${route.url}`
       ).toBe(false);
-      expect(isProtectedAccountingRequest(route.method, route.url, route.data), `${route.method} ${route.url}`).toBe(
-        false
-      );
+      expect(
+        isProtectedAccountingRequest(route.method, route.url, route.data),
+        `${route.method} ${route.url}`
+      ).toBe(false);
     }
   });
 
-  it("uses validated server-owned session context before route-local requireAuth hydrates req.user", () => {
+  it("resolves the posting company from authenticated server-owned session context", () => {
     const erpRequest = {
       path: "/api/payroll/pay-worker",
       session: { userId: 7, currentCompanyId: 12 },
