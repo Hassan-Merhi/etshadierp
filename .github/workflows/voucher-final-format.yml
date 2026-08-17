@@ -1,0 +1,39 @@
+name: Voucher Final Format
+
+on:
+  push:
+    branches:
+      - codex/voucher-idempotency-phases4-8
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: codex/voucher-idempotency-phases4-8
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.14.0'
+          cache: npm
+      - run: sed -i 's#https://package-proxy.replit.com/#https://registry.npmjs.org/#g' package-lock.json
+      - run: npm ci --ignore-scripts
+      - name: Format final files
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            shared/voucherPathIdentityPolicy.ts \
+            server/services/accounting/voucherPathPhase5to6Boundary.ts \
+            server/services/accounting/replayAuthorizationContext.ts \
+            tests/voucher-path-phase5-route-coverage.test.ts
+      - name: Commit and remove formatter
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/voucher-final-format.yml
+          git add shared/voucherPathIdentityPolicy.ts server/services/accounting/voucherPathPhase5to6Boundary.ts server/services/accounting/replayAuthorizationContext.ts tests/voucher-path-phase5-route-coverage.test.ts
+          git commit -m "format final voucher phase fixes"
+          git push origin HEAD:codex/voucher-idempotency-phases4-8
