@@ -2,10 +2,6 @@ import {
   infrastructurePostingIdentity,
   insertInfrastructureVoucherTx,
 } from "../accounting/infrastructureVoucherIdentity";
-import {
-  infrastructurePostingIdentity,
-  insertInfrastructureVoucherTx,
-} from "../accounting/infrastructureVoucherIdentity";
 /**
  * rentalPaymentPostingService.ts
  *

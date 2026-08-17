@@ -2,10 +2,6 @@ import {
   infrastructurePostingIdentity,
   insertInfrastructureVoucherTx,
 } from "../../accounting/infrastructureVoucherIdentity";
-import {
-  infrastructurePostingIdentity,
-  insertInfrastructureVoucherTx,
-} from "../../accounting/infrastructureVoucherIdentity";
 import Decimal from "decimal.js";
 import { and, eq, isNull } from "drizzle-orm";
 import {

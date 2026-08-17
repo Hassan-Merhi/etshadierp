@@ -1,3 +1,4 @@
+import { infrastructurePostingIdentity } from "../../services/accounting/infrastructureVoucherIdentity";
 /**
  * importRoutes: PoImport endpoints.
  *
@@ -400,6 +401,11 @@ export function registerPoImportRoutes(app: Express) {
         // Otherwise: entries created at container offload time per Tally conventions
         const voucher = await storage.createVoucher({
           companyId: req.session.currentCompanyId!,
+          postingSource: infrastructurePostingIdentity(
+            "po-import",
+            `${req.session.currentCompanyId!}:${poNumber}`,
+            "purchase"
+          ),
           currency: "USD",
           voucherNumber: `PO-${poNumber}-${Date.now()}`,
           voucherType: "Purchase",
@@ -598,6 +604,11 @@ export function registerPoImportRoutes(app: Express) {
               resolvedFreightPaidBy === "parent" && poFreight > 0 ? poGrandTotal : poIntercoTotal;
             const parentVoucher = await storage.createVoucher({
               companyId: parentCompanyId,
+              postingSource: infrastructurePostingIdentity(
+                "po-import",
+                `${parentCompanyId}:${poNumber}`,
+                "parent-intercompany"
+              ),
               currency: "USD",
               voucherNumber: `IC-${poNumber}-${Date.now()}`,
               voucherType: "Journal",

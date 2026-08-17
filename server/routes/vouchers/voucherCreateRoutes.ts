@@ -1,3 +1,4 @@
+import { infrastructurePostingIdentity } from "../../services/accounting/infrastructureVoucherIdentity";
 import type { Express } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
@@ -34,7 +35,15 @@ export function registerVoucherCreateRoutes(app: Express) {
       }
       const companyId = req.session.currentCompanyId;
       const exchangeRate = companyId ? await getCurrentExchangeRate(companyId) : null;
-      const voucher = await storage.createVoucher({ ...req.body, exchangeRate });
+      const voucher = await storage.createVoucher({
+        ...req.body,
+        exchangeRate,
+        postingSource: infrastructurePostingIdentity(
+          "manual-voucher",
+          `${companyId ?? req.body.companyId}:${req.body.voucherNumber}`,
+          "create"
+        ),
+      });
       res.json(voucher);
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });

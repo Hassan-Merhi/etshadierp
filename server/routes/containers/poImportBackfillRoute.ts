@@ -1,3 +1,4 @@
+import { infrastructurePostingIdentity } from "../../services/accounting/infrastructureVoucherIdentity";
 import type { Express } from "express";
 
 import { requireAuth } from "../../auth";
@@ -60,6 +61,11 @@ export function registerPoImportBackfillRoute(app: Express) {
         // Create voucher for this PO with double-entry bookkeeping
         const voucher = await storage.createVoucher({
           companyId: req.session.currentCompanyId!,
+          postingSource: infrastructurePostingIdentity(
+            "po-import-backfill",
+            `${req.session.currentCompanyId!}:${po.id}`,
+            "purchase"
+          ),
           currency: "USD",
           voucherNumber: `PO-${po.poNumber}-BACKFILL-${Date.now()}`,
           voucherType: "Purchase",
