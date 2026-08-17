@@ -2,6 +2,7 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "../db";
 import { adjustInventory } from "../inventoryHelper";
 import { locations, stockItems, stockTransferItems, stockTransferVouchers, vouchers } from "@shared/schema";
+import { journalStockTransferLeg, nextStockTransferRevision } from "./inventory/stockTransferJournal";
 
 export interface StockTransferLifecycleItem {
   stockItemId: number;
@@ -174,11 +175,24 @@ async function reverseAppliedItems(
   tx: any,
   companyId: number,
   destinationLocationId: number,
-  items: StockTransferLifecycleItem[]
+  items: StockTransferLifecycleItem[],
+  journal?: { transferId: number; revision: number }
 ) {
   for (const item of items) {
     await adjustInventory(tx, item.sourceLocationId, item.stockItemId, item.quantity, companyId, item.rate);
     await adjustInventory(tx, destinationLocationId, item.stockItemId, -item.quantity, companyId);
+
+    if (journal) {
+      await journalStockTransferLeg(tx, {
+        companyId,
+        transferId: journal.transferId,
+        revision: journal.revision,
+        phase: "reverse",
+        fromLocationId: destinationLocationId,
+        toLocationId: item.sourceLocationId,
+        leg: item,
+      });
+    }
   }
 }
 
@@ -186,7 +200,8 @@ async function validateAndApplyItems(
   tx: any,
   companyId: number,
   destinationLocationId: number,
-  items: StockTransferLifecycleItem[]
+  items: StockTransferLifecycleItem[],
+  journal?: { transferId: number; revision: number }
 ) {
   await assertCompanyScope(tx, companyId, destinationLocationId, items);
 
@@ -196,6 +211,18 @@ async function validateAndApplyItems(
   for (const item of items) {
     await adjustInventory(tx, item.sourceLocationId, item.stockItemId, -item.quantity, companyId);
     await adjustInventory(tx, destinationLocationId, item.stockItemId, item.quantity, companyId, item.rate);
+
+    if (journal) {
+      await journalStockTransferLeg(tx, {
+        companyId,
+        transferId: journal.transferId,
+        revision: journal.revision,
+        phase: "issue",
+        fromLocationId: item.sourceLocationId,
+        toLocationId: destinationLocationId,
+        leg: item,
+      });
+    }
   }
 }
 
@@ -269,14 +296,27 @@ export async function saveStockTransferLifecycle(
     else if (!wasApplied && !willBeOptional) transition = "post";
     else transition = "draft-edit";
 
+    // One revision spans the reversal and the reissue of a single edit, so the
+    // pair reads back out of the journal as one event rather than two unrelated
+    // movements that happen to be adjacent.
+    const canonicalRevision = await nextStockTransferRevision(tx, companyId, transferId);
+
     if (wasApplied && oldItems.length > 0) {
-      await reverseAppliedItems(tx, companyId, oldDestinationLocationId, oldItems);
+      await reverseAppliedItems(tx, companyId, oldDestinationLocationId, oldItems, {
+        transferId,
+        revision: canonicalRevision,
+      });
     }
 
     await assertCompanyScope(tx, companyId, destinationLocationId, normalizedItems);
     const savedItems = await replaceTransferItems(tx, transferId, normalizedItems);
     const shouldApply = !willBeOptional;
-    if (shouldApply) await validateAndApplyItems(tx, companyId, destinationLocationId, normalizedItems);
+    if (shouldApply) {
+      await validateAndApplyItems(tx, companyId, destinationLocationId, normalizedItems, {
+        transferId,
+        revision: canonicalRevision,
+      });
+    }
 
     const totalAmount = normalizedItems.reduce((sum, item) => sum + item.quantity * item.rate, 0);
     await tx
@@ -360,7 +400,10 @@ export async function finalizeOptionalStockTransfer(
 
     let transition: StockTransferLifecycleResult["transition"] = "post";
     if (!inventoryApplied) {
-      await validateAndApplyItems(tx, companyId, destinationLocationId, items);
+      await validateAndApplyItems(tx, companyId, destinationLocationId, items, {
+        transferId,
+        revision: await nextStockTransferRevision(tx, companyId, transferId),
+      });
     } else {
       // Legacy mismatch: stock already moved while header remained optional.
       // Repair only the flags; never move stock a second time.
@@ -429,7 +472,10 @@ export async function reopenStockTransferAsDraft(
     );
 
     if (locked.inventory_applied) {
-      await reverseAppliedItems(tx, companyId, destinationLocationId, items);
+      await reverseAppliedItems(tx, companyId, destinationLocationId, items, {
+        transferId,
+        revision: await nextStockTransferRevision(tx, companyId, transferId),
+      });
     }
 
     await tx

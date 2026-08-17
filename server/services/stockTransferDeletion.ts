@@ -12,6 +12,7 @@ import {
   vouchers,
 } from "@shared/schema";
 import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../lib/migratedVoucherGuard";
+import { journalStockTransferLeg, nextStockTransferRevision } from "./inventory/stockTransferJournal";
 import { applyEmployeeBalanceDeltasTx } from "./accounting/employeeBalancePosting";
 
 export class StockTransferDeletionError extends Error {
@@ -48,10 +49,12 @@ export function shouldReverseStockTransferOnDelete(input: {
   return input.inventoryApplied === true || input.optional !== true;
 }
 
-export function sortStockTransferDeletionItems<T extends {
-  sourceLocationId: number | null;
-  stockItemId: number;
-}>(items: T[]): T[] {
+export function sortStockTransferDeletionItems<
+  T extends {
+    sourceLocationId: number | null;
+    stockItemId: number;
+  },
+>(items: T[]): T[] {
   return [...items].sort(
     (a, b) => Number(a.sourceLocationId ?? 0) - Number(b.sourceLocationId ?? 0) || a.stockItemId - b.stockItemId
   );
@@ -64,9 +67,7 @@ async function assertPersistedTransferScope(input: {
   items: Array<{ sourceLocationId: number; stockItemId: number }>;
 }): Promise<void> {
   const { tx, companyId, destinationLocationId, items } = input;
-  const locationIds = Array.from(
-    new Set([destinationLocationId, ...items.map((item) => item.sourceLocationId)])
-  );
+  const locationIds = Array.from(new Set([destinationLocationId, ...items.map((item) => item.sourceLocationId)]));
   const validLocations = await tx
     .select({ id: locations.id })
     .from(locations)
@@ -114,11 +115,7 @@ export async function deleteStockTransferVoucher(input: {
   }
 
   return db.transaction(async (tx) => {
-    const [lockedVoucher] = await tx
-      .select()
-      .from(vouchers)
-      .where(eq(vouchers.id, voucherId))
-      .for("update");
+    const [lockedVoucher] = await tx.select().from(vouchers).where(eq(vouchers.id, voucherId)).for("update");
 
     if (!lockedVoucher) {
       throw new StockTransferDeletionError("VOUCHER_NOT_FOUND", "Voucher not found", 404);
@@ -131,24 +128,13 @@ export async function deleteStockTransferVoucher(input: {
       );
     }
     if (!isStockTransferVoucherType(lockedVoucher.voucherType)) {
-      throw new StockTransferDeletionError(
-        "NOT_STOCK_TRANSFER",
-        "Voucher is not a stock transfer",
-        400
-      );
+      throw new StockTransferDeletionError("NOT_STOCK_TRANSFER", "Voucher is not a stock transfer", 400);
     }
     if (isReadonlyMigratedVoucher(lockedVoucher)) {
-      throw new StockTransferDeletionError(
-        "MIGRATED_VOUCHER_READONLY",
-        READONLY_MIGRATED_VOUCHER_MESSAGE,
-        403
-      );
+      throw new StockTransferDeletionError("MIGRATED_VOUCHER_READONLY", READONLY_MIGRATED_VOUCHER_MESSAGE, 403);
     }
 
-    const entries = await tx
-      .select()
-      .from(voucherEntries)
-      .where(eq(voucherEntries.voucherId, voucherId));
+    const entries = await tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
 
     if (lockedVoucher.deletedAt) {
       return {
@@ -170,17 +156,15 @@ export async function deleteStockTransferVoucher(input: {
     let reversedInventory = false;
     if (transfer) {
       const transferItems = sortStockTransferDeletionItems(
-        await tx
-          .select()
-          .from(stockTransferItems)
-          .where(eq(stockTransferItems.transferId, transfer.id))
-          .for("update")
+        await tx.select().from(stockTransferItems).where(eq(stockTransferItems.transferId, transfer.id)).for("update")
       );
 
-      if (shouldReverseStockTransferOnDelete({
-        inventoryApplied: transfer.inventoryApplied,
-        optional: lockedVoucher.optional,
-      })) {
+      if (
+        shouldReverseStockTransferOnDelete({
+          inventoryApplied: transfer.inventoryApplied,
+          optional: lockedVoucher.optional,
+        })
+      ) {
         const destinationLocationId = Number(transfer.destinationLocationId);
         if (!Number.isInteger(destinationLocationId) || destinationLocationId <= 0) {
           throw new StockTransferDeletionError(
@@ -209,6 +193,8 @@ export async function deleteStockTransferVoucher(input: {
           items: scopedItems,
         });
 
+        const canonicalRevision = await nextStockTransferRevision(tx, companyId, Number(transfer.id));
+
         for (const item of scopedItems) {
           const quantity = Number(item.row.quantity);
           const rate = Number(item.row.rate ?? 0);
@@ -220,21 +206,21 @@ export async function deleteStockTransferVoucher(input: {
             );
           }
 
-          await adjustInventory(
-            tx,
-            item.sourceLocationId,
-            item.stockItemId,
-            quantity,
+          await adjustInventory(tx, item.sourceLocationId, item.stockItemId, quantity, companyId, rate);
+          await adjustInventory(tx, destinationLocationId, item.stockItemId, -quantity, companyId);
+
+          // Deleting a posted transfer moves the stock back, and until now the
+          // journal recorded only the outbound half. The document is removed
+          // below, so this row is the sole surviving account of the return.
+          await journalStockTransferLeg(tx, {
             companyId,
-            rate
-          );
-          await adjustInventory(
-            tx,
-            destinationLocationId,
-            item.stockItemId,
-            -quantity,
-            companyId
-          );
+            transferId: Number(transfer.id),
+            revision: canonicalRevision,
+            phase: "reverse",
+            fromLocationId: destinationLocationId,
+            toLocationId: item.sourceLocationId,
+            leg: { stockItemId: item.stockItemId, quantity, rate },
+          });
         }
         reversedInventory = transferItems.length > 0;
       }
@@ -256,12 +242,7 @@ export async function deleteStockTransferVoucher(input: {
     const linkedTransfers = await tx
       .select()
       .from(interCompanyTransfers)
-      .where(
-        or(
-          eq(interCompanyTransfers.fromVoucherId, voucherId),
-          eq(interCompanyTransfers.toVoucherId, voucherId)
-        )
-      );
+      .where(or(eq(interCompanyTransfers.fromVoucherId, voucherId), eq(interCompanyTransfers.toVoucherId, voucherId)));
     for (const linked of linkedTransfers) {
       const otherVoucherId = linked.fromVoucherId === voucherId ? linked.toVoucherId : linked.fromVoucherId;
       await tx.delete(interCompanyTransfers).where(eq(interCompanyTransfers.id, linked.id));
@@ -274,10 +255,7 @@ export async function deleteStockTransferVoucher(input: {
     await tx
       .delete(intercompanyPaymentRequests)
       .where(
-        and(
-          eq(intercompanyPaymentRequests.fromVoucherId, voucherId),
-          eq(intercompanyPaymentRequests.status, "pending")
-        )
+        and(eq(intercompanyPaymentRequests.fromVoucherId, voucherId), eq(intercompanyPaymentRequests.status, "pending"))
       );
 
     const [deletedVoucher] = await tx
