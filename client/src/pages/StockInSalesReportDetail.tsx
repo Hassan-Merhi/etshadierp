@@ -439,52 +439,68 @@ export default function StockInSalesReportDetail() {
         </DropdownMenu>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {isLoading ? (
-          Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-24 rounded-xl" />)
+          Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-[98px] rounded-xl" />)
         ) : (
           <>
-            <div className="rounded-xl border bg-muted/30 p-3">
-              <p className="text-xs text-muted-foreground">Opening Stock</p>
-              <div className="mt-1 flex items-end justify-between gap-4">
+            <div className="flex min-h-[98px] flex-col rounded-xl border bg-muted/20 px-3.5 py-3">
+              <p className="text-[12px] font-medium leading-none text-muted-foreground">Opening Stock</p>
+              <div className="mt-auto grid grid-cols-2 gap-3 pt-3">
                 <div>
-                  <p className="text-[11px] text-muted-foreground">Qty</p>
-                  <p className="font-mono text-lg font-semibold">{formatNumber(summary.openingStockQty, 0)}</p>
+                  <p className="text-[9px] font-medium uppercase tracking-[0.08em] text-muted-foreground/80">Qty</p>
+                  <p className="mt-1 whitespace-nowrap font-mono text-[17px] font-semibold leading-none tracking-tight tabular-nums">
+                    {formatNumber(summary.openingStockQty, 0)}
+                  </p>
                 </div>
-                <div className="text-right">
-                  <p className="text-[11px] text-muted-foreground">Value</p>
-                  <p className="font-mono text-lg font-semibold">{roundedMoney(summary.openingStockValue)}</p>
+                <div className="min-w-0 text-right">
+                  <p className="text-[9px] font-medium uppercase tracking-[0.08em] text-muted-foreground/80">Value</p>
+                  <p className="mt-1 whitespace-nowrap font-mono text-[15px] font-semibold leading-none tracking-tight tabular-nums 2xl:text-[16px]">
+                    {roundedMoney(summary.openingStockValue)}
+                  </p>
                 </div>
               </div>
             </div>
-            <div className="rounded-xl border bg-muted/30 p-3">
-              <p className="text-xs text-muted-foreground">Stock In Qty</p>
-              <p className="mt-1 font-mono text-lg font-semibold">{formatNumber(summary.stockInQty, 0)}</p>
+            <div className="flex min-h-[98px] flex-col rounded-xl border bg-muted/20 px-3.5 py-3">
+              <p className="text-[12px] font-medium leading-none text-muted-foreground">Stock In Qty</p>
+              <p className="mt-auto whitespace-nowrap pt-3 font-mono text-[19px] font-semibold leading-none tracking-tight tabular-nums">
+                {formatNumber(summary.stockInQty, 0)}
+              </p>
             </div>
-            <div className="rounded-xl border bg-muted/30 p-3">
-              <p className="text-xs text-muted-foreground">Stock Out</p>
-              <p className="mt-1 font-mono text-lg font-semibold">{formatNumber(summary.stockOutQty, 0)}</p>
+            <div className="flex min-h-[98px] flex-col rounded-xl border bg-muted/20 px-3.5 py-3">
+              <p className="text-[12px] font-medium leading-none text-muted-foreground">Stock Out</p>
+              <p className="mt-auto whitespace-nowrap pt-3 font-mono text-[19px] font-semibold leading-none tracking-tight tabular-nums">
+                {formatNumber(summary.stockOutQty, 0)}
+              </p>
             </div>
-            <div className="rounded-xl border bg-muted/30 p-3">
-              <p className="text-xs text-muted-foreground">Closing / In Hand</p>
-              <div className="mt-1 flex items-end justify-between gap-4">
+            <div className="flex min-h-[98px] flex-col rounded-xl border bg-muted/20 px-3.5 py-3">
+              <p className="text-[12px] font-medium leading-none text-muted-foreground">Closing / In Hand</p>
+              <div className="mt-auto grid grid-cols-2 gap-3 pt-3">
                 <div>
-                  <p className="text-[11px] text-muted-foreground">Qty</p>
-                  <p className="font-mono text-lg font-semibold">{formatNumber(summary.closingStockQty, 0)}</p>
+                  <p className="text-[9px] font-medium uppercase tracking-[0.08em] text-muted-foreground/80">Qty</p>
+                  <p className="mt-1 whitespace-nowrap font-mono text-[17px] font-semibold leading-none tracking-tight tabular-nums">
+                    {formatNumber(summary.closingStockQty, 0)}
+                  </p>
                 </div>
-                <div className="text-right">
-                  <p className="text-[11px] text-muted-foreground">Value</p>
-                  <p className="font-mono text-lg font-semibold">{roundedMoney(summary.closingStockValue)}</p>
+                <div className="min-w-0 text-right">
+                  <p className="text-[9px] font-medium uppercase tracking-[0.08em] text-muted-foreground/80">Value</p>
+                  <p className="mt-1 whitespace-nowrap font-mono text-[15px] font-semibold leading-none tracking-tight tabular-nums 2xl:text-[16px]">
+                    {roundedMoney(summary.closingStockValue)}
+                  </p>
                 </div>
               </div>
             </div>
-            <div className="rounded-xl border bg-muted/30 p-3">
-              <p className="text-xs text-muted-foreground">Gross Profit</p>
-              <p className="mt-1 font-mono text-lg font-semibold">{roundedMoney(summary.costProfit)}</p>
+            <div className="flex min-h-[98px] flex-col rounded-xl border bg-muted/20 px-3.5 py-3">
+              <p className="text-[12px] font-medium leading-none text-muted-foreground">Gross Profit</p>
+              <p className="mt-auto whitespace-nowrap pt-3 font-mono text-[19px] font-semibold leading-none tracking-tight tabular-nums">
+                {roundedMoney(summary.costProfit)}
+              </p>
             </div>
-            <div className="rounded-xl border bg-muted/30 p-3">
-              <p className="text-xs text-muted-foreground">Avg Profit / Bale</p>
-              <p className="mt-1 font-mono text-lg font-semibold">{roundedMoney(summary.avgProfitPerBale)}</p>
+            <div className="flex min-h-[98px] flex-col rounded-xl border bg-muted/20 px-3.5 py-3">
+              <p className="text-[12px] font-medium leading-none text-muted-foreground">Avg Profit / Bale</p>
+              <p className="mt-auto whitespace-nowrap pt-3 font-mono text-[19px] font-semibold leading-none tracking-tight tabular-nums">
+                {roundedMoney(summary.avgProfitPerBale)}
+              </p>
             </div>
           </>
         )}
