@@ -59,6 +59,6 @@ export async function updateExportRun(id: number, data: { finishedAt: Date; } | 
 /**
  * Finish a run: merges data and sets finished_at = now().
  */
-export async function finishExportRun(id: number, data: Record<string, any>): Promise<void> {
+export async function finishExportRun(id: number, data: Record<string, unknown>): Promise<void> {
   return updateExportRun(id, { ...data, finishedAt: new Date() });
 }

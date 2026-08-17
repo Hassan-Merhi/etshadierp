@@ -340,8 +340,8 @@ export function registerRawStockOpeningBalanceRoutes(app: Express) {
       if (!rawStockRow) return res.status(404).json({ message: "Opening balance record not found" });
 
       await db.transaction(async (tx) => {
-        const rawUpdates: Record<string, any> = {};
-        const containerUpdates: Record<string, any> = {};
+        const rawUpdates: Record<string, unknown> = {};
+        const containerUpdates: Record<string, unknown> = {};
 
         if (receivedKg !== undefined) {
           rawUpdates.receivedKg = String(parseFloat(receivedKg));

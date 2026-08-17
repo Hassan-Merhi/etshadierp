@@ -416,7 +416,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
     if (!isAllMode || masters.length === 0) return;
     const XLSX = await import("@/lib/excelHelper");
     const rows = masterItems.map((item: MasterItem) => {
-      const row: Record<string, any> = {
+      const row: Record<string, unknown> = {
         Code: item.code || "",
         "Item Name": item.name,
         Group: item.stockGroupName || "",
@@ -535,7 +535,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       const XLSX = await import("@/lib/excelHelper");
 
       const rows = filteredItems.map((item: any) => {
-        const row: Record<string, any> = {
+        const row: Record<string, unknown> = {
           Code: item.code || "",
           "Item Name": item.name,
           Group: item.stockGroupName || "",

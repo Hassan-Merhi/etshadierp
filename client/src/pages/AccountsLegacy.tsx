@@ -261,7 +261,7 @@ export default function Accounts() {
   });
 
   const createBankMutation = useMutation({
-    mutationFn: async (data: Record<string, any>) => {
+    mutationFn: async (data: Record<string, unknown>) => {
       const res = await apiRequest("POST", "/api/bank-accounts", {
         ...data,
         companyId: selectedCompany?.id,

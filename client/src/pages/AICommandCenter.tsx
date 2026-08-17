@@ -39,7 +39,7 @@ interface PlanStep {
   id: string;
   name: string;
   tool: string;
-  params: Record<string, any>;
+  params: Record<string, unknown>;
   requiresApproval: boolean;
   status: StepStatus;
   result?: any;

@@ -391,7 +391,7 @@ async function finalizeCutover(req: Request, res: Response): Promise<any> {
     return res.status(409).json({ message: "Cutover finalization is already running or awaiting recovery." });
   }
 
-  const partialDeltaSummary: Record<string, any> = {};
+  const partialDeltaSummary: Record<string, unknown> = {};
   try {
     const migrationBody = {
       sourceCompanyId: pair.sourceId,
@@ -473,7 +473,7 @@ async function finalizeCutover(req: Request, res: Response): Promise<any> {
     });
   } catch (caught) {
     const message = caught instanceof Error ? caught.message : String(caught);
-    const recovery: Record<string, any> = {};
+    const recovery: Record<string, unknown> = {};
     try {
       recovery.users = await restoreUsersToSourceExact(
         cutoverId,
