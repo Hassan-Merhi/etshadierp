@@ -61,7 +61,14 @@ export async function journalStockTransferLeg(
       source: {
         sourceType: STOCK_TRANSFER_SOURCE_TYPE,
         sourceId: String(input.transferId),
-        idempotencyKey: `${STOCK_TRANSFER_SOURCE_TYPE}:${input.transferId}:rev${input.revision}:${input.phase}:${input.leg.stockItemId}`,
+        // The locations are part of the identity, not decoration. A transfer may
+        // draw the same stock item from two source locations in one operation;
+        // both legs share the transfer, revision, phase and item, so a key built
+        // from those alone is identical for both. postStockMovementTx treats a
+        // repeated key as a replay and returns the first movement without
+        // looking at the request, so the second source's movement would never
+        // reach the journal while its inventory moved anyway.
+        idempotencyKey: `${STOCK_TRANSFER_SOURCE_TYPE}:${input.transferId}:rev${input.revision}:${input.phase}:${input.leg.stockItemId}:${input.fromLocationId}-${input.toLocationId}`,
       },
       // The journal records what the transfer did. Stock transfers deliberately
       // permit negative inventory, and evidence must not impose a rule the

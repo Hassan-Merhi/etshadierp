@@ -108,14 +108,19 @@ describe("database accounting convergence snapshots", () => {
   });
 });
 
+const SOURCE_LOCATION = 11;
+const DESTINATION_LOCATION = 12;
+
 const issueLeg = {
   companyId: 4,
   sourceType: "stock-transfer",
   sourceId: "77",
+  locationId: SOURCE_LOCATION,
+  stockItemId: 900,
   quantityDelta: "-5",
   unitCost: "2.5",
 };
-const receiptLeg = { ...issueLeg, quantityDelta: "5" };
+const receiptLeg = { ...issueLeg, locationId: DESTINATION_LOCATION, quantityDelta: "5" };
 
 describe("canonical stock transfer evidence", () => {
   it("reports the receipt leg once both sides balance", () => {
@@ -133,6 +138,60 @@ describe("canonical stock transfer evidence", () => {
       movementQuantity: "5",
       movementValue: "12.5",
     });
+  });
+
+  it("reports what an edited transfer currently accounts for, not what it ever moved", () => {
+    // Ten units posted, then edited down to two. The journal is append-only, so
+    // all six rows survive: the original pair, the reversal pair, and the new
+    // pair. Summing the positive legs reports 10 + 10 + 2 = 22 against a
+    // document of 2, and every edited transfer becomes a false discrepancy.
+    const [evidence] = summarizeCanonicalStockTransferEvidence({
+      companyId: 4,
+      rows: [
+        { ...issueLeg, quantityDelta: "-10", unitCost: "3" },
+        { ...receiptLeg, quantityDelta: "10", unitCost: "3" },
+        { ...receiptLeg, quantityDelta: "-10", unitCost: "3" },
+        { ...issueLeg, quantityDelta: "10", unitCost: "3" },
+        { ...issueLeg, quantityDelta: "-2", unitCost: "3" },
+        { ...receiptLeg, quantityDelta: "2", unitCost: "3" },
+      ],
+    });
+
+    expect(evidence).toMatchObject({ sourceId: "77", movementQuantity: "2", movementValue: "6" });
+  });
+
+  it("keeps two stock items at one location on separate balances", () => {
+    // Netting is keyed by location *and* item. Here one item arrives at
+    // location 12 while a different item leaves it. Keyed by location alone the
+    // two cancel, location 12 nets to nothing, and the transfer reports half
+    // the stock it moved. The items are independent balances and stay that way.
+    const [evidence] = summarizeCanonicalStockTransferEvidence({
+      companyId: 4,
+      rows: [
+        { ...issueLeg, locationId: 11, stockItemId: 900, quantityDelta: "-10", unitCost: "1" },
+        { ...issueLeg, locationId: 12, stockItemId: 900, quantityDelta: "10", unitCost: "1" },
+        { ...issueLeg, locationId: 12, stockItemId: 901, quantityDelta: "-10", unitCost: "1" },
+        { ...issueLeg, locationId: 13, stockItemId: 901, quantityDelta: "10", unitCost: "1" },
+      ],
+    });
+
+    expect(evidence.movementQuantity).toBe("20");
+  });
+
+  it("rejects a reversal priced differently from the leg it reverses", () => {
+    // Quantity nets to zero on both sides, so a quantity-only check sees a
+    // clean cancellation. The value does not net, and that is the discrepancy.
+    expect(() =>
+      summarizeCanonicalStockTransferEvidence({
+        companyId: 4,
+        rows: [
+          { ...issueLeg, quantityDelta: "-5", unitCost: "2" },
+          { ...receiptLeg, quantityDelta: "5", unitCost: "2" },
+          { ...receiptLeg, quantityDelta: "-5", unitCost: "3" },
+          { ...issueLeg, quantityDelta: "5", unitCost: "3" },
+        ],
+      })
+    ).toThrowError(expect.objectContaining({ code: "CONVERGENCE_STOCK_EVIDENCE_UNBALANCED" }));
   });
 
   it("rejects a transfer whose legs do not balance", () => {

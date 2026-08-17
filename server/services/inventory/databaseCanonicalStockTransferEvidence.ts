@@ -80,6 +80,8 @@ export const loadDatabaseCanonicalStockTransferEvidence: StockTransferMovementEv
       company_id AS "companyId",
       source_type AS "sourceType",
       source_id AS "sourceId",
+      location_id AS "locationId",
+      stock_item_id AS "stockItemId",
       quantity_delta AS "quantityDelta",
       unit_cost AS "unitCost"
     FROM canonical_stock_movements
@@ -124,6 +126,8 @@ export const loadDatabaseCanonicalStockTransferEvidence: StockTransferMovementEv
       companyId: positiveInteger(row.companyId, "movement.companyId"),
       sourceType: String(row.sourceType ?? "").trim(),
       sourceId: String(row.sourceId ?? "").trim(),
+      locationId: positiveInteger(row.locationId, "movement.locationId"),
+      stockItemId: positiveInteger(row.stockItemId, "movement.stockItemId"),
       quantityDelta: String(row.quantityDelta),
       unitCost: String(row.unitCost),
     })),

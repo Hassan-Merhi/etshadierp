@@ -297,6 +297,68 @@ describe("stock transfer edit journal", () => {
     expect(journalNetAtDestination).toBeCloseTo(4, 3);
   });
 
+  it("journals both sources when one item is drawn from two locations", async () => {
+    const stockItemId = ctx.stockItemIds[0];
+    const [thirdLocation] = await db
+      .insert(schema.locations)
+      .values({
+        companyId: ctx.companyId,
+        code: `${TEST_PREFIX}-src2-${Date.now()}`,
+        name: "Second multi-source origin",
+      })
+      .returning();
+    await db
+      .insert(schema.inventory)
+      .values({
+        companyId: ctx.companyId,
+        locationId: thirdLocation.id,
+        stockItemId,
+        quantity: "500.000",
+        averageRate: "10.00",
+        totalValue: "5000.00",
+      })
+      .onConflictDoNothing();
+
+    const transferId = await createTransfer(3);
+    const before = await transferJournalRows(transferId);
+
+    const response = await agent.put(`/api/stock-transfers/${transferId}`).send({
+      destinationLocationId: ctx.location2Id,
+      notes: "two origins, one item",
+      items: [
+        { stockItemId, sourceLocationId: ctx.locationId, quantity: 6, rate: 10 },
+        { stockItemId, sourceLocationId: thirdLocation.id, quantity: 4, rate: 10 },
+      ],
+    });
+    expect(response.status).toBe(200);
+
+    const added = (await transferJournalRows(transferId)).filter(
+      (row) => !before.some((existing) => existing.idempotency_key === row.idempotency_key)
+    );
+    const issueKeys = new Set(
+      added.filter((row) => row.idempotency_key.includes(":issue:")).map((row) => row.idempotency_key)
+    );
+
+    // Both legs share the transfer, the revision, the phase and the stock item.
+    // Keyed on those alone they are the same key, postStockMovementTx reads the
+    // second call as a replay of the first and returns without writing, and one
+    // source's four units move in inventory with nothing in the journal saying
+    // so. The two must be distinct keys.
+    expect(issueKeys.size, "the two sources collapsed onto one idempotency key").toBe(2);
+
+    for (const locationId of [ctx.locationId, thirdLocation.id]) {
+      const issuedHere = added
+        .filter((row) => row.idempotency_key.includes(":issue:") && row.location_id === locationId)
+        .reduce((total, row) => total + Number(row.quantity_delta), 0);
+      expect(issuedHere, `location ${locationId} issued nothing`).toBeLessThan(0);
+    }
+
+    const arrived = added
+      .filter((row) => row.idempotency_key.includes(":issue:") && row.location_id === ctx.location2Id)
+      .reduce((total, row) => total + Number(row.quantity_delta), 0);
+    expect(arrived).toBeCloseTo(10, 3);
+  });
+
   it("keeps a repeated edit from posting the same movement twice", async () => {
     const transferId = await createTransfer(5);
     const body = {
