@@ -110,7 +110,7 @@ export default function FactoryPOS() {
   const printUserName = authUser?.fullName || authUser?.name || authUser?.username || authUser?.email || "User";
 
   // Fetch existing sale when in edit mode
-  const { data: editSaleData } = useQuery<any>({
+  const { data: editSaleData } = useQuery({
     queryKey: ["/api/factory/pos/sales", editSaleId],
     queryFn: async () => {
       if (!editSaleId) return null;

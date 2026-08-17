@@ -250,7 +250,7 @@ export default function BarcodeLookup() {
       : null;
   })();
 
-  const { data: returnToStockOrderInfo, isLoading: orderInfoLoading } = useQuery<any>({
+  const { data: returnToStockOrderInfo, isLoading: orderInfoLoading } = useQuery({
     queryKey: ["/api/factory/bales", returnableBaleId, "order-info"],
     queryFn: async () => {
       const res = await modeApiRequest("GET", `/api/factory/bales/${returnableBaleId}/order-info`);

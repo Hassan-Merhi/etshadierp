@@ -26,7 +26,7 @@ export default function BaleStockEntry() {
 
   const handleTabChange = (tab: string) => setMountedTabs((prev) => (prev.has(tab) ? prev : new Set([...prev, tab])));
 
-  const { data: settings } = useQuery<any>({
+  const { data: settings } = useQuery({
     queryKey: ["/api/factory/settings"],
     queryFn: async () => {
       const r = await fetch("/api/factory/settings");
@@ -44,7 +44,7 @@ export default function BaleStockEntry() {
   const showGroundScan = !hiddenTabs.includes("hide_tab_stockentry_ground_scan");
   const showDailyScan = !hiddenTabs.includes("hide_tab_stockentry_daily_scan");
 
-  const { data: _productionSession, refetch: refetchSession } = useQuery<any>({
+  const { data: _productionSession, refetch: refetchSession } = useQuery({
     queryKey: ["/api/factory/stock-entry/production-session", todayStr],
     queryFn: async () => {
       const r = await fetch(`/api/factory/stock-entry/production-session?date=${todayStr}`);

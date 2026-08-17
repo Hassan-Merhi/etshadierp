@@ -258,7 +258,7 @@ export default function BalesHistory() {
     },
   });
 
-  const { data: returnToStockOrderInfo, isLoading: orderInfoLoading } = useQuery<any>({
+  const { data: returnToStockOrderInfo, isLoading: orderInfoLoading } = useQuery({
     queryKey: ["/api/factory/bales", returnToStockBale?.bale?.id, "order-info"],
     queryFn: async () => {
       if (!returnToStockBale) return null;

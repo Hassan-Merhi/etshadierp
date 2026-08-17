@@ -53,7 +53,7 @@ export function ExchangeRateSettings() {
     enabled: !!selectedCompany?.id && !!company?.displayCurrency,
   });
 
-  const { data: latestRate } = useQuery<any>({
+  const { data: latestRate } = useQuery({
     queryKey: ["/api/exchange-rates/latest", company?.baseCurrency, company?.displayCurrency],
     queryFn: async () => {
       if (!company?.baseCurrency || !company?.displayCurrency) return null;

@@ -28,7 +28,7 @@ const ALL_TAB_OPTIONS: {
 ];
 
 export default function FactoryWorkersHub() {
-  const { data: settings } = useQuery<any>({
+  const { data: settings } = useQuery({
     queryKey: ["/api/factory/settings"],
     queryFn: async () => {
       const response = await fetch("/api/factory/settings");

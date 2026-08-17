@@ -331,7 +331,7 @@ export default function SpreadsheetEditor() {
     queryKey: ["/api/spreadsheets"],
   });
 
-  const { data: openedSheet, isLoading: sheetLoading } = useQuery<any>({
+  const { data: openedSheet, isLoading: sheetLoading } = useQuery({
     queryKey: ["/api/spreadsheets", openSheetId],
     queryFn: async () => {
       const res = await fetch(`/api/spreadsheets/${openSheetId}`, { credentials: "include" });

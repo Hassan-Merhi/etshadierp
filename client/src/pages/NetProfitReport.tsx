@@ -288,7 +288,7 @@ export default function NetProfitReport() {
     return p.toString();
   }, [startDate, endDate, selectedCompanyId, isAdminOrDev]);
 
-  const { data, isLoading, error } = useQuery<any>({
+  const { data, isLoading, error } = useQuery({
     queryKey: ["/api/reports/net-profit-statement", queryParams],
     queryFn: async ({ queryKey }) => {
       const params = queryKey[1] as string;

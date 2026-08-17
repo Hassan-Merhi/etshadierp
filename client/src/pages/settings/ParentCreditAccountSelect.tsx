@@ -41,7 +41,7 @@ export function ParentCreditAccountSelect({ company }: { company: Record<string,
   const [isCreating, setIsCreating] = useState(false);
   const [newAccountName, setNewAccountName] = useState("");
 
-  const { data: companySettings } = useQuery<any>({
+  const { data: companySettings } = useQuery({
     queryKey: ["/api/company-settings", company.id],
     queryFn: async () => {
       try {

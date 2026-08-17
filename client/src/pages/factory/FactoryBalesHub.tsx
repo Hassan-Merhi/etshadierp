@@ -9,7 +9,7 @@ import BaleProducts from "../BaleProductsBilingual";
 export default function FactoryBalesHub() {
   const hash = typeof window !== "undefined" ? window.location.hash.replace("#", "") : "";
 
-  const { data: settings } = useQuery<any>({
+  const { data: settings } = useQuery({
     queryKey: ["/api/factory/settings"],
     queryFn: async () => {
       const r = await fetch("/api/factory/settings");

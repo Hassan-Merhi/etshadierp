@@ -9,7 +9,7 @@ type LoadingsTab = "loadings" | "pending";
 export default function FactoryLoadingsHub() {
   const hash = typeof window !== "undefined" ? window.location.hash.replace("#", "") : "";
 
-  const { data: settings, isSuccess: settingsLoaded } = useQuery<any>({
+  const { data: settings, isSuccess: settingsLoaded } = useQuery({
     queryKey: ["/api/factory/settings"],
     queryFn: async () => {
       const r = await fetch("/api/factory/settings");
