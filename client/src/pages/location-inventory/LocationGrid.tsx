@@ -11,8 +11,8 @@ interface LocationGridProps {
   setLocationSearchTerm: (s: string) => void;
   posUser?: any;
   canManageWhatsapp?: boolean;
-  openRenameDialog?: (loc: Location, e?: any) => void;
-  openWaGroupDialog?: (loc: Location, e?: any) => void;
+  openRenameDialog?: (loc: Location, e?: { stopPropagation: () => void; }) => void;
+  openWaGroupDialog?: (loc: Location, e?: { stopPropagation: () => void; }) => void;
 }
 
 export function LocationGrid({

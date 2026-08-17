@@ -338,7 +338,7 @@ export function registerVoucherPurchaseUpdateRoutes(app: Express) {
 
         for (const oldItem of oldAdjustmentItems) {
           const quantity = parseFloat(oldItem.quantity);
-          const rate = parseFloat(oldItem.rate);
+          const _rate = parseFloat(oldItem.rate);
 
           await adjustInventory(tx, oldLocationId, oldItem.stockItemId, -quantity, existingVoucher.companyId);
         }

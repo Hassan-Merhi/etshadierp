@@ -128,7 +128,7 @@ export default function FactoryInvoiceCreate() {
     if (orderDetail.orderDate) {
       setOrderDate(orderDetail.orderDate.substring(0, 10));
     }
-  }, [orderDetail?.id]);
+  }, [orderDetail, selectedCustomerId]);
 
   const { data: customers = [] } = useQuery<Customer[]>({
     queryKey: ["/api/factory/customers"],
@@ -344,7 +344,7 @@ export default function FactoryInvoiceCreate() {
         proformaIdUsed: activeProforma.id,
       });
     }
-  }, [customerId, activeProforma?.id]);
+  }, [activeProforma, createOrderMutation, customerId, orderDate, orderId, selectedCompany]);
 
   const handleScan = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {

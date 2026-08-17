@@ -10,7 +10,7 @@ import { logger } from "../../lib/logger";
 import { pool } from "../../db";
 import {} from "@shared/schema";
 
-export function registerFactoryMixBatchesByDateRoutes(app: Express, requireAuth: any, db: any) {
+export function registerFactoryMixBatchesByDateRoutes(app: Express, requireAuth: any, _db: any) {
   // ── Mix batches by date ───────────────────────────────────────────────────
   app.get("/api/factory/mix-batches-by-date", requireAuth, async (req: import("express").Request, res: import("express").Response) => {
     try {

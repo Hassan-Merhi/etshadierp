@@ -275,7 +275,7 @@ export function registerNetProfitExcelRoute(app: Express) {
       // Account exclusion rules matching dashboard
       const npExcludedTypes = ["Income", "Profit", "Equity", "EQUITY", "Fixed Asset"];
       const npExpenseTypes = ["Expense", "Direct Expense", "Indirect Expense"];
-      const npLiabilityTypes = ["Liability", "Duty Agent", "Transporter Agent", "Loan"];
+      const _npLiabilityTypes = ["Liability", "Duty Agent", "Transporter Agent", "Loan"];
       const npAssetTypes = ["Asset", "Current Asset", "Fixed Asset", "Bank", "Cash"];
       const npStockPatterns = [
         "closing stock",
@@ -307,7 +307,7 @@ export function registerNetProfitExcelRoute(app: Express) {
         "deposit",
         "caution",
       ];
-      const isExcludedFromNp = (acc: any) => {
+      const isExcludedFromNp = (acc: { code: string; id: number; name: string; active: boolean; createdAt: Date; companyId: number; deletedAt: Date | null; accountType: string; subType: string | null; parentId: number | null; openingBalance: string | null; openingBalanceSide: string | null; openingBalanceNativeAmount: string | null; openingBalanceCurrency: string | null; openingBalanceHistoricalRate: string | null; openingBalanceBaseAmount: string | null; isHidden: boolean; }) => {
         if (npExcludedTypes.includes(acc.accountType || "")) return true;
         if (acc.code === "PRODUCTION_ADJUSTMENT" || acc.code === "CONSUMPTION_EXPENSE") return true;
         const nameLower = (acc.name || "").toLowerCase();

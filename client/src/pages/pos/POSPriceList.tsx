@@ -1,5 +1,5 @@
 import { getErrorDetails } from "@shared/errorUtils";
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -59,7 +59,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       inputRef.current?.focus();
       inputRef.current?.select();
     }
-  }, [editingItem?.stockItemId, editingItem?.locationId]);
+  }, [editingItem]);
   const lastSavedRef = useRef<{ stockItemId: number; locationId: number } | null>(null);
   const skipBlurSaveRef = useRef(false);
   const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
@@ -124,8 +124,8 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
     enabled: isAllMode,
   });
 
-  const masters = mastersData?.masters ?? [];
-  const masterItems = mastersData?.items ?? [];
+  const masters = useMemo(() => mastersData?.masters ?? [], [mastersData?.masters]);
+  const masterItems = useMemo(() => mastersData?.items ?? [], [mastersData?.items]);
 
   // ── Merged state ────────────────────────────────────────────────────────────
   const isLoading = isAllMode ? mastersLoading : priceListLoading;
@@ -153,7 +153,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
     return Array.from(groups).sort();
   }, [locationPricedList]);
 
-  const isItemUnpriced = (item: any): boolean => {
+  const isItemUnpriced = useCallback((item: any): boolean => {
     if (isAllMode) {
       const hasBase = item.baseSellingPrice && parseFloat(item.baseSellingPrice) > 0;
       if (hasBase) return false; // base price covers all locations
@@ -163,11 +163,11 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       return !allHavePrice; // unpriced until every location has a price
     }
     return !item.sellingPrice || parseFloat(item.sellingPrice) === 0;
-  };
+  }, [isAllMode]);
 
   const unpricedCount = useMemo(
     () => locationPricedList.filter(isItemUnpriced).length,
-    [locationPricedList, isAllMode]
+    [locationPricedList, isItemUnpriced]
   );
 
   // Groups that have at least one unpriced item, with their counts — used for the chip picker
@@ -182,7 +182,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
     return Array.from(map.entries())
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [locationPricedList, showUnpriced, isAllMode]);
+  }, [showUnpriced, locationPricedList, isItemUnpriced]);
 
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -198,7 +198,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       const matchesUnpriced = !showUnpriced || isItemUnpriced(item);
       return matchesSearch && matchesGroup && matchesUnpriced;
     });
-  }, [locationPricedList, search, groupFilter, showUnpriced, hiddenUnpricedGroups, isAllMode]);
+  }, [search, locationPricedList, showUnpriced, hiddenUnpricedGroups, groupFilter, isItemUnpriced]);
 
   const selectedLocation = locations.find((l) => l.id === selectedLocationId);
 
@@ -416,7 +416,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
     if (!isAllMode || masters.length === 0) return;
     const XLSX = await import("@/lib/excelHelper");
     const rows = masterItems.map((item: MasterItem) => {
-      const row: Record<string, any> = {
+      const row: Record<string, unknown> = {
         Code: item.code || "",
         "Item Name": item.name,
         Group: item.stockGroupName || "",
@@ -535,7 +535,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       const XLSX = await import("@/lib/excelHelper");
 
       const rows = filteredItems.map((item: any) => {
-        const row: Record<string, any> = {
+        const row: Record<string, unknown> = {
           Code: item.code || "",
           "Item Name": item.name,
           Group: item.stockGroupName || "",

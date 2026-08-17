@@ -25,7 +25,7 @@ export default function EditSupplier() {
   const [_location, navigate] = useLocation();
   const handleBack = useBackToParent();
   const { toast } = useToast();
-  const { formatAmount } = useCurrencyContext();
+  const { formatAmount: _formatAmount } = useCurrencyContext();
   const { selectedCompany } = useCompany();
   const supplierId = params.id ? parseInt(params.id) : null;
   useEscapeToParent("/suppliers");
@@ -78,7 +78,7 @@ export default function EditSupplier() {
           null,
       });
     }
-  }, [supplier]);
+  }, [form, supplier]);
 
   const updateMutation = useMutation({
     mutationFn: async (data) => {

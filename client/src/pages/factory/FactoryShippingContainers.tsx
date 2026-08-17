@@ -256,7 +256,7 @@ export default function FactoryShippingContainers() {
     },
   });
 
-  const deleteShippingInvoiceMutation = useMutation({
+  const _deleteShippingInvoiceMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `${LIST_KEY}/${id}/shipping-invoice`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [LIST_KEY] });

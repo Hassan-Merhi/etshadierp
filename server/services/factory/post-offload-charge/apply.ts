@@ -513,7 +513,7 @@ export async function applyPostOffloadChargeMutation(
         newVoucherId = null;
       } else {
         // Update existing voucher header + recreate entries
-        const { voucherCompanyId, chargesPayableAcctId } = accountingCtx || {
+        const { voucherCompanyId: _voucherCompanyId, chargesPayableAcctId } = accountingCtx || {
           voucherCompanyId: companyId,
           chargesPayableAcctId: 0,
         };

@@ -416,7 +416,7 @@ export default function POImport() {
                   <div>
                     <h3 className="font-semibold text-destructive">Validation Errors Found</h3>
                     <ul className="mt-2 space-y-1 text-sm text-destructive">
-                      {validationResult.errors.map((error: any, idx: number) => <li key={idx}>• {error}</li>)}
+                      {validationResult.errors.map((error: React.ReactNode, idx: number) => <li key={idx}>• {error}</li>)}
                     </ul>
                   </div>
                 </div>

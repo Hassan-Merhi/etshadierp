@@ -69,7 +69,7 @@ export function AgentCard({
     newAmount: number;
     newContainerId: number;
   } | null>(null);
-  const [replaceConfirmDiff, setReplaceConfirmDiff] = useState(false);
+  const [_replaceConfirmDiff, setReplaceConfirmDiff] = useState(false);
   const [pendingGraduationIds, setPendingGraduationIds] = useState<number[]>([]);
 
   // ── Custom order (localStorage) ───────────────────────────────────────────
@@ -210,7 +210,7 @@ export function AgentCard({
     ledgerBalance,
     offloadedDutyTotal,
     clearedByPayments,
-    openBalance,
+    openBalance: _openBalance,
     warnings,
     clearedRows,
     partialRows,
@@ -250,7 +250,7 @@ export function AgentCard({
         [newIds[idx], newIds[idx + 1]] = [newIds[idx + 1], newIds[idx]];
       saveOrder(newIds);
     },
-    [openAndPartial]
+    [openAndPartial, saveOrder]
   );
   const moveToTop = useCallback(
     (containerId: number) => {
@@ -258,7 +258,7 @@ export function AgentCard({
       if (ids.indexOf(containerId) <= 0) return;
       saveOrder([containerId, ...ids.filter((id) => id !== containerId)]);
     },
-    [openAndPartial]
+    [openAndPartial, saveOrder]
   );
 
   const openSum = openAndPartial.reduce((s, r) => s + r.remainingAmount, 0);
@@ -341,7 +341,7 @@ export function AgentCard({
     if (staleIds.length === 0) return;
     setPendingGraduationIds((prev) => [...new Set([...prev, ...staleIds])]);
     setAllPrepaidMutation.mutate(dbPrepaidIds.filter((id) => validTransitIdSet.has(id)));
-  }, [validTransitIdSet]); 
+  }, [dbPrepaidIds, isDbOverride, setAllPrepaidMutation, validTransitIdSet]); 
   useEffect(() => {
     if (pendingGraduationIds.length === 0) return;
     const openPartialIdSet = new Set(allOpenPartial.map((r) => r.id));
@@ -350,7 +350,7 @@ export function AgentCard({
     setPendingGraduationIds((prev) => prev.filter((id) => !openPartialIdSet.has(id)));
     const existing = customOrder ?? allOpenPartial.map((r) => r.id);
     saveOrder([...toPromote, ...existing.filter((id) => !toPromote.includes(id))]);
-  }, [allOpenPartial, pendingGraduationIds]); 
+  }, [allOpenPartial, customOrder, pendingGraduationIds, saveOrder]); 
 
   const confidenceBadge = {
     exact: { label: "Exact match", cls: "bg-green-700 text-white" },

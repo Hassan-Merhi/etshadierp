@@ -41,7 +41,7 @@ interface StockTransferRevisionHistoryProps {
   modeApiRequest: unknown;
   queryClient: unknown;
   lastKnownTransferIdRef: unknown;
-  formatNumber: (num: any, decimals?: number) => string;
+  formatNumber: (num: number, decimals?: number) => string;
 }
 
 export function StockTransferRevisionHistory({
@@ -51,9 +51,9 @@ export function StockTransferRevisionHistory({
   transferRevisionsExpanded,
   setTransferRevisionsExpanded,
   setApproveRevisionTarget,
-  modeApiRequest,
-  queryClient,
-  lastKnownTransferIdRef,
+  modeApiRequest: _modeApiRequest,
+  queryClient: _queryClient,
+  lastKnownTransferIdRef: _lastKnownTransferIdRef,
   formatNumber,
 }: StockTransferRevisionHistoryProps) {
   if (!voucherIdToEdit || !stableTransferId) return null;

@@ -93,7 +93,7 @@ export function registerFactoryMixBatchUpdateRoutes(app: Express) {
           .for("update");
         if (!batch) throw new Error("Mix batch not found");
 
-        const usedKg = parseFloat(batch.usedKg || "0");
+        const _usedKg = parseFloat(batch.usedKg || "0");
 
         // ── 1. Reverse all existing sources ──
         const oldSources = await tx
@@ -159,7 +159,7 @@ export function registerFactoryMixBatchUpdateRoutes(app: Express) {
         // DEFECT 15 FIX: use Decimal.js for cost accumulation (edit route).
         let dTotalWeightKg = new Decimal(0);
         let dTotalCost = new Decimal(0);
-        const sourceRecords: any[] = [];
+        const sourceRecords = [];
 
         for (const source of supplierSources || []) {
           // costPerKg from the client is NEVER trusted for a real supplier.

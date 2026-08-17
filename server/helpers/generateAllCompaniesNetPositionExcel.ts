@@ -45,7 +45,7 @@ function subHdr(cell: any) {
   cell.alignment = { horizontal: "center", vertical: "middle" };
 }
 
-function numCell(cell: any, value: number, positive = true) {
+function numCell(cell: any, value: number, _positive = true) {
   cell.value = value;
   cell.numFmt = currencyFmt;
   cell.alignment = { horizontal: "right" };
@@ -112,7 +112,7 @@ export async function generateAllCompaniesNetPositionExcel(
   wb.creator = "ERP System";
   wb.created = new Date();
 
-  const year = new Date(endDate).getUTCFullYear();
+  const _year = new Date(endDate).getUTCFullYear();
 
   // ════════════════════════════════════════════════════════════
   //  SHEET 1: Net Position (balance-sheet snapshot)

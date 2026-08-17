@@ -38,7 +38,7 @@ import {
 } from "./intent";
 
 function buildSystemPrompt(context: ERPContext, userPreferences?: UserPreferences): string {
-  const currency = userPreferences?.currency || "USD";
+  const _currency = userPreferences?.currency || "USD";
   const profitMargin =
     parseFloat(context.profitAnalysis.totalSales) > 0
       ? (

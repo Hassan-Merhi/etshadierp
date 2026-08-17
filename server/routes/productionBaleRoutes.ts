@@ -433,7 +433,7 @@ export function registerProductionBaleRoutes(app: Express) {
       const costPerKg = parseFloat(mixBatch.costPerKg);
 
       const updated = await db.transaction(async (tx) => {
-        const finalizedBales: any[] = [];
+        const finalizedBales = [];
         for (const baleId of scannedIds) {
           const baleRecord = scannedBaleRecords.find((b) => b.id === baleId);
           const baleWeight = parseFloat(baleRecord?.weightKg || "0");

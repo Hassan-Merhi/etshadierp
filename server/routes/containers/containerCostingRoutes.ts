@@ -124,7 +124,7 @@ export function registerContainerCostingRoutes(app: Express) {
 
         // Recalculate itemsTotal for all affected POs, then the container
         const containerPOs = await storage.getPurchaseOrdersByContainer(containerId);
-        const poIds = containerPOs.map((po) => po.id);
+        const _poIds = containerPOs.map((po) => po.id);
 
         let containerItemsTotal = 0;
         let containerChargesTotal = 0;

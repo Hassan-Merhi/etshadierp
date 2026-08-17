@@ -200,7 +200,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         const isInsuranceMember = /^insurance\s*[-–]/i.test(a.name || "");
         return !isPayrollPayable && !isAccruedRentPayable && !isFactoryWorkerAdvances && !isInsuranceMember;
       });
-      const ledgerForUsTotal = round2(ledgerForUs.reduce((s: number, a: any) => s + a.value, 0));
+      const _ledgerForUsTotal = round2(ledgerForUs.reduce((s: number, a: any) => s + a.value, 0));
       const ledgerOnUsTotal = round2(ledgerOnUs.reduce((s: number, a: any) => s + a.value, 0));
 
       const customerItems: { name: string; balanceUsd: number; ledgerAccountId?: number }[] = [];

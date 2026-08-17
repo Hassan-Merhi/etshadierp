@@ -25,7 +25,7 @@ import { LocationInventoryBreadcrumb } from "./location-inventory/LocationInvent
 import type { InventoryLocation as Location } from "./location-inventory/locationInventoryTypes";
 
 export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
-  const { setSelectedLocation } = useLocation();
+  const { setSelectedLocation: _setSelectedLocation } = useLocation();
   const [_route, navigate] = useRoute();
   const { toast } = useToast();
   const { formatAmount } = useCurrencyContext();

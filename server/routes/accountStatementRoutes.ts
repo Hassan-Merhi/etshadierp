@@ -542,7 +542,7 @@ export function registerAccountStatementRoutes(app: Express) {
 
       // Opening balance row (no filter) or B/F row (filtered)
       if (!startDate && openingBalance > 0 && accountType === "ledger") {
-        const obBal = openingBalanceSide === "Dr" ? openingBalance : -openingBalance;
+        const _obBal = openingBalanceSide === "Dr" ? openingBalance : -openingBalance;
         const obRow = sheet.addRow([
           new Date().toLocaleDateString("en-GB"),
           "—",

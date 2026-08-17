@@ -474,7 +474,7 @@ export default function FactoryProformas() {
         String(s ?? "")
           .toLowerCase()
           .replace(/[\s_-]/g, "");
-      const findCol = (row: Record<string, any>, aliases: string[]): string => {
+      const findCol = (row: Record<string, unknown>, aliases: string[]): string => {
         const keys = Object.keys(row);
         for (const alias of aliases) {
           const found = keys.find((k) => normalize(k) === alias);

@@ -65,7 +65,7 @@ export default function Accounts() {
   const hideBalances = (myErpPages?.hiddenErpCostFields ?? []).includes("accounts_balances");
   const appMode = useAppMode();
   const modePrefix = useModePrefix();
-  const modeApiRequest = getApiRequest(appMode);
+  const _modeApiRequest = getApiRequest(appMode);
   const [, navigate] = useLocation();
   const searchString = useSearch();
 
@@ -261,7 +261,7 @@ export default function Accounts() {
   });
 
   const createBankMutation = useMutation({
-    mutationFn: async (data: Record<string, any>) => {
+    mutationFn: async (data: Record<string, unknown>) => {
       const res = await apiRequest("POST", "/api/bank-accounts", {
         ...data,
         companyId: selectedCompany?.id,
@@ -300,7 +300,7 @@ export default function Accounts() {
   const { data: currentUser } = useQuery<{ role?: string }>({ queryKey: ["/api/auth/me"] });
   const [exportLang, setExportLang] = useState<"en" | "fr" | "ar">("en");
 
-  const fixPayrollAccountsMutation = useMutation({
+  const _fixPayrollAccountsMutation = useMutation({
     mutationFn: () =>
       apiRequest("POST", "/api/factory/payroll/migrate-worker-names", {
         companyId: selectedCompany?.id,
@@ -440,7 +440,7 @@ export default function Accounts() {
       fromExternalNavRef.current = true;
       setSelectedAccount(found);
     }
-  }, [allAccounts, urlAccountId, urlAccountType]);
+  }, [allAccounts, selectedAccount, urlAccountId, urlAccountType]);
 
   // Dedicated query for Group accounts used by the Parent Group combobox.
   // Uses /api/ledger-accounts directly (same source as Account Groups page) so
@@ -648,7 +648,7 @@ export default function Accounts() {
     } else {
       bankForm.reset();
     }
-  }, [bankToEdit]);
+  }, [bankForm, bankToEdit]);
   const editForm = useForm({
     resolver: zodResolver(updateLedgerAccountSchema.omit({ id: true, companyId: true })),
   });

@@ -304,7 +304,7 @@ export async function applyZeroCostMixBatchSourcesFix(
   sourceIds: number[],
   opts: {
     manualRates?: Record<number, number>;
-    onAudit?: (tx: any, result: ZeroCostSourceFixResult) => Promise<void>;
+    onAudit?: (tx: Parameters<Parameters<typeof db.transaction>[0]>[0], result: ZeroCostSourceFixResult) => Promise<void>;
   } = {}
 ): Promise<ZeroCostSourceFixResult[]> {
   const results: ZeroCostSourceFixResult[] = [];

@@ -8,7 +8,7 @@ import { FileImage, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-export function DocumentPreviewDialog({ setViewingDoc, viewingDoc }: { setViewingDoc: any; viewingDoc: any }) {
+export function DocumentPreviewDialog({ setViewingDoc, viewingDoc }: { setViewingDoc: React.Dispatch<React.SetStateAction<{ id: number; companyId: number; fileUrl: string; fileName: string; fileType: string | null; fileSize: number | null; fileData: string | null; uploadedAt: Date | null; workerId: number; originalName: string; } | null>>; viewingDoc: { id: number; companyId: number; fileUrl: string; fileName: string; fileType: string | null; fileSize: number | null; fileData: string | null; uploadedAt: Date | null; workerId: number; originalName: string; } | null }) {
   return (
     <Dialog
       open={viewingDoc !== null}

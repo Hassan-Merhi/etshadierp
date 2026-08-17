@@ -20,7 +20,7 @@ export async function upsertChargeMapping(params: {
   sourceContainerId: number;
   spContainerId: number;
   candidate: ChargeCandidate;
-  sourceAccounts: Map<number, any>;
+  sourceAccounts: Map<number, Record<string, unknown>>;
   targetAccounts: Awaited<ReturnType<typeof loadTargetAccounts>>;
 }): Promise<{ reviewStatus: string; amountUsd: number; inserted: boolean }> {
   const { candidate } = params;
@@ -78,7 +78,7 @@ function addPositiveCharge(candidates: ChargeCandidate[], candidate: ChargeCandi
   if (Math.abs(candidate.amountUsd) > 0.0001) candidates.push(candidate);
 }
 
-export async function getContainerChargeCandidates(container: any, po: any | null): Promise<ChargeCandidate[]> {
+export async function getContainerChargeCandidates(container: Record<string, unknown>, po: Record<string, unknown> | null): Promise<ChargeCandidate[]> {
   const candidates: ChargeCandidate[] = [];
 
   if (po) {
@@ -223,8 +223,8 @@ export async function getContainerChargeCandidates(container: any, po: any | nul
 }
 
 export async function getSourceContainerLines(
-  container: any,
-  po: any | null
+  container: Record<string, unknown>,
+  po: Record<string, unknown> | null
 ): Promise<{ source: string; rows: any[] }> {
   if (po) {
     const poLines = await db.execute(sql`

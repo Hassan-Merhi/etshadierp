@@ -20,12 +20,12 @@ interface ChatActionsState {
   setLastUsedProvider: (p: string | null) => void;
   setSuggestions: (s: string[]) => void;
   setPendingVoucher: (v: VoucherDraft | null) => void;
-  setPendingStockAdj: (v: any) => void;
-  setPendingStockTransfer: (v: any) => void;
+  setPendingStockAdj: React.Dispatch<React.SetStateAction<StockAdjustmentDraft | null>>;
+  setPendingStockTransfer: React.Dispatch<React.SetStateAction<StockTransferDraft | null>>;
   setPendingStockTransferBatch: (v: StockTransferDraft[] | null) => void;
   setVoucherSearchResults: (v: any) => void;
-  setPendingStockItem: (v: any) => void;
-  setPendingPriceUpdate: (v: any) => void;
+  setPendingStockItem: React.Dispatch<React.SetStateAction<StockItemDraft | null>>;
+  setPendingPriceUpdate: React.Dispatch<React.SetStateAction<PriceUpdateDraft | null>>;
   setAccountQueryResult: (v: any) => void;
   setVerifyContainerDraft: (v: any) => void;
   setDataQueryResult: (v: any) => void;

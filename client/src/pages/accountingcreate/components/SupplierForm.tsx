@@ -17,7 +17,7 @@ function SupplierForm({
   isPending,
 }: {
   form: any;
-  onSubmit: (data: any, saveAndNew?: boolean) => void;
+  onSubmit: (data: false, saveAndNew?: boolean) => void;
   onCancel: () => void;
   isPending: boolean;
 }) {

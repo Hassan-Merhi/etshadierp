@@ -43,7 +43,7 @@ export async function createExportRun(
  * Update arbitrary fields on a run row.
  * Keys must be camelCase names from FIELD_MAP above; unknown keys are silently ignored.
  */
-export async function updateExportRun(id: number, data: Record<string, any>): Promise<void> {
+export async function updateExportRun(id: number, data: { finishedAt: Date; } | ({ companiesCount: number; companyFilesCount: number; zipSizeBytes: number; skippedCompanies: string | null; }) | { emailAttempted: boolean; } | { whatsappAttempted: boolean; } | ({ companiesCount: number; companyFilesCount: number; zipSizeBytes: number; skippedCompanies: string | null; whatsappAttempted: boolean; })): Promise<void> {
   if (!id) return;
   const entries = Object.entries(data).filter(([k]) => FIELD_MAP[k] !== undefined);
   if (!entries.length) return;
@@ -59,6 +59,6 @@ export async function updateExportRun(id: number, data: Record<string, any>): Pr
 /**
  * Finish a run: merges data and sets finished_at = now().
  */
-export async function finishExportRun(id: number, data: Record<string, any>): Promise<void> {
+export async function finishExportRun(id: number, data: Record<string, unknown>): Promise<void> {
   return updateExportRun(id, { ...data, finishedAt: new Date() });
 }

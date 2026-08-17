@@ -127,7 +127,7 @@ export default function MixBatches() {
       return remaining > 0.001;
     }) ?? [];
 
-  const getStatusIcon = (status: string) => {
+  const _getStatusIcon = (status: string) => {
     switch (status) {
       case "ACTIVE":
         return <PlayCircle className="h-4 w-4" />;
@@ -138,7 +138,7 @@ export default function MixBatches() {
     }
   };
 
-  const getStatusVariant = (status: string) => {
+  const _getStatusVariant = (status: string) => {
     switch (status) {
       case "ACTIVE":
         return "default";
@@ -173,7 +173,7 @@ export default function MixBatches() {
 
     // Build row data
     const totals: Record<string, number> = {};
-    const rows: any[] = dates.map((date) => {
+    const rows = dates.map((date) => {
       const row: any = { DATE: date };
       for (const name of batchNames) {
         const val = matrix[date]?.[name] || 0;

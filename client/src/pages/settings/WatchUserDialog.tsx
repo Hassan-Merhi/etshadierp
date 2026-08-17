@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -344,7 +344,7 @@ export function WatchUserDialog({
     if (viewerSurfaceRef.current?.requestFullscreen) void viewerSurfaceRef.current.requestFullscreen();
   };
 
-  const requestFreshFrame = async () => {
+  const requestFreshFrame = useCallback(async () => {
     setRefreshing(true);
     setStreamError(null);
     setStreamGeneration((value) => value + 1);
@@ -353,14 +353,14 @@ export function WatchUserDialog({
     } finally {
       window.setTimeout(() => setRefreshing(false), 5000);
     }
-  };
+  }, [refetchFrame]);
 
   useEffect(() => {
     if (!hasScreen || frameAgeMs < 15000 || refreshing) return;
     void requestFreshFrame();
     // The age threshold prevents repeated reconnect loops.
     
-  }, [Math.floor(frameAgeMs / 15000), hasScreen]);
+  }, [frameAgeMs, hasScreen, refreshing, requestFreshFrame]);
 
   const frameMetadata = useMemo(() => {
     const capture = screenFrame?.capture;

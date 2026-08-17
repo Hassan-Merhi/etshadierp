@@ -9,7 +9,7 @@ interface UseSidebarSyncProps {
   paymentAccountType: string;
   sidebarHighlightedIndex: number;
   setSidebarHighlightedIndex: (i: number) => void;
-  entries: any[];
+  entries: { accountType: "customer" | "supplier" | "employee" | "bank" | "ledger" | "fixedAsset" | "factorySupplier"; accountId: number; accountName: string; amount: string; }[];
   activeRowIndex: number | null;
   allAccounts: CombinedAccount[];
 }
@@ -82,7 +82,7 @@ export function useSidebarSync({
       }
     }
     setSidebarHighlightedIndex(0);
-  }, [sidebarSearchValue, activeRowIndex, activeRowAccountId, activeRowAccountType]);
+  }, [sidebarSearchValue, activeRowIndex, activeRowAccountId, activeRowAccountType, filteredSidebarAccounts, setSidebarHighlightedIndex]);
 
   useEffect(() => {
     if (filteredSidebarAccounts.length === 0) return;
@@ -90,7 +90,7 @@ export function useSidebarSync({
     if (sidebarHighlightedIndex > maxIndex) {
       setSidebarHighlightedIndex(maxIndex);
     }
-  }, [filteredSidebarAccounts.length]);
+  }, [filteredSidebarAccounts.length, setSidebarHighlightedIndex, sidebarHighlightedIndex]);
 
   const selectedAccount = useMemo(
     () => allAccounts.find((acc) => acc.type === paymentAccountType && acc.id === paymentAccountId),

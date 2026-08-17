@@ -93,7 +93,7 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
         setLocationCashAccounts({});
       }
     }
-  }, [open, editingRole?.id]);
+  }, [open, editingRole.id, editingRole, form, userId, companies]);
 
   const { data: locations = [] } = useQuery<any[]>({
     queryKey: ["/api/locations", { companyId: selectedCompanyId }],

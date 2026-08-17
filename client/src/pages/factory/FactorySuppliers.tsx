@@ -70,8 +70,8 @@ export default function FactorySuppliers() {
         : null
   );
 
-  const [showInactive, setShowInactive] = useState(false);
-  const [expandedSupplierIds, setExpandedSupplierIds] = useState<Set<number>>(new Set());
+  const [showInactive, _setShowInactive] = useState(false);
+  const [_expandedSupplierIds, _setExpandedSupplierIds] = useState<Set<number>>(new Set());
   const [createSubAccountParentId, setCreateSubAccountParentId] = useState<number | null>(null);
   type SupplierFilter =
     | "all"
@@ -493,7 +493,7 @@ export default function FactorySuppliers() {
 
   const allSuppliers = suppliers || [];
   const activeSuppliers = allSuppliers.filter((s) => s.isActive);
-  const inactiveSuppliers = allSuppliers.filter((s) => !s.isActive);
+  const _inactiveSuppliers = allSuppliers.filter((s) => !s.isActive);
   const subAccountsByParent = allSuppliers.reduce(
     (acc, s) => {
       if (s.parentId) {

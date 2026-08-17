@@ -152,12 +152,12 @@ export function writeSheet(
   ws: any,
   stats: ReturnType<typeof computeStats>,
   sheetLabel: string,
-  showNetPosition: boolean,
-  npValue: number
+  _showNetPosition: boolean,
+  _npValue: number
 ) {
   const {
     salesTotal,
-    directIncTotal,
+    directIncTotal: _directIncTotal,
     directIncDetails,
     totalIncome,
     purchaseTotal,
@@ -396,7 +396,7 @@ export function writeSummarySheet(
   monthStatsList: ReturnType<typeof computeStats>[],
   totalStats: ReturnType<typeof computeStats>,
   monthLabels: string[],
-  npValue: number
+  _npValue: number
 ) {
   const numMonths = monthLabels.length;
   const totalCol = numMonths + 2; // col B = month1, ..., last month col = B+numMonths-1, total = B+numMonths
@@ -431,7 +431,7 @@ export function writeSummarySheet(
 
   // Helper: write a data row
   const numFmt = "$#,##0";
-  const pctFmt = "0.00%";
+  const _pctFmt = "0.00%";
 
   const writeRow = (
     label: string,

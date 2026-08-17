@@ -139,7 +139,7 @@ function AccountBreakdown({
   badgeClass: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [, navigate] = useLocation();
+  const [, _navigate] = useLocation();
   const active = (accounts || []).filter((a) => a.debit !== 0 || a.credit !== 0);
 
   return (

@@ -66,7 +66,7 @@ async function writeDaybookEntry(
 
 /** Find or create a ledger account by name for a company. Returns the account row.
  *  Skips soft-deleted accounts and handles race-condition unique-constraint failures. */
-async function findOrCreateLedger(companyId: number, name: string, accountType: string): Promise<{ id: number }> {
+async function _findOrCreateLedger(companyId: number, name: string, accountType: string): Promise<{ id: number }> {
   const [existing] = await db
     .select({ id: ledgerAccounts.id })
     .from(ledgerAccounts)
@@ -108,7 +108,7 @@ async function findOrCreateLedger(companyId: number, name: string, accountType: 
   throw new Error(`Unable to create ledger account "${name}" after multiple attempts`);
 }
 
-const workerUpload = multer({
+const _workerUpload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => {
       const dir = path.join(process.cwd(), "uploads", "workers");
@@ -122,7 +122,7 @@ const workerUpload = multer({
   }),
 });
 
-function computeMonthlyPay(salary: number, startStr: string, endStr: string): number {
+function _computeMonthlyPay(salary: number, startStr: string, endStr: string): number {
   const start = new Date(startStr + "T00:00:00");
   const end = new Date(endStr + "T00:00:00");
   let total = 0;
@@ -144,7 +144,7 @@ function computeMonthlyPay(salary: number, startStr: string, endStr: string): nu
 // Helper: Compute monthly pay from actual attendance records.
 // Monthly payroll uses attendance-based calculation (Present/Late = 1 day, Half Day = 0.5 day)
 // rather than calendar-day proration to match actual work performed.
-function computeMonthlyPayFromAttendance(baseSalary: number, periodStart: string, attendanceRows: any[]): number {
+function _computeMonthlyPayFromAttendance(baseSalary: number, periodStart: string, attendanceRows: any[]): number {
   const daysInMonth = (dateStr: string) => {
     const d = new Date(dateStr);
     return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();

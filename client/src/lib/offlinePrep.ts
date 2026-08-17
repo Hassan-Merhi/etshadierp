@@ -61,7 +61,7 @@ function toEntity(id: string | number, companyId: number, data: any): CachedEnti
   };
 }
 
-function extractArray(data: any): any[] {
+function extractArray(data: any) {
   if (Array.isArray(data)) return data;
   // Common wrapper shapes
   for (const key of [
@@ -393,7 +393,7 @@ export async function runOfflinePrep(companyId: number, onProgress: (p: PrepProg
         const items = dataset.extractItems(raw, companyId);
 
         if (dataset.tableKey && db[dataset.tableKey]) {
-          const table = db[dataset.tableKey] as ReturnType<typeof db.users.toCollection>["db"]["table"];
+          const _table = db[dataset.tableKey] as ReturnType<typeof db.users.toCollection>["db"]["table"];
           // Clear existing data for this company, then bulk-insert
           await (
             db as unknown as {

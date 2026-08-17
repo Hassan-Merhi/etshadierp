@@ -65,7 +65,7 @@ export function VoucherEntriesTable({
   onRowBlur,
   isFactoryCompany = false,
   onAutoCreateAccount,
-  isAutoCreating = false,
+  isAutoCreating: _isAutoCreating = false,
 }: VoucherEntriesTableProps) {
   const { fields, append, remove } = fieldArray;
   const { formatAmount, selectedCurrency, convertToUSD } = useCurrencyContext();
@@ -95,7 +95,7 @@ export function VoucherEntriesTable({
       setSidebarSearchValue("");
     }
     
-  }, [mobileEditOpen, mobileEditIndex]);
+  }, [mobileEditOpen, mobileEditIndex, form, onRowFocus, setSidebarSearchValue]);
 
   const openMobileEdit = (index: number) => {
     setMobileEditIndex(index);

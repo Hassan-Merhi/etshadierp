@@ -38,7 +38,7 @@ export function registerVoucherPaymentRoutes(app: Express) {
         voucherDate,
         paymentAccountType, // "ledger", "bank", "supplier", "employee", "fixedAsset"
         paymentAccountId,
-        paymentAccountName,
+        paymentAccountName: _paymentAccountName,
         entries, // Array of { accountType, accountId, accountName, amount }
         notes,
         optional,
@@ -154,7 +154,7 @@ export function registerVoucherPaymentRoutes(app: Express) {
           })
           .returning();
 
-        const voucherEntriesToCreate: any[] = [];
+        const voucherEntriesToCreate = [];
 
         // Pre-compute the payment-account field once (same for every entry)
         const paymentAccountField = await buildAccountField(paymentAccountType, paymentAccountId);
@@ -455,7 +455,7 @@ export function registerVoucherPaymentRoutes(app: Express) {
         voucherDate,
         paymentAccountType,
         paymentAccountId,
-        paymentAccountName,
+        paymentAccountName: _paymentAccountName,
         entries,
         notes,
         optional,
@@ -526,7 +526,7 @@ export function registerVoucherPaymentRoutes(app: Express) {
         // Delete existing voucher entries
         await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
 
-        const voucherEntriesToCreate: any[] = [];
+        const voucherEntriesToCreate = [];
 
         // Create new entries with dual-currency normalization.
         for (const entry of entries) {
@@ -590,7 +590,7 @@ export function registerVoucherPaymentRoutes(app: Express) {
             historicalRate: pRateRaw,
           });
 
-          const mkDR = (acctField: any) => ({
+          const mkDR = (acctField: Record<string, unknown>) => ({
             voucherId: updatedVoucher.id,
             ...acctField,
             debitAmount: normDR.debitAmount,
@@ -604,7 +604,7 @@ export function registerVoucherPaymentRoutes(app: Express) {
             rateConvention: normDR.rateConvention,
             narration,
           });
-          const mkCR = (acctField: any) => ({
+          const mkCR = (acctField: Record<string, unknown>) => ({
             voucherId: updatedVoucher.id,
             ...acctField,
             debitAmount: normCR.debitAmount,

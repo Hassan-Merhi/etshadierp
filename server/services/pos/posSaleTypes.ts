@@ -7,7 +7,7 @@
 
 export interface HandlerErrorResult {
   status: number;
-  body: Record<string, any>;
+  body: Record<string, unknown>;
 }
 
 export interface ResolvedPaymentAccount {

@@ -10,7 +10,7 @@ interface ImportResultBannerProps {
     errors: string[];
     importId: string | null;
   } | null;
-  setImportResult: (v: any) => void;
+  setImportResult: React.Dispatch<React.SetStateAction<{ updated: number; skipped: number; notFound: number; errors: string[]; importId: string | null; } | null>>;
   undoImportMutation: {
     mutate: (id: string) => void;
     isPending: boolean;

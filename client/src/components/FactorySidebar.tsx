@@ -288,14 +288,14 @@ export function FactorySidebar({ user }: { user?: any }) {
     if (count > prevUnreadRef.current)
       toast({ title: "New message", description: `You have ${count} unread message${count > 1 ? "s" : ""}.` });
     prevUnreadRef.current = count;
-  }, [chatUnread?.count]);
+  }, [chatUnread?.count, toast]);
 
   const {
     sections: visibleSections,
     isPinnedVisible,
     isAdmin,
     isDeveloper,
-    isPrivileged,
+    isPrivileged: _isPrivileged,
   } = useFactoryVisibleSections(user);
 
   const { openSections, toggleSection } = useOpenSections(visibleSections);

@@ -185,7 +185,7 @@ export const PrintTemplate = ({
   );
 };
 
-interface VouchersProps {
+interface _VouchersProps {
   posUser?: any;
 }
 

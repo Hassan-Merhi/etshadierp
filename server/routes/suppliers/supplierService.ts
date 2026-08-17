@@ -35,7 +35,7 @@ async function createUniqueSupplierCode(companyId: number, legalName: string, re
   return code;
 }
 
-function supplierAuditChanges(existing: any, updated: any) {
+function supplierAuditChanges(existing: Record<string, unknown>, updated: Record<string, unknown>) {
   const changes: Record<string, { old?: unknown; new?: unknown }> = {};
   for (const field of [
     "legalName",

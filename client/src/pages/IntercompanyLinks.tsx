@@ -61,7 +61,7 @@ const EMPTY_FORM = {
 };
 
 export default function IntercompanyLinks() {
-  const [, navigate] = useLocation();
+  const [, _navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -158,7 +158,7 @@ export default function IntercompanyLinks() {
     if (recipientsDialogLink && recipientsData.length >= 0) {
       setRecipientForm(recipientsData.map((r) => r.userId));
     }
-  }, [recipientsData, recipientsDialogLink?.id]);
+  }, [recipientsData, recipientsDialogLink]);
 
   // Mutations
   const createMutation = useMutation({
@@ -172,7 +172,7 @@ export default function IntercompanyLinks() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, payload }: { id: number; payload: any }) =>
+    mutationFn: ({ id, payload }: { id: number; payload: { label: string | null; sourceCompanyId: number; sourceLedgerAccountId: number; destCompanyId: number; destLedgerAccountId: number; } }) =>
       apiRequest("PUT", `/api/intercompany-links/${id}`, payload),
     onSuccess: () => {
       toast({ title: "Link updated" });

@@ -184,13 +184,13 @@ export function registerSupplierFxTransferRoutes(app: Express) {
       const supplierAvail = totalValue - totalCommission - totalPaid - fxSupplierOut;
       const commAvail = totalCommission - fxCommOut;
 
-      let available: number;
+      let _available: number;
       if (sourceType === "commission") {
-        available = commAvail;
+        _available = commAvail;
       } else if (sourceType === "both") {
-        available = supplierAvail + commAvail;
+        _available = supplierAvail + commAvail;
       } else {
-        available = supplierAvail; // "supplier" (default)
+        _available = supplierAvail; // "supplier" (default)
       }
 
       // ─────────────────────────────────────────────────────────────────────────

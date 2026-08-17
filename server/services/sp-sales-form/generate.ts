@@ -260,7 +260,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
   const entryWs = wb.getWorksheet("ENTRY");
   const costingWs = wb.getWorksheet("Costing");
   const salesWs = wb.getWorksheet("Sales");
-  const ageingWs = wb.getWorksheet("Ageing");
+  const _ageingWs = wb.getWorksheet("Ageing");
   const summaryIWs = wb.getWorksheet("Summary-Itemwise");
 
   if (!entryWs || !costingWs) throw new Error("ENTRY or Costing sheet missing from template");

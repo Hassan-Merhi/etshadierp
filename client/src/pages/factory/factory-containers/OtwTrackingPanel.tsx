@@ -41,11 +41,11 @@ export function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrac
     otwStatusFilter === "all" ? containers : containers.filter((c) => c.status === otwStatusFilter);
 
   const today = new Date().toDateString();
-  const checkedToday = containers.filter((c) => {
+  const _checkedToday = containers.filter((c) => {
     const fc = c as any;
     return fc.trackingLastCheckedAt && new Date(fc.trackingLastCheckedAt).toDateString() === today;
   }).length;
-  const withErrors = containers.filter((c) => !!(c as { trackingError: unknown }).trackingError).length;
+  const _withErrors = containers.filter((c) => !!(c as { trackingError: unknown }).trackingError).length;
   const timelineContainer = containers.find((c) => c.id === timelineId) ?? null;
 
   const trackNowMutation = useMutation({

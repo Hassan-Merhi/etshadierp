@@ -29,14 +29,14 @@ function LedgerAccountForm({
   isPending,
 }: {
   form: any;
-  onSubmit: (data: any, saveAndNew?: boolean) => void;
+  onSubmit: (data: false, saveAndNew?: boolean) => void;
   onCancel: () => void;
   isPending: boolean;
 }) {
-  const { toast } = useToast();
+  const { toast: _toast } = useToast();
   const { selectedCompany } = useCompany();
   const appMode = useAppMode();
-  const modeApiRequest = getApiRequest(appMode);
+  const _modeApiRequest = getApiRequest(appMode);
   const accountType = form.watch("accountType");
   const openingBalance = form.watch("openingBalance");
   // Get available subtypes based on account type

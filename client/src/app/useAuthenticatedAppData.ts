@@ -65,7 +65,7 @@ export function useAuthenticatedAppData({ selectedCompanyId, userPresent, isPOS 
     retry: 2,
   });
 
-  const { data: factorySettings } = useQuery<Record<string, any>>({
+  const { data: factorySettings } = useQuery<Record<string, unknown>>({
     queryKey: companyQueryKey("/api/factory/settings", selectedCompanyId),
     queryFn: async () => {
       const response = await fetch("/api/factory/settings");

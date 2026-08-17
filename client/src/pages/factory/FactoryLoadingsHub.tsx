@@ -34,7 +34,7 @@ export default function FactoryLoadingsHub() {
     } else {
       setActiveTab("loadings");
     }
-  }, [settingsLoaded, accessLoaded]); 
+  }, [settingsLoaded, accessLoaded, hash, showPending]); 
 
   // If showPending turns false while the pending tab is active, fall back
   useEffect(() => {

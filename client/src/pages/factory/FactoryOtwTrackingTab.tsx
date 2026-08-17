@@ -108,13 +108,13 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     return sa.localeCompare(sb);
   });
   // Summary stats
-  const pending = otwContainers.filter((c) => c.status === "PENDING").length;
+  const _pending = otwContainers.filter((c) => c.status === "PENDING").length;
   const inTransit = otwContainers.filter((c) => c.status === "IN_TRANSIT").length;
   const arrived = otwContainers.filter((c) => c.status === "ARRIVED").length;
   const delayed = otwContainers.filter((c) => calcDelayDays(c) > 0).length;
-  const withErrors = otwContainers.filter((c) => !!c.trackingError).length;
+  const _withErrors = otwContainers.filter((c) => !!c.trackingError).length;
   const today = new Date().toDateString();
-  const checkedToday = otwContainers.filter((c) => {
+  const _checkedToday = otwContainers.filter((c) => {
     const fc = c;
     return fc.trackingLastCheckedAt && new Date(fc.trackingLastCheckedAt).toDateString() === today;
   }).length;
@@ -172,7 +172,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
   const totalWeight = filtered.reduce((sum, c) => sum + num(c.totalKg), 0);
   const timelineContainer = otwContainers.find((c) => c.id === timelineId) ?? null;
   const trackingEnabledCount = otwContainers.filter((c) => c.trackingEnabled !== false).length;
-  const hasActiveFilters =
+  const _hasActiveFilters =
     search ||
     supplierFilter !== "all" ||
     freightFilter !== "all" ||

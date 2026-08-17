@@ -223,7 +223,7 @@ export default function ProformaAddLine() {
 
     return clearAutoSaveTimers;
     
-  }, [autoSave, selectedItem?.id, qty, price]);
+  }, [addMutation, autoSave, price, qty, selectedItem]);
 
   const handleSelectItem = (item: StockItem) => {
     if (selectedItem?.id === item.id) {

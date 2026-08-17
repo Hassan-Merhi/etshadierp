@@ -4,7 +4,7 @@ import { requireAuth } from "../../auth";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 
-function requestCompanyId(req: any): number | null {
+function requestCompanyId(req: import("express").Request): number | null {
   const raw = req.session?.factoryCompanyId || req.session?.currentCompanyId;
   const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
@@ -70,7 +70,7 @@ const LEDGER_CLASSIFICATION_SQL = `
   END
 `;
 
-async function sendLedgerSummary(companyId: number, res: any): Promise<void> {
+async function sendLedgerSummary(companyId: number, res: import("express").Response): Promise<void> {
   const result = await pool.query(
     `WITH classified AS (
        SELECT
@@ -146,7 +146,7 @@ async function sendLedgerSummary(companyId: number, res: any): Promise<void> {
   res.json({ ...buckets, totals: { ...totals, grand } });
 }
 
-async function sendLedgerDetails(companyId: number, req: any, res: any): Promise<void> {
+async function sendLedgerDetails(companyId: number, req: import("express").Request, res: import("express").Response): Promise<void> {
   const section = String(req.query.section || "");
   const validSections = new Set(["currentStock", "wasteStock", "sold", "wasteDispatched", "pendingLoading"]);
   if (!validSections.has(section)) {

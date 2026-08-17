@@ -94,12 +94,12 @@ export function StockEntryTab() {
         selectedLogoId,
       });
     }
-  }, [cart, productionPositionByProduct, selectedLocationId, entryDate, selectedCustomerId, selectedLogoId]);
+  }, [cart, productionPositionByProduct, selectedLocationId, entryDate, selectedCustomerId, selectedLogoId, scheduleCartSave]);
 
-  const { data: baleProducts, isLoading: productsLoading } = useQuery<FactoryBaleProduct[]>({
+  const { data: baleProducts, isLoading: _productsLoading } = useQuery<FactoryBaleProduct[]>({
     queryKey: ["/api/factory/bale-products"],
   });
-  const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
+  const { data: _currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const { data: locations } = useQuery<Location[]>({ queryKey: ["/api/locations"] });
   const { data: categories } = useQuery<FactoryCategory[]>({ queryKey: ["/api/factory/categories"] });
 

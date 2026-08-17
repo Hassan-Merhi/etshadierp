@@ -112,7 +112,7 @@ export function computeFactoryGuardRedirect(params: {
   isFactoryRoute: boolean;
   isAdminOwner: boolean;
   myAccess: MyAccess | undefined;
-  factorySettings: Record<string, any> | undefined;
+  factorySettings: Record<string, unknown> | undefined;
   factoryDefaultPage: string;
   currentLocation: string;
 }): string | null {

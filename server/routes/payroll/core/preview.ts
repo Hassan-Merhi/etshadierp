@@ -215,6 +215,7 @@ export function registerPayrollPreviewRoutes(app: Express) {
 
         return {
           id: worker.id,
+          employeeCode: worker.employeeCode || null,
           name: worker.fullName,
           position: worker.position || null,
           base,

@@ -72,7 +72,7 @@ function uniqueDestinationCode(code: string, occupied: Set<string>): string {
   throw new AccountMigrationConflict(`Could not generate a unique destination code for ${code}.`);
 }
 
-async function lockCompanies(tx: any, sourceCompanyId: number, destinationCompanyId: number) {
+async function lockCompanies(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], sourceCompanyId: number, destinationCompanyId: number) {
   const ids = [sourceCompanyId, destinationCompanyId].sort((a, b) => a - b);
   for (const companyId of ids) {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('account-migration'), ${companyId})`);
@@ -89,7 +89,7 @@ function deepestError(error: unknown): any {
   return current ?? error;
 }
 
-function respondWithError(res: any, error: unknown) {
+function respondWithError(res: import("express").Response, error: unknown) {
   if (error instanceof AccountMigrationConflict) {
     return res.status(error.status).json({ message: error.message });
   }

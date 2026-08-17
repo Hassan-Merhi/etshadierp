@@ -51,11 +51,7 @@ export function isValidScreenFeedDataUrl(value: unknown): value is string {
 
 export function sanitizeScreenFeedFailureReason(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
-  const sanitized = value
-    .replace(URL_LIKE_RE, "[url]")
-    .replace(EMAIL_LIKE_RE, "[email]")
-    
-    .replace(/[\u0000-\u001f\u007f]/g, " ")
+  const sanitized = Array.from(value).map((character) => { const code = character.charCodeAt(0); return code <= 31 || code === 127 ? " " : character; }).join("").replace(URL_LIKE_RE, "[url]").replace(EMAIL_LIKE_RE, "[email]")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, MAX_FAILURE_REASON_LENGTH);

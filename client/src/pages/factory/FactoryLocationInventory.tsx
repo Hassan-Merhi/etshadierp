@@ -833,7 +833,7 @@ export default function FactoryLocationInventory() {
     setFinalizeOpen(true);
   };
 
-  const doSaveProforma = () => {
+  const doSaveProforma = useCallback(() => {
     const lines = selectedItems.map((item) => ({
       articleCode: item.articleCode,
       productName: item.productName,
@@ -850,7 +850,7 @@ export default function FactoryLocationInventory() {
         lines,
       });
     }
-  };
+  }, [bulkCreateMutation, editingProformaId, proformaName, replaceLinesMutation, selectedCustomerId, selectedItems]);
 
   const handleSaveProforma = () => {
     if (!selectedCustomerId) {
@@ -896,7 +896,7 @@ export default function FactoryLocationInventory() {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
     
-  }, [proformaAutoSave, proformaMode, editingProformaId, selections, editModeInitialized]);
+  }, [proformaAutoSave, proformaMode, editingProformaId, selections, editModeInitialized, doSaveProforma]);
 
   const handleExportExcel = () => {
     if (!savedProformaId) return;

@@ -76,10 +76,7 @@ export function sanitizeDownloadFileName(value: unknown): string | null {
     throw new ProtectedAssetAccessError("ASSET_FILE_NAME_INVALID");
   }
 
-  const normalized = value
-    .normalize("NFKC")
-    
-    .replace(/[\u0000-\u001f\u007f]/g, "")
+  const normalized = Array.from(value.normalize("NFKC")).filter((character) => { const code = character.charCodeAt(0); return code > 31 && code !== 127; }).join("")
     .replace(/[\\/]+/g, "-")
     .replace(/\.\.+/g, ".")
     .trim();

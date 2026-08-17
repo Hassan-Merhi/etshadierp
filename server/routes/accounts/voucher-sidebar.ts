@@ -94,7 +94,7 @@ export function registerAccountVoucherSidebarRoutes(app: Express) {
       // Strip internal system-only accounts (sp_stock, sp_opnbal are isHidden=true for a reason)
       const ledgers = ledgersRaw.filter((a) => !["sp_stock", "sp_opnbal"].includes(a.subType ?? ""));
 
-      const companyVoucherIds = companyVouchers.map((v) => v.id);
+      const _companyVoucherIds = companyVouchers.map((v) => v.id);
       // FACTORY-PAY-* voucher IDs — excluded when computing factory supplier voucher-paid amounts
       // to prevent double-counting with fPayments (factorySupplierPayments).
       const factoryPayVoucherIds = new Set(

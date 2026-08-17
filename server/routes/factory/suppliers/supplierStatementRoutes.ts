@@ -589,7 +589,7 @@ export function registerSupplierStatementRoutes(app: Express) {
         if (cg.currencyCode === "USD") return sum + netPay;
         // Weighted-average fxRateToUsd across this currency's containers whose rate actually
         // looks resolved (confirmed non-USD rate, or legacy heuristic where no flag exists yet).
-        const ctrs: any[] = cg.containers;
+        const ctrs = cg.containers;
         const resolvedCtrs = ctrs.filter((c) => {
           const { looksSet } = resolveStoredFxRate(cg.currencyCode, c.fxRateToUsd, c.fxRateConfirmed);
           return looksSet;
@@ -702,7 +702,7 @@ export function registerSupplierStatementRoutes(app: Express) {
         const sign = neg ? "-" : "+";
         return `${sign}${prefix}${parseFloat(amt || "0").toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       };
-      const ledger: any[] = [
+      const ledger = [
         ...enrichedStatement.map((s) => ({
           key: `c-${s.id}`,
           date: s.date,

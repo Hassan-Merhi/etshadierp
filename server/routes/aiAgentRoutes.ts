@@ -275,7 +275,7 @@ export function registerAiAgentRoutes(app: Express) {
           .limit(50);
 
         res.json(tasks);
-      } catch (err: unknown) {
+      } catch (_err: unknown) {
         res.status(500).json({ message: "Internal server error" });
       }
     }
@@ -484,7 +484,7 @@ export function registerAiAgentRoutes(app: Express) {
 
         // Check if there are more pending steps
         const hasMore = plan.steps.some((s) => s.status === "pending");
-        const newTaskStatus = hasMore ? "running" : "completed";
+        const _newTaskStatus = hasMore ? "running" : "completed";
 
         // If more steps, run them now
         if (hasMore) {

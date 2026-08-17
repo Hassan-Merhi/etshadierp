@@ -52,8 +52,8 @@ const typeBadgeClass: Record<string, string> = {
 export default function Customers() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
-  const { formatAmount, formatCashAmount } = useCurrencyContext();
-  const [, navigate] = useLocation();
+  const { formatAmount: _formatAmount, formatCashAmount } = useCurrencyContext();
+  const [, _navigate] = useLocation();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);

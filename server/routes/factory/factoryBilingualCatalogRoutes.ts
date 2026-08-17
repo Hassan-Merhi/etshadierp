@@ -28,7 +28,7 @@ function readCookie(header: unknown, name: string): string | null {
   return null;
 }
 
-function getRequestLanguage(req: any): FactoryCatalogLanguage {
+function getRequestLanguage(req: import("express").Request): FactoryCatalogLanguage {
   return parseFactoryCatalogLanguage(
     req.query?.lang ?? req.headers?.["x-factory-catalog-language"] ?? readCookie(req.headers?.cookie, LANGUAGE_COOKIE),
     "en"
@@ -50,14 +50,14 @@ function mapCategory(category: typeof factoryCategories.$inferSelect, language: 
   };
 }
 
-function sendFactoryCompanyAccessError(res: any) {
+function sendFactoryCompanyAccessError(res: import("express").Response) {
   return res.status(403).json({
     message: "You do not have access to the selected Factory company.",
     code: "FACTORY_COMPANY_ACCESS_REQUIRED",
   });
 }
 
-async function sendCategories(req: any, res: any, companyId: number) {
+async function sendCategories(req: import("express").Request, res: import("express").Response, companyId: number) {
   const language = getRequestLanguage(req);
   const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
   const filters = [eq(factoryCategories.companyId, companyId), isNull(factoryCategories.deletedAt)];
@@ -72,7 +72,7 @@ async function sendCategories(req: any, res: any, companyId: number) {
   return res.json(results.map((category) => mapCategory(category, language)));
 }
 
-async function sendProducts(req: any, res: any, companyId: number) {
+async function sendProducts(req: import("express").Request, res: import("express").Response, companyId: number) {
   const language = getRequestLanguage(req);
   const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
   const filters = [eq(factoryBaleProducts.companyId, companyId), isNull(factoryBaleProducts.deletedAt)];
@@ -128,7 +128,7 @@ async function sendProducts(req: any, res: any, companyId: number) {
   );
 }
 
-async function sendProductDetail(req: any, res: any, companyId: number, id: number) {
+async function sendProductDetail(req: import("express").Request, res: import("express").Response, companyId: number, id: number) {
   const language = getRequestLanguage(req);
   const [row] = await db
     .select({
@@ -169,7 +169,7 @@ async function sendProductDetail(req: any, res: any, companyId: number, id: numb
 }
 
 async function applyDeferredProductArabic(
-  req: any,
+  req: import("express").Request,
   payload: any,
   deferred: { nameAr?: string | null; descriptionAr?: string | null },
   suppressFallbacks: boolean
@@ -200,7 +200,7 @@ async function applyDeferredProductArabic(
   return product ? (payload?.product ? { ...payload, product } : product) : payload;
 }
 
-function prepareMutation(req: any, res: any, next: any) {
+function prepareMutation(req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) {
   const method = req.method.toUpperCase();
   const path = req.path;
   const language = getRequestLanguage(req);
@@ -284,7 +284,7 @@ function prepareMutation(req: any, res: any, next: any) {
   return next();
 }
 
-async function factoryBilingualCatalogMiddleware(req: any, res: any, next: any) {
+async function factoryBilingualCatalogMiddleware(req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) {
   if (req.method !== "GET") return prepareMutation(req, res, next);
   if (req.query.legacy === "1") return next();
 

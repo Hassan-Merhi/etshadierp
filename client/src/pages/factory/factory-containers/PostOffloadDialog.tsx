@@ -80,7 +80,7 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
       txDate: d,
     }: {
       containerId: number;
-      charges: any[];
+      charges: { description: string; amount: string; currencyCode: string; ledgerAccountId: number | null; supplierId: number | null; }[];
       txDate: string;
     }) => {
       const res = await factoryApiRequest("POST", `/api/factory/containers/${containerId}/post-offload-charges`, {

@@ -1,6 +1,6 @@
 import type { ClientErrorLike } from "@/lib/clientError";
 import { getErrorDetails } from "@shared/errorUtils";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -102,28 +102,6 @@ export default function Login() {
     setHasSavedPasskey(!!localStorage.getItem(passkeyStorageKey(username.trim())));
   }, [username, isNative]);
 
-  useEffect(() => {
-    if (!isNative) return;
-    (async () => {
-      try {
-        const info = await BiometricAuth.checkBiometry();
-        if (!info.isAvailable) return;
-        setBiometryAvailable(true);
-        setBiometryType(info.biometryTypes?.[0] ?? null);
-        const creds = await loadBiometricCredentials();
-        if (!creds) return;
-        setHasSavedCreds(true);
-        const { value: optIn } = await Preferences.get({ key: OPT_IN_KEY });
-        if (optIn === "yes") {
-          setTimeout(() => triggerBiometric(creds), 600);
-        }
-      } catch {
-        /* biometrics not available */
-      }
-    })();
-    
-  }, [isNative]);
-
   const [, navigate] = useLocation();
   const passkeySupported =
     PASSKEY_ENABLED && !isNative && typeof window !== "undefined" && !!window.PublicKeyCredential;
@@ -214,7 +192,7 @@ export default function Login() {
     finalizeLogin();
   };
 
-  const triggerBiometric = async (creds?: { username: string; password: string }) => {
+  const triggerBiometric = useCallback(async (creds?: { username: string; password: string }) => {
     setBiometryPending(true);
     try {
       await BiometricAuth.authenticate({
@@ -243,7 +221,29 @@ export default function Login() {
     } finally {
       setBiometryPending(false);
     }
-  };
+  }, [loginMutation, toast]);
+
+useEffect(() => {
+    if (!isNative) return;
+    (async () => {
+      try {
+        const info = await BiometricAuth.checkBiometry();
+        if (!info.isAvailable) return;
+        setBiometryAvailable(true);
+        setBiometryType(info.biometryTypes?.[0] ?? null);
+        const creds = await loadBiometricCredentials();
+        if (!creds) return;
+        setHasSavedCreds(true);
+        const { value: optIn } = await Preferences.get({ key: OPT_IN_KEY });
+        if (optIn === "yes") {
+          setTimeout(() => triggerBiometric(creds), 600);
+        }
+      } catch {
+        /* biometrics not available */
+      }
+    })();
+    
+  }, [isNative, triggerBiometric]);
 
   const handleRegisterPasskey = async () => {
     setPasskeyRegPending(true);

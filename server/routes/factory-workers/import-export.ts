@@ -262,7 +262,7 @@ export function registerFactoryWorkerImportExportRoutes(app: Express, requireAut
           existingWorkers.filter((w: any) => w.nationalId).map((w: any) => [w.nationalId, w])
         );
 
-        const parseDate = (v: any): string | null => {
+        const parseDate = (v: number): string | null => {
           if (!v) return null;
           if (typeof v === "number") {
             // Excel serial date

@@ -154,7 +154,7 @@ async function guardSpOffload(req: Request, res: Response, next: NextFunction): 
 
     const requestedCharges = Array.isArray(req.body?.chargeLines) ? req.body.chargeLines : [];
     const requestedLandedTotal = requestedCharges.reduce(
-      (sum: number, charge: any) => sum + (Number.isFinite(Number(charge?.amountUsd)) ? Number(charge.amountUsd) : 0),
+      (sum: number, charge: Record<string, unknown>) => sum + (Number.isFinite(Number(charge?.amountUsd)) ? Number(charge.amountUsd) : 0),
       0
     );
     const replayCompatible = existingOffload
@@ -197,10 +197,10 @@ async function guardSpOffload(req: Request, res: Response, next: NextFunction): 
     }
 
     const requiredSubTypes = ["sp_goods_otw", "sp_otw_clearing", "sp_stock", "sp_cost_clearing"];
-    if (requestedCharges.some((charge: any) => charge?.chargeType === "prepaid_used")) {
+    if (requestedCharges.some((charge: Record<string, unknown>) => charge?.chargeType === "prepaid_used")) {
       requiredSubTypes.push("sp_prepaid");
     }
-    if (requestedCharges.some((charge: any) => charge?.chargeType === "parent_agent")) {
+    if (requestedCharges.some((charge: Record<string, unknown>) => charge?.chargeType === "parent_agent")) {
       requiredSubTypes.push("sp_prepaid_expenses");
     }
 
@@ -225,8 +225,8 @@ async function guardSpOffload(req: Request, res: Response, next: NextFunction): 
 
     const bankIds = uniquePositiveIds(
       requestedCharges
-        .filter((charge: any) => charge?.chargeType === "paid_now")
-        .map((charge: any) => charge?.creditBankAccountId)
+        .filter((charge: Record<string, unknown>) => charge?.chargeType === "paid_now")
+        .map((charge: Record<string, unknown>) => charge?.creditBankAccountId)
     );
     if (bankIds.length > 0) {
       const bankRows = await client.query<{ id: number }>(
@@ -247,8 +247,8 @@ async function guardSpOffload(req: Request, res: Response, next: NextFunction): 
 
     const ledgerIds = uniquePositiveIds(
       requestedCharges
-        .filter((charge: any) => charge?.chargeType === "unpaid_payable" || charge?.chargeType === "other")
-        .map((charge: any) => charge?.creditLedgerAccountId)
+        .filter((charge: Record<string, unknown>) => charge?.chargeType === "unpaid_payable" || charge?.chargeType === "other")
+        .map((charge: Record<string, unknown>) => charge?.creditLedgerAccountId)
     );
     if (ledgerIds.length > 0) {
       const ledgerRows = await client.query<{ id: number }>(
@@ -271,8 +271,8 @@ async function guardSpOffload(req: Request, res: Response, next: NextFunction): 
 
     const parentAgentIds = uniquePositiveIds(
       requestedCharges
-        .filter((charge: any) => charge?.chargeType === "parent_agent")
-        .map((charge: any) => charge?.parentAgentAccountId)
+        .filter((charge: Record<string, unknown>) => charge?.chargeType === "parent_agent")
+        .map((charge: Record<string, unknown>) => charge?.parentAgentAccountId)
     );
     if (parentAgentIds.length > 0) {
       const parentCompany = await client.query<{ parent_company_id: number | null }>(

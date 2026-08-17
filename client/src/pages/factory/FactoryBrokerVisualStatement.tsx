@@ -16,8 +16,8 @@ import { FileText, TrendingUp, CreditCard, DollarSign } from "lucide-react";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const DISPLAY_CURRENCIES = ["EUR", "AUD", "USD"] as const;
-type DisplayCcy = (typeof DISPLAY_CURRENCIES)[number];
+const _DISPLAY_CURRENCIES = ["EUR", "AUD", "USD"] as const;
+type _DisplayCcy = (typeof _DISPLAY_CURRENCIES)[number];
 
 function fmt(n: number, decimals = 2) {
   if (!n || n === 0) return "";

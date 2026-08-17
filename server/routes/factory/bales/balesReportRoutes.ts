@@ -326,7 +326,7 @@ export function registerBalesReportRoutes(app: Express) {
       const fmtN = (v: any, dec = 3) =>
         parseFloat(v || "0").toLocaleString("en-US", { minimumFractionDigits: dec, maximumFractionDigits: dec });
       const NAVY = "#1F3864";
-      const LIGHT_BLUE = "#EFF3FB";
+      const _LIGHT_BLUE = "#EFF3FB";
       const STRIPE = "#F8F8F8";
       const GROUP_BG = "#E8ECF4";
       const pageW = 515; // usable width with 40px margin each side
@@ -386,7 +386,7 @@ export function registerBalesReportRoutes(app: Express) {
       doc.fillColor("#000000");
       let y = tableTop + 16;
 
-      let rowIdx = 0;
+      let _rowIdx = 0;
       for (const g of groups) {
         // page break check — need room for group row + at least one bale row
         if (y > 780) {
@@ -439,7 +439,7 @@ export function registerBalesReportRoutes(app: Express) {
           y += 12;
         }
 
-        rowIdx++;
+        _rowIdx++;
       }
 
       // ── Totals footer ─────────────────────────────────────────────────────

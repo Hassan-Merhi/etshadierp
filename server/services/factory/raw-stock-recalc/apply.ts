@@ -31,7 +31,7 @@ const RECALC_REFUSED_STATUSES = new Set(["CLOSED", "COMPLETED"]);
 const RECALC_LOCK_NAMESPACE = 9001;
 
 export interface ApplyRawStockRecalcOptions {
-  onAudit?: (tx: any, result: ApplyResult) => Promise<void>;
+  onAudit?: (tx: Parameters<Parameters<typeof db.transaction>[0]>[0], result: ApplyResult) => Promise<void>;
   expectedFingerprints?: Record<number, string>;
   includeCompletedBatches?: boolean;
   /** Allow CLOSED/COMPLETED containers when all safety checks pass. */
@@ -44,7 +44,7 @@ export interface ApplyRawStockRecalcOptions {
  * needs to be written.
  */
 async function isFullyCorrect(
-  tx: any,
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   containerId: number,
   next: ReturnType<typeof computeCorrectContainerCost>,
   container: any,

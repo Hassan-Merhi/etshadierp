@@ -67,7 +67,7 @@ function hashGroupId(groupId: string): bigint {
  * Returns the created voucherId (or null if no cashAccountId).
  */
 async function postGroupCore(
-  tx: any,
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   opts: {
     companyId: number;
     module: RentalModule;
@@ -102,7 +102,7 @@ async function postGroupCore(
     allocs,
     totalAmountStr,
     paymentDate,
-    asOfDate,
+    asOfDate: _asOfDate,
     currency,
     exchangeRate,
     narration,
@@ -200,7 +200,7 @@ async function postGroupCore(
       { allocs, totalAmountStr, cashAccountId, currency, exchangeRate }
     );
 
-    const payEntries: any[] = [
+    const payEntries = [
       { voucherId: v.id, ledgerAccountId: cashAccountId, ...normEntry("0", totalAmountStr), narration },
     ];
 
@@ -393,7 +393,7 @@ async function postGroupCore(
       { allocs, totalAmountStr, cashAccountId, currency, exchangeRate }
     );
 
-    const lEntries: any[] = [
+    const lEntries = [
       {
         voucherId: v.id,
         ledgerAccountId: cashAccountId,

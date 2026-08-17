@@ -11,9 +11,9 @@ import { Loader2 } from "lucide-react";
 
 interface ApproveRevisionDialogProps {
   approveRevisionTarget: any;
-  setApproveRevisionTarget: (target: any) => void;
+  setApproveRevisionTarget: (target: null) => void;
   approveRevisionMutation: any;
-  formatNumber: (num: any, decimals?: number) => string;
+  formatNumber: (num: number, decimals?: number) => string;
 }
 
 export function ApproveRevisionDialog({

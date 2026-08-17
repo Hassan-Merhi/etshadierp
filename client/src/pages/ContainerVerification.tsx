@@ -115,7 +115,7 @@ export default function ContainerVerification() {
   });
 
   const updateItemMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+    mutationFn: async ({ id, data }: { id: number; data: { barcode: string; itemName: string; qty: string; weightPerBale: string; pricePerBale: string; } }) => {
       const res = await apiRequest("PATCH", `/api/container-loaded-items/${id}`, data);
       return res.json();
     },
@@ -294,7 +294,7 @@ export default function ContainerVerification() {
     ) {
       autoPopulateMutation.mutate();
     }
-  }, [loadedItems, loadingItems, containerData]);
+  }, [loadedItems, loadingItems, containerData, autoPopulateMutation]);
 
   // Auto-select supplier when opened via "Compare" from Daybook (supplierId URL param).
   useEffect(() => {

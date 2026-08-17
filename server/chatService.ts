@@ -321,7 +321,7 @@ export async function chat(
             const { content, totalLines, truncated } = await readProjectFile(fp);
             codeContext += `\n\n**File: ${fp}** (${totalLines} lines${truncated ? `, first 300 shown` : ""})\n\`\`\`typescript\n${content}\n\`\`\``;
             if (!codeReadFiles.includes(fp)) codeReadFiles.push(fp);
-          } catch (err: unknown) {
+          } catch (_err: unknown) {
             // Still not found — fall back to grep by base name
             const basename = fp.replace(/.*\//, "").replace(/\.\w+$/, "");
             const grepResult = await grepProjectFiles(basename, ".").catch(() => "(not found)");
@@ -437,7 +437,7 @@ export async function chat(
         }
       }
 
-      const primaryFilePath = resolvedPaths[0] ?? codeReadFiles[0] ?? "path/to/file.ts";
+      const _primaryFilePath = resolvedPaths[0] ?? codeReadFiles[0] ?? "path/to/file.ts";
       const contentSection = contentBlocks.length > 0 ? "\n\n" + contentBlocks.join("\n\n") : "";
 
       systemPrompt = `You are a senior TypeScript engineer on this ERP/POS project (React 18 + Express + Drizzle ORM + shadcn/ui). You MUST respond with ONLY a valid JSON object — no markdown, no explanation, ONLY raw JSON.

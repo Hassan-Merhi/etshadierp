@@ -259,22 +259,7 @@ export function useVoucherHydration({
       }
       setVoucherEffectiveDate(voucherToEdit.effectiveDate || "");
     }
-  }, [
-    voucherToEdit,
-    allAccounts,
-    bankAccounts,
-    bankAccountsFetched,
-    ledgerAccounts,
-    ledgerAccountsFetched,
-    suppliers,
-    suppliersFetched,
-    employees,
-    fixedAssets,
-    customers,
-    customersFetched,
-    factorySuppliersList,
-    form,
-  ]);
+  }, [voucherToEdit, allAccounts, bankAccounts, bankAccountsFetched, ledgerAccounts, ledgerAccountsFetched, suppliers, suppliersFetched, employees, fixedAssets, customers, customersFetched, factorySuppliersList, form, setVoucherEffectiveDate, setTransactionRate]);
 
   return { hydratedVoucherIdRef };
 }

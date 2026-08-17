@@ -47,7 +47,7 @@ export function registerFactoryProfitabilityRoutes(app: Express, requireAuth: an
       if (bales.length === 0) return res.json([]);
 
       const mixBatchIds = Array.from(new Set(bales.map((b: any) => b.mixBatchId).filter(Boolean))) as number[];
-      const sources =
+      const _sources =
         mixBatchIds.length > 0
           ? await db
               .select()
@@ -72,7 +72,7 @@ export function registerFactoryProfitabilityRoutes(app: Express, requireAuth: an
 
       const orderBaleMap = new Map<number, any>(orderBales.map((ob: any) => [ob.baleId, ob]));
 
-      const freightEntries = await db.select().from(containerFreight).where(eq(containerFreight.companyId, companyId));
+      const _freightEntries = await db.select().from(containerFreight).where(eq(containerFreight.companyId, companyId));
 
       const result = bales.map((bale: any) => {
         const weightKg = parseFloat(bale.weightKg || "0");

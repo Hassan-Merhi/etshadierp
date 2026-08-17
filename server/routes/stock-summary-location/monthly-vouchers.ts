@@ -204,7 +204,7 @@ export function registerLocationMonthlyVoucherRoutes(app: Express) {
         // Calculate voucher-derived opening balance
         const voucherOpeningQty = priorInwardQty - priorOutwardQty;
         const voucherOpeningValue = priorInwardValue - priorOutwardValue;
-        const voucherOpeningRate = voucherOpeningQty > 0 ? voucherOpeningValue / voucherOpeningQty : 0;
+        const _voucherOpeningRate = voucherOpeningQty > 0 ? voucherOpeningValue / voucherOpeningQty : 0;
 
         // ============ CALCULATE MOVEMENTS AFTER THE SELECTED MONTH ============
         // To reconcile with inventory, we need to work backwards from current inventory
@@ -558,7 +558,7 @@ export function registerLocationMonthlyVoucherRoutes(app: Express) {
 
         for (const item of offloadData) {
           const qty = parseFloat(item.quantity);
-          const baseRate = parseFloat(item.rate);
+          const _baseRate = parseFloat(item.rate);
           const baseValue = parseFloat(item.lineTotal);
           const additionalCostPerBale = parseFloat(item.additionalCostPerBale);
           const additionalCost = additionalCostPerBale * qty;
@@ -597,12 +597,12 @@ export function registerLocationMonthlyVoucherRoutes(app: Express) {
 
         // Calculate in-month net movements from transactions
         let inMonthInwardQty = 0;
-        let inMonthInwardValue = 0;
+        let _inMonthInwardValue = 0;
         let inMonthOutwardQty = 0;
 
         for (const t of transactions) {
           inMonthInwardQty += t.inwardQty;
-          inMonthInwardValue += t.inwardValue;
+          _inMonthInwardValue += t.inwardValue;
           inMonthOutwardQty += t.outwardQty;
         }
 
@@ -617,7 +617,7 @@ export function registerLocationMonthlyVoucherRoutes(app: Express) {
         // The difference represents imported/adjusted stock not captured by vouchers
         const importedQty = expectedOpeningQty - voucherOpeningQty;
         const importedValue = expectedOpeningValue - voucherOpeningValue;
-        const importedRate = importedQty > 0 ? importedValue / importedQty : 0;
+        const _importedRate = importedQty > 0 ? importedValue / importedQty : 0;
 
         // Use the expected opening (which reconciles with inventory) as the actual opening
         // For value, use the expected rate from inventory (this ensures consistency)

@@ -687,7 +687,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       (e) => !(e.stockItemId > 0 && e.sourceLocationId > 0 && parseFloat(e.quantity) === 0)
     );
     const isEditMode = !!voucherIdToEdit;
-    let originalItems = [];
+    let _originalItems = [];
     if (isEditMode && voucherIdToEdit) {
       let st = stockTransferToEdit as any | undefined;
       if (!st) {
@@ -701,7 +701,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
           // Best-effort side request; the user-visible flow does not depend on it completing.
         }
       }
-      if (st?.items) originalItems = st.items;
+      if (st?.items) _originalItems = st.items;
     }
     await stockTransferMutation.mutateAsync(data);
   };

@@ -16,7 +16,7 @@ import { Loader2, BarChart3, CreditCard, CheckCircle2, FileSpreadsheet } from "l
 const REPORT_TABS = ["payable", "profit", "sales-form"] as const;
 type ReportTab = (typeof REPORT_TABS)[number];
 
-function fmt(v: any, dec = 2) {
+function fmt(v: number, dec = 2) {
   const n = parseFloat(String(v ?? "0"));
   return isNaN(n)
     ? `$0.${"0".repeat(dec)}`

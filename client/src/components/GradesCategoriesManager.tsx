@@ -56,7 +56,7 @@ function MetaList({
   title,
   icon: Icon,
   apiPath,
-  queryKey,
+  queryKey: _queryKey,
   testPrefix,
 }: {
   title: string;

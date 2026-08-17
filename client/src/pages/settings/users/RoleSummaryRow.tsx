@@ -16,7 +16,7 @@ interface RoleSummaryRowProps {
 
 const NON_RESTRICTABLE_ROLES = ["Developer", "Admin"];
 
-function countActivePermissions(role: string, permissions: any[]): number {
+function countActivePermissions(role: string, permissions: Record<string, unknown>[]): number {
   const isNormal = role === "Normal User";
   return permissions.filter((p) => {
     if (p.role !== role) return false;
@@ -44,7 +44,7 @@ function getRoleBadgeClass(role: string): string {
 export function RoleSummaryRow({ role, companyName, locationNames, isEditing, onEdit, onDelete }: RoleSummaryRowProps) {
   const [restrictionsOpen, setRestrictionsOpen] = useState(false);
   const isPOS = role.role === "POS";
-  const isPrivileged = ["Admin", "Owner", "Developer"].includes(role.role);
+  const _isPrivileged = ["Admin", "Owner", "Developer"].includes(role.role);
   const canShowRestrictions = !NON_RESTRICTABLE_ROLES.includes(role.role) && !!role.companyId;
 
   const { data: allPermissions = [] } = useQuery({

@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Loader2, ArrowRight } from "lucide-react";
 
-function fmt(v: any, dec = 2) {
+function fmt(v: number, dec = 2) {
   const n = parseFloat(String(v ?? "0"));
   return isNaN(n)
     ? `$0.${"0".repeat(dec)}`

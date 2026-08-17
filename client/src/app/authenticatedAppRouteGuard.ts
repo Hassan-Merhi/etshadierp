@@ -24,7 +24,7 @@ interface ResolveAuthenticatedAppRouteOptions {
   myAccess?: FactoryAccess;
   myAccessLoading: boolean;
   myAccessError: boolean;
-  factorySettings?: Record<string, any>;
+  factorySettings?: Record<string, unknown>;
 }
 
 export function resolveAuthenticatedAppRoute({

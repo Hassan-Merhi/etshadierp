@@ -21,7 +21,7 @@ import { formatNumber } from "@/lib/formatNumber";
 
 import type { MergePreviewResult } from "../types";
 
-export function MergeStockItemsCard({ embedded }: { embedded?: boolean } = {}) {
+export function MergeStockItemsCard({ embedded: _embedded }: { embedded?: boolean } = {}) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const [keptItem, setKeptItem] = useState<{ id: number; name: string } | null>(null);

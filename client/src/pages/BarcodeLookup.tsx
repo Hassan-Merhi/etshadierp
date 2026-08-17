@@ -369,7 +369,7 @@ export default function BarcodeLookup() {
       setSearchValue(ref);
       setTimeout(() => referenceLookup.mutate(ref), 0);
     }
-  }, []);
+  }, [referenceLookup]);
 
   const handleSearch = () => {
     if (!searchValue.trim()) return;

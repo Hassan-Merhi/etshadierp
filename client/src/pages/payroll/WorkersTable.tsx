@@ -24,7 +24,7 @@ interface WorkersTableProps {
   handleUpdateAmount: (id: number, val: string) => void;
   handleDeleteWorker: (worker: Employee) => void;
   setStatementEmployee: (val: Employee | null) => void;
-  setWorkerOverrides: (val: any) => void;
+  setWorkerOverrides: (val: Record<string, unknown>) => void;
   formatAmount: (amt: number) => string;
   addWorkerToWorkerGroupMutation?: any;
   groupId?: number;
@@ -41,7 +41,7 @@ export function WorkersTable({
   handleUpdateAmount,
   handleDeleteWorker,
   setStatementEmployee,
-  setWorkerOverrides,
+  setWorkerOverrides: _setWorkerOverrides,
   formatAmount,
   addWorkerToWorkerGroupMutation,
   groupId,
@@ -63,7 +63,7 @@ export function WorkersTable({
         const advanceInfo = (worker as any).advanceInfo || { total: 0, count: 0 };
         const deductionInfo = (worker as any).deductionInfo || { total: 0, count: 0 };
         const monthlySalary = parseFloat(worker.monthlySalary || "0");
-        const balance = parseFloat((worker as any).calculatedBalance || "0");
+        const _balance = parseFloat((worker as any).calculatedBalance || "0");
         const paymentAmount = parseFloat(workerPayments[worker.id]?.amount || "0");
         const isSelected = workerPayments[worker.id]?.selected || false;
         const hasNegativePayment = paymentAmount < 0;

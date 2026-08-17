@@ -79,7 +79,7 @@ export default function BalesHistory() {
   const { colors: designColors } = useLabelDesignColors();
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [batchFilter, setBatchFilter] = useState("all");
+  const [batchFilter, _setBatchFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState(() => new Date().toLocaleDateString("en-CA"));
   const [currentPage, setCurrentPage] = useState(1);
@@ -151,7 +151,7 @@ export default function BalesHistory() {
   const { data: myAccess } = useQuery<{ fullAccess: boolean; pageKeys: string[]; hiddenCostFields: string[] }>({
     queryKey: ["/api/factory/my-access"],
   });
-  const hiddenCost = myAccess?.hiddenCostFields ?? [];
+  const _hiddenCost = myAccess?.hiddenCostFields ?? [];
 
   type BalesPage = { items: any[]; total: number; page: number; limit: number; totalPages: number };
   const { data: balesResponse, isLoading } = useQuery<BalesPage>({
@@ -190,7 +190,7 @@ export default function BalesHistory() {
   const serverTotalPages = balesResponse?.totalPages ?? 1;
   const serverTotal = balesResponse?.total ?? 0;
 
-  const { data: mixBatches } = useQuery<FactoryMixBatch[]>({
+  const { data: _mixBatches } = useQuery<FactoryMixBatch[]>({
     queryKey: ["/api/factory/mix-batches"],
   });
 

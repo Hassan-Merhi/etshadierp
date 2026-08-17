@@ -80,13 +80,6 @@ export function useOfflineQueue() {
     };
   }, [toast]);
 
-  // Auto-sync when coming back online
-  useEffect(() => {
-    if (isOnline && queue.some((q) => q.status === "pending" || q.status === "failed")) {
-      syncQueue();
-    }
-  }, [isOnline]);
-
   // Generate unique client ID for idempotency
   const generateClientId = useCallback(() => {
     return `pos_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
@@ -203,6 +196,12 @@ export function useOfflineQueue() {
       });
     }
   }, [isSyncing, isOnline, queue, toast]);
+
+useEffect(() => {
+    if (isOnline && queue.some((q) => q.status === "pending" || q.status === "failed")) {
+      syncQueue();
+    }
+  }, [isOnline, queue, syncQueue]);
 
   // Remove a failed sale from queue
   const removeFromQueue = useCallback((clientId: string) => {

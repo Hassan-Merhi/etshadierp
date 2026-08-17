@@ -95,7 +95,7 @@ interface CreditNoteTabProps {
 
 export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps) {
   const { toast } = useToast();
-  const { formatDisplayDate } = useDateFormat();
+  const { formatDisplayDate: _formatDisplayDate } = useDateFormat();
   const [items, setItems] = useState<CreditNoteItem[]>([]);
   const [selectedLocationId, setSelectedLocationId] = useState<number>(0);
   const [searchTerm, setSearchTerm] = useState("");
@@ -205,29 +205,6 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
   useEffect(() => {
     setHighlightedIndex(0);
   }, [searchTerm, selectedLocationId]);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (filteredItems.length === 0) return;
-
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        setHighlightedIndex((prev) => (prev < filteredItems.length - 1 ? prev + 1 : 0));
-      } else if (e.key === "ArrowUp") {
-        e.preventDefault();
-        setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : filteredItems.length - 1));
-      } else if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        const selectedItem = filteredItems[highlightedIndex];
-        if (selectedItem) {
-          addItemToCart(selectedItem);
-        }
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [filteredItems, highlightedIndex, itemQuantity, refundRate, selectedLocationId]);
 
   useEffect(() => {
     if (itemListRef.current) {
@@ -373,6 +350,29 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
     setRefundRate("");
     searchInputRef.current?.focus();
   }, [itemQuantity, locations, refundRate, selectedLocationId, toast]);
+
+useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (filteredItems.length === 0) return;
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setHighlightedIndex((prev) => (prev < filteredItems.length - 1 ? prev + 1 : 0));
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : filteredItems.length - 1));
+      } else if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        const selectedItem = filteredItems[highlightedIndex];
+        if (selectedItem) {
+          addItemToCart(selectedItem);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [addItemToCart, filteredItems, highlightedIndex]);
 
   const removeItem = (index: number) => {
     setItems((prev) => prev.filter((_, i) => i !== index));

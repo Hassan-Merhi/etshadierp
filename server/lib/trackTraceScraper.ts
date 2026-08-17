@@ -301,7 +301,7 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
     } else {
       // Fall back: click/submit via evaluate()
       const submitResult: string = await page
-        .evaluate((cn: string): string => {
+        .evaluate((_cn: string): string => {
           const allLinks = Array.from(
             document.querySelectorAll("a, button, input[type=submit], input[type=button]")
           ) as HTMLElement[];

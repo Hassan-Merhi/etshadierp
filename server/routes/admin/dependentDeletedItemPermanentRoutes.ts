@@ -70,7 +70,7 @@ function extractDatabaseErrorMetadata(error: unknown): DatabaseErrorMetadata {
  * deleted because the user explicitly chose Delete Forever.
  */
 async function clearRemainingRestrictiveReferences(
-  tx: any,
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   parentTable: "factory_containers" | "factory_mix_batches" | "customer_orders",
   parentId: number
 ): Promise<void> {

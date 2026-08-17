@@ -319,7 +319,7 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
   });
 
   // Print handler
-  function handlePrint() {
+  function _handlePrint() {
     window.print();
   }
 

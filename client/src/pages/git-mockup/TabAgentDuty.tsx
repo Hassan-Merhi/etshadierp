@@ -13,6 +13,8 @@ import type {
   AgentDutyWaSettings,
 } from "./types";
 
+const CONF_RANK: Record<AgentDutySummary["matchConfidence"], number> = { exact: 0, fuzzy: 1, unmapped: 2 };
+
 export function TabAgentDuty() {
   const [companyMode, setCompanyMode] = useState<CompanyViewMode>("session");
 
@@ -30,11 +32,15 @@ export function TabAgentDuty() {
     staleTime: 120_000,
   });
 
-  const sections: AgentDutyCompanySection[] = !data
-    ? []
-    : data.mode === "all"
-      ? data.companies
-      : [{ companyId: data.companyId, companyName: data.companyName, agents: data.agents }];
+  const sections: AgentDutyCompanySection[] = useMemo(
+    () =>
+      !data
+        ? []
+        : data.mode === "all"
+          ? data.companies
+          : [{ companyId: data.companyId, companyName: data.companyName, agents: data.agents }],
+    [data]
+  );
 
   useEffect(() => {
     const uniqueCompanyIds = [...new Set(sections.map((s) => s.companyId))];
@@ -69,9 +75,8 @@ export function TabAgentDuty() {
         .catch(() => {});
     }
     
-  }, [data]);
+  }, [data, sections]);
 
-  const CONF_RANK: Record<AgentDutySummary["matchConfidence"], number> = { exact: 0, fuzzy: 1, unmapped: 2 };
   // In "all companies" mode always merge agents with the same name across companies.
   const displaySections: AgentDutyCompanySection[] = useMemo(() => {
     if (companyMode !== "all" || sections.length <= 1) return sections;
@@ -115,7 +120,7 @@ export function TabAgentDuty() {
     }
     merged.sort((a, b) => a.agentName.localeCompare(b.agentName));
     return [{ companyId: 0, companyName: "All Companies", agents: merged }];
-  }, [sections, companyMode]); 
+  }, [companyMode, sections]); 
 
   const totalAgents = displaySections.reduce((s, c) => s + c.agents.length, 0);
 

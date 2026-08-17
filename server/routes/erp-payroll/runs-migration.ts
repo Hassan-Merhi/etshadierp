@@ -298,7 +298,7 @@ export function registerPayrollRunMigrationRoutes(app: Express) {
         }
 
         // Check if there are any named groups — if only __default__, still fix account code
-        const hasNamedGroups = [...byGroup.keys()].some((k) => k !== "__default__");
+        const _hasNamedGroups = [...byGroup.keys()].some((k) => k !== "__default__");
 
         // Delete old/generic debit entries (SALARY_EXPENSE or unsplit BONUS_EXPENSE)
         for (const de of debitRes.rows) {

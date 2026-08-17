@@ -85,7 +85,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
   const companyId = selectedCompany?.id;
   // forceErp: when an SP company opens an ERP-sourced container, treat it as a regular ERP container
   const isSupplierPartner = forceErp ? false : selectedCompany?.companyType === "supplier_partner";
-  const printRef = useRef<HTMLDivElement>(null);
+  const _printRef = useRef<HTMLDivElement>(null);
 
   // Check for auto-print query parameter
   useEffect(() => {
@@ -141,7 +141,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
 
   const containerSale = containerSales.find((sale: ContainerSale) => sale.containerId === parseInt(containerId!));
 
-  const { data: docsData, isLoading: docsLoading } = useQuery<{
+  const { data: docsData, isLoading: _docsLoading } = useQuery<{
     documents: any[];
     docTypes: any[];
     completeness: { total: number; uploaded: number; complete: boolean };
@@ -155,7 +155,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
     enabled: !!containerId,
   });
 
-  const { data: freightData = [], isLoading: freightLoading } = useQuery<any[]>({
+  const { data: _freightData = [], isLoading: _freightLoading } = useQuery<any[]>({
     queryKey: ["/api/factory/containers", containerId, "freight"],
     queryFn: async () => {
       const res = await fetch(`/api/factory/containers/${containerId}/freight`);
@@ -313,7 +313,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
     onError: (e: ClientErrorLike) => toast({ title: "Upload failed", description: e.message, variant: "destructive" }),
   });
 
-  const deleteDocMutation = useMutation({
+  const _deleteDocMutation = useMutation({
     mutationFn: async (docId: number) => {
       await apiRequest("DELETE", `/api/factory/containers/${containerId}/documents/${docId}`);
     },
@@ -328,7 +328,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
     },
   });
 
-  async function handleViewDoc(storageKey: string) {
+  async function _handleViewDoc(storageKey: string) {
     try {
       const resp = await fetch(`/api/factory/uploads/${storageKey}`, { credentials: "include" });
       if (!resp.ok) {
@@ -374,7 +374,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
     },
   });
 
-  const deleteFreightMutation = useMutation({
+  const _deleteFreightMutation = useMutation({
     mutationFn: async (freightId: number) => {
       await apiRequest("DELETE", `/api/factory/containers/${containerId}/freight/${freightId}`);
     },
@@ -409,7 +409,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
     },
   });
 
-  const deletePaymentMutation = useMutation({
+  const _deletePaymentMutation = useMutation({
     mutationFn: async ({ freightId, paymentId }: { freightId: number; paymentId: number }) => {
       await apiRequest("DELETE", `/api/factory/freight/${freightId}/payments/${paymentId}`);
     },
