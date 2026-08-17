@@ -45,6 +45,12 @@ function ModifyRentForm({
     onError: (e: ClientErrorLike) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  const handleEffectiveFromChange = (value: string) => {
+    if (value === "current" || value === "next") {
+      setEffectiveFrom(value);
+    }
+  };
+
   return (
     <div className="space-y-3 pt-3">
       <div className="bg-muted/40 rounded-md p-3 text-sm">
@@ -64,11 +70,7 @@ function ModifyRentForm({
         </div>
         <div>
           <Label>Effective From</Label>
-          <RadioGroup
-            value={effectiveFrom}
-            onValueChange={(v) => setEffectiveFrom(v as React.SetStateAction<"current" | "next">)}
-            className="flex gap-4 pt-2"
-          >
+          <RadioGroup value={effectiveFrom} onValueChange={handleEffectiveFromChange} className="flex gap-4 pt-2">
             <div className="flex items-center gap-1.5">
               <RadioGroupItem value="current" id={`mc-${contract.id}`} />
               <Label htmlFor={`mc-${contract.id}`} className="font-normal cursor-pointer">
