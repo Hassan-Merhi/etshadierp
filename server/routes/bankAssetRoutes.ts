@@ -557,7 +557,7 @@ export function registerBankAssetRoutes(app: Express) {
       }
 
       // Parse and structure the data
-      const rows = rawData as any[];
+      const rows = (rawData);
       const errors: string[] = [];
       const itemRows: any[] = [];
       const chargeRows: any[] = [];
