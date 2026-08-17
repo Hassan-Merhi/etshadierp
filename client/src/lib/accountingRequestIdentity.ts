@@ -2,6 +2,27 @@ const ACCOUNTING_REQUEST_TTL_MS = 30 * 60 * 1000;
 const MAX_PENDING_ACCOUNTING_IDENTITIES = 100;
 const ACCOUNTING_REQUEST_STORAGE_KEY = "erp_pending_accounting_request_ids_v2";
 
+const PHASE4_OPERATIONAL_POST_PATHS = new Set([
+  "/api/salary-advances",
+  "/api/payroll/bonus-employee",
+  "/api/payroll/bulk-bonus-employees",
+  "/api/payroll/bulk-withdraw-employees",
+  "/api/payroll/deposit-employee",
+  "/api/payroll/bulk-deposit-employees",
+  "/api/payroll/withdraw-employee",
+  "/api/payroll/pay-worker",
+  "/api/payroll/bulk-pay-workers",
+  "/api/factory/employees/bulk-payroll",
+  "/api/factory/employees/bulk-withdraw",
+  "/api/factory/employee-bonuses",
+  "/api/factory/pos/sale",
+  "/api/factory/supplier-payments",
+  "/api/factory/advances/cash-adjustment",
+  "/api/factory/advances/repay-by-month",
+  "/api/factory/advances/post-repayment-vouchers",
+  "/api/factory/payrolls/mark-paid-bulk",
+]);
+
 const pendingAccountingRequestIds = new Map<string, { requestId: string; createdAt: number }>();
 
 type AccountingRequestPayload = Record<string, unknown>;
@@ -65,18 +86,22 @@ function isPhase4OperationalAccountingRequest(
   pathname: string,
   data: unknown
 ): data is AccountingRequestPayload {
-  if (method.toUpperCase() !== "POST" || !isRecord(data)) return false;
+  if (!isRecord(data)) return false;
+  const verb = method.toUpperCase();
 
-  if (pathname === "/api/salary-advances" || pathname.startsWith("/api/salary-advances/")) return true;
-  if (pathname.startsWith("/api/erp-payroll/")) return true;
-  if (pathname.startsWith("/api/payroll/")) return true;
-  if (pathname.startsWith("/api/employees/") && /(?:salary|advance)/i.test(pathname)) return true;
-  if (pathname === "/api/factory/supplier-payments") return true;
-  if (pathname.startsWith("/api/factory/employee")) return true;
-  if (pathname.startsWith("/api/factory/pos")) return true;
-  if (pathname === "/api/factory/advances" || pathname.startsWith("/api/factory/advances/")) return true;
-  if (/^\/api\/factory\/workers\/[^/]+\/bulk-repay-advances$/.test(pathname)) return true;
-  if (pathname === "/api/factory/payrolls/mark-paid-bulk") return true;
+  if (verb === "POST") {
+    if (PHASE4_OPERATIONAL_POST_PATHS.has(pathname)) return true;
+    if (/^\/api\/factory\/employees\/[^/]+\/(?:deposit|withdraw)$/.test(pathname)) return true;
+    if (/^\/api\/factory\/worker-bonuses\/[^/]+\/pay$/.test(pathname)) return true;
+    if (/^\/api\/factory\/workers\/[^/]+\/bulk-repay-advances$/.test(pathname)) return true;
+    if (/^\/api\/factory\/advances\/[^/]+\/repayments$/.test(pathname)) return true;
+    return false;
+  }
+
+  if (verb === "PATCH") {
+    if (/^\/api\/payroll\/runs\/[^/]+$/.test(pathname)) return data.action === "pay";
+    if (/^\/api\/factory\/payrolls\/[^/]+\/(?:mark-paid|fix-accounting)$/.test(pathname)) return true;
+  }
 
   return false;
 }
