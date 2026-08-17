@@ -23,7 +23,8 @@ jobs:
       - run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
       - run: npm ci --no-audit --bin-links=true
       - run: python3 scripts/phase3-finish-temp.py
-      - run: node node_modules/prettier/bin/prettier.cjs --write server/services/accounting/centralPostingEngine.ts server/services/accounting/voucherPostingService.ts server/services/accounting/voucherPostingService.test.ts server/services/accounting/infrastructureVoucherIdentity.ts server/routes/factory/factoryInsuranceRoutes.ts tests/infrastructure-voucher-identity.test.ts scripts/audit-write-evidence.mjs
+      - run: python3 scripts/phase3-storage-source-temp.py
+      - run: node node_modules/prettier/bin/prettier.cjs --write server/services/accounting/centralPostingEngine.ts server/services/accounting/voucherPostingService.ts server/services/accounting/voucherPostingService.test.ts server/services/accounting/infrastructureVoucherIdentity.ts server/routes/factory/factoryInsuranceRoutes.ts server/routes/payroll/_payrollAccountingHelper.ts server/services/containers/offload-lifecycle/charge-vouchers.ts server/services/containers/offload-lifecycle/sp-journals.ts server/services/factory/post-offload-charge/apply.ts server/services/pos/createSaleVoucher.ts server/services/rental/rentalPaymentPostingService.ts server/storage/accounting/fiscal-periods.ts server/storage/accounting/vouchers.ts server/storage/containers-store/offload.ts server/storage/containers-store/purchase-orders.ts server/routes/containers/poImportBackfillRoute.ts server/routes/containers/containerCrudRoutes.ts server/routes/stockAdjustmentWasteRoutes.ts server/routes/import/po-import.ts server/routes/vouchers/voucherCreateRoutes.ts tests/infrastructure-voucher-identity.test.ts tests/infrastructure-voucher-writer-contract.test.ts scripts/audit-write-evidence.mjs
       - name: Commit results
         shell: bash
         run: |
@@ -32,6 +33,6 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add server/services/accounting/centralPostingEngine.ts server/services/accounting/voucherPostingService.ts server/services/accounting/voucherPostingService.test.ts server/services/accounting/infrastructureVoucherIdentity.ts server/routes/factory/factoryInsuranceRoutes.ts tests/infrastructure-voucher-identity.test.ts scripts/audit-write-evidence.mjs
-          git commit -m "finish phase 3 infrastructure identity wiring"
+          git add server tests scripts
+          git commit -m "require stable identity across phase 3 voucher writers"
           git -c core.hooksPath=/dev/null push origin HEAD:codex/voucher-idempotency-phase3
