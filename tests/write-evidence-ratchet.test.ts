@@ -52,6 +52,7 @@ const voucherReview = JSON.parse(
     migrationImportRepair: number;
     operationalWithoutRequestIdentity: number;
     phase3InfrastructureCompleted: number;
+    phase4OperationalCompleted: number;
     unreviewed: number;
   };
   reviewed: Record<string, { verdict: string; reason: string; files: string[] }>;
@@ -143,7 +144,7 @@ describe("write evidence ratchet", () => {
     );
     expect(new Set(classified).size, "a voucher file is classified twice").toBe(classified.length);
     expect(voucherReview.summary.activeReviewed).toBe(baseline.voucherWritesWithoutRequestIdentity.files.length);
-    expect(baseline.voucherWritesWithoutRequestIdentity.ceiling).toBe(70);
+    expect(baseline.voucherWritesWithoutRequestIdentity.ceiling).toBe(48);
   });
 
   it("keeps the voucher unreviewed remainder empty", () => {
@@ -153,7 +154,7 @@ describe("write evidence ratchet", () => {
 
   it("keeps the real voucher backlog explicit rather than hiding it in review labels", () => {
     const realBacklog = voucherReview.reviewed["operational-without-request-identity"];
-    expect(realBacklog.verdict).toBe("genuine backlog");
+    expect(realBacklog.verdict).toBe("genuine Phase 5 backlog");
     expect(realBacklog.files.length).toBe(voucherReview.summary.operationalWithoutRequestIdentity);
     expect(realBacklog.files.length).toBeGreaterThan(0);
 
@@ -191,7 +192,9 @@ describe("write evidence ratchet", () => {
     expect(completed.files.filter((file) => measuredBacklog.has(file))).toEqual([]);
     expect(new Set(completed.files).size).toBe(completed.files.length);
     expect(voucherReview.summary.initialReviewed).toBe(
-      voucherReview.summary.activeReviewed + voucherReview.summary.phase3InfrastructureCompleted
+      voucherReview.summary.activeReviewed +
+        voucherReview.summary.phase3InfrastructureCompleted +
+        voucherReview.summary.phase4OperationalCompleted
     );
   });
 
