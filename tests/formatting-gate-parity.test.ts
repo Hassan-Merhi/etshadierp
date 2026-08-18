@@ -2,7 +2,7 @@
  * The formatting gates agree on what they check.
  *
  * Three jobs run Prettier over "the files this change touched", each with its
- * own copy of the file selection: CI, CircleCI Parity, and the bandwidth final
+ * own copy of the file selection: CI, canonical CircleCI, and the bandwidth final
  * verification. They drifted — CI covered client/src, server and shared while
  * the other two also covered tests and scripts — and three unformatted test
  * files sailed through CI to fail in the parity job, because the job a
@@ -20,7 +20,7 @@ import { describe, expect, it } from "vitest";
 
 const WORKFLOW_FILES = [
   ".github/workflows/ci.yml",
-  ".github/workflows/circleci-parity.yml",
+  ".circleci/config.yml",
   ".github/workflows/bandwidth-phase5-final-verification.yml",
 ] as const;
 
