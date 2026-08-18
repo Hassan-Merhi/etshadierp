@@ -1,0 +1,112 @@
+name: Phase 18 Windows Sharded Executor
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: write
+env:
+  CI: true
+  NODE_OPTIONS: --max-old-space-size=6144
+concurrency:
+  group: phase18-windows-sharded-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  shard:
+    if: github.event.pull_request.head.ref == 'agent/phase18-wave2-windows-sharded'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0,1,2,3,4,5,6,7]
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/phase18-wave2-windows-sharded
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.14.0'
+          cache: npm
+      - run: npm ci
+      - name: Solve shard
+        shell: bash
+        env:
+          PHASE18_SHARD_INDEX: ${{ matrix.shard }}
+          PHASE18_SHARD_TOTAL: 8
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          node scripts/phase18-shard-solver.cjs
+          if git diff --quiet -- client/src server shared; then echo "WINDOWS_SHARD_NO_CHANGES=${PHASE18_SHARD_INDEX}"; exit 0; fi
+          git add client/src server shared
+          git commit -m "refactor: Phase 18 Windows shard ${PHASE18_SHARD_INDEX} candidate [phase18-windows-shard-result] [skip ci]"
+          git push --force origin HEAD:agent/phase18-windows-shard-${PHASE18_SHARD_INDEX}-result
+
+  integrate:
+    if: github.event.pull_request.head.ref == 'agent/phase18-wave2-windows-sharded'
+    needs: shard
+    runs-on: windows-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/phase18-wave2-windows-sharded
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.14.0'
+          cache: npm
+      - run: npm ci
+      - name: Integrate Windows shard candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          count(){ set +e; node scripts/audit-type-escapes.mjs --json >/tmp/count.json 2>/dev/null; set -e; node -e "const r=require('/tmp/count.json');process.stdout.write(String(r.summary.typeEscapeTotal))"; }
+          git fetch origin '+refs/heads/agent/phase18-windows-shard-*-result:refs/remotes/origin/agent/phase18-windows-shard-*-result' || true
+          base=$(git rev-parse HEAD)
+          start=$(count)
+          for shard in $(seq 0 7); do
+            branch="origin/agent/phase18-windows-shard-${shard}-result"
+            git rev-parse --verify "$branch" >/dev/null 2>&1 || continue
+            merge_base=$(git merge-base "$base" "$branch" || true)
+            [ -n "$merge_base" ] || continue
+            git diff --binary "$merge_base" "$branch" -- client/src server shared > /tmp/shard.patch
+            [ -s /tmp/shard.patch ] || continue
+            git apply --3way /tmp/shard.patch
+          done
+          if git diff --quiet -- client/src server shared && git diff --cached --quiet -- client/src server shared; then echo WINDOWS_SHARDED_NO_CHANGES; exit 1; fi
+          candidate=$(count)
+          echo "WINDOWS_SHARDED_CANDIDATE $start->$candidate"
+          [ "$candidate" -lt "$start" ] || exit 1
+          for attempt in $(seq 1 30); do
+            set +e; npm run check > /tmp/check.log 2>&1; rc=$?; set -e
+            if [ "$rc" -eq 0 ]; then echo "WINDOWS_SHARDED_COMPILER_GREEN attempt=$attempt"; break; fi
+            node -e "const fs=require('fs');const s=fs.readFileSync('/tmp/check.log','utf8');const a=[...s.matchAll(/^([^ (]+\\.(?:ts|tsx))\\([0-9]+,[0-9]+\\): error TS[0-9]+:/gm)].map(m=>m[1]);fs.writeFileSync('/tmp/error-files.txt',[...new Set(a)].sort().join('\\n'));"
+            reverted=0
+            while IFS= read -r f; do
+              [ -n "$f" ] || continue
+              if git diff --quiet "$base" -- "$f"; then continue; fi
+              git checkout "$base" -- "$f"
+              reverted=$((reverted+1))
+            done < /tmp/error-files.txt
+            echo "WINDOWS_SHARDED_ROLLBACK attempt=$attempt reverted=$reverted"
+            if [ "$reverted" -gt 0 ]; then continue; fi
+            f=$(git diff --name-only "$base" -- client/src server shared | head -1 || true)
+            [ -n "$f" ] || exit 1
+            git checkout "$base" -- "$f"
+          done
+          npm run check
+          final=$(count)
+          echo "WINDOWS_SHARDED_FINAL $start->$final"
+          [ "$final" -lt "$start" ] || exit 1
+          git add client/src server shared
+          git commit -m 'refactor: integrate Phase 18 Windows shard reductions [phase18-windows-source] [skip ci]'
+          set +e; node scripts/audit-type-escapes.mjs --json >/tmp/after.json; set -e
+          node -e "const fs=require('fs');const r=JSON.parse(fs.readFileSync('/tmp/after.json','utf8'));const top=(r.files||[]).filter(f=>f.total).sort((a,b)=>b.total-a.total).slice(0,300);fs.writeFileSync('phase18-windows-report.md',['# Phase 18 Windows Sharded Result','', 'Type escapes: '+r.summary.typeEscapeTotal,'Explicit any: '+r.summary.explicitAny,'as any: '+r.summary.asAny,'Suppressions: '+r.summary.suppressions,'Files with escapes: '+r.summary.filesWithEscapes,'','## Top files','',...top.map(f=>'- '+f.total+' — '+f.path),''].join('\\n'));"
+          git add phase18-windows-report.md
+          git commit -m 'chore: publish Phase 18 Windows sharded result [phase18-windows-result] [skip ci]'
+          git push --force origin HEAD:agent/phase18-wave2-windows-result
