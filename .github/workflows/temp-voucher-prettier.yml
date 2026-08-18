@@ -1,0 +1,40 @@
+name: Temporary Voucher Prettier
+
+on:
+  push:
+    branches:
+      - agent/voucher-details-location-price
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v7
+        with:
+          ref: agent/voucher-details-location-price
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22.14.0
+          cache: npm
+      - name: Normalize package registry URLs
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+      - name: Format changed files
+        run: node node_modules/prettier/bin/prettier.cjs --write server/routes/voucher-entries/hassan-price.ts server/routes/voucher-entries/reads.ts tests/voucher-details-hassan-price.test.ts
+      - name: Commit formatter output
+        run: |
+          if git diff --quiet; then
+            echo "Already formatted."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/routes/voucher-entries/hassan-price.ts server/routes/voucher-entries/reads.ts tests/voucher-details-hassan-price.test.ts
+          git commit -m "style: apply repo Prettier"
+          git push origin HEAD:agent/voucher-details-location-price
