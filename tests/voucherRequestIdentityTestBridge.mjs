@@ -52,12 +52,12 @@ async function cleanupGeneratedRequestIdentity(request) {
 // but legacy route suites physically delete their fixtures between test cases.
 // Once a test has completed, its durable request identities are no longer needed
 // for same-test replay assertions, so clear them before the next case. The
-// dedicated Phase 3 identity proof deliberately carries one marker across test
-// cases and remains excluded explicitly.
+// dedicated Phase 2 and Phase 3 identity proofs deliberately carry markers
+// across test cases and remain excluded explicitly.
 afterEach(async () => {
   await pool.query(
-    "DELETE FROM accounting_posting_requests WHERE source_type IS DISTINCT FROM $1",
-    ["phase3-test-writer"]
+    "DELETE FROM accounting_posting_requests WHERE source_type IS DISTINCT FROM $1 AND source_type IS DISTINCT FROM $2",
+    ["phase3-test-writer", "phase2-test"]
   );
 });
 
