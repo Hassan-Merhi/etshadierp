@@ -38,6 +38,7 @@
       "tests/ui/mobile-responsive-phase6-core-erp.test.ts",
       "tests/ui/mobile-responsive-phase7-factory.test.ts",
       "tests/ui/mobile-responsive-phase8-pos.test.ts",
+      "tests/ui/mobile-responsive-phase9-reports.test.ts",
       "tests/remote-support-permission-contract.test.ts",
       "tests/ui/pos-negative-stock-permission.test.ts",
       "tests/ui/tracking-containers-abort-recovery.test.ts",
