@@ -23,7 +23,8 @@
     "no-useless-escape": 100000,
     "prefer-const": 100000,
     "no-var": 100000,
-    "preserve-caught-error": 100000
+    "preserve-caught-error": 100000,
+    "no-useless-assignment": 100000
   },
   "notes": {
     "diagnostic": "Temporary branch only; never merge these thresholds."
