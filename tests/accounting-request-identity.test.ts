@@ -85,16 +85,14 @@ describe("accounting request identity", () => {
   });
 
   it("protects active Payment/Receipt creation and reuses its uncertain retry identity", () => {
-    const first = attachAccountingRequestIdentity(
-      "POST",
-      PAYMENT_RECEIPT_URL,
-      paymentReceiptPayload(),
-    ) as Record<string, unknown>;
-    const retry = attachAccountingRequestIdentity(
-      "POST",
-      PAYMENT_RECEIPT_URL,
-      paymentReceiptPayload(),
-    ) as Record<string, unknown>;
+    const first = attachAccountingRequestIdentity("POST", PAYMENT_RECEIPT_URL, paymentReceiptPayload()) as Record<
+      string,
+      unknown
+    >;
+    const retry = attachAccountingRequestIdentity("POST", PAYMENT_RECEIPT_URL, paymentReceiptPayload()) as Record<
+      string,
+      unknown
+    >;
 
     expect(isProtectedAccountingRequest("POST", PAYMENT_RECEIPT_URL, first)).toBe(true);
     expect(typeof first.clientRequestId).toBe("string");
@@ -148,7 +146,10 @@ describe("accounting request identity", () => {
 
   it("releases only successful or definite client-error outcomes", () => {
     expect(shouldReleaseAccountingRequestIdentity(200)).toBe(true);
-    expect(shouldReleaseAccountingRequestIdentity(409)).toBe(true);
+    expect(shouldReleaseAccountingRequestIdentity(422, "VALIDATION_ERROR")).toBe(true);
+    expect(shouldReleaseAccountingRequestIdentity(409, "POSTING_IDEMPOTENCY_CONFLICT")).toBe(true);
+    expect(shouldReleaseAccountingRequestIdentity(409)).toBe(false);
+    expect(shouldReleaseAccountingRequestIdentity(409, "ACCOUNTING_REQUEST_OUTCOME_UNCERTAIN")).toBe(false);
     expect(shouldReleaseAccountingRequestIdentity(500)).toBe(false);
     expect(shouldReleaseAccountingRequestIdentity(503)).toBe(false);
   });
