@@ -11,7 +11,8 @@
     "client/src/pages/vouchers/StockTransferForm.tsx": 2388
   },
   "routeManifestAdditions": [
-    "GET /api/factory/customer-loading/products [requireAuth > <anonymous>]"
+    "GET /api/factory/customer-loading/products [requireAuth > <anonymous>]",
+    "GET /api/factory/customer-loading/history [requireAuth > <anonymous>]"
   ],
   "routeManifestMountAdditions": [],
   "sourceTextAssertionDelta": {
