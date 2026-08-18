@@ -37,7 +37,6 @@
       "tests/ui/mobile-responsive-phase6-core-erp.test.ts",
       "tests/ui/mobile-responsive-phase7-factory.test.ts",
       "tests/ui/mobile-responsive-phase8-pos.test.ts",
-      "tests/ui/mobile-responsive-phase9-reports.test.ts",
       "tests/remote-support-permission-contract.test.ts",
       "tests/ui/pos-negative-stock-permission.test.ts",
       "tests/ui/tracking-containers-abort-recovery.test.ts",
@@ -54,8 +53,7 @@
       "tests/ui/remote-support-fast-viewer.test.ts",
       "tests/stock-item-name-update-by-code.test.ts",
       "server/lib/reportPrecision.test.ts",
-      "tests/remote-support-phase4-hardening.test.ts",
-      "tests/ui/customer-loading-phase3.test.tsx"
+      "tests/remote-support-phase4-hardening.test.ts"
     ],
     "maxAdditionalTextAssertions": 604
   }
