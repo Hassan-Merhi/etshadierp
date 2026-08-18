@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Diagnostic-only thresholds on the temporary static-build branch. Main remains unchanged.",
+  "description": "Diagnostic-only total threshold on the temporary static-build branch. Main remains unchanged.",
   "scan": {
     "patterns": [
       "client/src/**/*.{ts,tsx}",
@@ -15,19 +15,10 @@
     "errorCeiling": 0
   },
   "perRule": {
-    "react-hooks/exhaustive-deps": 100000,
-    "no-control-regex": 100000,
-    "unused-imports/no-unused-vars": 100000,
-    "no-case-declarations": 100000,
-    "no-empty": 100000,
-    "no-useless-escape": 100000,
-    "prefer-const": 100000,
-    "no-var": 100000,
-    "preserve-caught-error": 100000,
-    "no-useless-assignment": 100000,
-    "no-extra-boolean-cast": 100000
+    "react-hooks/exhaustive-deps": 28,
+    "no-control-regex": 5
   },
   "notes": {
-    "diagnostic": "Temporary branch only; never merge these thresholds."
+    "diagnostic": "Temporary branch only; never merge this threshold."
   }
 }
