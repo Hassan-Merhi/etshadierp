@@ -54,14 +54,14 @@ jobs:
                 break
               fi
 
-              mapfile -t errs < <(sed -nE 's#^([^ (]+\.(ts|tsx))\([0-9]+,[0-9]+\): error TS[0-9]+:.*#\1#p' /tmp/check.log | sort -u)
               reverted=0
-              for f in "${errs[@]}"; do
+              while IFS= read -r f; do
+                [ -n "$f" ] || continue
                 if git diff --quiet "$base" -- "$f"; then continue; fi
                 git checkout "$base" -- "$f"
                 reverted=$((reverted+1))
                 echo "PHASE1_SHARD_DIRECT_ROLLBACK shard=${{ matrix.shard }} file=$f"
-              done
+              done < <(sed -nE 's#^([^ (]+\.(ts|tsx))\([0-9]+,[0-9]+\): error TS[0-9]+:.*#\1#p' /tmp/check.log | sort -u)
               if [ "$reverted" -gt 0 ]; then continue; fi
 
               culprit=$(git diff --name-only "$base" -- client/src server shared | head -1 || true)
@@ -124,14 +124,14 @@ jobs:
                 echo "PHASE1_INTEGRATION_COMPILER_GREEN attempt=$attempt"
                 break
               fi
-              mapfile -t errs < <(sed -nE 's#^([^ (]+\.(ts|tsx))\([0-9]+,[0-9]+\): error TS[0-9]+:.*#\1#p' /tmp/check.log | sort -u)
               reverted=0
-              for f in "${errs[@]}"; do
+              while IFS= read -r f; do
+                [ -n "$f" ] || continue
                 if git diff --quiet "$base" -- "$f"; then continue; fi
                 git checkout "$base" -- "$f"
                 reverted=$((reverted+1))
                 echo "PHASE1_INTEGRATION_DIRECT_ROLLBACK file=$f"
-              done
+              done < <(sed -nE 's#^([^ (]+\.(ts|tsx))\([0-9]+,[0-9]+\): error TS[0-9]+:.*#\1#p' /tmp/check.log | sort -u)
               if [ "$reverted" -gt 0 ]; then continue; fi
               culprit=$(git diff --name-only "$base" -- client/src server shared | head -1 || true)
               [ -n "$culprit" ] || break
