@@ -31,6 +31,7 @@ const harness = vi.hoisted(() => {
   const deletedTables: unknown[] = [];
 
   const tx = {
+    execute: vi.fn(async () => []),
     select: vi.fn(() => {
       const result = selectResults.shift() ?? [];
       const builder = {
@@ -89,11 +90,15 @@ const harness = vi.hoisted(() => {
 
 vi.mock("../shared/schema", () => harness.tables);
 vi.mock("@shared/schema", () => harness.tables);
-vi.mock("drizzle-orm", () => ({
-  and: (...conditions: unknown[]) => conditions,
-  eq: (column: unknown, value: unknown) => ({ column, value }),
-  isNull: (column: unknown) => ({ column, value: null }),
-}));
+vi.mock("drizzle-orm", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("drizzle-orm")>();
+  return {
+    ...actual,
+    and: (...conditions: unknown[]) => conditions,
+    eq: (column: unknown, value: unknown) => ({ column, value }),
+    isNull: (column: unknown) => ({ column, value: null }),
+  };
+});
 vi.mock("../server/services/factory/rawStockCostCascade", () => ({
   cascadeContainerCostChange: harness.cascadeContainerCostChange,
 }));
