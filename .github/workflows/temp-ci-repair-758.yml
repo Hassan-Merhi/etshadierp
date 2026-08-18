@@ -1,16 +1,15 @@
 name: TEMP CI Repair 758
 
 on:
-  push:
-    branches:
-      - fix/ci-postgres-suite-cleanup-20260818
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: write
 
 jobs:
   repair:
-    if: github.actor != 'github-actions[bot]'
+    if: github.event.pull_request.head.ref == 'fix/ci-postgres-suite-cleanup-20260818'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
