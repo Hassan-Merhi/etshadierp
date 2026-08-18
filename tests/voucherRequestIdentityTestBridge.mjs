@@ -1,11 +1,9 @@
 import supertest from "supertest";
-import { afterEach } from "vitest";
 import { pool } from "../server/db";
 
 const STATE_CHANGING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 let requestSequence = 0;
-let stateChangingRequestSeen = false;
 
 function hasClientRequestId(data) {
   return (
@@ -24,22 +22,22 @@ requestPrototype.end = function endWithVoucherRequestIdentity(callback) {
   const method = String(this.method || "").toUpperCase();
   const stateChanging = STATE_CHANGING_METHODS.has(method);
   const existingHeader = this.get?.("X-Idempotency-Key");
-
-  if (stateChanging) {
-    stateChangingRequestSeen = true;
-  }
+  let generatedKey = null;
 
   if (stateChanging && !existingHeader && !hasClientRequestId(this._data)) {
     requestSequence += 1;
-    this.set("X-Idempotency-Key", `vitest-${process.pid}-${requestSequence}`);
+    generatedKey = `vitest-${process.pid}-${requestSequence}`;
+    this.set("X-Idempotency-Key", generatedKey);
   }
 
-  return originalEnd.call(this, callback);
+  if (!generatedKey || typeof callback !== "function") {
+    return originalEnd.call(this, callback);
+  }
+
+  return originalEnd.call(this, (error, response) => {
+    void pool
+      .query("DELETE FROM accounting_posting_requests WHERE idempotency_key = $1", [generatedKey])
+      .then(() => callback(error, response))
+      .catch((cleanupError) => callback(error ?? cleanupError, response));
+  });
 };
-
-afterEach(async () => {
-  if (!stateChangingRequestSeen) return;
-
-  stateChangingRequestSeen = false;
-  await pool.query("DELETE FROM accounting_posting_requests");
-});
