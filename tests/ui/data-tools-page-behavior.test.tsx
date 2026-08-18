@@ -62,6 +62,9 @@ vi.mock("@/contexts/CompanyContext", () => ({
   useCompany: () => ({ selectedCompany: { id: 4, name: "GC Lshi" } }),
 }));
 vi.mock("@/contexts/AppModeContext", () => ({ useAppMode: () => "erp" }));
+vi.mock("@/contexts/ApplicationLanguageContext", () => ({
+  useApplicationLanguage: () => ({ t: (key: string) => key }),
+}));
 vi.mock("@/lib/factoryApi", () => ({ getApiRequest: () => harness.modeApiRequest }));
 vi.mock("@/lib/queryClient", () => ({
   apiRequest: harness.apiRequest,

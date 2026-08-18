@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   infrastructurePostingIdentity,
   insertInfrastructureVoucherTx,
@@ -43,6 +44,13 @@ export async function insertSaleVoucher(
     exchangeRate,
   } = params;
 
+  // Modern clients provide clientSaleId as the durable retry identity. Older
+  // callers predate that field and are intentionally non-idempotent, but they
+  // still need a valid infrastructure posting source. Give those one-shot
+  // requests an opaque identity rather than deriving it from the display
+  // voucher number (which intentionally contains timestamp/random data).
+  const postingSourceId = clientSaleId || `legacy-${randomUUID()}`;
+
   const { voucher: txVoucher } = await insertInfrastructureVoucherTx(
     tx,
     {
@@ -64,10 +72,10 @@ export async function insertSaleVoucher(
       exchangeRate: exchangeRate || null,
       isCreditSale: !!isCreditSale,
     },
-    // clientSaleId is the caller's stable retry identity. Do not fall back to
-    // voucherNumber: POS display voucher numbers intentionally contain
-    // Date.now()/randomUUID and would turn a retry into a new posting key.
-    infrastructurePostingIdentity("pos-sale", clientSaleId, "sales-voucher"),
+    // clientSaleId remains authoritative whenever the caller supplies it.
+    // Legacy callers receive an opaque per-request source id above; they never
+    // had cross-request idempotency semantics to preserve.
+    infrastructurePostingIdentity("pos-sale", postingSourceId, "sales-voucher"),
     params
   );
 
