@@ -8,14 +8,12 @@ if (!configPath) throw new Error("tsconfig.json not found");
 const configFile = ts.readConfigFile(configPath, ts.sys.readFile);
 const parsed = ts.parseJsonConfigFileContent(configFile.config, ts.sys, path.dirname(configPath));
 const mode = process.env.PHASE18_MODE || "safe";
-const blockPath = process.env.PHASE18_BLOCKLIST || "";
-const blocked = new Set(
-  blockPath && fs.existsSync(blockPath)
-    ? fs.readFileSync(blockPath, "utf8").split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
-    : []
-);
 
 function rel(file) { return path.relative(root, file).replaceAll("\\", "/"); }
+function eligible(file) {
+  const r = rel(file);
+  return /^(client\/src|server|shared)\//.test(r) && /\.(ts|tsx)$/.test(r) && !r.endsWith(".d.ts") && fs.existsSync(file);
+}
 function contains(outer, inner) { return outer && inner && outer.pos <= inner.pos && outer.end >= inner.end; }
 function annotationStart(source, typeNode) {
   let i = typeNode.getStart() - 1;
@@ -105,21 +103,97 @@ function apply(text, edits) {
   return next;
 }
 
-let filesChanged = 0;
-let editsApplied = 0;
-const labels = {};
+const state = new Map();
 for (const file of parsed.fileNames) {
-  const relative = rel(file);
-  if (!/^(client\/src|server|shared)\//.test(relative) || !/\.(ts|tsx)$/.test(relative) || relative.endsWith(".d.ts") || blocked.has(relative) || !fs.existsSync(file)) continue;
-  const text = fs.readFileSync(file, "utf8");
-  const edits = collect(file, text);
-  if (!edits.length) continue;
-  const next = apply(text, edits);
-  if (next === text) continue;
-  fs.writeFileSync(file, next);
-  filesChanged += 1;
-  editsApplied += edits.length;
-  for (const edit of edits) labels[edit.label] = (labels[edit.label] || 0) + 1;
-  console.log(`BULK mode=${mode} ${relative} ${edits.length}`);
+  if (!fs.existsSync(file)) continue;
+  state.set(path.resolve(file), { text: fs.readFileSync(file, "utf8"), version: 0 });
 }
-console.log(`BULK_RESULT mode=${mode} files=${filesChanged} edits=${editsApplied} blocked=${blocked.size} labels=${JSON.stringify(labels)}`);
+const host = {
+  getCompilationSettings: () => parsed.options,
+  getScriptFileNames: () => parsed.fileNames,
+  getScriptVersion: (file) => String(state.get(path.resolve(file))?.version ?? 0),
+  getScriptSnapshot: (file) => {
+    const entry = state.get(path.resolve(file));
+    if (entry) return ts.ScriptSnapshot.fromString(entry.text);
+    if (fs.existsSync(file)) return ts.ScriptSnapshot.fromString(fs.readFileSync(file, "utf8"));
+  },
+  getCurrentDirectory: () => root,
+  getDefaultLibFileName: (options) => ts.getDefaultLibFilePath(options),
+  fileExists: ts.sys.fileExists,
+  readFile: ts.sys.readFile,
+  readDirectory: ts.sys.readDirectory,
+  directoryExists: ts.sys.directoryExists,
+  getDirectories: ts.sys.getDirectories,
+  realpath: ts.sys.realpath,
+  useCaseSensitiveFileNames: () => ts.sys.useCaseSensitiveFileNames,
+  getNewLine: () => ts.sys.newLine,
+};
+const service = ts.createLanguageService(host, ts.createDocumentRegistry());
+function setText(file, text) {
+  const key = path.resolve(file);
+  const entry = state.get(key) || { text: fs.readFileSync(file, "utf8"), version: 0 };
+  if (entry.text === text) return;
+  entry.text = text;
+  entry.version += 1;
+  state.set(key, entry);
+}
+function errorCount() {
+  const program = service.getProgram();
+  if (!program) throw new Error("TypeScript language service did not create a program");
+  const diagnostics = ts.getPreEmitDiagnostics(program);
+  return diagnostics.reduce((count, diagnostic) => count + (diagnostic.category === ts.DiagnosticCategory.Error ? 1 : 0), 0);
+}
+
+const proposals = [];
+for (const file of parsed.fileNames) {
+  if (!eligible(file)) continue;
+  const original = fs.readFileSync(file, "utf8");
+  const edits = collect(file, original);
+  if (!edits.length) continue;
+  const transformed = apply(original, edits);
+  if (transformed === original) continue;
+  proposals.push({ file, original, transformed, edits });
+}
+
+const stats = { mode, proposedFiles: proposals.length, proposedEdits: proposals.reduce((n, p) => n + p.edits.length, 0), acceptedFiles: 0, acceptedEdits: 0, rejectedFiles: 0, checks: 0, labels: {} };
+const accepted = new Set();
+const profile = mode === "safe"
+  ? { chunk: 128, maxDepth: 7 }
+  : mode === "param"
+    ? { chunk: 64, maxDepth: 5 }
+    : mode === "cast"
+      ? { chunk: 64, maxDepth: 5 }
+      : { chunk: 48, maxDepth: 3 };
+
+function testGroup(group, depth) {
+  if (!group.length) return;
+  for (const proposal of group) setText(proposal.file, proposal.transformed);
+  stats.checks += 1;
+  const errors = errorCount();
+  if (errors === 0) {
+    for (const proposal of group) accepted.add(proposal.file);
+    return;
+  }
+  for (const proposal of group) setText(proposal.file, proposal.original);
+  if (group.length === 1 || depth >= profile.maxDepth) {
+    stats.rejectedFiles += group.length;
+    return;
+  }
+  const midpoint = Math.ceil(group.length / 2);
+  testGroup(group.slice(0, midpoint), depth + 1);
+  testGroup(group.slice(midpoint), depth + 1);
+}
+
+for (let i = 0; i < proposals.length; i += profile.chunk) testGroup(proposals.slice(i, i + profile.chunk), 0);
+
+for (const proposal of proposals) {
+  if (!accepted.has(proposal.file)) continue;
+  const text = state.get(path.resolve(proposal.file))?.text;
+  if (text !== proposal.transformed) throw new Error(`Accepted proposal state drifted for ${rel(proposal.file)}`);
+  fs.writeFileSync(proposal.file, proposal.transformed);
+  stats.acceptedFiles += 1;
+  stats.acceptedEdits += proposal.edits.length;
+  for (const edit of proposal.edits) stats.labels[edit.label] = (stats.labels[edit.label] || 0) + 1;
+  console.log(`GLOBAL_ACCEPT mode=${mode} ${rel(proposal.file)} edits=${proposal.edits.length}`);
+}
+console.log(`GLOBAL_RESULT ${JSON.stringify(stats)}`);
