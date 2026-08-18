@@ -56,8 +56,8 @@ const journalData = {
       totalCredits: "12000",
     },
   ],
-  total: 2,
-  totalPages: 1,
+  total: 150,
+  totalPages: 3,
 };
 
 vi.mock("@tanstack/react-query", () => ({
@@ -153,6 +153,7 @@ import TransactionJournal from "@/pages/TransactionJournal";
 describe("transaction journal page behavior", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    sessionStorage.clear();
   });
 
   it("aggregates company summaries and renders cross-company vouchers", () => {
@@ -176,6 +177,29 @@ describe("transaction journal page behavior", () => {
     fireEvent.click(screen.getByTestId("chip-type-payment"));
     fireEvent.click(screen.getByTestId("button-toggle-factory"));
     expect(screen.getByTestId("button-toggle-factory")).toHaveTextContent("Included");
+  });
+
+  it("resets pagination for every filter path and can clear the complete filter set", () => {
+    render(<TransactionJournal />);
+
+    fireEvent.click(screen.getByTestId("button-next-page"));
+    expect(screen.getByText("Page 2 of 3")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("chip-type-payment"));
+    expect(screen.getByText("Page 1 of 3")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("button-next-page"));
+    fireEvent.click(screen.getByTestId("checkbox-company-4"));
+    expect(screen.getByText("Page 1 of 3")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("button-next-page"));
+    fireEvent.change(screen.getByTestId("input-search"), { target: { value: "PAY-101" } });
+    expect(screen.getByText("Page 1 of 3")).toBeInTheDocument();
+
+    expect(screen.getByTestId("button-reset-filters")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("button-reset-filters"));
+    expect(screen.getByTestId("input-search")).toHaveValue("");
+    expect(screen.getByTestId("button-toggle-factory")).toHaveTextContent("Excluded");
+    expect(screen.queryByTestId("button-reset-filters")).not.toBeInTheDocument();
   });
 
   it("hides individual rows and can reveal or clear them", () => {

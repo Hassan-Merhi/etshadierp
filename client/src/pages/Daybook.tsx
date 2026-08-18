@@ -42,7 +42,6 @@ import { cn } from "@/lib/utils";
 import { isReadonlyMigratedVoucher } from "@/lib/migratedVoucherGuard";
 import { isBlockingQueryError } from "@/lib/abortError";
 import { utils, writeFile } from "@/lib/excelHelper";
-import { getDefaultPeriodValue } from "@/components/ui/period-filter";
 import { useDateJump } from "@/hooks/use-date-jump";
 import { createVoucherSchema } from "./daybook/types";
 import type {
@@ -65,6 +64,7 @@ import { VoucherDetailsDialog } from "./daybook/VoucherDetailsDialog";
 import { VoucherEditDialog } from "./daybook/VoucherEditDialog";
 import { usePaginatedDaybookVouchers } from "./daybook/usePaginatedDaybookVouchers";
 import { VOUCHER_TYPE_ORDER } from "./daybook/constants";
+import { useDaybookFilterState } from "./daybook/useDaybookFilterState";
 
 export default function Daybook({ user }: { user?: any } = {}) {
   const { toast } = useToast();
@@ -77,7 +77,16 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const hiddenErpCosts = myErpPages?.hiddenErpCostFields ?? [];
   const hideAmounts = hiddenErpCosts.includes("daybook_amounts");
   const [activeDaybookTab, setActiveDaybookTab] = useState<"transactions" | "activity">("transactions");
-  const [periodFilter, setPeriodFilter] = useState(getDefaultPeriodValue("today"));
+  const {
+    periodFilter,
+    filters,
+    voucherPage,
+    setVoucherPage,
+    setPeriodFilter,
+    setFilters,
+    resetFilters: resetDaybookFilters,
+    hasActiveFilters: hasActiveDaybookFilters,
+  } = useDaybookFilterState(selectedCompany?.id);
   useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
 
   const shiftDay = (delta: number) => {
@@ -107,14 +116,6 @@ export default function Daybook({ user }: { user?: any } = {}) {
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, []);
-  const [filters, setFilters] = useState({
-    voucherType: "all",
-    searchQuery: "",
-    sortOrder: "desc" as "asc" | "desc",
-    minAmount: "",
-    maxAmount: "",
-    statusFilter: "all" as "all" | "active" | "optional",
-  });
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
   const [selectedDialogRow, setSelectedDialogRow] = useState<number | null>(null);
@@ -154,7 +155,6 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const [showHidden, setShowHidden] = useState(false);
   const DAYBOOK_PAGE_SIZE = 200;
   const VOUCHER_PAGE_SIZE = 100;
-  const [voucherPage, setVoucherPage] = useState(1);
   const [daybookRowLimit, setDaybookRowLimit] = useState(DAYBOOK_PAGE_SIZE);
   const _scrollYRef = useRef(0);
   const [viewMode, setViewMode] = useState<"detailed" | "condensed">(() => loadDaybookState()?.viewMode ?? "detailed");
@@ -194,7 +194,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
     setViewDialogOpen(false);
     setEditDialogOpen(false);
     setVoucherPage(1);
-  }, [selectedCompany?.id]);
+  }, [selectedCompany?.id, setVoucherPage]);
 
   const [purchaseOrderData, setPurchaseOrderData] = useState<any>(null);
   const [poSupplierBalance, setPoSupplierBalance] = useState<string | null>(null);
@@ -504,6 +504,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
     filters.minAmount,
     filters.maxAmount,
     filters.statusFilter,
+    setVoucherPage,
   ]);
 
   const offloadsUrl = useMemo(
@@ -707,6 +708,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
             setPeriodFilter={setPeriodFilter}
             filters={filters}
             setFilters={setFilters}
+            hasActiveFilters={hasActiveDaybookFilters}
+            onResetFilters={resetDaybookFilters}
             onPrevDay={() => shiftDay(-1)}
             onNextDay={() => shiftDay(1)}
           />

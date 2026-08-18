@@ -23,6 +23,16 @@ const harness = vi.hoisted(() => {
     factoryDaybookEntries: { name: "factoryDaybookEntries", id: "factoryDaybookEntries.id" },
     vouchers: { name: "vouchers", id: "vouchers.id" },
     voucherEntries: { name: "voucherEntries", id: "voucherEntries.id", voucherId: "voucherEntries.voucherId" },
+    accountingPostingRequests: {
+      name: "accountingPostingRequests",
+      companyId: "accountingPostingRequests.companyId",
+      idempotencyKey: "accountingPostingRequests.idempotencyKey",
+      sourceType: "accountingPostingRequests.sourceType",
+      sourceId: "accountingPostingRequests.sourceId",
+      requestFingerprint: "accountingPostingRequests.requestFingerprint",
+      voucherId: "accountingPostingRequests.voucherId",
+    },
+    auditLog: { name: "auditLog", id: "auditLog.id" },
   };
   const selectResults: unknown[][] = [];
   const returningResults: unknown[][] = [];
@@ -31,11 +41,13 @@ const harness = vi.hoisted(() => {
   const deletedTables: unknown[] = [];
 
   const tx = {
+    execute: vi.fn(async () => []),
     select: vi.fn(() => {
       const result = selectResults.shift() ?? [];
       const builder = {
         where: () => builder,
         for: async () => result,
+        limit: async () => result,
         then: (resolve: (value: unknown[]) => unknown, reject: (reason: unknown) => unknown) =>
           Promise.resolve(result).then(resolve, reject),
       };
@@ -89,11 +101,15 @@ const harness = vi.hoisted(() => {
 
 vi.mock("../shared/schema", () => harness.tables);
 vi.mock("@shared/schema", () => harness.tables);
-vi.mock("drizzle-orm", () => ({
-  and: (...conditions: unknown[]) => conditions,
-  eq: (column: unknown, value: unknown) => ({ column, value }),
-  isNull: (column: unknown) => ({ column, value: null }),
-}));
+vi.mock("drizzle-orm", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("drizzle-orm")>();
+  return {
+    ...actual,
+    and: (...conditions: unknown[]) => conditions,
+    eq: (column: unknown, value: unknown) => ({ column, value }),
+    isNull: (column: unknown) => ({ column, value: null }),
+  };
+});
 vi.mock("../server/services/factory/rawStockCostCascade", () => ({
   cascadeContainerCostChange: harness.cascadeContainerCostChange,
 }));

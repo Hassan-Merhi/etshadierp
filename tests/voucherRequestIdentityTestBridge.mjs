@@ -1,4 +1,5 @@
 import supertest from "supertest";
+import { afterEach } from "vitest";
 import { pool } from "../server/db";
 
 const STATE_CHANGING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
@@ -41,10 +42,24 @@ async function cleanupGeneratedRequestIdentity(request) {
   // Clear the marker before awaiting so callback- and promise-based Supertest
   // completion paths can both call this helper without racing a duplicate
   // cleanup query. Explicit idempotency keys are never stored here and are
-  // intentionally preserved for replay assertions.
+  // intentionally preserved for replay assertions within the current test.
   request[GENERATED_KEY] = null;
   await pool.query("DELETE FROM accounting_posting_requests WHERE idempotency_key = $1", [generatedKey]);
 }
+
+// The backend test job uses one disposable database for the whole Vitest run.
+// Posting identities intentionally block direct voucher deletion in production,
+// but legacy route suites physically delete their fixtures between test cases.
+// Once a test has completed, its durable request identities are no longer needed
+// for same-test replay assertions, so clear them before the next case. The
+// dedicated Phase 2 and Phase 3 identity proofs deliberately carry markers
+// across test cases and remain excluded explicitly.
+afterEach(async () => {
+  await pool.query(
+    "DELETE FROM accounting_posting_requests WHERE source_type IS DISTINCT FROM $1 AND source_type IS DISTINCT FROM $2",
+    ["phase3-test-writer", "phase2-test"]
+  );
+});
 
 const requestPrototype = supertest.Test.prototype;
 const originalEnd = requestPrototype.end;

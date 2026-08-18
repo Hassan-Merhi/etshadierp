@@ -242,6 +242,7 @@ import Daybook from "@/pages/Daybook";
 describe("Daybook page behavior", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    sessionStorage.clear();
     harness.apiRequest.mockResolvedValue({ ok: true, json: async () => ({}) });
     harness.loadAllVouchers.mockResolvedValue([
       {
