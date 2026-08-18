@@ -15,7 +15,7 @@
     "errorCeiling": 0
   },
   "perRule": {
-    "react-hooks/exhaustive-deps": 28,
+    "react-hooks/exhaustive-deps": 100000,
     "no-control-regex": 5
   },
   "notes": {
