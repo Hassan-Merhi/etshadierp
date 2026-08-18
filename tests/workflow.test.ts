@@ -94,6 +94,9 @@ async function cleanupVouchers() {
     .from(schema.vouchers)
     .where(eq(schema.vouchers.companyId, ctx.companyId));
   for (const v of rows) {
+    await db
+      .delete(schema.accountingPostingRequests)
+      .where(eq(schema.accountingPostingRequests.voucherId, v.id));
     await db.delete(schema.salesItems).where(eq(schema.salesItems.voucherId, v.id));
     await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, v.id));
   }
