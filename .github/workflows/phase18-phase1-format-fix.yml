@@ -66,3 +66,4 @@ jobs:
             server/storage/stock-ops/transfers-update.ts
           git commit -m 'ci: lock certified Phase 1 type-escape baseline'
           git push origin HEAD:agent/phase18-phase1-safe-macos-result
+# retrigger landing repair
