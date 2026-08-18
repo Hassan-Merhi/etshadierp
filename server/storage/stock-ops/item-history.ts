@@ -2,7 +2,7 @@ import { eq, and, sql } from "drizzle-orm";
 import { db, pool } from "../../db";
 import * as schema from "@shared/schema";
 
-export async function getLastPurchaseOrderForItem(stockItemId: number, companyId: number): Promise<any | null> {
+export async function getLastPurchaseOrderForItem(stockItemId: number, companyId: number) {
   const result = await db
     .select({
       poNumber: schema.purchaseOrders.poNumber,
@@ -21,7 +21,7 @@ export async function getLastPurchaseOrderForItem(stockItemId: number, companyId
   return result.length > 0 ? result[0] : null;
 }
 
-export async function getLastSaleForItem(stockItemId: number, companyId: number): Promise<any | null> {
+export async function getLastSaleForItem(stockItemId: number, companyId: number) {
   const result = await db
     .select({
       voucherNumber: schema.vouchers.voucherNumber,
@@ -65,7 +65,7 @@ export async function getAllPurchasesForItem(
   companyId: number,
   fromDate?: string,
   toDate?: string
-): Promise<any[]> {
+) {
   const conditions = [
     eq(schema.poLineItems.stockItemId, stockItemId),
     eq(schema.purchaseOrders.companyId, companyId),
@@ -97,7 +97,7 @@ export async function getAllSalesForItem(
   companyId: number,
   fromDate?: string,
   toDate?: string
-): Promise<any[]> {
+) {
   const conditions = [
     eq(schema.salesItems.stockItemId, stockItemId),
     eq(schema.vouchers.companyId, companyId),
@@ -124,7 +124,7 @@ export async function getAllSalesForItem(
     .orderBy(sql`${schema.vouchers.voucherDate} DESC`);
 }
 
-export async function getInventoryLocationsByItem(stockItemId: number, companyId: number): Promise<any[]> {
+export async function getInventoryLocationsByItem(stockItemId: number, companyId: number) {
   const results = await db.execute(sql`
     SELECT DISTINCT ON (i.location_id)
       i.location_id as "locationId",
@@ -143,7 +143,7 @@ export async function getInventoryLocationsByItem(stockItemId: number, companyId
   return (results.rows as any[]).sort((a, b) => (a.locationName || "").localeCompare(b.locationName || ""));
 }
 
-export async function getVoucherHistoryForItem(stockItemId: number, companyId: number): Promise<any[]> {
+export async function getVoucherHistoryForItem(stockItemId: number, companyId: number) {
   const sales = await db
     .select({
       voucherId: schema.vouchers.id,

@@ -441,7 +441,7 @@ async function postGroupCore(
 
 export async function createRentalPaymentGroup(
   opts: RentalPaymentGroupOptions
-): Promise<{ paymentGroupId: string; scheduled: boolean; payments: any[] }> {
+) {
   const {
     companyId,
     contractCompanyId,
