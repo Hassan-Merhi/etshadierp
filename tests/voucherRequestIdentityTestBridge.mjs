@@ -1,4 +1,5 @@
 import supertest from "supertest";
+import { afterEach } from "vitest";
 import { pool } from "../server/db";
 
 const STATE_CHANGING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
@@ -45,6 +46,18 @@ async function cleanupGeneratedRequestIdentity(request) {
   request[GENERATED_KEY] = null;
   await pool.query("DELETE FROM accounting_posting_requests WHERE idempotency_key = $1", [generatedKey]);
 }
+
+// Infrastructure voucher writers persist durable `infra:*` posting markers
+// with an intentional ON DELETE RESTRICT voucher FK. Individual integration
+// suites often delete their vouchers in beforeEach/afterAll and predate that
+// durable marker table. Clear only infrastructure markers after each completed
+// test so the next suite-local teardown can remove its vouchers. This is
+// test-only cleanup: explicit central-posting identities remain available for
+// replay assertions during the test that created them, and production FK
+// semantics are unchanged.
+afterEach(async () => {
+  await pool.query("DELETE FROM accounting_posting_requests WHERE idempotency_key LIKE 'infra:%'");
+});
 
 const requestPrototype = supertest.Test.prototype;
 const originalEnd = requestPrototype.end;
