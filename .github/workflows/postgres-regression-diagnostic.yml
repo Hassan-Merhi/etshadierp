@@ -1,11 +1,12 @@
 name: Postgres Regression Diagnostic
 on:
-  push:
-    branches: [diagnostic/postgres-regression-20260818]
+  pull_request:
+    branches: [main]
 permissions:
   contents: read
 jobs:
   postgres-regression:
+    if: github.event.pull_request.head.ref == 'diagnostic/postgres-regression-20260818'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     services:
