@@ -2,6 +2,8 @@ name: Static Build Lint Diagnostic
 on:
   push:
     branches: [fix/static-build-diagnostics-20260818]
+  pull_request:
+    branches: [main]
 permissions:
   contents: write
 jobs:
@@ -46,6 +48,7 @@ jobs:
           fs.writeFileSync('static-build-lint-diagnostic.md', lines.join('\n'));
           NODE
       - name: Publish diagnostic report
+        if: github.event_name == 'push'
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
@@ -53,3 +56,7 @@ jobs:
           git diff --cached --quiet && exit 0
           git commit -m 'chore: publish static-build lint diagnostic [skip ci]'
           git push
+      - uses: actions/upload-artifact@v7
+        with:
+          name: static-build-lint-diagnostic
+          path: static-build-lint-diagnostic.md
