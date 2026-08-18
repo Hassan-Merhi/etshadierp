@@ -1,0 +1,112 @@
+name: TEMP CI Repair 758
+
+on:
+  push:
+    branches:
+      - fix/ci-postgres-suite-cleanup-20260818
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/ci-postgres-suite-cleanup-20260818
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.14.0'
+          cache: npm
+      - run: npm ci --no-audit --bin-links=true
+      - name: Repair exact residual test harness failures
+        shell: python
+        run: |
+          from pathlib import Path
+
+          bridge = Path("tests/voucherRequestIdentityTestBridge.mjs")
+          text = bridge.read_text()
+          old = '''  await pool.query(
+            "DELETE FROM accounting_posting_requests WHERE source_type IS DISTINCT FROM $1",
+            ["phase3-test-writer"]
+          );'''
+          if old not in text:
+              old = '''  await pool.query(
+              "DELETE FROM accounting_posting_requests WHERE source_type IS DISTINCT FROM $1",
+              ["phase3-test-writer"]
+            );'''
+          if old not in text:
+              old = '''  await pool.query(
+    "DELETE FROM accounting_posting_requests WHERE source_type IS DISTINCT FROM $1",
+    ["phase3-test-writer"]
+  );'''
+          new = '''  await pool.query(
+            "DELETE FROM accounting_posting_requests WHERE source_type IS DISTINCT FROM $1 AND source_type IS DISTINCT FROM $2",
+            ["phase3-test-writer", "phase2-test"]
+          );'''
+          if old not in text:
+              raise SystemExit("posting bridge cleanup marker not found")
+          bridge.write_text(text.replace(old, new, 1))
+
+          path = Path("tests/post-offload-charge-mutation-positive-path.test.ts")
+          text = path.read_text()
+          old_tx = '''  const tx = {
+            select: vi.fn(() => {'''
+          if old_tx not in text:
+              old_tx = '''  const tx = {
+    select: vi.fn(() => {'''
+          new_tx = '''  const tx = {
+    execute: vi.fn(async () => []),
+    select: vi.fn(() => {'''
+          if old_tx not in text:
+              raise SystemExit("post-offload tx marker not found")
+          text = text.replace(old_tx, new_tx, 1)
+
+          old_mock = '''vi.mock("drizzle-orm", () => ({
+  and: (...conditions: unknown[]) => conditions,
+  eq: (column: unknown, value: unknown) => ({ column, value }),
+  isNull: (column: unknown) => ({ column, value: null }),
+}));'''
+          new_mock = '''vi.mock("drizzle-orm", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("drizzle-orm")>();
+  return {
+    ...actual,
+    and: (...conditions: unknown[]) => conditions,
+    eq: (column: unknown, value: unknown) => ({ column, value }),
+    isNull: (column: unknown) => ({ column, value: null }),
+  };
+});'''
+          if old_mock not in text:
+              raise SystemExit("post-offload drizzle mock marker not found")
+          path.write_text(text.replace(old_mock, new_mock, 1))
+      - name: Format repaired files
+        run: >-
+          npx prettier --write
+          tests/post-offload-charge-mutation-positive-path.test.ts
+          tests/vouchers.test.ts
+          tests/whatsapp-triggers.test.ts
+          tests/ui/helpers.tsx
+          tests/voucherRequestIdentityTestBridge.mjs
+      - name: Targeted backend tests
+        run: >-
+          node node_modules/vitest/vitest.mjs run
+          tests/central-posting-idempotency.test.ts
+          tests/post-offload-charge-mutation-positive-path.test.ts
+          --maxWorkers=1 --no-file-parallelism
+      - name: Commit repairs
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "No repair changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tests/post-offload-charge-mutation-positive-path.test.ts tests/vouchers.test.ts tests/whatsapp-triggers.test.ts tests/ui/helpers.tsx tests/voucherRequestIdentityTestBridge.mjs
+          git commit -m "test: fix remaining CI harness regressions"
+          git push origin HEAD:fix/ci-postgres-suite-cleanup-20260818
