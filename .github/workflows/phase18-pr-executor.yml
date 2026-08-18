@@ -11,12 +11,12 @@ concurrency:
   cancel-in-progress: true
 jobs:
   execute:
-    if: github.event.pull_request.head.ref == 'agent/phase18-executor'
+    if: github.event.pull_request.head.ref == 'agent/phase18-executor' || github.event.pull_request.head.ref == 'agent/phase18-wave2-staged'
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v7
-        with: {ref: agent/phase18-executor, fetch-depth: 0}
+        with: {ref: '${{ github.event.pull_request.head.ref }}', fetch-depth: 0}
       - name: Guard result commit
         id: guard
         shell: bash
@@ -42,6 +42,7 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          target_branch='${{ github.event.pull_request.head.ref }}'
           count(){ set +e; node scripts/audit-type-escapes.mjs --json >/tmp/count.json 2>/dev/null; set -e; node -e "const r=require('/tmp/count.json');process.stdout.write(String(r.summary.typeEscapeTotal))"; }
           phase_check(){ node node_modules/typescript/bin/tsc --noEmit --incremental --tsBuildInfoFile /tmp/phase18-wave2.tsbuildinfo; }
           rm -f /tmp/phase18-wave2.tsbuildinfo
@@ -92,7 +93,7 @@ jobs:
               fi
               git add client/src server shared
               git commit -m "refactor: Phase 18 ${mode} type reduction pass ${pass} [phase18-wave2-bulk]"
-              git push origin HEAD:agent/phase18-executor
+              git push origin HEAD:"$target_branch"
               sort -u /tmp/phase18-blocked.txt -o /tmp/phase18-blocked.txt
               echo "BULK_PASS_ACCEPTED mode=$mode pass=$pass $pass_start->$pass_end blocked=$(wc -l < /tmp/phase18-blocked.txt)"
               [ "$pass_end" -eq 0 ] && break
@@ -106,6 +107,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          target_branch='${{ github.event.pull_request.head.ref }}'
           count(){ set +e; node scripts/audit-type-escapes.mjs --json >/tmp/count.json 2>/dev/null; set -e; node -e "const r=require('/tmp/count.json');process.stdout.write(String(r.summary.typeEscapeTotal))"; }
           phase_check(){ node node_modules/typescript/bin/tsc --noEmit --incremental --tsBuildInfoFile /tmp/phase18-wave2-targeted.tsbuildinfo; }
           rm -f /tmp/phase18-wave2-targeted.tsbuildinfo
@@ -119,7 +121,7 @@ jobs:
                 if [ "$pass_end" -lt "$pass_start" ]; then
                   git add client/src server shared
                   git commit -m "refactor: Phase 18 targeted type reduction [phase18-wave2-targeted]"
-                  git push origin HEAD:agent/phase18-executor
+                  git push origin HEAD:"$target_branch"
                   echo "TARGET_PASS_ACCEPTED $pass_start->$pass_end"
                 else
                   git reset --hard "$pass_base"
@@ -137,6 +139,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          target_branch='${{ github.event.pull_request.head.ref }}'
           npm run check
           set +e; node scripts/audit-type-escapes.mjs --json >/tmp/after.json; set -e
           node - <<'NODE'
@@ -147,4 +150,4 @@ jobs:
           NODE
           git add phase18-executor-report.md
           git commit -m 'chore: publish Phase 18 executor result [phase18-executor-result]'
-          git push origin HEAD:agent/phase18-executor
+          git push origin HEAD:"$target_branch"
