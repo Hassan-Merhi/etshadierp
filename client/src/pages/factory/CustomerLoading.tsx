@@ -1,10 +1,16 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Loader2, PackageCheck, PackageX, Search, Truck, UsersRound } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Loader2, PackageCheck, PackageX, Search, ShoppingCart, Truck, UsersRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 interface CustomerOption {
   id: number;
@@ -58,10 +64,10 @@ function formatNumber(value: number, maximumFractionDigits = 0) {
   return new Intl.NumberFormat(undefined, { maximumFractionDigits }).format(value || 0);
 }
 
-function formatMoney(value: string | null) {
+function formatMoney(value: number | string | null) {
   const amount = Number(value ?? 0);
   if (!Number.isFinite(amount)) return "—";
-  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(amount);
+  return new Intl.NumberFormat(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(amount);
 }
 
 function formatDate(value: string | null) {
@@ -72,12 +78,18 @@ function formatDate(value: string | null) {
 }
 
 export default function CustomerLoading() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [customerId, setCustomerId] = useState<string>("");
   const [search, setSearch] = useState("");
   const [loadingFilter, setLoadingFilter] = useState<LoadingFilter>("ALL");
   const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [weightFilter, setWeightFilter] = useState("ALL");
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<number>>(new Set());
   const [draftQuantities, setDraftQuantities] = useState<Record<number, string>>({});
+  const [draftPrices, setDraftPrices] = useState<Record<number, string>>({});
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [proformaName, setProformaName] = useState("");
 
   const customersQuery = useQuery<CustomerOption[]>({
     queryKey: ["/api/factory/customers", "customer-loading-picker"],
@@ -96,14 +108,16 @@ export default function CustomerLoading() {
   const products = loadingQuery.data?.products ?? [];
   const categories = useMemo(
     () =>
-      [...new Set(products.map((product) => product.categoryName).filter((value): value is string => Boolean(value)))]
-        .sort((a, b) => a.localeCompare(b)),
+      [...new Set(products.map((product) => product.categoryName).filter((value): value is string => Boolean(value)))].sort(
+        (a, b) => a.localeCompare(b)
+      ),
     [products]
   );
   const weights = useMemo(
     () =>
-      [...new Set(products.map((product) => product.weightPerBaleKg).filter((value): value is string => Boolean(value)))]
-        .sort((a, b) => Number(a) - Number(b)),
+      [...new Set(products.map((product) => product.weightPerBaleKg).filter((value): value is string => Boolean(value)))].sort(
+        (a, b) => Number(a) - Number(b)
+      ),
     [products]
   );
 
@@ -120,14 +134,114 @@ export default function CustomerLoading() {
     });
   }, [products, loadingFilter, categoryFilter, weightFilter, search]);
 
+  const selectedLines = useMemo(
+    () =>
+      products
+        .filter((product) => selectedProductIds.has(product.id))
+        .map((product) => {
+          const quantity = Math.max(0, Number.parseInt(draftQuantities[product.id] || "0", 10) || 0);
+          const pricePerBale = Number(draftPrices[product.id] ?? product.sellingPrice ?? 0) || 0;
+          const weightPerBale = Number(product.weightPerBaleKg ?? 0) || 0;
+          return {
+            product,
+            quantity,
+            pricePerBale,
+            totalKg: quantity * weightPerBale,
+            lineTotal: quantity * pricePerBale,
+          };
+        }),
+    [products, selectedProductIds, draftQuantities, draftPrices]
+  );
+
+  const validSelectedLines = selectedLines.filter((line) => line.quantity > 0 && Boolean(line.product.articleCode || line.product.code));
+  const selectedTotals = validSelectedLines.reduce(
+    (totals, line) => ({
+      lines: totals.lines + 1,
+      quantity: totals.quantity + line.quantity,
+      kg: totals.kg + line.totalKg,
+      amount: totals.amount + line.lineTotal,
+    }),
+    { lines: 0, quantity: 0, kg: 0, amount: 0 }
+  );
+
+  const createProformaMutation = useMutation({
+    mutationFn: async () => {
+      if (!customerId || validSelectedLines.length === 0) throw new Error("Select at least one product with a quantity.");
+      const name = proformaName.trim();
+      if (!name) throw new Error("Proforma name is required.");
+      const response = await apiRequest("POST", "/api/factory/customer-proformas/bulk", {
+        customerId: Number(customerId),
+        name,
+        isActive: true,
+        lines: validSelectedLines.map(({ product, quantity, pricePerBale }) => ({
+          articleCode: product.articleCode || product.code,
+          productName: product.name,
+          quantity,
+          pricePerBale: String(pricePerBale),
+          productionPricePerBale: String(product.productionPrice ?? "0"),
+          pricingMode: "per_bale",
+        })),
+      });
+      return response.json();
+    },
+    onSuccess: (created) => {
+      setPreviewOpen(false);
+      setSelectedProductIds(new Set());
+      setDraftQuantities({});
+      setDraftPrices({});
+      setProformaName("");
+      void queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-proformas"] });
+      void queryClient.invalidateQueries({ queryKey: ["/api/factory/v2/stock-allocation"] });
+      toast({
+        title: "Proforma created",
+        description: created?.name ? `${created.name} was created successfully.` : "The proforma was created successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to create proforma", description: error.message, variant: "destructive" });
+    },
+  });
+
   const summary = loadingQuery.data?.summary;
+  const allVisibleSelected = filteredProducts.length > 0 && filteredProducts.every((product) => selectedProductIds.has(product.id));
+
+  function resetSelection() {
+    setSelectedProductIds(new Set());
+    setDraftQuantities({});
+    setDraftPrices({});
+  }
+
+  function toggleProduct(product: CustomerLoadingProduct, checked: boolean) {
+    setSelectedProductIds((current) => {
+      const next = new Set(current);
+      if (checked) next.add(product.id);
+      else next.delete(product.id);
+      return next;
+    });
+    if (checked && !draftQuantities[product.id]) {
+      setDraftQuantities((current) => ({ ...current, [product.id]: "1" }));
+    }
+  }
+
+  function openPreview() {
+    if (validSelectedLines.length === 0) {
+      toast({ title: "No products selected", description: "Select at least one product and enter a quantity.", variant: "destructive" });
+      return;
+    }
+    if (!proformaName.trim()) {
+      const customerName = loadingQuery.data?.customer.legalName || "Customer";
+      const date = new Date().toISOString().slice(0, 10);
+      setProformaName(`${customerName} - ${date}`);
+    }
+    setPreviewOpen(true);
+  }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-5 p-4 md:p-6" data-testid="customer-loading-page">
+    <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-5 p-4 pb-24 md:p-6 md:pb-24" data-testid="customer-loading-page">
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight">Customer Loading</h1>
         <p className="text-sm text-muted-foreground">
-          See which bale products each customer has loaded before and prepare quantities for the next proforma.
+          See which bale products each customer has loaded before, select items, enter quantities, and create a proforma directly.
         </p>
       </div>
 
@@ -143,7 +257,8 @@ export default function CustomerLoading() {
                 setLoadingFilter("ALL");
                 setCategoryFilter("ALL");
                 setWeightFilter("ALL");
-                setDraftQuantities({});
+                resetSelection();
+                setProformaName("");
               }}
             >
               <SelectTrigger data-testid="customer-loading-customer-select">
@@ -192,7 +307,7 @@ export default function CustomerLoading() {
             <div className="flex flex-col gap-3 border-b p-4 xl:flex-row xl:items-center xl:justify-between">
               <div>
                 <div className="font-semibold">Product List</div>
-                <div className="text-xs text-muted-foreground">{filteredProducts.length} of {products.length} products shown</div>
+                <div className="text-xs text-muted-foreground">{filteredProducts.length} of {products.length} products shown · {selectedProductIds.size} selected</div>
               </div>
               <div className="grid gap-2 sm:grid-cols-2 xl:flex xl:items-center">
                 <div className="relative sm:col-span-2 xl:w-72">
@@ -215,9 +330,30 @@ export default function CustomerLoading() {
             </div>
 
             <div className="max-h-[62vh] overflow-auto">
-              <table className="w-full min-w-[1260px] border-collapse text-sm">
+              <table className="w-full min-w-[1420px] border-collapse text-sm">
                 <thead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_hsl(var(--border))]">
                   <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
+                    <th className="w-12 px-4 py-3 font-medium">
+                      <Checkbox
+                        checked={allVisibleSelected}
+                        onCheckedChange={(checked) => {
+                          const shouldSelect = checked === true;
+                          setSelectedProductIds((current) => {
+                            const next = new Set(current);
+                            for (const product of filteredProducts) shouldSelect ? next.add(product.id) : next.delete(product.id);
+                            return next;
+                          });
+                          if (shouldSelect) {
+                            setDraftQuantities((current) => {
+                              const next = { ...current };
+                              for (const product of filteredProducts) if (!next[product.id]) next[product.id] = "1";
+                              return next;
+                            });
+                          }
+                        }}
+                        aria-label="Select visible products"
+                      />
+                    </th>
                     <th className="px-4 py-3 font-medium">Article Code</th>
                     <th className="px-4 py-3 font-medium">Product</th>
                     <th className="px-4 py-3 font-medium">Arabic Name</th>
@@ -226,40 +362,67 @@ export default function CustomerLoading() {
                     <th className="px-4 py-3 text-right font-medium">Sell Price</th>
                     <th className="px-4 py-3 font-medium">Status</th>
                     <th className="px-4 py-3 text-right font-medium">Total Loaded</th>
-                    <th className="px-4 py-3 text-right font-medium">Total KG</th>
                     <th className="px-4 py-3 font-medium">Last Loaded</th>
                     <th className="px-4 py-3 text-right font-medium">Qty</th>
+                    <th className="px-4 py-3 text-right font-medium">Line Total</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredProducts.map((product) => (
-                    <tr key={product.id} className="border-b last:border-b-0 hover:bg-muted/30" data-testid={`customer-loading-product-${product.id}`}>
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">{product.articleCode || product.code}</td>
-                      <td className="px-4 py-3 font-medium">{product.name}</td>
-                      <td className="px-4 py-3 text-right" dir="rtl">{product.nameAr || "—"}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{product.categoryName || "—"}</td>
-                      <td className="px-4 py-3 text-right tabular-nums">{product.weightPerBaleKg ? `${formatNumber(Number(product.weightPerBaleKg), 2)} kg` : "—"}</td>
-                      <td className="px-4 py-3 text-right tabular-nums">{formatMoney(product.sellingPrice)}</td>
-                      <td className="px-4 py-3">{product.loadingStatus === "LOADED" ? <Badge variant="secondary">Loaded</Badge> : <Badge variant="outline">Never loaded</Badge>}</td>
-                      <td className="px-4 py-3 text-right font-medium tabular-nums">{formatNumber(product.totalBalesLoaded)}</td>
-                      <td className="px-4 py-3 text-right tabular-nums">{formatNumber(product.totalKgLoaded, 1)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{formatDate(product.lastLoadedAt)}</td>
-                      <td className="px-4 py-2 text-right">
-                        <Input
-                          inputMode="numeric"
-                          min={0}
-                          value={draftQuantities[product.id] ?? ""}
-                          onChange={(event) => {
-                            const value = event.target.value.replace(/[^0-9]/g, "");
-                            setDraftQuantities((current) => ({ ...current, [product.id]: value }));
-                          }}
-                          placeholder="0"
-                          className="ml-auto h-8 w-20 text-right tabular-nums"
-                          aria-label={`Quantity for ${product.name}`}
-                        />
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredProducts.map((product) => {
+                    const selected = selectedProductIds.has(product.id);
+                    const qty = Number.parseInt(draftQuantities[product.id] || "0", 10) || 0;
+                    const price = Number(draftPrices[product.id] ?? product.sellingPrice ?? 0) || 0;
+                    return (
+                      <tr key={product.id} className={`border-b last:border-b-0 hover:bg-muted/30 ${selected ? "bg-primary/5" : ""}`} data-testid={`customer-loading-product-${product.id}`}>
+                        <td className="px-4 py-3"><Checkbox checked={selected} onCheckedChange={(checked) => toggleProduct(product, checked === true)} aria-label={`Select ${product.name}`} /></td>
+                        <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">{product.articleCode || product.code}</td>
+                        <td className="px-4 py-3 font-medium">{product.name}</td>
+                        <td className="px-4 py-3 text-right" dir="rtl">{product.nameAr || "—"}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{product.categoryName || "—"}</td>
+                        <td className="px-4 py-3 text-right tabular-nums">{product.weightPerBaleKg ? `${formatNumber(Number(product.weightPerBaleKg), 2)} kg` : "—"}</td>
+                        <td className="px-4 py-2 text-right">
+                          <Input
+                            inputMode="decimal"
+                            value={draftPrices[product.id] ?? product.sellingPrice ?? "0"}
+                            onChange={(event) => {
+                              const value = event.target.value.replace(/[^0-9.]/g, "");
+                              setDraftPrices((current) => ({ ...current, [product.id]: value }));
+                              if (value && !selected) toggleProduct(product, true);
+                            }}
+                            className="ml-auto h-8 w-24 text-right tabular-nums"
+                            aria-label={`Price for ${product.name}`}
+                          />
+                        </td>
+                        <td className="px-4 py-3">{product.loadingStatus === "LOADED" ? <Badge variant="secondary">Loaded</Badge> : <Badge variant="outline">Never loaded</Badge>}</td>
+                        <td className="px-4 py-3 text-right font-medium tabular-nums">{formatNumber(product.totalBalesLoaded)}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{formatDate(product.lastLoadedAt)}</td>
+                        <td className="px-4 py-2 text-right">
+                          <Input
+                            inputMode="numeric"
+                            min={0}
+                            value={draftQuantities[product.id] ?? ""}
+                            onChange={(event) => {
+                              const value = event.target.value.replace(/[^0-9]/g, "");
+                              setDraftQuantities((current) => ({ ...current, [product.id]: value }));
+                              const numeric = Number.parseInt(value || "0", 10) || 0;
+                              if (numeric > 0 && !selected) toggleProduct(product, true);
+                              if (numeric === 0 && selected) {
+                                setSelectedProductIds((current) => {
+                                  const next = new Set(current);
+                                  next.delete(product.id);
+                                  return next;
+                                });
+                              }
+                            }}
+                            placeholder="0"
+                            className="ml-auto h-8 w-20 text-right tabular-nums"
+                            aria-label={`Quantity for ${product.name}`}
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-right font-medium tabular-nums">{qty > 0 ? formatMoney(qty * price) : "—"}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
               {filteredProducts.length === 0 && <div className="p-10 text-center text-sm text-muted-foreground">No products match the current filters.</div>}
@@ -267,6 +430,75 @@ export default function CustomerLoading() {
           </Card>
         </>
       )}
+
+      {customerId && selectedProductIds.size > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t bg-background/95 px-4 py-3 shadow-lg backdrop-blur md:px-6" data-testid="customer-loading-selection-bar">
+          <div className="mx-auto flex max-w-[1800px] flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm">
+              <span><strong>{selectedTotals.lines}</strong> products</span>
+              <span><strong>{formatNumber(selectedTotals.quantity)}</strong> bales</span>
+              <span><strong>{formatNumber(selectedTotals.kg, 1)}</strong> kg</span>
+              <span>Total <strong>{formatMoney(selectedTotals.amount)}</strong></span>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={resetSelection}>Clear</Button>
+              <Button onClick={openPreview} disabled={validSelectedLines.length === 0} data-testid="customer-loading-create-proforma">
+                <ShoppingCart className="mr-2 h-4 w-4" /> Create Proforma
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Review Proforma</DialogTitle>
+            <DialogDescription>Confirm the customer, quantities, prices, and totals before creating the proforma.</DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Customer</Label>
+              <Input value={loadingQuery.data?.customer.legalName || ""} disabled />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="customer-loading-proforma-name">Proforma Name</Label>
+              <Input id="customer-loading-proforma-name" value={proformaName} onChange={(event) => setProformaName(event.target.value)} data-testid="customer-loading-proforma-name" />
+            </div>
+          </div>
+
+          <div className="max-h-[45vh] overflow-auto rounded-md border">
+            <table className="w-full min-w-[720px] text-sm">
+              <thead className="sticky top-0 bg-muted">
+                <tr><th className="px-3 py-2 text-left">Product</th><th className="px-3 py-2 text-right">Qty</th><th className="px-3 py-2 text-right">KG</th><th className="px-3 py-2 text-right">Price</th><th className="px-3 py-2 text-right">Total</th></tr>
+              </thead>
+              <tbody>
+                {validSelectedLines.map((line) => (
+                  <tr key={line.product.id} className="border-t">
+                    <td className="px-3 py-2"><div className="font-medium">{line.product.name}</div><div className="text-xs text-muted-foreground">{line.product.articleCode || line.product.code}</div></td>
+                    <td className="px-3 py-2 text-right tabular-nums">{formatNumber(line.quantity)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{formatNumber(line.totalKg, 1)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{formatMoney(line.pricePerBale)}</td>
+                    <td className="px-3 py-2 text-right font-medium tabular-nums">{formatMoney(line.lineTotal)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="border-t bg-muted/40 font-medium">
+                <tr><td className="px-3 py-3">Grand Total</td><td className="px-3 py-3 text-right">{formatNumber(selectedTotals.quantity)}</td><td className="px-3 py-3 text-right">{formatNumber(selectedTotals.kg, 1)}</td><td></td><td className="px-3 py-3 text-right">{formatMoney(selectedTotals.amount)}</td></tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPreviewOpen(false)} disabled={createProformaMutation.isPending}>Back</Button>
+            <Button onClick={() => createProformaMutation.mutate()} disabled={!proformaName.trim() || createProformaMutation.isPending} data-testid="customer-loading-confirm-proforma">
+              {createProformaMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Create Proforma
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
