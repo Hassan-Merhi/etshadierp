@@ -1,0 +1,107 @@
+name: Phase 18 macOS Sharded Executor
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: write
+env:
+  CI: true
+  NODE_OPTIONS: --max-old-space-size=6144
+concurrency:
+  group: phase18-macos-sharded-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  shard:
+    if: github.event.pull_request.head.ref == 'agent/phase18-wave2-macos-sharded'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0,1,2,3]
+    runs-on: macos-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/phase18-wave2-macos-sharded
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.14.0'
+          cache: npm
+      - run: npm ci
+      - name: Solve shard
+        shell: bash
+        env:
+          PHASE18_SHARD_INDEX: ${{ matrix.shard }}
+          PHASE18_SHARD_TOTAL: 4
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          node scripts/phase18-shard-solver.cjs
+          if git diff --quiet -- client/src server shared; then echo "SHARD_NO_CHANGES=${PHASE18_SHARD_INDEX}"; exit 0; fi
+          npm run check
+          git add client/src server shared
+          git commit -m "refactor: Phase 18 macOS shard ${PHASE18_SHARD_INDEX} candidate [phase18-macos-shard] [skip ci]"
+          git push --force origin HEAD:agent/phase18-macos-shard-${PHASE18_SHARD_INDEX}-result
+  integrate:
+    if: github.event.pull_request.head.ref == 'agent/phase18-wave2-macos-sharded'
+    needs: shard
+    runs-on: macos-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/phase18-wave2-macos-sharded
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.14.0'
+          cache: npm
+      - run: npm ci
+      - name: Integrate candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          count(){ set +e; node scripts/audit-type-escapes.mjs --json >/tmp/count.json 2>/dev/null; set -e; node -e "const r=require('/tmp/count.json');process.stdout.write(String(r.summary.typeEscapeTotal))"; }
+          base=$(git rev-parse HEAD)
+          start=$(count)
+          git fetch origin '+refs/heads/agent/phase18-macos-shard-*-result:refs/remotes/origin/agent/phase18-macos-shard-*-result' || true
+          for shard in 0 1 2 3; do
+            branch="origin/agent/phase18-macos-shard-${shard}-result"
+            git rev-parse --verify "$branch" >/dev/null 2>&1 || continue
+            merge_base=$(git merge-base "$base" "$branch" || true)
+            [ -n "$merge_base" ] || continue
+            git diff --binary "$merge_base" "$branch" -- client/src server shared >/tmp/shard.patch
+            [ -s /tmp/shard.patch ] || continue
+            git apply --3way /tmp/shard.patch
+          done
+          candidate=$(count)
+          echo "MACOS_SHARDED_CANDIDATE $start->$candidate"
+          [ "$candidate" -lt "$start" ] || exit 1
+          for attempt in $(seq 1 30); do
+            set +e; npm run check >/tmp/check.log 2>&1; rc=$?; set -e
+            if [ "$rc" -eq 0 ]; then break; fi
+            files=$(node -e "const fs=require('fs');const s=fs.readFileSync('/tmp/check.log','utf8');console.log([...new Set([...s.matchAll(/^([^ (]+\\.(?:ts|tsx))\\([0-9]+,[0-9]+\\): error TS[0-9]+:/gm)].map(m=>m[1]))].join('\\n'))")
+            reverted=0
+            while IFS= read -r f; do
+              [ -n "$f" ] || continue
+              if git diff --quiet "$base" -- "$f"; then continue; fi
+              git checkout "$base" -- "$f"
+              reverted=$((reverted+1))
+            done <<< "$files"
+            [ "$reverted" -gt 0 ] || break
+          done
+          npm run check
+          final=$(count)
+          echo "MACOS_SHARDED_FINAL $start->$final"
+          [ "$final" -lt "$start" ] || exit 1
+          git add client/src server shared
+          git commit -m 'refactor: integrate Phase 18 macOS sharded reductions [phase18-macos-sharded-source] [skip ci]'
+          set +e; node scripts/audit-type-escapes.mjs --json >/tmp/after.json; set -e
+          node -e "const fs=require('fs');const r=JSON.parse(fs.readFileSync('/tmp/after.json','utf8'));const top=(r.files||[]).filter(f=>f.total).sort((a,b)=>b.total-a.total).slice(0,300);fs.writeFileSync('phase18-macos-sharded-report.md',['# Phase 18 macOS Sharded Result','', 'Type escapes: '+r.summary.typeEscapeTotal,'Explicit any: '+r.summary.explicitAny,'as any: '+r.summary.asAny,'Suppressions: '+r.summary.suppressions,'Files with escapes: '+r.summary.filesWithEscapes,'','## Top files','',...top.map(f=>'- '+f.total+' — '+f.path),''].join('\\n'));"
+          git add phase18-macos-sharded-report.md
+          git commit -m 'chore: publish Phase 18 macOS sharded result [phase18-macos-sharded-result] [skip ci]'
+          git push --force origin HEAD:agent/phase18-wave2-macos-sharded-result
