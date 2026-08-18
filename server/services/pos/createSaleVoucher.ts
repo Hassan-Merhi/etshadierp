@@ -64,10 +64,11 @@ export async function insertSaleVoucher(
       exchangeRate: exchangeRate || null,
       isCreditSale: !!isCreditSale,
     },
-    // clientSaleId is the caller's stable retry identity. Do not fall back to
-    // voucherNumber: POS display voucher numbers intentionally contain
-    // Date.now()/randomUUID and would turn a retry into a new posting key.
-    infrastructurePostingIdentity("pos-sale", clientSaleId, "sales-voucher"),
+    // A supplied clientSaleId remains the stable cross-retry identity. Legacy
+    // callers that do not send one still need a non-empty posting source; their
+    // generated voucherNumber is unique for this request and does not pretend to
+    // provide retry idempotency that the caller did not request.
+    infrastructurePostingIdentity("pos-sale", clientSaleId || voucherNumber, "sales-voucher"),
     params
   );
 
