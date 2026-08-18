@@ -49,7 +49,9 @@ export async function insertSaleVoucher(
   // still need a valid infrastructure posting source. Give those one-shot
   // requests an opaque identity rather than deriving it from the display
   // voucher number (which intentionally contains timestamp/random data).
-  const postingSourceId = clientSaleId || `legacy-${randomUUID()}`;
+  const postingIdentity = clientSaleId
+    ? infrastructurePostingIdentity("pos-sale", clientSaleId, "sales-voucher")
+    : infrastructurePostingIdentity("pos-sale", `legacy-${randomUUID()}`, "sales-voucher");
 
   const { voucher: txVoucher } = await insertInfrastructureVoucherTx(
     tx,
@@ -72,10 +74,7 @@ export async function insertSaleVoucher(
       exchangeRate: exchangeRate || null,
       isCreditSale: !!isCreditSale,
     },
-    // clientSaleId remains authoritative whenever the caller supplies it.
-    // Legacy callers receive an opaque per-request source id above; they never
-    // had cross-request idempotency semantics to preserve.
-    infrastructurePostingIdentity("pos-sale", postingSourceId, "sales-voucher"),
+    postingIdentity,
     params
   );
 
