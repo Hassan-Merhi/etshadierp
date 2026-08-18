@@ -87,7 +87,7 @@ describe("customer loading intelligence route", () => {
     expect(harness.db.execute).not.toHaveBeenCalled();
   });
 
-  it("classifies loaded and never-loaded products and returns customer KPIs", async () => {
+  it("classifies active loading orders as loaded and returns customer KPIs", async () => {
     harness.selectResults.push([{ id: 12, legalName: "Customer A" }]);
     harness.executeResults.push({ rows: [
       { id: 1, code: "P1", articleCode: "HMD11001", name: "Shirts", nameAr: null, categoryId: 3, categoryName: "Summer", categoryNameAr: null, weightPerBaleKg: "40.00", sellingPrice: "80.00", productionPrice: "50.00", active: true, totalBalesLoaded: 7, totalKgLoaded: "280.000", loadingCount: 2, lastLoadedAt: "2026-08-17T10:00:00.000Z" },
@@ -102,7 +102,11 @@ describe("customer loading intelligence route", () => {
       expect.objectContaining({ id: 2, loadingStatus: "NEVER_LOADED", totalBalesLoaded: 0, totalKgLoaded: 0 }),
     ]);
     const sqlCall = harness.db.execute.mock.calls[0]?.[0] as any;
-    expect(sqlCall.strings.join(" ")).toContain("fils.status <> 'CANCELLED'");
+    const sqlText = sqlCall.strings.join(" ");
+    expect(sqlText).toContain("FROM customer_order_bales cob");
+    expect(sqlText).toContain("co.status IN ('LOADING', 'PENDING_VERIFICATION', 'VERIFIED', 'FINALIZED')");
+    expect(sqlText).toContain("co.deleted_at IS NULL");
+    expect(sqlText).toContain("DISTINCT ON (cob.bale_id)");
     expect(sqlCall.values).toContain(4);
     expect(sqlCall.values).toContain(12);
   });
@@ -120,20 +124,22 @@ describe("customer loading intelligence route", () => {
     expect(harness.db.execute).not.toHaveBeenCalled();
   });
 
-  it("returns deduplicated per-session history with invoice source references", async () => {
+  it("returns deduplicated active-order history with invoice source references", async () => {
     harness.selectResults.push([{ id: 12, legalName: "Customer A" }]);
     harness.executeResults.push(
       { rows: [{ id: 8, code: "P8", articleCode: "HMD8", name: "Asian Wear" }] },
-      { rows: [{ sessionId: 21, invoiceId: 33, status: "COMPLETED", truckNo: "T-4", driverName: "Driver", startedAt: "2026-08-17T08:00:00Z", completedAt: "2026-08-17T09:00:00Z", balesLoaded: 9, kgLoaded: "360.000", lastScanAt: "2026-08-17T08:55:00Z" }] }
+      { rows: [{ sessionId: 33, invoiceId: 33, status: "VERIFIED", truckNo: "CONT-4", driverName: "Carrier", startedAt: "2026-08-17T08:00:00Z", completedAt: "2026-08-17T09:00:00Z", balesLoaded: 9, kgLoaded: "360.000", lastScanAt: "2026-08-17T08:55:00Z" }] }
     );
     const res = resHarness();
     await routes.get("GET /api/factory/customer-loading/history")!(req({ query: { customerId: "12", productId: "8" } }), res);
     expect(res.statusCode).toBe(200);
     expect(res.body.product).toEqual({ id: 8, code: "P8", articleCode: "HMD8", name: "Asian Wear" });
-    expect(res.body.history[0]).toEqual(expect.objectContaining({ sessionId: 21, invoiceId: 33, balesLoaded: 9, kgLoaded: 360 }));
+    expect(res.body.history[0]).toEqual(expect.objectContaining({ sessionId: 33, invoiceId: 33, status: "VERIFIED", balesLoaded: 9, kgLoaded: 360 }));
     const historySql = harness.db.execute.mock.calls[1]?.[0] as any;
-    expect(historySql.strings.join(" ")).toContain("DISTINCT ON (filb.bale_id)");
-    expect(historySql.strings.join(" ")).toContain("fils.status <> 'CANCELLED'");
-    expect(historySql.strings.join(" ")).toContain("LIMIT 100");
+    const historyText = historySql.strings.join(" ");
+    expect(historyText).toContain("DISTINCT ON (cob.bale_id)");
+    expect(historyText).toContain("co.status IN ('LOADING', 'PENDING_VERIFICATION', 'VERIFIED', 'FINALIZED')");
+    expect(historyText).toContain("co.deleted_at IS NULL");
+    expect(historyText).toContain("LIMIT 100");
   });
 });

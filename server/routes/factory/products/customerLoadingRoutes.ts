@@ -2,9 +2,10 @@
  * Customer loading intelligence.
  *
  * A product is considered "loaded" for a customer when at least one bale for
- * that article has been scanned into a non-cancelled invoice loading session.
- * Cancelled sessions are intentionally excluded so abandoned/reversed loading
- * work never becomes customer purchase history.
+ * that article belongs to a non-deleted customer order whose status is LOADING,
+ * PENDING_VERIFICATION, VERIFIED, or FINALIZED. This matches the ERP's existing
+ * loading lifecycle and makes pending/in-progress/verified invoices visible
+ * before the separate truck-scanning session starts.
  */
 import type { Express, Request, Response } from "express";
 import { and, eq, sql } from "drizzle-orm";
@@ -68,33 +69,50 @@ export function registerCustomerLoadingRoutes(app: Express) {
 
       const queryResult = await db.execute(sql`
         WITH customer_loaded_bales AS (
-          SELECT DISTINCT ON (filb.bale_id)
-            filb.bale_id,
-            filb.session_id,
-            COALESCE(filb.article_code, fb.article_code) AS article_code,
-            filb.weight_kg,
-            filb.scanned_at
-          FROM factory_invoice_loading_bales filb
-          INNER JOIN factory_invoice_loading_sessions fils
-            ON fils.id = filb.session_id
-           AND fils.company_id = filb.company_id
+          SELECT DISTINCT ON (cob.bale_id)
+            cob.bale_id,
+            cob.order_id,
+            COALESCE(cob.article_code, fb.article_code) AS article_code,
+            COALESCE(cob.weight, fb.weight_kg) AS weight_kg,
+            COALESCE(
+              co.finalized_at,
+              co.loading_finalized_at,
+              co.verified_at,
+              co.loading_started_at,
+              co.updated_at,
+              co.created_at
+            ) AS loaded_at
+          FROM customer_order_bales cob
+          INNER JOIN customer_orders co
+            ON co.id = cob.order_id
           LEFT JOIN factory_bales fb
-            ON fb.id = filb.bale_id
-           AND fb.company_id = filb.company_id
-          WHERE filb.company_id = ${companyId}
-            AND fils.customer_id = ${customerId}
-            AND fils.status <> 'CANCELLED'
-            AND COALESCE(filb.article_code, fb.article_code) IS NOT NULL
-            AND BTRIM(COALESCE(filb.article_code, fb.article_code)) <> ''
-          ORDER BY filb.bale_id, filb.scanned_at DESC, filb.id DESC
+            ON fb.id = cob.bale_id
+           AND fb.company_id = co.company_id
+          WHERE co.company_id = ${companyId}
+            AND co.customer_id = ${customerId}
+            AND co.deleted_at IS NULL
+            AND co.status IN ('LOADING', 'PENDING_VERIFICATION', 'VERIFIED', 'FINALIZED')
+            AND COALESCE(cob.article_code, fb.article_code) IS NOT NULL
+            AND BTRIM(COALESCE(cob.article_code, fb.article_code)) <> ''
+          ORDER BY
+            cob.bale_id,
+            COALESCE(
+              co.finalized_at,
+              co.loading_finalized_at,
+              co.verified_at,
+              co.loading_started_at,
+              co.updated_at,
+              co.created_at
+            ) DESC,
+            cob.id DESC
         ),
         loaded_by_article AS (
           SELECT
             UPPER(BTRIM(article_code)) AS article_key,
             COUNT(*)::integer AS total_bales_loaded,
             COALESCE(SUM(weight_kg::numeric), 0)::numeric AS total_kg_loaded,
-            COUNT(DISTINCT session_id)::integer AS loading_count,
-            MAX(scanned_at) AS last_loaded_at
+            COUNT(DISTINCT order_id)::integer AS loading_count,
+            MAX(loaded_at) AS last_loaded_at
           FROM customer_loaded_bales
           GROUP BY UPPER(BTRIM(article_code))
         )
@@ -121,7 +139,7 @@ export function registerCustomerLoadingRoutes(app: Express) {
          AND fc.company_id = fbp.company_id
          AND fc.deleted_at IS NULL
         LEFT JOIN loaded_by_article lba
-          ON lba.article_key = UPPER(BTRIM(fbp.article_code))
+          ON lba.article_key = UPPER(BTRIM(COALESCE(fbp.article_code, fbp.code)))
         WHERE fbp.company_id = ${companyId}
           AND fbp.deleted_at IS NULL
         ORDER BY fbp.name ASC, fbp.id ASC
@@ -147,9 +165,10 @@ export function registerCustomerLoadingRoutes(app: Express) {
       return res.json({
         customer,
         definition: {
-          loaded: "At least one bale scanned into a non-cancelled invoice loading session for this customer",
-          cancelledSessionsExcluded: true,
-          duplicateScansCollapsedByBale: true,
+          loaded: "At least one bale in a LOADING, PENDING_VERIFICATION, VERIFIED, or FINALIZED invoice for this customer",
+          cancelledOrdersExcluded: true,
+          deletedOrdersExcluded: true,
+          duplicateBalesCollapsed: true,
         },
         summary: {
           totalProducts: products.length,
@@ -191,44 +210,49 @@ export function registerCustomerLoadingRoutes(app: Express) {
 
       const historyResult = await db.execute(sql`
         WITH deduped AS (
-          SELECT DISTINCT ON (filb.bale_id)
-            filb.bale_id,
-            filb.session_id,
-            filb.invoice_id,
-            filb.bale_reference,
-            filb.weight_kg,
-            filb.scanned_at,
-            filb.scanned_by_name
-          FROM factory_invoice_loading_bales filb
-          INNER JOIN factory_invoice_loading_sessions fils
-            ON fils.id = filb.session_id
-           AND fils.company_id = filb.company_id
+          SELECT DISTINCT ON (cob.bale_id)
+            cob.bale_id,
+            cob.order_id,
+            cob.bale_reference,
+            COALESCE(cob.weight, fb.weight_kg) AS weight_kg,
+            COALESCE(
+              co.finalized_at,
+              co.loading_finalized_at,
+              co.verified_at,
+              co.loading_started_at,
+              co.updated_at,
+              co.created_at
+            ) AS last_activity_at
+          FROM customer_order_bales cob
+          INNER JOIN customer_orders co
+            ON co.id = cob.order_id
           LEFT JOIN factory_bales fb
-            ON fb.id = filb.bale_id
-           AND fb.company_id = filb.company_id
-          WHERE filb.company_id = ${companyId}
-            AND fils.customer_id = ${customerId}
-            AND fils.status <> 'CANCELLED'
-            AND UPPER(BTRIM(COALESCE(filb.article_code, fb.article_code))) = UPPER(BTRIM(${articleCode}))
-          ORDER BY filb.bale_id, filb.scanned_at DESC, filb.id DESC
+            ON fb.id = cob.bale_id
+           AND fb.company_id = co.company_id
+          WHERE co.company_id = ${companyId}
+            AND co.customer_id = ${customerId}
+            AND co.deleted_at IS NULL
+            AND co.status IN ('LOADING', 'PENDING_VERIFICATION', 'VERIFIED', 'FINALIZED')
+            AND UPPER(BTRIM(COALESCE(cob.article_code, fb.article_code))) = UPPER(BTRIM(${articleCode}))
+          ORDER BY cob.bale_id, COALESCE(co.updated_at, co.created_at) DESC, cob.id DESC
         )
         SELECT
-          d.session_id AS "sessionId",
-          d.invoice_id AS "invoiceId",
-          fils.status,
-          fils.truck_no AS "truckNo",
-          fils.driver_name AS "driverName",
-          fils.started_at AS "startedAt",
-          fils.completed_at AS "completedAt",
+          d.order_id AS "sessionId",
+          d.order_id AS "invoiceId",
+          co.status,
+          co.container_number AS "truckNo",
+          co.shipping_company AS "driverName",
+          co.loading_started_at AS "startedAt",
+          COALESCE(co.loading_finalized_at, co.finalized_at) AS "completedAt",
           COUNT(*)::integer AS "balesLoaded",
           COALESCE(SUM(d.weight_kg::numeric), 0)::numeric AS "kgLoaded",
-          MAX(d.scanned_at) AS "lastScanAt"
+          MAX(d.last_activity_at) AS "lastScanAt"
         FROM deduped d
-        INNER JOIN factory_invoice_loading_sessions fils
-          ON fils.id = d.session_id
-         AND fils.company_id = ${companyId}
-        GROUP BY d.session_id, d.invoice_id, fils.status, fils.truck_no, fils.driver_name, fils.started_at, fils.completed_at
-        ORDER BY MAX(d.scanned_at) DESC
+        INNER JOIN customer_orders co
+          ON co.id = d.order_id
+         AND co.company_id = ${companyId}
+        GROUP BY d.order_id, co.status, co.container_number, co.shipping_company, co.loading_started_at, co.loading_finalized_at, co.finalized_at
+        ORDER BY MAX(d.last_activity_at) DESC
         LIMIT 100
       `);
 
