@@ -87,7 +87,26 @@ jobs:
         run: node node_modules/drizzle-kit/bin.cjs push --force
       - name: Verify disposable database schema
         run: node scripts/verify-ci-disposable-schema.mjs
-      - name: Backend tests
-        run: node node_modules/vitest/vitest.mjs run --maxWorkers=1 --no-file-parallelism
+      - name: Capture backend tests
+        id: backend
+        shell: bash
+        run: |
+          set +e
+          node node_modules/vitest/vitest.mjs run --maxWorkers=1 --no-file-parallelism 2>&1 | tee postgres-backend-vitest.log
+          rc=${PIPESTATUS[0]}
+          set -e
+          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Upload backend diagnostic
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: postgres-backend-diagnostic
+          path: postgres-backend-vitest.log
+          if-no-files-found: error
+          retention-days: 1
+      - name: Fail if backend tests failed
+        if: steps.backend.outputs.exit_code != '0'
+        run: exit 1
       - name: Frontend tests
         run: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
