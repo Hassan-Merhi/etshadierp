@@ -24,7 +24,7 @@ export function renderWithProviders(ui: React.ReactElement): RenderResult {
   return render(
     <QueryClientProvider client={client}>
       <ApplicationLanguageProvider>{ui}</ApplicationLanguageProvider>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
 }
 

@@ -1,11 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import request from "supertest";
-import {
-  seedTestData,
-  cleanupTestData,
-  closeTestServer,
-  type TestContext,
-} from "./setup";
+import { seedTestData, cleanupTestData, closeTestServer, type TestContext } from "./setup";
 import { db } from "../server/db";
 import { eq } from "drizzle-orm";
 import * as schema from "../shared/schema";
@@ -33,9 +28,7 @@ async function cleanupVouchers() {
     .where(eq(schema.vouchers.companyId, ctx.companyId));
 
   for (const v of vouchers) {
-    await db
-      .delete(schema.accountingPostingRequests)
-      .where(eq(schema.accountingPostingRequests.voucherId, v.id));
+    await db.delete(schema.accountingPostingRequests).where(eq(schema.accountingPostingRequests.voucherId, v.id));
     await db.delete(schema.salesItems).where(eq(schema.salesItems.voucherId, v.id));
     await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, v.id));
   }
@@ -70,9 +63,7 @@ describe("Voucher Creation — Journal", () => {
   });
 
   it("creates a balanced journal voucher (DR = CR)", async () => {
-    const res = await agent
-      .post("/api/vouchers/journal")
-      .send(journalBody(500, ctx.cashAccountId, ctx.salesAccountId));
+    const res = await agent.post("/api/vouchers/journal").send(journalBody(500, ctx.cashAccountId, ctx.salesAccountId));
 
     expect(res.status).toBeGreaterThanOrEqual(200);
     expect(res.status).toBeLessThan(300);
@@ -101,10 +92,7 @@ describe("Voucher Creation — Journal", () => {
     const voucherId = res.body?.voucher?.id ?? res.body?.id ?? res.body?.voucherId;
     expect(voucherId).toBeDefined();
 
-    const entries = await db
-      .select()
-      .from(schema.voucherEntries)
-      .where(eq(schema.voucherEntries.voucherId, voucherId));
+    const entries = await db.select().from(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, voucherId));
 
     const totalDebit = entries.reduce((s, e) => s + parseFloat(e.debitAmount ?? "0"), 0);
     const totalCredit = entries.reduce((s, e) => s + parseFloat(e.creditAmount ?? "0"), 0);
@@ -124,19 +112,14 @@ describe("Voucher Creation — Journal", () => {
     const voucherId = res.body?.voucher?.id ?? res.body?.id ?? res.body?.voucherId;
     expect(voucherId).toBeDefined();
 
-    const [voucher] = await db
-      .select()
-      .from(schema.vouchers)
-      .where(eq(schema.vouchers.id, voucherId));
+    const [voucher] = await db.select().from(schema.vouchers).where(eq(schema.vouchers.id, voucherId));
 
     expect(voucher).toBeDefined();
     expect(voucher.companyId).toBe(ctx.companyId);
   });
 
   it("creates a voucher record of type Journal", async () => {
-    const res = await agent
-      .post("/api/vouchers/journal")
-      .send(journalBody(750, ctx.cashAccountId, ctx.salesAccountId));
+    const res = await agent.post("/api/vouchers/journal").send(journalBody(750, ctx.cashAccountId, ctx.salesAccountId));
 
     expect(res.status).toBeGreaterThanOrEqual(200);
     expect(res.status).toBeLessThan(300);
@@ -144,10 +127,7 @@ describe("Voucher Creation — Journal", () => {
     const voucherId = res.body?.voucher?.id ?? res.body?.id ?? res.body?.voucherId;
     expect(voucherId).toBeDefined();
 
-    const [voucher] = await db
-      .select()
-      .from(schema.vouchers)
-      .where(eq(schema.vouchers.id, voucherId));
+    const [voucher] = await db.select().from(schema.vouchers).where(eq(schema.vouchers.id, voucherId));
 
     expect(voucher?.voucherType).toBe("Journal");
   });
@@ -198,7 +178,7 @@ describe("Voucher Delete", () => {
     expect(deleteRes.status).toBeLessThan(300);
 
     const listRes = await agent.get("/api/vouchers");
-    const vouchers = Array.isArray(listRes.body) ? listRes.body : listRes.body?.vouchers ?? [];
+    const vouchers = Array.isArray(listRes.body) ? listRes.body : (listRes.body?.vouchers ?? []);
     const stillPresent = vouchers.some((v: any) => v.id === voucherId && !v.deletedAt);
     expect(stillPresent).toBe(false);
   });
@@ -231,10 +211,7 @@ describe("Voucher — Accounting Invariants", () => {
     const voucherId = res.body?.voucher?.id ?? res.body?.id ?? res.body?.voucherId;
     expect(voucherId).toBeDefined();
 
-    const entries = await db
-      .select()
-      .from(schema.voucherEntries)
-      .where(eq(schema.voucherEntries.voucherId, voucherId));
+    const entries = await db.select().from(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, voucherId));
 
     const totalDebit = entries.reduce((s, e) => s + parseFloat(e.debitAmount ?? "0"), 0);
     const totalCredit = entries.reduce((s, e) => s + parseFloat(e.creditAmount ?? "0"), 0);

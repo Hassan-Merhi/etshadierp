@@ -18,12 +18,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import request from "supertest";
-import {
-  seedTestData,
-  cleanupTestData,
-  closeTestServer,
-  type TestContext,
-} from "./setup";
+import { seedTestData, cleanupTestData, closeTestServer, type TestContext } from "./setup";
 import { db } from "../server/db";
 import { eq } from "drizzle-orm";
 import * as schema from "../shared/schema";
@@ -48,9 +43,7 @@ async function cleanupVouchers() {
     .from(schema.vouchers)
     .where(eq(schema.vouchers.companyId, ctx.companyId));
   for (const v of vouchers) {
-    await db
-      .delete(schema.accountingPostingRequests)
-      .where(eq(schema.accountingPostingRequests.voucherId, v.id));
+    await db.delete(schema.accountingPostingRequests).where(eq(schema.accountingPostingRequests.voucherId, v.id));
     await db.delete(schema.salesItems).where(eq(schema.salesItems.voucherId, v.id));
     await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, v.id));
   }
@@ -62,7 +55,7 @@ function journalBody(amount = 100) {
     voucherDate: new Date().toISOString().split("T")[0],
     notes: "WA trigger test",
     entries: [
-      { type: "DR", accountType: "ledger", accountId: ctx.cashAccountId,  amount: String(amount), narration: "" },
+      { type: "DR", accountType: "ledger", accountId: ctx.cashAccountId, amount: String(amount), narration: "" },
       { type: "CR", accountType: "ledger", accountId: ctx.salesAccountId, amount: String(amount), narration: "" },
     ],
   };
@@ -137,9 +130,7 @@ describe("WhatsApp — Journal voucher edit does not duplicate trigger", () => {
     const voucherId = createRes.body?.voucher?.id ?? createRes.body?.id ?? createRes.body?.voucherId;
     expect(voucherId).toBeDefined();
 
-    const updateRes = await agent.put(`/api/vouchers/${voucherId}/journal`).send(
-      journalBody(200),
-    );
+    const updateRes = await agent.put(`/api/vouchers/${voucherId}/journal`).send(journalBody(200));
 
     if (updateRes.status >= 200 && updateRes.status < 300) {
       expect(updateRes.body).toHaveProperty("whatsapp");
@@ -152,27 +143,21 @@ describe("WhatsApp — Journal voucher edit does not duplicate trigger", () => {
 
 describe("WhatsApp — Payment/Receipt voucher trigger field", () => {
   it("Payment voucher create response contains whatsapp field", async () => {
-    const res = await agent
-      .post("/api/vouchers/payment-receipt")
-      .send(paymentReceiptBody("Payment", 250));
+    const res = await agent.post("/api/vouchers/payment-receipt").send(paymentReceiptBody("Payment", 250));
     expect(res.status).toBeGreaterThanOrEqual(200);
     expect(res.status).toBeLessThan(300);
     expect(res.body).toHaveProperty("whatsapp");
   });
 
   it("Payment whatsapp.prompt is a boolean", async () => {
-    const res = await agent
-      .post("/api/vouchers/payment-receipt")
-      .send(paymentReceiptBody("Payment", 100));
+    const res = await agent.post("/api/vouchers/payment-receipt").send(paymentReceiptBody("Payment", 100));
     expect(res.status).toBeGreaterThanOrEqual(200);
     expect(res.status).toBeLessThan(300);
     expect(typeof res.body?.whatsapp?.prompt).toBe("boolean");
   });
 
   it("Receipt voucher create response contains whatsapp field", async () => {
-    const res = await agent
-      .post("/api/vouchers/payment-receipt")
-      .send(paymentReceiptBody("Receipt", 175));
+    const res = await agent.post("/api/vouchers/payment-receipt").send(paymentReceiptBody("Receipt", 175));
     expect(res.status).toBeGreaterThanOrEqual(200);
     expect(res.status).toBeLessThan(300);
     expect(res.body).toHaveProperty("whatsapp");
@@ -180,13 +165,10 @@ describe("WhatsApp — Payment/Receipt voucher trigger field", () => {
   });
 
   it("Payment voucher saves successfully regardless of WhatsApp state", async () => {
-    const res = await agent
-      .post("/api/vouchers/payment-receipt")
-      .send(paymentReceiptBody("Payment", 500));
+    const res = await agent.post("/api/vouchers/payment-receipt").send(paymentReceiptBody("Payment", 500));
     expect(res.status).toBeGreaterThanOrEqual(200);
     expect(res.status).toBeLessThan(300);
-    const voucherId =
-      res.body?.voucher?.id ?? res.body?.id ?? res.body?.voucherId;
+    const voucherId = res.body?.voucher?.id ?? res.body?.id ?? res.body?.voucherId;
     expect(voucherId).toBeDefined();
   });
 });
