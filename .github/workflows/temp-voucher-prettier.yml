@@ -1,21 +1,19 @@
 name: Temporary Voucher Prettier
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/voucher-details-location-price
+      - main
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  format:
+  format-diff:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout branch
+      - name: Checkout repository
         uses: actions/checkout@v7
-        with:
-          ref: agent/voucher-details-location-price
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
@@ -25,16 +23,7 @@ jobs:
         run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
       - name: Install dependencies
         run: npm ci --no-audit --bin-links=true
-      - name: Format changed files
-        run: node node_modules/prettier/bin/prettier.cjs --write server/routes/voucher-entries/hassan-price.ts server/routes/voucher-entries/reads.ts tests/voucher-details-hassan-price.test.ts
-      - name: Commit formatter output
+      - name: Print Prettier diff
         run: |
-          if git diff --quiet; then
-            echo "Already formatted."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add server/routes/voucher-entries/hassan-price.ts server/routes/voucher-entries/reads.ts tests/voucher-details-hassan-price.test.ts
-          git commit -m "style: apply repo Prettier"
-          git push origin HEAD:agent/voucher-details-location-price
+          node node_modules/prettier/bin/prettier.cjs --write server/routes/voucher-entries/reads.ts
+          git diff -- server/routes/voucher-entries/reads.ts
