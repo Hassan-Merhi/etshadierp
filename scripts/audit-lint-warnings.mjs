@@ -120,7 +120,12 @@ export function auditLintWarnings() {
       0
     );
     const expected = typeEscapeCeiling - suppressions;
-    typeEscapeAgreement = { typeEscapeCeiling, suppressions, expected, actual: config.perRule[ANY_RULE] };
+    typeEscapeAgreement = {
+      typeEscapeCeiling,
+      suppressions,
+      expected,
+      actual: config.perRule[ANY_RULE],
+    };
     if (config.perRule[ANY_RULE] !== expected) {
       failures.push(
         `${ANY_RULE} ceiling is ${config.perRule[ANY_RULE]} but config/type-escape-boundaries.json implies ` +
