@@ -12,7 +12,7 @@ function toFiniteNumber(value: string | number | null | undefined): number {
 export function calculateHassanPriceMetrics(
   actualSellingPrice: string | number | null | undefined,
   priceListSellingPrice: string | number | null | undefined,
-  quantity: string | number | null | undefined,
+  quantity: string | number | null | undefined
 ): HassanPriceMetrics | null {
   const price = toFiniteNumber(priceListSellingPrice);
   if (price <= 0) return null;
