@@ -159,11 +159,8 @@ export function registerVoucherEntryReadRoutes(app: Express) {
                 .where(
                   and(
                     eq(stockItemLocationPrices.locationId, voucher.locationId),
-                    inArray(
-                      stockItemLocationPrices.stockItemId,
-                      salesItemsList.map((item) => item.stockItemId),
-                    ),
-                  ),
+                    inArray(stockItemLocationPrices.stockItemId, salesItemsList.map((item) => item.stockItemId))
+                  )
                 )
             : [];
         const locationPriceMap = new Map(locationPriceRows.map((row) => [row.stockItemId, row.sellingPrice]));
