@@ -1,0 +1,50 @@
+name: Postgres Regression Diagnostic
+on:
+  push:
+    branches: [diagnostic/postgres-regression-20260818]
+permissions:
+  contents: read
+jobs:
+  postgres-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:15.13
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: heliumdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d heliumdb"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      NODE_ENV: test
+      SESSION_SECRET: diagnostic-session-secret
+      CSRF_ENFORCE: "0"
+      ENABLE_SCHEDULERS: "false"
+      NODE_OPTIONS: --max-old-space-size=4096
+      PORT: "5000"
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
+      PGSSLMODE: disable
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.14.0'
+          cache: npm
+      - run: npm ci --no-audit --bin-links=true
+      - name: Verify migration registry
+        run: node scripts/verify-migration-registry.mjs --json
+      - name: Prepare disposable database schema
+        run: node node_modules/drizzle-kit/bin.cjs push --force
+      - name: Verify disposable database schema
+        run: node scripts/verify-ci-disposable-schema.mjs
+      - name: Backend tests
+        run: node node_modules/vitest/vitest.mjs run --maxWorkers=1 --no-file-parallelism
+      - name: Frontend tests
+        run: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
