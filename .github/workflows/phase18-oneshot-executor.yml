@@ -25,11 +25,8 @@ jobs:
           node-version: '22.14.0'
           cache: npm
       - run: npm ci
-      - name: Solve entire tree once
+      - name: Bulk transform and compiler harvest
         shell: bash
-        env:
-          PHASE18_SHARD_INDEX: 0
-          PHASE18_SHARD_TOTAL: 1
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
@@ -37,14 +34,18 @@ jobs:
           count(){ set +e; node scripts/audit-type-escapes.mjs --json >/tmp/count.json 2>/dev/null; set -e; node -e "const r=require('/tmp/count.json');process.stdout.write(String(r.summary.typeEscapeTotal))"; }
           base=$(git rev-parse HEAD)
           start=$(count)
-          echo "ONESHOT_START=$start"
-          node scripts/phase18-shard-solver.cjs
+          echo "BULK_START=$start"
+          for mode in safe param array generic property union cast unknown; do
+            echo "BULK_PROPOSE mode=$mode before=$(count)"
+            PHASE18_MODE="$mode" node scripts/phase18-wave2-propose.cjs
+            echo "BULK_PROPOSE_DONE mode=$mode after=$(count)"
+          done
           candidate=$(count)
-          echo "ONESHOT_CANDIDATE=$start->$candidate"
+          echo "BULK_CANDIDATE=$start->$candidate"
           [ "$candidate" -lt "$start" ] || { echo 'No strict improvement'; exit 1; }
-          for attempt in $(seq 1 40); do
+          for attempt in $(seq 1 24); do
             set +e; npm run check >/tmp/check.log 2>&1; rc=$?; set -e
-            if [ "$rc" -eq 0 ]; then echo "ONESHOT_COMPILER_GREEN attempt=$attempt"; break; fi
+            if [ "$rc" -eq 0 ]; then echo "BULK_COMPILER_GREEN attempt=$attempt"; break; fi
             node -e "const fs=require('fs');const s=fs.readFileSync('/tmp/check.log','utf8');const a=[...new Set([...s.matchAll(/^([^ (]+\\.(?:ts|tsx))\\([0-9]+,[0-9]+\\): error TS[0-9]+:/gm)].map(m=>m[1]))];fs.writeFileSync('/tmp/error-files.txt',a.join('\\n'));"
             reverted=0
             while IFS= read -r f; do
@@ -53,22 +54,22 @@ jobs:
               git checkout "$base" -- "$f"
               reverted=$((reverted+1))
             done < /tmp/error-files.txt
-            echo "ONESHOT_ROLLBACK attempt=$attempt reverted=$reverted"
+            echo "BULK_ROLLBACK attempt=$attempt direct_files=$reverted"
             if [ "$reverted" -eq 0 ]; then
-              f=$(git diff --name-only "$base" -- client/src server shared | head -1 || true)
-              [ -n "$f" ] || break
-              git checkout "$base" -- "$f"
-              echo "ONESHOT_DEPENDENCY_ROLLBACK file=$f"
+              mapfile -t modified < <(git diff --name-only "$base" -- client/src server shared | head -25)
+              [ "${#modified[@]}" -gt 0 ] || break
+              git checkout "$base" -- "${modified[@]}"
+              echo "BULK_DEPENDENCY_ROLLBACK attempt=$attempt files=${#modified[@]}"
             fi
           done
           npm run check
           final=$(count)
-          echo "ONESHOT_FINAL=$start->$final"
+          echo "BULK_FINAL=$start->$final"
           [ "$final" -lt "$start" ] || exit 1
           git add client/src server shared
-          git commit -m 'refactor: Phase 18 one-shot full-tree type reduction [phase18-oneshot-source] [skip ci]'
+          git commit -m 'refactor: Phase 18 bulk full-tree type reduction [phase18-oneshot-source] [skip ci]'
           set +e; node scripts/audit-type-escapes.mjs --json >/tmp/after.json; set -e
-          node -e "const fs=require('fs');const r=JSON.parse(fs.readFileSync('/tmp/after.json','utf8'));const top=(r.files||[]).filter(f=>f.total).sort((a,b)=>b.total-a.total).slice(0,400);fs.writeFileSync('phase18-oneshot-report.md',['# Phase 18 One-Shot Result','', 'Type escapes: '+r.summary.typeEscapeTotal,'Explicit any: '+r.summary.explicitAny,'as any: '+r.summary.asAny,'Suppressions: '+r.summary.suppressions,'Files with escapes: '+r.summary.filesWithEscapes,'','## Top files','',...top.map(f=>'- '+f.total+' — '+f.path),''].join('\\n'));"
+          node -e "const fs=require('fs');const r=JSON.parse(fs.readFileSync('/tmp/after.json','utf8'));const top=(r.files||[]).filter(f=>f.total).sort((a,b)=>b.total-a.total).slice(0,500);fs.writeFileSync('phase18-oneshot-report.md',['# Phase 18 One-Shot Result','', 'Type escapes: '+r.summary.typeEscapeTotal,'Explicit any: '+r.summary.explicitAny,'as any: '+r.summary.asAny,'Suppressions: '+r.summary.suppressions,'Files with escapes: '+r.summary.filesWithEscapes,'','## Top files','',...top.map(f=>'- '+f.total+' — '+f.path),''].join('\\n'));"
           git add phase18-oneshot-report.md
           git commit -m 'chore: publish Phase 18 one-shot result [phase18-oneshot-result] [skip ci]'
           git push --force origin HEAD:agent/phase18-wave2-oneshot-result
