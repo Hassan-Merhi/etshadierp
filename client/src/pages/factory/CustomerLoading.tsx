@@ -95,7 +95,7 @@ export default function CustomerLoading() {
     enabled: Boolean(customerId && historyProduct), staleTime: 30_000,
   });
 
-  const products = loadingQuery.data?.products ?? [];
+  const products = useMemo(() => loadingQuery.data?.products ?? [], [loadingQuery.data?.products]);
   const categories = useMemo(() => [...new Set(products.map((p) => p.categoryName).filter((v): v is string => Boolean(v)))].sort((a, b) => a.localeCompare(b)), [products]);
   const weights = useMemo(() => [...new Set(products.map((p) => p.weightPerBaleKg).filter((v): v is string => Boolean(v)))].sort((a, b) => Number(a) - Number(b)), [products]);
   const filteredProducts = useMemo(() => {
@@ -121,8 +121,8 @@ export default function CustomerLoading() {
     const weightPerBale = Number(product.weightPerBaleKg ?? 0) || 0;
     return { product, quantity, rawPrice, pricePerBale, priceValid: rawPrice !== "" && Number.isFinite(parsedPrice) && parsedPrice >= 0, totalKg: quantity * weightPerBale, lineTotal: quantity * pricePerBale };
   }), [products, selectedProductIds, draftQuantities, draftPrices]);
-  const validSelectedLines = selectedLines.filter((line) => line.quantity > 0 && line.priceValid && Boolean(line.product.articleCode || line.product.code));
-  const hasInvalidSelectedLine = selectedLines.some((line) => line.quantity <= 0 || !line.priceValid || !Boolean(line.product.articleCode || line.product.code));
+  const validSelectedLines = selectedLines.filter((line) => line.quantity > 0 && line.priceValid && (line.product.articleCode || line.product.code));
+  const hasInvalidSelectedLine = selectedLines.some((line) => line.quantity <= 0 || !line.priceValid || !(line.product.articleCode || line.product.code));
   const selectedTotals = validSelectedLines.reduce((t, line) => ({ lines: t.lines + 1, quantity: t.quantity + line.quantity, kg: t.kg + line.totalKg, amount: t.amount + line.lineTotal }), { lines: 0, quantity: 0, kg: 0, amount: 0 });
 
   const createProformaMutation = useMutation({
