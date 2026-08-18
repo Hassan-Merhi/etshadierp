@@ -1,0 +1,90 @@
+name: Phase 18 PR Executor
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: write
+env:
+  CI: true
+jobs:
+  execute:
+    if: github.event.pull_request.head.ref == 'agent/phase18-executor'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/phase18-executor
+          fetch-depth: 0
+      - name: Guard result commit
+        id: guard
+        shell: bash
+        run: |
+          if git log -1 --pretty=%B | grep -Fq '[phase18-executor-result]'; then echo 'skip=true' >> "$GITHUB_OUTPUT"; else echo 'skip=false' >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/setup-node@v6
+        if: steps.guard.outputs.skip != 'true'
+        with: {node-version: '22.14.0', cache: npm}
+      - run: npm ci
+        if: steps.guard.outputs.skip != 'true'
+      - name: Baseline
+        if: steps.guard.outputs.skip != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run check
+          set +e; node scripts/audit-type-escapes.mjs --json >/tmp/before.json; set -e
+          node -e "const r=require('/tmp/before.json'); console.log('BEFORE='+JSON.stringify(r.summary))"
+      - name: Recover cached compiler-proven source patches
+        if: steps.guard.outputs.skip != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'; git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin '+refs/heads/agent/phase18-*:refs/remotes/origin/agent/phase18-*' || true
+          count(){ set +e; node scripts/audit-type-escapes.mjs --json >/tmp/count.json 2>/dev/null; set -e; node -e "const r=require('/tmp/count.json');process.stdout.write(String(r.summary.typeEscapeTotal))"; }
+          start=$(count); kept=0
+          mapfile -t branches < <(git for-each-ref --format='%(refname:short)' 'refs/remotes/origin/agent/phase18-*result*' | sort -u)
+          for branch in "${branches[@]}"; do
+            checkpoint=$(git rev-parse HEAD); current=$(count); base=$(git merge-base HEAD "$branch" || true); [ -n "$base" ] || continue
+            git diff --binary "$base" "$branch" -- client/src server shared >/tmp/candidate.patch
+            [ -s /tmp/candidate.patch ] || continue
+            set +e; git apply --3way /tmp/candidate.patch >/tmp/apply.log 2>&1; arc=$?; set -e
+            if [ "$arc" -ne 0 ]; then git reset --hard "$checkpoint"; git clean -fd -- client/src server shared; continue; fi
+            if git diff --quiet -- client/src server shared; then git reset --hard "$checkpoint"; continue; fi
+            set +e; npm run check >/tmp/check.log 2>&1; crc=$?; set -e
+            if [ "$crc" -ne 0 ]; then git reset --hard "$checkpoint"; git clean -fd -- client/src server shared; continue; fi
+            after=$(count)
+            if [ "$after" -ge "$current" ]; then git reset --hard "$checkpoint"; git clean -fd -- client/src server shared; continue; fi
+            git add client/src server shared; git commit -m "refactor: recover ${branch#origin/} [phase18-executor-cache]"; kept=$((kept+1)); echo "KEPT $branch $current->$after"
+          done
+          echo "CACHE_RESULT kept=$kept $start->$(count)"
+      - name: Solve remaining compiler-safe anys
+        if: steps.guard.outputs.skip != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          before=$(git rev-parse HEAD)
+          node scripts/phase18-current-candidate-solver.cjs
+          if git diff --quiet -- client/src server shared; then echo 'SOLVER_NO_CHANGES=1'; exit 0; fi
+          if npm run check; then
+            git add client/src server shared
+            git commit -m 'refactor: solve current compiler-safe any occurrences [phase18-executor-solver]'
+          else
+            git reset --hard "$before"
+          fi
+      - name: Report and push result branch
+        if: steps.guard.outputs.skip != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run check
+          set +e; node scripts/audit-type-escapes.mjs --json >/tmp/after.json; set -e
+          node - <<'NODE'
+          const fs=require('fs');const r=JSON.parse(fs.readFileSync('/tmp/after.json','utf8'));
+          const top=(r.files||[]).filter(f=>f.total).sort((a,b)=>b.total-a.total).slice(0,80);
+          fs.writeFileSync('phase18-executor-report.md',['# Phase 18 Executor Report','',`Type escapes: ${r.summary.typeEscapeTotal}`,`Explicit any: ${r.summary.explicitAny}`,`as any: ${r.summary.asAny}`,`Suppressions: ${r.summary.suppressions}`,'','## Top files','',...top.map(f=>`- ${f.total} — ${f.path}`),''].join('\n'));
+          console.log('AFTER='+JSON.stringify(r.summary));
+          NODE
+          git add phase18-executor-report.md
+          git commit -m 'chore: publish Phase 18 executor result [phase18-executor-result]'
+          git push origin HEAD:agent/phase18-executor
