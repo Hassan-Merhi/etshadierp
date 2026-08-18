@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   execute:
-    if: github.event.pull_request.head.ref == 'agent/phase18-executor' || github.event.pull_request.head.ref == 'agent/phase18-wave2-staged'
+    if: github.event.pull_request.head.ref == 'agent/phase18-wave2-staged'
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
@@ -92,7 +92,7 @@ jobs:
                 break
               fi
               git add client/src server shared
-              git commit -m "refactor: Phase 18 ${mode} type reduction pass ${pass} [phase18-wave2-bulk]"
+              git commit -m "refactor: Phase 18 ${mode} type reduction pass ${pass} [phase18-wave2-bulk] [skip ci]"
               git push origin HEAD:"$target_branch"
               sort -u /tmp/phase18-blocked.txt -o /tmp/phase18-blocked.txt
               echo "BULK_PASS_ACCEPTED mode=$mode pass=$pass $pass_start->$pass_end blocked=$(wc -l < /tmp/phase18-blocked.txt)"
@@ -120,7 +120,7 @@ jobs:
                 pass_end=$(count)
                 if [ "$pass_end" -lt "$pass_start" ]; then
                   git add client/src server shared
-                  git commit -m "refactor: Phase 18 targeted type reduction [phase18-wave2-targeted]"
+                  git commit -m "refactor: Phase 18 targeted type reduction [phase18-wave2-targeted] [skip ci]"
                   git push origin HEAD:"$target_branch"
                   echo "TARGET_PASS_ACCEPTED $pass_start->$pass_end"
                 else
