@@ -40,6 +40,8 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           count(){ set +e; node scripts/audit-type-escapes.mjs --json >/tmp/count.json 2>/dev/null; set -e; node -e "const r=require('/tmp/count.json');process.stdout.write(String(r.summary.typeEscapeTotal))"; }
+          phase_check(){ node node_modules/typescript/bin/tsc --noEmit --incremental --tsBuildInfoFile /tmp/phase18-wave2.tsbuildinfo; }
+          rm -f /tmp/phase18-wave2.tsbuildinfo
           : > /tmp/phase18-blocked.txt
           wave_start=$(count)
           echo "BULK_WAVE_START=$wave_start"
@@ -50,7 +52,7 @@ jobs:
             if git diff --quiet -- client/src server shared; then echo "BULK_NO_CHANGES pass=$pass"; break; fi
             green=0
             for attempt in $(seq 1 40); do
-              set +e; npm run check >/tmp/check.log 2>&1; rc=$?; set -e
+              set +e; phase_check >/tmp/check.log 2>&1; rc=$?; set -e
               if [ "$rc" -eq 0 ]; then green=1; echo "BULK_COMPILER_GREEN pass=$pass attempt=$attempt"; break; fi
               mapfile -t errs < <(sed -nE 's#^([^ (]+\.(ts|tsx))\([0-9]+,[0-9]+\): error TS[0-9]+:.*#\1#p' /tmp/check.log | sort -u)
               reverted=0
@@ -69,9 +71,9 @@ jobs:
               echo "$f" >> /tmp/phase18-blocked.txt
               echo "BULK_DEPENDENCY_ROLLBACK pass=$pass file=$f"
             done
-            if [ "$green" -ne 1 ]; then git reset --hard "$pass_base"; echo "BULK_PASS_REJECTED pass=$pass"; break; fi
+            if [ "$green" -ne 1 ]; then git reset --hard "$pass_base"; rm -f /tmp/phase18-wave2.tsbuildinfo; echo "BULK_PASS_REJECTED pass=$pass"; break; fi
             pass_end=$(count)
-            if [ "$pass_end" -ge "$pass_start" ]; then git reset --hard "$pass_base"; echo "BULK_NO_STRICT_IMPROVEMENT pass=$pass $pass_start->$pass_end"; break; fi
+            if [ "$pass_end" -ge "$pass_start" ]; then git reset --hard "$pass_base"; rm -f /tmp/phase18-wave2.tsbuildinfo; echo "BULK_NO_STRICT_IMPROVEMENT pass=$pass $pass_start->$pass_end"; break; fi
             git add client/src server shared
             git commit -m "refactor: Phase 18 bulk type reduction pass $pass [phase18-wave2-bulk]"
             echo "BULK_PASS_ACCEPTED pass=$pass $pass_start->$pass_end blocked=$(sort -u /tmp/phase18-blocked.txt | wc -l)"
@@ -86,13 +88,15 @@ jobs:
         run: |
           set -euo pipefail
           count(){ set +e; node scripts/audit-type-escapes.mjs --json >/tmp/count.json 2>/dev/null; set -e; node -e "const r=require('/tmp/count.json');process.stdout.write(String(r.summary.typeEscapeTotal))"; }
+          phase_check(){ node node_modules/typescript/bin/tsc --noEmit --incremental --tsBuildInfoFile /tmp/phase18-wave2-targeted.tsbuildinfo; }
+          rm -f /tmp/phase18-wave2-targeted.tsbuildinfo
           for pass in $(seq 1 3); do
             pass_base=$(git rev-parse HEAD)
             pass_start=$(count)
             [ "$pass_start" -eq 0 ] && break
             node scripts/phase18-current-candidate-solver.cjs
             if git diff --quiet -- client/src server shared; then echo "TARGET_NO_CHANGES pass=$pass"; break; fi
-            if npm run check; then
+            if phase_check; then
               pass_end=$(count)
               if [ "$pass_end" -lt "$pass_start" ]; then
                 git add client/src server shared
@@ -102,6 +106,7 @@ jobs:
               fi
             fi
             git reset --hard "$pass_base"
+            rm -f /tmp/phase18-wave2-targeted.tsbuildinfo
             echo "TARGET_PASS_REJECTED pass=$pass"
             break
           done
