@@ -24,7 +24,8 @@
     "prefer-const": 100000,
     "no-var": 100000,
     "preserve-caught-error": 100000,
-    "no-useless-assignment": 100000
+    "no-useless-assignment": 100000,
+    "no-extra-boolean-cast": 100000
   },
   "notes": {
     "diagnostic": "Temporary branch only; never merge these thresholds."
