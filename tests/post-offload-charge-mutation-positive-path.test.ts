@@ -23,6 +23,16 @@ const harness = vi.hoisted(() => {
     factoryDaybookEntries: { name: "factoryDaybookEntries", id: "factoryDaybookEntries.id" },
     vouchers: { name: "vouchers", id: "vouchers.id" },
     voucherEntries: { name: "voucherEntries", id: "voucherEntries.id", voucherId: "voucherEntries.voucherId" },
+    accountingPostingRequests: {
+      name: "accountingPostingRequests",
+      companyId: "accountingPostingRequests.companyId",
+      idempotencyKey: "accountingPostingRequests.idempotencyKey",
+      sourceType: "accountingPostingRequests.sourceType",
+      sourceId: "accountingPostingRequests.sourceId",
+      requestFingerprint: "accountingPostingRequests.requestFingerprint",
+      voucherId: "accountingPostingRequests.voucherId",
+    },
+    auditLog: { name: "auditLog", id: "auditLog.id" },
   };
   const selectResults: unknown[][] = [];
   const returningResults: unknown[][] = [];
@@ -37,6 +47,7 @@ const harness = vi.hoisted(() => {
       const builder = {
         where: () => builder,
         for: async () => result,
+        limit: async () => result,
         then: (resolve: (value: unknown[]) => unknown, reject: (reason: unknown) => unknown) =>
           Promise.resolve(result).then(resolve, reject),
       };
