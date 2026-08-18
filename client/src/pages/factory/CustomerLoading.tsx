@@ -95,7 +95,7 @@ export default function CustomerLoading() {
     enabled: Boolean(customerId && historyProduct), staleTime: 30_000,
   });
 
-  const products = loadingQuery.data?.products ?? [];
+  const products = useMemo(() => loadingQuery.data?.products ?? [], [loadingQuery.data?.products]);
   const categories = useMemo(() => [...new Set(products.map((p) => p.categoryName).filter((v): v is string => Boolean(v)))].sort((a, b) => a.localeCompare(b)), [products]);
   const weights = useMemo(() => [...new Set(products.map((p) => p.weightPerBaleKg).filter((v): v is string => Boolean(v)))].sort((a, b) => Number(a) - Number(b)), [products]);
   const filteredProducts = useMemo(() => {
