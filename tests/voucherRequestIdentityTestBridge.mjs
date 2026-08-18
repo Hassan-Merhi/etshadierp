@@ -44,19 +44,19 @@ async function cleanupGeneratedRequestIdentity(request) {
   // cleanup query. Explicit idempotency keys are never stored here and are
   // intentionally preserved for replay assertions.
   request[GENERATED_KEY] = null;
-  await pool.query("DELETE FROM accounting_posting_requests WHERE idempotency_key = $1", [generatedKey]);
+  await pool.query("DELETE FROM accounting_posting_requests WHERE idempotency_key = $1", [
+    generatedKey,
+  ]);
 }
 
-// Infrastructure voucher writers persist durable `infra:*` posting markers
-// with an intentional ON DELETE RESTRICT voucher FK. Individual integration
-// suites often delete their vouchers in beforeEach/afterAll and predate that
-// durable marker table. Clear only infrastructure markers after each completed
-// test so the next suite-local teardown can remove its vouchers. This is
-// test-only cleanup: explicit central-posting identities remain available for
-// replay assertions during the test that created them, and production FK
-// semantics are unchanged.
+// The backend test job uses one disposable database for the whole Vitest run.
+// Durable posting identities are intentionally ON DELETE RESTRICT in production,
+// while many older suites delete their vouchers directly between individual
+// test cases. Keep each test isolated by clearing posting identities only after
+// the test has completed. Replay/idempotency assertions still observe the rows
+// for the entire test that created them; production FK behavior is unchanged.
 afterEach(async () => {
-  await pool.query("DELETE FROM accounting_posting_requests WHERE idempotency_key LIKE 'infra:%'");
+  await pool.query("DELETE FROM accounting_posting_requests");
 });
 
 const requestPrototype = supertest.Test.prototype;
@@ -95,6 +95,6 @@ requestPrototype.then = function thenWithVoucherRequestIdentity(onFulfilled, onR
 
       if (typeof onRejected === "function") return onRejected(error);
       throw error;
-    }
+    },
   );
 };
