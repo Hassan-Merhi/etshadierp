@@ -8,7 +8,7 @@ jobs:
   postgres-regression:
     if: github.event.pull_request.head.ref == 'diagnostic/postgres-main-20260819'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:15.13
@@ -45,11 +45,31 @@ jobs:
         run: node node_modules/drizzle-kit/bin.cjs push --force
       - name: Verify disposable database schema
         run: node scripts/verify-ci-disposable-schema.mjs
-      - name: Backend tests
+      - name: Prior failing backend suites
         shell: bash
         run: |
           set +e
-          node node_modules/vitest/vitest.mjs run --maxWorkers=1 --no-file-parallelism 2>&1 | tee backend-vitest.log
+          node node_modules/vitest/vitest.mjs run --maxWorkers=1 --no-file-parallelism \
+            tests/rental-payment-accounting-reconciliation.test.ts \
+            tests/reports.test.ts \
+            tests/whatsapp-triggers.test.ts \
+            tests/accounting.test.ts \
+            tests/canonical-pos-sale-journal.test.ts \
+            tests/factory-insurance-company-isolation.test.ts \
+            tests/factory-post-offload-impact-preview.test.ts \
+            tests/god-file-boundaries.test.ts \
+            tests/insurance-write-routes.test.ts \
+            tests/inventory.test.ts \
+            tests/pdf-invoice.test.ts \
+            tests/pos.test.ts \
+            tests/post-offload-charge-mutation-positive-path.test.ts \
+            tests/route-manifest.test.ts \
+            tests/source-text-assertions.test.ts \
+            tests/toolchain-and-script-inventory.test.ts \
+            tests/toolchain-coherence-audit.test.ts \
+            tests/type-escape-boundaries.test.ts \
+            tests/vouchers.test.ts \
+            tests/workflow.test.ts 2>&1 | tee backend-vitest.log
           status=${PIPESTATUS[0]}
           echo "backend_status=$status" >> "$GITHUB_ENV"
           exit 0
@@ -60,5 +80,3 @@ jobs:
           path: backend-vitest.log
       - name: Fail if backend tests failed
         run: test "${backend_status}" -eq 0
-      - name: Frontend tests
-        run: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
