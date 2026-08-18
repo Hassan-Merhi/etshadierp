@@ -115,8 +115,6 @@ describe("PATCH /api/insurance/members/:id", () => {
     const response = await agent.patch(`/api/insurance/members/${member.id}`).send({ name: `${TEST_PREFIX} After` });
     expect(response.status).toBe(200);
 
-    // The account carries the name into every future journal; leaving it behind
-    // files next month's entry under someone who no longer exists.
     const account = await pool.query<{ name: string }>(`SELECT name FROM ledger_accounts WHERE id = $1`, [
       member.ledger_account_id,
     ]);
@@ -150,8 +148,6 @@ describe("DELETE /api/insurance/members/:id", () => {
     expect(response.status).toBe(200);
 
     expect(await memberRow(member.id)).toBeNull();
-    // The account is soft-deleted rather than dropped, because past journals
-    // still have entries pointing at it.
     const account = await pool.query<{ deleted_at: string | null }>(
       `SELECT deleted_at FROM ledger_accounts WHERE id = $1`,
       [member.ledger_account_id]
@@ -186,7 +182,6 @@ describe("POST /api/insurance/generate", () => {
       `SELECT debit_amount, credit_amount FROM voucher_entries WHERE voucher_id = $1`,
       [response.body.voucherId]
     );
-    // One expense leg plus one per member.
     expect(legs.rowCount).toBe(3);
 
     const debits = legs.rows.reduce((sum, leg) => sum + Number(leg.debit_amount), 0);
@@ -203,9 +198,9 @@ describe("POST /api/insurance/generate", () => {
   it("prorates a member who starts inside the period", async () => {
     await deactivateAllMembers();
     // June has 30 days; starting on the 16th leaves 15 days, so half of 300.
-    await createMember({ name: `${TEST_PREFIX} Prorated`, amount: "300.00", startDate: "2026-06-16" });
+    await createMember({ name: `${TEST_PREFIX} Prorated`, amount: "300.00", startDate: "2025-06-16" });
 
-    const response = await agent.post("/api/insurance/generate").send({ month: 6, year: 2026 });
+    const response = await agent.post("/api/insurance/generate").send({ month: 6, year: 2025 });
     expect(response.status).toBe(200);
 
     const legs = await pool.query<{ debit_amount: string; credit_amount: string }>(
@@ -215,8 +210,6 @@ describe("POST /api/insurance/generate", () => {
     const debits = legs.rows.reduce((sum, leg) => sum + Number(leg.debit_amount), 0);
     const credits = legs.rows.reduce((sum, leg) => sum + Number(leg.credit_amount), 0);
 
-    // 300 / 30 * (30 - 16 + 1) = 150. A whole-month charge would post 300 and
-    // still balance, which is exactly why this needs asserting on the amount.
     expect(debits).toBeCloseTo(150, 2);
     expect(credits).toBeCloseTo(150, 2);
   });
@@ -226,14 +219,13 @@ describe("POST /api/insurance/generate", () => {
     await createMember({ name: `${TEST_PREFIX} Present`, amount: "60.00", startDate: "2025-01-01" });
     await createMember({ name: `${TEST_PREFIX} Future`, amount: "999.00", startDate: "2027-01-01" });
 
-    const response = await agent.post("/api/insurance/generate").send({ month: 6, year: 2026 });
+    const response = await agent.post("/api/insurance/generate").send({ month: 7, year: 2026 });
     expect(response.status).toBe(200);
 
     const legs = await pool.query<{ debit_amount: string }>(
       `SELECT debit_amount FROM voucher_entries WHERE voucher_id = $1`,
       [response.body.voucherId]
     );
-    // Expense leg plus the one eligible member — the future starter is absent.
     expect(legs.rowCount).toBe(2);
     const debits = legs.rows.reduce((sum, leg) => sum + Number(leg.debit_amount), 0);
     expect(debits).toBeCloseTo(60, 2);
@@ -247,7 +239,7 @@ describe("POST /api/insurance/generate", () => {
       startDate: "2025-01-01",
     });
 
-    const response = await agent.post("/api/insurance/generate").send({ month: 6, year: 2026 });
+    const response = await agent.post("/api/insurance/generate").send({ month: 8, year: 2026 });
     expect(response.status).toBe(200);
 
     const legs = await pool.query<{ ledger_account_id: number; debit_amount: string; credit_amount: string }>(
@@ -257,10 +249,6 @@ describe("POST /api/insurance/generate", () => {
     const memberLeg = legs.rows.find((leg) => leg.ledger_account_id === member.ledger_account_id);
     const expenseLeg = legs.rows.find((leg) => leg.ledger_account_id !== member.ledger_account_id);
 
-    // Incurring the month's insurance is an expense, and what the company now
-    // owes the member is a liability. Run the other way — as this did until the
-    // direction was corrected — it reduces recorded expense and makes the
-    // member's account read as an asset.
     expect(Number(expenseLeg?.debit_amount)).toBeCloseTo(45, 2);
     expect(Number(expenseLeg?.credit_amount)).toBeCloseTo(0, 2);
     expect(Number(memberLeg?.credit_amount)).toBeCloseTo(45, 2);
