@@ -2,37 +2,13 @@
 /**
  * audit-write-evidence.mjs
  *
- * Two properties that the existing gates cannot see.
+ * Measures evidence left by stock and voucher writes. Existing backlogs are
+ * ratcheted by exact file set. Voucher creation is creation-only: updating,
+ * deleting or restoring an existing voucher cannot create a duplicate row.
  *
- * `audit-write-route-coverage.mjs` asks whether a sensitive write route is
- * *tested*. It is at zero and stays there. But a route can be fully tested and
- * still write money or stock without leaving the evidence the rest of the
- * system reconciles against:
- *
- *   Journal evidence — a file that changes `inventory` without going through
- *   postStockMovementTx moves stock with no row in the canonical movement
- *   journal. Convergence reconciliation compares documents against that
- *   journal, so an unjournalled mutation is not a discrepancy it reports; it is
- *   a discrepancy it cannot see.
- *
- *   Request identity — a file that creates a voucher without resolving a client
- *   request id has no idempotency key, so a retried submission posts the
- *   entries twice. The retry does not have to be a user double-click: a proxy
- *   timeout, a mobile network handover, or an offline queue replay is enough.
- *
- * Both are backlogs, not zeros — the repository has a lot of both — so this
- * works the way the lint and type-escape gates work: measure, pin, and forbid
- * growth. It also pins the *set*, not only the count, because a backlog that
- * stays at 71 while a different file joins it is a new defect wearing an old
- * number.
- *
- * Nothing here is a substitute for the journal or the idempotency key. It is
- * the thing that notices when the next write path forgets them.
- *
- * Usage:
- *   npm run audit:write-evidence
- *   node scripts/audit-write-evidence.mjs --json
- *   UPDATE_WRITE_EVIDENCE_BASELINE=1 node scripts/audit-write-evidence.mjs
+ * Phase 7 additionally freezes the reviewed direct-voucher creator inventory:
+ * a brand-new `.insert(vouchers)` / `INSERT INTO vouchers` file fails even if
+ * somebody attempts to hide it behind a count-only baseline.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -40,45 +16,22 @@ import { fileURLToPath } from "node:url";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const baselinePath = path.join(projectRoot, "config/write-evidence-baseline.json");
+const voucherReviewPath = path.join(projectRoot, "config/voucher-write-evidence-review.json");
 
-/**
- * Schema-creation and migration code legitimately touches these tables without
- * being a business write path: it is building the tables, not moving stock.
- */
 const EXCLUDED_PREFIXES = ["server/startup-schema/", "server/db.ts", "server/migrations/"];
 
-/** A write to the named table, in either drizzle or raw SQL form. */
 function writesTable(source, table, camel) {
   const drizzle = new RegExp(String.raw`\.(?:insert|update|delete)\(\s*(?:schema\.)?(?:${table}|${camel})\s*[,)]`);
   const raw = new RegExp(String.raw`\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+"?${table}"?\b`, "i");
   return drizzle.test(source) || raw.test(source);
 }
 
-/**
- * A new row in the named table. Request identity is about replay-safe creation:
- * updating, soft-deleting, restoring, or moving an existing voucher cannot
- * create a second voucher row, so those operations must not inflate the
- * duplicate-posting backlog.
- */
 function createsTableRow(source, table, camel) {
   const drizzle = new RegExp(String.raw`\.insert\(\s*(?:schema\.)?(?:${table}|${camel})\s*[,)]`);
   const raw = new RegExp(String.raw`\bINSERT\s+INTO\s+"?${table}"?\b`, "i");
   return drizzle.test(source) || raw.test(source);
 }
 
-/**
- * Stock also moves without any statement naming the table.
- *
- * server/inventoryHelper.ts owns the balance arithmetic, and most write paths
- * call adjustInventory() rather than writing `inventory` themselves — then the
- * ones that were converted call postStockMovementTx() beside it to record what
- * moved. Matching only the table missed every caller of the helper: thirty
- * files that move stock and journal nothing were invisible to this audit while
- * it reported a tidy backlog of twenty-one.
- *
- * The helper itself is not a gap and is exempt below: it is the layer the
- * journal sits above, and it has no idea which document is calling it.
- */
 const STOCK_BALANCE_HELPER = /\b(?:adjustInventory|reverseInventoryByExactValue)\s*\(/;
 const STOCK_BALANCE_HELPER_MODULE = "server/inventoryHelper.ts";
 
@@ -87,34 +40,78 @@ function mutatesStock(file, source) {
   return writesTable(source, "inventory", "inventory") || STOCK_BALANCE_HELPER.test(source);
 }
 
-/**
- * Reaching the canonical movement journal, by whichever door.
- *
- * Naming functions rather than the journal table is deliberate:
- * postStockMovementTx is where the validation, the locking and the idempotent
- * replay live, and a file inserting journal rows around it would be evidence of
- * the wrong thing. But crediting only that one name punishes the obvious
- * refactor — moving a repeated journal call into a shared helper made a
- * correctly journalled file look unjournalled the first time it was tried. Each
- * wrapper that exists solely to call it is credited too.
- */
 const JOURNAL_WRITER = /\b(?:postStockMovementTx|journalStockTransferLeg)\b/;
 
-/**
- * Any of the request-identity mechanisms. A route satisfies this by taking a
- * caller-supplied id (clientRequestId), by deriving one for a stock document,
- * by holding the accounting idempotency marker directly — or by going through
- * postBalancedVoucherTx, which validates `source.idempotencyKey` as required
- * text and looks the key up before posting. A file that reaches the central
- * engine cannot post a voucher without an identity, so crediting the literal
- * strings alone was under-counting the paths that are already safe.
- */
 const REQUEST_IDENTITY =
   /\b(?:clientRequestId|resolveStockDocumentRequestId|stockDocumentIdempotencyKey|postBalancedVoucherTx|insertInfrastructureVoucherTx|insertInfrastructureVoucher)\b/;
 
 const IDENTITY_OWNING_VOUCHER_WRITERS = new Set([
   "server/services/accounting/voucherPostingService.ts",
   "server/services/accounting/infrastructureVoucherIdentity.ts",
+]);
+
+export const PHASE4_OPERATIONAL_REQUEST_BOUNDARY_WRITERS = new Set([
+  "server/routes/employees/salaryAdvanceRoutes.ts",
+  "server/routes/erp-payroll/bonuses.ts",
+  "server/routes/erp-payroll/bulk-adjustments.ts",
+  "server/routes/erp-payroll/employee-deposits.ts",
+  "server/routes/erp-payroll/runs.ts",
+  "server/routes/erp-payroll/withdrawals.ts",
+  "server/routes/erp-payroll/worker-payments.ts",
+  "server/routes/factory/employee-pos/employee-crud/bulk-payroll.ts",
+  "server/routes/factory/employee-pos/employee-crud/bulk-withdraw.ts",
+  "server/routes/factory/employee-pos/employee-crud/cash.ts",
+  "server/routes/factory/employee-pos/employeeAdvancesBonusRoutes.ts",
+  "server/routes/factory/employee-pos/pos-financial/sale-write.ts",
+  "server/routes/factory/suppliers/crud/payments.ts",
+  "server/routes/payroll/advance-accounting/bulk-repay.ts",
+  "server/routes/payroll/advance-accounting/cash.ts",
+  "server/routes/payroll/advance-accounting/repay-by-month.ts",
+  "server/routes/payroll/advance-accounting/repayment-audit.ts",
+  "server/routes/payroll/advance-accounting/repayments.ts",
+  "server/routes/payroll/core/mark-paid.ts",
+  "server/routes/vouchers/voucherCreateRoutes.ts",
+  "server/routes/vouchers/voucherJournalRoutes.ts",
+  "server/routes/vouchers/voucherPaymentRoutes.ts",
+]);
+
+export const PHASE5_OPERATIONAL_REQUEST_BOUNDARY_WRITERS = new Set([
+  "server/routes/containers/offload/create.ts",
+  "server/routes/creditNoteRoutes.ts",
+  "server/routes/factory/containers/create.ts",
+  "server/routes/factory/containers/delete.ts",
+  "server/routes/factory/containers/other-charges.ts",
+  "server/routes/factory/containers/update.ts",
+  "server/routes/factory/customer-orders/orderChargesRoutes.ts",
+  "server/routes/factory/factoryTransporterRoutes.ts",
+  "server/routes/factory/raw-stock/rawStockAdjRoutes.ts",
+  "server/routes/factory/raw-stock/rawStockOffloadRoutes.ts",
+  "server/routes/factory/raw-stock/rawStockReverseOffloadRoute.ts",
+  "server/routes/payroll/worker-stats-advances/advanceAdminRoutes.ts",
+  "server/routes/payroll/worker-stats-advances/advancesRoutes.ts",
+  "server/routes/rental/shared/accrual.ts",
+  "server/routes/rental/shared/auto-transfer.ts",
+  "server/routes/rental/units-contracts/contract-end.ts",
+  "server/routes/rental/units-contracts/guarantees.ts",
+  "server/routes/sp/spLifecycleRoutes.ts",
+  "server/routes/sp/spOffloadLifecycleRoutes.ts",
+  "server/routes/sp/spOffloadRoutes.ts",
+  "server/routes/sp/spOpeningStockRoutes.ts",
+  "server/routes/sp/spSalesRoutes.ts",
+]);
+
+export const PHASE6_SPECIAL_PURPOSE_COMPLETED_WRITERS = new Set([
+  "server/routes/admin/adminPoFixRoutes.ts",
+  "server/routes/creditSalesImportRoutes.ts",
+  "server/routes/erp-payroll/runs-migration.ts",
+  "server/routes/exchangeRateRoutes.ts",
+  "server/routes/factory/docs-users/companyImportRoutes.ts",
+  "server/routes/payroll/worker-statement/backfill.ts",
+  "server/routes/posImportRoutes.ts",
+  "server/routes/rental/rentalAccrualConfigRoutes.ts",
+  "server/routes/sp-migration/spMigrationSetupRoutes.ts",
+  "server/routes/stockTransferImportRoutes.ts",
+  "server/services/rental/reclassifyDeferredRentService.ts",
 ]);
 
 function sourceFiles(directory, collected = []) {
@@ -130,17 +127,28 @@ function sourceFiles(directory, collected = []) {
   return collected;
 }
 
+function reviewedDirectVoucherCreators() {
+  const review = JSON.parse(fs.readFileSync(voucherReviewPath, "utf8"));
+  const approved = new Set();
+  for (const sectionName of ["reviewed", "completed"]) {
+    const section = review?.[sectionName] ?? {};
+    for (const group of Object.values(section)) {
+      if (!group || typeof group !== "object" || !Array.isArray(group.files)) continue;
+      for (const file of group.files) approved.add(file);
+    }
+  }
+  return approved;
+}
+
 export function auditWriteEvidence() {
   const files = sourceFiles(path.join(projectRoot, "server"))
     .filter((file) => !EXCLUDED_PREFIXES.some((prefix) => file.startsWith(prefix)))
     .sort();
 
+  const approvedDirectCreators = reviewedDirectVoucherCreators();
   const unjournalledStockWrites = [];
   const voucherWritesWithoutRequestIdentity = [];
-  // The other side of each measurement. A detector that credited nothing would
-  // report a maximal backlog; one that credited everything would report an
-  // empty one. Both counts are published so a test can tell those apart from a
-  // correct measurement without naming individual files.
+  const unapprovedDirectVoucherCreation = [];
   let journalledStockWrites = 0;
   let voucherWritesWithRequestIdentity = 0;
 
@@ -151,8 +159,19 @@ export function auditWriteEvidence() {
       if (JOURNAL_WRITER.test(source)) journalledStockWrites += 1;
       else unjournalledStockWrites.push(file);
     }
+
     if (createsTableRow(source, "vouchers", "vouchers")) {
-      if (IDENTITY_OWNING_VOUCHER_WRITERS.has(file) || REQUEST_IDENTITY.test(source)) {
+      if (!approvedDirectCreators.has(file) && !IDENTITY_OWNING_VOUCHER_WRITERS.has(file)) {
+      unapprovedDirectVoucherCreation.push(file);
+    }
+
+      if (
+        IDENTITY_OWNING_VOUCHER_WRITERS.has(file) ||
+        PHASE4_OPERATIONAL_REQUEST_BOUNDARY_WRITERS.has(file) ||
+        PHASE5_OPERATIONAL_REQUEST_BOUNDARY_WRITERS.has(file) ||
+        PHASE6_SPECIAL_PURPOSE_COMPLETED_WRITERS.has(file) ||
+        REQUEST_IDENTITY.test(source)
+      ) {
         voucherWritesWithRequestIdentity += 1;
       } else {
         voucherWritesWithoutRequestIdentity.push(file);
@@ -164,6 +183,7 @@ export function auditWriteEvidence() {
     scannedFiles: files.length,
     unjournalledStockWrites,
     voucherWritesWithoutRequestIdentity,
+    unapprovedDirectVoucherCreation,
     journalledStockWrites,
     voucherWritesWithRequestIdentity,
   };
@@ -173,11 +193,6 @@ function readBaseline() {
   return JSON.parse(fs.readFileSync(baselinePath, "utf8"));
 }
 
-/**
- * Compares a measured backlog against its pinned one. Growth in count fails;
- * so does a swap that holds the count steady, because the file that joined is
- * a new write path with no evidence.
- */
 export function compareBacklog(label, measured, pinned) {
   const errors = [];
   const notes = [];
@@ -206,6 +221,13 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
 
   if (process.env.UPDATE_WRITE_EVIDENCE_BASELINE === "1") {
     const existing = readBaseline();
+    if (result.unapprovedDirectVoucherCreation.length > 0) {
+      console.error(
+        `Refusing to re-pin: ${result.unapprovedDirectVoucherCreation.length} unreviewed direct voucher creator(s): ` +
+          result.unapprovedDirectVoucherCreation.join(", ")
+      );
+      process.exit(1);
+    }
     const updated = {
       ...existing,
       stockWritesWithoutJournalEvidence: {
@@ -241,6 +263,12 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const errors = [...stock.errors, ...vouchers.errors];
   const notes = [...stock.notes, ...vouchers.notes];
 
+  for (const file of result.unapprovedDirectVoucherCreation) {
+    errors.push(
+      `Direct voucher creation escape hatch: ${file} creates vouchers directly but is absent from the reviewed creation inventory.`
+    );
+  }
+
   if (process.argv.includes("--json")) {
     process.stdout.write(`${JSON.stringify({ ...result, errors, notes }, null, 2)}\n`);
   } else {
@@ -249,7 +277,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
         `${result.unjournalledStockWrites.length} stock writes without journal evidence ` +
         `(ceiling ${baseline.stockWritesWithoutJournalEvidence.ceiling}), ` +
         `${result.voucherWritesWithoutRequestIdentity.length} voucher writes without request identity ` +
-        `(ceiling ${baseline.voucherWritesWithoutRequestIdentity.ceiling}).`
+        `(ceiling ${baseline.voucherWritesWithoutRequestIdentity.ceiling}), ` +
+        `${result.unapprovedDirectVoucherCreation.length} unapproved direct voucher creators.`
     );
     for (const note of notes) console.log(`NOTE: ${note}`);
     for (const error of errors) console.error(`ERROR: ${error}`);
