@@ -194,10 +194,8 @@ jobs:
     executor: node22
     steps:
       - install_dependencies
-      - run: npm run lint
-      - run:
-          when: always
-          command: npm run audit:lint-ratchet
+      - run: node scripts/run-lint.mjs --quiet
+      - run: npm run audit:lint-ratchet
 
   diagnose-typescript:
     executor: node22
