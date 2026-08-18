@@ -1,5 +1,6 @@
 import { Search, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { CoreErpFilterGrid } from "@/components/ui/core-erp-mobile";
 import { Input } from "@/components/ui/input";
 import { PeriodFilter, PeriodFilterValue } from "@/components/ui/period-filter";
@@ -16,12 +17,21 @@ interface DaybookFiltersProps {
     maxAmount: string;
   };
   setFilters: (v: any) => void;
+  hasActiveFilters?: boolean;
+  onResetFilters?: () => void;
   onPrevDay?: () => void;
   onNextDay?: () => void;
 }
 
-export function DaybookFilters({ periodFilter, setPeriodFilter, filters, setFilters }: DaybookFiltersProps) {
-  const hasActiveFilters =
+export function DaybookFilters({
+  periodFilter,
+  setPeriodFilter,
+  filters,
+  setFilters,
+  hasActiveFilters,
+  onResetFilters,
+}: DaybookFiltersProps) {
+  const hasActiveNonPeriodFilters =
     filters.voucherType !== "all" ||
     !!filters.searchQuery ||
     !!filters.minAmount ||
@@ -76,7 +86,7 @@ export function DaybookFilters({ periodFilter, setPeriodFilter, filters, setFilt
         </div>
       </CoreErpFilterGrid>
 
-      {hasActiveFilters && (
+      {(hasActiveFilters || hasActiveNonPeriodFilters) && (
         <div
           className="flex max-w-full items-center gap-1.5 overflow-x-auto overscroll-x-contain pb-1"
           aria-label="Active Daybook filters"
@@ -136,6 +146,19 @@ export function DaybookFilters({ periodFilter, setPeriodFilter, filters, setFilt
               Search: {filters.searchQuery}
               <X className="h-3 w-3" />
             </Badge>
+          )}
+          {onResetFilters && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-6 shrink-0 gap-1 px-2 text-xs"
+              onClick={onResetFilters}
+              data-testid="button-reset-filters"
+            >
+              <X className="h-3 w-3" />
+              Reset Filters
+            </Button>
           )}
         </div>
       )}

@@ -19,6 +19,12 @@ For every viewport it verifies the login screen, root horizontal overflow, visib
 
 When credentials are supplied, it also verifies that the authenticated app shell and `#main-content` are visible, that the shell fills the viewport, and that selected ERP routes do not return to login.
 
+## Pull-request UX gate
+
+The Mobile Responsiveness workflow creates a disposable PostgreSQL database and authenticated Developer fixture, starts the pull-request build, and runs the multilingual browser smoke against Daybook and All Daybook. English, Arabic RTL, and French are checked at phone, tablet, and desktop widths. Screenshots, the structured browser report, and the startup health evidence are retained as workflow artifacts.
+
+This targeted rendered gate complements the source-contract and frontend suites without rerunning the complete backend CI matrix. The six-size route matrix and the manual orientation/device checks below remain the final release certification.
+
 ## Run against a local or preview deployment
 
 The target URL must serve a build of the pull-request branch. Testing the current production deployment does not validate unmerged code.

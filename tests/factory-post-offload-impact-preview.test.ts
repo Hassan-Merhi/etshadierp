@@ -49,7 +49,7 @@ describe("post-offload impact preview", () => {
   it("keeps legacy callers compatible while strictly checking refreshed clients", () => {
     const middleware = read("server/routes/factory/raw-stock/postOffloadImpactPreviewMiddleware.ts");
 
-    expect(middleware).toContain("Number((req.body as any)?.impactPreviewVersion) !== 1");
+    expect(middleware).toContain("Number(req.body?.impactPreviewVersion) !== 1");
     expect(middleware).toContain("verifyPostOffloadImpactPreview");
     expect(middleware).toContain("POST_OFFLOAD_IMPACT_PREVIEW_REQUIRED");
     expect(middleware).toContain("POST_OFFLOAD_IMPACT_PREVIEW_STALE");

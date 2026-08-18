@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { hasAnyOpenDialog } from "@/hooks/use-escape-back";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -9,40 +9,18 @@ import { useToast } from "@/hooks/use-toast";
 import { format, addDays } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
-import {
-  Search,
-  Filter,
-  Building2,
-  RefreshCw,
-  X,
-  FileText,
-  Factory,
-  Eye,
-  EyeOff,
-  Pencil,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
+import { usePaginatedFilterState } from "@/hooks/use-paginated-filter-state";
+import { RefreshCw, X, FileText, Eye, EyeOff, Pencil, ChevronLeft, ChevronRight } from "lucide-react";
 
 import type { CompanyOption, JournalResponse, VoucherDetail } from "./transactionjournal/types";
 import { companyColor, fmtDate, formatAmount } from "./transactionjournal/utils";
 import { VoucherTypeBadge } from "./transactionjournal/components/VoucherTypeBadge";
+import { TransactionJournalFilterControls } from "./transactionjournal/components/TransactionJournalFilterControls";
+import { createTransactionJournalFilters, type TransactionJournalFilters } from "./transactionjournal/filterState";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export default function TransactionJournal() {
@@ -52,15 +30,18 @@ export default function TransactionJournal() {
   const { formatCashAmount } = useCurrencyContext();
 
   // ── Filter state ──
-  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(getDefaultPeriodValue("today"));
-  const [selectedCos, setSelectedCos] = useState<number[]>([]); // empty = all
-  const [voucherType, setVoucherType] = useState("all");
-  const [currency, setCurrency] = useState("all");
-  const [optionalFilter, setOptionalFilter] = useState("active");
-  const [includeFactory, setIncludeFactory] = useState(false);
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
+  const {
+    filters: journalFilters,
+    page,
+    setPage,
+    setFilter,
+    resetFilters,
+    hasActiveFilters,
+  } = usePaginatedFilterState<TransactionJournalFilters>({
+    createInitialFilters: createTransactionJournalFilters,
+    storageKey: "erp-transaction-journal-filters-v1",
+  });
+  const { periodFilter, selectedCos, voucherType, currency, optionalFilter, includeFactory, search } = journalFilters;
   const LIMIT = 50;
 
   // ── Hide amounts toggle (local + user preference) ──
@@ -190,11 +171,6 @@ export default function TransactionJournal() {
     };
   }, [drawerOpen, detailData]);
 
-  const handleSearch = useCallback(() => {
-    setSearch(searchInput);
-    setPage(1);
-  }, [searchInput]);
-
   // ── Switch company and navigate ──
   const openInCompany = async (companyId: number, path: string) => {
     const company = contextCompanies.find((c) => c.id === companyId);
@@ -239,7 +215,7 @@ export default function TransactionJournal() {
 
       if (isBack) {
         e.preventDefault();
-        setPeriodFilter((prev) => ({
+        setFilter("periodFilter", (prev) => ({
           fromDate: prev.fromDate ? format(addDays(new Date(prev.fromDate), -1), dateFmt) : prev.fromDate,
           toDate: prev.toDate ? format(addDays(new Date(prev.toDate), -1), dateFmt) : prev.toDate,
           preset: "custom",
@@ -247,7 +223,7 @@ export default function TransactionJournal() {
         setPage(1);
       } else if (isForward) {
         e.preventDefault();
-        setPeriodFilter((prev) => ({
+        setFilter("periodFilter", (prev) => ({
           fromDate: prev.fromDate ? format(addDays(new Date(prev.fromDate), 1), dateFmt) : prev.fromDate,
           toDate: prev.toDate ? format(addDays(new Date(prev.toDate), 1), dateFmt) : prev.toDate,
           preset: "custom",
@@ -257,7 +233,7 @@ export default function TransactionJournal() {
     };
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, []);
+  }, [setFilter, setPage]);
 
   // ── Summary aggregation ──
   const summaryByCompany = (data?.summary || []).reduce<
@@ -309,235 +285,14 @@ export default function TransactionJournal() {
         </Button>
       </div>
 
-      {/* ── Filters ── */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <div className="flex items-center gap-2">
-              <Filter className="w-5 h-5" />
-              <CardTitle>Filters</CardTitle>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap items-end gap-4">
-            {/* Period */}
-            <div className="space-y-2">
-              <Label>Period</Label>
-              <PeriodFilter
-                value={periodFilter}
-                onChange={(v) => {
-                  setPeriodFilter(v);
-                  setPage(1);
-                }}
-                data-testid="period-filter"
-              />
-            </div>
-
-            {/* Company multi-select */}
-            <div className="space-y-2">
-              <Label>Companies</Label>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="min-w-[160px] justify-between"
-                    data-testid="button-company-filter"
-                  >
-                    <Building2 className="h-4 w-4 mr-2 shrink-0" />
-                    <span className="flex-1 text-left truncate">
-                      {selectedCos.length === 0 ? "All Companies" : `${selectedCos.length} selected`}
-                    </span>
-                    <Filter className="h-3.5 w-3.5 ml-1 text-muted-foreground shrink-0" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-64">
-                  <DropdownMenuLabel>Select Companies</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuCheckboxItem
-                    checked={selectedCos.length === 0}
-                    onCheckedChange={() => setSelectedCos([])}
-                    data-testid="checkbox-all-companies"
-                  >
-                    All Companies
-                  </DropdownMenuCheckboxItem>
-                  <DropdownMenuSeparator />
-                  {availableCompanies.map((c) => (
-                    <DropdownMenuCheckboxItem
-                      key={c.id}
-                      checked={selectedCos.includes(c.id)}
-                      onCheckedChange={(checked) => {
-                        setSelectedCos((prev) => (checked ? [...prev, c.id] : prev.filter((id) => id !== c.id)));
-                      }}
-                      data-testid={`checkbox-company-${c.id}`}
-                    >
-                      {c.name}
-                    </DropdownMenuCheckboxItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
-            {/* Voucher type */}
-            <div className="space-y-2">
-              <Label htmlFor="voucher-type-tj">Voucher Type</Label>
-              <Select
-                value={voucherType}
-                onValueChange={(v) => {
-                  setVoucherType(v);
-                  setPage(1);
-                }}
-              >
-                <SelectTrigger id="voucher-type-tj" className="w-[150px]" data-testid="select-voucher-type">
-                  <SelectValue placeholder="All Types" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  {(voucherTypes || []).map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {t}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Currency */}
-            <div className="space-y-2">
-              <Label htmlFor="currency-tj">Currency</Label>
-              <Select
-                value={currency}
-                onValueChange={(v) => {
-                  setCurrency(v);
-                  setPage(1);
-                }}
-              >
-                <SelectTrigger id="currency-tj" className="w-[110px]" data-testid="select-currency">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="USD">USD</SelectItem>
-                  <SelectItem value="CFA">CFA</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Status */}
-            <div className="space-y-2">
-              <Label htmlFor="status-tj">Status</Label>
-              <Select
-                value={optionalFilter}
-                onValueChange={(v) => {
-                  setOptionalFilter(v);
-                  setPage(1);
-                }}
-              >
-                <SelectTrigger id="status-tj" className="w-[130px]" data-testid="select-optional">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="active">Active Only</SelectItem>
-                  <SelectItem value="optional">Optional Only</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Factory toggle */}
-            <div className="space-y-2">
-              <Label>Factory</Label>
-              <div>
-                <Button
-                  variant={includeFactory ? "default" : "outline"}
-                  className="gap-2"
-                  onClick={() => {
-                    setIncludeFactory((v) => !v);
-                    setPage(1);
-                  }}
-                  data-testid="button-toggle-factory"
-                >
-                  <Factory className="h-4 w-4" />
-                  {includeFactory ? "Included" : "Excluded"}
-                </Button>
-              </div>
-            </div>
-
-            {/* Search */}
-            <div className="space-y-2 flex-1 min-w-0 w-full md:min-w-[200px] md:w-auto">
-              <Label htmlFor="search-tj">Search</Label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="search-tj"
-                    value={searchInput}
-                    onChange={(e) => setSearchInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                    placeholder="Voucher # or narration…"
-                    className="pl-8"
-                    data-testid="input-search"
-                  />
-                </div>
-                <Button variant="default" className="shrink-0" onClick={handleSearch} data-testid="button-search">
-                  Search
-                </Button>
-                {search && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => {
-                      setSearchInput("");
-                      setSearch("");
-                    }}
-                    data-testid="button-clear-search"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ── Type quick-filter chips ── */}
-      {(() => {
-        const chips = [
-          { label: "All", value: "all" },
-          { label: "Payment", value: "Payment" },
-          { label: "Receipt", value: "Receipt" },
-          { label: "Sales", value: "Sales" },
-          { label: "Purchase", value: "Purchase" },
-          { label: "Stock Transfer", value: "Stock Transfer" },
-          { label: "Journal", value: "Journal" },
-          { label: "Mixed", value: "Mixed" },
-          { label: "Production", value: "Production" },
-          { label: "Consumption", value: "Consumption" },
-        ];
-        return (
-          <div className="flex flex-wrap gap-1.5" data-testid="type-chips">
-            {chips.map((c) => {
-              const active = voucherType === c.value || (c.value === "all" && voucherType === "all");
-              return (
-                <button
-                  key={c.value}
-                  onClick={() => setVoucherType(c.value)}
-                  data-testid={`chip-type-${c.value.replace(/\s+/g, "-").toLowerCase()}`}
-                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors
-                    ${
-                      active
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-background text-muted-foreground border-border hover:text-foreground hover:border-foreground/40"
-                    }`}
-                >
-                  {c.label}
-                </button>
-              );
-            })}
-          </div>
-        );
-      })()}
+      <TransactionJournalFilterControls
+        filters={journalFilters}
+        availableCompanies={availableCompanies}
+        voucherTypes={voucherTypes}
+        setFilter={setFilter}
+        resetFilters={resetFilters}
+        hasActiveFilters={hasActiveFilters}
+      />
 
       {/* ── Summary cards ── */}
       {!isLoading && Object.keys(summaryByCompany).length > 0 && (
@@ -548,7 +303,9 @@ export default function TransactionJournal() {
               className={`cursor-pointer hover-elevate ${selectedCos.includes(Number(id)) ? "ring-1 ring-primary" : ""}`}
               onClick={() => {
                 const num = Number(id);
-                setSelectedCos((prev) => (prev.includes(num) ? prev.filter((x) => x !== num) : [...prev, num]));
+                setFilter("selectedCos", (prev) =>
+                  prev.includes(num) ? prev.filter((value) => value !== num) : [...prev, num]
+                );
               }}
               data-testid={`card-company-summary-${id}`}
             >
