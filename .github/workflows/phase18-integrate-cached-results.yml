@@ -1,0 +1,95 @@
+name: Phase 18 Integrate Cached Results
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+env:
+  CI: true
+jobs:
+  integrate:
+    if: contains(github.event.head_commit.message, '[phase18-integrate-cached-results]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v7
+        with: {ref: main, fetch-depth: 0}
+      - uses: actions/setup-node@v6
+        with: {node-version: '22.14.0', cache: npm}
+      - run: npm ci
+      - name: Integrate compiler-green improving cached result branches
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          npm run check
+          git fetch origin '+refs/heads/agent/phase18-*:refs/remotes/origin/agent/phase18-*' || true
+          count_escapes() {
+            set +e
+            node scripts/audit-type-escapes.mjs --json > /tmp/type-count.json 2>/dev/null
+            set -e
+            node -e "const r=require('/tmp/type-count.json');process.stdout.write(String(r.summary.typeEscapeTotal))"
+          }
+          before_all=$(count_escapes)
+          echo "START_ESCAPES=$before_all"
+          kept=0
+          tried=0
+          mapfile -t branches < <(git for-each-ref --format='%(refname:short)' 'refs/remotes/origin/agent/phase18-*result*' | sort -u)
+          for branch in "${branches[@]}"; do
+            tried=$((tried+1))
+            echo "=== TRY $branch ==="
+            checkpoint=$(git rev-parse HEAD)
+            current=$(count_escapes)
+            base=$(git merge-base HEAD "$branch" || true)
+            if [ -z "$base" ]; then echo "NO_MERGE_BASE $branch"; continue; fi
+            git diff --binary "$base" "$branch" -- client/src server shared > /tmp/candidate.patch
+            if [ ! -s /tmp/candidate.patch ]; then echo "NO_SOURCE_PATCH $branch"; continue; fi
+            set +e
+            git apply --3way /tmp/candidate.patch >/tmp/apply.log 2>&1
+            arc=$?
+            set -e
+            if [ "$arc" -ne 0 ]; then
+              echo "PATCH_CONFLICT $branch"
+              git reset --hard "$checkpoint"
+              git clean -fd -- client/src server shared
+              continue
+            fi
+            if git diff --quiet -- client/src server shared; then
+              git reset --hard "$checkpoint"
+              continue
+            fi
+            set +e
+            npm run check >/tmp/check.log 2>&1
+            crc=$?
+            set -e
+            if [ "$crc" -ne 0 ]; then
+              echo "COMPILER_REJECT $branch"
+              tail -n 25 /tmp/check.log || true
+              git reset --hard "$checkpoint"
+              git clean -fd -- client/src server shared
+              continue
+            fi
+            after=$(count_escapes)
+            echo "ESCAPES $current -> $after"
+            if [ "$after" -ge "$current" ]; then
+              echo "NO_STRICT_IMPROVEMENT $branch"
+              git reset --hard "$checkpoint"
+              git clean -fd -- client/src server shared
+              continue
+            fi
+            git add client/src server shared
+            git commit -m "refactor: recover compiler-proven Phase 18 result from ${branch#origin/} [phase18-cached-result] [skip ci]"
+            kept=$((kept+1))
+          done
+          final=$(count_escapes)
+          echo "CACHED_RESULTS tried=$tried kept=$kept escapes=$before_all->$final"
+          npm run check
+      - name: Push recovered improvements
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git rebase origin/main
+          npm run check
+          git push origin HEAD:main
