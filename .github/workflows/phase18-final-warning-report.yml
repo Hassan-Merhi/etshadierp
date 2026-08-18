@@ -1,0 +1,49 @@
+name: Phase 18 Final Warning Report
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+env:
+  CI: true
+jobs:
+  report:
+    if: contains(github.event.head_commit.message, '[phase18-final-warning-report]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.14.0'
+          cache: npm
+      - run: npm ci
+      - name: Generate exact warning inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run lint || true
+          node - <<'NODE'
+          const fs=require('fs'),path=require('path');
+          const report=JSON.parse(fs.readFileSync('artifacts/lint/eslint-report.json','utf8'));
+          const rows=[]; const perRule={};
+          for(const result of report){
+            for(const m of result.messages||[]){
+              if(m.severity!==1) continue;
+              const file=path.relative(process.cwd(),result.filePath).replaceAll('\\','/');
+              rows.push({file,line:m.line,column:m.column,rule:m.ruleId,message:m.message});
+              perRule[m.ruleId]=(perRule[m.ruleId]||0)+1;
+            }
+          }
+          rows.sort((a,b)=>a.file.localeCompare(b.file)||a.line-b.line||a.column-b.column);
+          const md=['# Phase 18 Final Warning Inventory','',`Total: ${rows.length}`,'',...Object.entries(perRule).sort().map(([r,n])=>`- ${r}: ${n}`),'','## Warnings','',...rows.map(r=>`- ${r.file}:${r.line}:${r.column} — ${r.rule} — ${r.message}`),''];
+          fs.writeFileSync('phase18-final-warning-report.md',md.join('\n'));
+          NODE
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add phase18-final-warning-report.md
+          git commit -m 'chore: publish Phase 18 final warning inventory'
+          git push --force origin HEAD:agent/phase18-final-warning-report
