@@ -92,12 +92,7 @@ export async function getAllPurchasesForItem(
     .orderBy(sql`${schema.purchaseOrders.createdAt} DESC`);
 }
 
-export async function getAllSalesForItem(
-  stockItemId: number,
-  companyId: number,
-  fromDate?: string,
-  toDate?: string
-) {
+export async function getAllSalesForItem(stockItemId: number, companyId: number, fromDate?: string, toDate?: string) {
   const conditions = [
     eq(schema.salesItems.stockItemId, stockItemId),
     eq(schema.vouchers.companyId, companyId),

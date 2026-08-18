@@ -439,9 +439,7 @@ async function postGroupCore(
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-export async function createRentalPaymentGroup(
-  opts: RentalPaymentGroupOptions
-) {
+export async function createRentalPaymentGroup(opts: RentalPaymentGroupOptions) {
   const {
     companyId,
     contractCompanyId,
