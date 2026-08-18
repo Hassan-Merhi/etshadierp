@@ -1,0 +1,55 @@
+name: Static Build Lint Diagnostic
+on:
+  push:
+    branches: [fix/static-build-diagnostics-20260818]
+permissions:
+  contents: write
+jobs:
+  lint-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/static-build-diagnostics-20260818
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22.14.0"
+          cache: npm
+      - run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+      - run: npm ci --no-audit --bin-links=true
+      - name: Generate exact lint warning report
+        run: |
+          node scripts/run-lint.mjs --quiet
+          node - <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const rows = JSON.parse(fs.readFileSync('artifacts/lint/eslint-report.json','utf8'));
+          const byRule = new Map();
+          const lines = [];
+          for (const row of rows) {
+            const rel = path.relative(process.cwd(), row.filePath).replaceAll('\\','/');
+            for (const m of row.messages || []) {
+              if (m.severity !== 1) continue;
+              const rule = m.ruleId || '(no-rule)';
+              if (!byRule.has(rule)) byRule.set(rule, []);
+              byRule.get(rule).push(`${rel}:${m.line}:${m.column}`);
+            }
+          }
+          lines.push('# Static Build Lint Diagnostic','');
+          for (const [rule, locs] of [...byRule.entries()].sort((a,b)=>b[1].length-a[1].length)) {
+            lines.push(`## ${rule}: ${locs.length}`);
+            for (const loc of locs.slice(0,100)) lines.push(`- ${loc}`);
+            lines.push('');
+          }
+          fs.writeFileSync('static-build-lint-diagnostic.md', lines.join('\n'));
+          NODE
+      - name: Publish diagnostic report
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add static-build-lint-diagnostic.md
+          git diff --cached --quiet && exit 0
+          git commit -m 'chore: publish static-build lint diagnostic [skip ci]'
+          git push
