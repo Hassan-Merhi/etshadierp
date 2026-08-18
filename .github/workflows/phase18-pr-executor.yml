@@ -6,6 +6,9 @@ permissions:
   contents: write
 env:
   CI: true
+concurrency:
+  group: phase18-pr-executor-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 jobs:
   execute:
     if: github.event.pull_request.head.ref == 'agent/phase18-executor'
