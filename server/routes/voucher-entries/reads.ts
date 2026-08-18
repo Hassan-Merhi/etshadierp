@@ -9,8 +9,10 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth } from "../../auth";
+import { calculateHassanPriceMetrics } from "./hassan-price";
 import {
   stockItems,
+  stockItemLocationPrices,
   stockTransferVouchers,
   stockTransferItems,
   stockAdjustmentVouchers,
@@ -20,7 +22,7 @@ import {
   locations,
   users,
 } from "@shared/schema";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 export function registerVoucherEntryReadRoutes(app: Express) {
   app.get("/api/vouchers/:id/entries", requireAuth, async (req, res) => {
@@ -138,7 +140,7 @@ export function registerVoucherEntryReadRoutes(app: Express) {
             costPrice: salesItems.costPrice,
             totalSales: salesItems.totalSales,
             profit: salesItems.profit,
-            configuredPrice: salesItems.configuredPrice,
+            baseSellingPrice: stockItems.sellingPrice,
             stockItemName: stockItems.name,
             stockItemCode: stockItems.code,
           })
@@ -146,14 +148,30 @@ export function registerVoucherEntryReadRoutes(app: Express) {
           .leftJoin(stockItems, eq(salesItems.stockItemId, stockItems.id))
           .where(eq(salesItems.voucherId, id));
 
+        const locationPriceRows =
+          voucher.locationId && salesItemsList.length > 0
+            ? await db
+                .select({
+                  stockItemId: stockItemLocationPrices.stockItemId,
+                  sellingPrice: stockItemLocationPrices.sellingPrice,
+                })
+                .from(stockItemLocationPrices)
+                .where(
+                  and(
+                    eq(stockItemLocationPrices.locationId, voucher.locationId),
+                    inArray(
+                      stockItemLocationPrices.stockItemId,
+                      salesItemsList.map((item) => item.stockItemId),
+                    ),
+                  ),
+                )
+            : [];
+        const locationPriceMap = new Map(locationPriceRows.map((row) => [row.stockItemId, row.sellingPrice]));
+
         if (salesItemsList.length > 0) {
           const itemsWithDetails = salesItemsList.map((item) => {
-            const qty = parseFloat(item.quantity) || 0;
-            const actualPrice = parseFloat(item.sellingPrice) || 0;
-            const configuredPriceNum = parseFloat(item.configuredPrice || "0");
-            const hassansProfit = configuredPriceNum > 0 ? (actualPrice - configuredPriceNum) * qty : 0;
-            const hassansTotal = configuredPriceNum > 0 ? configuredPriceNum * qty : 0;
-            const hassansPercentage = hassansTotal > 0 ? (hassansProfit / hassansTotal) * 100 : 0;
+            const priceListSellingPrice = locationPriceMap.get(item.stockItemId) ?? item.baseSellingPrice ?? null;
+            const hassanMetrics = calculateHassanPriceMetrics(item.sellingPrice, priceListSellingPrice, item.quantity);
 
             return {
               id: item.id,
@@ -167,10 +185,10 @@ export function registerVoucherEntryReadRoutes(app: Express) {
               costPrice: hideCostAndProfit ? null : item.costPrice,
               totalSales: item.totalSales,
               profit: hideCostAndProfit ? null : item.profit,
-              configuredPrice: hideCostAndProfit || configuredPriceNum <= 0 ? null : item.configuredPrice,
-              hassansPrice: hideCostAndProfit || configuredPriceNum <= 0 ? null : configuredPriceNum.toFixed(2),
-              hassansProfit: hideCostAndProfit || configuredPriceNum <= 0 ? null : hassansProfit.toFixed(2),
-              hassansPercentage: hideCostAndProfit || configuredPriceNum <= 0 ? null : hassansPercentage.toFixed(1),
+              configuredPrice: hideCostAndProfit || !hassanMetrics ? null : hassanMetrics.price.toFixed(2),
+              hassansPrice: hideCostAndProfit || !hassanMetrics ? null : hassanMetrics.price.toFixed(2),
+              hassansProfit: hideCostAndProfit || !hassanMetrics ? null : hassanMetrics.profit.toFixed(2),
+              hassansPercentage: hideCostAndProfit || !hassanMetrics ? null : hassanMetrics.percentage.toFixed(1),
               debitAmount: "0",
               creditAmount: item.totalSales,
               narration: `Sale of ${item.quantity} x ${item.stockItemName || "Unknown Item"} @ $${item.sellingPrice}`,
