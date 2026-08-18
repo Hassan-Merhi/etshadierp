@@ -1,5 +1,7 @@
 import superagent from "superagent";
 
+const STATE_CHANGING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
 let requestSequence = 0;
 
 function hasClientRequestId(data) {
@@ -17,10 +19,9 @@ const originalEnd = requestPrototype.end;
 
 requestPrototype.end = function endWithVoucherRequestIdentity(callback) {
   const method = String(this.method || "").toUpperCase();
-  const isWrite = method === "POST" || method === "PATCH";
   const existingHeader = this.get?.("X-Idempotency-Key");
 
-  if (isWrite && !existingHeader && !hasClientRequestId(this._data)) {
+  if (STATE_CHANGING_METHODS.has(method) && !existingHeader && !hasClientRequestId(this._data)) {
     requestSequence += 1;
     this.set("X-Idempotency-Key", `vitest-${process.pid}-${requestSequence}`);
   }
