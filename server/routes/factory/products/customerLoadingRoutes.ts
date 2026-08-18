@@ -1,5 +1,5 @@
 /**
- * Customer loading intelligence foundation.
+ * Customer loading intelligence.
  *
  * A product is considered "loaded" for a customer when at least one bale for
  * that article has been scanned into a non-cancelled invoice loading session.
@@ -45,6 +45,15 @@ function asNumber(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+async function findScopedCustomer(companyId: number, customerId: number) {
+  const [customer] = await db
+    .select({ id: customers.id, legalName: customers.legalName })
+    .from(customers)
+    .where(and(eq(customers.id, customerId), eq(customers.companyId, companyId), sql`${customers.deletedAt} IS NULL`))
+    .limit(1);
+  return customer ?? null;
+}
+
 export function registerCustomerLoadingRoutes(app: Express) {
   app.get("/api/factory/customer-loading/products", requireAuth, async (req: Request, res: Response) => {
     try {
@@ -54,12 +63,7 @@ export function registerCustomerLoadingRoutes(app: Express) {
       const customerId = parsePositiveId(req.query.customerId);
       if (!customerId) return res.status(400).json({ message: "Valid customerId is required" });
 
-      const [customer] = await db
-        .select({ id: customers.id, legalName: customers.legalName })
-        .from(customers)
-        .where(and(eq(customers.id, customerId), eq(customers.companyId, companyId)))
-        .limit(1);
-
+      const customer = await findScopedCustomer(companyId, customerId);
       if (!customer) return res.status(404).json({ message: "Customer not found" });
 
       const queryResult = await db.execute(sql`
@@ -159,6 +163,84 @@ export function registerCustomerLoadingRoutes(app: Express) {
       });
     } catch (error: unknown) {
       logger.error("customer-loading products error", { error });
+      return res.status(500).json({ message: getErrorMessage(error) });
+    }
+  });
+
+  app.get("/api/factory/customer-loading/history", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const customerId = parsePositiveId(req.query.customerId);
+      const productId = parsePositiveId(req.query.productId);
+      if (!customerId || !productId) return res.status(400).json({ message: "Valid customerId and productId are required" });
+
+      const customer = await findScopedCustomer(companyId, customerId);
+      if (!customer) return res.status(404).json({ message: "Customer not found" });
+
+      const productResult = await db.execute(sql`
+        SELECT id, code, article_code AS "articleCode", name
+        FROM factory_bale_products
+        WHERE id = ${productId} AND company_id = ${companyId} AND deleted_at IS NULL
+        LIMIT 1
+      `);
+      const [product] = resultRows(productResult) as Array<{ id: number; code: string; articleCode: string | null; name: string }>;
+      if (!product) return res.status(404).json({ message: "Product not found" });
+      const articleCode = product.articleCode || product.code;
+
+      const historyResult = await db.execute(sql`
+        WITH deduped AS (
+          SELECT DISTINCT ON (filb.bale_id)
+            filb.bale_id,
+            filb.session_id,
+            filb.invoice_id,
+            filb.bale_reference,
+            filb.weight_kg,
+            filb.scanned_at,
+            filb.scanned_by_name
+          FROM factory_invoice_loading_bales filb
+          INNER JOIN factory_invoice_loading_sessions fils
+            ON fils.id = filb.session_id
+           AND fils.company_id = filb.company_id
+          LEFT JOIN factory_bales fb
+            ON fb.id = filb.bale_id
+           AND fb.company_id = filb.company_id
+          WHERE filb.company_id = ${companyId}
+            AND fils.customer_id = ${customerId}
+            AND fils.status <> 'CANCELLED'
+            AND UPPER(BTRIM(COALESCE(filb.article_code, fb.article_code))) = UPPER(BTRIM(${articleCode}))
+          ORDER BY filb.bale_id, filb.scanned_at DESC, filb.id DESC
+        )
+        SELECT
+          d.session_id AS "sessionId",
+          d.invoice_id AS "invoiceId",
+          fils.status,
+          fils.truck_no AS "truckNo",
+          fils.driver_name AS "driverName",
+          fils.started_at AS "startedAt",
+          fils.completed_at AS "completedAt",
+          COUNT(*)::integer AS "balesLoaded",
+          COALESCE(SUM(d.weight_kg::numeric), 0)::numeric AS "kgLoaded",
+          MAX(d.scanned_at) AS "lastScanAt"
+        FROM deduped d
+        INNER JOIN factory_invoice_loading_sessions fils
+          ON fils.id = d.session_id
+         AND fils.company_id = ${companyId}
+        GROUP BY d.session_id, d.invoice_id, fils.status, fils.truck_no, fils.driver_name, fils.started_at, fils.completed_at
+        ORDER BY MAX(d.scanned_at) DESC
+        LIMIT 100
+      `);
+
+      const history = (resultRows(historyResult) as Array<Record<string, unknown>>).map((row) => ({
+        ...row,
+        balesLoaded: asNumber(row.balesLoaded),
+        kgLoaded: asNumber(row.kgLoaded),
+      }));
+
+      return res.json({ customer, product, history });
+    } catch (error: unknown) {
+      logger.error("customer-loading history error", { error });
       return res.status(500).json({ message: getErrorMessage(error) });
     }
   });
