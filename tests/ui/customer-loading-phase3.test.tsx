@@ -40,4 +40,13 @@ describe("customer loading phase 3 proforma builder rules", () => {
     expect(validLine({ quantity: 2, rawPrice: "80", articleCode: null, code: "P1" })).toBe(true);
     expect(validLine({ quantity: 2, rawPrice: "80", articleCode: null, code: "" })).toBe(false);
   });
+
+  it("keeps kg totals while allowing zero-price promotional lines", () => {
+    expect(selectionTotals([{ quantity: 3, weightPerBale: 20, pricePerBale: 0 }])).toEqual({
+      lines: 1,
+      quantity: 3,
+      kg: 60,
+      amount: 0,
+    });
+  });
 });
