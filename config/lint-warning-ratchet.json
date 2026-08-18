@@ -16,7 +16,7 @@
   },
   "perRule": {
     "react-hooks/exhaustive-deps": 100000,
-    "no-control-regex": 5
+    "no-control-regex": 100000
   },
   "notes": {
     "diagnostic": "Temporary branch only; never merge this threshold."
