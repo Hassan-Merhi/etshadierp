@@ -1,6 +1,6 @@
 {
-  "version": 30,
-  "description": "Repository-wide god-file architecture boundaries plus a one-way size ratchet. Files already over the repository limit are frozen at their recorded size in repositoryScan.grandfathered: they may shrink but never grow, and any new file crossing the limit fails until it is split or explicitly baselined. Versions 25-28 permanently retire the four Wave 13 targets: BarcodeLookup.tsx, FactorySuppliers.tsx, SupplierProfitCheck.tsx, and GcLshiMigration.tsx. Versions 29-30 permanently retire the two Wave 14 targets: FactorySettings.tsx and DataToolsTab.tsx. The retired targets preserve stable original import paths behind focused typed models, views, dialogs, and components, with every authored replacement file below the 900-line repository limit.",
+  "version": 31,
+  "description": "Repository-wide god-file architecture boundaries plus a one-way size ratchet. Files already over the repository limit are frozen at their recorded size in repositoryScan.grandfathered: they may shrink but never grow, and any new file crossing the limit fails until it is split or explicitly baselined. Versions 25-28 permanently retire the four Wave 13 targets: BarcodeLookup.tsx, FactorySuppliers.tsx, SupplierProfitCheck.tsx, and GcLshiMigration.tsx. Versions 29-30 permanently retire the two Wave 14 targets: FactorySettings.tsx and DataToolsTab.tsx. Version 31 permanently retires postOffloadPhase6Safety.ts behind its stable public import path; the implementation moved unchanged into a sub-900-line same-directory module. Retired targets preserve stable original import paths behind focused modules, with every authored replacement file below the 900-line repository limit.",
   "retiredFiles": [
     "server/routesLegacy.ts",
     "server/routes/reportsRoutesLegacy.ts",
@@ -167,7 +167,6 @@
       "client/src/pages/TransactionJournal.tsx": 1600,
       "server/chatService.ts": 2000,
       "server/index.ts": 1725,
-      "server/services/factory/postOffloadPhase6Safety.ts": 927,
       "tests/excel-export-v2.test.ts": 1425,
       "tests/inventory.test.ts": 1450,
       "tests/workflow.test.ts": 1025,
