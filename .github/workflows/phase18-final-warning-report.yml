@@ -13,37 +13,61 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
-        with:
-          ref: main
-          fetch-depth: 0
+        with: {ref: main, fetch-depth: 0}
       - uses: actions/setup-node@v6
-        with:
-          node-version: '22.14.0'
-          cache: npm
+        with: {node-version: '22.14.0', cache: npm}
       - run: npm ci
-      - name: Generate exact warning inventory
+      - name: Generate compact live debt inventory
         shell: bash
         run: |
           set -euo pipefail
-          npm run lint || true
+          npm run lint -- --quiet || true
+          node scripts/audit-type-escapes.mjs --json >/tmp/type.json || true
           node - <<'NODE'
-          const fs=require('fs'),path=require('path');
+          const fs=require('fs'),path=require('path'),ts=require('typescript');
           const report=JSON.parse(fs.readFileSync('artifacts/lint/eslint-report.json','utf8'));
-          const rows=[]; const perRule={};
+          const type=JSON.parse(fs.readFileSync('/tmp/type.json','utf8'));
+          const perRule={}, perFile=new Map(), contexts=new Map(), samples=new Map();
           for(const result of report){
+            const rel=path.relative(process.cwd(),result.filePath).replaceAll('\\','/');
             for(const m of result.messages||[]){
               if(m.severity!==1) continue;
-              const file=path.relative(process.cwd(),result.filePath).replaceAll('\\','/');
-              rows.push({file,line:m.line,column:m.column,rule:m.ruleId,message:m.message});
               perRule[m.ruleId]=(perRule[m.ruleId]||0)+1;
+              perFile.set(rel,(perFile.get(rel)||0)+1);
             }
           }
-          rows.sort((a,b)=>a.file.localeCompare(b.file)||a.line-b.line||a.column-b.column);
-          const md=['# Phase 18 Final Warning Inventory','',`Total: ${rows.length}`,'',...Object.entries(perRule).sort().map(([r,n])=>`- ${r}: ${n}`),'','## Warnings','',...rows.map(r=>`- ${r.file}:${r.line}:${r.column} — ${r.rule} — ${r.message}`),''];
-          fs.writeFileSync('phase18-final-warning-report.md',md.join('\n'));
+          for(const f of type.files||[]){
+            if(!f.total) continue;
+            const text=fs.readFileSync(f.path,'utf8');
+            const sf=ts.createSourceFile(f.path,text,ts.ScriptTarget.Latest,true,f.path.endsWith('x')?ts.ScriptKind.TSX:ts.ScriptKind.TS);
+            const visit=n=>{
+              if(n.kind===ts.SyntaxKind.AnyKeyword){
+                const p=n.parent, pp=p?.parent;
+                let key=ts.SyntaxKind[p?.kind]||'Unknown';
+                if(ts.isTypeReferenceNode(p)) key=`TypeReference:${p.typeName.getText(sf)}`;
+                else if(ts.isArrayTypeNode(p)) key='ArrayElement';
+                else if(ts.isUnionTypeNode(p)) key='UnionMember';
+                else if(ts.isParameter(p)) key='Parameter';
+                else if(ts.isPropertySignature(p)) key='PropertySignature';
+                else if(ts.isPropertyDeclaration(p)) key='PropertyDeclaration';
+                else if(ts.isAsExpression(p)) key='AsExpression';
+                else if(ts.isTypeAliasDeclaration(p)) key='TypeAlias';
+                else if(ts.isVariableDeclaration(p)) key='VariableDeclaration';
+                else if((ts.isCallExpression(pp)||ts.isNewExpression(pp))&&pp.typeArguments?.includes(p)) key='CallTypeArgument';
+                contexts.set(key,(contexts.get(key)||0)+1);
+                if(!samples.has(key)) samples.set(key,[]);
+                if(samples.get(key).length<4){const lc=sf.getLineAndCharacterOfPosition(n.getStart(sf));samples.get(key).push(`${f.path}:${lc.line+1}:${lc.character+1} :: ${p.getText(sf).slice(0,160)}`)}
+              }
+              ts.forEachChild(n,visit);
+            }; visit(sf);
+          }
+          const totalWarnings=Object.values(perRule).reduce((a,b)=>a+b,0);
+          const md=['# Phase 18 Live Debt Inventory','',`ESLint warnings: ${totalWarnings}`,`Type escapes: ${type.summary?.typeEscapeTotal ?? 'unknown'}`,`Files with escapes: ${type.summary?.filesWithEscapes ?? 'unknown'}`,`Explicit any: ${type.summary?.explicitAny ?? 'unknown'}`,`as any: ${type.summary?.asAny ?? 'unknown'}`,`TS suppressions: ${type.summary?.suppressions ?? 'unknown'}`,'','## Rules','',...Object.entries(perRule).sort((a,b)=>b[1]-a[1]).map(([r,n])=>`- ${r}: ${n}`),'','## Top files','',...[...perFile].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])).slice(0,100).map(([f,n])=>`- ${n} — ${f}`),'','## Any AST contexts',''];
+          for(const [k,n] of [...contexts].sort((a,b)=>b[1]-a[1])){md.push(`- ${k}: ${n}`);for(const s of samples.get(k)||[])md.push(`  - ${s}`)}
+          md.push(''); fs.writeFileSync('phase18-final-warning-report.md',md.join('\n'));
           NODE
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add phase18-final-warning-report.md
-          git commit -m 'chore: publish Phase 18 final warning inventory'
+          git commit -m 'chore: publish compact Phase 18 live debt inventory'
           git push --force origin HEAD:agent/phase18-final-warning-report
