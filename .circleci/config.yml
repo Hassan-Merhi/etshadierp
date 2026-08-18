@@ -120,8 +120,6 @@ jobs:
           command: npm run lint
       - run:
           name: Lint warning ratchet
-          # Per-rule half of the gate the Lint step enforces in total. Reads the
-          # report that run wrote, so it adds no second lint pass.
           when: always
           command: npm run audit:lint-ratchet
       - run:
@@ -185,6 +183,43 @@ jobs:
           name: Final production readiness contract
           command: npm run verify:final-production-readiness
 
+  diagnose-dependencies:
+    executor: node22
+    steps:
+      - install_dependencies
+      - run: npm run verify:lockfile
+      - run: npm run verify:production-dependencies
+
+  diagnose-lint:
+    executor: node22
+    steps:
+      - install_dependencies
+      - run: npm run lint
+      - run:
+          when: always
+          command: npm run audit:lint-ratchet
+
+  diagnose-typescript:
+    executor: node22
+    steps:
+      - install_dependencies
+      - run: npm run check
+
+  diagnose-build:
+    executor: node22
+    steps:
+      - install_dependencies
+      - run: npm run build
+      - run: npm run verify:server-bundle
+
+  diagnose-safety:
+    executor: node22
+    steps:
+      - install_dependencies
+      - run: npm run verify:observability
+      - run: npm run verify:final-production-readiness
+      - run: npm run verify:bandwidth
+
 workflows:
   full-erp-verification:
     jobs:
@@ -202,3 +237,26 @@ workflows:
           filters:
             branches:
               only: main
+
+  static-build-diagnostics:
+    jobs:
+      - diagnose-dependencies:
+          filters:
+            branches:
+              only: fix/static-build-diagnostics-20260818
+      - diagnose-lint:
+          filters:
+            branches:
+              only: fix/static-build-diagnostics-20260818
+      - diagnose-typescript:
+          filters:
+            branches:
+              only: fix/static-build-diagnostics-20260818
+      - diagnose-build:
+          filters:
+            branches:
+              only: fix/static-build-diagnostics-20260818
+      - diagnose-safety:
+          filters:
+            branches:
+              only: fix/static-build-diagnostics-20260818
