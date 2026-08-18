@@ -44,19 +44,20 @@ async function cleanupGeneratedRequestIdentity(request) {
   // cleanup query. Explicit idempotency keys are never stored here and are
   // intentionally preserved for replay assertions.
   request[GENERATED_KEY] = null;
-  await pool.query("DELETE FROM accounting_posting_requests WHERE idempotency_key = $1", [
-    generatedKey,
-  ]);
+  await pool.query("DELETE FROM accounting_posting_requests WHERE idempotency_key = $1", [generatedKey]);
 }
 
 // The backend test job uses one disposable database for the whole Vitest run.
-// Durable posting identities are intentionally ON DELETE RESTRICT in production,
-// while many older suites delete their vouchers directly between individual
-// test cases. Keep each test isolated by clearing posting identities only after
-// the test has completed. Replay/idempotency assertions still observe the rows
-// for the entire test that created them; production FK behavior is unchanged.
+// Infrastructure writers create durable `infra:*` identities that intentionally
+// block direct voucher deletion in production. Older route suites still clean up
+// their vouchers directly between tests, so clear only infrastructure identities
+// created by application writers after each test. The dedicated Phase 3 identity
+// proof keeps its marker across test cases and is excluded explicitly.
 afterEach(async () => {
-  await pool.query("DELETE FROM accounting_posting_requests");
+  await pool.query(
+    "DELETE FROM accounting_posting_requests WHERE idempotency_key LIKE 'infra:%' AND source_type <> $1",
+    ["phase3-test-writer"]
+  );
 });
 
 const requestPrototype = supertest.Test.prototype;
@@ -95,6 +96,6 @@ requestPrototype.then = function thenWithVoucherRequestIdentity(onFulfilled, onR
 
       if (typeof onRejected === "function") return onRejected(error);
       throw error;
-    },
+    }
   );
 };
