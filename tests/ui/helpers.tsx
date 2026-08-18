@@ -1,6 +1,7 @@
 import React from "react";
 import { render, type RenderResult } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ApplicationLanguageProvider } from "@/contexts/ApplicationLanguageContext";
 
 /** Create a fresh QueryClient per test — no retries so tests fail fast. */
 function makeTestClient(): QueryClient {
@@ -20,7 +21,11 @@ function makeTestClient(): QueryClient {
 
 export function renderWithProviders(ui: React.ReactElement): RenderResult {
   const client = makeTestClient();
-  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+  return render(
+    <QueryClientProvider client={client}>
+      <ApplicationLanguageProvider>{ui}</ApplicationLanguageProvider>
+    </QueryClientProvider>,
+  );
 }
 
 /** Stub fetch so any useQuery that actually fires returns an empty payload. */
