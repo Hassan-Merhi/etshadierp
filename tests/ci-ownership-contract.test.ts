@@ -52,5 +52,6 @@ describe("CI ownership", () => {
     expect(circle).toContain("static-build:");
     expect(circle).toContain("postgres-regression:");
     expect(circle).toContain("security-readiness:");
+    expect(circle).not.toMatch(/branches:\s*\n\s*only:\s*main/);
   });
 });
