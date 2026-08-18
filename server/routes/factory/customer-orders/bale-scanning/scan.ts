@@ -13,6 +13,11 @@ import { db } from "../../../../db";
 import { requireAuth } from "../../../../auth";
 import { recalculateOrderTotalsForScannedArticle, type ScannedArticleTotalsPatch } from "./incrementalTotals";
 import {
+  normalizeLoadingArticleCode,
+  shouldEnforceProformaOverload,
+  shouldRequireProformaMembership,
+} from "./proformaScanPolicy";
+import {
   factoryBaleProducts,
   factoryBales,
   customerProformaLines,
@@ -58,7 +63,7 @@ export function registerOrderBaleScanRoutes(app: Express) {
       // Only match by unique bale identifiers (referenceNumber, baleCode) — NOT by articleCode or
       // productName, which are shared across many bales and would falsely block scanning the next
       // available bale of the same product type.
-      const scanLower = scanCode.toLowerCase();
+      const scanLower = scanCode.trim().toLowerCase();
       const [reservedBale] = await db
         .select()
         .from(factoryBales)
@@ -209,7 +214,9 @@ export function registerOrderBaleScanRoutes(app: Express) {
 
         // Effective article code: prefer the bale's own field, fall back to the
         // product master's articleCode so the proforma check is consistent.
-        const effectiveArticleCode: string = bale.articleCode || productForBale?.articleCode || "";
+        const effectiveArticleCode: string = (bale.articleCode || productForBale?.articleCode || "").trim();
+        const normalizedEffectiveArticleCode = normalizeLoadingArticleCode(effectiveArticleCode);
+        const ignoreProforma = req.body.allowBypassProforma === true;
 
         let priceUsed = "0";
         if (productForBale?.sellingPrice) priceUsed = productForBale.sellingPrice;
@@ -221,7 +228,7 @@ export function registerOrderBaleScanRoutes(app: Express) {
             .where(
               and(
                 eq(customerProformaLines.proformaId, order.proformaIdUsed),
-                eq(customerProformaLines.articleCode, effectiveArticleCode)
+                sql`LOWER(TRIM(${customerProformaLines.articleCode})) = ${normalizedEffectiveArticleCode}`
               )
             );
           const proformaLine = pl || null;
@@ -235,16 +242,23 @@ export function registerOrderBaleScanRoutes(app: Express) {
             } else {
               priceUsed = proformaLine.pricePerBale;
             }
-            // Overload check: count existing bales of this article in the order.
-            // Use effectiveArticleCode (not bale.articleCode) so bales that were
-            // stored without an articleCode are still counted correctly via the
-            // product master's code.
-            if (!req.body.allowBypassOverload) {
+            // "Ignore Proforma" means exactly that: when enabled the first scan
+            // must not be stopped by either membership or quantity/overload checks.
+            // Normal mode still keeps the existing explicit second-scan bypass.
+            if (
+              shouldEnforceProformaOverload({
+                ignoreProforma,
+                allowBypassOverload: req.body.allowBypassOverload === true,
+              })
+            ) {
               const [countResult] = await tx
                 .select({ count: sql<number>`COUNT(*)::int` })
                 .from(customerOrderBales)
                 .where(
-                  and(eq(customerOrderBales.orderId, orderId), eq(customerOrderBales.articleCode, effectiveArticleCode))
+                  and(
+                    eq(customerOrderBales.orderId, orderId),
+                    sql`LOWER(TRIM(COALESCE(${customerOrderBales.articleCode}, ''))) = ${normalizedEffectiveArticleCode}`
+                  )
                 );
               const currentCount = countResult?.count || 0;
               if (currentCount >= proformaLine.quantity) {
@@ -260,7 +274,12 @@ export function registerOrderBaleScanRoutes(app: Express) {
                 };
               }
             }
-          } else if (!req.body.allowBypassProforma) {
+          } else if (
+            shouldRequireProformaMembership({
+              ignoreProforma,
+              hasProformaLine: false,
+            })
+          ) {
             return {
               ok: false,
               httpStatus: 400,
