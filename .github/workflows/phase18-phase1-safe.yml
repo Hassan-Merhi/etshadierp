@@ -1,0 +1,87 @@
+name: Phase 18 Wave 2 Phase 1 Safe Inference
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: write
+env:
+  CI: true
+  NODE_OPTIONS: --max-old-space-size=6144
+concurrency:
+  group: phase18-wave2-phase1-safe-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  execute:
+    if: github.event.pull_request.head.ref == 'agent/phase18-wave2-phase1-safe'
+    runs-on: macos-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/phase18-wave2-phase1-safe
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.14.0'
+          cache: npm
+      - run: npm ci
+      - name: Baseline compiler
+        run: npm run check
+      - name: Exhaust safe inference reductions
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          count(){ set +e; node scripts/audit-type-escapes.mjs --json >/tmp/count.json 2>/dev/null; set -e; node -e "const r=require('/tmp/count.json');process.stdout.write(String(r.summary.typeEscapeTotal))"; }
+          phase_check(){ rm -f /tmp/phase18-p1.tsbuildinfo; node node_modules/typescript/bin/tsc --noEmit --incremental --tsBuildInfoFile /tmp/phase18-p1.tsbuildinfo; }
+          start=$(count)
+          echo "PHASE1_START=$start"
+          : > /tmp/phase18-safe-blocked.txt
+          total_accepted=0
+          for round in $(seq 1 12); do
+            round_base=$(git rev-parse HEAD)
+            round_start=$(count)
+            echo "PHASE1_ROUND_START round=$round count=$round_start"
+            PHASE18_MODE=safe PHASE18_BLOCKLIST=/tmp/phase18-safe-blocked.txt node scripts/phase18-wave2-propose.cjs
+            if git diff --quiet -- client/src server shared; then echo "PHASE1_EXHAUSTED round=$round reason=no-proposals"; break; fi
+            green=0
+            for attempt in $(seq 1 40); do
+              set +e; phase_check >/tmp/check.log 2>&1; rc=$?; set -e
+              if [ "$rc" -eq 0 ]; then green=1; echo "PHASE1_COMPILER_GREEN round=$round attempt=$attempt"; break; fi
+              node -e "const fs=require('fs');const s=fs.readFileSync('/tmp/check.log','utf8');const a=[...s.matchAll(/^([^ (]+\\.(?:ts|tsx))\\([0-9]+,[0-9]+\\): error TS[0-9]+:/gm)].map(m=>m[1]);fs.writeFileSync('/tmp/error-files.txt',[...new Set(a)].sort().join('\\n'));"
+              reverted=0
+              while IFS= read -r f; do
+                [ -n "$f" ] || continue
+                if git diff --quiet "$round_base" -- "$f"; then continue; fi
+                git checkout "$round_base" -- "$f"
+                echo "$f" >> /tmp/phase18-safe-blocked.txt
+                reverted=$((reverted+1))
+              done < /tmp/error-files.txt
+              echo "PHASE1_ROLLBACK round=$round attempt=$attempt reverted=$reverted"
+              if [ "$reverted" -gt 0 ]; then continue; fi
+              f=$(git diff --name-only "$round_base" -- client/src server shared | head -1 || true)
+              [ -n "$f" ] || break
+              git checkout "$round_base" -- "$f"
+              echo "$f" >> /tmp/phase18-safe-blocked.txt
+            done
+            if [ "$green" -ne 1 ]; then git reset --hard "$round_base"; echo "PHASE1_EXHAUSTED round=$round reason=no-compiler-green-candidate"; break; fi
+            round_end=$(count)
+            if [ "$round_end" -ge "$round_start" ]; then git reset --hard "$round_base"; echo "PHASE1_EXHAUSTED round=$round reason=no-strict-improvement"; break; fi
+            delta=$((round_start-round_end)); total_accepted=$((total_accepted+delta))
+            git add client/src server shared
+            git commit -m "refactor: Phase 18 Wave 2 Phase 1 safe inference round ${round} [skip ci]"
+            git push origin HEAD:agent/phase18-wave2-phase1-safe
+            echo "PHASE1_ACCEPTED round=$round $round_start->$round_end delta=$delta"
+          done
+          npm run check
+          final=$(count)
+          echo "PHASE1_FINAL=$start->$final accepted=$total_accepted"
+          set +e; node scripts/audit-type-escapes.mjs --json >/tmp/final.json; set -e
+          node - <<'NODE'
+          const fs=require('fs');const r=JSON.parse(fs.readFileSync('/tmp/final.json','utf8'));
+          fs.writeFileSync('phase18-phase1-safe-report.md',['# Phase 18 Wave 2 — Phase 1 Safe Inference','',`Type escapes after Phase 1: ${r.summary.typeEscapeTotal}`,`Explicit any: ${r.summary.explicitAny}`,`as any: ${r.summary.asAny}`,`Suppressions: ${r.summary.suppressions}`,`Files with escapes: ${r.summary.filesWithEscapes}`,'','Phase 1 criterion: all compiler-green safe-inference reductions are exhausted.'].join('\n'));
+          NODE
+          git add phase18-phase1-safe-report.md
+          if ! git diff --cached --quiet; then git commit -m 'chore: certify Phase 1 safe inference exhaustion [phase18-phase1-safe-result] [skip ci]'; fi
+          git push origin HEAD:agent/phase18-wave2-phase1-safe
