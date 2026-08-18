@@ -1,4 +1,4 @@
-import superagent from "superagent";
+import supertest from "supertest";
 
 const STATE_CHANGING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
@@ -14,7 +14,7 @@ function hasClientRequestId(data) {
   );
 }
 
-const requestPrototype = superagent.Request.prototype;
+const requestPrototype = supertest.Test.prototype;
 const originalEnd = requestPrototype.end;
 
 requestPrototype.end = function endWithVoucherRequestIdentity(callback) {
