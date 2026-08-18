@@ -76,6 +76,7 @@ jobs:
             if [ "$pass_end" -ge "$pass_start" ]; then git reset --hard "$pass_base"; rm -f /tmp/phase18-wave2.tsbuildinfo; echo "BULK_NO_STRICT_IMPROVEMENT pass=$pass $pass_start->$pass_end"; break; fi
             git add client/src server shared
             git commit -m "refactor: Phase 18 bulk type reduction pass $pass [phase18-wave2-bulk]"
+            git push origin HEAD:agent/phase18-executor
             echo "BULK_PASS_ACCEPTED pass=$pass $pass_start->$pass_end blocked=$(sort -u /tmp/phase18-blocked.txt | wc -l)"
             sort -u /tmp/phase18-blocked.txt -o /tmp/phase18-blocked.txt
             if [ "$pass_end" -eq 0 ]; then break; fi
@@ -101,6 +102,7 @@ jobs:
               if [ "$pass_end" -lt "$pass_start" ]; then
                 git add client/src server shared
                 git commit -m "refactor: Phase 18 targeted type reduction pass $pass [phase18-wave2-targeted]"
+                git push origin HEAD:agent/phase18-executor
                 echo "TARGET_PASS_ACCEPTED pass=$pass $pass_start->$pass_end"
                 continue
               fi
