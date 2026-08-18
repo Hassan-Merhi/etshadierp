@@ -4,6 +4,10 @@ import { resolveDatabaseSsl } from "./lib/databaseSsl.mjs";
 
 const { Client } = pg;
 const INSTALL_KEY = Symbol.for("erp.factory-bilingual-schema.applied");
+const STARTUP_SCHEMA_LOCK_SQL =
+  "SELECT pg_advisory_lock(hashtext('erp.startup'), hashtext('factory-schema'))";
+const STARTUP_SCHEMA_UNLOCK_SQL =
+  "SELECT pg_advisory_unlock(hashtext('erp.startup'), hashtext('factory-schema'))";
 
 const connectionString =
   process.env.DATABASE_URL ||
@@ -67,9 +71,15 @@ export async function ensureFactoryBilingualSchema() {
   const columnsAdded = [];
   const missingOptionalTables = new Set();
   const availableTables = new Set();
+  let startupSchemaLockAcquired = false;
 
   try {
     await client.connect();
+    await client.query("SET statement_timeout = '90s'");
+    await client.query(STARTUP_SCHEMA_LOCK_SQL);
+    startupSchemaLockAcquired = true;
+    await client.query("RESET statement_timeout");
+
     await client.query("BEGIN");
     await client.query("SET LOCAL lock_timeout = '15s'");
     await client.query("SET LOCAL statement_timeout = '90s'");
@@ -121,10 +131,10 @@ export async function ensureFactoryBilingualSchema() {
       if (!availableTables.has(tableName)) continue;
       const verification = await client.query(
         `SELECT 1
-           FROM information_schema.columns
-          WHERE table_schema = 'public'
-            AND table_name = $1
-            AND column_name = $2`,
+         FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = $1
+          AND column_name = $2`,
         [tableName, columnName]
       );
       if (verification.rowCount === 0) missingColumns.push(`${tableName}.${columnName}`);
@@ -161,6 +171,9 @@ export async function ensureFactoryBilingualSchema() {
     });
     throw error;
   } finally {
+    if (startupSchemaLockAcquired) {
+      await client.query(STARTUP_SCHEMA_UNLOCK_SQL).catch(() => {});
+    }
     await client.end().catch(() => {});
   }
 }
