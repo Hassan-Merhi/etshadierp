@@ -17,8 +17,9 @@ jobs:
   ci:
     name: Check / Build / Lint / Test
     runs-on: ubuntu-latest
-    # This job does install, lint, type-check, build, every static audit, and the
-    # full backend and frontend suites in one place. Recent runs on main took
+    # This job does install, lint, type-check, build, every static audit, and one
+    # instrumented run of each backend and frontend suite. Coverage is the
+    # authoritative test execution, so the suites are not repeated without it. Recent runs on main took
     # 27–34 minutes against the previous 35-minute limit; the last merge finished
     # with 67 seconds to spare. That is not a margin — it means a slow runner
     # cancels main, and the cancellation reads as "cancelled" rather than
@@ -219,8 +220,8 @@ jobs:
             fi
           fi
 
-          # Same paths and extensions as the CircleCI Parity job's formatting
-          # step. The two disagreed once — this job covered client/src, server
+          # Same paths and extensions as the canonical CircleCI static-build
+          # formatting step. The two disagreed once — this job covered client/src, server
           # and shared while parity also covered tests and scripts — and three
           # unformatted test files reached the parity job because this one had
           # never looked at them.
@@ -346,43 +347,11 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-      - name: Backend tests
-        id: backend_tests
-        if: always() && steps.runtime_migrations.outcome == 'success'
-        run: |
-          set -o pipefail
-          npm run test:backend 2>&1 | tee backend-test-errors-ci.txt
-
-      - name: API smoke sweep
-        id: smoke_sweep
-        # Its own step so that "an endpoint stopped responding" is a distinct
-        # signal from a unit-test failure.
-        if: always() && steps.runtime_migrations.outcome == 'success'
-        run: |
-          set -o pipefail
-          npm run test:smoke-sweep 2>&1 | tee smoke-sweep-errors-ci.txt
-
-      - name: Upload smoke sweep failure log
-        if: always() && steps.smoke_sweep.outcome == 'failure'
-        uses: actions/upload-artifact@v7
-        with:
-          name: smoke-sweep-errors
-          path: smoke-sweep-errors-ci.txt
-          if-no-files-found: error
-          retention-days: 7
-
-      - name: Upload backend test failure log
-        if: always() && steps.backend_tests.outcome == 'failure'
-        uses: actions/upload-artifact@v7
-        with:
-          name: backend-test-errors
-          path: backend-test-errors-ci.txt
-          if-no-files-found: error
-          retention-days: 7
-
-      - name: Backend coverage thresholds
+      # Coverage executes the complete backend suite, so this is the single
+      # authoritative backend test run as well as the threshold gate.
+      - name: Backend tests and coverage thresholds
         id: backend_coverage
-        if: always() && steps.backend_tests.outcome == 'success'
+        if: always() && steps.runtime_migrations.outcome == 'success'
         run: |
           set -o pipefail
           npm run test:backend:coverage 2>&1 | tee backend-coverage-errors-ci.txt
@@ -405,25 +374,11 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Frontend tests
-        id: frontend_tests
-        if: always() && steps.install.outcome == 'success'
-        run: |
-          set -o pipefail
-          npm run test:frontend 2>&1 | tee frontend-test-errors-ci.txt
-
-      - name: Upload frontend test failure log
-        if: always() && steps.frontend_tests.outcome == 'failure'
-        uses: actions/upload-artifact@v7
-        with:
-          name: frontend-test-errors
-          path: frontend-test-errors-ci.txt
-          if-no-files-found: error
-          retention-days: 7
-
-      - name: Frontend coverage thresholds
+      # Coverage executes the complete frontend suite, so this is the single
+      # authoritative frontend test run as well as the threshold gate.
+      - name: Frontend tests and coverage thresholds
         id: frontend_coverage
-        if: always() && steps.frontend_tests.outcome == 'success'
+        if: always() && steps.install.outcome == 'success'
         run: |
           set -o pipefail
           npm run test:frontend:coverage 2>&1 | tee frontend-coverage-errors-ci.txt
