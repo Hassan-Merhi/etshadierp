@@ -14,9 +14,11 @@ import { registerFactoryProductHistoryRoutes } from "./productHistoryRoutes";
 import { registerFactoryProductBulkRoutes } from "./productBulkRoutes";
 import { registerFactoryProductImportRoutes } from "./productImportRoutes";
 import { registerFactoryProductImageRoutes } from "./productImageRoutes";
+import { registerCustomerLoadingRoutes } from "./customerLoadingRoutes";
 
 export function registerFactoryProductsRoutes(app: Express) {
   registerFactoryCategoryRoutes(app);
+  registerCustomerLoadingRoutes(app);
   registerFactoryProductReadRoutes(app);
   registerFactoryProductWriteRoutes(app);
   registerFactoryProductCascadeRoutes(app);

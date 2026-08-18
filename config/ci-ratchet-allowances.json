@@ -10,7 +10,10 @@
     "client/src/pages/factory/WasteDispatchOptimized.tsx": 987,
     "client/src/pages/vouchers/StockTransferForm.tsx": 2388
   },
-  "routeManifestAdditions": [],
+  "routeManifestAdditions": [
+    "GET /api/factory/customer-loading/products [requireAuth > <anonymous>]",
+    "GET /api/factory/customer-loading/history [requireAuth > <anonymous>]"
+  ],
   "routeManifestMountAdditions": [],
   "sourceTextAssertionDelta": {
     "additionalSourceCoupledTests": [

@@ -73,16 +73,14 @@ jobs:
           }
 
           ''','')
-          anchor='''} from "./payrollSchemas";
-'''
-          imp='''import {
-            calculateAdvanceStats,
-            type AddWorkerDeductionFormData,
-            type AdvancesTabProps,
-            type SalaryAdvanceRepayment,
-            type WorkerDeduction,
-          } from "./advancesTabModel";
-'''
+          anchor='} from "./payrollSchemas";\n'
+          imp=('import {\n'
+               '  calculateAdvanceStats,\n'
+               '  type AddWorkerDeductionFormData,\n'
+               '  type AdvancesTabProps,\n'
+               '  type SalaryAdvanceRepayment,\n'
+               '  type WorkerDeduction,\n'
+               '} from "./advancesTabModel";\n')
           if imp not in s: s=s.replace(anchor,anchor+imp,1)
           s=s.replace('select: (data: any[]) => data.filter((e) => e.employeeType === "Worker"),','select: (data) => data.filter((employee) => employee.employeeType === "Worker"),')
           s=s.replace('useQuery<any[]>({\n    queryKey: ["/api/salary-advance-deductions", selectedCompany?.id],','useQuery<SalaryAdvanceRepayment[]>({\n    queryKey: ["/api/salary-advance-deductions", selectedCompany?.id],',1)

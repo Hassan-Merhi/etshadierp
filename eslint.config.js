@@ -30,9 +30,11 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      // Editor feedback; the exact type-escape gate is frozen at zero in
-      // config/type-escape-boundaries.json and may only remain zero.
-      "@typescript-eslint/no-explicit-any": "warn",
+      // Type escapes have their own zero-tolerance gate in
+      // config/type-escape-boundaries.json. Keeping this ESLint rule enabled
+      // would double-count the same backlog and bypass the 33-warning lint
+      // ratchet, whose frozen rules are exhaustive-deps and no-control-regex.
+      "@typescript-eslint/no-explicit-any": "off",
       // unused-imports/no-unused-vars below replaces the base rule to avoid duplicate reports.
       "@typescript-eslint/no-unused-vars": "off",
       "unused-imports/no-unused-imports": "error",
