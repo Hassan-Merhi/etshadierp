@@ -1,6 +1,6 @@
 {
-  "version": 28,
-  "description": "Repository-wide god-file architecture boundaries plus a one-way size ratchet. Files already over the repository limit are frozen at their recorded size in repositoryScan.grandfathered: they may shrink but never grow, and any new file crossing the limit fails until it is split or explicitly baselined. Versions 25-28 permanently retire the four Wave 13 targets: BarcodeLookup.tsx, FactorySuppliers.tsx, SupplierProfitCheck.tsx, and GcLshiMigration.tsx, after behavior-preserving splits into stable original-path shells and focused typed modules, with every authored replacement file below the 900-line repository limit.",
+  "version": 30,
+  "description": "Repository-wide god-file architecture boundaries plus a one-way size ratchet. Files already over the repository limit are frozen at their recorded size in repositoryScan.grandfathered: they may shrink but never grow, and any new file crossing the limit fails until it is split or explicitly baselined. Versions 25-28 permanently retire the four Wave 13 targets: BarcodeLookup.tsx, FactorySuppliers.tsx, SupplierProfitCheck.tsx, and GcLshiMigration.tsx. Versions 29-30 permanently retire the two Wave 14 targets: FactorySettings.tsx and DataToolsTab.tsx. The retired targets preserve stable original import paths behind focused typed models, views, dialogs, and components, with every authored replacement file below the 900-line repository limit.",
   "retiredFiles": [
     "server/routesLegacy.ts",
     "server/routes/reportsRoutesLegacy.ts",
@@ -154,7 +154,6 @@
       "client/src/pages/factory/FactoryPendingInvoiceVerify.tsx": 1850,
       "client/src/pages/factory/FactoryPOS.tsx": 1775,
       "client/src/pages/factory/FactoryProformas.tsx": 1475,
-      "client/src/pages/factory/FactorySettings.tsx": 1475,
       "client/src/pages/factory/FactoryShippingContainers.tsx": 925,
       "client/src/pages/factory/FactoryStatusBuilder.tsx": 975,
       "client/src/pages/factory/FactoryStockAllocationV5.tsx": 1875,
@@ -165,7 +164,6 @@
       "client/src/pages/pos/POSPriceList.tsx": 1425,
       "client/src/pages/SalesReportDetail.tsx": 1400,
       "client/src/pages/SalesReportLegacy.tsx": 1000,
-      "client/src/pages/settings/DataToolsTab.tsx": 1825,
       "client/src/pages/TransactionJournal.tsx": 1600,
       "server/chatService.ts": 2000,
       "server/index.ts": 1725,
