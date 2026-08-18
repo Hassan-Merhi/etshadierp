@@ -187,18 +187,11 @@ jobs:
 
 workflows:
   full-erp-verification:
+    # This is the canonical CircleCI path for pull-request branches and main.
+    # The former GitHub-hosted clone is deliberately absent.
     jobs:
-      - static-build:
-          filters:
-            branches:
-              only: main
-      - postgres-regression:
-          filters:
-            branches:
-              only: main
+      - static-build
+      - postgres-regression
       - security-readiness:
           requires:
             - static-build
-          filters:
-            branches:
-              only: main
