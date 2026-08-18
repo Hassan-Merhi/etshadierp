@@ -1,0 +1,92 @@
+name: TEMP Postgres teardown repair
+
+on:
+  push:
+    branches:
+      - fix/postgres-test-voucher-cleanup-fk-20260818
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/postgres-test-voucher-cleanup-fk-20260818
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.14.0'
+          cache: npm
+      - run: npm ci --no-audit --bin-links=true
+      - name: Repair schema-based voucher teardown ordering
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          files = [
+              Path('tests/reports.test.ts'),
+              Path('tests/workflow.test.ts'),
+              Path('tests/accounting.test.ts'),
+              Path('tests/whatsapp-triggers.test.ts'),
+              Path('tests/rental-payment-accounting-reconciliation.test.ts'),
+              Path('tests/pos.test.ts'),
+              Path('tests/pdf-invoice.test.ts'),
+          ]
+
+          pattern = re.compile(
+              r'^(?P<indent>\s*)await db\.delete\(schema\.voucherEntries\)\.where\(eq\(schema\.voucherEntries\.voucherId, (?P<expr>.+?)\)\);$',
+              re.MULTILINE,
+          )
+
+          modified = []
+          for path in files:
+              text = path.read_text()
+
+              def replace(match):
+                  indent = match.group('indent')
+                  expr = match.group('expr')
+                  marker = f'.where(eq(schema.accountingPostingRequests.voucherId, {expr}));'
+                  prefix = text[max(0, match.start() - 400):match.start()]
+                  if marker in prefix:
+                      return match.group(0)
+                  return (
+                      f'{indent}await db\n'
+                      f'{indent}  .delete(schema.accountingPostingRequests)\n'
+                      f'{indent}  .where(eq(schema.accountingPostingRequests.voucherId, {expr}));\n'
+                      f'{match.group(0)}'
+                  )
+
+              updated = pattern.sub(replace, text)
+              if updated != text:
+                  path.write_text(updated)
+                  modified.append(str(path))
+
+          print('Modified cleanup files:', ', '.join(modified) if modified else '(none)')
+          Path('/tmp/modified-tests.txt').write_text('\n'.join(modified))
+          PY
+      - name: Format touched tests
+        shell: bash
+        run: |
+          mapfile -t files < /tmp/modified-tests.txt
+          files+=(tests/vouchers.test.ts)
+          npx prettier --write "${files[@]}"
+      - name: Commit deterministic test-only repairs
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git add tests/*.test.ts
+          if git diff --cached --quiet; then
+            echo 'No test changes to commit.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'test: make suite voucher teardowns posting-FK safe'
+          git push origin HEAD:fix/postgres-test-voucher-cleanup-fk-20260818
