@@ -63,13 +63,13 @@ export function registerCustomerLoadingRoutes(app: Express) {
       if (!customer) return res.status(404).json({ message: "Customer not found" });
 
       const queryResult = await db.execute(sql`
-        WITH loaded_by_article AS (
-          SELECT
-            UPPER(BTRIM(COALESCE(filb.article_code, fb.article_code))) AS article_key,
-            COUNT(DISTINCT filb.bale_id)::integer AS total_bales_loaded,
-            COALESCE(SUM(filb.weight_kg::numeric), 0)::numeric AS total_kg_loaded,
-            COUNT(DISTINCT filb.session_id)::integer AS loading_count,
-            MAX(filb.scanned_at) AS last_loaded_at
+        WITH customer_loaded_bales AS (
+          SELECT DISTINCT ON (filb.bale_id)
+            filb.bale_id,
+            filb.session_id,
+            COALESCE(filb.article_code, fb.article_code) AS article_code,
+            filb.weight_kg,
+            filb.scanned_at
           FROM factory_invoice_loading_bales filb
           INNER JOIN factory_invoice_loading_sessions fils
             ON fils.id = filb.session_id
@@ -82,7 +82,17 @@ export function registerCustomerLoadingRoutes(app: Express) {
             AND fils.status <> 'CANCELLED'
             AND COALESCE(filb.article_code, fb.article_code) IS NOT NULL
             AND BTRIM(COALESCE(filb.article_code, fb.article_code)) <> ''
-          GROUP BY UPPER(BTRIM(COALESCE(filb.article_code, fb.article_code)))
+          ORDER BY filb.bale_id, filb.scanned_at DESC, filb.id DESC
+        ),
+        loaded_by_article AS (
+          SELECT
+            UPPER(BTRIM(article_code)) AS article_key,
+            COUNT(*)::integer AS total_bales_loaded,
+            COALESCE(SUM(weight_kg::numeric), 0)::numeric AS total_kg_loaded,
+            COUNT(DISTINCT session_id)::integer AS loading_count,
+            MAX(scanned_at) AS last_loaded_at
+          FROM customer_loaded_bales
+          GROUP BY UPPER(BTRIM(article_code))
         )
         SELECT
           fbp.id,
@@ -135,6 +145,7 @@ export function registerCustomerLoadingRoutes(app: Express) {
         definition: {
           loaded: "At least one bale scanned into a non-cancelled invoice loading session for this customer",
           cancelledSessionsExcluded: true,
+          duplicateScansCollapsedByBale: true,
         },
         summary: {
           totalProducts: products.length,
