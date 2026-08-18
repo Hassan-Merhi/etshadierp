@@ -45,7 +45,7 @@ jobs:
           count(){ set +e; node scripts/audit-type-escapes.mjs --json >/tmp/count.json 2>/dev/null; set -e; node -e "const r=require('/tmp/count.json');process.stdout.write(String(r.summary.typeEscapeTotal))"; }
           wave_start=$(count)
           echo "GLOBAL_WAVE_START=$wave_start"
-          for mode in safe param cast unknown; do
+          for mode in safe param array generic property union cast unknown; do
             mode_base=$(git rev-parse HEAD)
             mode_start=$(count)
             echo "GLOBAL_MODE_START mode=$mode count=$mode_start"
