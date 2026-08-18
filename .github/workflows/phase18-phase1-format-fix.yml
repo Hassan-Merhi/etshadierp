@@ -1,0 +1,38 @@
+name: Phase 18 Phase 1 Format Fix
+on:
+  push:
+    branches: [agent/phase18-phase1-safe-macos-result]
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/phase18-phase1-safe-macos-result
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.14.0'
+          cache: npm
+      - run: npm ci --no-audit --bin-links=true
+      - name: Format Phase 1 changed source
+        run: |
+          npx prettier --write \
+            server/services/rental/rentalPaymentPostingService.ts \
+            server/storage/containers-store/containers.ts \
+            server/storage/factory/production.ts \
+            server/storage/stock-ops/item-history.ts \
+            server/storage/stock-ops/transfers-create.ts \
+            server/storage/stock-ops/transfers-update.ts
+      - name: Commit formatting
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if git diff --quiet; then
+            echo 'Already formatted.'
+            exit 0
+          fi
+          git add server/services/rental/rentalPaymentPostingService.ts server/storage/containers-store/containers.ts server/storage/factory/production.ts server/storage/stock-ops/item-history.ts server/storage/stock-ops/transfers-create.ts server/storage/stock-ops/transfers-update.ts
+          git commit -m 'style: format Phase 1 accepted inference changes [skip ci]'
+          git push origin HEAD:agent/phase18-phase1-safe-macos-result
