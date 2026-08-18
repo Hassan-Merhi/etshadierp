@@ -1,0 +1,52 @@
+name: Phase 18 Phase 1 Backend Cleanup Repair
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: write
+env:
+  CI: true
+  NODE_OPTIONS: --max-old-space-size=6144
+jobs:
+  repair:
+    if: github.event.pull_request.head.ref == 'agent/phase18-phase1-safe-macos-result'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/phase18-phase1-safe-macos-result
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.14.0'
+          cache: npm
+      - run: npm ci
+      - name: Repair FK-safe workflow cleanup and verify compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          node - <<'NODE'
+          const fs = require('fs');
+          const path = 'tests/workflow.test.ts';
+          let s = fs.readFileSync(path, 'utf8');
+          const needle = '  for (const v of rows) {\n    await db.delete(schema.salesItems).where(eq(schema.salesItems.voucherId, v.id));';
+          const replacement = '  for (const v of rows) {\n    await db\n      .delete(schema.accountingPostingRequests)\n      .where(eq(schema.accountingPostingRequests.voucherId, v.id));\n    await db.delete(schema.salesItems).where(eq(schema.salesItems.voucherId, v.id));';
+          if (!s.includes(needle)) {
+            if (s.includes('schema.accountingPostingRequests') && s.includes('async function cleanupVouchers()')) {
+              console.log('FK cleanup already repaired.');
+            } else {
+              throw new Error('Expected cleanupVouchers pattern not found; refusing broad edit.');
+            }
+          } else {
+            s = s.replace(needle, replacement);
+            fs.writeFileSync(path, s);
+          }
+          NODE
+          npm run check
+          rm .github/workflows/phase18-phase1-backend-cleanup-repair.yml
+          git add tests/workflow.test.ts .github/workflows/phase18-phase1-backend-cleanup-repair.yml
+          git commit -m 'test: clean posting requests before workflow vouchers'
+          SKIP_TSC_CHECK=1 git push origin HEAD:agent/phase18-phase1-safe-macos-result
