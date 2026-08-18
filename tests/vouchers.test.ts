@@ -33,6 +33,9 @@ async function cleanupVouchers() {
     .where(eq(schema.vouchers.companyId, ctx.companyId));
 
   for (const v of vouchers) {
+    await db
+      .delete(schema.accountingPostingRequests)
+      .where(eq(schema.accountingPostingRequests.voucherId, v.id));
     await db.delete(schema.salesItems).where(eq(schema.salesItems.voucherId, v.id));
     await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, v.id));
   }
@@ -194,9 +197,6 @@ describe("Voucher Delete", () => {
     expect(deleteRes.status).toBeGreaterThanOrEqual(200);
     expect(deleteRes.status).toBeLessThan(300);
 
-    // The voucher must no longer be accessible (soft-delete sets deletedAt;
-    // hard-delete removes the row). Either way the route must succeed and the
-    // voucher must not appear in the active list.
     const listRes = await agent.get("/api/vouchers");
     const vouchers = Array.isArray(listRes.body) ? listRes.body : listRes.body?.vouchers ?? [];
     const stillPresent = vouchers.some((v: any) => v.id === voucherId && !v.deletedAt);
