@@ -16,10 +16,10 @@
  * Freezing each rule separately makes that trade fail while still letting any
  * single rule fall freely.
  *
- * no-explicit-any is the one rule whose real gate lives elsewhere:
- * config/type-escape-boundaries.json freezes it per file, which is strictly
- * stronger. Its entry here exists so the two cannot drift apart, and this audit
- * checks that they still agree.
+ * no-explicit-any is enforced by the dedicated type-escape ratchet. If this
+ * lint ratchet also carries a no-explicit-any ceiling, we verify that the two
+ * agree; when the ESLint rule is intentionally disabled, the dedicated gate is
+ * the single source of truth and there is no lint ceiling to compare.
  *
  * Usage:
  *   npm run lint && npm run audit:lint-ratchet
@@ -27,8 +27,8 @@
  *   UPDATE_LINT_WARNING_BASELINE=1 node scripts/audit-lint-warnings.mjs
  *
  * Exits non-zero when a rule is above its ceiling, when the report disagrees
- * with the total the lint gate enforces, or when the no-explicit-any ceiling
- * has drifted from the type-escape ceiling. Headroom is reported, never fatal.
+ * with the total the lint gate enforces, or when a configured no-explicit-any
+ * ceiling has drifted from the type-escape ceiling. Headroom is reported, never fatal.
  */
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { resolve } from "path";
@@ -105,11 +105,14 @@ export function auditLintWarnings() {
     }
   }
 
-  // The two configs count the same `any` from different places: ESLint reports
-  // one warning per `any` in a type position, the type-escape audit counts the
-  // same AnyKeyword nodes plus ts-comment suppressions, which are not a rule.
+  // When the lint ratchet carries its own explicit-any ceiling, keep it aligned
+  // with the stronger dedicated type-escape gate. If ESLint intentionally does
+  // not gate explicit-any, the dedicated ratchet remains the source of truth.
   let typeEscapeAgreement = null;
-  if (existsSync(TYPE_ESCAPE_CONFIG_PATH)) {
+  if (
+    existsSync(TYPE_ESCAPE_CONFIG_PATH) &&
+    Object.prototype.hasOwnProperty.call(config.perRule, ANY_RULE)
+  ) {
     const typeEscapes = JSON.parse(readFileSync(TYPE_ESCAPE_CONFIG_PATH, "utf8"));
     const typeEscapeCeiling = typeEscapes.totals?.typeEscapeCeiling;
     const suppressions = Object.values(typeEscapes.scan?.baseline ?? {}).reduce(
