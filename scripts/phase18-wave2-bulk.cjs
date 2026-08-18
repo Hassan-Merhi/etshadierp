@@ -15,6 +15,13 @@ function eligible(file) {
   return /^(client\/src|server|shared)\//.test(r) && /\.(ts|tsx)$/.test(r) && !r.endsWith(".d.ts") && fs.existsSync(file);
 }
 function contains(outer, inner) { return outer && inner && outer.pos <= inner.pos && outer.end >= inner.end; }
+function ancestor(node, predicate, limit = 8) {
+  let current = node.parent;
+  for (let depth = 0; current && depth < limit; depth += 1, current = current.parent) {
+    if (predicate(current)) return current;
+  }
+  return null;
+}
 function annotationStart(source, typeNode) {
   let i = typeNode.getStart() - 1;
   while (i >= 0 && /\s/.test(source[i])) i -= 1;
@@ -54,6 +61,14 @@ function callTypeArgument(node, sourceFile) {
   }
   return null;
 }
+function typeArgumentOwner(node) {
+  return ancestor(node, (owner) => {
+    const args = owner.typeArguments;
+    return Array.isArray(args) || (args && typeof args.some === "function")
+      ? [...args].some((arg) => contains(arg, node))
+      : false;
+  });
+}
 function editFor(node, sourceFile) {
   const parent = node.parent;
   if (mode === "cast") {
@@ -61,6 +76,24 @@ function editFor(node, sourceFile) {
       return { start: parent.getStart(sourceFile), end: parent.end, repl: `(${parent.expression.getText(sourceFile)})`, label: "remove-cast" };
     }
     return null;
+  }
+  if (mode === "array") {
+    const owner = ancestor(node, (candidate) => ts.isArrayTypeNode(candidate) && contains(candidate.elementType, node));
+    return owner ? { start: node.getStart(sourceFile), end: node.end, repl: "unknown", label: "array-unknown" } : null;
+  }
+  if (mode === "generic") {
+    return typeArgumentOwner(node) ? { start: node.getStart(sourceFile), end: node.end, repl: "unknown", label: "generic-unknown" } : null;
+  }
+  if (mode === "property") {
+    const owner = ancestor(node, (candidate) =>
+      (ts.isPropertySignature(candidate) || ts.isIndexSignatureDeclaration(candidate)) && candidate.type && contains(candidate.type, node)
+    );
+    return owner ? { start: node.getStart(sourceFile), end: node.end, repl: "unknown", label: "property-unknown" } : null;
+  }
+  if (mode === "union") {
+    return ancestor(node, (candidate) => ts.isUnionTypeNode(candidate))
+      ? { start: node.getStart(sourceFile), end: node.end, repl: "unknown", label: "union-unknown" }
+      : null;
   }
   if (mode === "unknown") return { start: node.getStart(sourceFile), end: node.end, repl: "unknown", label: "unknown" };
   const owner = annotationOwner(node, sourceFile);
@@ -157,13 +190,17 @@ for (const file of parsed.fileNames) {
 
 const stats = { mode, proposedFiles: proposals.length, proposedEdits: proposals.reduce((n, p) => n + p.edits.length, 0), acceptedFiles: 0, acceptedEdits: 0, rejectedFiles: 0, checks: 0, labels: {} };
 const accepted = new Set();
-const profile = mode === "safe"
-  ? { chunk: 128, maxDepth: 7 }
-  : mode === "param"
-    ? { chunk: 64, maxDepth: 5 }
-    : mode === "cast"
-      ? { chunk: 64, maxDepth: 5 }
-      : { chunk: 48, maxDepth: 3 };
+const profiles = {
+  safe: { chunk: 128, maxDepth: 7 },
+  param: { chunk: 64, maxDepth: 5 },
+  array: { chunk: 128, maxDepth: 7 },
+  generic: { chunk: 96, maxDepth: 6 },
+  property: { chunk: 64, maxDepth: 5 },
+  union: { chunk: 48, maxDepth: 4 },
+  cast: { chunk: 64, maxDepth: 5 },
+  unknown: { chunk: 48, maxDepth: 3 },
+};
+const profile = profiles[mode] || profiles.unknown;
 
 function testGroup(group, depth) {
   if (!group.length) return;
