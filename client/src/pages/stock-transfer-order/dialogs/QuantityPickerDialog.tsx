@@ -17,7 +17,7 @@ type QuantityPickerDialogProps = {
   editVoucherId: number | null;
   handleAddToOrder: () => void | Promise<void>;
   pickerQuantity: string;
-  quantityInputRef: RefObject<HTMLInputElement>;
+  quantityInputRef: RefObject<HTMLInputElement | null>;
   quantityPicker: QuantityPickerState;
   setPickerQuantity: Dispatch<SetStateAction<string>>;
   setQuantityPicker: Dispatch<SetStateAction<QuantityPickerState>>;
@@ -33,10 +33,7 @@ export function QuantityPickerDialog({
   setQuantityPicker,
 }: QuantityPickerDialogProps) {
   return (
-    <Dialog
-      open={quantityPicker.open}
-      onOpenChange={(open) => setQuantityPicker({ ...quantityPicker, open })}
-    >
+    <Dialog open={quantityPicker.open} onOpenChange={(open) => setQuantityPicker({ ...quantityPicker, open })}>
       <DialogContent className="sm:max-w-[400px]">
         <DialogHeader>
           <DialogTitle>Add to Order</DialogTitle>
@@ -46,10 +43,7 @@ export function QuantityPickerDialog({
             <p className="font-medium">{quantityPicker.stockItem?.name}</p>
             <p className="text-sm text-muted-foreground">From: {quantityPicker.locationName}</p>
             <p className="text-sm text-muted-foreground">
-              Available:{" "}
-              <span className="font-mono">
-                {formatNumber(quantityPicker.availableQty, 0)}
-              </span>{" "}
+              Available: <span className="font-mono">{formatNumber(quantityPicker.availableQty, 0)}</span>{" "}
               {quantityPicker.stockItem?.uom}
             </p>
           </div>
@@ -58,9 +52,7 @@ export function QuantityPickerDialog({
             <Label htmlFor="picker-quantity">
               Quantity
               {editVoucherId ? (
-                <span className="text-muted-foreground font-normal ml-1 text-xs">
-                  (negative = reduce, e.g. -1)
-                </span>
+                <span className="text-muted-foreground font-normal ml-1 text-xs">(negative = reduce, e.g. -1)</span>
               ) : (
                 ""
               )}
@@ -78,20 +70,16 @@ export function QuantityPickerDialog({
               }}
               data-testid="input-picker-quantity"
             />
-            {parseFloat(pickerQuantity) > quantityPicker.availableQty &&
-              parseFloat(pickerQuantity) > 0 && (
-                <p className="text-sm text-destructive flex items-center gap-1">
-                  <AlertCircle className="h-3 w-3" />
-                  Exceeds available stock
-                </p>
-              )}
+            {parseFloat(pickerQuantity) > quantityPicker.availableQty && parseFloat(pickerQuantity) > 0 && (
+              <p className="text-sm text-destructive flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" />
+                Exceeds available stock
+              </p>
+            )}
           </div>
         </div>
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => setQuantityPicker({ ...quantityPicker, open: false })}
-          >
+          <Button variant="outline" onClick={() => setQuantityPicker({ ...quantityPicker, open: false })}>
             Cancel
           </Button>
           <Button
@@ -100,8 +88,7 @@ export function QuantityPickerDialog({
               !pickerQuantity ||
               parseFloat(pickerQuantity) === 0 ||
               isNaN(parseFloat(pickerQuantity)) ||
-              (parseFloat(pickerQuantity) > 0 &&
-                parseFloat(pickerQuantity) > quantityPicker.availableQty)
+              (parseFloat(pickerQuantity) > 0 && parseFloat(pickerQuantity) > quantityPicker.availableQty)
             }
             data-testid="button-confirm-add"
           >
