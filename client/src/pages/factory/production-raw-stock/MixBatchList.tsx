@@ -37,7 +37,7 @@ interface MixBatchListProps {
   setMixBatchDate: (date: string) => void;
   mixBatchesByDate: any[];
   mixBatchesByDateLoading: boolean;
-  mixBatchPrintRef: React.RefObject<HTMLDivElement>;
+  mixBatchPrintRef: React.RefObject<HTMLDivElement | null>;
   formatDisplayDate: (date: string) => string;
 }
 

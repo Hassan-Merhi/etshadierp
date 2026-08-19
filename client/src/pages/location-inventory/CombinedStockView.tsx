@@ -31,7 +31,7 @@ interface CombinedStockViewProps {
   openMovement: (locId: number | null, locName: string | null, stockItemId: number, stockItemName: string) => void;
   formatAmount: (amt: number) => string;
   posUser?: any;
-  allStockTableRef: React.RefObject<HTMLDivElement>;
+  allStockTableRef: React.RefObject<HTMLDivElement | null>;
 }
 
 export function CombinedStockView({

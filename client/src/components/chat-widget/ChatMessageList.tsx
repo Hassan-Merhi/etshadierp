@@ -92,7 +92,7 @@ interface ChatMessageListProps {
   gitPushing: boolean;
   perFilePushResult: Record<string, PushResult>;
   setPerFilePushResult: (v: Record<string, PushResult>) => void;
-  scrollAreaRef: React.RefObject<HTMLDivElement>;
+  scrollAreaRef: React.RefObject<HTMLDivElement | null>;
 }
 
 export function ChatMessageList({

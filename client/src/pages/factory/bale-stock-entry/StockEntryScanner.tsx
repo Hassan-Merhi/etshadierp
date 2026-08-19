@@ -5,7 +5,7 @@ import { FactoryMobileScannerPanel, FactoryMobileStatus } from "@/components/ui/
 import { FactoryBaleProduct } from "@shared/schema";
 
 interface StockEntryScannerProps {
-  scanRef: React.RefObject<HTMLInputElement>;
+  scanRef: React.RefObject<HTMLInputElement | null>;
   scanInput: string;
   onScanInputChange: (val: string) => void;
   onScanKeyDown: (e: React.KeyboardEvent) => void;
@@ -93,7 +93,9 @@ export function StockEntryScanner({
           aria-autocomplete="list"
           aria-expanded={isOpen}
           aria-controls={listId}
-          aria-activedescendant={activeIndex >= 0 ? `factory-product-option-${filteredProducts[activeIndex]?.id}` : undefined}
+          aria-activedescendant={
+            activeIndex >= 0 ? `factory-product-option-${filteredProducts[activeIndex]?.id}` : undefined
+          }
           aria-invalid={Boolean(scanError)}
           aria-describedby={scanError ? errorId : undefined}
           autoComplete="off"
@@ -160,7 +162,9 @@ export function StockEntryScanner({
                     </span>
                   </span>
                 </span>
-                <Plus className={`h-5 w-5 shrink-0 ${idx === activeIndex ? "text-primary" : "text-muted-foreground"}`} />
+                <Plus
+                  className={`h-5 w-5 shrink-0 ${idx === activeIndex ? "text-primary" : "text-muted-foreground"}`}
+                />
               </button>
             ))}
           </div>

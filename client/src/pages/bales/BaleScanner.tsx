@@ -10,7 +10,7 @@ interface BaleScannerProps {
   setScanMode: (mode: "quick" | "review") => void;
   barcodeInput: string;
   setBarcodeInput: (val: string) => void;
-  barcodeInputRef: RefObject<HTMLInputElement>;
+  barcodeInputRef: RefObject<HTMLInputElement | null>;
   onScan: (barcode: string) => void;
 }
 
