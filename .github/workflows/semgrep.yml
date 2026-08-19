@@ -33,7 +33,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 2
+          # The regression scan must be able to resolve the exact PR base SHA.
+          # A shallow checkout can omit it on long-lived/diverged branches,
+          # causing the gate to fail before Semgrep scans any code.
+          fetch-depth: 0
 
       - name: Validate baseline commit
         shell: sh
