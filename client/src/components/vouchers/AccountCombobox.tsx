@@ -36,7 +36,7 @@ export function AccountCombobox({
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const { selectedCompany } = useCompany();
 
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => setDebouncedSearch(searchTerm), 300);
@@ -101,7 +101,7 @@ export function AccountCombobox({
     ...customers.map((c) => ({
       type: "customer" as const,
       id: c.id,
-      name: (c).legalName || (c as any).name || "",
+      name: c.legalName || (c as any).name || "",
     })),
   ].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 

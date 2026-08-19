@@ -5,7 +5,7 @@ import type { SaleRow, APIInventoryItem, Location } from "../pos-components/posT
 interface PosInvoiceActionsParams {
   rows: SaleRow[];
   printRef: React.MutableRefObject<HTMLDivElement | null>;
-  stockPrintRef: React.RefObject<HTMLDivElement>;
+  stockPrintRef: React.RefObject<HTMLDivElement | null>;
   activeLocation: Location | null;
   apiInventory: APIInventoryItem[];
   toast: (opts: { title: string; description?: string; variant?: "destructive" | "default" }) => void;

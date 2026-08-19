@@ -6,7 +6,7 @@ import { InventoryItem } from "./posTypes";
 export interface InventoryPickerProps {
   inventory: InventoryItem[];
   selectItem: (item: InventoryItem) => void;
-  itemListRef: React.RefObject<HTMLDivElement>;
+  itemListRef: React.RefObject<HTMLDivElement | null>;
   highlightedIndex: number;
   syncTerm?: string;
   mobile?: boolean;
@@ -49,14 +49,18 @@ export function InventoryPicker({
   });
 
   return (
-    <Card className={`flex flex-col overflow-hidden ${mobile ? "flex-1 rounded-none border-0 shadow-none" : "w-full lg:w-96 h-[300px] lg:h-auto shrink-0"}`}>
+    <Card
+      className={`flex flex-col overflow-hidden ${mobile ? "flex-1 rounded-none border-0 shadow-none" : "w-full lg:w-96 h-[300px] lg:h-auto shrink-0"}`}
+    >
       {/* Header */}
       <div className={`shrink-0 ${mobile ? "px-4 pt-4 pb-3" : "px-3 pt-3 pb-2"}`}>
         <div className="flex items-center gap-1.5 mb-2">
           <Search className={`text-foreground shrink-0 ${mobile ? "h-5 w-5" : "h-4 w-4"}`} />
           <p className={`font-bold text-foreground tracking-wide ${mobile ? "text-base" : "text-sm"}`}>Items</p>
         </div>
-        <div className={`flex items-center gap-2 rounded-md border border-primary bg-background px-2.5 focus-within:ring-2 focus-within:ring-primary/40 transition-all ${mobile ? "h-11" : "h-9"}`}>
+        <div
+          className={`flex items-center gap-2 rounded-md border border-primary bg-background px-2.5 focus-within:ring-2 focus-within:ring-primary/40 transition-all ${mobile ? "h-11" : "h-9"}`}
+        >
           <Search className={`text-muted-foreground shrink-0 ${mobile ? "h-5 w-5" : "h-4 w-4"}`} />
           <input
             className={`flex-1 bg-transparent outline-none placeholder:text-muted-foreground ${mobile ? "text-base" : "text-sm"}`}
@@ -66,11 +70,7 @@ export function InventoryPicker({
             data-testid="input-product-search"
           />
           {localSearch && (
-            <button
-              className="text-muted-foreground"
-              onClick={() => setLocalSearch("")}
-              aria-label="Clear search"
-            >
+            <button className="text-muted-foreground" onClick={() => setLocalSearch("")} aria-label="Clear search">
               ×
             </button>
           )}
@@ -95,13 +95,15 @@ export function InventoryPicker({
               data-testid={`button-select-item-${item.stockItemId ?? item.code}`}
             >
               <div className="min-w-0">
-                <p className={`font-semibold leading-tight truncate ${mobile ? "text-base" : "text-sm"}`}>{item.name}</p>
-                <p className={`text-muted-foreground font-mono ${mobile ? "text-xs mt-0.5" : "text-[11px]"}`}>{item.code}</p>
+                <p className={`font-semibold leading-tight truncate ${mobile ? "text-base" : "text-sm"}`}>
+                  {item.name}
+                </p>
+                <p className={`text-muted-foreground font-mono ${mobile ? "text-xs mt-0.5" : "text-[11px]"}`}>
+                  {item.code}
+                </p>
               </div>
               <span
-                className={`shrink-0 font-bold rounded ${
-                  mobile ? "text-xs px-2 py-1" : "text-[10px] px-1.5 py-0.5"
-                } ${
+                className={`shrink-0 font-bold rounded ${mobile ? "text-xs px-2 py-1" : "text-[10px] px-1.5 py-0.5"} ${
                   isOut
                     ? "bg-red-500/15 text-red-500"
                     : isLow

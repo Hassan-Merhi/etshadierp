@@ -35,7 +35,7 @@ interface PosMobileLayoutProps {
   customerAccounts: any[];
   searchTerm: string;
   setSearchTerm: (v: string) => void;
-  mobileSearchInputRef: React.RefObject<HTMLInputElement>;
+  mobileSearchInputRef: React.RefObject<HTMLInputElement | null>;
   inventory: InventoryItem[];
   selectItem: (item: any) => void;
   rows: SaleRow[];

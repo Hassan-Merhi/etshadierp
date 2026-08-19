@@ -17,7 +17,7 @@ interface ContainerTableProps {
   colVis: Record<OtwColId, boolean>;
   sessionCompanyId: number | null;
   onOpenDrawer: (c: EnrichedContainerRow) => void;
-  printRef: React.RefObject<HTMLDivElement>;
+  printRef: React.RefObject<HTMLDivElement | null>;
 }
 
 export function ContainerTable({ containers, colVis, sessionCompanyId, onOpenDrawer, printRef }: ContainerTableProps) {
