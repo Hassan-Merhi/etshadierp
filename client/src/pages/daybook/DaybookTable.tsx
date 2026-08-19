@@ -83,7 +83,7 @@ export function DaybookTable({
   // Loading, failure and empty are three different situations. Rendering a bare
   // header for all three makes a failed request look like a day with no
   // transactions, so each one gets its own visible state.
-  const statusMessage: JSX.Element | null = errorMessage ? (
+  const statusMessage: React.JSX.Element | null = errorMessage ? (
     <div className="flex flex-col items-center gap-2 py-10 text-center" data-testid="daybook-error">
       <p className="text-sm text-destructive">{errorMessage}</p>
       {onRetry && (
@@ -313,7 +313,7 @@ export function DaybookTable({
   /* ── Detailed view ── */
 
   // ── Build desktop table rows (unchanged) ─────────────────────────────────
-  const tableRows: JSX.Element[] = [];
+  const tableRows: React.JSX.Element[] = [];
   let lastDate = "";
   for (const row of displayedRows) {
     const rowDate = row._type === "voucher" ? row.data.voucherDate : row.data.offloadedAt.slice(0, 10);
@@ -619,7 +619,7 @@ export function DaybookTable({
   }
 
   // ── Build mobile card items ───────────────────────────────────────────────
-  const mobileItems: JSX.Element[] = [];
+  const mobileItems: React.JSX.Element[] = [];
   let mobileLastDate = "";
   for (const row of displayedRows) {
     const rowDate = row._type === "voucher" ? row.data.voucherDate : row.data.offloadedAt.slice(0, 10);
