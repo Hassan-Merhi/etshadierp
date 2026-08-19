@@ -217,7 +217,8 @@ jobs:
 
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add build/viteHeavyListPaginationPlugin.ts \
+          git add -f build/viteHeavyListPaginationPlugin.ts
+          git add \
             client/src/pages/StockEntryHistory.tsx \
             client/src/pages/factory/daybook/useFactoryDaybookModel.ts \
             client/src/pages/factory/factorycontainerloadingscan/useFactoryContainerLoadingScanModel.ts \
