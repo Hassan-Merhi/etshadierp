@@ -1,4 +1,4 @@
-import { useState, useRef, Suspense } from "react";
+import { useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { useMainContentFocus } from "@/hooks/use-main-content-focus";
 import { useWorkspaceWheelScroll } from "@/hooks/use-workspace-wheel-scroll";
@@ -25,14 +25,13 @@ import { UserMenu } from "@/components/UserMenu";
 import { DailyRateModal } from "@/components/DailyRateModal";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { PendingSyncIndicator } from "@/components/PendingSyncIndicator";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CommandPalette } from "@/components/CommandPalette";
 import { ModuleIdentity } from "@/components/navigation/module-identity";
 import { Router } from "@/routes/AppRoutes";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { LoadingState } from "@/components/ui/page-state";
 import { SkipLink } from "@/components/ui/responsive-accessibility";
+import { WorkspaceRouteBoundary } from "@/components/ui/workspace-route-boundary";
 import { ArrowLeft, LogOut, Search, ShoppingCart } from "lucide-react";
 import { usePosNavigationItems } from "./usePosNavigationItems";
 import { canUseAdminSearch, type ShellUser } from "./shellUser";
@@ -245,17 +244,14 @@ export function PosShell({
                   : "flex-1 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-6"
               }`}
             >
-              <div className={isFullHeightRoute ? "h-full min-w-0" : "w-full min-w-0 max-w-full"}>
-                <ErrorBoundary resetKey={currentLocation}>
-                  <Suspense
-                    fallback={
-                      <LoadingState title="Loading point of sale" description="Preparing the latest sales workspace." />
-                    }
-                  >
-                    <Router user={user} posImportEnabled={posImportEnabled} />
-                  </Suspense>
-                </ErrorBoundary>
-              </div>
+              <WorkspaceRouteBoundary
+                resetKey={currentLocation}
+                loadingTitle="Loading point of sale"
+                loadingDescription="Preparing the latest sales workspace."
+                fill={isFullHeightRoute}
+              >
+                <Router user={user} posImportEnabled={posImportEnabled} />
+              </WorkspaceRouteBoundary>
             </main>
           </div>
         </div>

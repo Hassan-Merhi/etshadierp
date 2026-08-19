@@ -6,6 +6,7 @@ on:
     paths:
       - "client/**"
       - "scripts/verify-mobile-responsive-*.mjs"
+      - "scripts/audit-ux-module-consistency.mjs"
       - "scripts/prepare-phase9-browser-smoke-fixture.mjs"
       - "scripts/run-phase9-language-browser-smoke.mjs"
       - "scripts/verify-bandwidth-*.mjs"
@@ -54,7 +55,6 @@ jobs:
       ERP_SMOKE_PASSWORD: ux-ci-${{ github.run_id }}-${{ github.run_attempt }}
       ERP_SMOKE_REQUIRE_AUTHENTICATED: "1"
       ERP_SMOKE_REQUIRE_EXACT_ROUTES: "1"
-      ERP_SMOKE_ROUTES: /transaction-journal,/daybook
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
@@ -70,6 +70,8 @@ jobs:
         run: npm run lint
       - name: Production build
         run: npm run build
+      - name: Cross-module UX consistency audit
+        run: npm run audit:ux-consistency
       - name: Prepare disposable browser fixture
         run: |
           node node_modules/drizzle-kit/bin.cjs push --force

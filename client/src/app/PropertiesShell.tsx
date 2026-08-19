@@ -9,6 +9,7 @@ import { AppTopBar } from "@/components/AppTopBar";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { CommandPalette } from "@/components/CommandPalette";
 import { SkipLink } from "@/components/ui/responsive-accessibility";
+import { WorkspaceRouteBoundary } from "@/components/ui/workspace-route-boundary";
 import { PropertiesRoutes } from "@/app/PropertiesRoutes";
 import { canUseAdminSearch, type ShellUser } from "./shellUser";
 import { MODULE_ACCENT } from "@/components/sidebar/sidebarPrimitives";
@@ -49,9 +50,13 @@ export function PropertiesShell({ user, currentLocation, handleLogout, leaveConf
               aria-label="Properties workspace"
               className="flex-1 overflow-y-auto overscroll-y-contain p-3 outline-none sm:p-6"
             >
-              <div className="w-full min-w-0 max-w-full [&_form]:min-w-0 [&_table]:w-full [&_[role=table]]:w-full [&_.overflow-x-auto]:overscroll-x-contain">
-                <PropertiesRoutes user={user} currentLocation={currentLocation} />
-              </div>
+              <WorkspaceRouteBoundary
+                resetKey={currentLocation}
+                loadingTitle="Loading properties workspace"
+                loadingDescription="Preparing the latest property and rental information."
+              >
+                <PropertiesRoutes user={user} />
+              </WorkspaceRouteBoundary>
             </main>
           </div>
         </div>

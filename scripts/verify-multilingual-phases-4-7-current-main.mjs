@@ -26,7 +26,7 @@ const bundles = [
     parts: 4,
     translatorImport: "translatePhase4SupplierPartnerText",
     test: "tests/phase4-supplier-partner-translations.test.ts",
-    expectedCount: 230,
+    expectedCount: 231,
   },
   {
     phase: 5,
@@ -44,7 +44,7 @@ const bundles = [
     parts: 4,
     translatorImport: "translatePhase6ReportsExportsText",
     test: "tests/phase6-reports-exports-translations.test.ts",
-    expectedCount: 251,
+    expectedCount: 254,
   },
   {
     phase: 7,
@@ -53,11 +53,10 @@ const bundles = [
     parts: 11,
     translatorImport: "translatePhase7BackendMessageText",
     test: "tests/phase7-backend-messages-translations.test.ts",
-    // 593 -> 596 when Green API fallback messages were translated. The
-    // catalogue and its test moved together; this contract did not, and because
-    // Release Verification is dispatch-only it went unnoticed from 13 August
-    // until the workflow was first run.
-    expectedCount: 596,
+    // Green API fallback messages raised the catalogue from 593 to 596. The
+    // shared workspace-boundary UX pass adds one reviewed route-error phrase,
+    // so the current-main contract is now 597.
+    expectedCount: 597,
   },
 ];
 
@@ -164,7 +163,7 @@ console.log(
       phases: [4, 5, 6, 7],
       status: "reconciled-on-current-main",
       languages: ["en", "ar", "fr"],
-      reviewedEntries: 230 + 182 + 251 + 596,
+      reviewedEntries: 231 + 182 + 254 + 597,
       storedBusinessValuesProtected: true,
       sqlRequired: false,
     },

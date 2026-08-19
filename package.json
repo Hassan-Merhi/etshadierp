@@ -42,6 +42,7 @@
     "audit:company-scope": "node scripts/audit-company-scope.mjs",
     "audit:coverage-ratchet": "node scripts/audit-coverage-ratchet.mjs",
     "audit:lint-ratchet": "node scripts/audit-lint-warnings.mjs",
+    "audit:ux-consistency": "node scripts/audit-ux-module-consistency.mjs",
     "start": "node --expose-gc --import ./server/factoryContainerSchemaBridge.mjs --import ./server/supplierCompanyScopeBridge.mjs --import ./server/exportBufferBridge.mjs --import ./server/scheduledAttachmentBridge.mjs --import ./server/apiPaginationBridge.mjs --import ./server/runtimeMemoryGuard.mjs dist/index.js",
     "check": "node node_modules/typescript/bin/tsc --noEmit",
     "check:security": "node scripts/run-program-6-focused-security-checks.mjs",

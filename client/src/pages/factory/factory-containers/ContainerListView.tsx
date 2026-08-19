@@ -30,6 +30,8 @@ interface ContainerListViewProps {
   setSearchQuery: (v: string) => void;
   statusFilter: string;
   setStatusFilter: (v: string) => void;
+  hasActiveFilters: boolean;
+  onResetFilters: () => void;
   expandedSuppliers: Set<string>;
   setExpandedSuppliers: (fn: (prev: Set<string>) => Set<string>) => void;
   selectedIds: Set<number>;
@@ -50,6 +52,8 @@ export function ContainerListView({
   setSearchQuery,
   statusFilter,
   setStatusFilter,
+  hasActiveFilters,
+  onResetFilters,
   expandedSuppliers,
   setExpandedSuppliers,
   selectedIds,
@@ -189,6 +193,12 @@ export function ContainerListView({
               <SelectItem value="NO_WEIGHT">No Weight</SelectItem>
             </SelectContent>
           </Select>
+          {hasActiveFilters && (
+            <Button variant="outline" type="button" onClick={onResetFilters} data-testid="button-reset-filters">
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Reset filters
+            </Button>
+          )}
         </div>
       </div>
 

@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useReactToPrint } from "react-to-print";
 import { format } from "date-fns";
 import { z } from "zod";
+import { usePaginatedFilterState } from "@/hooks/use-paginated-filter-state";
 
 interface POSCustomer {
   id: number;
@@ -43,7 +44,15 @@ export default function POSCustomers() {
   const { formatCashAmount, formatAmount } = useCurrencyContext();
   const { selectedCompany } = useCompany();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const {
+    filters: { searchQuery },
+    setFilter,
+    resetFilters,
+    hasActiveFilters,
+  } = usePaginatedFilterState<{ searchQuery: string }>({
+    createInitialFilters: () => ({ searchQuery: "" }),
+    storageKey: selectedCompany?.id ? `erp-pos-customers-filters-v1:${selectedCompany.id}` : undefined,
+  });
   const [statementCustomer, setStatementCustomer] = useState<POSCustomer | null>(null);
 
   const printRef = useRef<HTMLDivElement>(null);
@@ -250,15 +259,22 @@ export default function POSCustomers() {
 
       {/* Search + customer table */}
       <div className="space-y-3">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-          <Input
-            placeholder="Search customers..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-            data-testid="input-search-customers"
-          />
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
+          <div className="relative min-w-0 flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              placeholder="Search customers..."
+              value={searchQuery}
+              onChange={(e) => setFilter("searchQuery", e.target.value)}
+              className="pl-10"
+              data-testid="input-search-customers"
+            />
+          </div>
+          {hasActiveFilters && (
+            <Button variant="outline" type="button" onClick={resetFilters} data-testid="button-reset-filters">
+              Reset filters
+            </Button>
+          )}
         </div>
 
         {isLoading ? (

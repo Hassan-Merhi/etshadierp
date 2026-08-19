@@ -167,9 +167,8 @@ describe("Keyboard navigation infrastructure is intact", () => {
 // ── App routing infrastructure ───────────────────────────────────────────────
 
 describe("App routing infrastructure is intact", () => {
-  it("PosShell.tsx — Suspense fallback is present (lazy load errors show UI, not blank)", () => {
-    // Suspense wraps Router in every shell (PosShell, FactoryShell, ErpShell)
-    expect(src("client/src/app/PosShell.tsx")).toContain("Suspense");
+  it("PosShell.tsx — shared route boundary provides the Suspense fallback", () => {
+    expect(src("client/src/app/PosShell.tsx")).toContain("WorkspaceRouteBoundary");
   });
 
   it("App.tsx — wouter Switch/Route routing is used", () => {
