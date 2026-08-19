@@ -1,0 +1,37 @@
+name: PR 818 Governance Diagnostic
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    if: github.event.pull_request.number == 818
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Set up canonical Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: "22.14.0"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+      - name: Documentation state index
+        shell: bash
+        run: |
+          set +e
+          npm run audit:doc-index
+          echo DOC_INDEX_EXIT=$?
+          exit 0
+      - name: Script inventory
+        shell: bash
+        run: |
+          set +e
+          npm run audit:scripts
+          echo SCRIPT_INVENTORY_EXIT=$?
+          exit 0
