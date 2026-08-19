@@ -1,19 +1,18 @@
 name: God Files Sync Current Main
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  push:
+    branches: [agent/god-files-recovery-main]
 
 permissions:
   contents: write
 
 concurrency:
-  group: god-files-sync-current-main-${{ github.event.pull_request.number }}
+  group: god-files-sync-current-main
   cancel-in-progress: true
 
 jobs:
   sync:
-    if: github.event.pull_request.head.ref == 'agent/god-files-recovery-main'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -51,8 +50,6 @@ jobs:
             git add client/src/pages/StockItems.tsx
           fi
 
-          # PR #773 added persistent/resettable Stock Items filters in the root page.
-          # Port that behavior into the recovered split model/view while retaining the tiny root wrapper.
           python - <<'PY'
           from pathlib import Path
 
