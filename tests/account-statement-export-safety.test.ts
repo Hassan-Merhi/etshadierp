@@ -36,7 +36,7 @@ describe("account statement export safety", () => {
     expect(validateStatementDateRange("2026-08-01", "2026-08-19")).toEqual({ ok: true });
   });
 
-  it("accepts a real PDF buffer and rejects empty/non-PDF output", () => {
+  it("accepts a real PDF buffer and rejects empty or non-PDF output", () => {
     expect(() => assertValidPdfBuffer(Buffer.from("%PDF-1.7\nstatement"))).not.toThrow();
     expect(() => assertValidPdfBuffer(Buffer.alloc(0))).toThrow(/invalid or empty PDF buffer/);
     expect(() => assertValidPdfBuffer(Buffer.from("not-a-pdf"))).toThrow(/invalid or empty PDF buffer/);
