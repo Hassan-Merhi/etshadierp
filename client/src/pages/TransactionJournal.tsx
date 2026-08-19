@@ -29,9 +29,6 @@ export default function TransactionJournal() {
               <RefreshCw className="h-4 w-4 text-muted-foreground animate-spin" data-testid="icon-refreshing" />
             )}
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            All vouchers across all companies — filtered and searchable
-          </p>
         </div>
         <Button
           variant="outline"
