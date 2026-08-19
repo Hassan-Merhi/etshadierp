@@ -14,6 +14,15 @@ export interface LoadedItem {
   pricePerBale: string | null;
 }
 
+/** The editable shape of a loaded item, as the add and edit rows hold it. */
+export interface LoadedItemDraft {
+  barcode: string;
+  itemName: string;
+  qty: string;
+  weightPerBale: string;
+  pricePerBale: string;
+}
+
 export interface ComparisonItem {
   barcode: string;
   itemName: string;
