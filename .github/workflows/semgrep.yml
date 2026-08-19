@@ -46,6 +46,7 @@ jobs:
             echo "Semgrep baseline is not a 40-character commit SHA."
             exit 2
           fi
+          git config --global --add safe.directory "$PWD"
           git fetch --no-tags --depth=1 origin "$SEMGREP_BASELINE_COMMIT"
           git cat-file -e "${SEMGREP_BASELINE_COMMIT}^{commit}"
 
