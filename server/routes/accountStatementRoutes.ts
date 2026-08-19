@@ -280,7 +280,11 @@ export function registerAccountStatementRoutes(app: Express) {
       const accountType = req.params.type;
       const accountId = parseInt(req.params.id);
       const companyId = req.session.currentCompanyId;
-      const { startDate, endDate, lang = "en" } = req.query as {
+      const {
+        startDate,
+        endDate,
+        lang = "en",
+      } = req.query as {
         startDate?: string;
         endDate?: string;
         lang?: string;
