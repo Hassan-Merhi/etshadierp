@@ -2,8 +2,6 @@ name: Phase 18 Doc Index Repair
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
 permissions:
   contents: write
 env:
@@ -11,7 +9,7 @@ env:
   NODE_OPTIONS: --max-old-space-size=6144
 jobs:
   repair:
-    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[phase18-current-main-repair]')
+    if: contains(github.event.head_commit.message, '[phase18-current-main-repair]')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
@@ -97,127 +95,3 @@ jobs:
           npm run check
           npx vitest run tests/god-file-boundaries.test.ts tests/route-manifest.test.ts --pool=forks --maxWorkers=2
           git push --no-verify origin HEAD:main
-
-  repair-pr:
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'agent/phase18-phase1-safe-macos-result'
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
-      PGSSLMODE: disable
-      NODE_ENV: test
-      SESSION_SECRET: phase18-pr-repair-secret
-      CSRF_ENFORCE: "0"
-      ENABLE_SCHEDULERS: "false"
-    services:
-      postgres:
-        image: postgres:15.13
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: heliumdb
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d heliumdb"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: agent/phase18-phase1-safe-macos-result
-          fetch-depth: 0
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '22.14.0'
-          cache: npm
-      - run: npm ci --no-audit --bin-links=true
-      - name: Prepare disposable database schema
-        run: node node_modules/drizzle-kit/bin.cjs push --force
-      - name: Repair remaining PR gates
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          import json
-          from pathlib import Path
-
-          p = Path('client/src/pages/factory/FactoryShippingContainers.tsx')
-          s = p.read_text()
-          for marker in (
-              '// ─── Types ────────────────────────────────────────────────────────────────────\n',
-              '  // ── Column visibility (per-user, persisted to localStorage) ───────────────────\n',
-          ):
-              if marker in s:
-                  s = s.replace(marker, '', 1)
-          p.write_text(s)
-
-          p = Path('client/src/pages/vouchers/StockTransferForm.tsx')
-          s = p.read_text()
-          marker = 'import {} from "@/components/ui/dialog";\n'
-          if marker in s:
-              s = s.replace(marker, '', 1)
-          p.write_text(s)
-
-          p = Path('config/ci-ratchet-allowances.json')
-          data = json.loads(p.read_text())
-          stale = data.get('routeManifestAdditions', [])
-          expected = [
-              'GET /api/factory/customer-loading/products [requireAuth > <anonymous>]',
-              'GET /api/factory/customer-loading/history [requireAuth > <anonymous>]',
-          ]
-          if stale not in (expected, []):
-              raise SystemExit(f'unexpected routeManifestAdditions: {stale!r}')
-          data['routeManifestAdditions'] = []
-          p.write_text(json.dumps(data, indent=2) + '\n')
-          PY
-          npx prettier --write tests/workflow.test.ts client/src/pages/factory/FactoryShippingContainers.tsx client/src/pages/vouchers/StockTransferForm.tsx config/ci-ratchet-allowances.json
-          UPDATE_ROUTE_MANIFEST=1 npx vitest run tests/route-manifest.test.ts --pool=forks --maxWorkers=2
-          GOD_BACKLOG="$(node --input-type=module -e "import { auditGodFileBoundaries } from './scripts/audit-god-file-boundaries.mjs'; console.log(auditGodFileBoundaries().summary.grandfatheredExcessLines)")"
-          ROUTE_COUNT="$(node -e "console.log(require('./config/route-manifest.json').routeCount)")"
-          GOD_BACKLOG="$GOD_BACKLOG" ROUTE_COUNT="$ROUTE_COUNT" python - <<'PY'
-          import os
-          import re
-          from pathlib import Path
-
-          backlog = int(os.environ['GOD_BACKLOG'])
-          routes = int(os.environ['ROUTE_COUNT'])
-          backlog_text = f'{backlog:,}'
-          routes_text = f'{routes:,}'
-
-          p = Path('docs/god-file-split-program.md')
-          s = p.read_text()
-          s, n = re.subn(r'\*\*Backlog: (\d{1,3}(?:,\d{3})*) files?, [\d,]+ lines over the limit\*\*', lambda m: m.group(0).replace(re.search(r'[\d,]+ lines', m.group(0)).group(0), f'{backlog_text} lines'), s, count=1)
-          if n != 1:
-              raise SystemExit('god-file backlog summary not found')
-          p.write_text(s)
-
-          p = Path('docs/system-quality-program.md')
-          s = p.read_text()
-          s, n1 = re.subn(r'(\| God-file backlog \| 49 files, )[\d,]+( excess lines \|)', rf'\g<1>{backlog_text}\g<2>', s, count=1)
-          s, n2 = re.subn(r'(\| Registered routes \| )[\d,]+( \|)', rf'\g<1>{routes_text}\g<2>', s, count=1)
-          if n1 != 1 or n2 != 1:
-              raise SystemExit('system-quality live figures not found')
-          p.write_text(s)
-          PY
-      - name: Verify repaired PR tree
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm run audit:doc-index
-          npm run check
-          npx prettier --check tests/workflow.test.ts client/src/pages/factory/FactoryShippingContainers.tsx client/src/pages/vouchers/StockTransferForm.tsx config/ci-ratchet-allowances.json
-          npx vitest run tests/god-file-boundaries.test.ts tests/route-manifest.test.ts tests/doc-index.test.ts tests/doc-index-contract.test.ts tests/toolchain-and-script-inventory.test.ts --pool=forks --maxWorkers=2
-      - name: Restore workflow to current main and push verified PR repairs
-        shell: bash
-        run: |
-          set -euo pipefail
-          git fetch origin main
-          git checkout origin/main -- .github/workflows/phase18-doc-index-repair.yml
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add .github/workflows/phase18-doc-index-repair.yml config/ci-ratchet-allowances.json config/route-manifest.json docs/god-file-split-program.md docs/system-quality-program.md client/src/pages/factory/FactoryShippingContainers.tsx client/src/pages/vouchers/StockTransferForm.tsx tests/workflow.test.ts
-          git diff --cached --check
-          git commit --no-verify -m 'fix: clear remaining Phase 18 CI gates'
-          git push --no-verify origin HEAD:agent/phase18-phase1-safe-macos-result
