@@ -25,44 +25,9 @@ jobs:
           sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
           npm ci --no-audit --bin-links=true
 
-      - name: Verify lockfile and production dependencies
+      - name: Show Prettier diff for translation aggregator
         run: |
-          npm run verify:lockfile
-          npm run verify:production-dependencies
-
-      - name: Check formatting for PR source changes
-        run: |
-          git fetch --no-tags --prune --depth=1 origin +refs/heads/main:refs/remotes/origin/main
-          mapfile -d '' changed_files < <(
-            git diff --name-only --diff-filter=ACMR -z origin/main HEAD -- client/src server shared tests scripts |
-              grep -zE '\.(ts|tsx|css|mjs)$' || true
-          )
-          if [ "${#changed_files[@]}" -eq 0 ]; then
-            echo "No changed source files require formatting checks."
-            exit 0
-          fi
-          printf 'Checking formatting for %s changed source file(s):\n' "${#changed_files[@]}"
-          printf ' - %s\n' "${changed_files[@]}"
-          node node_modules/prettier/bin/prettier.cjs --check "${changed_files[@]}"
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Lint warning ratchet
-        if: always()
-        run: npm run audit:lint-ratchet
-
-      - name: TypeScript
-        run: npm run check
-
-      - name: Production build
-        run: npm run build
-
-      - name: Verify server bundle
-        run: npm run verify:server-bundle
-
-      - name: Repository safety contracts
-        run: |
-          npm run verify:observability
-          npm run verify:final-production-readiness
-          npm run verify:bandwidth
+          cp client/src/i18n/sharedUiPhase3Translations.ts /tmp/sharedUiPhase3Translations.before.ts
+          node node_modules/prettier/bin/prettier.cjs --write client/src/i18n/sharedUiPhase3Translations.ts
+          diff -u /tmp/sharedUiPhase3Translations.before.ts client/src/i18n/sharedUiPhase3Translations.ts || true
+          node node_modules/prettier/bin/prettier.cjs --check client/src/i18n/sharedUiPhase3Translations.ts
