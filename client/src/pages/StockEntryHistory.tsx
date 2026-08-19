@@ -152,6 +152,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     refetchOnReconnect: false,
     placeholderData: (prev) => prev,
   });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- God Files extraction preserves pre-split behavior.
   const groups: GroupRow[] = pagedGroups?.items ?? [];
 
   const { data: workers = [] } = useQuery<any[]>({

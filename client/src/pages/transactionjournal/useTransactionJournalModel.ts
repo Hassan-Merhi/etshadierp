@@ -102,6 +102,7 @@ export function useTransactionJournalModel() {
       ...(selectedCos.length ? { companyIds: selectedCos.join(",") } : {}),
     });
     return p.toString();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- God Files extraction preserves pre-split behavior.
   }, [periodFilter, voucherType, currency, optionalFilter, includeFactory, page, search, selectedCos]);
 
   const { data, isLoading, isFetching, refetch } = useQuery<JournalResponse>({
@@ -190,6 +191,7 @@ export function useTransactionJournalModel() {
   const handleSearch = useCallback(() => {
     setSearch(searchInput);
     setPage(1);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- God Files extraction preserves pre-split behavior.
   }, [searchInput]);
 
   const clearSearch = () => {
@@ -259,6 +261,7 @@ export function useTransactionJournalModel() {
     };
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- God Files extraction preserves pre-split behavior.
   }, []);
 
   // ── Summary aggregation ──

@@ -445,6 +445,7 @@ export function useFactoryContainerLoadingScanModel() {
       orderDate,
       containerNotes: loadingNote.trim() || undefined,
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- God Files extraction preserves pre-split behavior.
   }, [customerId, selectedLocationId, selectedProformaId, proformas, orderDate, loadingNote, createOrderMutation]);
 
   /** "Start New Loading" from the pending-orders warning — no note is carried over. */

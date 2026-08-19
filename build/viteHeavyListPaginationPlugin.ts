@@ -2,7 +2,7 @@ import type { Plugin } from "vite";
 
 const STOCK_ENTRY_SUFFIX = "/client/src/pages/StockEntryHistory.tsx";
 const V5_ALLOCATION_SUFFIX = "/client/src/pages/factory/FactoryStockAllocationV5.tsx";
-const FACTORY_DAYBOOK_SUFFIX = "/client/src/pages/factory/FactoryDaybook.tsx";
+const FACTORY_DAYBOOK_SUFFIX = "/__god_files_native__/FactoryDaybook.tsx";
 
 function replaceExactly(source: string, before: string, after: string, label: string): string {
   const first = source.indexOf(before);

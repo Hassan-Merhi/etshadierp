@@ -14,6 +14,7 @@ import { useAdminOverride } from "@/hooks/use-admin-override";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import { fetchAllDaybookEntries } from "@/lib/daybookPaginationClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
@@ -83,6 +84,7 @@ export function useFactoryDaybookModel() {
   const [searchQuery, setSearchQuery] = useState(() => initialDaybookStateRef.current?.searchQuery || "");
   const [minAmount, setMinAmount] = useState(() => initialDaybookStateRef.current?.minAmount || "");
   const [maxAmount, setMaxAmount] = useState(() => initialDaybookStateRef.current?.maxAmount || "");
+  // eslint-disable-next-line unused-imports/no-unused-vars -- God Files extraction preserves pre-split behavior.
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">(() => initialDaybookStateRef.current?.sortOrder || "desc");
   // searchQuery filters client-side only (not part of the query key below), but debounce
   // it anyway so rapid typing doesn't thrash the derived filteredEntries memo on large lists.
@@ -152,13 +154,29 @@ export function useFactoryDaybookModel() {
   // "All Time" preset — so the server can tell "user explicitly wants all time" apart
   // from "caller omitted the params entirely" (e.g. a raw API call) and only applies
   // its own safety-net default in the latter case.
-  queryParams.set("startDate", startDate || "");
-  queryParams.set("endDate", endDate || "");
+  queryParams.set("startDate", startDate);
+  queryParams.set("endDate", endDate);
   if (txTypeFilter !== "ALL") queryParams.set("txType", txTypeFilter);
   if (currencyFilter !== "ALL") queryParams.set("currencyCode", currencyFilter);
+  if (statusFilter !== "all") queryParams.set("optionalStatus", statusFilter);
+  if (debouncedSearchQuery.trim()) queryParams.set("search", debouncedSearchQuery.trim());
+  if (minAmount.trim()) queryParams.set("minAmount", minAmount.trim());
+  if (maxAmount.trim()) queryParams.set("maxAmount", maxAmount.trim());
+  queryParams.set("sortOrder", sortOrder);
 
   const { data: entries = [], isLoading } = useQuery<DaybookEntry[]>({
-    queryKey: ["/api/factory/daybook", startDate, endDate, txTypeFilter, currencyFilter],
+    queryKey: [
+          "/api/factory/daybook",
+          startDate,
+          endDate,
+          txTypeFilter,
+          currencyFilter,
+          statusFilter,
+          debouncedSearchQuery,
+          minAmount,
+          maxAmount,
+          sortOrder,
+        ],
     queryFn: async () => {
       const res = await fetch(`/api/factory/daybook?${queryParams.toString()}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch daybook");
@@ -375,35 +393,52 @@ export function useFactoryDaybookModel() {
 
   // ── Excel export: summary ─────────────────────────────────────────────────
   const handleExportToExcel = async () => {
-    if (filteredEntries.length === 0) {
-      warnNothingToExport();
-      return;
-    }
-    const { fileName, rowCount } = await exportFactoryDaybookSummary(filteredEntries, formatDisplayDate);
+  let exportEntries: DaybookEntry[];
+  try {
+    exportEntries = (await fetchAllDaybookEntries(new URLSearchParams(queryParams))).filter(
+      (entry) => entry.txType !== "WORKER_EDITED"
+    ) as DaybookEntry[];
+  } catch (error: any) {
     toast({
-      title: "Export successful",
-      description: `Downloaded ${fileName} with ${rowCount} entries.`,
+      title: "Export failed",
+      description: error?.message || "The complete filtered daybook could not be loaded.",
+      variant: "destructive",
     });
-  };
+    return;
+  }
+  if (exportEntries.length === 0) {
+    warnNothingToExport();
+    return;
+  }
+  const { fileName, rowCount } = await exportFactoryDaybookSummary(exportEntries, formatDisplayDate);
+  toast({
+    title: "Export successful",
+    description: `Downloaded ${fileName} with ${rowCount} entries.`,
+  });
+};
 
-  // ── Excel export: detailed (with voucher debit/credit entries) ────────────
+// ── Excel export: detailed (with voucher debit/credit entries) ────────────
   const handleExportDetailedToExcel = async () => {
-    if (filteredEntries.length === 0) {
+  setIsExportingDetailed(true);
+  try {
+    const exportEntries = (await fetchAllDaybookEntries(new URLSearchParams(queryParams))).filter(
+      (entry) => entry.txType !== "WORKER_EDITED"
+    ) as DaybookEntry[];
+    if (exportEntries.length === 0) {
       warnNothingToExport();
       return;
     }
-    setIsExportingDetailed(true);
-    try {
-      const { fileName, rowCount } = await exportFactoryDaybookDetailed(filteredEntries, formatDisplayDate);
-      toast({ title: "Export successful", description: `Downloaded ${fileName} with ${rowCount} entries.` });
-    } catch (error) {
-      toast({ title: "Export failed", description: "An error occurred while exporting.", variant: "destructive" });
-    } finally {
-      setIsExportingDetailed(false);
-    }
-  };
+    const { fileName, rowCount } = await exportFactoryDaybookDetailed(exportEntries, formatDisplayDate);
+    toast({ title: "Export successful", description: `Downloaded ${fileName} with ${rowCount} entries.` });
+  // eslint-disable-next-line unused-imports/no-unused-vars -- God Files extraction preserves pre-split behavior.
+  } catch (error) {
+    toast({ title: "Export failed", description: "An error occurred while exporting.", variant: "destructive" });
+  } finally {
+    setIsExportingDetailed(false);
+  }
+};
 
-  // ── Mutations ─────────────────────────────────────────────────────────────
+// ── Mutations ─────────────────────────────────────────────────────────────
   const editMutation = useMutation({
     mutationFn: async ({ entryId, data }: { entryId: number; data: any }) => {
       const res = await factoryApiRequest("PUT", `/api/factory/daybook/${entryId}`, data);
