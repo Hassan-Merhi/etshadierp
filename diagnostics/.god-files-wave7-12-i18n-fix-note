@@ -4,3 +4,4 @@ Human-authored exact-head retrigger after split-only lint cleanup.
 Human-authored exact-head retrigger after latest-main sync and recovery-quality gate fix.
 Human-authored exact-head retrigger for committed recovery quality cleanup.
 Human-authored exact-head retrigger after promoting cleanup into the active workflow.
+Human-authored exact-head retrigger after robust Daybook cleanup matcher.
