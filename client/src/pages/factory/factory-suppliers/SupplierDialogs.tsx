@@ -70,8 +70,10 @@ interface SupplierDialogsProps {
   setObEditValue: (val: string) => void;
   obEditMutation: UseMutationResult<any, any, any>;
 
-  dueDialogSupplier: null;
-  setDueDialogSupplier: React.Dispatch<React.SetStateAction<null>>;
+  dueDialogSupplier: { name: string; containers: unknown[] } | null;
+  setDueDialogSupplier: React.Dispatch<
+    React.SetStateAction<{ name: string; containers: unknown[] } | null>
+  >;
   formatDate: (val: string) => string;
   formatNum: (val: string) => string;
 
