@@ -45,14 +45,10 @@ jobs:
             client/src/pages/settings/datatoolstab
           )
 
-          # Copy the historical split support modules first.
           for d in "${dirs[@]}"; do
             git checkout "$OLD" -- "$d"
           done
 
-          # Latest main wins for every support file it has changed since the split
-          # base, except Barcode types: the extracted model needs the old superset
-          # (Swap/Return-to-stock types + enriched label-print fields).
           git diff --name-only "$BASE" origin/main -- "${dirs[@]}" | sort -u >/tmp/main-touched-support.txt
           while IFS= read -r f; do
             [ -n "$f" ] || continue
@@ -67,7 +63,6 @@ jobs:
           done </tmp/main-touched-support.txt
           git checkout "$OLD" -- client/src/pages/barcodelookup/types.ts
 
-          # Switch all six Wave 13-14 roots to their already-extracted wrappers.
           git checkout "$OLD" -- \
             client/src/pages/BarcodeLookup.tsx \
             client/src/pages/factory/FactorySuppliers.tsx \
@@ -79,8 +74,6 @@ jobs:
           python - <<'PY'
           from pathlib import Path
 
-          # Preserve latest-main Data Tools behavior: the developer-only location
-          # cost-price override was extracted after the historical split.
           p=Path('client/src/pages/settings/datatoolstab/DataToolsView.tsx')
           s=p.read_text()
           if 'LocationCostPriceOverride' not in s:
@@ -96,12 +89,23 @@ jobs:
               s=s.replace(fix_card, fix_card+override)
           p.write_text(s)
 
-          # Keep current-main Barcode strict handling while retaining the split's
-          # enriched compatibility types.
           p=Path('client/src/pages/barcodelookup/useBarcodeLookupModel.tsx')
           s=p.read_text()
           s=s.replace('onError: (error: Error) => {\n      if (isGloballyHandledError(error)) return;', 'onError: (error: unknown) => {\n      if (isGloballyHandledError(error)) return;')
           s=s.replace('description: error.message, variant: "destructive"', 'description: error instanceof Error ? error.message : "Request failed", variant: "destructive"')
+          s=s.replace(
+              '                scannedByUserId: data.scannedByUserId,\n                scannedByName: data.scannedByName,',
+              '                scannedByUserId: data.scannedByUserId == null ? null : String(data.scannedByUserId),\n                scannedByName: data.scannedByName ?? null,'
+          )
+          p.write_text(s)
+
+          p=Path('client/src/pages/factory/factory-suppliers/SupplierDialogs.tsx')
+          s=p.read_text()
+          old='''  dueDialogSupplier: null;\n  setDueDialogSupplier: React.Dispatch<React.SetStateAction<null>>;'''
+          new='''  dueDialogSupplier: { name: string; containers: unknown[] } | null;\n  setDueDialogSupplier: React.Dispatch<\n    React.SetStateAction<{ name: string; containers: unknown[] } | null>\n  >;'''
+          if old not in s:
+              raise SystemExit('Factory Suppliers due-dialog type block not found')
+          s=s.replace(old,new)
           p.write_text(s)
           PY
 
