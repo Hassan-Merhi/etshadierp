@@ -143,15 +143,6 @@ jobs:
           import json
           from pathlib import Path
 
-          for name in ['docs/god-file-split-program.md', 'docs/system-quality-program.md']:
-              p = Path(name)
-              s = p.read_text()
-              if '25,056' in s:
-                  s = s.replace('25,056', '25,059')
-              elif '25,059' not in s:
-                  raise SystemExit(f'expected stale or corrected god-file figure in {name}')
-              p.write_text(s)
-
           p = Path('client/src/pages/factory/FactoryShippingContainers.tsx')
           s = p.read_text()
           marker = '// ─── Types ────────────────────────────────────────────────────────────────────\n'
@@ -180,6 +171,26 @@ jobs:
           PY
           npx prettier --write tests/workflow.test.ts client/src/pages/factory/FactoryShippingContainers.tsx client/src/pages/vouchers/StockTransferForm.tsx config/ci-ratchet-allowances.json
           UPDATE_ROUTE_MANIFEST=1 npx vitest run tests/route-manifest.test.ts --pool=forks --maxWorkers=2
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('docs/god-file-split-program.md')
+          s = p.read_text()
+          for old in ('25,056', '25,059'):
+              s = s.replace(old, '24,987')
+          if '24,987' not in s:
+              raise SystemExit('god-file backlog figure not found')
+          p.write_text(s)
+
+          p = Path('docs/system-quality-program.md')
+          s = p.read_text()
+          for old in ('25,056', '25,059'):
+              s = s.replace(old, '24,987')
+          s = s.replace('| Registered routes | 1,906 |', '| Registered routes | 1,908 |')
+          if '24,987' not in s or '| Registered routes | 1,908 |' not in s:
+              raise SystemExit('system-quality live figures not synchronized')
+          p.write_text(s)
+          PY
       - name: Verify repaired PR tree
         shell: bash
         run: |
