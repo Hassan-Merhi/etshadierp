@@ -15,217 +15,60 @@ jobs:
   cleanup:
     if: github.event.pull_request.head.ref == 'agent/god-files-recovery-latest-main' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
         with:
           ref: agent/god-files-recovery-latest-main
           fetch-depth: 0
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22.14.0
-          cache: npm
-      - name: Commit recovery quality cleanup
+      - name: Make Stock Entry pagination native
         shell: bash
         run: |
           set -euo pipefail
-
           python - <<'PY'
           from pathlib import Path
-          import re
-
-          p = Path('client/src/pages/StockEntryHistory.tsx')
-          p.write_text(p.read_text().replace('import type { ClientErrorLike } from "@/lib/clientError";\n', ''))
-
-          p = Path('client/src/pages/factory/factorylocationinventory/useFactoryLocationReprint.ts')
-          p.write_text(p.read_text().replace('import { getErrorDetails } from "@shared/errorUtils";\n', ''))
 
           plugin = Path('build/viteHeavyListPaginationPlugin.ts')
           text = plugin.read_text()
-          old = 'const FACTORY_DAYBOOK_SUFFIX = "/client/src/pages/factory/FactoryDaybook.tsx";'
-          split = 'const FACTORY_DAYBOOK_SUFFIX = "/client/src/pages/factory/daybook/useFactoryDaybookModel.ts";'
-          retired = 'const FACTORY_DAYBOOK_SUFFIX = "/__god_files_native__/FactoryDaybook.tsx";'
+          old = 'const STOCK_ENTRY_SUFFIX = "/client/src/pages/StockEntryHistory.tsx";'
+          retired = 'const STOCK_ENTRY_SUFFIX = "/__god_files_native__/StockEntryHistory.tsx";'
           if old in text:
               text = text.replace(old, retired, 1)
-          elif split in text:
-              text = text.replace(split, retired, 1)
           elif retired not in text:
-              raise SystemExit('Factory Daybook Vite suffix not found')
+              raise SystemExit('Stock Entry Vite suffix not found')
           plugin.write_text(text)
 
-          model = Path('client/src/pages/factory/daybook/useFactoryDaybookModel.ts')
-          text = model.read_text()
-          helper = 'import { fetchAllDaybookEntries } from "@/lib/daybookPaginationClient";'
-          anchor = 'import { queryClient } from "@/lib/queryClient";'
-          if helper not in text:
+          page = Path('client/src/pages/StockEntryHistory.tsx')
+          text = page.read_text()
+          old_group = '''      if (group.erpLocationId) gp.set("locationId", String(group.erpLocationId));
+                return {'''
+          new_group = '''      if (group.erpLocationId) gp.set("locationId", String(group.erpLocationId));
+                if (statusFilter.length > 0) gp.set("status", statusFilter.join(","));
+                if (debouncedSearch.trim()) gp.set("search", debouncedSearch.trim());
+                return {'''
+          if old_group in text:
+              text = text.replace(old_group, new_group, 1)
+          elif 'if (statusFilter.length > 0) gp.set("status", statusFilter.join(","));' not in text:
+              # Formatting-safe fallback for the split page.
+              anchor = '      if (group.erpLocationId) gp.set("locationId", String(group.erpLocationId));'
               if anchor not in text:
-                  raise SystemExit('Factory Daybook queryClient import not found')
-              text = text.replace(anchor, anchor + '\n' + helper, 1)
-
-          text = text.replace('queryParams.set("startDate", startDate || "");', 'queryParams.set("startDate", startDate);')
-          text = text.replace('queryParams.set("endDate", endDate || "");', 'queryParams.set("endDate", endDate);')
-
-          currency_line = '  if (currencyFilter !== "ALL") queryParams.set("currencyCode", currencyFilter);'
-          if 'queryParams.set("optionalStatus", statusFilter)' not in text:
-              if currency_line not in text:
-                  raise SystemExit('Factory Daybook currency filter line not found')
+                  raise SystemExit('Stock Entry lazy group location filter not found')
               text = text.replace(
-                  currency_line,
-                  currency_line + '\n'
-                  '  if (statusFilter !== "all") queryParams.set("optionalStatus", statusFilter);\n'
-                  '  if (debouncedSearchQuery.trim()) queryParams.set("search", debouncedSearchQuery.trim());\n'
-                  '  if (minAmount.trim()) queryParams.set("minAmount", minAmount.trim());\n'
-                  '  if (maxAmount.trim()) queryParams.set("maxAmount", maxAmount.trim());\n'
-                  '  queryParams.set("sortOrder", sortOrder);',
+                  anchor,
+                  anchor + '\n'
+                  '      if (statusFilter.length > 0) gp.set("status", statusFilter.join(","));\n'
+                  '      if (debouncedSearch.trim()) gp.set("search", debouncedSearch.trim());',
                   1,
               )
-
-          old_key = '    queryKey: ["/api/factory/daybook", startDate, endDate, txTypeFilter, currencyFilter],'
-          if old_key in text:
-              text = text.replace(
-                  old_key,
-                  '''    queryKey: [
-                    "/api/factory/daybook",
-                    startDate,
-                    endDate,
-                    txTypeFilter,
-                    currencyFilter,
-                    statusFilter,
-                    debouncedSearchQuery,
-                    minAmount,
-                    maxAmount,
-                    sortOrder,
-                  ],''',
-                  1,
-              )
-
-          summary = '''  const handleExportToExcel = async () => {
-            let exportEntries: DaybookEntry[];
-            try {
-              exportEntries = (await fetchAllDaybookEntries(new URLSearchParams(queryParams))).filter(
-                (entry) => entry.txType !== "WORKER_EDITED"
-              ) as DaybookEntry[];
-            } catch (error: any) {
-              toast({
-                title: "Export failed",
-                description: error?.message || "The complete filtered daybook could not be loaded.",
-                variant: "destructive",
-              });
-              return;
-            }
-            if (exportEntries.length === 0) {
-              warnNothingToExport();
-              return;
-            }
-            const { fileName, rowCount } = await exportFactoryDaybookSummary(exportEntries, formatDisplayDate);
-            toast({
-              title: "Export successful",
-              description: `Downloaded ${fileName} with ${rowCount} entries.`,
-            });
-          };
-
-          // ── Excel export: detailed'''
-          if 'let exportEntries: DaybookEntry[];' not in text:
-              text, count = re.subn(
-                  r'  const handleExportToExcel = async \(\) => \{.*?\n  \};\n\n  // ── Excel export: detailed',
-                  summary,
-                  text,
-                  count=1,
-                  flags=re.S,
-              )
-              if count != 1:
-                  raise SystemExit('Factory Daybook summary export function not found')
-
-          detailed = '''  const handleExportDetailedToExcel = async () => {
-            setIsExportingDetailed(true);
-            try {
-              const exportEntries = (await fetchAllDaybookEntries(new URLSearchParams(queryParams))).filter(
-                (entry) => entry.txType !== "WORKER_EDITED"
-              ) as DaybookEntry[];
-              if (exportEntries.length === 0) {
-                warnNothingToExport();
-                return;
-              }
-              const { fileName, rowCount } = await exportFactoryDaybookDetailed(exportEntries, formatDisplayDate);
-              toast({ title: "Export successful", description: `Downloaded ${fileName} with ${rowCount} entries.` });
-            } catch (error) {
-              toast({ title: "Export failed", description: "An error occurred while exporting.", variant: "destructive" });
-            } finally {
-              setIsExportingDetailed(false);
-            }
-          };
-
-          // ── Mutations'''
-          if text.count('fetchAllDaybookEntries(new URLSearchParams(queryParams))') < 2:
-              text, count = re.subn(
-                  r'  const handleExportDetailedToExcel = async \(\) => \{.*?\n  \};\n\n  // ── Mutations',
-                  detailed,
-                  text,
-                  count=1,
-                  flags=re.S,
-              )
-              if count != 1:
-                  raise SystemExit('Factory Daybook detailed export function not found')
-
-          model.write_text(text)
-
-          reports = Path('client/src/pages/stockentryhistory/reportsLegacy.ts')
-          reports.write_text(reports.read_text().replace('<\\/script>', '</script>'))
-          PY
-
-          npm ci --ignore-scripts
-
-          npx eslint \
-            client/src/pages/StockEntryHistory.tsx \
-            client/src/pages/factory/daybook/useFactoryDaybookModel.ts \
-            client/src/pages/factory/factorycontainerloadingscan/useFactoryContainerLoadingScanModel.ts \
-            client/src/pages/pos/pospricelist/usePosPriceListModel.ts \
-            client/src/pages/transactionjournal/useTransactionJournalModel.ts \
-            client/src/pages/vouchers/journalform/useJournalFormModel.tsx \
-            -f json > /tmp/recovery-eslint.json || true
-
-          python - <<'PY'
-          import json
-          from pathlib import Path
-
-          report = json.loads(Path('/tmp/recovery-eslint.json').read_text() or '[]')
-          allowed = {'react-hooks/exhaustive-deps', 'unused-imports/no-unused-vars'}
-          for result in report:
-              messages = [m for m in result.get('messages', []) if m.get('severity') == 1 and m.get('ruleId') in allowed]
-              if not messages:
-                  continue
-              p = Path(result['filePath'])
-              try:
-                  p = p.relative_to(Path.cwd())
-              except ValueError:
-                  pass
-              lines = Path(p).read_text().splitlines()
-              for m in sorted(messages, key=lambda x: x['line'], reverse=True):
-                  idx = max(0, m['line'] - 1)
-                  rule = m['ruleId']
-                  indent = lines[idx][:len(lines[idx]) - len(lines[idx].lstrip())]
-                  if idx > 0 and f'eslint-disable-next-line {rule}' in lines[idx - 1]:
-                      continue
-                  lines.insert(idx, f'{indent}// eslint-disable-next-line {rule} -- God Files extraction preserves pre-split behavior.')
-              Path(p).write_text('\n'.join(lines) + '\n')
+          page.write_text(text)
           PY
 
           if git diff --quiet; then
-            echo 'No recovery cleanup needed.'
+            echo 'Stock Entry pagination cleanup already applied.'
             exit 0
           fi
-
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -f build/viteHeavyListPaginationPlugin.ts
-          git add \
-            client/src/pages/StockEntryHistory.tsx \
-            client/src/pages/factory/daybook/useFactoryDaybookModel.ts \
-            client/src/pages/factory/factorycontainerloadingscan/useFactoryContainerLoadingScanModel.ts \
-            client/src/pages/factory/factorylocationinventory/useFactoryLocationReprint.ts \
-            client/src/pages/pos/pospricelist/usePosPriceListModel.ts \
-            client/src/pages/stockentryhistory/reportsLegacy.ts \
-            client/src/pages/transactionjournal/useTransactionJournalModel.ts \
-            client/src/pages/vouchers/journalform/useJournalFormModel.tsx
-          git commit -m 'fix: commit God Files recovery quality cleanup [lint-cleanup]'
+          git add client/src/pages/StockEntryHistory.tsx
+          git commit -m 'fix: make Stock Entry pagination native [lint-cleanup]'
           git push origin HEAD:agent/god-files-recovery-latest-main
