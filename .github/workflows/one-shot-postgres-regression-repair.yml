@@ -1,16 +1,16 @@
 name: One-shot postgres regression repair
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/postgres-regression-isolate-879e5a8f
+      - main
 
 permissions:
   contents: write
 
 jobs:
   repair:
-    if: github.event.head_commit.message != 'ci: apply postgres regression repairs'
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,8 +39,7 @@ jobs:
           new = '**Backlog: 47 files, 24,565 lines over the limit**'
           if old not in text and new not in text:
               raise SystemExit('Expected god-file backlog line not found')
-          text = text.replace(old, new)
-          god_file_doc.write_text(text)
+          god_file_doc.write_text(text.replace(old, new))
 
           quality_doc = Path('docs/system-quality-program.md')
           text = quality_doc.read_text()
@@ -48,8 +47,7 @@ jobs:
           new = '| God-file backlog | 47 files, 24,565 excess lines |'
           if old not in text and new not in text:
               raise SystemExit('Expected system-quality backlog row not found')
-          text = text.replace(old, new)
-          quality_doc.write_text(text)
+          quality_doc.write_text(text.replace(old, new))
           PY
 
       - name: Commit repair
