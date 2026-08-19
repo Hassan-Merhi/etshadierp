@@ -1,125 +1,113 @@
 /**
- * Loaded-items editor on the container verification page.
+ * The loaded-items editor of the container verification page.
  *
- * Split out of ContainerVerification.tsx unchanged: the inline add row, the
- * per-row edit mode, the "Load from POs" button that only appears while the
- * list is empty, and the Excel import trigger.
+ * The add row and the inline edit row are drafts: they exist only while a row
+ * is being typed into, and nothing outside this card ever reads them. So the
+ * card keeps that state and the page keeps the data, and the two meet at four
+ * callbacks. The write callbacks are awaited rather than fired and forgotten,
+ * because a draft may only be cleared once the server has actually taken it —
+ * on failure the row stays open with what was typed still in it.
+ *
+ * Extracted from ContainerVerification.tsx during the god-file split.
  */
+import { useState } from "react";
 import { Pencil, Plus, RefreshCw, Save, Trash2, Upload, X } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { ContainerVerificationModel } from "./useContainerVerificationModel";
 
-type ItemDraft = { barcode: string; itemName: string; qty: string; weightPerBale: string; pricePerBale: string };
+import type { LoadedItem, LoadedItemDraft } from "./types";
 
-/** The five editable cells shared by the add row and the per-row edit mode. */
-function DraftCells({
-  draft,
-  onChange,
-  testIdPrefix,
+const EMPTY_DRAFT: LoadedItemDraft = {
+  barcode: "",
+  itemName: "",
+  qty: "0",
+  weightPerBale: "0",
+  pricePerBale: "0",
+};
+
+function draftOf(item: LoadedItem): LoadedItemDraft {
+  return {
+    barcode: item.barcode,
+    itemName: item.itemName || "",
+    qty: String(item.qty),
+    weightPerBale: item.weightPerBale || "0",
+    pricePerBale: item.pricePerBale || "0",
+  };
+}
+
+export function LoadedItemsCard({
+  items,
+  autoPopulatePending,
+  onAutoPopulate,
+  onImportClick,
+  onAdd,
+  onUpdate,
+  onDelete,
 }: {
-  draft: ItemDraft;
-  onChange: (next: ItemDraft) => void;
-  testIdPrefix?: string;
+  items: LoadedItem[];
+  autoPopulatePending: boolean;
+  onAutoPopulate: () => void;
+  onImportClick: () => void;
+  onAdd: (draft: LoadedItemDraft) => Promise<unknown>;
+  onUpdate: (id: number, draft: LoadedItemDraft) => Promise<unknown>;
+  onDelete: (id: number) => void;
 }) {
-  const testId = (suffix: string) => (testIdPrefix ? `${testIdPrefix}-${suffix}` : undefined);
-  return (
-    <>
-      <TableCell>
-        <Input
-          value={draft.barcode}
-          onChange={(e) => onChange({ ...draft, barcode: e.target.value })}
-          placeholder={testIdPrefix ? "Barcode" : undefined}
-          className="h-8 text-xs"
-          data-testid={testId("barcode")}
-        />
-      </TableCell>
-      <TableCell>
-        <Input
-          value={draft.itemName}
-          onChange={(e) => onChange({ ...draft, itemName: e.target.value })}
-          placeholder={testIdPrefix ? "Name" : undefined}
-          className="h-8 text-xs"
-          data-testid={testId("name")}
-        />
-      </TableCell>
-      <TableCell>
-        <Input
-          type="number"
-          value={draft.qty}
-          onChange={(e) => onChange({ ...draft, qty: e.target.value })}
-          className="h-8 text-xs w-14 text-right"
-          data-testid={testId("qty")}
-        />
-      </TableCell>
-      <TableCell>
-        <Input
-          type="number"
-          step="0.001"
-          value={draft.weightPerBale}
-          onChange={(e) => onChange({ ...draft, weightPerBale: e.target.value })}
-          className="h-8 text-xs w-16 text-right"
-        />
-      </TableCell>
-      <TableCell>
-        <Input
-          type="number"
-          step="0.01"
-          value={draft.pricePerBale}
-          onChange={(e) => onChange({ ...draft, pricePerBale: e.target.value })}
-          className="h-8 text-xs w-16 text-right"
-        />
-      </TableCell>
-    </>
-  );
-}
+  const [addingItem, setAddingItem] = useState(false);
+  const [newItem, setNewItem] = useState<LoadedItemDraft>(EMPTY_DRAFT);
+  const [editingItemId, setEditingItemId] = useState<number | null>(null);
+  const [editItemData, setEditItemData] = useState<LoadedItemDraft>(EMPTY_DRAFT);
 
-function SaveCancelCell({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) {
-  return (
-    <TableCell>
-      <div className="flex items-center gap-1">
-        <Button size="icon" variant="ghost" onClick={onSave}>
-          <Save className="h-3 w-3" />
-        </Button>
-        <Button size="icon" variant="ghost" onClick={onCancel}>
-          <X className="h-3 w-3" />
-        </Button>
-      </div>
-    </TableCell>
-  );
-}
+  // The page's mutations already report their own failures; the drafts simply
+  // stay put so nothing typed is lost.
+  const submitNew = async () => {
+    try {
+      await onAdd(newItem);
+      setAddingItem(false);
+      setNewItem(EMPTY_DRAFT);
+    } catch {
+      /* handled by the caller */
+    }
+  };
 
-export function LoadedItemsCard({ model }: { model: ContainerVerificationModel }) {
-  const { loadedItems, addingItem, editingItemId } = model;
+  const submitEdit = async (id: number) => {
+    try {
+      await onUpdate(id, editItemData);
+      setEditingItemId(null);
+    } catch {
+      /* handled by the caller */
+    }
+  };
+
+  const startEdit = (item: LoadedItem) => {
+    setEditingItemId(item.id);
+    setEditItemData(draftOf(item));
+  };
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
-        <CardTitle className="text-sm">Loaded Items ({loadedItems.length})</CardTitle>
+        <CardTitle className="text-sm">Loaded Items ({items.length})</CardTitle>
         <div className="flex items-center gap-2">
-          {loadedItems.length === 0 && (
+          {items.length === 0 && (
             <Button
               variant="outline"
               size="sm"
-              onClick={model.runAutoPopulate}
-              disabled={model.autoPopulateMutation.isPending}
+              onClick={onAutoPopulate}
+              disabled={autoPopulatePending}
               data-testid="button-load-from-pos"
             >
-              <RefreshCw className={`mr-1 h-3 w-3 ${model.autoPopulateMutation.isPending ? "animate-spin" : ""}`} />
+              <RefreshCw className={`mr-1 h-3 w-3 ${autoPopulatePending ? "animate-spin" : ""}`} />
               Load from POs
             </Button>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => model.fileInputRef.current?.click()}
-            data-testid="button-import-loaded"
-          >
+          <Button variant="outline" size="sm" onClick={onImportClick} data-testid="button-import-loaded">
             <Upload className="mr-1 h-3 w-3" />
             Import
           </Button>
-          <Button size="sm" onClick={() => model.setAddingItem(true)} data-testid="button-add-loaded">
+          <Button size="sm" onClick={() => setAddingItem(true)} data-testid="button-add-loaded">
             <Plus className="mr-1 h-3 w-3" />
             Add
           </Button>
@@ -141,22 +129,117 @@ export function LoadedItemsCard({ model }: { model: ContainerVerificationModel }
             <TableBody>
               {addingItem && (
                 <TableRow>
-                  <DraftCells draft={model.newItem} onChange={model.setNewItem} testIdPrefix="input-new-loaded" />
-                  <SaveCancelCell
-                    onSave={() => model.addItemMutation.mutate(model.newItem)}
-                    onCancel={() => model.setAddingItem(false)}
-                  />
+                  <TableCell>
+                    <Input
+                      value={newItem.barcode}
+                      onChange={(e) => setNewItem({ ...newItem, barcode: e.target.value })}
+                      placeholder="Barcode"
+                      className="h-8 text-xs"
+                      data-testid="input-new-loaded-barcode"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      value={newItem.itemName}
+                      onChange={(e) => setNewItem({ ...newItem, itemName: e.target.value })}
+                      placeholder="Name"
+                      className="h-8 text-xs"
+                      data-testid="input-new-loaded-name"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      type="number"
+                      value={newItem.qty}
+                      onChange={(e) => setNewItem({ ...newItem, qty: e.target.value })}
+                      className="h-8 text-xs w-14 text-right"
+                      data-testid="input-new-loaded-qty"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      type="number"
+                      step="0.001"
+                      value={newItem.weightPerBale}
+                      onChange={(e) => setNewItem({ ...newItem, weightPerBale: e.target.value })}
+                      className="h-8 text-xs w-16 text-right"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={newItem.pricePerBale}
+                      onChange={(e) => setNewItem({ ...newItem, pricePerBale: e.target.value })}
+                      className="h-8 text-xs w-16 text-right"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      <Button size="icon" variant="ghost" onClick={submitNew}>
+                        <Save className="h-3 w-3" />
+                      </Button>
+                      <Button size="icon" variant="ghost" onClick={() => setAddingItem(false)}>
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </TableCell>
                 </TableRow>
               )}
-              {loadedItems.map((item) => (
+              {items.map((item) => (
                 <TableRow key={item.id}>
                   {editingItemId === item.id ? (
                     <>
-                      <DraftCells draft={model.editItemData} onChange={model.setEditItemData} />
-                      <SaveCancelCell
-                        onSave={() => model.updateItemMutation.mutate({ id: item.id, data: model.editItemData })}
-                        onCancel={() => model.setEditingItemId(null)}
-                      />
+                      <TableCell>
+                        <Input
+                          value={editItemData.barcode}
+                          onChange={(e) => setEditItemData({ ...editItemData, barcode: e.target.value })}
+                          className="h-8 text-xs"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          value={editItemData.itemName}
+                          onChange={(e) => setEditItemData({ ...editItemData, itemName: e.target.value })}
+                          className="h-8 text-xs"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          value={editItemData.qty}
+                          onChange={(e) => setEditItemData({ ...editItemData, qty: e.target.value })}
+                          className="h-8 text-xs w-14 text-right"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          step="0.001"
+                          value={editItemData.weightPerBale}
+                          onChange={(e) => setEditItemData({ ...editItemData, weightPerBale: e.target.value })}
+                          className="h-8 text-xs w-16 text-right"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={editItemData.pricePerBale}
+                          onChange={(e) => setEditItemData({ ...editItemData, pricePerBale: e.target.value })}
+                          className="h-8 text-xs w-16 text-right"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Button size="icon" variant="ghost" onClick={() => submitEdit(item.id)}>
+                            <Save className="h-3 w-3" />
+                          </Button>
+                          <Button size="icon" variant="ghost" onClick={() => setEditingItemId(null)}>
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
                     </>
                   ) : (
                     <>
@@ -171,10 +254,10 @@ export function LoadedItemsCard({ model }: { model: ContainerVerificationModel }
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          <Button size="icon" variant="ghost" onClick={() => model.startEdit(item)}>
+                          <Button size="icon" variant="ghost" onClick={() => startEdit(item)}>
                             <Pencil className="h-3 w-3" />
                           </Button>
-                          <Button size="icon" variant="ghost" onClick={() => model.deleteItemMutation.mutate(item.id)}>
+                          <Button size="icon" variant="ghost" onClick={() => onDelete(item.id)}>
                             <Trash2 className="h-3 w-3" />
                           </Button>
                         </div>
@@ -183,7 +266,7 @@ export function LoadedItemsCard({ model }: { model: ContainerVerificationModel }
                   )}
                 </TableRow>
               ))}
-              {loadedItems.length === 0 && !addingItem && (
+              {items.length === 0 && !addingItem && (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center text-muted-foreground text-sm py-6">
                     No loaded items. Add manually or import from Excel.
