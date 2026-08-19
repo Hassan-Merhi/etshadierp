@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import Papa from "papaparse";
 
 export interface ExcelRange {
   s: { r: number; c: number };
@@ -196,6 +197,36 @@ function binaryStringToArrayBuffer(s: string): ArrayBuffer {
   return buf;
 }
 
+function toBytes(data: ArrayBuffer | Uint8Array): Uint8Array {
+  return data instanceof Uint8Array ? Uint8Array.from(data) : new Uint8Array(data);
+}
+
+function isXlsxZip(bytes: Uint8Array): boolean {
+  return bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04;
+}
+
+async function loadSpreadsheet(workbook: ExcelJS.Workbook, bytes: Uint8Array): Promise<void> {
+  if (isXlsxZip(bytes)) {
+    await workbook.xlsx.load(Uint8Array.from(bytes).buffer);
+    return;
+  }
+
+  const text = new TextDecoder("utf-8").decode(bytes).replace(/^\uFEFF/, "");
+  const parsed = Papa.parse<string[]>(text, { skipEmptyLines: "greedy" });
+
+  if (parsed.errors.length > 0) {
+    throw new Error(`Could not parse CSV: ${parsed.errors[0].message}`);
+  }
+  if (parsed.data.length === 0) {
+    throw new Error("CSV file is empty");
+  }
+
+  const worksheet = workbook.addWorksheet("Sheet1");
+  for (const row of parsed.data) {
+    worksheet.addRow(row);
+  }
+}
+
 export async function writeFile(workbook: ExcelJS.Workbook, filename: string): Promise<void> {
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], {
@@ -214,14 +245,13 @@ export async function writeFile(workbook: ExcelJS.Workbook, filename: string): P
 export async function readFile(file: File): Promise<ExcelJS.Workbook> {
   const buffer = await file.arrayBuffer();
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
+  await loadSpreadsheet(workbook, new Uint8Array(buffer));
   return workbook;
 }
 
 export async function readFromBuffer(data: ArrayBuffer | Uint8Array): Promise<ExcelJS.Workbook> {
   const workbook = new ExcelJS.Workbook();
-  const normalizedBuffer = data instanceof ArrayBuffer ? data : Uint8Array.from(data).buffer;
-  await workbook.xlsx.load(normalizedBuffer);
+  await loadSpreadsheet(workbook, toBytes(data));
   return workbook;
 }
 
@@ -239,15 +269,14 @@ export async function read(
   if (data == null) {
     throw new Error("read: no data provided");
   }
+
   if (typeof File !== "undefined" && data instanceof File) {
     const buffer = await data.arrayBuffer();
-    await workbook.xlsx.load(buffer);
+    await loadSpreadsheet(workbook, new Uint8Array(buffer));
   } else if (typeof data === "string") {
-    await workbook.xlsx.load(binaryStringToArrayBuffer(data));
-  } else if (data instanceof ArrayBuffer) {
-    await workbook.xlsx.load(data);
+    await loadSpreadsheet(workbook, new Uint8Array(binaryStringToArrayBuffer(data)));
   } else {
-    await workbook.xlsx.load((data as Uint8Array).buffer as ArrayBuffer);
+    await loadSpreadsheet(workbook, toBytes(data));
   }
 
   const SheetNames: string[] = [];
