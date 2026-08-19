@@ -37,8 +37,6 @@ import {
 } from "@shared/schema";
 
 export function registerAccountStatementRoutes(app: Express) {
-  // Get deleted (soft-deleted) vouchers for a specific account — used by the Accounts page
-  // to show recoverable vouchers directly in the ledger view.
   app.get("/api/accounts/:type/:id/deleted-vouchers", requireAuth, async (req, res) => {
     try {
       const accountType = req.params.type;
@@ -48,7 +46,6 @@ export function registerAccountStatementRoutes(app: Express) {
       if (isNaN(accountId)) return res.status(400).json({ message: "Invalid ID" });
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      // Build the account-specific filter on voucherEntries
       let entryFilter: any;
       switch (accountType) {
         case "ledger":
@@ -95,8 +92,6 @@ export function registerAccountStatementRoutes(app: Express) {
     }
   });
 
-  // Compute the pre-period (opening) balance for any account type
-  // endDate = last day BEFORE the current period start
   app.get("/api/accounts/:type/:id/pre-period-balance", requireAuth, async (req, res) => {
     try {
       const accountType = req.params.type;
@@ -106,7 +101,6 @@ export function registerAccountStatementRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       if (isNaN(accountId)) return res.status(400).json({ message: "Invalid account ID" });
 
-      // Map type to the FK column name in voucher_entries
       const typeToColumn: Record<string, any> = {
         ledger: voucherEntries.ledgerAccountId,
         bank: voucherEntries.bankAccountId,
@@ -118,7 +112,6 @@ export function registerAccountStatementRoutes(app: Express) {
       const entryColumn = typeToColumn[accountType];
       if (!entryColumn) return res.status(400).json({ message: "Unknown account type" });
 
-      // Get initial opening balance from the account table
       let rawOB = 0;
       let obSide = "Dr";
       if (accountType === "ledger") {
@@ -126,8 +119,6 @@ export function registerAccountStatementRoutes(app: Express) {
           .select({ ob: ledgerAccounts.openingBalance, side: ledgerAccounts.openingBalanceSide })
           .from(ledgerAccounts)
           .where(eq(ledgerAccounts.id, accountId));
-        // If this ledger account is linked to a customer, the customer's
-        // opening balance is the authoritative source of truth.
         const [linkedCust] = await db
           .select({ id: customers.id, ob: customers.openingBalance, side: customers.openingBalanceSide })
           .from(customers)
@@ -136,8 +127,6 @@ export function registerAccountStatementRoutes(app: Express) {
         rawOB = parseFloat(linkedCust?.ob ?? acct?.ob ?? "0") || 0;
         obSide = linkedCust?.side ?? acct?.side ?? "Dr";
 
-        // For factory customer-linked ledger accounts, use combined formula
-        // (sales + customerBalances non-INVOICE + voucherEntries via both paths, all before endDate)
         if (linkedCust) {
           const currentCompany = await storage.getCompanyById(companyId);
           if (currentCompany?.companyType === "factory") {
@@ -148,9 +137,7 @@ export function registerAccountStatementRoutes(app: Express) {
 
             const [salesRows, cbRows, lVRows, cVRows] = await Promise.all([
               db
-                .select({
-                  total: sql<string>`COALESCE(SUM(CAST(${customerOrders.grandTotal} AS numeric)), 0)`,
-                })
+                .select({ total: sql<string>`COALESCE(SUM(CAST(${customerOrders.grandTotal} AS numeric)), 0)` })
                 .from(customerOrders)
                 .where(
                   and(
@@ -160,7 +147,6 @@ export function registerAccountStatementRoutes(app: Express) {
                     orderDateFilter
                   )
                 ),
-
               db
                 .select({
                   net: sql<string>`COALESCE(SUM(CAST(${customerBalances.debitAmount} AS numeric) - CAST(${customerBalances.creditAmount} AS numeric)), 0)`,
@@ -174,7 +160,6 @@ export function registerAccountStatementRoutes(app: Express) {
                     cbDateFilter
                   )
                 ),
-
               db
                 .select({
                   net: sql<string>`COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS numeric) - CAST(${voucherEntries.creditAmount} AS numeric)), 0)`,
@@ -190,7 +175,6 @@ export function registerAccountStatementRoutes(app: Express) {
                     dateFilter
                   )
                 ),
-
               db
                 .select({
                   net: sql<string>`COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS numeric) - CAST(${voucherEntries.creditAmount} AS numeric)), 0)`,
@@ -226,8 +210,6 @@ export function registerAccountStatementRoutes(app: Express) {
         rawOB = parseFloat(acct?.ob ?? "0") || 0;
         obSide = acct?.side ?? "Dr";
       } else if (accountType === "supplier") {
-        // The supplier opening balance only belongs to the parent company's
-        // books — never guess this via "lowest company ID".
         const isParentForSupplier = await isParentCompanyContext(companyId);
         if (isParentForSupplier) {
           const [acct] = await db
@@ -262,13 +244,9 @@ export function registerAccountStatementRoutes(app: Express) {
         obSide = "Dr";
       }
 
-      // Signed initial opening balance
-      // Supplier: positive rawOB is treated as Cr (they're owed money)
-      // Others: Cr side means negative in Dr-positive convention
       const isSupplier = accountType === "supplier";
       let balance = isSupplier ? rawOB : obSide === "Cr" ? -rawOB : rawOB;
 
-      // Sum all voucher entries before endDate (exclusive of period start)
       if (endDate) {
         const conditions = [
           eq(entryColumn, accountId),
@@ -276,12 +254,7 @@ export function registerAccountStatementRoutes(app: Express) {
           isNull(vouchers.deletedAt),
           sql`${vouchers.voucherDate} < ${endDate}`,
         ];
-        // Suppliers are shared across companies — scope strictly to this
-        // company's own vouchers or the pre-period balance would silently
-        // include every other company's history for the same supplier.
-        if (isSupplier) {
-          conditions.push(eq(vouchers.companyId, companyId));
-        }
+        if (isSupplier) conditions.push(eq(vouchers.companyId, companyId));
         const [totals] = await db
           .select({
             totalDebit: sql<string>`COALESCE(SUM(${voucherEntries.debitAmount}), 0)`,
@@ -293,11 +266,7 @@ export function registerAccountStatementRoutes(app: Express) {
 
         const sumDebit = parseFloat(totals?.totalDebit ?? "0") || 0;
         const sumCredit = parseFloat(totals?.totalCredit ?? "0") || 0;
-        if (isSupplier) {
-          balance += sumCredit - sumDebit;
-        } else {
-          balance += sumDebit - sumCredit;
-        }
+        balance += isSupplier ? sumCredit - sumDebit : sumDebit - sumCredit;
       }
 
       res.json({ balance });
@@ -306,13 +275,16 @@ export function registerAccountStatementRoutes(app: Express) {
     }
   });
 
-  // ── Account Statement PDF export ──────────────────────────────────────────
   app.get("/api/accounts/:type/:id/statement-pdf", requireAuth, async (req: Request, res: Response) => {
     try {
       const accountType = req.params.type;
       const accountId = parseInt(req.params.id);
       const companyId = req.session.currentCompanyId;
-      const { startDate, endDate, lang = "en" } = req.query as { startDate?: string; endDate?: string; lang?: string };
+      const { startDate, endDate, lang = "en" } = req.query as {
+        startDate?: string;
+        endDate?: string;
+        lang?: string;
+      };
 
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       if (isNaN(accountId)) return res.status(400).json({ message: "Invalid account ID" });
@@ -323,7 +295,6 @@ export function registerAccountStatementRoutes(app: Express) {
       const pdfBuf = await generateAccountStatementPdf({ accountType, accountId, companyId, startDate, endDate, lang });
       assertValidPdfBuffer(pdfBuf);
 
-      // Resolve human-readable account name for the filename
       let resolvedName = `${accountType}_${accountId}`;
       try {
         if (accountType === "ledger") {
@@ -358,7 +329,7 @@ export function registerAccountStatementRoutes(app: Express) {
           if (r) resolvedName = `${r.firstName} ${r.lastName}`.trim();
         }
       } catch {
-        // Failure here is non-fatal and the surrounding flow continues deliberately.
+        // filename fallback is non-fatal
       }
       const safeAccName = resolvedName.replace(/[^\w\s.()-]/g, "_").replace(/\s+/g, "_");
       res.setHeader("Content-Type", "application/pdf");
@@ -373,7 +344,6 @@ export function registerAccountStatementRoutes(app: Express) {
     }
   });
 
-  // ── Ledger / Account Statement — Excel export ────────────────────────────
   app.get("/api/accounts/statement/export-excel", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId as number;
@@ -387,7 +357,6 @@ export function registerAccountStatementRoutes(app: Express) {
       const dateRange = validateStatementDateRange(startDate, endDate);
       if (!dateRange.ok) return res.status(400).json({ message: dateRange.message });
 
-      // Resolve account name and opening balance
       let accountName = "Account";
       let openingBalance = 0;
       let openingBalanceSide = "Dr";
@@ -430,7 +399,6 @@ export function registerAccountStatementRoutes(app: Express) {
         accountName = `${acct.firstName} ${acct.lastName}`.trim();
       }
 
-      // Fetch transactions
       let txRows = [];
       if (accountType === "ledger") {
         txRows = await storage.getVoucherEntriesByLedger(accountId, startDate, endDate, companyId);
@@ -442,7 +410,6 @@ export function registerAccountStatementRoutes(app: Express) {
         txRows = await storage.getVoucherEntriesByEmployee(accountId, companyId, startDate, endDate);
       }
 
-      // Compute brought-forward balance (entries before startDate when filtering)
       let allTxForBF = [];
       if (startDate && accountType === "ledger") {
         allTxForBF = await storage.getVoucherEntriesByLedger(accountId, undefined, undefined, companyId);
@@ -457,7 +424,6 @@ export function registerAccountStatementRoutes(app: Express) {
         }
       }
 
-      // Build running balance rows
       let runBal = startDate ? bfBalance : openingBalanceSide === "Dr" ? openingBalance : -openingBalance;
       const enrichedRows = txRows.map((r) => {
         const dr = parseFloat(r.debitAmount || "0");
@@ -489,11 +455,17 @@ export function registerAccountStatementRoutes(app: Express) {
       workbook.created = new Date();
       workbook.modified = new Date();
       const sheet = workbook.addWorksheet("Statement", {
-        pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 },
         properties: { defaultRowHeight: 18 },
+        pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 },
       });
-      sheet.pageMargins = { left: 0.25, right: 0.25, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 };
-      sheet.properties.showGridLines = false;
+      sheet.pageSetup.margins = {
+        left: 0.25,
+        right: 0.25,
+        top: 0.5,
+        bottom: 0.5,
+        header: 0.2,
+        footer: 0.2,
+      };
 
       sheet.columns = [
         { key: "date", width: 13 },
@@ -504,7 +476,6 @@ export function registerAccountStatementRoutes(app: Express) {
         { key: "balance", width: 18 },
       ];
 
-      // Logo row
       try {
         const logoPath = path.join(process.cwd(), "server", "hmd-logo.png");
         if (fs.existsSync(logoPath)) {
@@ -516,10 +487,9 @@ export function registerAccountStatementRoutes(app: Express) {
           sheet.mergeCells("A1:F1");
         }
       } catch {
-        // Failure here is non-fatal and the surrounding flow continues deliberately.
+        // logo is optional
       }
 
-      // Header block
       const rComp = sheet.addRow([company?.name || "Company"]);
       rComp.getCell(1).font = { bold: true, size: 14, color: { argb: "FF1F3864" } };
       sheet.mergeCells(`A${rComp.number}:F${rComp.number}`);
@@ -552,7 +522,6 @@ export function registerAccountStatementRoutes(app: Express) {
       sheet.mergeCells(`A${rPrinted.number}:F${rPrinted.number}`);
       sheet.addRow([]);
 
-      // Column headers
       const hdr = sheet.addRow(["Date", "Voucher No.", "Particulars", "Debit (Dr)", "Credit (Cr)", "Balance"]);
       hdr.height = 22;
       hdr.eachCell((cell) => {
@@ -572,7 +541,6 @@ export function registerAccountStatementRoutes(app: Express) {
         },
       ];
 
-      // Opening balance row (no filter) or B/F row (filtered)
       if (!startDate && openingBalance > 0 && accountType === "ledger") {
         const obRow = sheet.addRow([
           "",
@@ -619,7 +587,6 @@ export function registerAccountStatementRoutes(app: Express) {
         bfRow.getCell(6).alignment = { horizontal: "right", vertical: "middle" };
       }
 
-      // Data rows
       enrichedRows.forEach((row, idx: number) => {
         const dr = row.dr > 0 ? row.dr : null;
         const cr = row.cr > 0 ? row.cr : null;
@@ -627,14 +594,7 @@ export function registerAccountStatementRoutes(app: Express) {
         const particulars = row.narration || row.voucherDescription || row.voucherType || "—";
         const balAbs = Math.abs(row.runBal);
         const balSide = row.runBal >= 0 ? "Dr" : "Cr";
-        const dataRow = sheet.addRow([
-          dateVal,
-          row.voucherNumber || "—",
-          particulars,
-          dr,
-          cr,
-          balAbs,
-        ]);
+        const dataRow = sheet.addRow([dateVal, row.voucherNumber || "—", particulars, dr, cr, balAbs]);
         dataRow.eachCell((cell) => {
           cell.border = allBorders;
           cell.alignment = { vertical: "top" };
@@ -654,7 +614,6 @@ export function registerAccountStatementRoutes(app: Express) {
         dataRow.getCell(6).alignment = { horizontal: "right", vertical: "top" };
       });
 
-      // Totals row
       const totRow = sheet.addRow(["", "", "TOTAL", totalDr, totalCr, ""]);
       totRow.eachCell((cell) => {
         cell.fill = navyFill;
@@ -666,7 +625,6 @@ export function registerAccountStatementRoutes(app: Express) {
       totRow.getCell(4).alignment = { horizontal: "right" };
       totRow.getCell(5).alignment = { horizontal: "right" };
 
-      // Closing balance row
       const cbRow = sheet.addRow([
         "",
         "",
@@ -687,7 +645,7 @@ export function registerAccountStatementRoutes(app: Express) {
       cbRow.getCell(5).alignment = { horizontal: "right" };
       cbRow.getCell(6).alignment = { horizontal: "right" };
 
-      sheet.printArea = `A1:F${cbRow.number}`;
+      sheet.pageSetup.printArea = `A1:F${cbRow.number}`;
       sheet.headerFooter.oddFooter = "&LAccount Statement&CPage &P of &N&R&D";
 
       const safeAccName = accountName.replace(/[^\w\s.()-]/g, "_").replace(/\s+/g, "_");
