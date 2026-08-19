@@ -173,7 +173,7 @@
       "client/src/pages/StockItems.tsx": 1375,
       "client/src/pages/StockTransferOrder.tsx": 2150,
       "client/src/pages/SupplierProfitCheck.tsx": 1975,
-      "client/src/pages/TransactionJournal.tsx": 1600,
+      "client/src/pages/TransactionJournal.tsx": 1350,
       "client/src/pages/vouchers/JournalForm.tsx": 1650,
       "client/src/pages/vouchers/StockAdjustmentForm.tsx": 1200,
       "client/src/pages/vouchers/StockTransferForm.tsx": 2400,
