@@ -6,47 +6,39 @@ on:
   pull_request:
     branches: [main]
 
-permissions:
-  contents: write
-
 concurrency:
   group: i18n-audit-${{ github.ref }}
+  # Cancel superseded pull-request runs only; every commit on main is gated.
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   audit:
-    name: One-time PR 778 full formatter
+    name: Classified untranslated-text audit
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout PR branch
+      - name: Checkout repository
         uses: actions/checkout@v7
-        with:
-          ref: ${{ github.head_ref }}
-          fetch-depth: 0
 
       - name: Set up canonical Node.js
         uses: actions/setup-node@v6
         with:
           node-version: "22.14.0"
-          cache: npm
 
-      - name: Normalize registry URLs
-        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+      - name: Verify audit classifier contract
+        run: node scripts/verify-i18n-audit-classifier.mjs
 
-      - name: Install dependencies
-        run: npm ci --no-audit --bin-links=true
-
-      - name: Format all changed PR 778 sources and restore workflow
-        shell: bash
+      - name: Enforce reviewed untranslated-text ratchet
         run: |
-          set -euo pipefail
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          node node_modules/prettier/bin/prettier.cjs --write client/src/lib/excelHelper.ts server/lib/accountStatementExportSafety.ts server/routes/accountStatementRoutes.ts tests/account-statement-export-safety.test.ts
-          git fetch origin main
-          git checkout origin/main -- .github/workflows/i18n-audit.yml
-          git add -A -- client/src/lib/excelHelper.ts server/lib/accountStatementExportSafety.ts server/routes/accountStatementRoutes.ts tests/account-statement-export-safety.test.ts .github/workflows/i18n-audit.yml
-          if ! git diff --cached --quiet; then
-            git commit -m 'style(accounts): format full statement export diff'
-          fi
-          git push origin HEAD:fix/account-statement-exports-20260819
+          node scripts/audit-i18n-phase14.mjs \
+            --json-out artifacts/i18n-audit/report.json \
+            --markdown-out artifacts/i18n-audit/report.md
+          cat artifacts/i18n-audit/report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload classified audit report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: classified-i18n-audit
+          path: artifacts/i18n-audit
+          if-no-files-found: warn
+          retention-days: 7
