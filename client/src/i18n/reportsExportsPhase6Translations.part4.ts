@@ -94,4 +94,11 @@ export const reportsExportsPhase6TranslationsPart4: readonly Phase6ReportsExport
   },
   { en: "Invalid container ID", ar: "معرف الحاوية غير صالح", fr: "Identifiant de conteneur invalide" },
   { en: "Container not found", ar: "الحاوية غير موجودة", fr: "Conteneur introuvable" },
+  {
+    en: "Could not parse CSV: ${parsed.errors[0].message}",
+    ar: "تعذر تحليل ملف CSV: {0}",
+    fr: "Impossible d’analyser le fichier CSV : {0}",
+  },
+  { en: "CSV file is empty", ar: "ملف CSV فارغ", fr: "Le fichier CSV est vide" },
+  { en: "read: unsupported data type", ar: "نوع البيانات غير مدعوم للقراءة", fr: "Type de données non pris en charge pour la lecture" },
 ];
