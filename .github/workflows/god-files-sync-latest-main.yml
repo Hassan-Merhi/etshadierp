@@ -1,19 +1,18 @@
 name: God Files Sync Latest Main
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  push:
+    branches: [agent/god-files-recovery-main]
 
 permissions:
   contents: write
 
 concurrency:
-  group: god-files-sync-main-${{ github.event.pull_request.number }}
+  group: god-files-sync-main-recovery
   cancel-in-progress: true
 
 jobs:
   sync:
-    if: github.event.pull_request.head.ref == 'agent/god-files-recovery-main'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -25,6 +24,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if git log -1 --pretty=%B | grep -Fq '[god-files-main-sync]'; then
+            echo 'Latest-main sync commit already applied.'
+            exit 0
+          fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git fetch origin main
@@ -50,8 +53,6 @@ jobs:
             git add client/src/pages/StockItems.tsx
           fi
 
-          # Preserve main's new persistent paginated-filter behavior inside the
-          # already-recovered Wave 5 model instead of restoring the monolith.
           python - <<'PY'
           from pathlib import Path
           p=Path('client/src/pages/stockitems/useStockItems.ts')
@@ -62,8 +63,9 @@ jobs:
               s=s.replace('import { PAGE_SIZE } from "./utils";', 'import { PAGE_SIZE } from "./utils";\nimport { useStockItemsFilters } from "./useStockItemsFilters";')
           old='''  const [searchTerm, setSearchTerm] = useState("");\n  const [debouncedSearch, setDebouncedSearch] = useState("");\n  const [selectedGroupFilter, setSelectedGroupFilter] = useState<number | null>(null);\n  const [selectedGradeFilter, setSelectedGradeFilter] = useState<number | null>(null);\n  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<number | "none" | null>(null);\n  const [currentPage, setCurrentPage] = useState(1);'''
           new='''  const { selectedCompany } = useCompany();\n  const {\n    filters: { searchTerm, selectedGroupFilter, selectedGradeFilter, selectedCategoryFilter },\n    currentPage,\n    setPage: setCurrentPage,\n    debouncedSearch,\n    setSearchTerm,\n    setSelectedGroupFilter,\n    setSelectedGradeFilter,\n    setSelectedCategoryFilter,\n  } = useStockItemsFilters(selectedCompany?.id);'''
-          if old in s:
-              s=s.replace(old,new)
+          if old not in s and 'useStockItemsFilters(selectedCompany?.id)' not in s:
+              raise SystemExit('StockItems model state shape changed unexpectedly; refusing sync')
+          s=s.replace(old,new)
           old_effect='''  useEffect(() => {\n    const timer = setTimeout(() => {\n      setDebouncedSearch(searchTerm);\n      setCurrentPage(1);\n    }, 300);\n    return () => clearTimeout(timer);\n  }, [searchTerm]);\n\n  useEffect(() => {\n    setCurrentPage(1);\n  }, [selectedGroupFilter, selectedGradeFilter, selectedCategoryFilter]);\n\n'''
           s=s.replace(old_effect,'')
           if 'useEffect(' not in s:
