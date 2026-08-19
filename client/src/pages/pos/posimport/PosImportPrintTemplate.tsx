@@ -11,7 +11,7 @@ import { formatNumber } from "@/lib/formatNumber";
 const CENTER_CELL = { textAlign: "center" as const, padding: "4px 3px", verticalAlign: "top", fontWeight: "600" };
 
 interface PrintProps {
-  printRef: RefObject<HTMLDivElement>;
+  printRef: RefObject<HTMLDivElement | null>;
   importedSale: any;
   printUserName: string;
   printCurrPrefix: string;
@@ -147,7 +147,6 @@ export function PosImportPrintTemplate({
           }}
         />
 
-        {/* Title */}
         <div
           style={{
             textAlign: "center",
@@ -160,7 +159,6 @@ export function PosImportPrintTemplate({
           POS INVOICE
         </div>
 
-        {/* Invoice Info */}
         <div
           style={{
             fontSize: "11pt",
@@ -177,7 +175,6 @@ export function PosImportPrintTemplate({
           <span>User: {printUserName}</span>
         </div>
 
-        {/* Daily Exchange Rate - Only for Mali company */}
         {showDailyRate && (
           <div
             style={{
@@ -194,7 +191,6 @@ export function PosImportPrintTemplate({
           </div>
         )}
 
-        {/* Credit Sale Customer Info */}
         {importedSale?.isCreditSale && importedSale?.customer && (
           <div
             style={{
@@ -210,10 +206,8 @@ export function PosImportPrintTemplate({
           </div>
         )}
 
-        {/* Items Table */}
         <ItemsTable importedSale={importedSale} printCurrPrefix={printCurrPrefix} fmtPrint={fmtPrint} />
 
-        {/* Total Paid */}
         <div
           style={{
             fontSize: "14pt",
@@ -229,7 +223,6 @@ export function PosImportPrintTemplate({
           <span>{fmtPrint(totalPaid, printCurrPrefix)}</span>
         </div>
 
-        {/* Notes */}
         {importedSale?.voucher?.description && (
           <div
             style={{ fontSize: "9pt", fontWeight: "600", marginTop: "8px", padding: "4px", border: "2px solid black" }}
@@ -238,7 +231,6 @@ export function PosImportPrintTemplate({
           </div>
         )}
 
-        {/* Footer */}
         <div
           style={{
             textAlign: "center",
