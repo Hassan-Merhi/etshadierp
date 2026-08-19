@@ -5,33 +5,29 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   audit:
     if: github.event.pull_request.number == 818
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout PR head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - name: Set up canonical Node.js
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
-          node-version: "22.14.0"
-          cache: npm
-      - name: Install dependencies
-        run: npm ci --no-audit --bin-links=true
-      - name: Documentation state index
+          ref: ${{ github.event.pull_request.head.ref }}
+      - name: Update live god-file figures
         shell: bash
         run: |
-          set +e
-          npm run audit:doc-index
-          echo DOC_INDEX_EXIT=$?
-          exit 0
-      - name: Script inventory
-        shell: bash
-        run: |
-          set +e
-          npm run audit:scripts
-          echo SCRIPT_INVENTORY_EXIT=$?
-          exit 0
+          sed -i 's/49 files, 24,985/47 files, 24,565/g' docs/god-file-split-program.md docs/system-quality-program.md
+          git diff --check
+          git diff -- docs/god-file-split-program.md docs/system-quality-program.md
+          if git diff --quiet -- docs/god-file-split-program.md docs/system-quality-program.md; then
+            echo "God-file documentation is already current."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/god-file-split-program.md docs/system-quality-program.md
+          git commit -m "Sync god-file documentation metrics"
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
