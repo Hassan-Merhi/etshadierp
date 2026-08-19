@@ -198,6 +198,8 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
       if (group.workerId) gp.set("workerId", String(group.workerId));
       if (group.productId) gp.set("productId", String(group.productId));
       if (group.erpLocationId) gp.set("locationId", String(group.erpLocationId));
+      if (statusFilter.length > 0) gp.set("status", statusFilter.join(","));
+      if (debouncedSearch.trim()) gp.set("search", debouncedSearch.trim());
       return {
         queryKey: ["/api/factory/bales/stock-entry-history/group", gp.toString()],
         queryFn: (): Promise<BaleDetail[]> =>

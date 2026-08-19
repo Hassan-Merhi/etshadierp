@@ -1,6 +1,6 @@
 import type { Plugin } from "vite";
 
-const STOCK_ENTRY_SUFFIX = "/client/src/pages/StockEntryHistory.tsx";
+const STOCK_ENTRY_SUFFIX = "/__god_files_native__/StockEntryHistory.tsx";
 const V5_ALLOCATION_SUFFIX = "/client/src/pages/factory/FactoryStockAllocationV5.tsx";
 const FACTORY_DAYBOOK_SUFFIX = "/__god_files_native__/FactoryDaybook.tsx";
 
