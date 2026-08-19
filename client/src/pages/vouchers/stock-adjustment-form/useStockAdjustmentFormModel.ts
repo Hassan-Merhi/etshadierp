@@ -184,7 +184,7 @@ export function useStockAdjustmentFormModel({ voucherIdToEdit }: StockAdjustment
       });
       hydratedVoucherIdRef.current = voucherIdToEdit;
     }
-  }, [stockAdjustmentToEdit, voucherToEdit, stockItems, stockAdjustmentForm]); // eslint-disable-line
+  }, [stockAdjustmentToEdit, voucherToEdit, stockItems, stockAdjustmentForm, voucherIdToEdit]);
 
   const stockAdjustmentMutation = useMutation({
     mutationFn: async (data: StockAdjustmentFormData) => {

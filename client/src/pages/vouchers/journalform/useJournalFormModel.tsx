@@ -257,7 +257,7 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
   const allJournalValues = journalForm.watch();
   useEffect(() => {
     if (!voucherIdToEdit) scheduleJournalSave(allJournalValues);
-  }, [JSON.stringify(allJournalValues), voucherIdToEdit]);
+  }, [allJournalValues, scheduleJournalSave, voucherIdToEdit]);
 
   const [activeJournalRow, setActiveJournalRow] = useState<number | null>(null);
   const [showAccountSidebar, setShowAccountSidebar] = useState(false);
