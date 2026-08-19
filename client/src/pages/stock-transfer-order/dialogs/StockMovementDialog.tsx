@@ -25,7 +25,7 @@ type StockMovementDialogProps = {
   historyLoading: boolean;
   historyLocation: Location | null;
   historyPeriod: PeriodFilterValue;
-  matrixRef: RefObject<HTMLDivElement>;
+  matrixRef: RefObject<HTMLDivElement | null>;
   navigate: (path: string) => void;
   setDetailDirection: Dispatch<SetStateAction<"in" | "out">>;
   setDetailMonth: Dispatch<SetStateAction<number>>;
@@ -108,40 +108,16 @@ export function StockMovementDialog({
               ))}
             </div>
           ) : !hasMovement ? (
-            <div className="text-center py-12 text-muted-foreground text-sm">
-              No stock movement for this period
-            </div>
+            <div className="text-center py-12 text-muted-foreground text-sm">No stock movement for this period</div>
           ) : (
             <table className="w-full text-sm border-collapse" style={{ minWidth: "700px" }}>
               <thead className="sticky top-0 z-10">
                 <tr className="bg-muted border-b">
-                  <th
-                    rowSpan={2}
-                    className="text-left align-bottom px-3 py-2 border-r font-semibold w-28"
-                  >
-                    Month
-                  </th>
-                  <th
-                    colSpan={3}
-                    className="text-center px-2 py-1.5 border-r font-semibold text-muted-foreground"
-                  >
-                    Opening
-                  </th>
-                  <th
-                    colSpan={3}
-                    className="text-center px-2 py-1.5 border-r font-semibold text-green-700 dark:text-green-400"
-                  >
-                    Stock In
-                  </th>
-                  <th
-                    colSpan={3}
-                    className="text-center px-2 py-1.5 border-r font-semibold text-red-700 dark:text-red-400"
-                  >
-                    Stock Out
-                  </th>
-                  <th colSpan={3} className="text-center px-2 py-1.5 font-semibold text-primary">
-                    Closing
-                  </th>
+                  <th rowSpan={2} className="text-left align-bottom px-3 py-2 border-r font-semibold w-28">Month</th>
+                  <th colSpan={3} className="text-center px-2 py-1.5 border-r font-semibold text-muted-foreground">Opening</th>
+                  <th colSpan={3} className="text-center px-2 py-1.5 border-r font-semibold text-green-700 dark:text-green-400">Stock In</th>
+                  <th colSpan={3} className="text-center px-2 py-1.5 border-r font-semibold text-red-700 dark:text-red-400">Stock Out</th>
+                  <th colSpan={3} className="text-center px-2 py-1.5 font-semibold text-primary">Closing</th>
                 </tr>
                 <tr className="bg-muted/70 border-b text-xs">
                   <th className="text-right px-3 py-1.5 font-medium text-muted-foreground border-r">Qty</th>
@@ -160,16 +136,9 @@ export function StockMovementDialog({
               </thead>
               <tbody>
                 {monthlyData.map((month) => {
-                  const active =
-                    month.inwardQty > 0 ||
-                    month.outwardQty > 0 ||
-                    month.openingQty !== 0 ||
-                    month.closingQty !== 0;
+                  const active = month.inwardQty > 0 || month.outwardQty > 0 || month.openingQty !== 0 || month.closingQty !== 0;
                   return (
-                    <tr
-                      key={month.month}
-                      className={`border-b transition-colors ${active ? "" : "text-muted-foreground/50"}`}
-                    >
+                    <tr key={month.month} className={`border-b transition-colors ${active ? "" : "text-muted-foreground/50"}`}>
                       <td className="font-medium px-3 py-2 border-r">{month.monthName}</td>
                       <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">{formatQty(month.openingQty)}</td>
                       <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">{formatRate(month.openingRate)}</td>
@@ -237,11 +206,7 @@ export function StockMovementDialog({
         </div>
 
         <DialogFooter className="flex-shrink-0 pt-2">
-          <Button
-            variant="outline"
-            onClick={() => setHistoryDialogOpen(false)}
-            data-testid="button-history-close"
-          >
+          <Button variant="outline" onClick={() => setHistoryDialogOpen(false)} data-testid="button-history-close">
             Close
           </Button>
           <Button
