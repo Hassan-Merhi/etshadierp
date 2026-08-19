@@ -34,6 +34,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { z } from "zod";
+import { usePaginatedFilterState } from "@/hooks/use-paginated-filter-state";
 
 const formSchema = insertCustomerSchema.extend({
   legalName: z.string().min(1, "Legal name is required"),
@@ -57,8 +58,15 @@ export default function Customers() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [hideZero, setHideZero] = useState(true);
+  const {
+    filters: { searchQuery, hideZero },
+    setFilter,
+    resetFilters,
+    hasActiveFilters,
+  } = usePaginatedFilterState<{ searchQuery: string; hideZero: boolean }>({
+    createInitialFilters: () => ({ searchQuery: "", hideZero: true }),
+    storageKey: selectedCompany?.id ? `erp-customers-filters-v1:${selectedCompany.id}` : undefined,
+  });
   const [statementCustomer, setStatementCustomer] = useState<
     (Customer & { balance: number; balanceSide: string }) | null
   >(null);
@@ -361,15 +369,24 @@ export default function Customers() {
           <Input
             placeholder="Search customers..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => setFilter("searchQuery", e.target.value)}
             className="pl-9"
             data-testid="input-search-customers"
           />
         </div>
-        <Button variant="outline" onClick={() => setHideZero(!hideZero)} data-testid="button-toggle-hide-zero">
+        <Button
+          variant="outline"
+          onClick={() => setFilter("hideZero", !hideZero)}
+          data-testid="button-toggle-hide-zero"
+        >
           {hideZero ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
           {hideZero ? "Show Zero" : "Hide Zero"}
         </Button>
+        {hasActiveFilters && (
+          <Button variant="outline" type="button" onClick={resetFilters} data-testid="button-reset-filters">
+            Reset filters
+          </Button>
+        )}
       </div>
 
       {/* Table */}

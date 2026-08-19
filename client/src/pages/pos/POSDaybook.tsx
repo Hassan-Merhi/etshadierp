@@ -31,6 +31,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useToast } from "@/hooks/use-toast";
+import { usePaginatedFilterState } from "@/hooks/use-paginated-filter-state";
 import { formatNumber } from "@/lib/formatNumber";
 import { sendInvoicePdfWithRetry } from "./utils/posPrintHelpers";
 import type { Voucher, VoucherWithItems } from "./posdaybook/types";
@@ -55,7 +56,6 @@ export default function POSDaybook() {
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
   const [printVoucherId, setPrintVoucherId] = useState<number | null>(null);
   const [hiddenRowIds, setHiddenRowIds] = useState<Set<number>>(new Set());
-  const [showHidden, setShowHidden] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
   const printStartedRef = useRef(false);
 
@@ -74,7 +74,15 @@ export default function POSDaybook() {
     return getDefaultPeriodValue("today");
   };
 
-  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(initialPeriod);
+  const {
+    filters: { periodFilter, showHidden },
+    setFilter,
+    resetFilters,
+    hasActiveFilters,
+  } = usePaginatedFilterState<{ periodFilter: PeriodFilterValue; showHidden: boolean }>({
+    createInitialFilters: () => ({ periodFilter: initialPeriod(), showHidden: false }),
+    storageKey: !dateParam && selectedCompany?.id ? `erp-pos-daybook-filters-v1:${selectedCompany.id}` : undefined,
+  });
 
   const { data: currentUser, isLoading: isLoadingUser } = useQuery<any>({
     queryKey: ["/api/auth/me"],
@@ -217,7 +225,7 @@ export default function POSDaybook() {
   const shiftDay = (days: number) => {
     const from = addDays(new Date(`${periodFilter.fromDate}T00:00:00`), days);
     const to = addDays(new Date(`${periodFilter.toDate}T00:00:00`), days);
-    setPeriodFilter({
+    setFilter("periodFilter", {
       fromDate: format(from, "yyyy-MM-dd"),
       toDate: format(to, "yyyy-MM-dd"),
       preset: "custom",
@@ -242,23 +250,48 @@ export default function POSDaybook() {
           <Button variant="ghost" size="icon" onClick={() => shiftDay(-1)} title="Previous day">
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="pos-daybook-period-filter" />
+          <PeriodFilter
+            value={periodFilter}
+            onChange={(next) => setFilter("periodFilter", next)}
+            data-testid="pos-daybook-period-filter"
+          />
           <Button variant="ghost" size="icon" onClick={() => shiftDay(1)} title="Next day">
             <ChevronRight className="h-4 w-4" />
           </Button>
+          {hasActiveFilters && (
+            <Button variant="outline" size="sm" onClick={resetFilters} data-testid="button-reset-filters">
+              <X className="mr-1 h-4 w-4" />
+              Reset filters
+            </Button>
+          )}
         </div>
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <Stat label="Sales" value={String(salesOnly.length)} icon={<Package className="h-4 w-4" />} loading={isLoading} />
-        <Stat label="Total Revenue" value={formatCashAmount(totalSales)} icon={<DollarSign className="h-4 w-4" />} loading={isLoading} />
+        <Stat
+          label="Sales"
+          value={String(salesOnly.length)}
+          icon={<Package className="h-4 w-4" />}
+          loading={isLoading}
+        />
+        <Stat
+          label="Total Revenue"
+          value={formatCashAmount(totalSales)}
+          icon={<DollarSign className="h-4 w-4" />}
+          loading={isLoading}
+        />
         <Stat
           label="Avg per Sale"
           value={formatCashAmount(salesOnly.length ? totalSales / salesOnly.length : 0)}
           icon={<Calendar className="h-4 w-4" />}
           loading={isLoading}
         />
-        <Stat label="Transfers" value={String(transfersOnly.length)} icon={<ArrowRight className="h-4 w-4" />} loading={isLoading} />
+        <Stat
+          label="Transfers"
+          value={String(transfersOnly.length)}
+          icon={<ArrowRight className="h-4 w-4" />}
+          loading={isLoading}
+        />
       </div>
 
       <div>
@@ -267,7 +300,7 @@ export default function POSDaybook() {
           <Button
             variant={showHidden ? "secondary" : "outline"}
             size="sm"
-            onClick={() => setShowHidden((value) => !value)}
+            onClick={() => setFilter("showHidden", (value) => !value)}
             disabled={hiddenRowIds.size === 0}
           >
             {showHidden ? <Eye className="mr-1 h-4 w-4" /> : <EyeOff className="mr-1 h-4 w-4" />}
@@ -276,7 +309,11 @@ export default function POSDaybook() {
         </div>
 
         {isLoadingUser || isLoading ? (
-          <div className="space-y-2">{[0, 1, 2].map((key) => <Skeleton key={key} className="h-12 w-full" />)}</div>
+          <div className="space-y-2">
+            {[0, 1, 2].map((key) => (
+              <Skeleton key={key} className="h-12 w-full" />
+            ))}
+          </div>
         ) : visibleVouchers.length === 0 ? (
           <div className="py-12 text-center text-muted-foreground">No transactions found</div>
         ) : (
@@ -312,9 +349,15 @@ export default function POSDaybook() {
                             {voucher.voucherType === "Sales" ? "Sale" : "Transfer"}
                           </Badge>
                         </TableCell>
-                        <TableCell className="hidden sm:table-cell">{voucher.locationName || `Location ${voucher.locationId}`}</TableCell>
-                        <TableCell className="text-right font-mono font-semibold">{formatCashAmount(Number(voucher.totalAmount || 0))}</TableCell>
-                        <TableCell className="hidden max-w-xs truncate md:table-cell">{voucher.description || "-"}</TableCell>
+                        <TableCell className="hidden sm:table-cell">
+                          {voucher.locationName || `Location ${voucher.locationId}`}
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-semibold">
+                          {formatCashAmount(Number(voucher.totalAmount || 0))}
+                        </TableCell>
+                        <TableCell className="hidden max-w-xs truncate md:table-cell">
+                          {voucher.description || "-"}
+                        </TableCell>
                         <TableCell>
                           <div className="flex justify-end gap-1">
                             {voucher.voucherType === "Sales" && (
@@ -416,7 +459,9 @@ export default function POSDaybook() {
             <span>TOTAL PAID</span>
             <span>{formatCashAmount(Number(printDetails?.totalAmount || 0))}</span>
           </div>
-          {printDetails?.description && <div className="mt-3 border border-black p-2 text-sm">Note: {printDetails.description}</div>}
+          {printDetails?.description && (
+            <div className="mt-3 border border-black p-2 text-sm">Note: {printDetails.description}</div>
+          )}
           {selectedCompany?.name && <div className="mt-5 text-center text-sm font-bold">{selectedCompany.name}</div>}
         </div>
       </div>
@@ -428,17 +473,38 @@ export default function POSDaybook() {
           </DialogHeader>
           <div className="flex-1 overflow-y-auto">
             {detailsLoading ? (
-              <div className="space-y-2">{[0, 1, 2].map((key) => <Skeleton key={key} className="h-14 w-full" />)}</div>
+              <div className="space-y-2">
+                {[0, 1, 2].map((key) => (
+                  <Skeleton key={key} className="h-14 w-full" />
+                ))}
+              </div>
             ) : voucherDetails ? (
               <div className="space-y-4">
                 <div className="grid gap-2 rounded-lg border p-3 text-sm sm:grid-cols-2">
-                  <div><span className="text-muted-foreground">Receipt:</span> {voucherDetails.voucherNumber}</div>
-                  <div><span className="text-muted-foreground">Date:</span> {voucherDetails.voucherDate}</div>
-                  <div><span className="text-muted-foreground">Location:</span> {voucherDetails.locationName || `Location ${voucherDetails.locationId}`}</div>
-                  <div><span className="text-muted-foreground">Type:</span> {voucherDetails.voucherType}</div>
-                  {voucherDetails.customerName && <div><span className="text-muted-foreground">Customer:</span> {voucherDetails.customerName}</div>}
+                  <div>
+                    <span className="text-muted-foreground">Receipt:</span> {voucherDetails.voucherNumber}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Date:</span> {voucherDetails.voucherDate}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Location:</span>{" "}
+                    {voucherDetails.locationName || `Location ${voucherDetails.locationId}`}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Type:</span> {voucherDetails.voucherType}
+                  </div>
+                  {voucherDetails.customerName && (
+                    <div>
+                      <span className="text-muted-foreground">Customer:</span> {voucherDetails.customerName}
+                    </div>
+                  )}
                   {voucherDetails.isCreditSale && <div className="font-semibold">Credit sale</div>}
-                  {voucherDetails.description && <div className="sm:col-span-2"><span className="text-muted-foreground">Notes:</span> {voucherDetails.description}</div>}
+                  {voucherDetails.description && (
+                    <div className="sm:col-span-2">
+                      <span className="text-muted-foreground">Notes:</span> {voucherDetails.description}
+                    </div>
+                  )}
                 </div>
                 <div className="table-responsive">
                   <Table>
@@ -456,33 +522,58 @@ export default function POSDaybook() {
                       {(voucherDetails.salesItems || []).map((item) => (
                         <TableRow key={item.id}>
                           <TableCell>{item.stockItemName || `Item ${item.stockItemId}`}</TableCell>
-                          <TableCell className="text-right font-mono">{formatNumber(Number(item.quantity || 0), 0)}</TableCell>
-                          <TableCell className="text-right font-mono">{formatCashAmount(Number(item.sellingPrice || 0))}</TableCell>
-                          <TableCell className="text-right font-mono font-semibold">{formatCashAmount(Number(item.totalSales || 0))}</TableCell>
-                          {canSeeProfitCost && <TableCell className="text-right font-mono">{formatCashAmount(Number(item.costPrice || 0))}</TableCell>}
-                          {canSeeProfitCost && <TableCell className="text-right font-mono">{formatCashAmount(Number(item.profit || 0))}</TableCell>}
+                          <TableCell className="text-right font-mono">
+                            {formatNumber(Number(item.quantity || 0), 0)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {formatCashAmount(Number(item.sellingPrice || 0))}
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-semibold">
+                            {formatCashAmount(Number(item.totalSales || 0))}
+                          </TableCell>
+                          {canSeeProfitCost && (
+                            <TableCell className="text-right font-mono">
+                              {formatCashAmount(Number(item.costPrice || 0))}
+                            </TableCell>
+                          )}
+                          {canSeeProfitCost && (
+                            <TableCell className="text-right font-mono">
+                              {formatCashAmount(Number(item.profit || 0))}
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 </div>
-                <div className="flex justify-end text-lg font-semibold">Total: {formatCashAmount(Number(voucherDetails.totalAmount || 0))}</div>
+                <div className="flex justify-end text-lg font-semibold">
+                  Total: {formatCashAmount(Number(voucherDetails.totalAmount || 0))}
+                </div>
               </div>
             ) : (
               <div className="py-8 text-center text-muted-foreground">Sale details could not be loaded.</div>
             )}
           </div>
           <div className="flex flex-wrap justify-end gap-2 border-t pt-4">
-            <Button variant="outline" onClick={() => setSelectedVoucher(null)}><X className="mr-2 h-4 w-4" />Close</Button>
-            <Button variant="outline" disabled={!voucherDetails} onClick={() => voucherDetails && setPrintVoucherId(voucherDetails.id)}>
-              <Printer className="mr-2 h-4 w-4" />Print
+            <Button variant="outline" onClick={() => setSelectedVoucher(null)}>
+              <X className="mr-2 h-4 w-4" />
+              Close
+            </Button>
+            <Button
+              variant="outline"
+              disabled={!voucherDetails}
+              onClick={() => voucherDetails && setPrintVoucherId(voucherDetails.id)}
+            >
+              <Printer className="mr-2 h-4 w-4" />
+              Print
             </Button>
             <Button
               variant="outline"
               disabled={!voucherDetails || whatsappMutation.isPending}
               onClick={() => voucherDetails && whatsappMutation.mutate(voucherDetails)}
             >
-              <MessageCircle className="mr-2 h-4 w-4" />Resend WhatsApp
+              <MessageCircle className="mr-2 h-4 w-4" />
+              Resend WhatsApp
             </Button>
             <TooltipProvider>
               <Tooltip>
@@ -507,13 +598,27 @@ export default function POSDaybook() {
   );
 }
 
-function Stat({ label, value, icon, loading }: { label: string; value: string; icon: React.ReactNode; loading: boolean }) {
+function Stat({
+  label,
+  value,
+  icon,
+  loading,
+}: {
+  label: string;
+  value: string;
+  icon: React.ReactNode;
+  loading: boolean;
+}) {
   return (
     <div className="flex items-center gap-3 rounded-lg border bg-muted/40 px-4 py-2.5">
       <div className="text-muted-foreground">{icon}</div>
       <div>
         <p className="mb-0.5 text-xs leading-none text-muted-foreground">{label}</p>
-        {loading ? <Skeleton className="mt-1 h-5 w-16" /> : <p className="font-mono text-lg font-semibold leading-none">{value}</p>}
+        {loading ? (
+          <Skeleton className="mt-1 h-5 w-16" />
+        ) : (
+          <p className="font-mono text-lg font-semibold leading-none">{value}</p>
+        )}
       </div>
     </div>
   );

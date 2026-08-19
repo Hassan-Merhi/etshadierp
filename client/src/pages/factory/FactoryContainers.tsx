@@ -36,6 +36,8 @@ import { queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import type { FactorySupplier } from "@shared/schema";
+import { useCompany } from "@/contexts/CompanyContext";
+import { usePaginatedFilterState } from "@/hooks/use-paginated-filter-state";
 
 import {
   type ContainerWithSupplier,
@@ -59,6 +61,7 @@ import {
 } from "./factory-containers/ContainerDialogs";
 
 export default function FactoryContainers() {
+  const { selectedCompany } = useCompany();
   const [viewMode, setViewMode] = useState<"list" | "summary" | "tracking">("tracking");
   const [_trackingNowId, _setTrackingNowId] = useState<number | null>(null);
   const [openOtwGroups, setOpenOtwGroups] = useState<Set<string>>(new Set());
@@ -66,8 +69,15 @@ export default function FactoryContainers() {
   const [editingContainer, setEditingContainer] = useState<ContainerWithSupplier | null>(null);
   const [expandedSuppliers, setExpandedSuppliers] = useState<Set<string>>(new Set(["__all__"]));
   const [viewContainer, setViewContainer] = useState<ContainerWithSupplier | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const {
+    filters: { searchQuery, statusFilter },
+    setFilter,
+    resetFilters,
+    hasActiveFilters,
+  } = usePaginatedFilterState<{ searchQuery: string; statusFilter: string }>({
+    createInitialFilters: () => ({ searchQuery: "", statusFilter: "all" }),
+    storageKey: selectedCompany?.id ? `erp-factory-containers-filters-v1:${selectedCompany.id}` : undefined,
+  });
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -331,9 +341,11 @@ export default function FactoryContainers() {
           filteredContainers={filteredContainers}
           suppliers={suppliers}
           searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
+          setSearchQuery={(next) => setFilter("searchQuery", next)}
           statusFilter={statusFilter}
-          setStatusFilter={setStatusFilter}
+          setStatusFilter={(next) => setFilter("statusFilter", next)}
+          hasActiveFilters={hasActiveFilters}
+          onResetFilters={resetFilters}
           expandedSuppliers={expandedSuppliers}
           setExpandedSuppliers={setExpandedSuppliers}
           selectedIds={selectedIds}

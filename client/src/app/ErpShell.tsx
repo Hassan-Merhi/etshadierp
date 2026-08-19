@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, Suspense } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { useMainContentFocus } from "@/hooks/use-main-content-focus";
 import { useWorkspaceWheelScroll } from "@/hooks/use-workspace-wheel-scroll";
@@ -10,10 +10,9 @@ import { DailyRateModal } from "@/components/DailyRateModal";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AppTopBar } from "@/components/AppTopBar";
 import { OfflineBanner } from "@/components/OfflineBanner";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CommandPalette } from "@/components/CommandPalette";
-import { LoadingState } from "@/components/ui/page-state";
 import { SkipLink } from "@/components/ui/responsive-accessibility";
+import { WorkspaceRouteBoundary } from "@/components/ui/workspace-route-boundary";
 import { Router } from "@/routes/AppRoutes";
 import { installErpNavigationHistory } from "@/lib/erp-navigation-history";
 import { canUseAdminSearch, type ShellUser } from "./shellUser";
@@ -67,17 +66,13 @@ export function ErpShell({ user, hasErpAccess, handleLogout, leaveConfirmDialog 
                 aria-label={t("workspace.controls")}
                 className="flex-1 overflow-y-auto overscroll-y-contain p-3 outline-none sm:p-6"
               >
-                <div className="w-full min-w-0 max-w-full [&_form]:min-w-0 [&_table]:w-full [&_[role=table]]:w-full [&_.overflow-x-auto]:overscroll-x-contain">
-                  <ErrorBoundary resetKey={currentLocation}>
-                    <Suspense
-                      fallback={
-                        <LoadingState title="Loading workspace" description="Preparing the latest ERP information." />
-                      }
-                    >
-                      <Router user={user} />
-                    </Suspense>
-                  </ErrorBoundary>
-                </div>
+                <WorkspaceRouteBoundary
+                  resetKey={currentLocation}
+                  loadingTitle="Loading workspace"
+                  loadingDescription="Preparing the latest ERP information."
+                >
+                  <Router user={user} />
+                </WorkspaceRouteBoundary>
               </main>
             </div>
           </div>

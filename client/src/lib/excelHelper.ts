@@ -197,8 +197,16 @@ function binaryStringToArrayBuffer(s: string): ArrayBuffer {
   return buf;
 }
 
+function isArrayBuffer(value: unknown): value is ArrayBuffer {
+  return Object.prototype.toString.call(value) === "[object ArrayBuffer]";
+}
+
+function isUint8Array(value: unknown): value is Uint8Array {
+  return Object.prototype.toString.call(value) === "[object Uint8Array]";
+}
+
 function toBytes(data: ArrayBuffer | Uint8Array): Uint8Array {
-  return data instanceof Uint8Array ? Uint8Array.from(data) : new Uint8Array(data);
+  return isUint8Array(data) ? Uint8Array.from(data) : new Uint8Array(data);
 }
 
 function isXlsxZip(bytes: Uint8Array): boolean {
@@ -269,14 +277,15 @@ export async function read(
   if (data == null) {
     throw new Error("read: no data provided");
   }
-
   if (typeof File !== "undefined" && data instanceof File) {
     const buffer = await data.arrayBuffer();
     await loadSpreadsheet(workbook, new Uint8Array(buffer));
   } else if (typeof data === "string") {
     await loadSpreadsheet(workbook, new Uint8Array(binaryStringToArrayBuffer(data)));
-  } else {
+  } else if (isArrayBuffer(data) || isUint8Array(data)) {
     await loadSpreadsheet(workbook, toBytes(data));
+  } else {
+    throw new Error("read: unsupported data type");
   }
 
   const SheetNames: string[] = [];

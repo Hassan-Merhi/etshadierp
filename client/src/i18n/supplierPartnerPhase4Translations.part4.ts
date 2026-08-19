@@ -223,4 +223,9 @@ export const supplierPartnerPhase4TranslationsPart4: readonly Phase4SupplierPart
     ar: "توزيع الأرباح للفترة {0} موجود بالفعل",
     fr: "La répartition du bénéfice pour {0} existe déjà",
   },
+  {
+    en: 'Target is missing required accounts: ${missingAccounts.map((row) => row.sub_type).join(", ")}.',
+    ar: "يفتقد الهدف الحسابات المطلوبة: {0}.",
+    fr: "Les comptes requis suivants manquent dans la cible : {0}.",
+  },
 ];

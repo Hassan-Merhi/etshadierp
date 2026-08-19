@@ -7,8 +7,8 @@ import {
 
 describe("Phase 6 Reports and Exports translations", () => {
   it("covers every reviewed reports and exports phrase exactly once", () => {
-    expect(reportsExportsPhase6Translations).toHaveLength(251);
-    expect(new Set(reportsExportsPhase6Translations.map((entry) => entry.en)).size).toBe(251);
+    expect(reportsExportsPhase6Translations).toHaveLength(254);
+    expect(new Set(reportsExportsPhase6Translations.map((entry) => entry.en)).size).toBe(254);
 
     for (const entry of reportsExportsPhase6Translations) {
       expect(entry.en.trim()).not.toBe("");
@@ -23,6 +23,13 @@ describe("Phase 6 Reports and Exports translations", () => {
     expect(translatePhase6ReportsExportsText("QZ Tray library failed to load", "ar")).toBe("فشل تحميل مكتبة QZ Tray");
     expect(translatePhase6ReportsExportsText("WhatsApp sending is disabled", "fr")).toBe(
       "L’envoi WhatsApp est désactivé"
+    );
+    expect(translatePhase6ReportsExportsText("Could not parse CSV: Invalid Quotes", "ar")).toBe(
+      "تعذر تحليل ملف CSV: Invalid Quotes"
+    );
+    expect(translatePhase6ReportsExportsText("CSV file is empty", "fr")).toBe("Le fichier CSV est vide");
+    expect(translatePhase6ReportsExportsText("read: unsupported data type", "ar")).toBe(
+      "القراءة: نوع بيانات غير مدعوم"
     );
   });
 
