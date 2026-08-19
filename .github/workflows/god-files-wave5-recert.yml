@@ -100,7 +100,7 @@ jobs:
             exit 1
           fi
 
-          npx vitest run tests/god-file-boundaries.test.ts
+          node scripts/audit-god-file-boundaries.mjs
           git add -A
           git commit -m 'refactor: re-certify God Files Wave 5 on current main [wave5-recert]'
           SKIP_TSC_CHECK=1 git push origin HEAD:agent/god-files-recovery-main
