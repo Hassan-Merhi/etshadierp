@@ -1,0 +1,155 @@
+name: AI Repair Intake
+
+on:
+  workflow_run:
+    workflows: [CI, CodeQL, Semgrep, Security]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      summary:
+        description: Short description of the reproducible defect
+        required: true
+        type: string
+      evidence_url:
+        description: URL to logs, production error evidence, or a failing run
+        required: true
+        type: string
+      base_branch:
+        description: Branch the repair agent should start from
+        required: true
+        default: main
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+
+concurrency:
+  group: ai-repair-intake-${{ github.event_name }}-${{ github.event.workflow_run.id || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  failed-main-workflow:
+    name: Create repair issue for failed main workflow
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPAIR_WORKFLOW: ${{ github.event.workflow_run.name }}
+      REPAIR_SHA: ${{ github.event.workflow_run.head_sha }}
+      REPAIR_URL: ${{ github.event.workflow_run.html_url }}
+      REPAIR_RUN_ID: ${{ github.event.workflow_run.id }}
+
+    steps:
+      - name: Ensure repair labels exist
+        shell: bash
+        run: |
+          gh api --method POST "repos/$GITHUB_REPOSITORY/labels" \
+            -f name='ai-repair' -f color='5319e7' \
+            -f description='Evidence-backed defect suitable for guarded AI repair' >/dev/null 2>&1 || true
+          gh api --method POST "repos/$GITHUB_REPOSITORY/labels" \
+            -f name='needs-triage' -f color='fbca04' \
+            -f description='Requires human triage before an agent is assigned' >/dev/null 2>&1 || true
+
+      - name: Create or update evidence-backed repair issue
+        shell: bash
+        run: |
+          short_sha="${REPAIR_SHA:0:7}"
+          title="[AI Repair] ${REPAIR_WORKFLOW} failed on main at ${short_sha}"
+
+          existing_number="$(gh issue list --state open --limit 100 \
+            --json number,title \
+            --jq ".[] | select(.title == \"${title}\") | .number" | head -n 1)"
+
+          cat > /tmp/ai-repair-body.md <<EOF
+          ## Evidence
+
+          - Workflow: **${REPAIR_WORKFLOW}**
+          - Branch: **main**
+          - Commit: \`${REPAIR_SHA}\`
+          - Failed run: ${REPAIR_URL}
+          - Run ID: \`${REPAIR_RUN_ID}\`
+
+          ## Repair contract
+
+          This issue was created from a concrete failed workflow run. Before changing code, inspect the linked run and reproduce/localize the failure.
+
+          When assigning an AI coding agent, use the repository's **bug-repair** custom agent. The agent must add focused regression proof where practical, preserve all existing CI/security ratchets, and deliver changes only through a reviewable pull request. It must not merge or push directly to \`main\`.
+
+          Human triage is intentionally required before agent assignment. Confirm this is a real defect rather than an infrastructure/transient failure, then remove **needs-triage** and assign the **bug-repair** agent.
+          EOF
+
+          if [[ -n "$existing_number" ]]; then
+            gh issue comment "$existing_number" --body-file /tmp/ai-repair-body.md
+          else
+            gh issue create \
+              --title "$title" \
+              --body-file /tmp/ai-repair-body.md \
+              --label ai-repair \
+              --label needs-triage
+          fi
+
+  manual-evidence-intake:
+    name: Create repair issue from supplied evidence
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPAIR_SUMMARY: ${{ inputs.summary }}
+      REPAIR_EVIDENCE_URL: ${{ inputs.evidence_url }}
+      REPAIR_BASE_BRANCH: ${{ inputs.base_branch }}
+
+    steps:
+      - name: Validate manual intake
+        shell: bash
+        run: |
+          if [[ "$REPAIR_BASE_BRANCH" != "main" ]]; then
+            echo "Manual AI repair intake currently permits only main as the repair base."
+            exit 2
+          fi
+          case "$REPAIR_EVIDENCE_URL" in
+            https://*) ;;
+            *) echo "Evidence URL must use HTTPS."; exit 2 ;;
+          esac
+
+      - name: Ensure repair labels exist
+        shell: bash
+        run: |
+          gh api --method POST "repos/$GITHUB_REPOSITORY/labels" \
+            -f name='ai-repair' -f color='5319e7' \
+            -f description='Evidence-backed defect suitable for guarded AI repair' >/dev/null 2>&1 || true
+          gh api --method POST "repos/$GITHUB_REPOSITORY/labels" \
+            -f name='needs-triage' -f color='fbca04' \
+            -f description='Requires human triage before an agent is assigned' >/dev/null 2>&1 || true
+
+      - name: Create manual repair issue
+        shell: bash
+        run: |
+          title="[AI Repair] ${REPAIR_SUMMARY}"
+          cat > /tmp/ai-repair-body.md <<EOF
+          ## Evidence
+
+          - Summary: ${REPAIR_SUMMARY}
+          - Evidence: ${REPAIR_EVIDENCE_URL}
+          - Repair base: **main**
+
+          ## Repair contract
+
+          Inspect and validate the linked evidence before changing code. When assigning an AI coding agent, use the repository's **bug-repair** custom agent.
+
+          The agent must reproduce/localize the defect, add focused regression proof where practical, preserve all existing CI/security ratchets, and deliver changes only through a reviewable pull request. It must not merge or push directly to \`main\`.
+
+          Human triage is intentionally required before assignment. Remove **needs-triage** only after confirming the evidence represents an actionable software defect.
+          EOF
+
+          gh issue create \
+            --title "$title" \
+            --body-file /tmp/ai-repair-body.md \
+            --label ai-repair \
+            --label needs-triage
