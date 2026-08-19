@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { registerCommonInventoryPerformanceRoutes } from "./commonInventoryPerformanceRoutes";
 import { registerLocationWhatsappLegacyCompatibilityRoutes } from "./locationWhatsappLegacyCompatibilityRoutes";
 import { registerLocationCrudRoutes } from "./locationCrudRoutes";
+import { registerLocationDeleteRoutes } from "./locationDeleteRoutes";
 import { registerLocationInventoryRoutes } from "./locationInventoryRoutes";
 import { registerLocationReportRoutes } from "./locationReportRoutes";
 import { registerLocationWhatsappScheduleRoutes } from "./locationWhatsappScheduleRoutes";
@@ -14,6 +15,7 @@ export function registerLocationRoutes(app: Express) {
   // permission + group-validation boundary instead of bypassing Phase 1.
   registerLocationWhatsappLegacyCompatibilityRoutes(app);
   registerLocationCrudRoutes(app);
+  registerLocationDeleteRoutes(app);
   registerLocationInventoryRoutes(app);
   registerLocationReportRoutes(app);
   registerLocationWhatsappScheduleRoutes(app);
