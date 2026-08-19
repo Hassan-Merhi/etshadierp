@@ -40,12 +40,14 @@ jobs:
               p.write_text(s)
           elif new not in s:
               raise SystemExit('Factory Daybook Vite transform suffix not found')
+
+          reports = Path('client/src/pages/stockentryhistory/reportsLegacy.ts')
+          reports_text = reports.read_text()
+          if '<\\/script>' in reports_text:
+              reports.write_text(reports_text.replace('<\\/script>', '</script>'))
           PY
 
           npm ci --ignore-scripts
-
-          # Remove mechanically fixable recovery warnings first.
-          npx eslint client/src/pages/stockentryhistory/reportsLegacy.ts --fix || true
 
           # Preserve pre-split effect semantics. The recovery extraction changed
           # lint inference/locations, not the intended dependency behavior. Keep
