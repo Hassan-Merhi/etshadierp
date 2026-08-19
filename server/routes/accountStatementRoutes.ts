@@ -9,6 +9,12 @@ import { toArrayBuffer } from "../lib/bufferCompatibility";
 import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
+import {
+  assertValidPdfBuffer,
+  normalizeStatementDate,
+  statementDateKey,
+  validateStatementDateRange,
+} from "../lib/accountStatementExportSafety";
 import path from "path";
 import fs from "fs";
 import { eq, and, desc, isNull, isNotNull, sql } from "drizzle-orm";
@@ -310,9 +316,12 @@ export function registerAccountStatementRoutes(app: Express) {
 
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       if (isNaN(accountId)) return res.status(400).json({ message: "Invalid account ID" });
+      const dateRange = validateStatementDateRange(startDate, endDate);
+      if (!dateRange.ok) return res.status(400).json({ message: dateRange.message });
 
       const { generateAccountStatementPdf } = await import("../lib/accountStatementPdfGenerator");
       const pdfBuf = await generateAccountStatementPdf({ accountType, accountId, companyId, startDate, endDate, lang });
+      assertValidPdfBuffer(pdfBuf);
 
       // Resolve human-readable account name for the filename
       let resolvedName = `${accountType}_${accountId}`;
@@ -354,10 +363,10 @@ export function registerAccountStatementRoutes(app: Express) {
       const safeAccName = resolvedName.replace(/[^\w\s.()-]/g, "_").replace(/\s+/g, "_");
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename=statement_${safeAccName}.pdf`);
+      res.setHeader("Content-Length", String(pdfBuf.length));
+      res.setHeader("Cache-Control", "no-store");
       res.end(pdfBuf);
       return;
-
-      // Legacy code below is unreachable — kept for reference only
     } catch (err: unknown) {
       logger.error("Statement PDF error:", { error: err });
       if (!res.headersSent) res.status(500).json({ message: getErrorMessage(err) });
@@ -375,6 +384,8 @@ export function registerAccountStatementRoutes(app: Express) {
       if (isNaN(accountId)) return res.status(400).json({ message: "Invalid accountId" });
       const startDate = (req.query.startDate as string) || undefined;
       const endDate = (req.query.endDate as string) || undefined;
+      const dateRange = validateStatementDateRange(startDate, endDate);
+      if (!dateRange.ok) return res.status(400).json({ message: dateRange.message });
 
       // Resolve account name and opening balance
       let accountName = "Account";
@@ -439,8 +450,10 @@ export function registerAccountStatementRoutes(app: Express) {
       let bfBalance = openingBalanceSide === "Dr" ? openingBalance : -openingBalance;
       if (startDate && allTxForBF.length > 0) {
         for (const r of allTxForBF) {
-          const rDate = (r.voucherDate || "").toString().slice(0, 10);
-          if (rDate < startDate) bfBalance += parseFloat(r.debitAmount || "0") - parseFloat(r.creditAmount || "0");
+          const rDate = statementDateKey(r.voucherDate);
+          if (rDate && rDate < startDate) {
+            bfBalance += parseFloat(r.debitAmount || "0") - parseFloat(r.creditAmount || "0");
+          }
         }
       }
 
@@ -472,12 +485,20 @@ export function registerAccountStatementRoutes(app: Express) {
 
       const ExcelJS = (await import("exceljs")).default;
       const workbook = new ExcelJS.Workbook();
-      const sheet = workbook.addWorksheet("Statement");
+      workbook.creator = "Business OS";
+      workbook.created = new Date();
+      workbook.modified = new Date();
+      const sheet = workbook.addWorksheet("Statement", {
+        pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 },
+        properties: { defaultRowHeight: 18 },
+      });
+      sheet.pageMargins = { left: 0.25, right: 0.25, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 };
+      sheet.properties.showGridLines = false;
 
       sheet.columns = [
         { key: "date", width: 13 },
         { key: "voucher", width: 18 },
-        { key: "particulars", width: 38 },
+        { key: "particulars", width: 42 },
         { key: "dr", width: 16 },
         { key: "cr", width: 16 },
         { key: "balance", width: 18 },
@@ -492,7 +513,7 @@ export function registerAccountStatementRoutes(app: Express) {
           const logoRow = sheet.addRow([]);
           logoRow.height = 80;
           sheet.addImage(logoId, { tl: { col: 2.5, row: 0 }, ext: { width: 260, height: 80 } });
-          sheet.mergeCells(`A1:F1`);
+          sheet.mergeCells("A1:F1");
         }
       } catch {
         // Failure here is non-fatal and the surrounding flow continues deliberately.
@@ -533,62 +554,76 @@ export function registerAccountStatementRoutes(app: Express) {
 
       // Column headers
       const hdr = sheet.addRow(["Date", "Voucher No.", "Particulars", "Debit (Dr)", "Credit (Cr)", "Balance"]);
+      hdr.height = 22;
       hdr.eachCell((cell) => {
         cell.fill = navyFill;
         cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
         cell.border = allBorders;
-        cell.alignment = { horizontal: "center" };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
       });
+      sheet.autoFilter = { from: { row: hdr.number, column: 1 }, to: { row: hdr.number, column: 6 } };
+      sheet.views = [
+        {
+          state: "frozen",
+          ySplit: hdr.number,
+          topLeftCell: `A${hdr.number + 1}`,
+          activeCell: `A${hdr.number + 1}`,
+          showGridLines: false,
+        },
+      ];
 
       // Opening balance row (no filter) or B/F row (filtered)
       if (!startDate && openingBalance > 0 && accountType === "ledger") {
-        const _obBal = openingBalanceSide === "Dr" ? openingBalance : -openingBalance;
         const obRow = sheet.addRow([
-          new Date().toLocaleDateString("en-GB"),
+          "",
           "—",
           "Opening Balance",
           openingBalanceSide === "Dr" ? openingBalance : null,
           openingBalanceSide === "Cr" ? openingBalance : null,
-          `${openingBalance.toFixed(2)} ${openingBalanceSide}`,
+          openingBalance,
         ]);
         obRow.eachCell((cell) => {
           cell.fill = lightBlueFill;
           cell.border = allBorders;
+          cell.alignment = { vertical: "middle" };
         });
         obRow.getCell(4).numFmt = numFmt;
         obRow.getCell(5).numFmt = numFmt;
-        obRow.getCell(4).alignment = { horizontal: "right" };
-        obRow.getCell(5).alignment = { horizontal: "right" };
-        obRow.getCell(6).alignment = { horizontal: "right" };
+        obRow.getCell(6).numFmt = `${numFmt} "${openingBalanceSide}"`;
+        obRow.getCell(4).alignment = { horizontal: "right", vertical: "middle" };
+        obRow.getCell(5).alignment = { horizontal: "right", vertical: "middle" };
+        obRow.getCell(6).alignment = { horizontal: "right", vertical: "middle" };
       } else if (startDate && Math.abs(bfBalance) > 0.005 && accountType === "ledger") {
         const bfAbs = Math.abs(bfBalance);
         const bfSide = bfBalance >= 0 ? "Dr" : "Cr";
         const bfRow = sheet.addRow([
-          new Date(startDate + "T00:00:00"),
+          normalizeStatementDate(startDate) ?? "",
           "—",
           "Balance Brought Forward",
           bfSide === "Dr" ? bfAbs : null,
           bfSide === "Cr" ? bfAbs : null,
-          `${bfAbs.toFixed(2)} ${bfSide}`,
+          bfAbs,
         ]);
         bfRow.eachCell((cell) => {
           cell.fill = lightBlueFill;
           cell.font = { bold: true };
           cell.border = allBorders;
+          cell.alignment = { vertical: "middle" };
         });
         bfRow.getCell(1).numFmt = "dd/mm/yyyy";
         bfRow.getCell(4).numFmt = numFmt;
         bfRow.getCell(5).numFmt = numFmt;
-        bfRow.getCell(4).alignment = { horizontal: "right" };
-        bfRow.getCell(5).alignment = { horizontal: "right" };
-        bfRow.getCell(6).alignment = { horizontal: "right" };
+        bfRow.getCell(6).numFmt = `${numFmt} "${bfSide}"`;
+        bfRow.getCell(4).alignment = { horizontal: "right", vertical: "middle" };
+        bfRow.getCell(5).alignment = { horizontal: "right", vertical: "middle" };
+        bfRow.getCell(6).alignment = { horizontal: "right", vertical: "middle" };
       }
 
       // Data rows
       enrichedRows.forEach((row, idx: number) => {
         const dr = row.dr > 0 ? row.dr : null;
         const cr = row.cr > 0 ? row.cr : null;
-        const dateVal = row.voucherDate ? new Date(row.voucherDate + "T00:00:00") : "";
+        const dateVal = normalizeStatementDate(row.voucherDate) ?? "";
         const particulars = row.narration || row.voucherDescription || row.voucherType || "—";
         const balAbs = Math.abs(row.runBal);
         const balSide = row.runBal >= 0 ? "Dr" : "Cr";
@@ -598,21 +633,25 @@ export function registerAccountStatementRoutes(app: Express) {
           particulars,
           dr,
           cr,
-          balAbs > 0 ? `${balAbs.toFixed(2)} ${balSide}` : "—",
+          balAbs,
         ]);
         dataRow.eachCell((cell) => {
           cell.border = allBorders;
+          cell.alignment = { vertical: "top" };
         });
-        if (idx % 2 === 0)
+        if (idx % 2 === 0) {
           dataRow.eachCell((cell) => {
             cell.fill = greyFill;
           });
-        dataRow.getCell(1).numFmt = "dd/mm/yyyy";
+        }
+        if (dateVal instanceof Date) dataRow.getCell(1).numFmt = "dd/mm/yyyy";
+        dataRow.getCell(3).alignment = { vertical: "top", wrapText: true };
         dataRow.getCell(4).numFmt = numFmt;
         dataRow.getCell(5).numFmt = numFmt;
-        dataRow.getCell(4).alignment = { horizontal: "right" };
-        dataRow.getCell(5).alignment = { horizontal: "right" };
-        dataRow.getCell(6).alignment = { horizontal: "right" };
+        dataRow.getCell(6).numFmt = `${numFmt} "${balSide}"`;
+        dataRow.getCell(4).alignment = { horizontal: "right", vertical: "top" };
+        dataRow.getCell(5).alignment = { horizontal: "right", vertical: "top" };
+        dataRow.getCell(6).alignment = { horizontal: "right", vertical: "top" };
       });
 
       // Totals row
@@ -634,7 +673,7 @@ export function registerAccountStatementRoutes(app: Express) {
         "Closing Balance",
         closingBalanceSide2 === "Dr" ? closingBalance2 : null,
         closingBalanceSide2 === "Cr" ? closingBalance2 : null,
-        `${closingBalance2.toFixed(2)} ${closingBalanceSide2}`,
+        closingBalance2,
       ]);
       cbRow.eachCell((cell) => {
         cell.fill = lightBlueFill;
@@ -643,14 +682,20 @@ export function registerAccountStatementRoutes(app: Express) {
       });
       cbRow.getCell(4).numFmt = numFmt;
       cbRow.getCell(5).numFmt = numFmt;
+      cbRow.getCell(6).numFmt = `${numFmt} "${closingBalanceSide2}"`;
       cbRow.getCell(4).alignment = { horizontal: "right" };
       cbRow.getCell(5).alignment = { horizontal: "right" };
       cbRow.getCell(6).alignment = { horizontal: "right" };
+
+      sheet.printArea = `A1:F${cbRow.number}`;
+      sheet.headerFooter.oddFooter = "&LAccount Statement&CPage &P of &N&R&D";
 
       const safeAccName = accountName.replace(/[^\w\s.()-]/g, "_").replace(/\s+/g, "_");
       const buf = Buffer.from(await workbook.xlsx.writeBuffer());
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="${safeAccName}_Statement.xlsx"`);
+      res.setHeader("Content-Length", String(buf.length));
+      res.setHeader("Cache-Control", "no-store");
       res.end(buf);
     } catch (err: unknown) {
       logger.error("Account statement Excel error:", { error: err });
