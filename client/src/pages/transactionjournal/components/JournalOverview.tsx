@@ -1,53 +1,9 @@
 /**
- * The two summary strips above the All Daybook table: the voucher-type quick
- * filter chips and the per-company summary cards.
- *
- * Split out of TransactionJournal.tsx unchanged — the chips still set the
- * voucher type without resetting the page (matching the original inline
- * handler), and clicking a summary card still toggles that company in the
- * company filter.
+ * Per-company summary cards above the All Daybook table.
  */
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { companyColor } from "../utils";
 import type { TransactionJournalModel } from "../useTransactionJournalModel";
-
-const TYPE_CHIPS = [
-  { label: "All", value: "all" },
-  { label: "Payment", value: "Payment" },
-  { label: "Receipt", value: "Receipt" },
-  { label: "Sales", value: "Sales" },
-  { label: "Purchase", value: "Purchase" },
-  { label: "Stock Transfer", value: "Stock Transfer" },
-  { label: "Journal", value: "Journal" },
-  { label: "Mixed", value: "Mixed" },
-  { label: "Production", value: "Production" },
-  { label: "Consumption", value: "Consumption" },
-];
-
-export function JournalTypeChips({ model }: { model: TransactionJournalModel }) {
-  return (
-    <div className="flex flex-wrap gap-1.5" data-testid="type-chips">
-      {TYPE_CHIPS.map((c) => {
-        const active = model.voucherType === c.value || (c.value === "all" && model.voucherType === "all");
-        return (
-          <button
-            key={c.value}
-            onClick={() => model.setVoucherType(c.value)}
-            data-testid={`chip-type-${c.value.replace(/\s+/g, "-").toLowerCase()}`}
-            className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors
-                    ${
-                      active
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-background text-muted-foreground border-border hover:text-foreground hover:border-foreground/40"
-                    }`}
-          >
-            {c.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
 
 export function JournalSummaryCards({ model }: { model: TransactionJournalModel }) {
   if (model.isLoading || Object.keys(model.summaryByCompany).length === 0) return null;
