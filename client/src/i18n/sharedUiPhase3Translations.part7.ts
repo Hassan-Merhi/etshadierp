@@ -13,4 +13,12 @@ export const phase3SharedUiTranslationsPart7: readonly Phase3SharedUiEntry[] = [
   },
   { en: "Show All", ar: "إظهار الكل", fr: "Tout afficher" },
   { en: "Done", ar: "تم", fr: "Terminé" },
+  { en: "Article Code", ar: "رمز الصنف", fr: "Code article" },
+  { en: "Arabic Name", ar: "الاسم بالعربية", fr: "Nom arabe" },
+  { en: "Wt/Bale", ar: "الوزن/بالة", fr: "Poids/balle" },
+  { en: "Sell Price", ar: "سعر البيع", fr: "Prix de vente" },
+  { en: "Available Stock", ar: "المخزون المتاح", fr: "Stock disponible" },
+  { en: "Total Loaded", ar: "إجمالي المحمّل", fr: "Total chargé" },
+  { en: "Total KG", ar: "إجمالي كغ", fr: "Total kg" },
+  { en: "Last Loaded", ar: "آخر تحميل", fr: "Dernier chargement" },
 ];
