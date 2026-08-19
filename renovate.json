@@ -27,6 +27,7 @@
     },
     {
       "description": "Require explicit approval for database, authentication, document-generation, and spreadsheet runtime dependencies",
+      "matchDatasources": ["npm"],
       "matchPackageNames": [
         "drizzle-orm",
         "drizzle-kit",
@@ -47,20 +48,25 @@
         "jspdf",
         "jspdf-autotable"
       ],
+      "minimumReleaseAge": "7 days",
       "dependencyDashboardApproval": true,
       "automerge": false
     },
     {
       "description": "Group non-major development-tool updates to reduce PR noise",
+      "matchDatasources": ["npm"],
       "matchDepTypes": ["devDependencies"],
       "matchUpdateTypes": ["minor", "patch"],
+      "minimumReleaseAge": "7 days",
       "groupName": "development dependencies",
       "automerge": false
     },
     {
       "description": "Group production patch updates while keeping them review-gated",
+      "matchDatasources": ["npm"],
       "matchDepTypes": ["dependencies"],
       "matchUpdateTypes": ["patch"],
+      "minimumReleaseAge": "7 days",
       "groupName": "production dependency patches",
       "automerge": false
     },
