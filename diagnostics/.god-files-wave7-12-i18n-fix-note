@@ -1,3 +1,4 @@
 Temporary marker for Wave 7-12 i18n dead-code cleanup. Remove before merge.
 Human-authored exact-head CI retrigger after Waves 13-14 re-certification.
 Human-authored exact-head retrigger after split-only lint cleanup.
+Human-authored exact-head retrigger after latest-main sync and recovery-quality gate fix.
