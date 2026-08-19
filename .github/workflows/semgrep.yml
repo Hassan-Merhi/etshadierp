@@ -17,32 +17,57 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  scan:
-    name: Semgrep CE security scan
-    if: github.actor != 'dependabot[bot]'
+  regression-scan:
+    name: Semgrep CE new-findings gate
+    if: >-
+      github.actor != 'dependabot[bot]' &&
+      (github.event_name == 'pull_request' || github.event_name == 'push')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     container:
-      image: semgrep/semgrep
+      image: semgrep/semgrep:1.172.0@sha256:65dcd4408adda7c183a6b4550cb1e9b19f7f627a6fbb7e0559bd466bedc44d7b
+    env:
+      SEMGREP_BASELINE_COMMIT: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
+          fetch-depth: 2
 
-      - name: Scan pull request for new findings
-        if: github.event_name == 'pull_request'
-        env:
-          SEMGREP_BASELINE_COMMIT: ${{ github.event.pull_request.base.sha }}
-        run: semgrep scan --config auto --error --baseline-commit "$SEMGREP_BASELINE_COMMIT"
+      - name: Validate baseline commit
+        shell: sh
+        run: |
+          case "$SEMGREP_BASELINE_COMMIT" in
+            ""|0000000000000000000000000000000000000000)
+              echo "A usable baseline commit is required for the Semgrep regression gate."
+              exit 2
+              ;;
+          esac
+          if ! printf '%s' "$SEMGREP_BASELINE_COMMIT" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "Semgrep baseline is not a 40-character commit SHA."
+            exit 2
+          fi
+          git config --global --add safe.directory "$PWD"
+          git cat-file -e "${SEMGREP_BASELINE_COMMIT}^{commit}"
+          git merge-base "$SEMGREP_BASELINE_COMMIT" HEAD >/dev/null
 
-      - name: Scan main push for new findings
-        if: github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000'
-        env:
-          SEMGREP_BASELINE_COMMIT: ${{ github.event.before }}
-        run: semgrep scan --config auto --error --baseline-commit "$SEMGREP_BASELINE_COMMIT"
+      - name: Scan for newly introduced findings
+        run: semgrep scan --config auto --baseline-commit "$SEMGREP_BASELINE_COMMIT" --error
 
-      - name: Full baseline visibility scan
-        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.event.before == '0000000000000000000000000000000000000000')
+  full-audit:
+    name: Semgrep CE full repository audit
+    if: >-
+      github.actor != 'dependabot[bot]' &&
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: semgrep/semgrep:1.172.0@sha256:65dcd4408adda7c183a6b4550cb1e9b19f7f627a6fbb7e0559bd466bedc44d7b
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Audit complete repository
         run: semgrep scan --config auto
