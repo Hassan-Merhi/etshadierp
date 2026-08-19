@@ -114,6 +114,11 @@ jobs:
             echo "$f" >> /tmp/copied.txt
           done < /tmp/selected.txt
 
+          echo "Safely selected files: $(wc -l < /tmp/copied.txt)"
+          cat /tmp/copied.txt
+          echo "Overlapping files left on current main: $(wc -l < /tmp/overlaps.txt)"
+          cat /tmp/overlaps.txt
+
           echo '## God Files recovery result' >> "$GITHUB_STEP_SUMMARY"
           echo '' >> "$GITHUB_STEP_SUMMARY"
           echo "Safely transplanted files: $(wc -l < /tmp/copied.txt)" >> "$GITHUB_STEP_SUMMARY"
@@ -124,7 +129,7 @@ jobs:
             sed 's/^/- `/' /tmp/overlaps.txt | sed 's/$/`/' >> "$GITHUB_STEP_SUMMARY"
           fi
 
-          if git diff --quiet; then
+          if git diff --cached --quiet && git diff --quiet; then
             echo 'No safe transplant changes were needed.'
             exit 0
           fi
