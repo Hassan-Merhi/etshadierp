@@ -24,8 +24,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if git log --format=%B -40 | grep -Fq '[restore-current-main-wave13-14-deps]'; then
-            echo 'Current-main support dependencies already restored.'
+          if git log --format=%B -40 | grep -Fq '[restore-current-main-wave13-14-deps-v2]'; then
+            echo 'Full current-main support dependency closure already restored.'
             exit 0
           fi
           git config user.name 'github-actions[bot]'
@@ -42,14 +42,19 @@ jobs:
             client/src/pages/factory/factorysettings/components/RecalculateBaleCostsCard.tsx \
             client/src/pages/factory/factorysettings/components/MigrateVoucherDescriptionsCard.tsx \
             client/src/pages/settings/datatoolstab/types.ts \
+            client/src/pages/settings/datatoolstab/utils.ts \
             client/src/pages/settings/datatoolstab/components/ReconcileOTWNamesCard.tsx \
             client/src/pages/settings/datatoolstab/components/MergeStockItemsLauncher.tsx \
+            client/src/pages/settings/datatoolstab/components/MergeStockItemsCard.tsx \
+            client/src/pages/settings/datatoolstab/components/BulkMergeStockItemsCard.tsx \
+            client/src/pages/settings/datatoolstab/components/MergeHistoryCard.tsx \
             client/src/pages/settings/datatoolstab/components/LocationCostPriceOverride.tsx \
             client/src/pages/sp/gclshimigration/types.ts \
+            client/src/pages/sp/gclshimigration/utils.ts \
             client/src/pages/sp/gclshimigration/components/StatusBadge.tsx \
             client/src/pages/sp/gclshimigration/components/Stage2StepRunner.tsx \
             client/src/pages/sp/gclshimigration/components/ProfitOpeningRunner.tsx \
             client/src/pages/sp/gclshimigration/components/ReconciliationRunner.tsx
           git add -A
-          git commit -m 'chore: restore current-main support dependencies [restore-current-main-wave13-14-deps]'
+          git commit -m 'chore: restore full current-main support dependency closure [restore-current-main-wave13-14-deps-v2]'
           git push origin HEAD:agent/god-files-recovery-latest-main
