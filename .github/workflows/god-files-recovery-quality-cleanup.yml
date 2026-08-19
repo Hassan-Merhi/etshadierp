@@ -31,15 +31,158 @@ jobs:
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
-          p = Path('build/viteHeavyListPaginationPlugin.ts')
-          s = p.read_text()
-          old = 'const FACTORY_DAYBOOK_SUFFIX = "/client/src/pages/factory/FactoryDaybook.tsx";'
-          new = 'const FACTORY_DAYBOOK_SUFFIX = "/client/src/pages/factory/daybook/useFactoryDaybookModel.ts";'
-          if old in s:
-              s = s.replace(old, new, 1)
-              p.write_text(s)
-          elif new not in s:
+
+          # Factory Daybook was split into a controller model. Make the pagination
+          # behavior native there instead of relying on a source-text Vite rewrite.
+          plugin = Path('build/viteHeavyListPaginationPlugin.ts')
+          plugin_text = plugin.read_text()
+          old_suffix = 'const FACTORY_DAYBOOK_SUFFIX = "/client/src/pages/factory/FactoryDaybook.tsx";'
+          split_suffix = 'const FACTORY_DAYBOOK_SUFFIX = "/client/src/pages/factory/daybook/useFactoryDaybookModel.ts";'
+          retired_suffix = 'const FACTORY_DAYBOOK_SUFFIX = "/__god_files_native__/FactoryDaybook.tsx";'
+          if old_suffix in plugin_text:
+              plugin_text = plugin_text.replace(old_suffix, retired_suffix, 1)
+          elif split_suffix in plugin_text:
+              plugin_text = plugin_text.replace(split_suffix, retired_suffix, 1)
+          elif retired_suffix not in plugin_text:
               raise SystemExit('Factory Daybook Vite transform suffix not found')
+          plugin.write_text(plugin_text)
+
+          model = Path('client/src/pages/factory/daybook/useFactoryDaybookModel.ts')
+          text = model.read_text()
+
+          import_anchor = 'import { queryClient } from "@/lib/queryClient";'
+          pagination_import = 'import { fetchAllDaybookEntries } from "@/lib/daybookPaginationClient";'
+          if pagination_import not in text:
+              if import_anchor not in text:
+                  raise SystemExit('Factory Daybook queryClient import not found')
+              text = text.replace(import_anchor, import_anchor + '\n' + pagination_import, 1)
+
+          old_dates = '''  // Always send startDate/endDate explicitly — including as empty strings for the
+  // "All Time" preset — so the server can tell "user explicitly wants all time" apart
+  // from "caller omitted the params entirely" (e.g. a raw API call) and only applies
+  // its own safety-net default in the latter case.
+  queryParams.set("startDate", startDate || "");
+  queryParams.set("endDate", endDate || "");'''
+          new_dates = '''  // Empty values are intentional: their presence prevents the paged backend
+  // from applying its today-only default when the UI selects All Time.
+  queryParams.set("startDate", startDate);
+  queryParams.set("endDate", endDate);'''
+          if old_dates in text:
+              text = text.replace(old_dates, new_dates, 1)
+          elif new_dates not in text:
+              raise SystemExit('Factory Daybook date parameter block not found')
+
+          old_filters = '''  if (txTypeFilter !== "ALL") queryParams.set("txType", txTypeFilter);
+  if (currencyFilter !== "ALL") queryParams.set("currencyCode", currencyFilter);'''
+          new_filters = '''  if (txTypeFilter !== "ALL") queryParams.set("txType", txTypeFilter);
+  if (currencyFilter !== "ALL") queryParams.set("currencyCode", currencyFilter);
+  if (statusFilter !== "all") queryParams.set("optionalStatus", statusFilter);
+  if (debouncedSearchQuery.trim()) queryParams.set("search", debouncedSearchQuery.trim());
+  if (minAmount.trim()) queryParams.set("minAmount", minAmount.trim());
+  if (maxAmount.trim()) queryParams.set("maxAmount", maxAmount.trim());
+  queryParams.set("sortOrder", sortOrder);'''
+          if old_filters in text:
+              text = text.replace(old_filters, new_filters, 1)
+          elif new_filters not in text:
+              raise SystemExit('Factory Daybook server filter block not found')
+
+          old_key = '    queryKey: ["/api/factory/daybook", startDate, endDate, txTypeFilter, currencyFilter],'
+          new_key = '''    queryKey: [
+      "/api/factory/daybook",
+      startDate,
+      endDate,
+      txTypeFilter,
+      currencyFilter,
+      statusFilter,
+      debouncedSearchQuery,
+      minAmount,
+      maxAmount,
+      sortOrder,
+    ],'''
+          if old_key in text:
+              text = text.replace(old_key, new_key, 1)
+          elif new_key not in text:
+              raise SystemExit('Factory Daybook query key not found')
+
+          old_summary = '''  const handleExportToExcel = async () => {
+    if (filteredEntries.length === 0) {
+      warnNothingToExport();
+      return;
+    }
+    const { fileName, rowCount } = await exportFactoryDaybookSummary(filteredEntries, formatDisplayDate);
+    toast({
+      title: "Export successful",
+      description: `Downloaded ${fileName} with ${rowCount} entries.`,
+    });
+  };'''
+          new_summary = '''  const handleExportToExcel = async () => {
+    let exportEntries: DaybookEntry[];
+    try {
+      exportEntries = (await fetchAllDaybookEntries(new URLSearchParams(queryParams))).filter(
+        (entry) => entry.txType !== "WORKER_EDITED"
+      ) as DaybookEntry[];
+    } catch (error: any) {
+      toast({
+        title: "Export failed",
+        description: error?.message || "The complete filtered daybook could not be loaded.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (exportEntries.length === 0) {
+      warnNothingToExport();
+      return;
+    }
+    const { fileName, rowCount } = await exportFactoryDaybookSummary(exportEntries, formatDisplayDate);
+    toast({
+      title: "Export successful",
+      description: `Downloaded ${fileName} with ${rowCount} entries.`,
+    });
+  };'''
+          if old_summary in text:
+              text = text.replace(old_summary, new_summary, 1)
+          elif new_summary not in text:
+              raise SystemExit('Factory Daybook summary export block not found')
+
+          old_detail = '''  const handleExportDetailedToExcel = async () => {
+    if (filteredEntries.length === 0) {
+      warnNothingToExport();
+      return;
+    }
+    setIsExportingDetailed(true);
+    try {
+      const { fileName, rowCount } = await exportFactoryDaybookDetailed(filteredEntries, formatDisplayDate);
+      toast({ title: "Export successful", description: `Downloaded ${fileName} with ${rowCount} entries.` });
+    } catch (error) {
+      toast({ title: "Export failed", description: "An error occurred while exporting.", variant: "destructive" });
+    } finally {
+      setIsExportingDetailed(false);
+    }
+  };'''
+          new_detail = '''  const handleExportDetailedToExcel = async () => {
+    setIsExportingDetailed(true);
+    try {
+      const exportEntries = (await fetchAllDaybookEntries(new URLSearchParams(queryParams))).filter(
+        (entry) => entry.txType !== "WORKER_EDITED"
+      ) as DaybookEntry[];
+      if (exportEntries.length === 0) {
+        warnNothingToExport();
+        return;
+      }
+      const { fileName, rowCount } = await exportFactoryDaybookDetailed(exportEntries, formatDisplayDate);
+      toast({ title: "Export successful", description: `Downloaded ${fileName} with ${rowCount} entries.` });
+    } catch (error) {
+      toast({ title: "Export failed", description: "An error occurred while exporting.", variant: "destructive" });
+    } finally {
+      setIsExportingDetailed(false);
+    }
+  };'''
+          if old_detail in text:
+              text = text.replace(old_detail, new_detail, 1)
+          elif new_detail not in text:
+              raise SystemExit('Factory Daybook detailed export block not found')
+
+          model.write_text(text)
 
           reports = Path('client/src/pages/stockentryhistory/reportsLegacy.ts')
           reports_text = reports.read_text()
@@ -87,7 +230,6 @@ jobs:
           for rel, messages in by_file.items():
               p = Path(rel)
               lines = p.read_text().splitlines()
-              # Descending order keeps original ESLint line numbers stable.
               for line_no, rule in sorted(set(messages), reverse=True):
                   idx = max(0, line_no - 1)
                   indent = lines[idx][:len(lines[idx]) - len(lines[idx].lstrip())]
