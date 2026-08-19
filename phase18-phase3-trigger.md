@@ -1,3 +1,4 @@
 Phase 18 Wave 2 Phase 3 current-main arrays/collections execution trigger.
-Base: 2ada0b60c2fd0203db730161d698679991d9e106
+Base: bf6bcea718865740f4b7886ce7d33afce46b3a8f
 Scope: arrays/collections only.
+Retrigger: 2026-08-19 current-main certification repair.
