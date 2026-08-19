@@ -11,15 +11,15 @@
     "step": 500
   },
   "totals": {
-    "warningCeiling": 33,
+    "warningCeiling": 3,
     "errorCeiling": 0
   },
   "perRule": {
-    "react-hooks/exhaustive-deps": 28,
-    "no-control-regex": 5
+    "react-hooks/exhaustive-deps": 3,
+    "no-control-regex": 0
   },
   "notes": {
     "errorCeiling": "Zero and permanent. ESLint errors are not part of the warning drawdown.",
-    "phase17": "Exact Phase 17 reconciliation on the Phase 16-cleaned tree: 33 warnings total, consisting of 28 react-hooks/exhaustive-deps warnings and 5 no-control-regex warnings. Type escapes are separately frozen at zero in config/type-escape-boundaries.json. Full warning repair and final certification remain Phase 18."
+    "phase18": "The UX consistency release locked in the Phase 18 warning drawdown: 3 react-hooks/exhaustive-deps warnings remain and no-control-regex is at zero. Type escapes remain separately frozen at zero in config/type-escape-boundaries.json."
   }
 }

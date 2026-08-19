@@ -31,20 +31,32 @@ if (!new Set(["localhost", "127.0.0.1", "::1"]).has(database.hostname)) {
 const pool = new Pool({ connectionString: databaseUrl });
 const client = await pool.connect();
 
+const companyFixtures = [
+  { code: "PHASE9-ERP", name: "UX Verification ERP", companyType: "erp" },
+  { code: "PHASE9-FACTORY", name: "UX Verification Factory", companyType: "factory" },
+  { code: "PHASE9-PROPERTIES", name: "UX Verification Properties", companyType: "properties" },
+  { code: "PHASE9-SP", name: "UX Verification Supplier Partner", companyType: "supplier_partner" },
+];
+
 try {
   const passwordHash = await bcrypt.hash(password, 10);
   await client.query("BEGIN");
 
-  const companyResult = await client.query(
-    `INSERT INTO companies (code, name, company_type, base_currency, active)
-     VALUES ('PHASE9-CI', 'Phase 9 Browser Verification', 'erp', 'USD', true)
-     ON CONFLICT (code) DO UPDATE
-       SET name = EXCLUDED.name, company_type = EXCLUDED.company_type,
-           base_currency = EXCLUDED.base_currency, active = true
-     RETURNING id`,
-  );
-  const companyId = companyResult.rows[0]?.id;
-  if (!companyId) throw new Error("fixture company was not returned");
+  const companyIds = {};
+  for (const fixture of companyFixtures) {
+    const companyResult = await client.query(
+      `INSERT INTO companies (code, name, company_type, base_currency, active)
+       VALUES ($1, $2, $3, 'USD', true)
+       ON CONFLICT (code) DO UPDATE
+         SET name = EXCLUDED.name, company_type = EXCLUDED.company_type,
+             base_currency = EXCLUDED.base_currency, active = true
+       RETURNING id`,
+      [fixture.code, fixture.name, fixture.companyType],
+    );
+    const companyId = companyResult.rows[0]?.id;
+    if (!companyId) throw new Error(`fixture company was not returned for ${fixture.code}`);
+    companyIds[fixture.code] = companyId;
+  }
 
   const userResult = await client.query(
     `INSERT INTO users (username, password, active)
@@ -58,17 +70,19 @@ try {
   if (!userId) throw new Error("fixture user was not returned");
 
   await client.query("DELETE FROM user_company_roles WHERE user_id = $1", [userId]);
-  await client.query(
-    `INSERT INTO user_company_roles (user_id, company_id, role)
-     VALUES ($1, $2, 'Developer')`,
-    [userId, companyId],
-  );
+  for (const companyId of Object.values(companyIds)) {
+    await client.query(
+      `INSERT INTO user_company_roles (user_id, company_id, role)
+       VALUES ($1, $2, 'Developer')`,
+      [userId, companyId],
+    );
+  }
 
   await client.query("COMMIT");
   console.log(
     JSON.stringify({
       status: "phase9-browser-fixture-ready",
-      companyId,
+      companyIds,
       username,
       databaseHost: database.hostname,
     }),

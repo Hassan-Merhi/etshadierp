@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -59,6 +59,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { useCompany } from "@/contexts/CompanyContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type {
   Location,
@@ -69,6 +70,7 @@ import type {
   StockItem,
 } from "./stockitems/types";
 import { PAGE_SIZE } from "./stockitems/utils";
+import { useStockItemsFilters } from "./stockitems/useStockItemsFilters";
 // Note: excelHelper (ExcelJS) is imported lazily inside exportToExcel / exportSalesHistory
 // so the 1.3 MB ExcelJS bundle is not loaded on every page startup.
 
@@ -76,12 +78,19 @@ export default function StockItems() {
   const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
   const hideStockRates = (myErpPages?.hiddenErpCostFields ?? []).includes("stock_rates");
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [selectedGroupFilter, setSelectedGroupFilter] = useState<number | null>(null);
-  const [selectedGradeFilter, setSelectedGradeFilter] = useState<number | null>(null);
-  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<number | "none" | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
+  const { selectedCompany } = useCompany();
+  const {
+    filters: { searchTerm, selectedGroupFilter, selectedGradeFilter, selectedCategoryFilter },
+    page: currentPage,
+    setPage: setCurrentPage,
+    resetFilters,
+    hasActiveFilters,
+    setSearchTerm,
+    setSelectedGroupFilter,
+    setSelectedGradeFilter,
+    setSelectedCategoryFilter,
+    debouncedSearch,
+  } = useStockItemsFilters(selectedCompany?.id);
 
   const [selectedStockItemId, setSelectedStockItemId] = useState<number | null>(null);
   const [selectedStockItemName, setSelectedStockItemName] = useState<string>("");
@@ -101,13 +110,11 @@ export default function StockItems() {
   const [adjustQuantity, setAdjustQuantity] = useState<string>("");
   const [adjustType, setAdjustType] = useState<"add" | "subtract">("add");
 
-  // Grades management
   const [manageGradesOpen, setManageGradesOpen] = useState(false);
   const [newGradeName, setNewGradeName] = useState("");
   const [editingGradeId, setEditingGradeId] = useState<number | null>(null);
   const [editingGradeName, setEditingGradeName] = useState("");
 
-  // Categories management
   const [manageCategoriesOpen, setManageCategoriesOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
@@ -115,18 +122,6 @@ export default function StockItems() {
 
   const { toast } = useToast();
   const { formatAmount } = useCurrencyContext();
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchTerm);
-      setCurrentPage(1);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [selectedGroupFilter, selectedGradeFilter, selectedCategoryFilter]);
 
   const pagedQueryKey = [
     "/api/stock-items",
@@ -182,7 +177,6 @@ export default function StockItems() {
     aliasMap.get(a.stockItemId)!.push(a.aliasCode);
   }
 
-  // Derived stats
   const _activeCount = displayItems.filter((i) => i.active).length;
   const _inactiveCount = displayItems.filter((i) => !i.active).length;
 
@@ -324,7 +318,6 @@ export default function StockItems() {
     },
   });
 
-  // ─── Handlers ─────────────────────────────────────────────────────────────
   const handleAdjustStock = async () => {
     if (!adjustStockItemId || !adjustLocationId || !adjustQuantity) {
       toast({ title: "Error", description: "Please fill in all fields", variant: "destructive" });
@@ -672,6 +665,12 @@ export default function StockItems() {
               ))}
             </SelectContent>
           </Select>
+        )}
+        {hasActiveFilters && (
+          <Button variant="outline" type="button" onClick={resetFilters} data-testid="button-reset-filters">
+            <X className="mr-2 h-4 w-4" />
+            Reset filters
+          </Button>
         )}
       </div>
 

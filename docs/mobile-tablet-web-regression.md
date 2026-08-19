@@ -21,7 +21,7 @@ When credentials are supplied, it also verifies that the authenticated app shell
 
 ## Pull-request UX gate
 
-The Mobile Responsiveness workflow creates a disposable PostgreSQL database and authenticated Developer fixture, starts the pull-request build, and runs the multilingual browser smoke against Daybook and All Daybook. English, Arabic RTL, and French are checked at phone, tablet, and desktop widths. Screenshots, the structured browser report, and the startup health evidence are retained as workflow artifacts.
+The Mobile Responsiveness workflow creates disposable ERP, Factory, Properties, and Supplier Partner companies with an authenticated Developer fixture, starts the pull-request build, and runs the multilingual browser smoke across their primary list, accounting, inventory, dashboard, and operational routes. English, Arabic RTL, and French are checked at phone, tablet, and desktop widths. Screenshots, the structured browser report, and the startup health evidence are retained as workflow artifacts.
 
 This targeted rendered gate complements the source-contract and frontend suites without rerunning the complete backend CI matrix. The six-size route matrix and the manual orientation/device checks below remain the final release certification.
 
@@ -44,7 +44,7 @@ Authenticated smoke:
 ERP_SMOKE_BASE_URL=https://preview.example.com \
 ERP_SMOKE_USERNAME='your-test-user' \
 ERP_SMOKE_PASSWORD='your-test-password' \
-ERP_SMOKE_ROUTES='/tracking,/transaction-journal,/daybook,/accounts,/inventory,/pos,/vouchers' \
+ERP_SMOKE_ROUTES='/tracking,/transaction-journal,/daybook,/accounts,/inventory?tab=by-location,/pos,/vouchers' \
 node scripts/run-responsive-browser-smoke.mjs
 ```
 

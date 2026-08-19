@@ -27,25 +27,63 @@ const VIEWPORTS = [
   { name: "desktop", width: 1440, height: 900, isMobile: false, hasTouch: false },
 ];
 
-const DEFAULT_AUTHENTICATED_ROUTES = [
-  "/tracking",
-  "/transaction-journal",
-  "/daybook",
-  "/accounts",
-  "/inventory",
-  "/pos",
-  "/vouchers",
+const DEFAULT_WORKSPACE_ROUTE_GROUPS = [
+  {
+    workspace: "erp",
+    companyCode: "PHASE9-ERP",
+    routes: [
+      "/tracking",
+      "/daybook",
+      "/transaction-journal",
+      "/accounts",
+      "/inventory?tab=by-location",
+      "/stock?tab=items",
+      "/vouchers",
+      "/sales-tools?tab=transfers",
+      "/pos",
+    ],
+  },
+  {
+    workspace: "factory",
+    companyCode: "PHASE9-FACTORY",
+    routes: [
+      "/factory/production-report",
+      "/factory/daybook",
+      "/factory/containers",
+      "/factory/location-inventory",
+    ],
+  },
+  {
+    workspace: "properties",
+    companyCode: "PHASE9-PROPERTIES",
+    routes: ["/properties/dashboard", "/properties/daybook", "/properties/accounts", "/properties/vouchers"],
+  },
+  {
+    workspace: "supplier-partner",
+    companyCode: "PHASE9-SP",
+    routes: ["/sp", "/sp/reports", "/sp/opening-stock"],
+  },
 ];
 
-const AUTHENTICATED_ROUTES = (process.env.ERP_SMOKE_ROUTES || DEFAULT_AUTHENTICATED_ROUTES.join(","))
+const requestedRoutes = (process.env.ERP_SMOKE_ROUTES || "")
   .split(",")
   .map((route) => route.trim())
   .filter(Boolean)
   .map((route) => (route.startsWith("/") ? route : `/${route}`));
+const WORKSPACE_ROUTE_GROUPS =
+  requestedRoutes.length > 0
+    ? [
+        {
+          workspace: "custom",
+          companyCode: process.env.ERP_SMOKE_COMPANY_CODE || "PHASE9-ERP",
+          routes: requestedRoutes,
+        },
+      ]
+    : DEFAULT_WORKSPACE_ROUTE_GROUPS;
 
 const report = {
   baseUrl: BASE_URL,
-  authenticatedRoutes: AUTHENTICATED,
+  workspaceRouteGroups: WORKSPACE_ROUTE_GROUPS,
   authenticatedRequired: REQUIRE_AUTHENTICATED,
   startedAt: new Date().toISOString(),
   cases: [],
@@ -97,6 +135,29 @@ async function login(page) {
     { timeout: TIMEOUT_MS },
   );
   await waitForSettledUi(page);
+}
+
+async function selectWorkspaceCompany(page, companyCode) {
+  return page.evaluate(async (targetCode) => {
+    const companiesResponse = await fetch("/api/user/companies", { credentials: "include", cache: "no-store" });
+    if (!companiesResponse.ok) throw new Error(`Company list failed (${companiesResponse.status})`);
+    const companies = await companiesResponse.json();
+    const assignment = Array.isArray(companies)
+      ? companies.find((company) => company.companyCode === targetCode)
+      : undefined;
+    const companyId = Number(assignment?.companyId);
+    if (!Number.isInteger(companyId) || companyId <= 0) throw new Error(`Company ${targetCode} is unavailable`);
+
+    const switchResponse = await fetch("/api/auth/set-company", {
+      method: "POST",
+      credentials: "include",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ companyId }),
+    });
+    if (!switchResponse.ok) throw new Error(`Company switch failed (${switchResponse.status})`);
+    window.localStorage.setItem("selectedCompanyId", String(companyId));
+    return { companyId, companyCode: targetCode };
+  }, companyCode);
 }
 
 async function completeLanguageOnboarding(page, language) {
@@ -358,41 +419,46 @@ try {
           await login(page);
           await applyLanguage(page, language.code);
           const languageOnboardingCompleted = await completeLanguageOnboarding(page, language.code);
-          for (const route of AUTHENTICATED_ROUTES) {
-            const status = await openRoute(page, route);
-            await applyLanguage(page, language.code);
-            const state = await readPageState(page);
-            const label = `${language.name} ${viewport.name} ${route}`;
-            const failures = assertPage(state, language.code, language.direction, "app", label);
-            if (state.path.startsWith("/login")) failures.push(`${label}: authenticated session returned to login`);
-            if (REQUIRE_EXACT_ROUTES && !state.path.startsWith(route)) {
-              failures.push(`${label}: redirected to ${state.path}`);
-            }
+          for (const group of WORKSPACE_ROUTE_GROUPS) {
+            const selectedWorkspaceCompany = await selectWorkspaceCompany(page, group.companyCode);
+            for (const route of group.routes) {
+              const status = await openRoute(page, route);
+              await applyLanguage(page, language.code);
+              const state = await readPageState(page);
+              const label = `${language.name} ${viewport.name} ${group.workspace} ${route}`;
+              const failures = assertPage(state, language.code, language.direction, "app", label);
+              if (state.path.startsWith("/login")) failures.push(`${label}: authenticated session returned to login`);
+              if (REQUIRE_EXACT_ROUTES && !state.path.startsWith(route)) {
+                failures.push(`${label}: redirected to ${state.path}`);
+              }
 
-            const skipNavigation = await activateSkipNavigation(page);
-            if (!skipNavigation.available) failures.push(`${label}: skip navigation link is missing`);
-            if (skipNavigation.available && skipNavigation.activeElementId !== "main-content") {
-              failures.push(
-                `${label}: skip navigation focused ${skipNavigation.activeElementId || "nothing"} instead of main-content`,
-              );
-            }
-            if (skipNavigation.available && skipNavigation.hash !== "#main-content") {
-              failures.push(`${label}: skip navigation did not preserve the #main-content hash`);
-            }
+              const skipNavigation = await activateSkipNavigation(page);
+              if (!skipNavigation.available) failures.push(`${label}: skip navigation link is missing`);
+              if (skipNavigation.available && skipNavigation.activeElementId !== "main-content") {
+                failures.push(
+                  `${label}: skip navigation focused ${skipNavigation.activeElementId || "nothing"} instead of main-content`,
+                );
+              }
+              if (skipNavigation.available && skipNavigation.hash !== "#main-content") {
+                failures.push(`${label}: skip navigation did not preserve the #main-content hash`);
+              }
 
-            const screenshot = await capture(page, language.code, viewport.name, route);
-            report.cases.push({
-              language: language.code,
-              viewport: viewport.name,
-              requestedRoute: route,
-              status,
-              state,
-              languageOnboardingCompleted,
-              skipNavigation,
-              screenshot,
-              failures,
-            });
-            report.failures.push(...failures);
+              const screenshot = await capture(page, language.code, viewport.name, `${group.workspace}-${route}`);
+              report.cases.push({
+                language: language.code,
+                viewport: viewport.name,
+                workspace: group.workspace,
+                requestedRoute: route,
+                selectedWorkspaceCompany,
+                status,
+                state,
+                languageOnboardingCompleted,
+                skipNavigation,
+                screenshot,
+                failures,
+              });
+              report.failures.push(...failures);
+            }
           }
         }
       } catch (error) {
