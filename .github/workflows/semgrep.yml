@@ -32,8 +32,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
 
-      - name: Fetch baseline commit
+      - name: Validate baseline commit
         shell: sh
         run: |
           case "$SEMGREP_BASELINE_COMMIT" in
@@ -47,8 +49,8 @@ jobs:
             exit 2
           fi
           git config --global --add safe.directory "$PWD"
-          git fetch --no-tags --depth=1 origin "$SEMGREP_BASELINE_COMMIT"
           git cat-file -e "${SEMGREP_BASELINE_COMMIT}^{commit}"
+          git merge-base "$SEMGREP_BASELINE_COMMIT" HEAD >/dev/null
 
       - name: Scan for newly introduced findings
         run: semgrep scan --config auto --baseline-commit "$SEMGREP_BASELINE_COMMIT" --error
