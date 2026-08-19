@@ -9,7 +9,7 @@
  */
 import { describe, expect, it } from "vitest";
 import ExcelJS from "exceljs";
-import { readFromBuffer, utils } from "./excelHelper";
+import { read, readFromBuffer, utils } from "./excelHelper";
 
 describe("cell addressing", () => {
   it("encodes column numbers as spreadsheet letters", () => {
@@ -118,5 +118,45 @@ describe("workbook assembly", () => {
 
     const parsed = await readFromBuffer(buffer as ArrayBuffer);
     expect(parsed.getWorksheet("Data")!.getCell(1, 1).value).toBe("value");
+  });
+
+  it("reads CSV data through the same API used by spreadsheet imports", async () => {
+    const csv = [
+      "Barcode,Item Name,Qty,Weight per Bale,Price per Bale",
+      'MJS31006,"CHILDREN BOOT, CREME 20 KGS",1,20,240',
+      "MJS31001,LADY SANDAL CREME 15 KGS,1,15,200",
+    ].join("\r\n");
+
+    const parsed = await read(new TextEncoder().encode(csv), { type: "array" });
+    expect(parsed.SheetNames).toEqual(["Sheet1"]);
+
+    const rows = utils.sheet_to_json<Record<string, string>>(parsed.Sheets.Sheet1);
+    expect(rows).toEqual([
+      {
+        Barcode: "MJS31006",
+        "Item Name": "CHILDREN BOOT, CREME 20 KGS",
+        Qty: "1",
+        "Weight per Bale": "20",
+        "Price per Bale": "240",
+      },
+      {
+        Barcode: "MJS31001",
+        "Item Name": "LADY SANDAL CREME 15 KGS",
+        Qty: "1",
+        "Weight per Bale": "15",
+        "Price per Bale": "200",
+      },
+    ]);
+  });
+
+  it("strips a UTF-8 BOM when reading CSV headers", async () => {
+    const csv = "\uFEFFBarcode,Item Name\nMJS31014,HIGH HEEL SHOES CREME 25 KGS";
+    const parsed = await readFromBuffer(new TextEncoder().encode(csv));
+    const rows = utils.sheet_to_json<Record<string, string>>(parsed.getWorksheet("Sheet1")!);
+
+    expect(rows[0]).toEqual({
+      Barcode: "MJS31014",
+      "Item Name": "HIGH HEEL SHOES CREME 25 KGS",
+    });
   });
 });
