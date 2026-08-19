@@ -1,4 +1,4 @@
-import { useState, useRef, Suspense } from "react";
+import { useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { useMainContentFocus } from "@/hooks/use-main-content-focus";
 import { useWorkspaceWheelScroll } from "@/hooks/use-workspace-wheel-scroll";
@@ -20,8 +20,8 @@ import { OfflineBanner } from "@/components/OfflineBanner";
 import { MODULE_ACCENT } from "@/components/sidebar/sidebarPrimitives";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CommandPalette } from "@/components/CommandPalette";
-import { LoadingState } from "@/components/ui/page-state";
 import { SkipLink } from "@/components/ui/responsive-accessibility";
+import { WorkspaceRouteBoundary } from "@/components/ui/workspace-route-boundary";
 import type { MyAccess } from "./factoryAccessGuard";
 import { canUseAdminSearch, type ShellUser } from "./shellUser";
 
@@ -105,7 +105,15 @@ export function FactoryShell({
               data-pos-workspace={isFactoryPosRoute ? "true" : undefined}
               className={`flex-1 overflow-y-auto overscroll-y-contain p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] outline-none sm:p-6 ${factoryWorkspaceClasses} ${isFactoryPosRoute ? factoryPosWorkspaceClasses : ""}`}
             >
-              <div className="w-full min-w-0 max-w-full [&_form]:min-w-0 [&_table]:w-full [&_[role=table]]:w-full [&_.overflow-x-auto]:overscroll-x-contain">
+              <WorkspaceRouteBoundary
+                resetKey={currentLocation}
+                loadingTitle={isFactoryPosRoute ? "Loading factory point of sale" : "Loading factory workspace"}
+                loadingDescription={
+                  isFactoryPosRoute
+                    ? "Preparing the latest sale-entry workspace."
+                    : "Preparing the latest factory and inventory information."
+                }
+              >
                 <FactoryCatalogLanguageSwitch />
                 <FactoryFrenchCatalogManager />
                 <FactoryBilingualDocumentActions />
@@ -117,23 +125,8 @@ export function FactoryShell({
                     </>
                   )}
                 </ErrorBoundary>
-                <ErrorBoundary resetKey={currentLocation}>
-                  <Suspense
-                    fallback={
-                      <LoadingState
-                        title={isFactoryPosRoute ? "Loading factory point of sale" : "Loading factory workspace"}
-                        description={
-                          isFactoryPosRoute
-                            ? "Preparing the latest sale-entry workspace."
-                            : "Preparing the latest factory and inventory information."
-                        }
-                      />
-                    }
-                  >
-                    <FactoryRoutes user={user} myAccess={myAccess} factoryDefaultPage={factoryDefaultPage} />
-                  </Suspense>
-                </ErrorBoundary>
-              </div>
+                <FactoryRoutes user={user} myAccess={myAccess} factoryDefaultPage={factoryDefaultPage} />
+              </WorkspaceRouteBoundary>
             </main>
           </div>
         </div>

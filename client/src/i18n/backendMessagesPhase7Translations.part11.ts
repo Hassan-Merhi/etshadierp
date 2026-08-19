@@ -117,4 +117,9 @@ export const backendMessagesPhase7TranslationsPart11: readonly Phase7BackendMess
     ar: "معرّف الشركة غير صالح في مسار الطلب.",
     fr: "Identifiant de société invalide dans le chemin de la requête.",
   },
+  {
+    en: 'Container "${containerNumber}" already has ${existingPOs.length} PO(s) imported (${existingPOs.map((p) => p.poNumber).join(", ")}). To avoid duplicates, please delete the existing POs first or use a different container number.',
+    ar: "تحتوي الحاوية «{0}» بالفعل على {1} أمر شراء مستورد ({2}). لتجنب التكرار، احذف أوامر الشراء الحالية أولاً أو استخدم رقم حاوية مختلفًا.",
+    fr: "Le conteneur « {0} » contient déjà {1} bon(s) de commande importé(s) ({2}). Pour éviter les doublons, supprimez d’abord les bons existants ou utilisez un autre numéro de conteneur.",
+  },
 ];

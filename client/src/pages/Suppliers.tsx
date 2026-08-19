@@ -44,6 +44,7 @@ import { suppliersApi } from "@/api/suppliersApi";
 import { format } from "date-fns";
 import { utils, writeFile } from "@/lib/excelHelper";
 import { useEscapeBack } from "@/hooks/use-escape-back";
+import { useSuppliersFilters } from "./suppliers/useSuppliersFilters";
 
 interface SupplierWithStats {
   id: number;
@@ -61,13 +62,7 @@ interface SupplierWithStats {
 
 export default function Suppliers() {
   const [selectedSupplier, setSelectedSupplier] = useState<SupplierWithStats | null>(null);
-  const [companyFilter, setCompanyFilter] = useState<string>("all");
-  const [hideZeroBalance, setHideZeroBalance] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const debouncedSearch = useDebounce(searchTerm, 300);
   const [dialogTab, setDialogTab] = useState<"transactions" | "purchase-orders">("transactions");
-  const [dateFilter, setDateFilter] = useState<"all" | "today" | "yesterday" | "this_month" | "this_year">("all");
-  const [hidePayments, setHidePayments] = useState(false);
   const [supplierToDelete, setSupplierToDelete] = useState<{ id: number; name: string } | null>(null);
 
   useEscapeBack(selectedSupplier ? () => setSelectedSupplier(null) : null);
@@ -76,6 +71,16 @@ export default function Suppliers() {
   const { formatAmount } = useCurrencyContext();
   const { toast } = useToast();
   const [_location, navigate] = useLocation();
+  const {
+    filters: { companyFilter, hideZeroBalance, searchTerm, dateFilter, hidePayments },
+    setFilter,
+    resetFilters,
+    hasActiveFilters,
+    setCompanyFilter,
+    setDateFilter,
+    setHidePayments,
+  } = useSuppliersFilters(selectedCompany?.id);
+  const debouncedSearch = useDebounce(searchTerm, 300);
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => suppliersApi.delete(id),
@@ -333,7 +338,7 @@ export default function Suppliers() {
           <Input
             placeholder="Search suppliers..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => setFilter("searchTerm", e.target.value)}
             className="pl-9"
             data-testid="input-supplier-search"
           />
@@ -341,12 +346,17 @@ export default function Suppliers() {
         <Button
           variant={hideZeroBalance ? "secondary" : "outline"}
           size="default"
-          onClick={() => setHideZeroBalance(!hideZeroBalance)}
+          onClick={() => setFilter("hideZeroBalance", !hideZeroBalance)}
           data-testid="button-toggle-zero-balance"
         >
           {hideZeroBalance ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
           {hideZeroBalance ? "Hide Zero" : "Show All"}
         </Button>
+        {hasActiveFilters && (
+          <Button variant="outline" type="button" onClick={resetFilters} data-testid="button-reset-filters">
+            Reset filters
+          </Button>
+        )}
       </div>
 
       {/* Supplier list */}

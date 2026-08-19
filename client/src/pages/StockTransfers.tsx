@@ -30,6 +30,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { PageHeader } from "@/components/PageHeader";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 import { useDateJump } from "@/hooks/use-date-jump";
+import { usePaginatedFilterState } from "@/hooks/use-paginated-filter-state";
+import { useCompany } from "@/contexts/CompanyContext";
 
 interface StockTransferRow {
   transferId: number;
@@ -50,15 +52,32 @@ interface StockTransfersProps {
   hideVoucherNotes?: boolean;
 }
 
+interface StockTransferFilters extends Record<string, unknown> {
+  period: PeriodFilterValue;
+  search: string;
+}
+
+function createStockTransferFilters(): StockTransferFilters {
+  return { period: getDefaultPeriodValue(), search: "" };
+}
+
 export default function StockTransfers({ hideVoucherNotes = false }: StockTransfersProps) {
   const [, setLocation] = useLocation();
   const { formatAmount } = useCurrencyContext();
   const { formatShortDate: formatDate } = useDateFormat();
   const { toast } = useToast();
+  const { selectedCompany } = useCompany();
 
-  const [period, setPeriod] = useState<PeriodFilterValue>(getDefaultPeriodValue());
-  useDateJump((date) => setPeriod({ fromDate: date, toDate: date, preset: "custom" }));
-  const [search, setSearch] = useState("");
+  const {
+    filters: { period, search },
+    setFilter,
+    resetFilters,
+    hasActiveFilters,
+  } = usePaginatedFilterState<StockTransferFilters>({
+    createInitialFilters: createStockTransferFilters,
+    storageKey: selectedCompany?.id ? `erp-stock-transfers-filters-v1:${selectedCompany.id}` : undefined,
+  });
+  useDateJump((date) => setFilter("period", { fromDate: date, toDate: date, preset: "custom" }));
   const debouncedSearch = useDebounce(search, 300);
   const [editingTransfer, setEditingTransfer] = useState<StockTransferRow | null>(null);
   const [editNotes, setEditNotes] = useState("");
@@ -182,20 +201,21 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
-        <PeriodFilter value={period} onChange={setPeriod} />
+        <PeriodFilter value={period} onChange={(next) => setFilter("period", next)} />
         <div className="relative flex-1 min-w-48 max-w-xs">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search by voucher, location, notes…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => setFilter("search", e.target.value)}
             className="pl-8"
             data-testid="input-search"
           />
         </div>
-        {search && (
-          <Button variant="ghost" size="icon" onClick={() => setSearch("")} data-testid="button-clear-search">
-            <X className="h-4 w-4" />
+        {hasActiveFilters && (
+          <Button variant="outline" size="sm" onClick={resetFilters} data-testid="button-reset-filters">
+            <X className="mr-2 h-4 w-4" />
+            Reset filters
           </Button>
         )}
       </div>
