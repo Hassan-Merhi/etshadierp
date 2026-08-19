@@ -63,6 +63,36 @@ export interface Account {
   balance?: number;
 }
 
+export interface JournalVoucherEntry {
+  bankAccountId?: number | null;
+  ledgerAccountId?: number | null;
+  supplierId?: number | null;
+  factorySupplierId?: number | null;
+  employeeId?: number | null;
+  fixedAssetId?: number | null;
+  customerId?: number | null;
+  debitAmount?: string | number | null;
+  creditAmount?: string | number | null;
+  narration?: string | null;
+}
+
+export interface JournalVoucherToEdit {
+  id: number;
+  voucherNumber?: string | null;
+  voucherType: string;
+  voucherDate: string;
+  entries?: JournalVoucherEntry[];
+  notes?: string | null;
+  optional?: boolean;
+  effectiveDate?: string | null;
+}
+
+export interface CreatedLedgerAccount {
+  id: number;
+  name: string;
+  code?: string | null;
+}
+
 export type JournalFormData = z.infer<typeof journalFormSchema>;
 
 export interface JournalFormProps {
