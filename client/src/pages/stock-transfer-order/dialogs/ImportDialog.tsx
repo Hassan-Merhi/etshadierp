@@ -27,7 +27,7 @@ type ImportDialogProps = {
   exportPreviewPDF: () => void | Promise<void>;
   handleImportFile: (file: File) => void | Promise<void>;
   importDialogOpen: boolean;
-  importFileRef: RefObject<HTMLInputElement>;
+  importFileRef: RefObject<HTMLInputElement | null>;
   importLoading: boolean;
   importPreview: ImportPreviewRow[];
   setImportDialogOpen: Dispatch<SetStateAction<boolean>>;
@@ -115,40 +115,22 @@ export function ImportDialog({
                 </span>
                 <span className="text-xs">.xlsx / .xls supported</span>
               </label>
-              {importLoading && (
-                <p className="text-sm text-center text-muted-foreground">Reading file…</p>
-              )}
+              {importLoading && <p className="text-sm text-center text-muted-foreground">Reading file…</p>}
             </div>
           ) : (
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex gap-2 text-xs">
-                  <span className="text-emerald-600 dark:text-emerald-400 font-medium">
-                    {updateCount} to update
-                  </span>
-                  {removeCount > 0 && (
-                    <span className="text-destructive font-medium">{removeCount} to remove</span>
-                  )}
-                  {unmatchedCount > 0 && (
-                    <span className="text-muted-foreground">{unmatchedCount} unmatched</span>
-                  )}
+                  <span className="text-emerald-600 dark:text-emerald-400 font-medium">{updateCount} to update</span>
+                  {removeCount > 0 && <span className="text-destructive font-medium">{removeCount} to remove</span>}
+                  {unmatchedCount > 0 && <span className="text-muted-foreground">{unmatchedCount} unmatched</span>}
                 </div>
                 <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={exportPreviewExcel}
-                    data-testid="button-export-preview-excel"
-                  >
+                  <Button variant="outline" size="sm" onClick={exportPreviewExcel} data-testid="button-export-preview-excel">
                     <FileDown className="h-3 w-3 mr-1" />
                     Excel
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={exportPreviewPDF}
-                    data-testid="button-export-preview-pdf"
-                  >
+                  <Button variant="outline" size="sm" onClick={exportPreviewPDF} data-testid="button-export-preview-pdf">
                     <FileDown className="h-3 w-3 mr-1" />
                     PDF
                   </Button>
@@ -180,41 +162,24 @@ export function ImportDialog({
                     </thead>
                     <tbody>
                       {importPreview.map((row, index) => (
-                        <tr
-                          key={index}
-                          className={cn("border-t", row.status === "not_found" && "opacity-50")}
-                        >
+                        <tr key={index} className={cn("border-t", row.status === "not_found" && "opacity-50")}>
                           <td className="p-2">
                             <p className="font-medium truncate max-w-[220px]">{row.stockItemName}</p>
                             {row.status === "new_item" && (
-                              <p className="text-xs text-emerald-600 dark:text-emerald-400">
-                                New — from {row.sourceLocationName || "?"}
-                              </p>
+                              <p className="text-xs text-emerald-600 dark:text-emerald-400">New — from {row.sourceLocationName || "?"}</p>
                             )}
-                            {row.status === "not_found" && (
-                              <p className="text-xs text-destructive">Not found — skipped</p>
-                            )}
-                            {row.status === "remove" && (
-                              <p className="text-xs text-destructive">Will be removed from order</p>
-                            )}
+                            {row.status === "not_found" && <p className="text-xs text-destructive">Not found — skipped</p>}
+                            {row.status === "remove" && <p className="text-xs text-destructive">Will be removed from order</p>}
                           </td>
-                          <td className="p-2 text-right font-mono text-muted-foreground">
-                            {formatNumber(row.currentQty, 0)}
-                          </td>
+                          <td className="p-2 text-right font-mono text-muted-foreground">{formatNumber(row.currentQty, 0)}</td>
                           <td
                             className={cn(
                               "p-2 text-right font-mono font-semibold",
-                              row.change > 0
-                                ? "text-emerald-600 dark:text-emerald-400"
-                                : "text-destructive"
+                              row.change > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"
                             )}
                           >
                             <span className="inline-flex items-center gap-0.5">
-                              {row.change > 0 ? (
-                                <TrendingUp className="h-3 w-3" />
-                              ) : (
-                                <TrendingDown className="h-3 w-3" />
-                              )}
+                              {row.change > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
                               {row.change > 0 ? "+" : ""}
                               {formatNumber(row.change, 0)}
                             </span>
@@ -223,20 +188,12 @@ export function ImportDialog({
                             {row.status !== "not_found" ? formatNumber(row.newQty, 0) : "—"}
                           </td>
                           <td className="p-2 text-center">
-                            {row.status === "ok" && (
-                              <Check className="h-4 w-4 text-emerald-500 mx-auto" />
-                            )}
+                            {row.status === "ok" && <Check className="h-4 w-4 text-emerald-500 mx-auto" />}
                             {row.status === "new_item" && (
-                              <span className="text-xs bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded-full">
-                                +New
-                              </span>
+                              <span className="text-xs bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded-full">+New</span>
                             )}
-                            {row.status === "remove" && (
-                              <AlertCircle className="h-4 w-4 text-destructive mx-auto" />
-                            )}
-                            {row.status === "not_found" && (
-                              <AlertCircle className="h-4 w-4 text-muted-foreground mx-auto" />
-                            )}
+                            {row.status === "remove" && <AlertCircle className="h-4 w-4 text-destructive mx-auto" />}
+                            {row.status === "not_found" && <AlertCircle className="h-4 w-4 text-muted-foreground mx-auto" />}
                           </td>
                         </tr>
                       ))}
