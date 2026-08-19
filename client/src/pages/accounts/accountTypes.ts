@@ -112,7 +112,7 @@ export interface AccountStatementViewProps {
   currentUser: any;
   formatAmount: (amt: number) => string;
   hideBalances: boolean;
-  printRef: React.RefObject<HTMLDivElement>;
+  printRef: React.RefObject<HTMLDivElement | null>;
   appMode: string;
   formatDisplayDate: (date: Date | string) => string;
   toggleVoucherSelection: (id: number) => void;

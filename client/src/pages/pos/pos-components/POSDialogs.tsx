@@ -38,7 +38,7 @@ export interface POSDialogsProps {
   handleStockPrint: () => void;
   handleSendWhatsAppReport: () => void;
   stockInventory: any[];
-  stockPrintRef: React.RefObject<HTMLDivElement>;
+  stockPrintRef: React.RefObject<HTMLDivElement | null>;
 }
 
 export function POSDialogs({

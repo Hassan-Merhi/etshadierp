@@ -116,7 +116,7 @@ export function BulkRenameTab() {
   const renderPreviewName = (name: string) => {
     const regex = buildRegex();
     if (!regex) return name;
-    const parts: (string | JSX.Element)[] = [];
+    const parts: (string | React.JSX.Element)[] = [];
     let lastIndex = 0;
     let match: RegExpExecArray | null;
     const r = new RegExp(regex.source, regex.flags);
@@ -161,7 +161,14 @@ export function BulkRenameTab() {
       if (data.failures && data.failures.length > 0) {
         toast({
           title: "Some items failed",
-          description: data.failures.map((f: { name: string | number | bigint | boolean | null | undefined; reason: string | number | bigint | boolean | null | undefined }) => `${f.name}: ${f.reason}`).join(", "),
+          description: data.failures
+            .map(
+              (f: {
+                name: string | number | bigint | boolean | null | undefined;
+                reason: string | number | bigint | boolean | null | undefined;
+              }) => `${f.name}: ${f.reason}`
+            )
+            .join(", "),
           variant: "destructive",
         });
       }

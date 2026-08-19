@@ -34,15 +34,17 @@ export function ImportProformaExcelDialog({
   customerId: number | null;
   customers: Customer[];
   downloadProformaTemplate: () => Promise<void>;
-  excelFileInputRef: React.RefObject<HTMLInputElement>;
+  excelFileInputRef: React.RefObject<HTMLInputElement | null>;
   excelImportErrors: string[];
-  excelImportLines: { articleCode: string; productName: string; quantity: string; pricePerBale: string; }[];
+  excelImportLines: { articleCode: string; productName: string; quantity: string; pricePerBale: string }[];
   excelImportLoading: boolean;
   excelImportName: string;
   handleExcelFile: (file: File) => Promise<void>;
   isExcelImportOpen: boolean;
   setExcelImportErrors: React.Dispatch<React.SetStateAction<string[]>>;
-  setExcelImportLines: React.Dispatch<React.SetStateAction<{ articleCode: string; productName: string; quantity: string; pricePerBale: string; }[]>>;
+  setExcelImportLines: React.Dispatch<
+    React.SetStateAction<{ articleCode: string; productName: string; quantity: string; pricePerBale: string }[]>
+  >;
   setExcelImportName: React.Dispatch<React.SetStateAction<string>>;
   setIsExcelImportOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }) {

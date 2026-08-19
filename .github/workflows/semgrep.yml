@@ -28,6 +28,21 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
-      - name: Scan source
-        run: semgrep scan --config auto --error
+      - name: Scan pull request for new findings
+        if: github.event_name == 'pull_request'
+        env:
+          SEMGREP_BASELINE_COMMIT: ${{ github.event.pull_request.base.sha }}
+        run: semgrep scan --config auto --error --baseline-commit "$SEMGREP_BASELINE_COMMIT"
+
+      - name: Scan main push for new findings
+        if: github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000'
+        env:
+          SEMGREP_BASELINE_COMMIT: ${{ github.event.before }}
+        run: semgrep scan --config auto --error --baseline-commit "$SEMGREP_BASELINE_COMMIT"
+
+      - name: Full baseline visibility scan
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.event.before == '0000000000000000000000000000000000000000')
+        run: semgrep scan --config auto

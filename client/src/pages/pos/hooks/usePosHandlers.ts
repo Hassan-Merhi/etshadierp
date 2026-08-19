@@ -33,12 +33,8 @@ interface PosHandlersParams {
   setLastAutosaved: React.Dispatch<React.SetStateAction<Date | null>>;
   setMobileTab: React.Dispatch<React.SetStateAction<"items" | "cart">>;
   setPendingStockSend: React.Dispatch<React.SetStateAction<boolean>>;
-  setStockWaStatus: React.Dispatch<
-    React.SetStateAction<"idle" | "sending" | "sent" | "failed" | "not_configured">
-  >;
-  setInvoiceWaStatus: React.Dispatch<
-    React.SetStateAction<"idle" | "sending" | "sent" | "failed">
-  >;
+  setStockWaStatus: React.Dispatch<React.SetStateAction<"idle" | "sending" | "sent" | "failed" | "not_configured">>;
+  setInvoiceWaStatus: React.Dispatch<React.SetStateAction<"idle" | "sending" | "sent" | "failed">>;
   setZeroStockItem: React.Dispatch<React.SetStateAction<string>>;
   setZeroStockAlert: React.Dispatch<React.SetStateAction<boolean>>;
   setSearchTerm: React.Dispatch<React.SetStateAction<string>>;
@@ -47,7 +43,7 @@ interface PosHandlersParams {
   // Refs
   inputRefs: React.MutableRefObject<{ [key: string]: HTMLInputElement }>;
   printRef: React.MutableRefObject<HTMLDivElement | null>;
-  stockPrintRef: React.RefObject<HTMLDivElement>;
+  stockPrintRef: React.RefObject<HTMLDivElement | null>;
   clientSaleIdRef: React.MutableRefObject<string>;
   // Query results
   activeCurrency: string;
