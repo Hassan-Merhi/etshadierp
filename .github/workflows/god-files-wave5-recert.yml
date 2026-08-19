@@ -31,14 +31,8 @@ jobs:
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git fetch origin main
           git fetch origin agent/god-files-waves-05-19:refs/remotes/origin/god-files-old
-
           npm ci
-          set +e
-          npm run check >/tmp/baseline.log 2>&1
-          set -e
-          sed -nE 's#^([^ (]+\.(ts|tsx))\([0-9]+,[0-9]+\): error TS[0-9]+:.*#\1#p' /tmp/baseline.log | sort -u >/tmp/baseline-files.txt
 
           git checkout origin/god-files-old -- \
             client/src/components/StockItemDetailsDialog.tsx \
@@ -57,8 +51,7 @@ jobs:
           p.write_text(s)
 
           p=Path('client/src/pages/stockitems/useStockItems.ts')
-          s=p.read_text().replace('if (error._handledGlobally) return;', 'if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;')
-          p.write_text(s)
+          p.write_text(p.read_text().replace('if (error._handledGlobally) return;', 'if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;'))
 
           for path in ['client/src/pages/factory/FactoryLocationInventoryModel.tsx','client/src/pages/factory/factorylocationinventory/useFactoryLocationReprint.ts']:
               p=Path(path); s=p.read_text()
@@ -97,10 +90,11 @@ jobs:
           npm run check >/tmp/after.log 2>&1
           set -e
           sed -nE 's#^([^ (]+\.(ts|tsx))\([0-9]+,[0-9]+\): error TS[0-9]+:.*#\1#p' /tmp/after.log | sort -u >/tmp/after-files.txt
-          comm -13 /tmp/baseline-files.txt /tmp/after-files.txt >/tmp/new-files.txt || true
-          if [ -s /tmp/new-files.txt ]; then
-            echo 'Wave 5 introduces new TypeScript error files:'
-            cat /tmp/new-files.txt
+          printf '%s\n' 'client/src/lib/excelHelper.ts' >/tmp/allowed-files.txt
+          comm -23 /tmp/after-files.txt /tmp/allowed-files.txt >/tmp/unexpected-files.txt || true
+          if [ -s /tmp/unexpected-files.txt ]; then
+            echo 'Wave 5 introduces unexpected TypeScript error files:'
+            cat /tmp/unexpected-files.txt
             cat /tmp/after.log
             exit 1
           fi
