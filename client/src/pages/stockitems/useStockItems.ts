@@ -129,7 +129,7 @@ export function useStockItems() {
       toast({ title: "Success", description: "Stock items deleted successfully" });
     },
     onError: (error: Error) => {
-      if (error._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to delete stock items", variant: "destructive" });
     },
   });
@@ -149,7 +149,7 @@ export function useStockItems() {
       toast({ title: "Success", description: "Stock adjusted successfully" });
     },
     onError: (error: Error) => {
-      if (error._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to adjust stock", variant: "destructive" });
     },
   });
@@ -166,7 +166,7 @@ export function useStockItems() {
       toast({ title: "Success", description: "Category assigned successfully" });
     },
     onError: (error: Error) => {
-      if (error._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to assign category", variant: "destructive" });
     },
   });
@@ -179,7 +179,7 @@ export function useStockItems() {
       toast({ title: "Grade created" });
     },
     onError: (error: Error) => {
-      if (error._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -194,7 +194,7 @@ export function useStockItems() {
       toast({ title: "Grade updated" });
     },
     onError: (error: Error) => {
-      if (error._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -208,7 +208,7 @@ export function useStockItems() {
       toast({ title: "Grade deleted" });
     },
     onError: (error: Error) => {
-      if (error._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -221,7 +221,7 @@ export function useStockItems() {
       toast({ title: "Category created" });
     },
     onError: (error: Error) => {
-      if (error._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -236,7 +236,7 @@ export function useStockItems() {
       toast({ title: "Category updated" });
     },
     onError: (error: Error) => {
-      if (error._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -250,7 +250,7 @@ export function useStockItems() {
       toast({ title: "Category deleted" });
     },
     onError: (error: Error) => {
-      if (error._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });

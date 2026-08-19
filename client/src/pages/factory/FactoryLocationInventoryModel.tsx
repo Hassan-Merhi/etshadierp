@@ -674,7 +674,7 @@ export function useFactoryLocationInventory() {
     setFinalizeOpen(true);
   };
 
-  const doSaveProforma = () => {
+  const doSaveProforma = useCallback(() => {
     const lines = selectedItems.map((item) => ({
       articleCode: item.articleCode,
       productName: item.productName,
@@ -691,7 +691,7 @@ export function useFactoryLocationInventory() {
         lines,
       });
     }
-  };
+  }, [bulkCreateMutation, editingProformaId, proformaName, replaceLinesMutation, selectedCustomerId, selectedItems]);
 
   const handleSaveProforma = () => {
     if (!selectedCustomerId) {
@@ -736,8 +736,7 @@ export function useFactoryLocationInventory() {
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [proformaAutoSave, proformaMode, editingProformaId, selections, editModeInitialized]);
+  }, [proformaAutoSave, proformaMode, editingProformaId, selections, editModeInitialized, doSaveProforma]);
 
   const handleExportExcel = () => {
     if (!savedProformaId) return;
