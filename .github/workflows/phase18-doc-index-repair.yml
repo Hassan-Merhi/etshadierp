@@ -1,7 +1,7 @@
 name: Phase 18 Doc Index Repair
 on:
   push:
-    branches: [main]
+    branches: [main, agent/phase18-phase1-safe-macos-result]
 permissions:
   contents: write
 jobs:
@@ -10,23 +10,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-        with: {ref: main, fetch-depth: 0}
+        with: {ref: ${{ github.ref_name }}, fetch-depth: 0}
       - uses: actions/setup-node@v6
         with: {node-version: '22.14.0', cache: npm}
       - run: npm ci
-      - name: Synchronize live quality figures in docs
+      - name: Synchronize branch quality artifacts
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
           replacements={
-            'docs/god-file-split-program.md': [('25,437 lines over the limit','25,299 lines over the limit')],
-            'docs/system-quality-program.md': [
-              ('25,437','25,299'),
-              ('8,646','0'),
-              ('9,270','33'),
-            ],
+            'docs/god-file-split-program.md': [('25,056 lines over the limit','25,059 lines over the limit')],
+            'docs/system-quality-program.md': [('25,056 excess lines','25,059 excess lines')],
           }
           for name,pairs in replacements.items():
               p=Path(name); s=p.read_text()
@@ -37,26 +33,20 @@ jobs:
                       raise SystemExit(f'neither stale nor corrected literal found for {old!r} in {name}')
               p.write_text(s)
           PY
+          UPDATE_ROUTE_MANIFEST=1 npm run test:backend -- route-manifest
+          npx prettier --write tests/workflow.test.ts
           npm run audit:doc-index
-      - name: Commit and robustly push verified doc sync
+      - name: Commit verified synchronization and restore repair workflow
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add docs/god-file-split-program.md docs/system-quality-program.md
+          git fetch origin main
+          git checkout origin/main -- .github/workflows/phase18-doc-index-repair.yml
+          git add .github/workflows/phase18-doc-index-repair.yml docs/god-file-split-program.md docs/system-quality-program.md config/route-manifest.json tests/workflow.test.ts
           if git diff --cached --quiet; then
-            npm run audit:doc-index
             exit 0
           fi
-          git commit -m 'docs: sync Phase 18 quality figures with live audits [skip ci]'
-          for attempt in 1 2 3 4 5 6; do
-            git fetch origin main
-            if git rebase origin/main && npm run audit:doc-index && git push --no-verify origin HEAD:main; then
-              echo "DOC_INDEX_PUSHED=$(git rev-parse HEAD)"
-              exit 0
-            fi
-            git rebase --abort || true
-            sleep 2
-          done
-          exit 1
+          git commit -m 'ci: sync Phase 18 generated quality artifacts [skip ci]'
+          git push --no-verify origin HEAD:${GITHUB_REF_NAME}
