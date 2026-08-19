@@ -1,19 +1,19 @@
 name: God Files Lint Cleanup
 
 on:
-  push:
-    branches: [agent/god-files-recovery-latest-main]
+  pull_request:
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
 
 concurrency:
-  group: god-files-lint-cleanup
+  group: god-files-lint-cleanup-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
   cleanup:
-    if: github.actor != 'github-actions[bot]'
+    if: github.event.pull_request.head.ref == 'agent/god-files-recovery-latest-main' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
