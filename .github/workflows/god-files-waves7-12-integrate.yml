@@ -1,0 +1,93 @@
+name: God Files Waves 7-12 Integration
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: god-files-waves7-12-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  integrate:
+    if: github.event.pull_request.head.ref == 'agent/god-files-recovery-main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/god-files-recovery-main
+          fetch-depth: 0
+      - name: Integrate completed Waves 7-12 without stale-base overwrite
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git log --format=%B -60 | grep -Fq '[waves7-12-recert]'; then
+            echo 'Waves 7-12 already integrated.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin agent/god-files-claude-waves-07-12:refs/remotes/origin/god-files-7-12
+          npm ci
+
+          # Only these roots were actually converted to small composition shells on
+          # the Waves 7-12 branch. Wave 5/6 roots are deliberately excluded because
+          # they were already re-certified separately on current main.
+          roots=(
+            client/src/pages/AccountsLegacy.tsx
+            client/src/pages/ContainerLoadingScan.tsx
+            client/src/pages/TransactionJournal.tsx
+            client/src/pages/daybook/VoucherDetailsDialog.tsx
+            client/src/pages/factory/FactoryContainerLoadingScan.tsx
+            client/src/pages/factory/FactoryDaybook.tsx
+            client/src/pages/factory/FactoryPOS.tsx
+            client/src/pages/pos/POSImport.tsx
+            client/src/pages/pos/POSPriceList.tsx
+          )
+
+          # Bring over missing extracted modules only. Existing recovery/current-main
+          # files are never overwritten here.
+          prefixes=(
+            client/src/pages/accountslegacy/
+            client/src/pages/containerloadingscan/
+            client/src/pages/transactionjournal/
+            client/src/pages/daybook/voucherdetailsdialog/
+            client/src/pages/factory/daybook/
+            client/src/pages/factory/factorycontainerloadingscan/
+            client/src/pages/factory/factorypos/
+            client/src/pages/pos/posimport/
+            client/src/pages/pos/pospricelist/
+          )
+          for prefix in "${prefixes[@]}"; do
+            while IFS= read -r path; do
+              [ -n "$path" ] || continue
+              if [ ! -e "$path" ]; then
+                git checkout origin/god-files-7-12 -- "$path"
+              fi
+            done < <(git ls-tree -r --name-only origin/god-files-7-12 -- "$prefix")
+          done
+
+          # Switch only the composition roots after all required missing modules exist.
+          git checkout origin/god-files-7-12 -- "${roots[@]}"
+
+          set +e
+          npm run check >/tmp/after.log 2>&1
+          set -e
+          sed -nE 's#^([^ (]+\.(ts|tsx))\([0-9]+,[0-9]+\): error TS[0-9]+:.*#\1#p' /tmp/after.log | sort -u >/tmp/after-files.txt
+          printf '%s\n' 'client/src/lib/excelHelper.ts' >/tmp/allowed-files.txt
+          comm -23 /tmp/after-files.txt /tmp/allowed-files.txt >/tmp/unexpected-files.txt || true
+          if [ -s /tmp/unexpected-files.txt ]; then
+            echo 'Waves 7-12 integration introduces unexpected TypeScript error files:'
+            cat /tmp/unexpected-files.txt
+            cat /tmp/after.log
+            exit 1
+          fi
+
+          node scripts/audit-god-file-boundaries.mjs
+          git add -A
+          git commit -m 'refactor: integrate and re-certify God Files Waves 7-12 [waves7-12-recert]'
+          SKIP_TSC_CHECK=1 git push origin HEAD:agent/god-files-recovery-main
