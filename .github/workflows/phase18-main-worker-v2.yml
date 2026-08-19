@@ -1,8 +1,7 @@
 name: Phase 18 Main Cleanup Worker v2
 
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -12,7 +11,6 @@ env:
 
 jobs:
   cleanup:
-    if: contains(github.event.head_commit.message, '[phase18-main-worker-v2]')
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
@@ -133,11 +131,8 @@ jobs:
             if ! git diff --cached --quiet; then git commit -m "refactor: compiler-safe inferred ${mode} types [phase18-${mode}] [skip ci]"; fi
             cat >/dev/null <<'KEEP'
           KEEP
-            # reinstall helper scripts for next mode because cleanup above removes them
             git show HEAD:.github/workflows/phase18-main-worker-v2.yml >/dev/null
           }
-          # Keep helpers throughout all modes; cleanup only after the last pass.
-          # Recreate them from this step's workspace copy if a failed mode reset removes changes.
           harvest contextual
           harvest declarations
           harvest casts
