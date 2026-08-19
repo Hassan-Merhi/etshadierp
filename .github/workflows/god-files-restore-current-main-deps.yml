@@ -1,0 +1,55 @@
+name: God Files Restore Current Main Dependencies
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: god-files-restore-current-main-deps-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  restore:
+    if: github.event.pull_request.head.ref == 'agent/god-files-recovery-latest-main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/god-files-recovery-latest-main
+          fetch-depth: 0
+      - name: Restore support files required by current-main monoliths
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git log --format=%B -40 | grep -Fq '[restore-current-main-wave13-14-deps]'; then
+            echo 'Current-main support dependencies already restored.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin main
+          git checkout origin/main -- \
+            client/src/pages/supplierprofitcheck/types.ts \
+            client/src/pages/supplierprofitcheck/utils.ts \
+            client/src/pages/supplierprofitcheck/components/ProfitCell.tsx \
+            client/src/pages/supplierprofitcheck/components/StatusBadge.tsx \
+            client/src/pages/supplierprofitcheck/components/StatCard.tsx \
+            client/src/pages/factory/factorysettings/types.ts \
+            client/src/pages/factory/factorysettings/utils.ts \
+            client/src/pages/factory/factorysettings/components/RecalculateBaleCostsCard.tsx \
+            client/src/pages/factory/factorysettings/components/MigrateVoucherDescriptionsCard.tsx \
+            client/src/pages/settings/datatoolstab/types.ts \
+            client/src/pages/settings/datatoolstab/components/ReconcileOTWNamesCard.tsx \
+            client/src/pages/settings/datatoolstab/components/MergeStockItemsLauncher.tsx \
+            client/src/pages/settings/datatoolstab/components/LocationCostPriceOverride.tsx \
+            client/src/pages/sp/gclshimigration/types.ts \
+            client/src/pages/sp/gclshimigration/components/StatusBadge.tsx \
+            client/src/pages/sp/gclshimigration/components/Stage2StepRunner.tsx \
+            client/src/pages/sp/gclshimigration/components/ProfitOpeningRunner.tsx \
+            client/src/pages/sp/gclshimigration/components/ReconciliationRunner.tsx
+          git add -A
+          git commit -m 'chore: restore current-main support dependencies [restore-current-main-wave13-14-deps]'
+          git push origin HEAD:agent/god-files-recovery-latest-main
