@@ -49,13 +49,6 @@ jobs:
           python - <<'PY'
           from pathlib import Path
 
-          def replace_all(path, old, new):
-              p=Path(path); s=p.read_text()
-              if old in s:
-                  s=s.replace(old,new)
-                  p.write_text(s)
-
-          # StockItemDetails: preserve current-main handled-error typing.
           p=Path('client/src/components/stockitemdetailsdialog/useStockItemDetailsDialog.ts')
           s=p.read_text()
           if 'ClientErrorLike' not in s:
@@ -63,12 +56,10 @@ jobs:
           s=s.replace('onError: (error: Error) => {\n      if (error._handledGlobally) return;', 'onError: (error: ClientErrorLike) => {\n      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;')
           p.write_text(s)
 
-          # StockItems: preserve current-main handled-error typing without changing runtime behavior.
           p=Path('client/src/pages/stockitems/useStockItems.ts')
           s=p.read_text().replace('if (error._handledGlobally) return;', 'if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;')
           p.write_text(s)
 
-          # Factory Location Inventory: current-main safer unknown-error handling.
           for path in ['client/src/pages/factory/FactoryLocationInventoryModel.tsx','client/src/pages/factory/factorylocationinventory/useFactoryLocationReprint.ts']:
               p=Path(path); s=p.read_text()
               if 'getErrorDetails' not in s and ('catch (err' in s or 'err.message' in s):
@@ -78,18 +69,15 @@ jobs:
               s=s.replace('(row: any) =>', '(row) =>')
               p.write_text(s)
 
-          # Factory Location Inventory: carry the current-main memoized proforma save behavior if this logic lives here.
           p=Path('client/src/pages/factory/FactoryLocationInventoryModel.tsx')
           s=p.read_text()
-          if 'const doSaveProforma = () =>' in s:
-              s=s.replace('const doSaveProforma = () => {', 'const doSaveProforma = useCallback(() => {')
-              marker='''    } else {\n      bulkCreateMutation.mutate({\n        customerId: Number(selectedCustomerId),\n        name: proformaName,\n        isActive: true,\n        lines,\n      });\n    }\n  };'''
-              repl='''    } else {\n      bulkCreateMutation.mutate({\n        customerId: Number(selectedCustomerId),\n        name: proformaName,\n        isActive: true,\n        lines,\n      });\n    }\n  }, [bulkCreateMutation, editingProformaId, proformaName, replaceLinesMutation, selectedCustomerId, selectedItems]);'''
-              if marker in s:
-                  s=s.replace(marker,repl)
+          old='''  const doSaveProforma = () => {\n    const lines = selectedItems.map((item) => ({\n      articleCode: item.articleCode,\n      productName: item.productName,\n      quantity: item.selectedQty,\n      pricePerBale: item.pricePerBale,\n    }));\n    if (editingProformaId) {\n      replaceLinesMutation.mutate({ id: editingProformaId, lines });\n    } else {\n      bulkCreateMutation.mutate({\n        customerId: parseInt(selectedCustomerId),\n        name: proformaName.trim(),\n        isActive: false,\n        lines,\n      });\n    }\n  };'''
+          new='''  const doSaveProforma = useCallback(() => {\n    const lines = selectedItems.map((item) => ({\n      articleCode: item.articleCode,\n      productName: item.productName,\n      quantity: item.selectedQty,\n      pricePerBale: item.pricePerBale,\n    }));\n    if (editingProformaId) {\n      replaceLinesMutation.mutate({ id: editingProformaId, lines });\n    } else {\n      bulkCreateMutation.mutate({\n        customerId: parseInt(selectedCustomerId),\n        name: proformaName.trim(),\n        isActive: false,\n        lines,\n      });\n    }\n  }, [bulkCreateMutation, editingProformaId, proformaName, replaceLinesMutation, selectedCustomerId, selectedItems]);'''
+          if old in s:
+              s=s.replace(old,new)
+          s=s.replace('    // eslint-disable-next-line react-hooks/exhaustive-deps\n  }, [proformaAutoSave, proformaMode, editingProformaId, selections, editModeInitialized]);', '  }, [proformaAutoSave, proformaMode, editingProformaId, selections, editModeInitialized, doSaveProforma]);')
           p.write_text(s)
 
-          # StockEntryHistory: retain current-main effect dependency and ClientErrorLike typing where applicable.
           p=Path('client/src/pages/StockEntryHistory.tsx')
           s=p.read_text()
           if 'ClientErrorLike' not in s:
