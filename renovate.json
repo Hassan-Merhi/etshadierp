@@ -1,30 +1,80 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
-  "timezone": "Africa/Lubumbashi",
-  "schedule": ["before 6am on Monday"],
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":configMigration",
+    ":separateMultipleMajorReleases",
+    "helpers:pinGitHubActionDigests",
+    "security:minimumReleaseAgeNpm"
+  ],
   "labels": ["dependencies"],
-  "dependencyDashboard": true,
-  "prConcurrentLimit": 10,
-  "prHourlyLimit": 2,
-  "rangeStrategy": "bump",
+  "timezone": "Africa/Lubumbashi",
+  "prConcurrentLimit": 5,
+  "branchConcurrentLimit": 8,
+  "automerge": false,
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["dependencies", "security"],
+    "automerge": false
+  },
   "packageRules": [
     {
-      "description": "Group development dependency patch updates",
-      "matchDepTypes": ["devDependencies"],
-      "matchUpdateTypes": ["patch"],
-      "groupName": "development patches"
+      "description": "Require explicit dashboard approval for every major upgrade",
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true,
+      "automerge": false
     },
     {
-      "description": "Group production dependency patch updates",
+      "description": "Require explicit approval for database, authentication, document-generation, and spreadsheet runtime dependencies",
+      "matchDatasources": ["npm"],
+      "matchPackageNames": [
+        "drizzle-orm",
+        "drizzle-kit",
+        "pg",
+        "express",
+        "express-session",
+        "connect-pg-simple",
+        "passport",
+        "passport-local",
+        "@simplewebauthn/browser",
+        "@simplewebauthn/server",
+        "bcryptjs",
+        "zod",
+        "xlsx",
+        "xlsx-js-style",
+        "exceljs",
+        "pdfkit",
+        "jspdf",
+        "jspdf-autotable"
+      ],
+      "minimumReleaseAge": "7 days",
+      "dependencyDashboardApproval": true,
+      "automerge": false
+    },
+    {
+      "description": "Group non-major development-tool updates to reduce PR noise",
+      "matchDatasources": ["npm"],
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "minimumReleaseAge": "7 days",
+      "groupName": "development dependencies",
+      "automerge": false
+    },
+    {
+      "description": "Group production patch updates while keeping them review-gated",
+      "matchDatasources": ["npm"],
       "matchDepTypes": ["dependencies"],
       "matchUpdateTypes": ["patch"],
-      "groupName": "production patches"
+      "minimumReleaseAge": "7 days",
+      "groupName": "production dependency patches",
+      "automerge": false
     },
     {
-      "description": "Group GitHub Actions updates",
+      "description": "Keep GitHub Actions digest updates isolated and review-gated",
       "matchManagers": ["github-actions"],
-      "groupName": "github actions"
+      "groupName": "GitHub Actions digests",
+      "automerge": false
     }
   ]
 }
