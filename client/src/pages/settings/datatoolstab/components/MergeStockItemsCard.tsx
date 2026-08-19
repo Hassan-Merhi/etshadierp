@@ -106,27 +106,140 @@ export function MergeStockItemsCard({ embedded: _embedded }: { embedded?: boolea
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Item to keep</Label>
-            <StockItemAutocomplete value={keptItem} onChange={(id, name) => { setKeptItem({ id, name }); setPreview(null); setPreviewError(null); setConfirmText(""); }} stockItems={allStockItems} placeholder="Search item to keep..." testId="merge-keep-item" />
+            <StockItemAutocomplete
+              value={keptItem}
+              onChange={(id, name) => {
+                setKeptItem({ id, name });
+                setPreview(null);
+                setPreviewError(null);
+                setConfirmText("");
+              }}
+              stockItems={allStockItems}
+              placeholder="Search item to keep..."
+              testId="merge-keep-item"
+            />
           </div>
           <div className="space-y-2">
             <Label>Duplicate to merge away</Label>
-            <StockItemAutocomplete value={dupItem} onChange={(id, name) => { setDupItem({ id, name }); setPreview(null); setPreviewError(null); setConfirmText(""); }} stockItems={allStockItems} placeholder="Search duplicate item..." testId="merge-dup-item" />
+            <StockItemAutocomplete
+              value={dupItem}
+              onChange={(id, name) => {
+                setDupItem({ id, name });
+                setPreview(null);
+                setPreviewError(null);
+                setConfirmText("");
+              }}
+              stockItems={allStockItems}
+              placeholder="Search duplicate item..."
+              testId="merge-dup-item"
+            />
           </div>
         </div>
-        <Button variant="outline" onClick={handlePreview} disabled={!keptItem || !dupItem || isLoadingPreview} data-testid="button-merge-preview">
-          {isLoadingPreview ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Eye className="h-4 w-4 mr-2" />}Preview Merge
+
+        <Button
+          variant="outline"
+          onClick={handlePreview}
+          disabled={!keptItem || !dupItem || isLoadingPreview}
+          data-testid="button-merge-preview"
+        >
+          {isLoadingPreview ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Eye className="h-4 w-4 mr-2" />}
+          Preview Merge
         </Button>
-        {previewError && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertDescription>{previewError}</AlertDescription></Alert>}
+
+        {previewError && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>{previewError}</AlertDescription>
+          </Alert>
+        )}
+
         {preview && (
           <div className="space-y-3">
-            {preview.uomMismatch && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertDescription>UOM mismatch — kept item is <strong>{preview.keptItem.uom}</strong>, duplicate is <strong>{preview.duplicateItem.uom}</strong>. This merge is blocked in Phase 1.</AlertDescription></Alert>}
-            {preview.warnings.map((w, i) => <Alert key={i}><AlertTriangle className="h-4 w-4" /><AlertDescription>{w}</AlertDescription></Alert>)}
-            <div className="rounded-md border"><Table><TableHeader><TableRow><TableHead>Location</TableHead><TableHead className="text-right">Keep Qty</TableHead><TableHead className="text-right">Dup Qty</TableHead><TableHead className="text-right">Combined Qty</TableHead><TableHead className="text-right">Combined Rate</TableHead><TableHead className="text-right">Combined Value</TableHead></TableRow></TableHeader><TableBody>{preview.inventoryImpact.map((row) => <TableRow key={row.locationId}><TableCell>{row.locationName}</TableCell><TableCell className="text-right tabular-nums">{formatNumber(row.keptQty, 3)}</TableCell><TableCell className="text-right tabular-nums">{formatNumber(row.dupQty, 3)}</TableCell><TableCell className="text-right tabular-nums font-medium">{formatNumber(row.combinedQty, 3)}</TableCell><TableCell className="text-right tabular-nums">{formatNumber(row.combinedRate, 2)}</TableCell><TableCell className="text-right tabular-nums">{formatNumber(row.combinedValue, 2)}</TableCell></TableRow>)}</TableBody></Table></div>
-            <div className="flex flex-wrap gap-4 text-sm text-muted-foreground"><span>Total value before: <strong className="text-foreground tabular-nums">{formatNumber(preview.totalValueBefore, 2)}</strong></span><span>Total value after: <strong className="text-foreground tabular-nums">{formatNumber(preview.totalValueAfter, 2)}</strong></span></div>
-            {!preview.uomMismatch && <div className="space-y-2 border-t pt-3"><p className="text-sm text-muted-foreground">This action cannot be undone. Type <strong>MERGE</strong> to confirm.</p><div className="flex gap-2 items-center flex-wrap"><Input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} placeholder="Type MERGE" className="max-w-[160px]"/><Button onClick={handleMerge} disabled={confirmText !== "MERGE" || isMerging}>{isMerging && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Confirm Merge</Button></div></div>}
+            {preview.uomMismatch && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  UOM mismatch — kept item is <strong>{preview.keptItem.uom}</strong>, duplicate is{" "}
+                  <strong>{preview.duplicateItem.uom}</strong>. This merge is blocked in Phase 1.
+                </AlertDescription>
+              </Alert>
+            )}
+            {preview.warnings.map((w, i) => (
+              <Alert key={i}>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>{w}</AlertDescription>
+              </Alert>
+            ))}
+
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Location</TableHead>
+                    <TableHead className="text-right">Keep Qty</TableHead>
+                    <TableHead className="text-right">Dup Qty</TableHead>
+                    <TableHead className="text-right">Combined Qty</TableHead>
+                    <TableHead className="text-right">Combined Rate</TableHead>
+                    <TableHead className="text-right">Combined Value</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {preview.inventoryImpact.map((row) => (
+                    <TableRow key={row.locationId} data-testid={`row-merge-impact-${row.locationId}`}>
+                      <TableCell>{row.locationName}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatNumber(row.keptQty, 3)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatNumber(row.dupQty, 3)}</TableCell>
+                      <TableCell className="text-right tabular-nums font-medium">
+                        {formatNumber(row.combinedQty, 3)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{formatNumber(row.combinedRate, 2)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatNumber(row.combinedValue, 2)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+              <span>
+                Total value before:{" "}
+                <strong className="text-foreground tabular-nums">{formatNumber(preview.totalValueBefore, 2)}</strong>
+              </span>
+              <span>
+                Total value after:{" "}
+                <strong className="text-foreground tabular-nums">{formatNumber(preview.totalValueAfter, 2)}</strong>
+              </span>
+            </div>
+
+            {!preview.uomMismatch && (
+              <div className="space-y-2 border-t pt-3">
+                <p className="text-sm text-muted-foreground">
+                  This action cannot be undone. Type <strong>MERGE</strong> to confirm.
+                </p>
+                <div className="flex gap-2 items-center flex-wrap">
+                  <Input
+                    value={confirmText}
+                    onChange={(e) => setConfirmText(e.target.value)}
+                    placeholder="Type MERGE"
+                    className="max-w-[160px]"
+                    data-testid="input-merge-confirm"
+                  />
+                  <Button
+                    onClick={handleMerge}
+                    disabled={confirmText !== "MERGE" || isMerging}
+                    data-testid="button-confirm-merge"
+                  >
+                    {isMerging && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Confirm Merge
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </CardContent>
     </Card>
   );
 }
+
+// ── Bulk Merge Stock Items Card ───────────────────────────────────────────────
