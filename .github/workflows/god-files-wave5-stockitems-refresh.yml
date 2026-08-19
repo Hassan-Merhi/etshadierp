@@ -1,0 +1,102 @@
+name: God Files Wave 5 StockItems Refresh
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: god-files-wave5-stockitems-refresh-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    if: github.event.pull_request.head.ref == 'agent/god-files-recovery-main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/god-files-recovery-main
+          fetch-depth: 0
+      - name: Preserve latest-main filters in recovered StockItems split
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git log --format=%B -25 | grep -Fq '[wave5-stockitems-latest-main]'; then
+            echo 'Wave 5 StockItems already refreshed.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin agent/god-files-waves-05-19:refs/remotes/origin/god-files-old
+          npm ci
+
+          # Restore only the tiny composition root. Keep all current-main support files.
+          git checkout origin/god-files-old -- client/src/pages/StockItems.tsx
+
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('client/src/pages/stockitems/useStockItems.ts')
+          s=p.read_text()
+
+          if 'useCompany' not in s:
+              s=s.replace(
+                  'import { useCurrencyContext } from "@/contexts/CurrencyContext";',
+                  'import { useCurrencyContext } from "@/contexts/CurrencyContext";\nimport { useCompany } from "@/contexts/CompanyContext";'
+              )
+          if 'useStockItemsFilters' not in s:
+              s=s.replace(
+                  'import { PAGE_SIZE } from "./utils";',
+                  'import { PAGE_SIZE } from "./utils";\nimport { useStockItemsFilters } from "./useStockItemsFilters";'
+              )
+
+          old='''  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [selectedGroupFilter, setSelectedGroupFilter] = useState<number | null>(null);
+  const [selectedGradeFilter, setSelectedGradeFilter] = useState<number | null>(null);
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<number | "none" | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);'''
+          new='''  const { selectedCompany } = useCompany();
+  const {
+    filters: { searchTerm, selectedGroupFilter, selectedGradeFilter, selectedCategoryFilter },
+    currentPage,
+    setPage: setCurrentPage,
+    debouncedSearch,
+    setSearchTerm,
+    setSelectedGroupFilter,
+    setSelectedGradeFilter,
+    setSelectedCategoryFilter,
+  } = useStockItemsFilters(selectedCompany?.id);'''
+          if old in s:
+              s=s.replace(old,new)
+          elif 'useStockItemsFilters(selectedCompany?.id)' not in s:
+              raise SystemExit('Unexpected useStockItems state shape; refusing automatic rewrite')
+
+          old_effects='''  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedGroupFilter, selectedGradeFilter, selectedCategoryFilter]);
+
+'''
+          s=s.replace(old_effects,'')
+          if 'useEffect(' not in s:
+              s=s.replace('import { useEffect, useState, type MouseEvent } from "react";', 'import { useState, type MouseEvent } from "react";')
+
+          p.write_text(s)
+          PY
+
+          npm run check
+          node scripts/audit-god-file-boundaries.mjs
+          git add client/src/pages/StockItems.tsx client/src/pages/stockitems/useStockItems.ts
+          git commit -m 'refactor: preserve latest-main StockItems filters in Wave 5 split [wave5-stockitems-latest-main]'
+          git push origin HEAD:agent/god-files-recovery-main
