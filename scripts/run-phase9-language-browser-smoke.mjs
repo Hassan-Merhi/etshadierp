@@ -185,8 +185,37 @@ async function completeLanguageOnboarding(page, language) {
     () => !document.querySelector('[data-testid="language-onboarding-continue"]')?.hasAttribute("disabled"),
     { timeout: TIMEOUT_MS },
   );
-  await page.click('[data-testid="language-onboarding-continue"]');
-  await page.waitForSelector(dialogSelector, { hidden: true, timeout: TIMEOUT_MS });
+  const continueSelector = '[data-testid="language-onboarding-continue"]';
+  const closeAttempts = 3;
+  let closed = false;
+  for (let attempt = 1; attempt <= closeAttempts; attempt += 1) {
+    if (attempt === 1) {
+      await page.click(continueSelector);
+    } else {
+      await page.evaluate((selector) => document.querySelector(selector)?.click(), continueSelector);
+    }
+
+    try {
+      await page.waitForFunction(
+        (selector) => {
+          const dialog = document.querySelector(selector);
+          if (!(dialog instanceof HTMLElement)) return true;
+          const style = window.getComputedStyle(dialog);
+          return dialog.dataset.state === "closed" || style.display === "none" || style.visibility === "hidden";
+        },
+        { timeout: Math.min(TIMEOUT_MS, 5_000) },
+        dialogSelector,
+      );
+      closed = true;
+      break;
+    } catch {
+      if (attempt === closeAttempts) {
+        throw new Error(`Language onboarding did not close after ${closeAttempts} attempts`);
+      }
+    }
+  }
+
+  if (!closed) throw new Error("Language onboarding close state was not observed");
   await waitForSettledUi(page);
   return true;
 }
