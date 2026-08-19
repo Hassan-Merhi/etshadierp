@@ -21,6 +21,7 @@ jobs:
       - name: Apply exact CI repairs
         shell: bash
         run: |
+          # This workflow is temporary and is deleted before merge.
           python3 - <<'PY'
           import json
           from pathlib import Path
