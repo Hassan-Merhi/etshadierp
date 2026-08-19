@@ -83,6 +83,7 @@ jobs:
           s=s.replace('(l: any) => ({ value: String(l.id), label: l.name })','(l) => ({ value: String(l.id), label: l.name })')
           s=s.replace('.filter((w: any) => w.active)', '.filter((w) => w.active)')
           s=s.replace('.map((w: any) => (', '.map((w) => (')
+          s=s.replace('w.fullName || w.full_name || w.name || String(w.id)', 'w.fullName || w.full_name || (w as typeof w & { name?: string }).name || String(w.id)')
           p.write_text(s)
           PY
 
