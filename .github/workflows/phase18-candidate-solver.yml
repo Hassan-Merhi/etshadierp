@@ -1,14 +1,12 @@
 name: Phase 18 Candidate Type Solver
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
 permissions:
   contents: write
 env:
   CI: true
 jobs:
   solve:
-    if: contains(github.event.head_commit.message, '[phase18-candidate-solver]')
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
