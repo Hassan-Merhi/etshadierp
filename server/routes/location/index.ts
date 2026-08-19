@@ -14,8 +14,11 @@ export function registerLocationRoutes(app: Express) {
   // clients that still send whatsappGroupChatId are upgraded through the same
   // permission + group-validation boundary instead of bypassing Phase 1.
   registerLocationWhatsappLegacyCompatibilityRoutes(app);
-  registerLocationCrudRoutes(app);
+  // Register the guarded delete route before the legacy CRUD bundle. Express
+  // resolves matching handlers in registration order, so this ensures DELETE
+  // requests cannot fall through to the older unguarded location delete path.
   registerLocationDeleteRoutes(app);
+  registerLocationCrudRoutes(app);
   registerLocationInventoryRoutes(app);
   registerLocationReportRoutes(app);
   registerLocationWhatsappScheduleRoutes(app);
