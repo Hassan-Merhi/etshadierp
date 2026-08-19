@@ -41,7 +41,7 @@ export async function createSpreadsheet(
 export async function updateSpreadsheet(
   id: number,
   companyId: number,
-  fields: { name?: string; data?: unknown; }
+  fields: { name?: string; data?: unknown }
 ): Promise<schema.Spreadsheet | undefined> {
   const [row] = await db
     .update(schema.spreadsheets)
