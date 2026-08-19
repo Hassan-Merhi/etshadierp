@@ -45,9 +45,8 @@ jobs:
           node node_modules/prettier/bin/prettier.cjs --write server/lib/accountStatementExportSafety.ts server/routes/accountStatementRoutes.ts tests/account-statement-export-safety.test.ts
           git fetch origin main
           git checkout origin/main -- .github/workflows/i18n-audit.yml
-          rm -f .github/workflows/temp-format-pr778.yml
           git checkout origin/main -- .github/workflows/phase18-eslint-autofix.yml
-          git add -A -- server/lib/accountStatementExportSafety.ts server/routes/accountStatementRoutes.ts tests/account-statement-export-safety.test.ts .github/workflows/i18n-audit.yml .github/workflows/temp-format-pr778.yml .github/workflows/phase18-eslint-autofix.yml
+          git add -A -- server/lib/accountStatementExportSafety.ts server/routes/accountStatementRoutes.ts tests/account-statement-export-safety.test.ts .github/workflows/i18n-audit.yml .github/workflows/phase18-eslint-autofix.yml
           if git diff --cached --quiet; then
             echo 'No formatting changes needed'
             exit 0
