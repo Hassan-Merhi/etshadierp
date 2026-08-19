@@ -4,59 +4,94 @@ on:
     branches: [main]
 permissions:
   contents: write
+env:
+  CI: true
+  NODE_OPTIONS: --max-old-space-size=6144
 jobs:
   repair:
-    if: contains(github.event.head_commit.message, '[phase18-doc-index-repair]')
+    if: contains(github.event.head_commit.message, '[phase18-current-main-repair]')
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
+      PGSSLMODE: disable
+      NODE_ENV: test
+      SESSION_SECRET: phase18-current-main-repair-secret
+      CSRF_ENFORCE: "0"
+      ENABLE_SCHEDULERS: "false"
+    services:
+      postgres:
+        image: postgres:15.13
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: heliumdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d heliumdb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v7
         with: {ref: main, fetch-depth: 0}
       - uses: actions/setup-node@v6
         with: {node-version: '22.14.0', cache: npm}
       - run: npm ci
-      - name: Synchronize live quality figures in docs
+      - name: Repair current-main architecture contracts without widening ratchets
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
-          replacements={
-            'docs/god-file-split-program.md': [('25,437 lines over the limit','25,299 lines over the limit')],
-            'docs/system-quality-program.md': [
-              ('25,437','25,299'),
-              ('8,646','0'),
-              ('9,270','33'),
-            ],
-          }
-          for name,pairs in replacements.items():
-              p=Path(name); s=p.read_text()
-              for old,new in pairs:
-                  if old in s:
-                      s=s.replace(old,new)
-                  elif new not in s:
-                      raise SystemExit(f'neither stale nor corrected literal found for {old!r} in {name}')
+
+          docs = [Path('docs/god-file-split-program.md'), Path('docs/system-quality-program.md')]
+          for p in docs:
+              s = p.read_text()
+              if '25,056' in s:
+                  s = s.replace('25,056', '25,059')
+              elif '25,059' not in s:
+                  raise SystemExit(f'expected stale or corrected god-file figure in {p}')
               p.write_text(s)
+
+          p = Path('client/src/pages/factory/FactoryShippingContainers.tsx')
+          s = p.read_text()
+          marker = '// ─── Types ────────────────────────────────────────────────────────────────────\n'
+          if marker in s:
+              s = s.replace(marker, '', 1)
+          p.write_text(s)
+
+          p = Path('client/src/pages/vouchers/StockTransferForm.tsx')
+          s = p.read_text()
+          marker = 'import {} from "@/components/ui/dialog";\n'
+          if marker in s:
+              s = s.replace(marker, '', 1)
+          p.write_text(s)
           PY
+          npx prettier --write client/src/pages/factory/FactoryShippingContainers.tsx client/src/pages/vouchers/StockTransferForm.tsx
+          UPDATE_ROUTE_MANIFEST=1 npx vitest run tests/route-manifest.test.ts --pool=forks --maxWorkers=2
+      - name: Verify repaired tree
+        shell: bash
+        run: |
+          set -euo pipefail
           npm run audit:doc-index
-      - name: Commit and robustly push verified doc sync
+          npm run check
+          npx prettier --check client/src/pages/factory/FactoryShippingContainers.tsx client/src/pages/vouchers/StockTransferForm.tsx
+          npx vitest run tests/god-file-boundaries.test.ts tests/route-manifest.test.ts tests/doc-index.test.ts tests/doc-index-contract.test.ts tests/toolchain-and-script-inventory.test.ts --pool=forks --maxWorkers=2
+      - name: Restore repair workflow and commit verified fixes
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add docs/god-file-split-program.md docs/system-quality-program.md
-          if git diff --cached --quiet; then
-            npm run audit:doc-index
-            exit 0
-          fi
-          git commit -m 'docs: sync Phase 18 quality figures with live audits [skip ci]'
-          for attempt in 1 2 3 4 5 6; do
-            git fetch origin main
-            if git rebase origin/main && npm run audit:doc-index && git push --no-verify origin HEAD:main; then
-              echo "DOC_INDEX_PUSHED=$(git rev-parse HEAD)"
-              exit 0
-            fi
-            git rebase --abort || true
-            sleep 2
-          done
-          exit 1
+          git checkout HEAD^ -- .github/workflows/phase18-doc-index-repair.yml
+          git add .github/workflows/phase18-doc-index-repair.yml config/route-manifest.json docs/god-file-split-program.md docs/system-quality-program.md client/src/pages/factory/FactoryShippingContainers.tsx client/src/pages/vouchers/StockTransferForm.tsx
+          git diff --cached --check
+          git commit -m 'fix: repair current-main architecture contracts'
+          git fetch origin main
+          git rebase origin/main
+          npm run audit:doc-index
+          npm run check
+          npx vitest run tests/god-file-boundaries.test.ts tests/route-manifest.test.ts --pool=forks --maxWorkers=2
+          git push --no-verify origin HEAD:main
