@@ -32,10 +32,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
 
-      - name: Scan for newly introduced findings
+      - name: Fetch baseline commit
         shell: sh
         run: |
           case "$SEMGREP_BASELINE_COMMIT" in
@@ -44,8 +42,15 @@ jobs:
               exit 2
               ;;
           esac
+          if ! printf '%s' "$SEMGREP_BASELINE_COMMIT" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "Semgrep baseline is not a 40-character commit SHA."
+            exit 2
+          fi
+          git fetch --no-tags --depth=1 origin "$SEMGREP_BASELINE_COMMIT"
           git cat-file -e "${SEMGREP_BASELINE_COMMIT}^{commit}"
-          semgrep scan --config auto --baseline-commit "$SEMGREP_BASELINE_COMMIT" --error
+
+      - name: Scan for newly introduced findings
+        run: semgrep scan --config auto --baseline-commit "$SEMGREP_BASELINE_COMMIT" --error
 
   full-audit:
     name: Semgrep CE full repository audit
