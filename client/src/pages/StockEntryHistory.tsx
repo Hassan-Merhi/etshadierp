@@ -1,4 +1,3 @@
-import type { ClientErrorLike } from "@/lib/clientError";
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient, useQueries } from "@tanstack/react-query";
 import {
