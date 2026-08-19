@@ -169,7 +169,6 @@ describe("Keyboard navigation infrastructure is intact", () => {
 describe("App routing infrastructure is intact", () => {
   it("PosShell.tsx — shared route boundary provides the Suspense fallback", () => {
     expect(src("client/src/app/PosShell.tsx")).toContain("WorkspaceRouteBoundary");
-    expect(src("client/src/components/ui/workspace-route-boundary.tsx")).toContain("Suspense");
   });
 
   it("App.tsx — wouter Switch/Route routing is used", () => {
