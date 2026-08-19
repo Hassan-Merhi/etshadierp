@@ -47,7 +47,6 @@ export default function FactoryInvoiceLoadingScan() {
   const { formatDisplayDate } = useDateFormat();
   useEscapeToParent(`/factory/sales/invoices/${invoiceId}`);
 
-  // ── Active session state ──
   const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
   const [showStartForm, setShowStartForm] = useState(false);
 
@@ -81,23 +80,16 @@ export default function FactoryInvoiceLoadingScan() {
     [lsKey]
   );
 
-  // ── Scanner state ──
   const [scanInput, setScanInput] = useState("");
   const [scanFlash, setScanFlash] = useState<"success" | "error" | null>(null);
   const [scanMessage, setScanMessage] = useState("");
   const scanRef = useRef<HTMLInputElement>(null);
 
-  // ── Cancel dialog ──
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
-
-  // ── Bale refs dialog ──
   const [baleRefLine, setBaleRefLine] = useState<{ code: string; name: string } | null>(null);
-
-  // ── View session bales dialog ──
   const [viewSessionId, setViewSessionId] = useState<number | null>(null);
 
-  // ── Data ──
   const summaryKey = [`/api/factory/invoices/${invoiceId}/loading-summary`, activeSessionId];
   const {
     data: summary,
@@ -119,16 +111,14 @@ export default function FactoryInvoiceLoadingScan() {
     retry: 1,
   });
 
-  // Auto-resume the most recent OPEN session when the page loads (handles navigate-away + return)
   useEffect(() => {
     if (!summary || activeSessionId) return;
     const openSession = summary.sessions.find((s) => s.status === "OPEN");
     if (openSession) {
       setActiveSessionId(openSession.id);
     }
-  }, [summary?.sessions.length]);
+  }, [activeSessionId, summary]);
 
-  // Auto-focus scan input when session is active
   useEffect(() => {
     if (activeSessionId && scanRef.current) {
       scanRef.current.focus();
@@ -140,8 +130,6 @@ export default function FactoryInvoiceLoadingScan() {
     setScanMessage(msg);
     setTimeout(() => setScanFlash(null), 1800);
   }, []);
-
-  // ── Mutations ──
 
   const createSessionMutation = useMutation({
     mutationFn: async () => {
@@ -159,7 +147,7 @@ export default function FactoryInvoiceLoadingScan() {
       queryClient.invalidateQueries({ queryKey: [`/api/factory/invoices/${invoiceId}/loading-summary`] });
       toast({ title: "Session started", description: `Loading session #${data.session.id} is now open.` });
     },
-    onError: (err: any) => {
+    onError: (err) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -181,7 +169,7 @@ export default function FactoryInvoiceLoadingScan() {
       flashFeedback("success", `Scanned: ${data.bale?.referenceNumber || data.loadingBale?.baleReference}`);
       setTimeout(() => scanRef.current?.focus(), 50);
     },
-    onError: (err: any) => {
+    onError: (err) => {
       setScanInput("");
       flashFeedback("error", err.message);
       setTimeout(() => scanRef.current?.focus(), 50);
@@ -198,7 +186,7 @@ export default function FactoryInvoiceLoadingScan() {
       queryClient.invalidateQueries({ queryKey: [`/api/factory/invoices/${invoiceId}/loading-summary`] });
       toast({ title: "Removed", description: "Bale removed and returned to unloaded." });
     },
-    onError: (err: any) => {
+    onError: (err) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -214,7 +202,7 @@ export default function FactoryInvoiceLoadingScan() {
       queryClient.invalidateQueries({ queryKey: [`/api/factory/invoices/${invoiceId}/loading-summary`] });
       toast({ title: "Completed", description: "Loading session completed successfully." });
     },
-    onError: (err: any) => {
+    onError: (err) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -230,7 +218,7 @@ export default function FactoryInvoiceLoadingScan() {
       queryClient.invalidateQueries({ queryKey: [`/api/factory/invoices/${invoiceId}/loading-summary`] });
       toast({ title: "Cancelled", description: "Loading session cancelled." });
     },
-    onError: (err: any) => {
+    onError: (err) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -245,7 +233,7 @@ export default function FactoryInvoiceLoadingScan() {
       toast({ title: "Proforma created", description: `"${data.proformaName}" is ready. Opening now…` });
       navigate(`/factory/sales/proformas/${data.proformaId}`);
     },
-    onError: (err: any) => {
+    onError: (err) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
@@ -275,7 +263,7 @@ export default function FactoryInvoiceLoadingScan() {
   }
 
   if (isError || (!isLoading && !summary)) {
-    const msg = (error as any)?.message || "Invoice not found";
+    const msg = error?.message || "Invoice not found";
     return (
       <div className="flex flex-col items-center justify-center h-full p-6 gap-3">
         <p className="text-destructive font-medium">{msg}</p>
@@ -293,7 +281,6 @@ export default function FactoryInvoiceLoadingScan() {
 
   return (
     <div className="flex flex-col min-h-full p-4 sm:p-6 max-w-5xl mx-auto space-y-4">
-      {/* ── Back + Title ── */}
       <div className="flex flex-wrap items-center gap-3">
         <Button
           variant="ghost"
@@ -319,7 +306,6 @@ export default function FactoryInvoiceLoadingScan() {
         </div>
       </div>
 
-      {/* ── Big counters ── */}
       <div className="grid grid-cols-2 gap-3">
         <Card>
           <CardContent className="pt-5 pb-4 text-center">
@@ -353,7 +339,6 @@ export default function FactoryInvoiceLoadingScan() {
         </Card>
       </div>
 
-      {/* ── Fully loaded banner ── */}
       {isFullyLoaded && (
         <Card className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950">
           <CardContent className="pt-4 pb-3 flex items-center gap-3">
@@ -366,7 +351,6 @@ export default function FactoryInvoiceLoadingScan() {
         </Card>
       )}
 
-      {/* ── Per-line summary (only pending lines shown) ── */}
       <Card>
         <CardHeader className="pb-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -433,7 +417,6 @@ export default function FactoryInvoiceLoadingScan() {
         </CardContent>
       </Card>
 
-      {/* ── Start loading form / active session scanner ── */}
       {!activeSessionId && !isFullyLoaded && (
         <Card>
           <CardHeader className="pb-2">
@@ -510,7 +493,6 @@ export default function FactoryInvoiceLoadingScan() {
         </Card>
       )}
 
-      {/* ── Active session scanner ── */}
       {activeSessionId && currentSession && (
         <Card className="border-blue-200 dark:border-blue-800">
           <CardHeader className="pb-2">
@@ -531,7 +513,6 @@ export default function FactoryInvoiceLoadingScan() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* 50-bale warning */}
             {show50Warning && (
               <div className="flex items-center gap-2 p-3 rounded-md bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800">
                 <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
@@ -542,7 +523,6 @@ export default function FactoryInvoiceLoadingScan() {
               </div>
             )}
 
-            {/* Scan flash feedback */}
             {scanFlash && (
               <div
                 className={`flex items-center gap-2 p-3 rounded-md font-medium text-sm transition-all ${
@@ -561,7 +541,6 @@ export default function FactoryInvoiceLoadingScan() {
               </div>
             )}
 
-            {/* Scanner input */}
             <form onSubmit={handleScan} className="flex gap-2">
               <Input
                 ref={scanRef}
@@ -608,7 +587,6 @@ export default function FactoryInvoiceLoadingScan() {
               </span>
             </div>
 
-            {/* Current session bales table */}
             {currentBales.length > 0 && (
               <div className="table-responsive rounded-md border">
                 <Table>
@@ -654,7 +632,6 @@ export default function FactoryInvoiceLoadingScan() {
               </div>
             )}
 
-            {/* Session actions */}
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <Button
                 onClick={() => setCompleteDialogOpen(true)}
@@ -697,7 +674,6 @@ export default function FactoryInvoiceLoadingScan() {
         </Card>
       )}
 
-      {/* ── Create proforma for remaining bales ── */}
       {!activeSessionId &&
         !isFullyLoaded &&
         summary.totals.remaining > 0 &&
@@ -727,7 +703,6 @@ export default function FactoryInvoiceLoadingScan() {
           </Card>
         )}
 
-      {/* ── Previous sessions ── */}
       {summary.sessions.length > 0 && (
         <SessionHistoryCard
           invoiceId={invoiceId}
@@ -738,7 +713,6 @@ export default function FactoryInvoiceLoadingScan() {
         />
       )}
 
-      {/* ── No sessions yet ── */}
       {summary.sessions.length === 0 && !showStartForm && !activeSessionId && (
         <Card>
           <CardContent className="pt-8 pb-8 flex flex-col items-center gap-3 text-center">
@@ -754,7 +728,6 @@ export default function FactoryInvoiceLoadingScan() {
         </Card>
       )}
 
-      {/* ── Dialogs ── */}
       <CompleteSessionDialog
         open={completeDialogOpen}
         onOpenChange={setCompleteDialogOpen}
