@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { getErrorDetails } from "@shared/errorUtils";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -73,14 +74,14 @@ export default function ContainerVerification() {
       queryClient.invalidateQueries({ queryKey: ["/api/containers", containerId, "loaded-items"] });
       if (verificationResult) generateComparison();
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
   });
 
   const updateItemMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+    mutationFn: async ({ id, data }: { id: number; data: LoadedItemDraft }) => {
       const res = await apiRequest("PATCH", `/api/container-loaded-items/${id}`, data);
       return res.json();
     },
@@ -88,7 +89,7 @@ export default function ContainerVerification() {
       queryClient.invalidateQueries({ queryKey: ["/api/containers", containerId, "loaded-items"] });
       if (verificationResult) generateComparison();
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
@@ -102,7 +103,7 @@ export default function ContainerVerification() {
       queryClient.invalidateQueries({ queryKey: ["/api/containers", containerId, "loaded-items"] });
       if (verificationResult) generateComparison();
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
@@ -113,7 +114,7 @@ export default function ContainerVerification() {
       const res = await apiRequest("POST", `/api/containers/${containerId}/auto-populate-loaded-items`);
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/containers", containerId, "loaded-items"] });
       const skippedMsg = data.skipped > 0 ? ` (${data.skipped} skipped - missing barcodes)` : "";
       toast({
@@ -122,7 +123,7 @@ export default function ContainerVerification() {
       });
       if (verificationResult) generateComparison();
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
@@ -133,12 +134,12 @@ export default function ContainerVerification() {
       const res = await apiRequest("POST", `/api/containers/${containerId}/import-loaded-items`, { items });
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/containers", containerId, "loaded-items"] });
       toast({ title: "Import complete", description: `${data.imported} items imported` });
       if (verificationResult) generateComparison();
     },
-    onError: (e: any) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Import error", description: e.message, variant: "destructive" });
     },
@@ -255,7 +256,7 @@ export default function ContainerVerification() {
     ) {
       autoPopulateMutation.mutate();
     }
-  }, [loadedItems, loadingItems, containerData]);
+  }, [loadedItems, loadingItems, containerData, autoPopulateMutation]);
 
   // Auto-select supplier when opened via "Compare" from Daybook (supplierId URL param).
   useEffect(() => {
