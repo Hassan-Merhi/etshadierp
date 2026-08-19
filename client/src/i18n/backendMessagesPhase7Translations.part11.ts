@@ -122,4 +122,14 @@ export const backendMessagesPhase7TranslationsPart11: readonly Phase7BackendMess
     ar: "تحتوي الحاوية «{0}» بالفعل على {1} أمر شراء مستورد ({2}). لتجنب التكرار، احذف أوامر الشراء الحالية أولاً أو استخدم رقم حاوية مختلفًا.",
     fr: "Le conteneur « {0} » contient déjà {1} bon(s) de commande importé(s) ({2}). Pour éviter les doublons, supprimez d’abord les bons existants ou utilisez un autre numéro de conteneur.",
   },
+  {
+    en: "startDate cannot be after endDate",
+    ar: "لا يمكن أن يكون تاريخ البدء بعد تاريخ الانتهاء",
+    fr: "La date de début ne peut pas être postérieure à la date de fin",
+  },
+  {
+    en: "Statement PDF generation returned an invalid or empty PDF buffer",
+    ar: "أعاد إنشاء كشف الحساب PDF ملف PDF غير صالح أو فارغ",
+    fr: "La génération du relevé PDF a renvoyé un PDF invalide ou vide",
+  },
 ];
