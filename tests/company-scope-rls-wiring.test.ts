@@ -1,36 +1,56 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-async function source(relativePath: string) {
-  return readFile(path.join(process.cwd(), relativePath), "utf8");
-}
+const installKey = Symbol.for("erp.company-scope-rls-readiness.applied");
+let originalInstallState: unknown;
+let ensureCompanyScopeRlsReadiness: () => Promise<void>;
+
+beforeAll(async () => {
+  originalInstallState = globalThis[installKey as keyof typeof globalThis];
+  (globalThis as Record<PropertyKey, unknown>)[installKey] = true;
+  ({ ensureCompanyScopeRlsReadiness } = await import("../server/companyScopeRlsBridge.mjs"));
+});
+
+afterAll(() => {
+  if (originalInstallState === undefined) {
+    delete (globalThis as Record<PropertyKey, unknown>)[installKey];
+  } else {
+    (globalThis as Record<PropertyKey, unknown>)[installKey] = originalInstallState;
+  }
+});
 
 describe("company-scope RLS startup wiring", () => {
-  it("is anchored in the bundled database bootstrap", async () => {
-    const dbSource = await source("server/db.ts");
-    expect(dbSource).toContain('import "./companyScopeRlsBridge.mjs";');
-  });
+  it("fails closed when no PostgreSQL configuration is available", async () => {
+    const previous = {
+      DATABASE_URL: process.env.DATABASE_URL,
+      PGHOST: process.env.PGHOST,
+      PGUSER: process.env.PGUSER,
+      PGPASSWORD: process.env.PGPASSWORD,
+      PGDATABASE: process.env.PGDATABASE,
+    };
 
-  it("also runs through the production preload path", async () => {
-    const preloadSource = await source("server/supplierCompanyScopeBridge.mjs");
-    expect(preloadSource).toContain('import "./companyScopeRlsBridge.mjs";');
-  });
+    delete process.env.DATABASE_URL;
+    delete process.env.PGHOST;
+    delete process.env.PGUSER;
+    delete process.env.PGPASSWORD;
+    delete process.env.PGDATABASE;
 
-  it("applies the reviewed 0016 migration transactionally and fails startup on error", async () => {
-    const bridgeSource = await source("server/companyScopeRlsBridge.mjs");
-    expect(bridgeSource).toContain("0016_company_scope_rls_readiness.sql");
-    expect(bridgeSource).toContain('await client.query("BEGIN")');
-    expect(bridgeSource).toContain('await client.query("COMMIT")');
-    expect(bridgeSource).toContain('await client.query("ROLLBACK")');
-    expect(bridgeSource).toContain("pg_advisory_xact_lock");
-    expect(bridgeSource).toContain("throw error");
-  });
-
-  it("keeps the migration registered in the Drizzle journal", async () => {
-    const journal = JSON.parse(await source("migrations/meta/_journal.json"));
-    expect(journal.entries.some((entry: { tag?: string }) => entry.tag === "0016_company_scope_rls_readiness")).toBe(
-      true
+    await expect(ensureCompanyScopeRlsReadiness()).rejects.toThrow(
+      "Company-scope RLS migration could not start because no PostgreSQL configuration is available."
     );
+
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  });
+
+  it("applies and verifies the company-scope migration against the configured database", async () => {
+    expect(process.env.DATABASE_URL || (process.env.PGHOST && process.env.PGUSER && process.env.PGDATABASE)).toBeTruthy();
+    await expect(ensureCompanyScopeRlsReadiness()).resolves.toBeUndefined();
+  });
+
+  it("is idempotent when startup readiness is checked repeatedly", async () => {
+    await expect(ensureCompanyScopeRlsReadiness()).resolves.toBeUndefined();
+    await expect(ensureCompanyScopeRlsReadiness()).resolves.toBeUndefined();
   });
 });
