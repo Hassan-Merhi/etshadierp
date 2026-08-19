@@ -4,6 +4,8 @@
  * Extracted from FactoryDispatchBatchDetail.tsx during the Phase 4 god-file split.
  */
 
+import type { BatchDetail } from "./types";
+
 export const RIDE_STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   DRAFT: { label: "Draft", className: "bg-muted text-muted-foreground" },
   LOADING: { label: "Loading", className: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" },
@@ -24,4 +26,24 @@ export function fmt(n: number | string, decimals = 2) {
   const v = typeof n === "string" ? parseFloat(n) : n;
   if (isNaN(v)) return "0";
   return v.toLocaleString(undefined, { maximumFractionDigits: decimals });
+}
+
+export function buildProformaProgress(
+  proformaLines: BatchDetail["proformaLines"],
+  articleTotals: BatchDetail["articleTotals"],
+) {
+  if (!proformaLines.length) return [];
+  return proformaLines.map((pl) => {
+    const at = articleTotals.find((a) => a.articleCode === pl.articleCode);
+    const scanned = parseInt(String(at?.scannedQty || 0));
+    return {
+      articleCode: pl.articleCode,
+      productName: pl.productName,
+      proformaQty: pl.quantity,
+      proformaPrice: pl.pricePerBale,
+      scannedQty: scanned,
+      remaining: pl.quantity - scanned,
+      totalAmount: at?.scannedAmount || "0",
+    };
+  });
 }
