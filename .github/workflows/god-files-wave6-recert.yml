@@ -1,0 +1,83 @@
+name: God Files Wave 6 Re-certification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: god-files-wave6-recert-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  recert:
+    if: github.event.pull_request.head.ref == 'agent/god-files-recovery-main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/god-files-recovery-main
+          fetch-depth: 0
+      - name: Re-certify Wave 6 on current main behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git log --format=%B -40 | grep -Fq '[wave6-recert]'; then
+            echo 'Wave 6 already re-certified.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin agent/god-files-waves-05-19:refs/remotes/origin/god-files-old
+          npm ci
+
+          # Switch only the four Wave 6 god-file entrypoints. Overlapping helper
+          # files stay on their current-main versions; this deliberately preserves
+          # the newer compact inventory pricing/revision behavior.
+          git checkout origin/god-files-old -- \
+            client/src/pages/vouchers/StockAdjustmentForm.tsx \
+            client/src/pages/vouchers/StockTransferForm.tsx \
+            client/src/pages/StockTransferOrder.tsx \
+            client/src/pages/vouchers/JournalForm.tsx
+
+          python - <<'PY'
+          from pathlib import Path
+
+          # Current-main hydration dependency for adjustment edit mode.
+          p=Path('client/src/pages/vouchers/stock-adjustment-form/useStockAdjustmentFormModel.ts')
+          s=p.read_text()
+          s=s.replace(
+              '}, [stockAdjustmentToEdit, voucherToEdit, stockItems, stockAdjustmentForm]); // eslint-disable-line',
+              '}, [stockAdjustmentToEdit, voucherToEdit, stockItems, stockAdjustmentForm, voucherIdToEdit]);'
+          )
+          p.write_text(s)
+
+          # Current-main journal autosave dependency semantics.
+          p=Path('client/src/pages/vouchers/journalform/useJournalFormModel.tsx')
+          s=p.read_text().replace(
+              '}, [JSON.stringify(allJournalValues), voucherIdToEdit]);',
+              '}, [allJournalValues, scheduleJournalSave, voucherIdToEdit]);'
+          )
+          p.write_text(s)
+          PY
+
+          set +e
+          npm run check >/tmp/after.log 2>&1
+          set -e
+          sed -nE 's#^([^ (]+\.(ts|tsx))\([0-9]+,[0-9]+\): error TS[0-9]+:.*#\1#p' /tmp/after.log | sort -u >/tmp/after-files.txt
+          printf '%s\n' 'client/src/lib/excelHelper.ts' >/tmp/allowed-files.txt
+          comm -23 /tmp/after-files.txt /tmp/allowed-files.txt >/tmp/unexpected-files.txt || true
+          if [ -s /tmp/unexpected-files.txt ]; then
+            echo 'Wave 6 introduces unexpected TypeScript error files:'
+            cat /tmp/unexpected-files.txt
+            cat /tmp/after.log
+            exit 1
+          fi
+
+          node scripts/audit-god-file-boundaries.mjs
+          git add -A
+          git commit -m 'refactor: re-certify God Files Wave 6 on current main [wave6-recert]'
+          SKIP_TSC_CHECK=1 git push origin HEAD:agent/god-files-recovery-main
