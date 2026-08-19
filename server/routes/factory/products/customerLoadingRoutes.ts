@@ -142,6 +142,7 @@ export function registerCustomerLoadingRoutes(app: Express) {
           ON lba.article_key = UPPER(BTRIM(COALESCE(fbp.article_code, fbp.code)))
         WHERE fbp.company_id = ${companyId}
           AND fbp.deleted_at IS NULL
+          AND fbp.active = true
         ORDER BY fbp.name ASC, fbp.id ASC
       `);
 
@@ -165,7 +166,8 @@ export function registerCustomerLoadingRoutes(app: Express) {
       return res.json({
         customer,
         definition: {
-          loaded: "At least one bale in a LOADING, PENDING_VERIFICATION, VERIFIED, or FINALIZED invoice for this customer",
+          loaded:
+            "At least one bale in a LOADING, PENDING_VERIFICATION, VERIFIED, or FINALIZED invoice for this customer",
           cancelledOrdersExcluded: true,
           deletedOrdersExcluded: true,
           duplicateBalesCollapsed: true,
@@ -193,7 +195,9 @@ export function registerCustomerLoadingRoutes(app: Express) {
 
       const customerId = parsePositiveId(req.query.customerId);
       const productId = parsePositiveId(req.query.productId);
-      if (!customerId || !productId) return res.status(400).json({ message: "Valid customerId and productId are required" });
+      if (!customerId || !productId) {
+        return res.status(400).json({ message: "Valid customerId and productId are required" });
+      }
 
       const customer = await findScopedCustomer(companyId, customerId);
       if (!customer) return res.status(404).json({ message: "Customer not found" });
@@ -204,7 +208,12 @@ export function registerCustomerLoadingRoutes(app: Express) {
         WHERE id = ${productId} AND company_id = ${companyId} AND deleted_at IS NULL
         LIMIT 1
       `);
-      const [product] = resultRows(productResult) as Array<{ id: number; code: string; articleCode: string | null; name: string }>;
+      const [product] = resultRows(productResult) as Array<{
+        id: number;
+        code: string;
+        articleCode: string | null;
+        name: string;
+      }>;
       if (!product) return res.status(404).json({ message: "Product not found" });
       const articleCode = product.articleCode || product.code;
 
@@ -251,7 +260,14 @@ export function registerCustomerLoadingRoutes(app: Express) {
         INNER JOIN customer_orders co
           ON co.id = d.order_id
          AND co.company_id = ${companyId}
-        GROUP BY d.order_id, co.status, co.container_number, co.shipping_company, co.loading_started_at, co.loading_finalized_at, co.finalized_at
+        GROUP BY
+          d.order_id,
+          co.status,
+          co.container_number,
+          co.shipping_company,
+          co.loading_started_at,
+          co.loading_finalized_at,
+          co.finalized_at
         ORDER BY MAX(d.last_activity_at) DESC
         LIMIT 100
       `);
