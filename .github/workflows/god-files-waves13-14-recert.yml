@@ -89,6 +89,14 @@ jobs:
               s=s.replace(fix_card, fix_card+override)
           p.write_text(s)
 
+          p=Path('client/src/pages/barcodelookup/types.ts')
+          s=p.read_text()
+          s=s.replace(
+              'export type LookupLabelPrint = BaleLabelPrint & {',
+              'export type LookupLabelPrint = Omit<BaleLabelPrint, "scannedAt" | "scannedByUserId"> & {'
+          )
+          p.write_text(s)
+
           p=Path('client/src/pages/barcodelookup/useBarcodeLookupModel.tsx')
           s=p.read_text()
           s=s.replace('onError: (error: Error) => {\n      if (isGloballyHandledError(error)) return;', 'onError: (error: unknown) => {\n      if (isGloballyHandledError(error)) return;')
