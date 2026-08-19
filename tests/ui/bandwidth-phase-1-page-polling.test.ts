@@ -4,13 +4,13 @@ import { describe, expect, it } from "vitest";
 
 const root = process.cwd();
 const read = (file: string) => fs.readFileSync(path.join(root, file), "utf8");
-const loadingPages = [
-  "client/src/pages/ContainerLoadingScan.tsx",
-  "client/src/pages/factory/FactoryContainerLoadingScan.tsx",
+const loadingModels = [
+  "client/src/pages/containerloadingscan/useContainerLoadingScanModel.ts",
+  "client/src/pages/factory/factorycontainerloadingscan/useFactoryContainerLoadingScanModel.ts",
 ];
 
 describe("Bandwidth Phase 1 page request policy", () => {
-  it.each(loadingPages)("removes fixed full-order polling and canonicalizes proforma keys in %s", (file) => {
+  it.each(loadingModels)("removes fixed full-order polling and canonicalizes proforma keys in %s", (file) => {
     const source = read(file);
     expect(source).not.toContain("refetchInterval: 15000");
     expect(source).not.toContain("customerId=${customerId}`, customerId]");
@@ -20,7 +20,9 @@ describe("Bandwidth Phase 1 page request policy", () => {
   });
 
   it("does not load the bale-removal history before its dialog opens", () => {
-    const source = read("client/src/pages/factory/FactoryContainerLoadingScan.tsx");
+    const source = read(
+      "client/src/pages/factory/factorycontainerloadingscan/useFactoryContainerLoadingScanModel.ts"
+    );
     expect(source).toContain("enabled: !!orderId && showRemovalLog");
   });
 
