@@ -9,7 +9,9 @@
     "client/src/pages/factory/WasteDispatchOptimized.tsx": 987,
     "client/src/pages/vouchers/StockTransferForm.tsx": 2388
   },
-  "routeManifestAdditions": [],
+  "routeManifestAdditions": [
+    "DELETE /api/locations/:locationId [requireAuth > <anonymous>]"
+  ],
   "routeManifestMountAdditions": [],
   "sourceTextAssertionDelta": {
     "additionalSourceCoupledTests": [

@@ -163,7 +163,7 @@ describe("account statement route behavior", () => {
     harness.selectResults.splice(0);
     harness.isParentCompanyContext.mockResolvedValue(true);
     harness.getCompanyById.mockResolvedValue({ id: 4, companyType: "erp" });
-    harness.generateAccountStatementPdf.mockResolvedValue(Buffer.from("pdf-statement"));
+    harness.generateAccountStatementPdf.mockResolvedValue(Buffer.from("%PDF-1.4\npdf-statement"));
   });
 
   it("returns recoverable deleted vouchers for a supported account type", async () => {
@@ -272,6 +272,6 @@ describe("account statement route behavior", () => {
     });
     expect(res.headers.get("Content-Type")).toBe("application/pdf");
     expect(res.headers.get("Content-Disposition")).toBe("attachment; filename=statement_Supplier___Alpha.pdf");
-    expect(res.body).toEqual(Buffer.from("pdf-statement"));
+    expect(res.body).toEqual(Buffer.from("%PDF-1.4\npdf-statement"));
   });
 });

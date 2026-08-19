@@ -24,8 +24,11 @@ describe("Phase 3 shared interface translations", () => {
     // ("Discrepancies", "To investigate", "This report never changes data.") the
     // detector does not flag at all; they are translated regardless, because a
     // screen that is half Arabic is a defect whether or not a ratchet noticed.
-    expect(phase3SharedUiTranslations).toHaveLength(582);
-    expect(new Set(phase3SharedUiTranslations.map((entry) => entry.en)).size).toBe(582);
+    // +13: reviewed Customer Loading column/filter copy added by the current repair
+    // branch. These entries are real translations, so the exact uniqueness contract
+    // advances with the translation table rather than treating them as audit backlog.
+    expect(phase3SharedUiTranslations).toHaveLength(595);
+    expect(new Set(phase3SharedUiTranslations.map((entry) => entry.en)).size).toBe(595);
 
     for (const entry of phase3SharedUiTranslations) {
       expect(entry.en.trim()).not.toBe("");
