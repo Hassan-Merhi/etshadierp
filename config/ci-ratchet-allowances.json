@@ -6,14 +6,10 @@
     "client/src/pages/ContainerLoadingScan.tsx": 1133,
     "client/src/pages/daybook/VoucherDetailsDialog.tsx": 984,
     "client/src/pages/factory/FactoryContainerLoadingScan.tsx": 1906,
-    "client/src/pages/factory/FactoryShippingContainers.tsx": 913,
     "client/src/pages/factory/WasteDispatchOptimized.tsx": 987,
     "client/src/pages/vouchers/StockTransferForm.tsx": 2388
   },
-  "routeManifestAdditions": [
-    "GET /api/factory/customer-loading/products [requireAuth > <anonymous>]",
-    "GET /api/factory/customer-loading/history [requireAuth > <anonymous>]"
-  ],
+  "routeManifestAdditions": [],
   "routeManifestMountAdditions": [],
   "sourceTextAssertionDelta": {
     "additionalSourceCoupledTests": [

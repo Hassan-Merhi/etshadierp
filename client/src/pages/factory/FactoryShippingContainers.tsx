@@ -60,7 +60,6 @@ import { DateCellInput } from "./factoryshippingcontainers/components/DateCellIn
 import { DocumentsModal } from "./factoryshippingcontainers/components/DocumentsModal";
 import { WhatsAppModal } from "./factoryshippingcontainers/components/WhatsAppModal";
 import { ShippingAvailabilityTable } from "./factoryshippingcontainers/components/ShippingAvailabilityTable";
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 export default function FactoryShippingContainers() {
   const { toast } = useToast();
@@ -79,7 +78,6 @@ export default function FactoryShippingContainers() {
   const [pendingDoneId, setPendingDoneId] = useState<number | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
 
-  // ── Column visibility (per-user, persisted to localStorage) ───────────────────
   const { data: me } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const [colVis, setColVis] = useState<Record<ShippingColId, boolean>>(DEFAULT_COL_VIS);
   useEffect(() => {
@@ -87,14 +85,18 @@ export default function FactoryShippingContainers() {
     try {
       const saved = localStorage.getItem(`fsc_col_vis_${me.id}`);
       if (saved) setColVis({ ...DEFAULT_COL_VIS, ...JSON.parse(saved) });
-    } catch { /* intentionally empty */ }
+    } catch {
+      /* intentionally empty */
+    }
   }, [me?.id]);
   function toggleCol(id: ShippingColId) {
     setColVis((prev) => {
       const next = { ...prev, [id]: !prev[id] };
       try {
         if (me?.id) localStorage.setItem(`fsc_col_vis_${me.id}`, JSON.stringify(next));
-      } catch { /* intentionally empty */ }
+      } catch {
+        /* intentionally empty */
+      }
       return next;
     });
   }
@@ -129,7 +131,7 @@ export default function FactoryShippingContainers() {
     enabled: doneExpanded,
     placeholderData: (previous) => previous,
   });
-  const done = useMemo(() => (donePageData?.rows ?? []), [donePageData?.rows]);
+  const done = useMemo(() => donePageData?.rows ?? [], [donePageData?.rows]);
   const doneTotal = donePageData?.total ?? 0;
   const doneTotalPages = donePageData?.totalPages ?? 0;
 
@@ -172,7 +174,8 @@ export default function FactoryShippingContainers() {
         );
       }, 8000);
     },
-    onError: (err: ClientErrorLike) => toast({ title: "Tracking failed", description: err.message, variant: "destructive" }),
+    onError: (err: ClientErrorLike) =>
+      toast({ title: "Tracking failed", description: err.message, variant: "destructive" }),
   });
 
   useEffect(

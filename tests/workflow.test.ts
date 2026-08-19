@@ -39,13 +39,7 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import request from "supertest";
-import {
-  seedTestData,
-  cleanupTestData,
-  closeTestServer,
-  getInventoryQty,
-  type TestContext,
-} from "./setup";
+import { seedTestData, cleanupTestData, closeTestServer, getInventoryQty, type TestContext } from "./setup";
 import { db } from "../server/db";
 import { eq, and, sql } from "drizzle-orm";
 import * as schema from "../shared/schema";
@@ -63,8 +57,7 @@ async function loginAsTestUser() {
     username: `${TEST_PREFIX}_testuser`,
     password: "testpassword123",
   });
-  if (res.status !== 200)
-    throw new Error(`Login failed: ${res.status} ${JSON.stringify(res.body)}`);
+  if (res.status !== 200) throw new Error(`Login failed: ${res.status} ${JSON.stringify(res.body)}`);
   await agent.post("/api/auth/set-company").send({ companyId: ctx.companyId });
 }
 
@@ -73,12 +66,7 @@ async function resetInventory() {
     const [existing] = await db
       .select()
       .from(schema.inventory)
-      .where(
-        and(
-          eq(schema.inventory.locationId, ctx.locationId),
-          eq(schema.inventory.stockItemId, stockItemId),
-        ),
-      );
+      .where(and(eq(schema.inventory.locationId, ctx.locationId), eq(schema.inventory.stockItemId, stockItemId)));
     if (existing) {
       await db
         .update(schema.inventory)
@@ -94,6 +82,7 @@ async function cleanupVouchers() {
     .from(schema.vouchers)
     .where(eq(schema.vouchers.companyId, ctx.companyId));
   for (const v of rows) {
+    await db.delete(schema.accountingPostingRequests).where(eq(schema.accountingPostingRequests.voucherId, v.id));
     await db.delete(schema.salesItems).where(eq(schema.salesItems.voucherId, v.id));
     await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, v.id));
   }
@@ -190,17 +179,11 @@ async function cleanupStockTransfersAndVouchers() {
           .delete(schema.stockTransferRevisionItems)
           .where(eq(schema.stockTransferRevisionItems.revisionId, rev.id));
       }
-      await db
-        .delete(schema.stockTransferRevisions)
-        .where(eq(schema.stockTransferRevisions.transferId, stv.id));
+      await db.delete(schema.stockTransferRevisions).where(eq(schema.stockTransferRevisions.transferId, stv.id));
       // Delete transfer items
-      await db
-        .delete(schema.stockTransferItems)
-        .where(eq(schema.stockTransferItems.transferId, stv.id));
+      await db.delete(schema.stockTransferItems).where(eq(schema.stockTransferItems.transferId, stv.id));
     }
-    await db
-      .delete(schema.stockTransferVouchers)
-      .where(eq(schema.stockTransferVouchers.voucherId, v.id));
+    await db.delete(schema.stockTransferVouchers).where(eq(schema.stockTransferVouchers.voucherId, v.id));
     await db.delete(schema.salesItems).where(eq(schema.salesItems.voucherId, v.id));
     await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, v.id));
   }
@@ -211,12 +194,7 @@ async function cleanupStockTransfersAndVouchers() {
 async function resetLocation2Inventory() {
   await db
     .delete(schema.inventory)
-    .where(
-      and(
-        eq(schema.inventory.locationId, ctx.location2Id),
-        eq(schema.inventory.companyId, ctx.companyId),
-      ),
-    );
+    .where(and(eq(schema.inventory.locationId, ctx.location2Id), eq(schema.inventory.companyId, ctx.companyId)));
 }
 
 function stockTransferBody(qty = 10) {
@@ -274,12 +252,12 @@ describe("Workflow — POS sale → ledger chain", () => {
 
     const transactions: any[] = Array.isArray(txRes.body)
       ? txRes.body
-      : txRes.body?.transactions ?? txRes.body?.entries ?? [];
+      : (txRes.body?.transactions ?? txRes.body?.entries ?? []);
 
     const match = transactions.some(
       (t: any) =>
         (t.voucherId === voucherId || t.voucher_id === voucherId) &&
-        parseFloat(t.debitAmount ?? t.debit_amount ?? t.amount ?? "0") > 0,
+        parseFloat(t.debitAmount ?? t.debit_amount ?? t.amount ?? "0") > 0
     );
     expect(match, `Expected transaction for voucherId=${voucherId} in ledger`).toBe(true);
   });
@@ -391,9 +369,7 @@ describe("Workflow — Payment voucher → balance change → delete → revert"
     const listRes = await agent.get("/api/vouchers");
     expect(listRes.status).toBe(200);
 
-    const list: any[] = Array.isArray(listRes.body)
-      ? listRes.body
-      : listRes.body?.vouchers ?? [];
+    const list: any[] = Array.isArray(listRes.body) ? listRes.body : (listRes.body?.vouchers ?? []);
 
     const found = list.some((v: any) => v.id === voucherId);
     expect(found).toBe(true);
@@ -408,19 +384,15 @@ describe("Workflow — Journal voucher edit and delete", () => {
   beforeEach(cleanupVouchers);
 
   it("editing a journal voucher (PATCH) updates its entries in the database", async () => {
-    const createRes = await agent
-      .post("/api/vouchers/journal")
-      .send(journalBody(500, "Initial amount"));
+    const createRes = await agent.post("/api/vouchers/journal").send(journalBody(500, "Initial amount"));
     expect(createRes.status).toBeGreaterThanOrEqual(200);
     const voucherId = extractId(createRes.body);
     expect(voucherId).toBeDefined();
 
-    const editRes = await agent
-      .patch(`/api/vouchers/${voucherId}/journal`)
-      .send(journalBody(800, "Updated amount"));
+    const editRes = await agent.patch(`/api/vouchers/${voucherId}/journal`).send(journalBody(800, "Updated amount"));
     expect(
       editRes.status,
-      `PATCH journal failed: ${editRes.status} ${JSON.stringify(editRes.body)}`,
+      `PATCH journal failed: ${editRes.status} ${JSON.stringify(editRes.body)}`
     ).toBeGreaterThanOrEqual(200);
     expect(editRes.status).toBeLessThan(300);
 
@@ -436,9 +408,7 @@ describe("Workflow — Journal voucher edit and delete", () => {
   });
 
   it("deleting a journal voucher soft-deletes the voucher (no longer active)", async () => {
-    const createRes = await agent
-      .post("/api/vouchers/journal")
-      .send(journalBody(250, "Delete test"));
+    const createRes = await agent.post("/api/vouchers/journal").send(journalBody(250, "Delete test"));
     const voucherId = extractId(createRes.body);
     expect(voucherId).toBeDefined();
 
@@ -448,10 +418,7 @@ describe("Workflow — Journal voucher edit and delete", () => {
 
     // The DELETE route soft-deletes: voucher gets a deletedAt timestamp.
     // Entries remain in DB as an audit trail but are excluded from live calculations.
-    const vRows = await db
-      .select()
-      .from(schema.vouchers)
-      .where(eq(schema.vouchers.id, voucherId!));
+    const vRows = await db.select().from(schema.vouchers).where(eq(schema.vouchers.id, voucherId!));
     const active = vRows.filter((v) => !v.deletedAt);
     expect(active.length).toBe(0); // no active (non-deleted) voucher row
   });
@@ -482,13 +449,10 @@ describe("Workflow — Reports reflect seeded transactions", () => {
           eq(schema.voucherEntries.ledgerAccountId, ctx.cashAccountId),
           sql`${schema.voucherEntries.voucherId} IN (
             SELECT id FROM vouchers WHERE company_id = ${ctx.companyId}
-          )`,
-        ),
+          )`
+        )
       );
-    const dbNet = entries.reduce(
-      (s, e) => s + parseFloat(e.debitAmount ?? "0") - parseFloat(e.creditAmount ?? "0"),
-      0,
-    );
+    const dbNet = entries.reduce((s, e) => s + parseFloat(e.debitAmount ?? "0") - parseFloat(e.creditAmount ?? "0"), 0);
 
     const balRes = await agent.get(`/api/accounts/ledger/${ctx.cashAccountId}/balance`);
     expect(balRes.status).toBe(200);
@@ -535,13 +499,10 @@ describe("Workflow — Reports reflect seeded transactions", () => {
     const res = await agent.get("/api/vouchers");
     expect(res.status).toBe(200);
 
-    const list: any[] = Array.isArray(res.body) ? res.body : res.body?.vouchers ?? [];
+    const list: any[] = Array.isArray(res.body) ? res.body : (res.body?.vouchers ?? []);
     for (const v of list) {
       if (v.totalAmount !== undefined && v.totalAmount !== null) {
-        expect(
-          isNaN(parseFloat(v.totalAmount)),
-          `Voucher ${v.id} has NaN totalAmount: ${v.totalAmount}`,
-        ).toBe(false);
+        expect(isNaN(parseFloat(v.totalAmount)), `Voucher ${v.id} has NaN totalAmount: ${v.totalAmount}`).toBe(false);
       }
     }
   });
@@ -604,10 +565,7 @@ describe("Workflow — Stock transfer inventory movement", () => {
     const dstBefore = await getInventoryQty(ctx.location2Id, ctx.stockItemIds[0]);
 
     const res = await agent.post("/api/stock-transfers").send(stockTransferBody(15));
-    expect(
-      res.status,
-      `Stock transfer POST failed: ${JSON.stringify(res.body)}`,
-    ).toBeGreaterThanOrEqual(200);
+    expect(res.status, `Stock transfer POST failed: ${JSON.stringify(res.body)}`).toBeGreaterThanOrEqual(200);
     expect(res.status).toBeLessThan(300);
 
     // Source inventory decreases
@@ -635,10 +593,7 @@ describe("Workflow — Stock transfer inventory movement", () => {
     expect(voucherId).toBeDefined();
 
     // Entries, if present, must balance
-    const entries = await db
-      .select()
-      .from(schema.voucherEntries)
-      .where(eq(schema.voucherEntries.voucherId, voucherId));
+    const entries = await db.select().from(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, voucherId));
     if (entries.length > 0) {
       const dr = entries.reduce((s, e) => s + parseFloat(e.debitAmount ?? "0"), 0);
       const cr = entries.reduce((s, e) => s + parseFloat(e.creditAmount ?? "0"), 0);
@@ -670,12 +625,7 @@ describe("Workflow — Stock transfer inventory movement", () => {
     const stVouchersBefore = await db
       .select({ id: schema.vouchers.id })
       .from(schema.vouchers)
-      .where(
-        and(
-          eq(schema.vouchers.companyId, ctx.companyId),
-          eq(schema.vouchers.voucherType, "Stock Transfer"),
-        ),
-      );
+      .where(and(eq(schema.vouchers.companyId, ctx.companyId), eq(schema.vouchers.voucherType, "Stock Transfer")));
 
     const res = await agent.post("/api/stock-transfers").send({
       sourceLocationId: ctx.locationId,
@@ -692,12 +642,7 @@ describe("Workflow — Stock transfer inventory movement", () => {
     const stVouchersAfter = await db
       .select({ id: schema.vouchers.id })
       .from(schema.vouchers)
-      .where(
-        and(
-          eq(schema.vouchers.companyId, ctx.companyId),
-          eq(schema.vouchers.voucherType, "Stock Transfer"),
-        ),
-      );
+      .where(and(eq(schema.vouchers.companyId, ctx.companyId), eq(schema.vouchers.voucherType, "Stock Transfer")));
     expect(stVouchersAfter.length).toBe(stVouchersBefore.length);
   });
 });
@@ -711,21 +656,15 @@ describe("Workflow — Daybook shows vouchers posted today", () => {
   beforeEach(cleanupVouchers);
 
   it("payment, receipt, and journal vouchers all appear in the daybook for today", async () => {
-    const payRes = await agent
-      .post("/api/vouchers/payment-receipt")
-      .send(paymentBody("Payment", 100));
+    const payRes = await agent.post("/api/vouchers/payment-receipt").send(paymentBody("Payment", 100));
     expect(payRes.status).toBeGreaterThanOrEqual(200);
     const payId = extractId(payRes.body);
 
-    const recRes = await agent
-      .post("/api/vouchers/payment-receipt")
-      .send(paymentBody("Receipt", 200));
+    const recRes = await agent.post("/api/vouchers/payment-receipt").send(paymentBody("Receipt", 200));
     expect(recRes.status).toBeGreaterThanOrEqual(200);
     const recId = extractId(recRes.body);
 
-    const jrnRes = await agent
-      .post("/api/vouchers/journal")
-      .send(journalBody(300, "Daybook test journal"));
+    const jrnRes = await agent.post("/api/vouchers/journal").send(journalBody(300, "Daybook test journal"));
     expect(jrnRes.status).toBeGreaterThanOrEqual(200);
     const jrnId = extractId(jrnRes.body);
 
@@ -735,7 +674,7 @@ describe("Workflow — Daybook shows vouchers posted today", () => {
 
     const dbRes = await agent.get(`/api/vouchers?startDate=${TODAY}&endDate=${TODAY}`);
     expect(dbRes.status).toBe(200);
-    const list: any[] = Array.isArray(dbRes.body) ? dbRes.body : dbRes.body?.vouchers ?? [];
+    const list: any[] = Array.isArray(dbRes.body) ? dbRes.body : (dbRes.body?.vouchers ?? []);
     const ids = list.map((v: any) => v.id);
 
     expect(ids, `Payment ${payId} not in daybook. IDs: ${ids}`).toContain(payId);
@@ -744,18 +683,14 @@ describe("Workflow — Daybook shows vouchers posted today", () => {
   });
 
   it("deleted voucher no longer appears as active in the daybook response", async () => {
-    const createRes = await agent
-      .post("/api/vouchers/journal")
-      .send(journalBody(150, "Daybook delete test"));
+    const createRes = await agent.post("/api/vouchers/journal").send(journalBody(150, "Daybook delete test"));
     expect(createRes.status).toBeGreaterThanOrEqual(200);
     const voucherId = extractId(createRes.body);
     expect(voucherId).toBeDefined();
 
     // Confirm it appears before deletion
     const beforeDel = await agent.get(`/api/vouchers?startDate=${TODAY}&endDate=${TODAY}`);
-    const listBefore: any[] = Array.isArray(beforeDel.body)
-      ? beforeDel.body
-      : beforeDel.body?.vouchers ?? [];
+    const listBefore: any[] = Array.isArray(beforeDel.body) ? beforeDel.body : (beforeDel.body?.vouchers ?? []);
     expect(listBefore.some((v: any) => v.id === voucherId)).toBe(true);
 
     const delRes = await agent.delete(`/api/vouchers/${voucherId}`);
@@ -763,14 +698,9 @@ describe("Workflow — Daybook shows vouchers posted today", () => {
 
     // After delete: must NOT appear as an active (non-deleted) entry
     const afterDel = await agent.get(`/api/vouchers?startDate=${TODAY}&endDate=${TODAY}`);
-    const listAfter: any[] = Array.isArray(afterDel.body)
-      ? afterDel.body
-      : afterDel.body?.vouchers ?? [];
+    const listAfter: any[] = Array.isArray(afterDel.body) ? afterDel.body : (afterDel.body?.vouchers ?? []);
     const foundActive = listAfter.some((v: any) => v.id === voucherId && !v.deletedAt);
-    expect(
-      foundActive,
-      `Deleted voucher ${voucherId} must not appear as active in daybook`,
-    ).toBe(false);
+    expect(foundActive, `Deleted voucher ${voucherId} must not appear as active in daybook`).toBe(false);
   });
 });
 
@@ -786,7 +716,7 @@ describe("Workflow — Company isolation (vouchers, ledger, inventory)", () => {
   // assertion would fail.
   let companyBId: number;
   let companyBVoucherId: number; // stored for explicit ID-based voucher-list assertion
-  let accountBId: number;       // Company B's account ID — used in ledger-access isolation test
+  let accountBId: number; // Company B's account ID — used in ledger-access isolation test
 
   beforeAll(async () => {
     const [co] = await db
@@ -855,7 +785,7 @@ describe("Workflow — Company isolation (vouchers, ledger, inventory)", () => {
     await db.delete(schema.voucherEntries).where(
       sql`${schema.voucherEntries.voucherId} IN (
         SELECT id FROM vouchers WHERE company_id = ${companyBId}
-      )`,
+      )`
     );
     await db.delete(schema.vouchers).where(eq(schema.vouchers.companyId, companyBId));
     await db.delete(schema.stockItems).where(eq(schema.stockItems.companyId, companyBId));
@@ -874,7 +804,7 @@ describe("Workflow — Company isolation (vouchers, ledger, inventory)", () => {
 
     const listRes = await agent.get("/api/vouchers");
     expect(listRes.status).toBe(200);
-    const list: any[] = Array.isArray(listRes.body) ? listRes.body : listRes.body?.vouchers ?? [];
+    const list: any[] = Array.isArray(listRes.body) ? listRes.body : (listRes.body?.vouchers ?? []);
 
     // Company A's voucher must be present
     expect(list.some((v: any) => v.id === voucherAId)).toBe(true);
@@ -882,7 +812,7 @@ describe("Workflow — Company isolation (vouchers, ledger, inventory)", () => {
     // Company B's voucher must NOT be present — checked by exact DB-assigned ID
     expect(
       list.some((v: any) => v.id === companyBVoucherId),
-      `Company B voucher ${companyBVoucherId} must not appear in Company A voucher list`,
+      `Company B voucher ${companyBVoucherId} must not appear in Company A voucher list`
     ).toBe(false);
 
     // Belt-and-suspenders: every row that carries companyId must belong to Company A
@@ -952,12 +882,10 @@ describe("Workflow — Company isolation (vouchers, ledger, inventory)", () => {
 
     const invRes = await agent.get(`/api/inventory?locationId=${ctx.locationId}`);
     expect(invRes.status).toBe(200);
-    const inv: any[] = Array.isArray(invRes.body) ? invRes.body : invRes.body?.inventory ?? [];
+    const inv: any[] = Array.isArray(invRes.body) ? invRes.body : (invRes.body?.inventory ?? []);
 
     // Checked by exact DB-assigned stock item ID — not a sentinel amount
-    const hasB = inv.some(
-      (i: any) => i.stockItemId === item.id || i.stock_item_id === item.id,
-    );
+    const hasB = inv.some((i: any) => i.stockItemId === item.id || i.stock_item_id === item.id);
     expect(hasB).toBe(false);
 
     // Inline cleanup — afterAll covers this too, but belt-and-suspenders

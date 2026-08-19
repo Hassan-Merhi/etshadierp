@@ -23,7 +23,7 @@ export async function getActiveContainers(companyId: number): Promise<Container[
     .orderBy(asc(schema.containers.containerNumber));
 }
 
-export async function getSoldContainers(companyId: number): Promise<any[]> {
+export async function getSoldContainers(companyId: number) {
   return await db
     .select({
       containerId: schema.containers.id,
@@ -95,7 +95,7 @@ export async function getPurchaseOrdersByContainer(containerId: number): Promise
   return await db.select().from(schema.purchaseOrders).where(eq(schema.purchaseOrders.containerId, containerId));
 }
 
-export async function getPurchaseOrdersBySupplier(supplierId: number, companyId: number): Promise<any[]> {
+export async function getPurchaseOrdersBySupplier(supplierId: number, companyId: number) {
   return await db
     .select({
       id: schema.purchaseOrders.id,

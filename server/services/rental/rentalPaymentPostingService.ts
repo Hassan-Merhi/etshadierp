@@ -439,9 +439,7 @@ async function postGroupCore(
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-export async function createRentalPaymentGroup(
-  opts: RentalPaymentGroupOptions
-): Promise<{ paymentGroupId: string; scheduled: boolean; payments: any[] }> {
+export async function createRentalPaymentGroup(opts: RentalPaymentGroupOptions) {
   const {
     companyId,
     contractCompanyId,

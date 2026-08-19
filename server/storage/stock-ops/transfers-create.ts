@@ -54,7 +54,7 @@ export async function createStockTransfer(
   destinationLocationId: number,
   notes: string,
   items: Array<{ sourceLocationId: number; stockItemId: number; quantity: string; rate: string }>
-): Promise<any> {
+) {
   return await db.transaction(async (tx) => {
     // The lock makes the duplicate check below decisive: two submissions for the
     // same voucher are ordered, and the second one finds the first one's row.
@@ -213,7 +213,7 @@ export async function createStockAdjustment(
   notes: string,
   items: Array<{ stockItemId: number; quantity: string; rate: string }>,
   _consumptionAccountOverride?: { code: string; name: string }
-): Promise<any> {
+) {
   return await db.transaction(async (tx) => {
     // Locking the voucher row serialises everyone who wants to adjust it, so the
     // duplicate check below cannot be overtaken between reading and inserting.
