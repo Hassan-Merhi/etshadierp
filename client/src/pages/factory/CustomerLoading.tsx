@@ -82,7 +82,35 @@ interface HistoryResponse {
 type LoadingFilter = "ALL" | "LOADED" | "NEVER_LOADED";
 type AvailableZeroFilter = "SHOW_ZERO" | "HIDE_ZERO";
 type AvailableNegativeFilter = "SHOW_NEGATIVE" | "HIDE_NEGATIVE";
+type ColumnKey =
+  | "articleCode"
+  | "product"
+  | "arabicName"
+  | "category"
+  | "weight"
+  | "sellPrice"
+  | "availableStock"
+  | "status"
+  | "totalLoaded"
+  | "totalKg"
+  | "lastLoaded"
+  | "qty";
+
 const PAGE_SIZE = 75;
+const COLUMN_OPTIONS: Array<{ key: ColumnKey; label: string }> = [
+  { key: "articleCode", label: "Article Code" },
+  { key: "product", label: "Product" },
+  { key: "arabicName", label: "Arabic Name" },
+  { key: "category", label: "Category" },
+  { key: "weight", label: "Wt/Bale" },
+  { key: "sellPrice", label: "Sell Price" },
+  { key: "availableStock", label: "Available Stock" },
+  { key: "status", label: "Status" },
+  { key: "totalLoaded", label: "Total Loaded" },
+  { key: "totalKg", label: "Total KG" },
+  { key: "lastLoaded", label: "Last Loaded" },
+  { key: "qty", label: "Qty" },
+];
 
 async function readJson<T>(url: string): Promise<T> {
   const response = await fetch(url, { credentials: "include" });
@@ -133,6 +161,10 @@ export default function CustomerLoading() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [proformaName, setProformaName] = useState("");
   const [historyProduct, setHistoryProduct] = useState<CustomerLoadingProduct | null>(null);
+  const [columnsOpen, setColumnsOpen] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState<Set<ColumnKey>>(
+    () => new Set(COLUMN_OPTIONS.map((column) => column.key))
+  );
   const [page, setPage] = useState(1);
   const qtyRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
@@ -302,6 +334,8 @@ export default function CustomerLoading() {
 
   const summary = loadingQuery.data?.summary;
   const allVisibleSelected = visibleProducts.length > 0 && visibleProducts.every((p) => selectedProductIds.has(p.id));
+  const isColumnVisible = (key: ColumnKey) => visibleColumns.has(key);
+
   function resetSelection() {
     setSelectedProductIds(new Set());
     setDraftQuantities({});
@@ -323,6 +357,21 @@ export default function CustomerLoading() {
       return next;
     });
     if (checked && !draftQuantities[product.id]) setDraftQuantities((current) => ({ ...current, [product.id]: "1" }));
+  }
+  function selectProductFromQuantity(productId: number) {
+    setSelectedProductIds((current) => {
+      if (current.has(productId)) return current;
+      const next = new Set(current);
+      next.add(productId);
+      return next;
+    });
+  }
+  function toggleColumn(key: ColumnKey, checked: boolean) {
+    setVisibleColumns((current) => {
+      const next = new Set(current);
+      checked ? next.add(key) : next.delete(key);
+      return next;
+    });
   }
   function openPreview() {
     if (validSelectedLines.length === 0 || hasInvalidSelectedLine) {
@@ -526,11 +575,14 @@ export default function CustomerLoading() {
                     <SelectItem value="HIDE_NEGATIVE">Hide Negative</SelectItem>
                   </SelectContent>
                 </Select>
+                <Button variant="outline" onClick={() => setColumnsOpen(true)} data-testid="customer-loading-columns-button">
+                  Columns
+                </Button>
               </div>
             </div>
 
             <div className="max-h-[62vh] overflow-auto">
-              <table className="w-full min-w-[1620px] border-collapse text-sm">
+              <table className="w-full min-w-[1100px] border-collapse text-sm">
                 <thead className="sticky top-0 z-30 bg-card shadow-[0_1px_0_hsl(var(--border))]">
                   <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
                     <th className="sticky left-0 z-40 w-12 bg-card px-3 py-3">
@@ -554,18 +606,26 @@ export default function CustomerLoading() {
                         aria-label="Select visible products"
                       />
                     </th>
-                    <th className="sticky left-12 z-40 min-w-[130px] bg-card px-4 py-3 font-medium">Article Code</th>
-                    <th className="min-w-[220px] px-4 py-3 font-medium">Product</th>
-                    <th className="min-w-[180px] px-4 py-3 font-medium">Arabic Name</th>
-                    <th className="px-4 py-3 font-medium">Category</th>
-                    <th className="px-4 py-3 text-right font-medium">Wt/Bale</th>
-                    <th className="px-4 py-3 text-right font-medium">Sell Price</th>
-                    <th className="px-4 py-3 text-right font-medium">Available Stock</th>
-                    <th className="px-4 py-3 font-medium">Status</th>
-                    <th className="px-4 py-3 text-right font-medium">Total Loaded</th>
-                    <th className="px-4 py-3 text-right font-medium">Total KG</th>
-                    <th className="px-4 py-3 font-medium">Last Loaded</th>
-                    <th className="px-4 py-3 text-right font-medium">Qty</th>
+                    {isColumnVisible("articleCode") && (
+                      <th className="min-w-[130px] px-4 py-3 font-medium">Article Code</th>
+                    )}
+                    {isColumnVisible("product") && <th className="min-w-[220px] px-4 py-3 font-medium">Product</th>}
+                    {isColumnVisible("arabicName") && (
+                      <th className="min-w-[180px] px-4 py-3 font-medium">Arabic Name</th>
+                    )}
+                    {isColumnVisible("category") && <th className="px-4 py-3 font-medium">Category</th>}
+                    {isColumnVisible("weight") && <th className="px-4 py-3 text-right font-medium">Wt/Bale</th>}
+                    {isColumnVisible("sellPrice") && <th className="px-4 py-3 text-right font-medium">Sell Price</th>}
+                    {isColumnVisible("availableStock") && (
+                      <th className="px-4 py-3 text-right font-medium">Available Stock</th>
+                    )}
+                    {isColumnVisible("status") && <th className="px-4 py-3 font-medium">Status</th>}
+                    {isColumnVisible("totalLoaded") && (
+                      <th className="px-4 py-3 text-right font-medium">Total Loaded</th>
+                    )}
+                    {isColumnVisible("totalKg") && <th className="px-4 py-3 text-right font-medium">Total KG</th>}
+                    {isColumnVisible("lastLoaded") && <th className="px-4 py-3 font-medium">Last Loaded</th>}
+                    {isColumnVisible("qty") && <th className="px-4 py-3 text-right font-medium">Qty</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -586,92 +646,113 @@ export default function CustomerLoading() {
                             aria-label={`Select ${product.name}`}
                           />
                         </td>
-                        <td className="sticky left-12 z-20 whitespace-nowrap bg-inherit px-4 py-3 font-mono text-xs">
-                          {product.articleCode || product.code}
-                        </td>
-                        <td className="px-4 py-3 font-medium">{product.name}</td>
-                        <td className="px-4 py-3 text-right" dir="rtl">
-                          {product.nameAr || "—"}
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">{product.categoryName || "—"}</td>
-                        <td className="px-4 py-3 text-right tabular-nums">
-                          {product.weightPerBaleKg ? `${formatNumber(Number(product.weightPerBaleKg), 2)} kg` : "—"}
-                        </td>
-                        <td className="px-4 py-2 text-right">
-                          {selected ? (
-                            <Input
-                              value={rawPrice}
-                              onChange={(e) =>
-                                setDraftPrices((current) => ({ ...current, [product.id]: e.target.value }))
-                              }
-                              inputMode="decimal"
-                              className="ml-auto h-8 w-24 text-right tabular-nums"
-                              aria-label={`Price for ${product.name}`}
-                            />
-                          ) : (
-                            <span className="tabular-nums">{formatMoney(product.sellingPrice)}</span>
-                          )}
-                        </td>
-                        <td
-                          className={`px-4 py-3 text-right font-medium tabular-nums ${availableStock !== null && availableStock < 0 ? "text-destructive" : ""}`}
-                        >
-                          {stockAllocationQuery.isLoading
-                            ? "…"
-                            : availableStock === null
-                              ? "—"
-                              : formatNumber(availableStock)}
-                        </td>
-                        <td className="px-4 py-3">
-                          <button
-                            type="button"
-                            className="text-left"
-                            onClick={() => product.loadingStatus === "LOADED" && setHistoryProduct(product)}
-                            disabled={product.loadingStatus !== "LOADED"}
-                          >
-                            {product.loadingStatus === "LOADED" ? (
-                              <Badge variant="secondary" className="cursor-pointer hover:bg-secondary/80">
-                                Loaded · {product.loadingCount}
-                              </Badge>
+                        {isColumnVisible("articleCode") && (
+                          <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">
+                            {product.articleCode || product.code}
+                          </td>
+                        )}
+                        {isColumnVisible("product") && <td className="px-4 py-3 font-medium">{product.name}</td>}
+                        {isColumnVisible("arabicName") && (
+                          <td className="px-4 py-3 text-right" dir="rtl">
+                            {product.nameAr || "—"}
+                          </td>
+                        )}
+                        {isColumnVisible("category") && (
+                          <td className="px-4 py-3 text-muted-foreground">{product.categoryName || "—"}</td>
+                        )}
+                        {isColumnVisible("weight") && (
+                          <td className="px-4 py-3 text-right tabular-nums">
+                            {product.weightPerBaleKg ? `${formatNumber(Number(product.weightPerBaleKg), 2)} kg` : "—"}
+                          </td>
+                        )}
+                        {isColumnVisible("sellPrice") && (
+                          <td className="px-4 py-2 text-right">
+                            {selected ? (
+                              <Input
+                                value={rawPrice}
+                                onChange={(e) =>
+                                  setDraftPrices((current) => ({ ...current, [product.id]: e.target.value }))
+                                }
+                                inputMode="decimal"
+                                className="ml-auto h-8 w-24 text-right tabular-nums"
+                                aria-label={`Price for ${product.name}`}
+                              />
                             ) : (
-                              <Badge variant="outline">Never loaded</Badge>
+                              <span className="tabular-nums">{formatMoney(product.sellingPrice)}</span>
                             )}
-                          </button>
-                        </td>
-                        <td className="px-4 py-3 text-right font-medium tabular-nums">
-                          {formatNumber(product.totalBalesLoaded)}
-                        </td>
-                        <td className="px-4 py-3 text-right tabular-nums">{formatNumber(product.totalKgLoaded, 1)}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
-                          {formatDate(product.lastLoadedAt)}
-                        </td>
-                        <td className="px-4 py-2 text-right">
-                          <Input
-                            ref={(node) => {
-                              qtyRefs.current[product.id] = node;
-                            }}
-                            inputMode="numeric"
-                            min={0}
-                            value={draftQuantities[product.id] ?? ""}
-                            onChange={(e) => {
-                              const value = e.target.value.replace(/[^0-9]/g, "");
-                              setDraftQuantities((current) => ({ ...current, [product.id]: value }));
-                              if (Number(value) > 0 && !selectedProductIds.has(product.id))
-                                toggleProduct(product, true);
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" || e.key === "ArrowDown") {
-                                e.preventDefault();
-                                moveQtyFocus(product.id, 1);
-                              } else if (e.key === "ArrowUp") {
-                                e.preventDefault();
-                                moveQtyFocus(product.id, -1);
-                              }
-                            }}
-                            placeholder="0"
-                            className="ml-auto h-8 w-20 text-right tabular-nums"
-                            aria-label={`Quantity for ${product.name}`}
-                          />
-                        </td>
+                          </td>
+                        )}
+                        {isColumnVisible("availableStock") && (
+                          <td
+                            className={`px-4 py-3 text-right font-medium tabular-nums ${availableStock !== null && availableStock < 0 ? "text-destructive" : ""}`}
+                          >
+                            {stockAllocationQuery.isLoading
+                              ? "…"
+                              : availableStock === null
+                                ? "—"
+                                : formatNumber(availableStock)}
+                          </td>
+                        )}
+                        {isColumnVisible("status") && (
+                          <td className="px-4 py-3">
+                            <button
+                              type="button"
+                              className="text-left"
+                              onClick={() => product.loadingStatus === "LOADED" && setHistoryProduct(product)}
+                              disabled={product.loadingStatus !== "LOADED"}
+                            >
+                              {product.loadingStatus === "LOADED" ? (
+                                <Badge variant="secondary" className="cursor-pointer hover:bg-secondary/80">
+                                  Loaded · {product.loadingCount}
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline">Never loaded</Badge>
+                              )}
+                            </button>
+                          </td>
+                        )}
+                        {isColumnVisible("totalLoaded") && (
+                          <td className="px-4 py-3 text-right font-medium tabular-nums">
+                            {formatNumber(product.totalBalesLoaded)}
+                          </td>
+                        )}
+                        {isColumnVisible("totalKg") && (
+                          <td className="px-4 py-3 text-right tabular-nums">{formatNumber(product.totalKgLoaded, 1)}</td>
+                        )}
+                        {isColumnVisible("lastLoaded") && (
+                          <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+                            {formatDate(product.lastLoadedAt)}
+                          </td>
+                        )}
+                        {isColumnVisible("qty") && (
+                          <td className="px-4 py-2 text-right">
+                            <Input
+                              ref={(node) => {
+                                qtyRefs.current[product.id] = node;
+                              }}
+                              inputMode="numeric"
+                              min={0}
+                              value={draftQuantities[product.id] ?? ""}
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/[^0-9]/g, "");
+                                setDraftQuantities((current) => ({ ...current, [product.id]: value }));
+                                if (Number(value) > 0) selectProductFromQuantity(product.id);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === "ArrowDown") {
+                                  e.preventDefault();
+                                  moveQtyFocus(product.id, 1);
+                                } else if (e.key === "ArrowUp") {
+                                  e.preventDefault();
+                                  moveQtyFocus(product.id, -1);
+                                }
+                              }}
+                              placeholder="0"
+                              className="ml-auto h-8 w-20 text-right tabular-nums"
+                              aria-label={`Quantity for ${product.name}`}
+                            />
+                          </td>
+                        )}
                       </tr>
                     );
                   })}
@@ -744,6 +825,35 @@ export default function CustomerLoading() {
           </div>
         </div>
       )}
+
+      <Dialog open={columnsOpen} onOpenChange={setColumnsOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Visible Columns</DialogTitle>
+            <DialogDescription>Turn columns on or off for the Customer Loading table.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 py-2 sm:grid-cols-2">
+            {COLUMN_OPTIONS.map((column) => (
+              <label key={column.key} className="flex cursor-pointer items-center gap-2 rounded-md border p-3 text-sm">
+                <Checkbox
+                  checked={visibleColumns.has(column.key)}
+                  onCheckedChange={(checked) => toggleColumn(column.key, Boolean(checked))}
+                />
+                <span>{column.label}</span>
+              </label>
+            ))}
+          </div>
+          <DialogFooter className="gap-2 sm:justify-between">
+            <Button
+              variant="outline"
+              onClick={() => setVisibleColumns(new Set(COLUMN_OPTIONS.map((column) => column.key)))}
+            >
+              Show All
+            </Button>
+            <Button onClick={() => setColumnsOpen(false)}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={previewOpen} onOpenChange={(open) => !createProformaMutation.isPending && setPreviewOpen(open)}>
         <DialogContent className="max-h-[90vh] max-w-5xl overflow-hidden p-0">
