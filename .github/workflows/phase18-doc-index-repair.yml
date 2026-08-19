@@ -140,6 +140,7 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'PY'
+          import json
           from pathlib import Path
 
           for name in ['docs/god-file-split-program.md', 'docs/system-quality-program.md']:
@@ -164,8 +165,20 @@ jobs:
           if marker in s:
               s = s.replace(marker, '', 1)
           p.write_text(s)
+
+          p = Path('config/ci-ratchet-allowances.json')
+          data = json.loads(p.read_text())
+          stale = data.get('routeManifestAdditions', [])
+          expected = [
+              'GET /api/factory/customer-loading/products [requireAuth > <anonymous>]',
+              'GET /api/factory/customer-loading/history [requireAuth > <anonymous>]',
+          ]
+          if stale not in (expected, []):
+              raise SystemExit(f'unexpected routeManifestAdditions: {stale!r}')
+          data['routeManifestAdditions'] = []
+          p.write_text(json.dumps(data, indent=2) + '\n')
           PY
-          npx prettier --write tests/workflow.test.ts client/src/pages/factory/FactoryShippingContainers.tsx client/src/pages/vouchers/StockTransferForm.tsx
+          npx prettier --write tests/workflow.test.ts client/src/pages/factory/FactoryShippingContainers.tsx client/src/pages/vouchers/StockTransferForm.tsx config/ci-ratchet-allowances.json
           UPDATE_ROUTE_MANIFEST=1 npx vitest run tests/route-manifest.test.ts --pool=forks --maxWorkers=2
       - name: Verify repaired PR tree
         shell: bash
@@ -173,7 +186,7 @@ jobs:
           set -euo pipefail
           npm run audit:doc-index
           npm run check
-          npx prettier --check tests/workflow.test.ts client/src/pages/factory/FactoryShippingContainers.tsx client/src/pages/vouchers/StockTransferForm.tsx
+          npx prettier --check tests/workflow.test.ts client/src/pages/factory/FactoryShippingContainers.tsx client/src/pages/vouchers/StockTransferForm.tsx config/ci-ratchet-allowances.json
           npx vitest run tests/god-file-boundaries.test.ts tests/route-manifest.test.ts tests/doc-index.test.ts tests/doc-index-contract.test.ts tests/toolchain-and-script-inventory.test.ts --pool=forks --maxWorkers=2
       - name: Restore workflow to current main and push verified PR repairs
         shell: bash
@@ -183,7 +196,7 @@ jobs:
           git checkout origin/main -- .github/workflows/phase18-doc-index-repair.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add .github/workflows/phase18-doc-index-repair.yml config/route-manifest.json docs/god-file-split-program.md docs/system-quality-program.md client/src/pages/factory/FactoryShippingContainers.tsx client/src/pages/vouchers/StockTransferForm.tsx tests/workflow.test.ts
+          git add .github/workflows/phase18-doc-index-repair.yml config/ci-ratchet-allowances.json config/route-manifest.json docs/god-file-split-program.md docs/system-quality-program.md client/src/pages/factory/FactoryShippingContainers.tsx client/src/pages/vouchers/StockTransferForm.tsx tests/workflow.test.ts
           git diff --cached --check
           git commit --no-verify -m 'fix: clear remaining Phase 18 CI gates'
           git push --no-verify origin HEAD:agent/phase18-phase1-safe-macos-result
