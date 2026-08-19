@@ -24,7 +24,11 @@ jobs:
         id: guard
         shell: bash
         run: |
-          if git log -1 --pretty=%B | grep -Fq '[phase18-phase2-result]'; then echo 'skip=true' >> "$GITHUB_OUTPUT"; else echo 'skip=false' >> "$GITHUB_OUTPUT"; fi
+          if git log --format=%B -n 20 | grep -Fq '[phase18-phase2-result]' || [ ! -f scripts/phase18-phase2-usage-infer.cjs ]; then
+            echo 'skip=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'skip=false' >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/setup-node@v6
         if: steps.guard.outputs.skip != 'true'
         with:
