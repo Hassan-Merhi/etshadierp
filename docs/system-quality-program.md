@@ -17,7 +17,7 @@ audit fails instead of allowing the reference to drift.
 
 | Signal | Now | Command |
 |---|---|---|
-| Type escapes (AST) | 3,297 total | `npm run audit:type-escapes` |
+| Type escapes (AST) | 3,296 total | `npm run audit:type-escapes` |
 | ESLint warnings | 33 total | `npm run lint` |
 | Startup migration failures | 0 on a fresh database | `npm run verify:startup-migrations` |
 | Backend coverage floor (lines) | 29% | `config/coverage-thresholds.json` |

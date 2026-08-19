@@ -3905,7 +3905,7 @@
         0
       ],
       "server/storage/accounting/spreadsheets.ts": [
-        2,
+        1,
         0,
         0
       ],
@@ -3972,6 +3972,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 3297
+    "typeEscapeCeiling": 3296
   }
 }
