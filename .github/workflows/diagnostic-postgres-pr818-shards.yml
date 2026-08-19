@@ -3,12 +3,15 @@ name: Diagnostic Postgres PR818 Shards
 on:
   push:
     branches: [diagnostic/postgres-pr818-shards]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: read
 
 jobs:
   backend-shard:
+    if: github.event_name == 'push' || github.head_ref == 'diagnostic/postgres-pr818-shards'
     name: Backend shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
