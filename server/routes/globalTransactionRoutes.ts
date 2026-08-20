@@ -1,14 +1,13 @@
 import { parseId } from "../lib/parseId";
 import { logger } from "../lib/logger";
 import { requireNonPOS } from "../auth";
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { db } from "../db";
 import {
   vouchers,
   voucherEntries,
   ledgerAccounts,
   companies,
-  userCompanyRoles,
   salesItems,
   stockItems,
   stockTransferVouchers,
@@ -26,16 +25,30 @@ import {
   factorySuppliers,
 } from "../../shared/schema";
 import { eq, and, gte, lte, inArray, or, ilike, desc, sql, count, isNull } from "drizzle-orm";
+import {
+  assertCompaniesAccess,
+  assertCompanyAccess,
+  getAccessibleCompanyIds,
+  getCompanyAccessContext,
+  parsePositiveCompanyId,
+  sendCompanyAccessError,
+} from "../security/companyAccessBoundary";
+
+async function resolveGlobalCompanyScope(req: Request): Promise<{ userId: string; companyIds: number[] }> {
+  const access = getCompanyAccessContext(req);
+  const accessible = await getAccessibleCompanyIds(access.userId);
+  return {
+    userId: access.userId,
+    companyIds: [...accessible].sort((left, right) => left - right),
+  };
+}
 
 export function registerGlobalTransactionRoutes(app: Express, requireAuth: any) {
   // GET /api/global/transactions
   // Returns vouchers across all ERP companies the user has access to.
   app.get("/api/global/transactions", requireAuth, requireNonPOS, async (req, res) => {
     try {
-      const userId = req.session.userId as string;
-      const userRole = req.session.currentRole as string;
-      const isAdmin = userRole === "Admin" || userRole === "Developer";
-      const _isPrivileged = ["Admin", "Owner", "Manager", "Developer"].includes(userRole);
+      const { userId, companyIds: accessibleCompanyIds } = await resolveGlobalCompanyScope(req);
 
       const {
         startDate,
@@ -67,29 +80,13 @@ export function registerGlobalTransactionRoutes(app: Express, requireAuth: any) 
         eq(companies.companyType, "supplier_partner")
       );
 
-      if (isAdmin) {
-        // Admins see all ERP + factory + properties companies
-        const allErpCompanies = await db.select({ id: companies.id }).from(companies).where(allowedTypeFilter);
-        allowedCompanyIds = allErpCompanies.map((c) => c.id);
-      } else {
-        // Regular users see only their assigned companies
-        const userRoles = await db
-          .select({ companyId: userCompanyRoles.companyId })
-          .from(userCompanyRoles)
-          .where(eq(userCompanyRoles.userId, userId));
-        const userCompanyIds = userRoles.map((r) => r.companyId);
-
-        if (userCompanyIds.length === 0) {
-          return res.json({ vouchers: [], total: 0, page, totalPages: 0, summary: [] });
-        }
-
-        // Intersect with allowed company types only
-        const erpCompanies = await db
-          .select({ id: companies.id })
-          .from(companies)
-          .where(and(allowedTypeFilter, inArray(companies.id, userCompanyIds)));
-        allowedCompanyIds = erpCompanies.map((c) => c.id);
-      }
+      const erpCompanies = accessibleCompanyIds.length
+        ? await db
+            .select({ id: companies.id })
+            .from(companies)
+            .where(and(allowedTypeFilter, inArray(companies.id, accessibleCompanyIds)))
+        : [];
+      allowedCompanyIds = erpCompanies.map((c) => c.id);
 
       if (allowedCompanyIds.length === 0) {
         return res.json({ vouchers: [], total: 0, page, totalPages: 0, summary: [] });
@@ -119,10 +116,8 @@ export function registerGlobalTransactionRoutes(app: Express, requireAuth: any) 
       // 2. Apply company filter from request (must be subset of allowed)
       let targetCompanyIds = allowedCompanyIds;
       if (companyIdsParam && companyIdsParam !== "all") {
-        const requested = companyIdsParam
-          .split(",")
-          .map((id) => parseInt(id))
-          .filter(Boolean);
+        const requested = companyIdsParam.split(",").map((id) => parsePositiveCompanyId(id, "companyId"));
+        await assertCompaniesAccess(userId, requested);
         targetCompanyIds = requested.filter((id) => allowedCompanyIds.includes(id));
         if (targetCompanyIds.length === 0) {
           return res.json({ vouchers: [], total: 0, page, totalPages: 0, summary: [] });
@@ -233,7 +228,7 @@ export function registerGlobalTransactionRoutes(app: Express, requireAuth: any) 
       });
     } catch (err) {
       logger.error("[GlobalTransactions]", { error: err });
-      return res.status(500).json({ message: "Failed to fetch global transactions" });
+      return sendCompanyAccessError(res, err);
     }
   });
 
@@ -241,11 +236,7 @@ export function registerGlobalTransactionRoutes(app: Express, requireAuth: any) 
   // Returns the distinct voucher types present across the user's companies
   app.get("/api/global/transactions/voucher-types", requireAuth, requireNonPOS, async (req, res) => {
     try {
-      const userId = req.session.userId as string;
-      const userRole = req.session.currentRole as string;
-      const isAdmin = userRole === "Admin" || userRole === "Developer";
-
-      let allowedCompanyIds: number[];
+      const { companyIds: accessibleCompanyIds } = await resolveGlobalCompanyScope(req);
       const typeFilter = or(
         eq(companies.companyType, "erp"),
         eq(companies.companyType, "properties"),
@@ -253,42 +244,34 @@ export function registerGlobalTransactionRoutes(app: Express, requireAuth: any) 
         eq(companies.companyType, "factory_v2"),
         eq(companies.companyType, "supplier_partner")
       );
-      if (isAdmin) {
-        const all = await db.select({ id: companies.id }).from(companies).where(typeFilter);
-        allowedCompanyIds = all.map((c) => c.id);
-      } else {
-        const userRoles = await db
-          .select({ companyId: userCompanyRoles.companyId })
-          .from(userCompanyRoles)
-          .where(eq(userCompanyRoles.userId, userId));
-        allowedCompanyIds = userRoles.map((r) => r.companyId);
-      }
+      const allowed = accessibleCompanyIds.length
+        ? await db
+            .select({ id: companies.id })
+            .from(companies)
+            .where(and(typeFilter, inArray(companies.id, accessibleCompanyIds)))
+        : [];
+      const allowedCompanyIds = allowed.map((c) => c.id);
 
       if (allowedCompanyIds.length === 0) return res.json([]);
 
-      const isPrivilegedTypes = ["Admin", "Owner", "Manager", "Developer"].includes(userRole);
       const types = await db
         .selectDistinct({ voucherType: vouchers.voucherType })
         .from(vouchers)
-        .where(
-          and(
-            inArray(vouchers.companyId, allowedCompanyIds),
-            ...(isPrivilegedTypes ? [] : [isNull(vouchers.deletedAt)])
-          )
-        )
+        .where(and(inArray(vouchers.companyId, allowedCompanyIds), isNull(vouchers.deletedAt)))
         .orderBy(vouchers.voucherType);
 
       return res.json(types.map((t) => t.voucherType));
     } catch (err) {
       logger.error("[GlobalTransactions/types]", { error: err });
-      return res.status(500).json({ message: "Failed to fetch voucher types" });
+      return sendCompanyAccessError(res, err);
     }
   });
 
   // GET /api/global/transactions/:voucherId/detail
-  // Returns full voucher + entries without session-company restriction (auth only).
+  // Returns full voucher + entries after checking the voucher's company scope.
   app.get("/api/global/transactions/:voucherId/detail", requireAuth, requireNonPOS, async (req, res) => {
     try {
+      const { userId } = await resolveGlobalCompanyScope(req);
       const voucherId = parseId(req.params.voucherId);
       if (voucherId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(voucherId)) return res.status(400).json({ message: "Invalid voucher ID" });
@@ -311,6 +294,7 @@ export function registerGlobalTransactionRoutes(app: Express, requireAuth: any) 
         .where(eq(vouchers.id, voucherId));
 
       if (!voucher) return res.status(404).json({ message: "Voucher not found" });
+      await assertCompanyAccess(userId, voucher.companyId);
 
       const entriesRaw = await db
         .select({
@@ -367,14 +351,16 @@ export function registerGlobalTransactionRoutes(app: Express, requireAuth: any) 
       return res.json({ voucher, entries });
     } catch (err) {
       logger.error("[GlobalTransactions/detail]", { error: err });
-      return res.status(500).json({ message: "Failed to fetch voucher detail" });
+      return sendCompanyAccessError(res, err);
     }
   });
 
   // GET /api/global/transactions/:voucherId/view-entries
-  // Returns rich entries (items for Sales/Purchase/StockTransfer/Mixed) — no company restriction.
+  // Returns rich entries (items for Sales/Purchase/StockTransfer/Mixed) after
+  // checking the voucher's company scope.
   app.get("/api/global/transactions/:voucherId/view-entries", requireAuth, requireNonPOS, async (req, res) => {
     try {
+      const { userId } = await resolveGlobalCompanyScope(req);
       const voucherId = parseId(req.params.voucherId);
       if (voucherId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(voucherId)) return res.status(400).json({ message: "Invalid voucher ID" });
@@ -384,6 +370,7 @@ export function registerGlobalTransactionRoutes(app: Express, requireAuth: any) 
         .from(vouchers)
         .where(eq(vouchers.id, voucherId));
       if (!voucher) return res.status(404).json({ message: "Voucher not found" });
+      await assertCompanyAccess(userId, voucher.companyId);
 
       const type = voucher.voucherType;
 
@@ -672,7 +659,7 @@ export function registerGlobalTransactionRoutes(app: Express, requireAuth: any) 
       return res.json(entries);
     } catch (err) {
       logger.error("[GlobalTransactions/view-entries]", { error: err });
-      return res.status(500).json({ message: "Failed to fetch view entries" });
+      return sendCompanyAccessError(res, err);
     }
   });
 }

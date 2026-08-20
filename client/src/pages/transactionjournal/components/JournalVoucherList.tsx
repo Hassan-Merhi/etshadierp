@@ -7,7 +7,7 @@
  * set (the Amount column disappears when amounts are hidden), same empty-state
  * copy and the same three per-row actions.
  */
-import { ChevronLeft, ChevronRight, Eye, EyeOff, Pencil, X } from "lucide-react";
+import { AlertCircle, ChevronLeft, ChevronRight, Eye, EyeOff, Pencil, RefreshCw, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -346,6 +346,28 @@ function PaginationFooter({ model }: { model: TransactionJournalModel }) {
 }
 
 export function JournalVoucherList({ model }: { model: TransactionJournalModel }) {
+  if (model.error) {
+    const message = model.error instanceof Error ? model.error.message : "Unable to load transactions.";
+    return (
+      <Card>
+        <CardContent
+          className="flex flex-col items-center justify-center gap-3 py-12 text-center"
+          data-testid="journal-error"
+        >
+          <AlertCircle className="h-8 w-8 text-destructive" />
+          <div>
+            <p className="font-medium">Could not load All Daybook</p>
+            <p className="mt-1 text-sm text-muted-foreground">{message}</p>
+          </div>
+          <Button variant="outline" onClick={() => model.refetch()} data-testid="button-journal-retry">
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Retry
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <ListHeader model={model} />

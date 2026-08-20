@@ -8,6 +8,7 @@ const harness = vi.hoisted(() => ({
   apiRequest: vi.fn(),
   toast: vi.fn(),
   refetch: vi.fn(),
+  queryError: null as Error | null,
 }));
 
 const journalData = {
@@ -64,7 +65,13 @@ vi.mock("@tanstack/react-query", () => ({
   useQuery: ({ queryKey }: any) => {
     if (queryKey?.[0] === "/api/my-erp-pages") return { data: { hiddenErpCostFields: [] } };
     if (queryKey?.[0] === "/api/global/transactions" && queryKey.length === 2) {
-      return { data: journalData, isLoading: false, isFetching: false, refetch: harness.refetch };
+      return {
+        data: journalData,
+        error: harness.queryError,
+        isLoading: false,
+        isFetching: false,
+        refetch: harness.refetch,
+      };
     }
     if (queryKey?.[0] === "/api/global/transactions/voucher-types") return { data: ["Payment", "Receipt"] };
     if (queryKey?.[0] === "/api/global/transactions" && queryKey?.[2] === "detail")
@@ -153,6 +160,7 @@ import TransactionJournal from "@/pages/TransactionJournal";
 describe("transaction journal page behavior", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    harness.queryError = null;
     sessionStorage.clear();
   });
 
@@ -233,5 +241,17 @@ describe("transaction journal page behavior", () => {
 
     fireEvent.click(screen.getByTestId("button-refresh-journal"));
     expect(harness.refetch).toHaveBeenCalled();
+  });
+
+  it("shows a retryable error instead of presenting a failed request as an empty list", () => {
+    harness.queryError = new Error("No access to the selected company");
+    render(<TransactionJournal />);
+
+    expect(screen.getByTestId("journal-error")).toHaveTextContent("No access to the selected company");
+    expect(screen.getByTestId("button-journal-retry")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("button-journal-retry"));
+    expect(harness.refetch).toHaveBeenCalled();
+    expect(screen.queryByText("No transactions found for the selected filters.")).not.toBeInTheDocument();
   });
 });

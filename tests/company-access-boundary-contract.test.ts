@@ -95,4 +95,16 @@ describe("Phase 7 company access boundary", () => {
       expect(route).not.toContain("getUserCompaniesWithRoles");
     }
   });
+
+  it("protects All Daybook list, type, and detail reads with the same company boundary", () => {
+    const globalTransactions = source("server/routes/globalTransactionRoutes.ts");
+
+    expect(globalTransactions).toContain("resolveGlobalCompanyScope");
+    expect(globalTransactions).toContain("getAccessibleCompanyIds");
+    expect(globalTransactions).toContain("assertCompaniesAccess(userId, requested)");
+    expect(globalTransactions).toContain("assertCompanyAccess(userId, voucher.companyId)");
+    expect(globalTransactions).toContain("sendCompanyAccessError(res, err)");
+    expect(globalTransactions).not.toContain("userCompanyRoles");
+    expect(globalTransactions).not.toContain('const isAdmin = userRole === "Admin"');
+  });
 });

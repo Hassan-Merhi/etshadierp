@@ -122,7 +122,7 @@ export function useTransactionJournalModel() {
     return p.toString();
   }, [periodFilter, voucherType, currency, optionalFilter, includeFactory, page, search, selectedCos, LIMIT]);
 
-  const { data, isLoading, isFetching, refetch } = useQuery<JournalResponse>({
+  const { data, error, isLoading, isFetching, refetch } = useQuery<JournalResponse>({
     queryKey: ["/api/global/transactions", queryParamsStr],
     queryFn: async () => {
       const res = await fetch(`/api/global/transactions?${queryParamsStr}`, { credentials: "include" });
@@ -335,6 +335,7 @@ export function useTransactionJournalModel() {
     voucherTypes,
     // data + paging
     isLoading,
+    error,
     isFetching,
     refetch,
     allVouchers,
