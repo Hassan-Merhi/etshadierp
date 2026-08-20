@@ -1,0 +1,17 @@
+Formatting: failure
+Checking formatting...
+[[33mwarn[39m] vitest.config.ts
+[[33mwarn[39m] Code style issues found in the above file. Run Prettier with --write to fix.
+
+TypeScript: success
+
+> rest-express@1.0.0 check
+> node node_modules/typescript/bin/tsc --noEmit
+
+
+Lint: success
+
+> rest-express@1.0.0 lint
+> node --max-old-space-size=6144 scripts/run-lint.mjs
+
+Linted 2774 files: 0 error(s), 3 warning(s) against a ceiling of 3. Report: artifacts/lint/eslint-report.json
