@@ -299,26 +299,24 @@ async function throwIfResNotOk(res: Response) {
       errorData = { message: fallback };
     }
 
-    // Create error with structured data for proper handling
-    const error: any = new Error(errorData.message || res.statusText);
-    error.status = res.status;
-    // Machine-readable failure reason. Several endpoints answer with a stable
-    // `code` alongside the prose message and callers need to branch on it —
-    // dropping it here forced them to match on message text instead.
-    error.code = errorData.code;
-    error.requiresConfirmation = errorData.requiresConfirmation;
-    error.employeeBalance = errorData.employeeBalance;
-    error.ledgerBalance = errorData.ledgerBalance;
-    error.notInProforma = errorData.notInProforma;
-    error.overloaded = errorData.overloaded;
+    // Preserve the structured API error fields without erasing the Error type.
+    const error = Object.assign(new Error(errorData.message || res.statusText), {
+      status: res.status,
+      code: errorData.code,
+      requiresConfirmation: errorData.requiresConfirmation,
+      employeeBalance: errorData.employeeBalance,
+      ledgerBalance: errorData.ledgerBalance,
+      notInProforma: errorData.notInProforma,
+      overloaded: errorData.overloaded,
+    });
     throw error;
   }
 }
 
-function isNetworkError(error: any): boolean {
+function isNetworkError(error: unknown): boolean {
   if (error instanceof TypeError) return true;
   if (error instanceof DOMException && error.name === "NetworkError") return true;
-  const msg: string = error?.message ?? "";
+  const msg = getErrorDetails(error).optionalMessage ?? "";
   return (
     msg.includes("Load failed") ||
     msg.includes("Failed to fetch") ||
@@ -398,9 +396,8 @@ export async function apiRequest(
       const description = getDescriptionForRequest(url);
       const body = data ? JSON.stringify(data) : "";
       enqueueRequest(url, method, body, description, getAppDate());
-      const offlineError: any = new Error(`Saved offline — will sync when connected`);
+      const offlineError = Object.assign(new Error(`Saved offline — will sync when connected`), { description });
       offlineError.name = "OfflineQueued";
-      offlineError.description = description;
       throw offlineError;
     }
     throw error;
