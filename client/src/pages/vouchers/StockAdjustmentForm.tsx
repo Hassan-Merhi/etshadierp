@@ -200,7 +200,7 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
       });
       hydratedVoucherIdRef.current = voucherIdToEdit;
     }
-  }, [stockAdjustmentToEdit, voucherToEdit, stockItems, stockAdjustmentForm, voucherIdToEdit]); 
+  }, [stockAdjustmentToEdit, voucherToEdit, stockItems, stockAdjustmentForm, voucherIdToEdit]);
 
   const stockAdjustmentMutation = useMutation({
     mutationFn: async (data: StockAdjustmentFormData) => {
@@ -1157,8 +1157,7 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
                       type="button"
                       variant="outline"
                       disabled={
-                        adjustmentEntries.filter((e) => e.stockItemId > 0 && parseFloat(e.quantity) > 0).length ===
-                        0
+                        adjustmentEntries.filter((e) => e.stockItemId > 0 && parseFloat(e.quantity) > 0).length === 0
                       }
                       data-testid="button-export-production-consumption"
                     >

@@ -427,7 +427,7 @@ export default function Accounts() {
     },
     enabled: !!selectedCompany,
   });
-  const allAccounts: Account[] = useMemo(() => (accountsResponse?.accounts ?? []), [accountsResponse?.accounts]);
+  const allAccounts: Account[] = useMemo(() => accountsResponse?.accounts ?? [], [accountsResponse?.accounts]);
 
   // Auto-select account when navigated here from ledger monthly summary (or any deep-link with ?accountId=)
   useEffect(() => {

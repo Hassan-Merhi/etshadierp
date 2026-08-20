@@ -540,7 +540,7 @@ export default function FactoryLocationInventory() {
     )
       return;
     const productByArticleCode = new Map<string, any>();
-    ((inventoryData)).forEach((prod) => {
+    inventoryData.forEach((prod) => {
       productByArticleCode.set((prod.articleCode || "").toLowerCase(), prod);
     });
     const newSelections = new Map<number, ProformaSelection>();
@@ -895,7 +895,6 @@ export default function FactoryLocationInventory() {
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
-    
   }, [proformaAutoSave, proformaMode, editingProformaId, selections, editModeInitialized, doSaveProforma]);
 
   const handleExportExcel = () => {
