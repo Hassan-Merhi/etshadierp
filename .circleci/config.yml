@@ -158,8 +158,44 @@ jobs:
           name: Verify disposable database schema
           command: node scripts/verify-ci-disposable-schema.mjs
       - run:
-          name: Backend tests
-          command: node node_modules/vitest/vitest.mjs run --maxWorkers=1 --no-file-parallelism
+          name: Integration backend tests
+          command: |
+            mapfile -t integration_test_files < <(
+              find tests -type f -name '*.test.ts' \
+                ! -path 'tests/ui/*' \
+                ! -path 'tests/api-smoke-sweep.test.ts' \
+                | sort
+            )
+            test "${#integration_test_files[@]}" -gt 0
+            node node_modules/vitest/vitest.mjs run \
+              "${integration_test_files[@]}" \
+              --maxWorkers=1 \
+              --no-file-parallelism
+
+  backend-core-regression:
+    executor: node22-postgres
+    steps:
+      - install_dependencies
+      - wait_for_postgres
+      - run:
+          name: Prepare disposable database schema
+          command: node node_modules/drizzle-kit/bin.cjs push --force
+      - run:
+          name: Co-located backend tests
+          command: |
+            mapfile -t core_test_files < <(
+              find server shared -type f -name '*.test.ts' | sort
+            )
+            test "${#core_test_files[@]}" -gt 0
+            node node_modules/vitest/vitest.mjs run \
+              "${core_test_files[@]}" \
+              --maxWorkers=1 \
+              --no-file-parallelism
+
+  frontend-regression:
+    executor: node22
+    steps:
+      - install_dependencies
       - run:
           name: Frontend tests
           command: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
@@ -188,10 +224,10 @@ jobs:
 workflows:
   full-erp-verification:
     # This is the canonical CircleCI path for pull-request branches and main.
-    # The former GitHub-hosted clone is deliberately absent.
+    # Verification jobs are independent so CircleCI can run them in parallel.
     jobs:
       - static-build
       - postgres-regression
-      - security-readiness:
-          requires:
-            - static-build
+      - backend-core-regression
+      - frontend-regression
+      - security-readiness
