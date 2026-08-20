@@ -7,25 +7,12 @@ import {
 
 describe("Phase 3 shared interface translations", () => {
   it("covers every reviewed shared UI phrase exactly once", () => {
-    // 542 (main) + 2: "Particulars" and "Adjust your filters and try again" were
-    // added when AnalyticsLegacy.tsx was split. That split moved those literals into
-    // the reports-exports i18n module, which must stay at zero actionable strings, so
-    // translating them was the only resolution that neither renamed a component to
-    // dodge the path-based classifier nor weakened that invariant. The same split
-    // exposed 23 sales-panel findings (22 unique phrases) to the sales-pos classifier,
-    // so those phrases are translated instead of raising the reviewed Phase 9 release cap.
-    // +16: the Convergence Reconciliation screen. The report already existed as
-    // an endpoint with nothing rendering it; giving it a page introduced its
-    // labels as literals, and the shared-ui and other-client modules are both
-    // ratcheted, so every one of them is translated here rather than counted as
-    // new backlog. Six of them ("Domain", "Record", "Finding", "Expected",
-    // "Recorded", "Everything agrees") also cover pre-existing literals
-    // elsewhere, which is why the audit total fell rather than held. Three more
-    // ("Discrepancies", "To investigate", "This report never changes data.") the
-    // detector does not flag at all; they are translated regardless, because a
-    // screen that is half Arabic is a defect whether or not a ratchet noticed.
-    expect(phase3SharedUiTranslations).toHaveLength(582);
-    expect(new Set(phase3SharedUiTranslations.map((entry) => entry.en)).size).toBe(582);
+    // The current reviewed registry contains 594 unique entries after the
+    // Customer Loading/i18n reconciliation. The i18n audit is the source of
+    // truth for missing actionable copy; this assertion freezes the exact
+    // reviewed table size so additions/removals require an intentional update.
+    expect(phase3SharedUiTranslations).toHaveLength(594);
+    expect(new Set(phase3SharedUiTranslations.map((entry) => entry.en)).size).toBe(594);
 
     for (const entry of phase3SharedUiTranslations) {
       expect(entry.en.trim()).not.toBe("");
