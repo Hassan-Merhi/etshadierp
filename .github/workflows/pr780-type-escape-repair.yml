@@ -1,3 +1,4 @@
+# retry: resume remaining cast/unknown cleanup from current repaired tree
 name: PR 780 Type Escape Repair
 
 on:
@@ -88,7 +89,6 @@ jobs:
               base=$(git rev-parse HEAD)
               PHASE18_MODE="$mode" PHASE18_BLOCKLIST=/tmp/pr780-blocked.txt node scripts/phase18-wave2-propose.cjs
 
-              # This repair is strictly limited to the 39 extracted files that violated the PR ratchet.
               while IFS= read -r changed; do
                 [ -n "$changed" ] || continue
                 if ! grep -Fxq "$changed" /tmp/pr780-targets.txt; then
