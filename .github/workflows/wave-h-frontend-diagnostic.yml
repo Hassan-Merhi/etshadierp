@@ -43,12 +43,12 @@ jobs:
                'expect(screen.getByTestId("input-adjustment-item-0")).toHaveValue("Alpha Bale");'),
               ('expect(screen.getByDisplayValue("Beta Bale")).toBeInTheDocument();',
                'expect(screen.getByTestId("input-adjustment-item-1")).toHaveValue("Beta Bale");'),
+              ('expect(await screen.findByText("JV-91")).toBeInTheDocument();',
+               'const voucherRow = screen.getByTestId("row-voucher-91");\n    expect(voucherRow).toHaveTextContent("Journal");\n    expect(voucherRow).toHaveTextContent("Agent sale");\n    expect(voucherRow).toHaveTextContent("$30.00");\n    expect(voucherRow).toHaveTextContent("$5.00");'),
           ]
           for old, new in replacements:
               if old in text:
                   text = text.replace(old, new, 1)
-          # Seed the selected agent's period queries directly. This test is for ledger grouping/rendering;
-          # fetch transport is already covered elsewhere and a seeded QueryClient is the normal UI-test harness.
           marker = '''        [\n          ["/api/agent-accounts"],\n          [{ id: 1, companyId: 1, accountId: "agent-1", accountType: "customer", accountName: "Alpha Agent" }],\n        ],'''
           seeded = marker + '''\n        [\n          ["/api/accounts/customer/101/transactions", { startDate: "2026-08-20", endDate: "2026-08-20" }],\n          [\n            { entryId: 1, voucherId: 91, debitAmount: "30", creditAmount: "0", narration: "Sale line", voucherNumber: "JV-91", voucherType: "Journal", voucherDate: "2026-08-20", voucherDescription: "Agent sale" },\n            { entryId: 2, voucherId: 91, debitAmount: "0", creditAmount: "5", narration: "Discount line", voucherNumber: "JV-91", voucherType: "Journal", voucherDate: "2026-08-20", voucherDescription: "Agent sale" },\n          ],\n        ],\n        [\n          ["/api/accounts/customer/101/pre-period-balance", { endDate: "2026-08-20" }],\n          { balance: 25 },\n        ],'''
           if seeded not in text and marker in text:
