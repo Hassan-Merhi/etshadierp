@@ -8,6 +8,7 @@
  */
 import React from "react";
 import { screen } from "@testing-library/react";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { renderWithProviders, stubFetch } from "./helpers";
 
 beforeAll(() => stubFetch());
@@ -117,7 +118,11 @@ describe("Wave H zero-coverage production surfaces", () => {
 
   it("mounts FactoryStockAllocationV5 and exposes the create-proforma action", async () => {
     const { default: FactoryStockAllocationV5 } = await import("@/pages/factory/FactoryStockAllocationV5");
-    renderWithProviders(<FactoryStockAllocationV5 />);
+    renderWithProviders(
+      <TooltipProvider>
+        <FactoryStockAllocationV5 />
+      </TooltipProvider>
+    );
     expect(await screen.findByTestId("button-v5-open-create-proforma")).toBeInTheDocument();
   });
 
