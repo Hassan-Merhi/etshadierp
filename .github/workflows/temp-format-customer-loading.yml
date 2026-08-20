@@ -6,15 +6,17 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   format-capture:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout repository
+      - name: Checkout PR head
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
 
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
@@ -33,6 +35,18 @@ jobs:
 
       - name: Verify formatted file
         run: node node_modules/prettier/bin/prettier.cjs --check client/src/pages/factory/CustomerLoading.tsx
+
+      - name: Commit exact formatter output
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- client/src/pages/factory/CustomerLoading.tsx
+          if git diff --cached --quiet; then
+            echo "CustomerLoading.tsx is already formatter-clean."
+            exit 0
+          fi
+          git commit -m "Format Customer Loading with Prettier"
+          git push origin "HEAD:${{ github.head_ref }}"
 
       - name: Upload formatted Customer Loading
         uses: actions/upload-artifact@v4
