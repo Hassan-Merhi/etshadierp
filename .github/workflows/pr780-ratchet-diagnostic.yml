@@ -4,9 +4,13 @@ on:
   push:
     branches:
       - agent/god-files-recovery-latest-main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   ratchets:
+    if: github.event_name == 'push' || github.event.pull_request.number == 780
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
