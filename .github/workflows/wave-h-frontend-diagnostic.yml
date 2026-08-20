@@ -19,6 +19,37 @@ jobs:
         run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
       - name: Install dependencies
         run: npm ci --no-audit --bin-links=true
+      - name: Apply candidate Wave H assertion fixes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          core = Path('tests/ui/wave-h-populated-core-pages.test.tsx')
+          text = core.read_text()
+          replacements = {
+              'expect(screen.getByText("$50.00")).toBeInTheDocument();':
+                  'expect(screen.getByTestId("total-combined-value")).toHaveTextContent("$50.00");',
+              'expect(await screen.findByText("Alpha Supplier")).toBeInTheDocument();':
+                  'const supplierDialog = await screen.findByRole("dialog");\n    expect(within(supplierDialog).getByRole("heading", { name: "Alpha Supplier" })).toBeInTheDocument();',
+              'expect(screen.getByDisplayValue("Alpha Bale")).toBeInTheDocument();':
+                  'expect(screen.getByTestId("input-adjustment-item-0")).toHaveValue("Alpha Bale");',
+              'expect(screen.getByDisplayValue("Beta Bale")).toBeInTheDocument();':
+                  'expect(screen.getByTestId("input-adjustment-item-1")).toHaveValue("Beta Bale");',
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit(f'missing expected assertion: {old}')
+              text = text.replace(old, new, 1)
+          core.write_text(text)
+
+          production = Path('tests/ui/wave-h-production-bales-behavior.test.tsx')
+          text = production.read_text()
+          old = 'expect(screen.getByTestId("batch-card-44")).toHaveTextContent("2x");'
+          new = 'expect(screen.getByTestId("batch-card-44")).toHaveTextContent("1x White Bale");\n    expect(screen.getByTestId("batch-card-44")).toHaveTextContent("1x Blue Bale");'
+          if old not in text:
+              raise SystemExit(f'missing expected assertion: {old}')
+          production.write_text(text.replace(old, new, 1))
+          PY
       - name: Run Wave H frontend behavior tests
         run: |
           node node_modules/vitest/vitest.mjs run \
