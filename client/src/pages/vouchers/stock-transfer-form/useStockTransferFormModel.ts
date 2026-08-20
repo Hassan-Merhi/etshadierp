@@ -256,7 +256,7 @@ export function useStockTransferFormModel({ voucherIdToEdit, isPOS, posUser }: S
       queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", voucherIdToEdit] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers/list"] });
     },
-    onError: (err: any) => {
+    onError: (err) => {
       toast({ title: "Approval failed", description: err.message, variant: "destructive" });
     },
   });
@@ -278,7 +278,7 @@ export function useStockTransferFormModel({ voucherIdToEdit, isPOS, posUser }: S
         description: `Found ${data.items.length} item(s). Click Validate to check the data.`,
       });
     },
-    onError: (error: any) => {
+    onError: (error) => {
       if (error?._handledGlobally) return;
       toast({ title: "Parse error", description: error.message, variant: "destructive" });
     },
@@ -305,7 +305,7 @@ export function useStockTransferFormModel({ voucherIdToEdit, isPOS, posUser }: S
         });
       }
     },
-    onError: (error: any) => {
+    onError: (error) => {
       if (error?._handledGlobally) return;
       toast({ title: "Validation error", description: error.message, variant: "destructive" });
     },
@@ -331,7 +331,7 @@ export function useStockTransferFormModel({ voucherIdToEdit, isPOS, posUser }: S
       setImportDestLocation("");
       setImportNotes("");
     },
-    onError: (error: any) => {
+    onError: (error) => {
       if (error?._handledGlobally) return;
       toast({ title: "Import error", description: error.message, variant: "destructive" });
     },
@@ -445,7 +445,7 @@ export function useStockTransferFormModel({ voucherIdToEdit, isPOS, posUser }: S
         });
       }
     },
-    onError: (error: any) => {
+    onError: (error) => {
       if (error?._handledGlobally) return;
       const isEditMode = !!voucherIdToEdit;
       toast({
@@ -465,8 +465,8 @@ export function useStockTransferFormModel({ voucherIdToEdit, isPOS, posUser }: S
     >();
     for (const item of stockTransferToEdit.items) {
       const key: RevKey = `${item.stockItemId}-${item.sourceLocationId ?? "null"}`;
-      const si = stockItems.find((s: any) => s.id === item.stockItemId);
-      const sl = locations.find((l: any) => l.id === item.sourceLocationId);
+      const si = stockItems.find((s) => s.id === item.stockItemId);
+      const sl = locations.find((l) => l.id === item.sourceLocationId);
       originalMap.set(key, {
         qty: parseFloat(item.quantity) || 0,
         stockItemId: item.stockItemId,
@@ -660,7 +660,7 @@ export function useStockTransferFormModel({ voucherIdToEdit, isPOS, posUser }: S
     const voucherDate = formData.voucherDate
       ? format(formData.voucherDate, "yyyy-MM-dd")
       : format(new Date(), "yyyy-MM-dd");
-    const validEntries = formData.entries.filter((e: any) => e.stockItemId > 0 && parseFloat(e.quantity) > 0);
+    const validEntries = formData.entries.filter((e) => e.stockItemId > 0 && parseFloat(e.quantity) > 0);
     if (validEntries.length === 0) {
       toast({
         title: "No data to export",
@@ -669,10 +669,10 @@ export function useStockTransferFormModel({ voucherIdToEdit, isPOS, posUser }: S
       });
       return;
     }
-    const destLoc = locations?.find((l: any) => l.id === formData.destinationLocationId);
+    const destLoc = locations?.find((l) => l.id === formData.destinationLocationId);
     const destLocationName = destLoc?.name || "";
     if (detailed) {
-      const exportData = validEntries.map((entry: any) => ({
+      const exportData = validEntries.map((entry) => ({
         Date: voucherDate,
         "Source Location": entry.sourceLocationName || "",
         "Destination Location": destLocationName,
@@ -691,9 +691,9 @@ export function useStockTransferFormModel({ voucherIdToEdit, isPOS, posUser }: S
       await writeFile(workbook, fileName);
       toast({ title: "Export successful", description: `Downloaded ${fileName} with ${validEntries.length} items.` });
     } else {
-      const totalQty = validEntries.reduce((sum: number, e: any) => sum + parseFloat(e.quantity), 0);
+      const totalQty = validEntries.reduce((sum: number, e) => sum + parseFloat(e.quantity), 0);
       const totalAmount = validEntries.reduce(
-        (sum: number, e: any) => sum + parseFloat(e.quantity) * parseFloat(e.rate || "0"),
+        (sum: number, e) => sum + parseFloat(e.quantity) * parseFloat(e.rate || "0"),
         0
       );
       const exportData = [

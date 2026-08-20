@@ -192,7 +192,7 @@ export function useAccountsLegacyModel() {
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
     },
-    onError: (err: any) => {
+    onError: (err) => {
       toast({ title: "Cannot delete", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -215,7 +215,7 @@ export function useAccountsLegacyModel() {
       toast({ title: "Account updated successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
     },
-    onError: (err: any) => {
+    onError: (err) => {
       toast({ title: "Update failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -237,7 +237,7 @@ export function useAccountsLegacyModel() {
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
     },
-    onError: (err: any) => {
+    onError: (err) => {
       toast({ title: "Update failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -258,7 +258,7 @@ export function useAccountsLegacyModel() {
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
     },
-    onError: (err: any) => {
+    onError: (err) => {
       toast({ title: "Delete failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -282,7 +282,7 @@ export function useAccountsLegacyModel() {
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
     },
-    onError: (err: any) => {
+    onError: (err) => {
       toast({ title: "Create failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -316,7 +316,7 @@ export function useAccountsLegacyModel() {
         description: `${data.vouchersUpdated ?? 0} voucher(s) updated · ${data.accountsDeleted ?? 0} old account(s) removed · ${(data.salaryAccountsReparented ?? 0) + (data.bonusAccountsReparented ?? 0)} account(s) grouped`,
       });
     },
-    onError: (err: any) => {
+    onError: (err) => {
       toast({ title: "Fix failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -375,7 +375,7 @@ export function useAccountsLegacyModel() {
       setWaRuleDialogOpen(false);
       queryClient.invalidateQueries({ queryKey: [waRuleBase, selectedAccountId, "whatsapp-rule"] });
     },
-    onError: (err: any) => {
+    onError: (err) => {
       toast({ title: "Save failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -393,7 +393,7 @@ export function useAccountsLegacyModel() {
     onSuccess: () => {
       toast({ title: "Statement sent to WhatsApp" });
     },
-    onError: (err: any) => {
+    onError: (err) => {
       toast({ title: "WhatsApp send failed", description: err?.message, variant: "destructive" });
     },
   });

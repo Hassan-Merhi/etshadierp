@@ -146,7 +146,7 @@ export function useDataToolsModel() {
       }
 
       const headerRow = utils.sheet_to_json<string[]>(worksheet, { header: 1 })[0] || [];
-      const columns = headerRow.map((header: any) => String(header || "").trim());
+      const columns = headerRow.map((header) => String(header || "").trim());
       const requiredColumns = ["barcode", "costPrice"];
       const missingColumns = requiredColumns.filter((column) => !columns.includes(column));
 
@@ -161,7 +161,7 @@ export function useDataToolsModel() {
 
       const errors: string[] = [];
       const rows: Array<{ barcode: string; costPrice: number }> = [];
-      jsonData.forEach((row: any, index: number) => {
+      jsonData.forEach((row, index: number) => {
         const rowNumber = index + 2;
         if (!row.barcode || String(row.barcode).trim() === "") {
           errors.push(`Row ${rowNumber}: Barcode is required`);
@@ -249,7 +249,7 @@ export function useDataToolsModel() {
       }
 
       const headerRow = utils.sheet_to_json<string[]>(worksheet, { header: 1 })[0] || [];
-      const columns = headerRow.map((header: any) => String(header || "").trim());
+      const columns = headerRow.map((header) => String(header || "").trim());
       const requiredColumns = ["Item_barcode", "quantity", "rate", "value"];
       const missingColumns = requiredColumns.filter((column) => !columns.includes(column));
       if (missingColumns.length > 0) {
@@ -269,7 +269,7 @@ export function useDataToolsModel() {
         rate: string;
         value: string;
       }> = [];
-      jsonData.forEach((row: any, index: number) => {
+      jsonData.forEach((row, index: number) => {
         const rowNumber = index + 2;
         if (!row.Item_barcode || String(row.Item_barcode).trim() === "") {
           errors.push(`Row ${rowNumber}: Item_barcode is required`);
@@ -357,7 +357,7 @@ export function useDataToolsModel() {
   };
 
   const getCurrentQty = (stockItemId: number): number => {
-    const locationRow = silentLocInventory.find((inventory: any) => inventory.stockItemId === stockItemId);
+    const locationRow = silentLocInventory.find((inventory) => inventory.stockItemId === stockItemId);
     return locationRow ? parseFloat(locationRow.quantity || "0") : 0;
   };
 
@@ -387,11 +387,11 @@ export function useDataToolsModel() {
           const change = parseFloat(String(row["Qty Change"] ?? row.Change ?? "0")) || 0;
           const rate = parseFloat(String(row.Rate ?? "0")) || 0;
 
-          let matched: any = code
-            ? (allStockItems as any[]).find((item: any) => item.code?.toLowerCase() === code.toLowerCase())
+          let matched = code
+            ? (allStockItems as any[]).find((item) => item.code?.toLowerCase() === code.toLowerCase())
             : undefined;
           if (!matched && name) {
-            matched = (allStockItems as any[]).find((item: any) => item.name.toLowerCase() === name.toLowerCase());
+            matched = (allStockItems as any[]).find((item) => item.name.toLowerCase() === name.toLowerCase());
           }
 
           if (!matched) {
@@ -452,7 +452,7 @@ export function useDataToolsModel() {
     document.text("Silent Adjustment Preview", 14, 18);
     document.setFontSize(10);
     document.text(
-      `Location: ${(locations as any[]).find((location: any) => String(location.id) === silentProdLocId)?.name || ""}   Date: ${new Date().toLocaleDateString()}`,
+      `Location: ${(locations as any[]).find((location) => String(location.id) === silentProdLocId)?.name || ""}   Date: ${new Date().toLocaleDateString()}`,
       14,
       25
     );

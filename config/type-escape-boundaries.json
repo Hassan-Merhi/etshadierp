@@ -59,11 +59,6 @@
         0,
         0
       ],
-      "client/src/components/StockItemDetailsDialog.tsx": [
-        2,
-        0,
-        0
-      ],
       "client/src/components/sidebar/sidebarPrimitives.tsx": [
         5,
         0,
@@ -175,8 +170,8 @@
         0
       ],
       "client/src/pages/AccountsLegacy.tsx": [
-        7,
         0,
+        2,
         0
       ],
       "client/src/pages/Agents.tsx": [
@@ -340,27 +335,12 @@
         0
       ],
       "client/src/pages/StockEntryHistory.tsx": [
-        5,
-        0,
-        0
-      ],
-      "client/src/pages/StockItems.tsx": [
-        3,
+        4,
         0,
         0
       ],
       "client/src/pages/StockTransferImport.tsx": [
         9,
-        0,
-        0
-      ],
-      "client/src/pages/StockTransferOrder.tsx": [
-        3,
-        0,
-        0
-      ],
-      "client/src/pages/SupplierProfitCheck.tsx": [
-        7,
         0,
         0
       ],
@@ -371,11 +351,6 @@
       ],
       "client/src/pages/Suppliers.tsx": [
         7,
-        0,
-        0
-      ],
-      "client/src/pages/TransactionJournal.tsx": [
-        3,
         0,
         0
       ],
@@ -434,6 +409,11 @@
         0,
         0
       ],
+      "client/src/pages/accountslegacy/useAccountsLegacyModel.ts": [
+        9,
+        0,
+        0
+      ],
       "client/src/pages/analytics/ContainerReportPanel.tsx": [
         4,
         0,
@@ -467,6 +447,11 @@
       "client/src/pages/barcodelookup/components/BaleStatusBadge.tsx": [
         1,
         0,
+        0
+      ],
+      "client/src/pages/containerloadingscan/useContainerLoadingScanModel.ts": [
+        7,
+        6,
         0
       ],
       "client/src/pages/containers/ContainerSpView.tsx": [
@@ -505,12 +490,27 @@
         0
       ],
       "client/src/pages/daybook/VoucherDetailsDialog.tsx": [
-        2,
+        1,
         0,
         0
       ],
       "client/src/pages/daybook/VoucherEditDialog.tsx": [
         2,
+        0,
+        0
+      ],
+      "client/src/pages/daybook/voucherdetailsdialog/LedgerVoucherEntries.tsx": [
+        3,
+        1,
+        0
+      ],
+      "client/src/pages/daybook/voucherdetailsdialog/PurchaseVoucherEntries.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/daybook/voucherdetailsdialog/VoucherRevisionHistory.tsx": [
+        3,
         0,
         0
       ],
@@ -569,22 +569,12 @@
         0,
         0
       ],
-      "client/src/pages/factory/FactoryContainerLoadingScan.tsx": [
-        3,
-        0,
-        0
-      ],
       "client/src/pages/factory/FactoryContainers.tsx": [
         5,
         0,
         0
       ],
       "client/src/pages/factory/FactoryCustomerStatement.tsx": [
-        1,
-        0,
-        0
-      ],
-      "client/src/pages/factory/FactoryDaybook.tsx": [
         1,
         0,
         0
@@ -624,11 +614,6 @@
         0,
         0
       ],
-      "client/src/pages/factory/FactoryLocationInventory.tsx": [
-        6,
-        0,
-        0
-      ],
       "client/src/pages/factory/FactoryNetPosition.tsx": [
         1,
         0,
@@ -646,11 +631,6 @@
       ],
       "client/src/pages/factory/FactoryOtwTrackingTab.tsx": [
         1,
-        0,
-        0
-      ],
-      "client/src/pages/factory/FactoryPOS.tsx": [
-        11,
         0,
         0
       ],
@@ -691,11 +671,6 @@
       ],
       "client/src/pages/factory/FactorySupplierStatement.tsx": [
         12,
-        0,
-        0
-      ],
-      "client/src/pages/factory/FactorySuppliers.tsx": [
-        8,
         0,
         0
       ],
@@ -821,6 +796,11 @@
       ],
       "client/src/pages/factory/daybook/entry-views/PayrollPaymentView.tsx": [
         5,
+        0,
+        0
+      ],
+      "client/src/pages/factory/daybook/useFactoryDaybookModel.ts": [
+        2,
         0,
         0
       ],
@@ -1014,6 +994,21 @@
         0,
         0
       ],
+      "client/src/pages/factory/factorycontainerloadingscan/ProformaProgressPanel.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factorycontainerloadingscan/scanFeedback.ts": [
+        0,
+        1,
+        0
+      ],
+      "client/src/pages/factory/factorycontainerloadingscan/useFactoryContainerLoadingScanModel.ts": [
+        5,
+        2,
+        0
+      ],
       "client/src/pages/factory/factoryfinancialsnapshot/components/KpiCard.tsx": [
         1,
         0,
@@ -1057,6 +1052,21 @@
       "client/src/pages/factory/factorypendinginvoiceverify/types.ts": [
         1,
         0,
+        0
+      ],
+      "client/src/pages/factory/factorypos/FactoryPosPrintTemplate.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factorypos/useFactoryPosModel.ts": [
+        16,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factorysettings/useFactorySettingsModel.ts": [
+        0,
+        1,
         0
       ],
       "client/src/pages/factory/factorysheetsandsacks/components/ItemFormDialog.tsx": [
@@ -1314,16 +1324,6 @@
         0,
         0
       ],
-      "client/src/pages/pos/POSImport.tsx": [
-        15,
-        0,
-        0
-      ],
-      "client/src/pages/pos/POSPriceList.tsx": [
-        4,
-        0,
-        0
-      ],
       "client/src/pages/pos/hooks/usePosCheckout.ts": [
         6,
         0,
@@ -1381,6 +1381,31 @@
       ],
       "client/src/pages/pos/pos-components/SaleGrid.tsx": [
         2,
+        0,
+        0
+      ],
+      "client/src/pages/pos/posimport/PosImportPrintTemplate.tsx": [
+        6,
+        0,
+        0
+      ],
+      "client/src/pages/pos/posimport/PosImportResults.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/pos/posimport/usePosImportModel.ts": [
+        13,
+        0,
+        0
+      ],
+      "client/src/pages/pos/pospricelist/PriceListTable.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/pos/pospricelist/usePosPriceListModel.ts": [
+        13,
         0,
         0
       ],
@@ -1471,11 +1496,6 @@
       ],
       "client/src/pages/settings/DailyExportTab.tsx": [
         1,
-        0,
-        0
-      ],
-      "client/src/pages/settings/DataToolsTab.tsx": [
-        11,
         0,
         0
       ],
@@ -1579,6 +1599,21 @@
         0,
         0
       ],
+      "client/src/pages/settings/datatoolstab/SilentProductionDialog.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/settings/datatoolstab/SilentTransferDialog.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/settings/datatoolstab/useDataToolsModel.ts": [
+        15,
+        0,
+        0
+      ],
       "client/src/pages/settings/users/AdvancedRestrictions.tsx": [
         1,
         0,
@@ -1669,33 +1704,43 @@
         0,
         0
       ],
-      "client/src/pages/stock-transfer-order/dialogs/DetailDialog.tsx": [
-        13,
-        0,
-        0
-      ],
-      "client/src/pages/stock-transfer-order/dialogs/ImportDialog.tsx": [
-        19,
-        0,
-        0
-      ],
-      "client/src/pages/stock-transfer-order/dialogs/QuantityPickerDialog.tsx": [
-        7,
-        0,
-        0
-      ],
       "client/src/pages/stock-transfer-order/dialogs/RevisionDialog.tsx": [
         1,
         0,
         0
       ],
-      "client/src/pages/stock-transfer-order/dialogs/StockMovementDialog.tsx": [
-        18,
+      "client/src/pages/supplierprofitcheck/components/StatCard.tsx": [
+        1,
         0,
         0
       ],
-      "client/src/pages/supplierprofitcheck/components/StatCard.tsx": [
+      "client/src/pages/transactionjournal/components/detail/PaymentReceiptPanel.tsx": [
         1,
+        0,
+        0
+      ],
+      "client/src/pages/transactionjournal/components/detail/PurchasePanel.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/transactionjournal/components/detail/SalesPanel.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/transactionjournal/components/detail/StockMovementPanel.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/transactionjournal/components/detail/panelTypes.ts": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/transactionjournal/useTransactionJournalModel.ts": [
+        3,
         0,
         0
       ],
@@ -1764,23 +1809,8 @@
         0,
         0
       ],
-      "client/src/pages/vouchers/JournalForm.tsx": [
-        4,
-        0,
-        0
-      ],
       "client/src/pages/vouchers/SaveRevisionDialog.tsx": [
         1,
-        0,
-        0
-      ],
-      "client/src/pages/vouchers/StockAdjustmentForm.tsx": [
-        2,
-        0,
-        0
-      ],
-      "client/src/pages/vouchers/StockTransferForm.tsx": [
-        18,
         0,
         0
       ],
@@ -1819,6 +1849,26 @@
         0,
         0
       ],
+      "client/src/pages/vouchers/stock-adjustment-form/useStockAdjustmentFormModel.ts": [
+        10,
+        0,
+        0
+      ],
+      "client/src/pages/vouchers/stock-transfer-form/StockTransferDesktopQuantityCells.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/vouchers/stock-transfer-form/StockTransferFooterAndDialogs.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/vouchers/stock-transfer-form/StockTransferMobileEntries.tsx": [
+        1,
+        0,
+        0
+      ],
       "client/src/pages/vouchers/stock-transfer-form/dialogs/ApproveRevisionDialog.tsx": [
         6,
         0,
@@ -1831,6 +1881,11 @@
       ],
       "client/src/pages/vouchers/stock-transfer-form/dialogs/SaveAsRevisionDialog.tsx": [
         1,
+        0,
+        0
+      ],
+      "client/src/pages/vouchers/stock-transfer-form/useStockTransferFormModel.ts": [
+        15,
         0,
         0
       ],

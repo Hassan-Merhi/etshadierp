@@ -190,7 +190,7 @@ export function useFactoryContainerLoadingScanModel() {
       const res = await modeApiRequest("POST", "/api/factory/customer-orders-loading", data);
       return await res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       setOrderId(data.id);
       toast({
         title: "Loading order created",
@@ -199,7 +199,7 @@ export function useFactoryContainerLoadingScanModel() {
       setTimeout(() => scannerRef.current?.focus(), 100);
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
@@ -218,7 +218,7 @@ export function useFactoryContainerLoadingScanModel() {
       const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/bales`, data);
       return await res.json();
     },
-    onSuccess: (data: any, variables: { scanCode: string }) => {
+    onSuccess: (data, variables: { scanCode: string }) => {
       setPendingBypassBaleRef(null);
       setPendingBypassOverloadRef(null);
       setScanFlash("success");
@@ -230,7 +230,7 @@ export function useFactoryContainerLoadingScanModel() {
       }, 500);
       if (orderId) {
         const scanned = variables.scanCode;
-        const newestForRef = [...(data?.bales || [])].sort((a: any, b: any) => b.id - a.id)[0];
+        const newestForRef = [...(data?.bales || [])].sort((a, b) => b.id - a.id)[0];
         const lastScanned = {
           baleReference: newestForRef?.baleReference || scanned,
           baleName: newestForRef?.baleName || "",
@@ -239,7 +239,7 @@ export function useFactoryContainerLoadingScanModel() {
         localStorage.setItem(`lastScannedBale_${orderId}`, JSON.stringify(lastScanned));
         setLastScannedRef(lastScanned);
       }
-      const newest = [...(data?.bales || [])].sort((a: any, b: any) => b.id - a.id)[0];
+      const newest = [...(data?.bales || [])].sort((a, b) => b.id - a.id)[0];
       if (newest?.articleCode) {
         setExpandedGroups((prev) => {
           const next = new Set(prev);
@@ -251,7 +251,7 @@ export function useFactoryContainerLoadingScanModel() {
       setScanCode("");
     },
     onError: (error: Error, variables: any) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error)?._handledGlobally) return;
       // Overload and not-in-proforma are soft rejections: arm a bypass so the
       // same code scanned a second time goes through.
       if ((error as any).overloaded) {
@@ -317,7 +317,7 @@ export function useFactoryContainerLoadingScanModel() {
       toast({ title: "Bale removed" });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
@@ -339,7 +339,7 @@ export function useFactoryContainerLoadingScanModel() {
       const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/bales/bulk-import`, body);
       return await res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries(
         { queryKey: ["/api/factory/customer-orders", orderId], exact: true, refetchType: "active" },
         { cancelRefetch: false }
@@ -359,7 +359,7 @@ export function useFactoryContainerLoadingScanModel() {
       setTimeout(() => scannerRef.current?.focus(), 100);
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error)?._handledGlobally) return;
       toast({ title: "Import failed", description: error.message, variant: "destructive" });
     },
   });
@@ -383,7 +383,7 @@ export function useFactoryContainerLoadingScanModel() {
     onError: (error: Error) => {
       if (error?._handledGlobally) return;
       setShowFinalizeDialog(false);
-      if ((error as any)?._handledGlobally) return;
+      if ((error)?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
@@ -404,7 +404,7 @@ export function useFactoryContainerLoadingScanModel() {
       toast({ title: "Note saved" });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error)?._handledGlobally) return;
       toast({ title: "Failed to save note", description: error.message, variant: "destructive" });
     },
   });
