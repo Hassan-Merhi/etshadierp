@@ -37,7 +37,7 @@ jobs:
                   p.write_text(s2)
           PY
 
-          cat > /tmp/pr780-type-repair.mjs <<'NODE'
+          cat > .pr780-type-repair.mjs <<'NODE'
           import fs from 'node:fs';
           import { execSync } from 'node:child_process';
           import ts from 'typescript';
@@ -140,7 +140,8 @@ jobs:
           }
           NODE
 
-          node /tmp/pr780-type-repair.mjs
+          node .pr780-type-repair.mjs
+          rm -f .pr780-type-repair.mjs
           npm run check
           node scripts/audit-type-escapes.mjs
           node scripts/audit-doc-index.mjs
