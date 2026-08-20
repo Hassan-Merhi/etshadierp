@@ -27,8 +27,8 @@ describe("Phase 3 shared interface translations", () => {
     // +12: reviewed Customer Loading column/filter copy added by the current repair
     // branch. These entries are real translations, so the exact uniqueness contract
     // advances with the translation table rather than treating them as audit backlog.
-    expect(phase3SharedUiTranslations).toHaveLength(594);
-    expect(new Set(phase3SharedUiTranslations.map((entry) => entry.en)).size).toBe(594);
+    expect(phase3SharedUiTranslations).toHaveLength(595);
+    expect(new Set(phase3SharedUiTranslations.map((entry) => entry.en)).size).toBe(595);
 
     for (const entry of phase3SharedUiTranslations) {
       expect(entry.en.trim()).not.toBe("");
