@@ -9,7 +9,7 @@ export interface RenderWithProvidersOptions {
   seedQueries?: readonly SeededQuery[];
 }
 
-/** Create a fresh QueryClient per test — no retries so tests fail fast. */
+/** Create a fresh QueryClient per test with app-like GET behavior and no retries. */
 function makeTestClient(seedQueries: readonly SeededQuery[] = []): QueryClient {
   const client = new QueryClient({
     defaultOptions: {
