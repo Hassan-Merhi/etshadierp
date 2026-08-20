@@ -76,19 +76,15 @@ jobs:
               });''',
               'factory cancellation error'
           )
-          s = replace_required(
-              s,
-              'const onlineOnlyError: any = new Error(',
-              'const onlineOnlyError = new Error(',
-              'factory online-only error'
-          )
+          s = replace_required(s, 'const onlineOnlyError: any = new Error(', 'const onlineOnlyError = new Error(', 'factory online-only error')
           p.write_text(s)
 
           p = Path('client/src/lib/queryClient.ts')
           s = p.read_text()
           s = replace_required(
               s,
-              '''    const error: any = new Error(errorData.message || res.statusText);
+              '''    // Create error with structured data for proper handling
+              const error: any = new Error(errorData.message || res.statusText);
               error.status = res.status;
               // Machine-readable failure reason. Several endpoints answer with a stable
               // `code` alongside the prose message and callers need to branch on it —
@@ -97,7 +93,8 @@ jobs:
               error.requiresConfirmation = errorData.requiresConfirmation;
               error.employeeBalance = errorData.employeeBalance;
               error.ledgerBalance = errorData.ledgerBalance;
-              error.notInProforma = errorData.notInProforma;''',
+              error.notInProforma = errorData.notInProforma;
+              error.overloaded = errorData.overloaded;''',
               '''    // Preserve the structured API error fields without erasing the Error type.
               const error = Object.assign(new Error(errorData.message || res.statusText), {
                 status: res.status,
@@ -106,21 +103,12 @@ jobs:
                 employeeBalance: errorData.employeeBalance,
                 ledgerBalance: errorData.ledgerBalance,
                 notInProforma: errorData.notInProforma,
+                overloaded: errorData.overloaded,
               });''',
               'query structured API error'
           )
-          s = replace_required(
-              s,
-              '''function isNetworkError(error: any): boolean {
-              if (error instanceof TypeError) return true;
-              if (error instanceof DOMException && error.name === "NetworkError") return true;
-              const msg: string = error?.message ?? "";''',
-              '''function isNetworkError(error: unknown): boolean {
-              if (error instanceof TypeError) return true;
-              if (error instanceof DOMException && error.name === "NetworkError") return true;
-              const msg = getErrorDetails(error).optionalMessage ?? "";''',
-              'query network boundary'
-          )
+          s = replace_required(s, 'function isNetworkError(error: any): boolean {', 'function isNetworkError(error: unknown): boolean {', 'query network signature')
+          s = replace_required(s, '  const msg: string = error?.message ?? "";', '  const msg = getErrorDetails(error).optionalMessage ?? "";', 'query network message')
           s = replace_required(
               s,
               '''      const offlineError: any = new Error(`Saved offline — will sync when connected`);
