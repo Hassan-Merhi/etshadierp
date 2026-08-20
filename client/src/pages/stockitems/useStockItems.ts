@@ -1,22 +1,33 @@
-import { useEffect, useState, type MouseEvent } from "react";
+import { useState, type MouseEvent } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
 import type { Location, PagedStockItemsResponse, StockCategory, StockGrade, StockGroup, StockItem } from "./types";
 import { PAGE_SIZE } from "./utils";
+import { useStockItemsFilters } from "./useStockItemsFilters";
 
 export function useStockItems() {
   const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
   const hideStockRates = (myErpPages?.hiddenErpCostFields ?? []).includes("stock_rates");
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [selectedGroupFilter, setSelectedGroupFilter] = useState<number | null>(null);
-  const [selectedGradeFilter, setSelectedGradeFilter] = useState<number | null>(null);
-  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<number | "none" | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
+  // Filters persist per company for the session and reset pagination on every
+  // change; the debounce lives inside the hook.
+  const { selectedCompany } = useCompany();
+  const {
+    filters: { searchTerm, selectedGroupFilter, selectedGradeFilter, selectedCategoryFilter },
+    page: currentPage,
+    setPage: setCurrentPage,
+    resetFilters,
+    hasActiveFilters,
+    setSearchTerm,
+    setSelectedGroupFilter,
+    setSelectedGradeFilter,
+    setSelectedCategoryFilter,
+    debouncedSearch,
+  } = useStockItemsFilters(selectedCompany?.id);
 
   const [selectedStockItemId, setSelectedStockItemId] = useState<number | null>(null);
   const [selectedStockItemName, setSelectedStockItemName] = useState("");
@@ -48,18 +59,6 @@ export function useStockItems() {
 
   const { toast } = useToast();
   const { formatAmount } = useCurrencyContext();
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchTerm);
-      setCurrentPage(1);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [selectedGroupFilter, selectedGradeFilter, selectedCategoryFilter]);
 
   const pagedQueryKey = [
     "/api/stock-items",
@@ -441,6 +440,8 @@ export function useStockItems() {
     setSelectedGradeFilter,
     selectedCategoryFilter,
     setSelectedCategoryFilter,
+    resetFilters,
+    hasActiveFilters,
     currentPage,
     setCurrentPage,
     selectedStockItemId,

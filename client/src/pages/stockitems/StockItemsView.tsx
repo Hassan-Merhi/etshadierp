@@ -26,6 +26,7 @@ import {
   Settings,
   Tag,
   Trash2,
+  X,
 } from "lucide-react";
 
 import { PAGE_SIZE } from "./utils";
@@ -46,6 +47,8 @@ export function StockItemsView({ stockItems }: { stockItems: StockItemsModel }) 
     setSelectedGradeFilter,
     selectedCategoryFilter,
     setSelectedCategoryFilter,
+    resetFilters,
+    hasActiveFilters,
     currentPage,
     setCurrentPage,
     selectedIds,
@@ -257,6 +260,12 @@ export function StockItemsView({ stockItems }: { stockItems: StockItemsModel }) 
               ))}
             </SelectContent>
           </Select>
+        )}
+        {hasActiveFilters && (
+          <Button variant="outline" type="button" onClick={resetFilters} data-testid="button-reset-filters">
+            <X className="mr-2 h-4 w-4" />
+            Reset filters
+          </Button>
         )}
       </div>
 
