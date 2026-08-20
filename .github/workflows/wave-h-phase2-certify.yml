@@ -1,0 +1,158 @@
+name: Wave H Phase 2 Certification
+
+on:
+  push:
+    branches: [wave-i/convergence-automation]
+    paths:
+      - .github/workflows/wave-h-phase2-certify.yml
+
+permissions:
+  contents: write
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: heliumdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
+      PGSSLMODE: disable
+      NODE_ENV: test
+      SESSION_SECRET: phase2-certification-secret
+      CSRF_ENFORCE: "0"
+      ENABLE_SCHEDULERS: "false"
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: wave-i/convergence-automation
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22.14.0"
+          cache: npm
+      - run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+      - run: npm ci --no-audit --bin-links=true
+      - run: node node_modules/drizzle-kit/bin.cjs push --force
+      - name: Backend coverage
+        id: coverage
+        continue-on-error: true
+        run: npm run test:backend:coverage
+      - name: Record backend result
+        if: always()
+        run: |
+          mkdir -p phase2-backend
+          cp coverage/backend/coverage-summary.json phase2-backend/coverage-summary.json 2>/dev/null || true
+          printf '%s\n' '${{ steps.coverage.outcome }}' > phase2-backend/outcome.txt
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: phase2-backend
+          path: phase2-backend
+          if-no-files-found: error
+          retention-days: 7
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NODE_ENV: test
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: wave-i/convergence-automation
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22.14.0"
+          cache: npm
+      - run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+      - run: npm ci --no-audit --bin-links=true
+      - name: Frontend coverage
+        id: coverage
+        continue-on-error: true
+        run: npm run test:frontend:coverage
+      - name: Record frontend result
+        if: always()
+        run: |
+          mkdir -p phase2-frontend
+          cp coverage/frontend/coverage-summary.json phase2-frontend/coverage-summary.json 2>/dev/null || true
+          printf '%s\n' '${{ steps.coverage.outcome }}' > phase2-frontend/outcome.txt
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: phase2-frontend
+          path: phase2-frontend
+          if-no-files-found: error
+          retention-days: 7
+
+  record:
+    needs: [backend, frontend]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: wave-i/convergence-automation
+      - uses: actions/download-artifact@v8
+        with:
+          name: phase2-backend
+          path: phase2-backend
+      - uses: actions/download-artifact@v8
+        with:
+          name: phase2-frontend
+          path: phase2-frontend
+      - name: Build exact certification record
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const readJson = (p) => fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : null;
+          const readText = (p) => fs.existsSync(p) ? fs.readFileSync(p, 'utf8').trim() : 'missing';
+          const backend = readJson('phase2-backend/coverage-summary.json');
+          const frontend = readJson('phase2-frontend/coverage-summary.json');
+          const backendStep = readText('phase2-backend/outcome.txt');
+          const frontendStep = readText('phase2-frontend/outcome.txt');
+          const backendLinesPct = backend?.total?.lines?.pct ?? null;
+          const frontendLinesPct = frontend?.total?.lines?.pct ?? null;
+          const result = {
+            measuredAtSha: process.env.GITHUB_SHA,
+            backendLinesPct,
+            backendTargetPct: 35,
+            frontendLinesPct,
+            frontendTargetPct: 20,
+            backendStep,
+            frontendStep,
+            backendPassed: backendStep === 'success' && backendLinesPct !== null && backendLinesPct >= 35,
+            frontendPassed: frontendStep === 'success' && frontendLinesPct !== null && frontendLinesPct >= 20
+          };
+          result.passed = result.backendPassed && result.frontendPassed;
+          fs.writeFileSync('phase2-measurement-result.json', JSON.stringify(result, null, 2) + '\n');
+          console.log(JSON.stringify(result, null, 2));
+          NODE
+      - name: Commit result and remove certification workflow
+        run: |
+          rm -f .github/workflows/wave-h-phase2-certify.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- phase2-measurement-result.json .github/workflows/wave-h-phase2-certify.yml
+          git commit -m "test: record Wave H Phase 2 coverage certification"
+          git push origin HEAD:wave-i/convergence-automation
+      - name: Enforce target
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const r = JSON.parse(fs.readFileSync('phase2-measurement-result.json', 'utf8'));
+          if (!r.passed) process.exit(1);
+          NODE
