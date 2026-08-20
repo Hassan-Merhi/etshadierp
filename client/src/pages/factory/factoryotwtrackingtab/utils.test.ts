@@ -29,10 +29,12 @@ describe("factory OTW tracking helpers", () => {
   });
 
   it("uses final payable amount when present and otherwise rate times weight", () => {
-    expect(containerCost({ currencyCode: "EUR", finalPayableAmount: "125", ratePerKg: "2", totalKg: "50" } as any))
-      .toEqual({ symbol: "€", amount: 125 });
-    expect(containerCost({ currencyCode: "USD", finalPayableAmount: "0", ratePerKg: "2.5", totalKg: "40" } as any))
-      .toEqual({ symbol: "$", amount: 100 });
+    expect(
+      containerCost({ currencyCode: "EUR", finalPayableAmount: "125", ratePerKg: "2", totalKg: "50" } as any)
+    ).toEqual({ symbol: "€", amount: 125 });
+    expect(
+      containerCost({ currencyCode: "USD", finalPayableAmount: "0", ratePerKg: "2.5", totalKg: "40" } as any)
+    ).toEqual({ symbol: "$", amount: 100 });
   });
 
   it("calculates delay only for past valid ETAs", () => {
