@@ -43,7 +43,11 @@ export function rewriteCustomerLoadingAllocationRequest(
   return CUSTOMER_LOADING_ALLOCATION_ENDPOINT;
 }
 
-if (typeof window !== "undefined" && !window.__erpCustomerLoadingAvailabilityFetchInstalled) {
+if (
+  typeof window !== "undefined" &&
+  typeof window.fetch === "function" &&
+  !window.__erpCustomerLoadingAvailabilityFetchInstalled
+) {
   window.__erpCustomerLoadingAvailabilityFetchInstalled = true;
   const previousFetch = window.fetch.bind(window);
   window.fetch = ((input: RequestInfo | URL, init?: RequestInit) =>
