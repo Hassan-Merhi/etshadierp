@@ -31,6 +31,19 @@ export function JournalFilters({ model }: { model: TransactionJournalModel }) {
             <Filter className="w-5 h-5" />
             <CardTitle>Filters</CardTitle>
           </div>
+          {model.hasActiveFilters && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="gap-1.5"
+              onClick={model.resetFilters}
+              data-testid="button-reset-filters"
+            >
+              <X className="h-4 w-4" />
+              Reset Filters
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent>

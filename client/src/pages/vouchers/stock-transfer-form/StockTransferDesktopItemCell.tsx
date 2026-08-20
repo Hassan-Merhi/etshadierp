@@ -1,10 +1,11 @@
 import type { StockTransferFormModel } from "./useStockTransferFormModel";
 
-const focusInput = (id: string) => setTimeout(() => {
-  const input = document.querySelector(`[data-testid="${id}"]`) as HTMLInputElement | null;
-  input?.focus();
-  input?.select();
-}, 50);
+const focusInput = (id: string) =>
+  setTimeout(() => {
+    const input = document.querySelector(`[data-testid="${id}"]`) as HTMLInputElement | null;
+    input?.focus();
+    input?.select();
+  }, 50);
 
 export function StockTransferDesktopItemCell({ model, index }: { model: StockTransferFormModel; index: number }) {
   const m = model;
@@ -26,9 +27,17 @@ export function StockTransferDesktopItemCell({ model, index }: { model: StockTra
       return;
     }
     const location = m.locations.find((candidate) => candidate.id === sourceId);
-    m.stockTransferForm.setValue(`entries.${index}.sourceLocationId`, sourceId, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+    m.stockTransferForm.setValue(`entries.${index}.sourceLocationId`, sourceId, {
+      shouldValidate: true,
+      shouldDirty: true,
+      shouldTouch: true,
+    });
     m.stockTransferForm.setValue(`entries.${index}.sourceLocationName`, location?.name || "");
-    m.stockTransferForm.setValue(`entries.${index}.stockItemId`, item.stockItemId, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+    m.stockTransferForm.setValue(`entries.${index}.stockItemId`, item.stockItemId, {
+      shouldValidate: true,
+      shouldDirty: true,
+      shouldTouch: true,
+    });
     m.stockTransferForm.setValue(`entries.${index}.stockItemCode`, stockItem.code || "");
     m.stockTransferForm.setValue(`entries.${index}.stockItemName`, stockItem.name);
     m.stockTransferForm.setValue(`entries.${index}.rate`, item.averageRate || "0");
@@ -40,7 +49,11 @@ export function StockTransferDesktopItemCell({ model, index }: { model: StockTra
     <div className="flex-1 min-w-[120px] border-r h-9 sm:h-10">
       <input
         type="text"
-        value={m.activeTransferRow === index && m.activeFieldType === "item" ? m.transferSearchTerm : entry?.stockItemName || ""}
+        value={
+          m.activeTransferRow === index && m.activeFieldType === "item"
+            ? m.transferSearchTerm
+            : entry?.stockItemName || ""
+        }
         onChange={(event) => {
           m.setTransferSearchTerm(event.target.value);
           m.setTransferHighlightedIndex(0);
@@ -77,11 +90,13 @@ export function StockTransferDesktopItemCell({ model, index }: { model: StockTra
           const items = m.filteredTransferInventory;
           if (event.key === "ArrowUp" && !event.shiftKey) {
             event.preventDefault();
-            if (m.showItemSidebar && items.length > 0) m.setTransferHighlightedIndex(Math.max(0, m.transferHighlightedIndex - 1));
+            if (m.showItemSidebar && items.length > 0)
+              m.setTransferHighlightedIndex(Math.max(0, m.transferHighlightedIndex - 1));
             else if (index > 0) focusInput(`input-item-name-${index - 1}`);
           } else if (event.key === "ArrowDown" && !event.shiftKey) {
             event.preventDefault();
-            if (m.showItemSidebar && items.length > 0) m.setTransferHighlightedIndex(Math.min(items.length - 1, m.transferHighlightedIndex + 1));
+            if (m.showItemSidebar && items.length > 0)
+              m.setTransferHighlightedIndex(Math.min(items.length - 1, m.transferHighlightedIndex + 1));
             else if (index < m.transferFields.length - 1) focusInput(`input-item-name-${index + 1}`);
           } else if (event.key === "ArrowLeft" && !m.isPOS) {
             event.preventDefault();

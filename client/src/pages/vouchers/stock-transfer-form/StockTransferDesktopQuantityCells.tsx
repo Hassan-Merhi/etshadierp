@@ -1,10 +1,11 @@
 import type { StockTransferFormModel } from "./useStockTransferFormModel";
 
-const focusInput = (id: string, delay = 50) => setTimeout(() => {
-  const input = document.querySelector(`[data-testid="${id}"]`) as HTMLInputElement | null;
-  input?.focus();
-  input?.select();
-}, delay);
+const focusInput = (id: string, delay = 50) =>
+  setTimeout(() => {
+    const input = document.querySelector(`[data-testid="${id}"]`) as HTMLInputElement | null;
+    input?.focus();
+    input?.select();
+  }, delay);
 
 export function StockTransferDesktopQuantityCells({ model, index }: { model: StockTransferFormModel; index: number }) {
   const m = model;
@@ -33,7 +34,8 @@ export function StockTransferDesktopQuantityCells({ model, index }: { model: Sto
           onChange={(event) => {
             const raw = event.target.value;
             m.setTransferQtyDraft((draft) => ({ ...draft, [index]: raw }));
-            if (!raw.startsWith("+") && !raw.startsWith("-")) m.stockTransferForm.setValue(`entries.${index}.quantity`, raw);
+            if (!raw.startsWith("+") && !raw.startsWith("-"))
+              m.stockTransferForm.setValue(`entries.${index}.quantity`, raw);
           }}
           onBlur={(event) => {
             const raw = (m.transferQtyDraft[index] ?? event.target.value).trim();
@@ -46,11 +48,16 @@ export function StockTransferDesktopQuantityCells({ model, index }: { model: Sto
             if (isNaN(delta)) return;
             if (m.voucherIdToEdit && m.stockTransferToEdit?.items) {
               const current = m.stockTransferForm.getValues(`entries.${index}`);
-              const original = (m.stockTransferToEdit.items as { stockItemId: number; sourceLocationId: number; quantity: string }[]).find(
+              const original = (
+                m.stockTransferToEdit.items as { stockItemId: number; sourceLocationId: number; quantity: string }[]
+              ).find(
                 (item) => item.stockItemId === current.stockItemId && item.sourceLocationId === current.sourceLocationId
               );
               const originalQuantity = original ? parseFloat(original.quantity) || 0 : 0;
-              m.stockTransferForm.setValue(`entries.${index}.quantity`, Math.max(0, originalQuantity + delta).toString());
+              m.stockTransferForm.setValue(
+                `entries.${index}.quantity`,
+                Math.max(0, originalQuantity + delta).toString()
+              );
             } else {
               m.stockTransferForm.setValue(`entries.${index}.quantity`, Math.max(0, delta).toString());
             }

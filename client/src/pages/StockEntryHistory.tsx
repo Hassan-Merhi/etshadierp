@@ -45,12 +45,7 @@ import { createStockEntryHistoryReports } from "./stockentryhistory/reports";
 import { StockEntryHistoryEditableDateCell } from "./stockentryhistory/EditableDateCell";
 import { DetailedHistoryTable } from "./stockentryhistory/DetailedHistoryTable";
 import { useStockEntryHistoryMutations } from "./stockentryhistory/useStockEntryHistoryMutations";
-import {
-  STATUS_COLORS,
-  STATUS_OPTIONS,
-  fetchAllStockEntryHistoryPages,
-  formatHistoryTime,
-} from "./stockentryhistory/utils";
+import { STATUS_COLORS, STATUS_OPTIONS, fetchAllStockEntryHistoryPages } from "./stockentryhistory/utils";
 
 export default function StockEntryHistory({ onActiveDateChange }: StockEntryHistoryProps = {}) {
   const { formatDisplayDate } = useDateFormat();
@@ -269,7 +264,6 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   });
   void handlePrintMatrix;
   void thirtyDaysAgo;
-  void formatHistoryTime;
 
   function EditableDateCell({
     dateStr,

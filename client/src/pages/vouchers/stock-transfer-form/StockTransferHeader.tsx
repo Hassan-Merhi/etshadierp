@@ -9,6 +9,7 @@ import { StockTransferDesktopEntries } from "./StockTransferDesktopEntries";
 import { StockTransferFooterAndDialogs } from "./StockTransferFooterAndDialogs";
 import { StockTransferMobileEntries } from "./StockTransferMobileEntries";
 import { StockTransferSidebars } from "./StockTransferSidebars";
+import { StockTransferTotals } from "./StockTransferTotals";
 import type { StockTransferFormModel } from "./useStockTransferFormModel";
 
 export function StockTransferHeader({ model }: { model: StockTransferFormModel }) {
@@ -73,7 +74,10 @@ export function StockTransferHeader({ model }: { model: StockTransferFormModel }
         render={({ field }) => (
           <FormItem className="flex items-center gap-2 space-y-0">
             <FormLabel className="text-sm text-muted-foreground whitespace-nowrap">To:</FormLabel>
-            <Select value={field.value > 0 ? field.value.toString() : ""} onValueChange={(value) => field.onChange(parseInt(value))}>
+            <Select
+              value={field.value > 0 ? field.value.toString() : ""}
+              onValueChange={(value) => field.onChange(parseInt(value))}
+            >
               <FormControl>
                 <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-destination-location">
                   <SelectValue placeholder="Select destination..." />
@@ -102,7 +106,13 @@ export function StockTransferHeader({ model }: { model: StockTransferFormModel }
             <FormControl>
               <Input
                 type="date"
-                value={field.value instanceof Date ? format(field.value, "yyyy-MM-dd") : typeof field.value === "string" ? field.value : ""}
+                value={
+                  field.value instanceof Date
+                    ? format(field.value, "yyyy-MM-dd")
+                    : typeof field.value === "string"
+                      ? field.value
+                      : ""
+                }
                 onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value + "T00:00:00") : new Date())}
                 className="w-full sm:w-[160px]"
                 data-testid="input-transfer-date"
@@ -165,6 +175,7 @@ export function StockTransferFormView({ model }: { model: StockTransferFormModel
             <Card className="flex-1 overflow-hidden min-w-0">
               <StockTransferMobileEntries model={model} />
               <StockTransferDesktopEntries model={model} />
+              <StockTransferTotals model={model} />
             </Card>
             <StockTransferSidebars model={model} />
           </div>

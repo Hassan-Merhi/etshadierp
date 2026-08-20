@@ -84,7 +84,9 @@ export function useFactoryDaybookModel() {
   const [searchQuery, setSearchQuery] = useState(() => initialDaybookStateRef.current?.searchQuery || "");
   const [minAmount, setMinAmount] = useState(() => initialDaybookStateRef.current?.minAmount || "");
   const [maxAmount, setMaxAmount] = useState(() => initialDaybookStateRef.current?.maxAmount || "");
-  const [sortOrder, _setSortOrder] = useState<"asc" | "desc">(() => initialDaybookStateRef.current?.sortOrder || "desc");
+  const [sortOrder, _setSortOrder] = useState<"asc" | "desc">(
+    () => initialDaybookStateRef.current?.sortOrder || "desc"
+  );
   // searchQuery filters client-side only (not part of the query key below), but debounce
   // it anyway so rapid typing doesn't thrash the derived filteredEntries memo on large lists.
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery);

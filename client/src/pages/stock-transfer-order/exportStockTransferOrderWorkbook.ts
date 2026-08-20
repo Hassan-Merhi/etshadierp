@@ -106,12 +106,7 @@ export async function exportStockTransferOrderWorkbook({
   row1Cell1.alignment = { horizontal: "center", vertical: "middle" };
   row1Cell1.border = thinBorder;
 
-  const row2 = worksheet.addRow([
-    "TRUCK TRIP",
-    "DESTINATION:",
-    destName,
-    ...(includeCost ? ["", ""] : []),
-  ]);
+  const row2 = worksheet.addRow(["TRUCK TRIP", "DESTINATION:", destName, ...(includeCost ? ["", ""] : [])]);
   row2.height = 26;
   if (numCols > 3) worksheet.mergeCells("A2:A3");
   const row2Cell1 = row2.getCell(1);
@@ -131,12 +126,7 @@ export async function exportStockTransferOrderWorkbook({
     row2.getCell(5).border = thinBorder;
   }
 
-  const row3 = worksheet.addRow([
-    "",
-    "DATE :",
-    exportDate,
-    ...(includeCost ? ["", ""] : []),
-  ]);
+  const row3 = worksheet.addRow(["", "DATE :", exportDate, ...(includeCost ? ["", ""] : [])]);
   row3.height = 22;
   if (numCols === 3) row3.getCell(1).border = thinBorder;
   const row3Cell2 = row3.getCell(2);
@@ -153,12 +143,7 @@ export async function exportStockTransferOrderWorkbook({
   }
   if (numCols === 3) worksheet.mergeCells("A2:A3");
 
-  const columnHeaders = [
-    "ITEM  NAME",
-    "LOCATION",
-    "Quantity",
-    ...(includeCost ? ["Rate", "Amount"] : []),
-  ];
+  const columnHeaders = ["ITEM  NAME", "LOCATION", "Quantity", ...(includeCost ? ["Rate", "Amount"] : [])];
   const row4 = worksheet.addRow(columnHeaders);
   row4.height = 22;
   for (let column = 1; column <= numCols; column += 1) {
@@ -204,10 +189,7 @@ export async function exportStockTransferOrderWorkbook({
     }
 
     const groupQuantity = group.items.reduce((sum, item) => sum + item.quantity, 0);
-    const groupAmount = group.items.reduce(
-      (sum, item) => sum + item.quantity * item.rate,
-      0
-    );
+    const groupAmount = group.items.reduce((sum, item) => sum + item.quantity * item.rate, 0);
     const subtotalValues: (string | number)[] = [
       `TOTAL ${group.locationName.toUpperCase()}`,
       "",
@@ -245,16 +227,8 @@ export async function exportStockTransferOrderWorkbook({
   }
 
   const grandQuantity = orderItems.reduce((sum, item) => sum + item.quantity, 0);
-  const grandAmount = orderItems.reduce(
-    (sum, item) => sum + item.quantity * item.rate,
-    0
-  );
-  const grandValues: (string | number)[] = [
-    "TOTAL",
-    "",
-    grandQuantity,
-    ...(includeCost ? ["", grandAmount] : []),
-  ];
+  const grandAmount = orderItems.reduce((sum, item) => sum + item.quantity * item.rate, 0);
+  const grandValues: (string | number)[] = ["TOTAL", "", grandQuantity, ...(includeCost ? ["", grandAmount] : [])];
   const grandRow = worksheet.addRow(grandValues);
   grandRow.height = 26;
   worksheet.mergeCells(`A${grandRow.number}:B${grandRow.number}`);

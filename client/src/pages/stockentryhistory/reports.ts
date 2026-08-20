@@ -31,9 +31,7 @@ export function createStockEntryHistoryReports(input: StockEntryHistoryReportsIn
       "Bale Count": group.baleCount,
       "Total Weight (kg)": parseFloat(group.totalWeight || "0"),
       "Avg Weight (kg)": parseFloat(group.avgWeight || "0"),
-      "First Bale Time": group.firstFinalizedAt
-        ? new Date(group.firstFinalizedAt).toLocaleString()
-        : "—",
+      "First Bale Time": group.firstFinalizedAt ? new Date(group.firstFinalizedAt).toLocaleString() : "—",
       "Last Bale Time": group.lastFinalizedAt ? new Date(group.lastFinalizedAt).toLocaleString() : "—",
     }));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), "Summary");
@@ -70,19 +68,11 @@ export function createStockEntryHistoryReports(input: StockEntryHistoryReportsIn
       XLSX.utils.sheet_add_aoa(matrixSheet, matrixRows, { origin: "A5" });
     }
 
-    const totalsRow = [
-      "TOTAL",
-      ...matrix.workers.map((worker) => matrix.workerTotals[worker] || 0),
-      matrix.grandTotal,
-    ];
+    const totalsRow = ["TOTAL", ...matrix.workers.map((worker) => matrix.workerTotals[worker] || 0), matrix.grandTotal];
     XLSX.utils.sheet_add_aoa(matrixSheet, [totalsRow], {
       origin: { r: 4 + matrix.rows.length, c: 0 },
     });
-    matrixSheet["!cols"] = [
-      { wch: 36 },
-      ...matrix.workers.map(() => ({ wch: 14 })),
-      { wch: 10 },
-    ];
+    matrixSheet["!cols"] = [{ wch: 36 }, ...matrix.workers.map(() => ({ wch: 14 })), { wch: 10 }];
     matrixSheet["!freeze"] = { xSplit: 0, ySplit: 4 };
     XLSX.utils.book_append_sheet(wb, matrixSheet, "Worker Matrix");
 

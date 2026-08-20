@@ -39,12 +39,18 @@ export function StockTransferSidebars({ model }: { model: StockTransferFormModel
           <div className="p-4 border-b">
             <div className="flex items-center justify-between gap-2 mb-2">
               <h3 className="text-sm font-semibold">Search Items</h3>
-              <button onClick={() => setShowItemSidebar(false)} className="text-xs text-muted-foreground hover:text-foreground" data-testid="button-close-item-sidebar">
+              <button
+                onClick={() => setShowItemSidebar(false)}
+                className="text-xs text-muted-foreground hover:text-foreground"
+                data-testid="button-close-item-sidebar"
+              >
                 ✕
               </button>
             </div>
             {transferInventorySource && (
-              <p className="text-xs text-muted-foreground mb-3">{locations.find((location) => location.id === transferInventorySource)?.name}</p>
+              <p className="text-xs text-muted-foreground mb-3">
+                {locations.find((location) => location.id === transferInventorySource)?.name}
+              </p>
             )}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -63,7 +69,9 @@ export function StockTransferSidebars({ model }: { model: StockTransferFormModel
           <div className="flex-1 overflow-y-auto p-2" ref={transferSidebarRef}>
             <div className="space-y-1">
               {!transferInventorySource ? (
-                <div className="text-center py-8 text-sm text-muted-foreground">Select a source location to see available items</div>
+                <div className="text-center py-8 text-sm text-muted-foreground">
+                  Select a source location to see available items
+                </div>
               ) : filteredTransferInventory.length === 0 ? (
                 <div className="text-center py-8 text-sm text-muted-foreground">No items found</div>
               ) : (
@@ -85,7 +93,8 @@ export function StockTransferSidebars({ model }: { model: StockTransferFormModel
                         if (!(sourceId > 0)) {
                           toast({
                             title: "Select a source location first",
-                            description: "Please select a source location from the inventory sidebar before adding items.",
+                            description:
+                              "Please select a source location from the inventory sidebar before adding items.",
                             variant: "destructive",
                           });
                           return;
@@ -96,7 +105,10 @@ export function StockTransferSidebars({ model }: { model: StockTransferFormModel
                           shouldDirty: true,
                           shouldTouch: true,
                         });
-                        stockTransferForm.setValue(`entries.${activeTransferRow}.sourceLocationName`, sourceLocation?.name || "");
+                        stockTransferForm.setValue(
+                          `entries.${activeTransferRow}.sourceLocationName`,
+                          sourceLocation?.name || ""
+                        );
                         stockTransferForm.setValue(`entries.${activeTransferRow}.stockItemId`, item.stockItemId, {
                           shouldValidate: true,
                           shouldDirty: true,
@@ -107,7 +119,9 @@ export function StockTransferSidebars({ model }: { model: StockTransferFormModel
                         stockTransferForm.setValue(`entries.${activeTransferRow}.rate`, item.averageRate || "0");
                         setTransferSearchTerm("");
                         setTimeout(() => {
-                          const quantity = document.querySelector(`[data-testid="input-transfer-quantity-${activeTransferRow}"]`) as HTMLInputElement;
+                          const quantity = document.querySelector(
+                            `[data-testid="input-transfer-quantity-${activeTransferRow}"]`
+                          ) as HTMLInputElement;
                           if (quantity) {
                             quantity.focus();
                             quantity.select();
@@ -120,7 +134,9 @@ export function StockTransferSidebars({ model }: { model: StockTransferFormModel
                           <div className="text-sm font-medium mb-1 truncate">{item.stockItemName}</div>
                         </div>
                         <div className="flex items-center">
-                          <div className={`text-xs font-medium px-2 py-0.5 rounded ${stock === 0 ? "bg-destructive/10 text-destructive" : stock < 10 ? "bg-chart-3/10 text-chart-3" : "bg-chart-2/10 text-chart-2"}`}>
+                          <div
+                            className={`text-xs font-medium px-2 py-0.5 rounded ${stock === 0 ? "bg-destructive/10 text-destructive" : stock < 10 ? "bg-chart-3/10 text-chart-3" : "bg-chart-2/10 text-chart-2"}`}
+                          >
                             {stock === 0 ? "Out" : `${stock.toFixed(0)}`}
                           </div>
                         </div>
@@ -139,7 +155,11 @@ export function StockTransferSidebars({ model }: { model: StockTransferFormModel
           <div className="p-4 border-b">
             <div className="flex items-center justify-between gap-2 mb-2">
               <h3 className="text-sm font-semibold">Select Source</h3>
-              <button onClick={() => setShowSourceSidebar(false)} className="text-xs text-muted-foreground hover:text-foreground" data-testid="button-close-source-sidebar">
+              <button
+                onClick={() => setShowSourceSidebar(false)}
+                className="text-xs text-muted-foreground hover:text-foreground"
+                data-testid="button-close-source-sidebar"
+              >
                 ✕
               </button>
             </div>
@@ -164,10 +184,14 @@ export function StockTransferSidebars({ model }: { model: StockTransferFormModel
                   .filter((location) => {
                     if (!transferSourceSearchTerm.trim()) return true;
                     const term = transferSourceSearchTerm.toLowerCase();
-                    return (location.name || "").toLowerCase().includes(term) || (location.code && location.code.toLowerCase().includes(term));
+                    return (
+                      (location.name || "").toLowerCase().includes(term) ||
+                      (location.code && location.code.toLowerCase().includes(term))
+                    );
                   })
                   .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-                if (filteredLocations.length === 0) return <div className="text-center py-8 text-sm text-muted-foreground">No locations found</div>;
+                if (filteredLocations.length === 0)
+                  return <div className="text-center py-8 text-sm text-muted-foreground">No locations found</div>;
                 return filteredLocations.map((location, index) => {
                   const isHighlighted = index === transferSourceHighlightedIndex && activeTransferRow !== null;
                   return (
@@ -191,7 +215,9 @@ export function StockTransferSidebars({ model }: { model: StockTransferFormModel
                         setActiveTransferRow(null);
                         setActiveFieldType(null);
                         setTimeout(() => {
-                          const item = document.querySelector(`[data-testid="input-item-name-${rowIndex}"]`) as HTMLInputElement;
+                          const item = document.querySelector(
+                            `[data-testid="input-item-name-${rowIndex}"]`
+                          ) as HTMLInputElement;
                           if (item) {
                             item.focus();
                             item.select();

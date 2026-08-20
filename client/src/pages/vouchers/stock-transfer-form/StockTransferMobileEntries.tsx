@@ -148,7 +148,9 @@ export function StockTransferMobileEntries({ model }: { model: StockTransferForm
               <input
                 type="text"
                 value={
-                  activeTransferRow === index && activeFieldType === "item" ? transferSearchTerm : entry?.stockItemName || ""
+                  activeTransferRow === index && activeFieldType === "item"
+                    ? transferSearchTerm
+                    : entry?.stockItemName || ""
                 }
                 onChange={(e) => {
                   setTransferSearchTerm(e.target.value);
@@ -197,9 +199,13 @@ export function StockTransferMobileEntries({ model }: { model: StockTransferForm
                         const sourceId = Number(transferInventorySource);
                         if (!(sourceId > 0)) return;
                         const sourceLocation = locations.find((l) => l.id === sourceId);
-                        stockTransferForm.setValue(`entries.${index}.sourceLocationId`, sourceId, { shouldValidate: true });
+                        stockTransferForm.setValue(`entries.${index}.sourceLocationId`, sourceId, {
+                          shouldValidate: true,
+                        });
                         stockTransferForm.setValue(`entries.${index}.sourceLocationName`, sourceLocation?.name || "");
-                        stockTransferForm.setValue(`entries.${index}.stockItemId`, item.stockItemId, { shouldValidate: true });
+                        stockTransferForm.setValue(`entries.${index}.stockItemId`, item.stockItemId, {
+                          shouldValidate: true,
+                        });
                         stockTransferForm.setValue(`entries.${index}.stockItemCode`, item.stockItemCode || "");
                         stockTransferForm.setValue(`entries.${index}.stockItemName`, item.stockItemName);
                         stockTransferForm.setValue(`entries.${index}.rate`, item.averageRate || "0");
@@ -220,7 +226,9 @@ export function StockTransferMobileEntries({ model }: { model: StockTransferForm
                 <input
                   type="text"
                   inputMode="decimal"
-                  value={transferQtyDraft[`m${index}`] !== undefined ? transferQtyDraft[`m${index}`] : entry?.quantity || ""}
+                  value={
+                    transferQtyDraft[`m${index}`] !== undefined ? transferQtyDraft[`m${index}`] : entry?.quantity || ""
+                  }
                   onFocus={() => setTransferQtyDraft((prev) => ({ ...prev, [`m${index}`]: entry?.quantity || "" }))}
                   onChange={(e) => {
                     const raw = e.target.value;
@@ -240,9 +248,14 @@ export function StockTransferMobileEntries({ model }: { model: StockTransferForm
                     if (isNaN(delta)) return;
                     if (voucherIdToEdit && stockTransferToEdit?.items) {
                       const origItem = (
-                        stockTransferToEdit.items as { stockItemId: number; sourceLocationId: number; quantity: string }[]
+                        stockTransferToEdit.items as {
+                          stockItemId: number;
+                          sourceLocationId: number;
+                          quantity: string;
+                        }[]
                       ).find(
-                        (item) => item.stockItemId === entry.stockItemId && item.sourceLocationId === entry.sourceLocationId
+                        (item) =>
+                          item.stockItemId === entry.stockItemId && item.sourceLocationId === entry.sourceLocationId
                       );
                       const origQty = origItem ? parseFloat(origItem.quantity) || 0 : 0;
                       stockTransferForm.setValue(`entries.${index}.quantity`, Math.max(0, origQty + delta).toString());
