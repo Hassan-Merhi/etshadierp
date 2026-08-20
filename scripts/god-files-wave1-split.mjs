@@ -38,24 +38,28 @@ function splitThree({ file, marker1, marker2, part2, part3, prefix2, prefix3 }) 
   write(part3, withPrefix(preamble + source.slice(b), prefix3, part3));
 }
 
+// The extracted names use `.zz...test.ts` so a lexical `find ... | sort`
+// (the canonical postgres-regression runner) keeps the parent first, followed
+// by its extracted pieces. This preserves the monolith's original execution
+// order as closely as possible while giving every new file an isolated prefix.
 splitTwo({
   file: "tests/xlsx-export.test.ts",
   marker: "// ── SP Sales Form — July 1–6 verification",
-  newFile: "tests/xlsx-export-sp-sales-form.test.ts",
+  newFile: "tests/xlsx-export.zz-sp-sales-form.test.ts",
   newPrefix: "xlsexpsp",
 });
 
 splitTwo({
   file: "tests/workflow.test.ts",
   marker: "// 6. DAYBOOK WORKFLOW",
-  newFile: "tests/workflow-daybook-isolation.test.ts",
+  newFile: "tests/workflow.zz-daybook-isolation.test.ts",
   newPrefix: "wftest2",
 });
 
 splitTwo({
   file: "tests/inventory.test.ts",
   marker: "describe(\"Inventory Reconciliation Endpoint Tests\"",
-  newFile: "tests/inventory-reconciliation.test.ts",
+  newFile: "tests/inventory.zz-reconciliation.test.ts",
   newPrefix: "invtest2",
 });
 
@@ -63,22 +67,22 @@ splitThree({
   file: "tests/excel-export-v2.test.ts",
   marker1: "// ── 8. Group subtotal row",
   marker2: "// ── 15c. Historical opening cash from a real ledger account",
-  part2: "tests/excel-export-v2-totals-cash.test.ts",
-  part3: "tests/excel-export-v2-historical-cash.test.ts",
+  part2: "tests/excel-export-v2.zz1-totals-cash.test.ts",
+  part3: "tests/excel-export-v2.zz2-historical-cash.test.ts",
   prefix2: "xlsxv2p2",
   prefix3: "xlsxv2p3",
 });
 
 const splitFiles = [
   "tests/xlsx-export.test.ts",
-  "tests/xlsx-export-sp-sales-form.test.ts",
+  "tests/xlsx-export.zz-sp-sales-form.test.ts",
   "tests/workflow.test.ts",
-  "tests/workflow-daybook-isolation.test.ts",
+  "tests/workflow.zz-daybook-isolation.test.ts",
   "tests/inventory.test.ts",
-  "tests/inventory-reconciliation.test.ts",
+  "tests/inventory.zz-reconciliation.test.ts",
   "tests/excel-export-v2.test.ts",
-  "tests/excel-export-v2-totals-cash.test.ts",
-  "tests/excel-export-v2-historical-cash.test.ts",
+  "tests/excel-export-v2.zz1-totals-cash.test.ts",
+  "tests/excel-export-v2.zz2-historical-cash.test.ts",
 ];
 
 for (const file of splitFiles) {
