@@ -83,6 +83,16 @@ Payload marker: `X-ERP-Payload-Profile: mix-batches-bulk-locked-rates`.
 
 No migration or manual SQL is required for Phase 3.
 
+## Current-main re-certification — 2026-08-20
+
+The Production/Bandwidth Hardening program was re-audited from current `main` after the Phase 1 Stock Allocation invalidation fix and the Phase 2 Customer Loading compact availability response landed.
+
+The Phase 3 heavy-read optimizations listed above are already present on current `main`, so they are being re-certified rather than duplicated. The current implementation also retains the query-pressure protections documented in `bandwidth-phase3-query-pressure.md`: supplier-balance batching plus the server read microcache for the major Factory/accounting read hotspots.
+
+Customer Loading itself now combines the Phase 1 no-background-invalidation policy with the Phase 2 compact availability response. Its allocation query keeps a two-minute stale window, ten-minute cache lifetime, one retry, and focus/reconnect refetch disabled; no additional interval polling is introduced by Phase 3.
+
+The re-certification target is therefore preservation of the existing optimized contracts on the latest main ancestry, with full exact-head CI used as the completion gate. No new accounting, stock-allocation, costing, authorization, company-scope, schema, migration, or quality-ratchet change is required for this Phase 3 pass.
+
 ## Deferred Phase 5 verification
 
 The final verification phase must run the full project checks and specifically confirm:
