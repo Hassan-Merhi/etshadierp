@@ -12,7 +12,7 @@ import { db } from "../../../db";
 import { storage } from "../../../storage";
 import { requireAuth, requireRole } from "../../../auth";
 import { containers, containerOffloads, containerOffloadItems, vouchers, voucherEntries } from "@shared/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, isNull, sql } from "drizzle-orm";
 import { reverseInventoryByExactValue } from "../../../inventoryHelper";
 
 export function registerContainerOffloadRecalcRoutes(app: Express) {
@@ -136,14 +136,19 @@ export function registerContainerOffloadRecalcRoutes(app: Express) {
             }
           }
 
-          // Delete OFFLOAD-related vouchers only (DUTY-, OFFICE-, TRANS-, CHG- prefixes)
-          // DO NOT delete PO vouchers that track supplier balances
+          // Reverse OFFLOAD-related vouchers only (DUTY-, OFFICE-, TRANS-, CHG-, XFER- prefixes).
+          // Keep the voucher row as a soft-deleted audit shell instead of physically deleting it:
+          // other tables may legitimately retain voucher_id FKs, and PostgreSQL correctly blocks
+          // physical deletion while those references exist. Removing the entries neutralizes the
+          // accounting effect; deleted_at keeps the voucher out of active ERP queries while
+          // preserving referential integrity and history.
           const containerVouchers = await tx
             .select()
             .from(vouchers)
             .where(
               and(
                 eq(vouchers.companyId, req.session.currentCompanyId!),
+                isNull(vouchers.deletedAt),
                 sql`(
                   (
                     LOWER(${vouchers.description}) LIKE LOWER(${"%container " + (container.containerNumber || "") + "%"})
@@ -162,24 +167,27 @@ export function registerContainerOffloadRecalcRoutes(app: Express) {
               )
             );
 
+          const reversedAt = new Date();
           for (const voucher of containerVouchers) {
             await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, voucher.id));
-            await tx.delete(vouchers).where(eq(vouchers.id, voucher.id));
+            await tx.update(vouchers).set({ deletedAt: reversedAt }).where(eq(vouchers.id, voucher.id));
           }
 
-          // Also reverse the HADI L'SHI side SP agent journal (companyId=1)
+          // Also reverse the HADI L'SHI side SP agent journal (companyId=1).
+          // Use the same FK-safe soft-delete strategy so linked audit records remain valid.
           const hadiSpVouchers = await tx
             .select()
             .from(vouchers)
             .where(
               and(
                 eq(vouchers.companyId, 1),
+                isNull(vouchers.deletedAt),
                 sql`${vouchers.voucherNumber} LIKE ${"SP-AGENT-ERP-" + containerId + "-%"}`
               )
             );
           for (const v of hadiSpVouchers) {
             await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, v.id));
-            await tx.delete(vouchers).where(eq(vouchers.id, v.id));
+            await tx.update(vouchers).set({ deletedAt: reversedAt }).where(eq(vouchers.id, v.id));
           }
 
           // Delete the offload record
