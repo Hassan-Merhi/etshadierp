@@ -47,7 +47,7 @@ jobs:
                   git checkout --theirs -- "$file"
                   ;;
               esac
-              git add -- "$file"
+              git add -f -- "$file"
             done <<< "$conflicts"
           fi
           if git diff --name-only --diff-filter=U | grep -q .; then
