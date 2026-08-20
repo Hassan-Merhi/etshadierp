@@ -13,7 +13,9 @@
   "routeManifestAdditions": [
     "DELETE /api/locations/:locationId [requireAuth > <anonymous>]"
   ],
-  "routeManifestMountAdditions": [],
+  "routeManifestMountAdditions": [
+    "USE /api/factory/v5/stock-allocation [<anonymous>]"
+  ],
   "sourceTextAssertionDelta": {
     "additionalSourceCoupledTests": [
       "tests/factory-post-offload-phase5-reconciliation.test.ts",
