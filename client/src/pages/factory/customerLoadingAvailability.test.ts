@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildAvailableStockMap,
   resolveAvailableStock,
+  rewriteCustomerLoadingAllocationRequest,
   shouldIncludeAvailableStock,
 } from "./customerLoadingAvailability";
 
@@ -32,5 +33,39 @@ describe("customer loading stock availability", () => {
 
   it("keeps missing allocation rows visible instead of hiding products while allocation data is incomplete", () => {
     expect(shouldIncludeAvailableStock(null, { showZeroStock: false, showNegativeStock: false })).toBe(true);
+  });
+
+  it("rewrites only Customer Loading's exact allocation GET to the compact availability view", () => {
+    expect(
+      rewriteCustomerLoadingAllocationRequest(
+        "/api/factory/v5/stock-allocation",
+        undefined,
+        "/factory/customer-loading"
+      )
+    ).toBe("/api/factory/v5/stock-allocation?view=availability");
+
+    expect(
+      rewriteCustomerLoadingAllocationRequest(
+        "/api/factory/v5/stock-allocation",
+        undefined,
+        "/factory/stock-allocation-v5"
+      )
+    ).toBe("/api/factory/v5/stock-allocation");
+
+    expect(
+      rewriteCustomerLoadingAllocationRequest(
+        "/api/factory/v5/stock-allocation?page=1",
+        undefined,
+        "/factory/customer-loading"
+      )
+    ).toBe("/api/factory/v5/stock-allocation?page=1");
+
+    expect(
+      rewriteCustomerLoadingAllocationRequest(
+        "/api/factory/v5/stock-allocation",
+        { method: "POST" },
+        "/factory/customer-loading"
+      )
+    ).toBe("/api/factory/v5/stock-allocation");
   });
 });
