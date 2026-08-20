@@ -41,7 +41,7 @@ jobs:
           import fs from 'node:fs';
           import { execSync } from 'node:child_process';
           import ts from 'typescript';
-          import { auditTypeEscapes } from process.cwd() + '/scripts/audit-type-escapes.mjs';
+          const { auditTypeEscapes } = await import('file://' + process.cwd() + '/scripts/audit-type-escapes.mjs');
 
           const targets = [
             'client/src/pages/vouchers/stock-transfer-form/useStockTransferFormModel.ts',
