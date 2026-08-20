@@ -1,21 +1,36 @@
-/**
- * StockMovementDialog — extracted from StockTransferOrder.tsx during the Phase 4 split.
- *
- * Props are the parent-scope bindings the block referenced; they were
- * discovered from compiler errors rather than guessed.
- */
+import type { Dispatch, RefObject, SetStateAction } from "react";
+import { ExternalLink, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
+import { PeriodFilter, type PeriodFilterValue } from "@/components/ui/period-filter";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MapPin, ExternalLink } from "lucide-react";
-import { PeriodFilter } from "@/components/ui/period-filter";
+import type { Location, StockItemData, StockMovementSummaryData } from "../../stocktransferorder/types";
+
+type StockMovementDialogProps = {
+  formatAmount: (amount: number) => string;
+  historyData: unknown;
+  historyDialogOpen: boolean;
+  historyItem: StockItemData | null;
+  historyLoading: boolean;
+  historyLocation: Location | null;
+  historyPeriod: PeriodFilterValue;
+  matrixRef: RefObject<HTMLDivElement | null>;
+  navigate: (path: string) => void;
+  setDetailDirection: Dispatch<SetStateAction<"in" | "out">>;
+  setDetailMonth: Dispatch<SetStateAction<number>>;
+  setDetailMonthName: Dispatch<SetStateAction<string>>;
+  setDetailOpen: Dispatch<SetStateAction<boolean>>;
+  setDetailYear: Dispatch<SetStateAction<number>>;
+  setHistoryDialogOpen: Dispatch<SetStateAction<boolean>>;
+  setHistoryPeriod: Dispatch<SetStateAction<PeriodFilterValue>>;
+};
 
 export function StockMovementDialog({
   formatAmount,
@@ -34,32 +49,34 @@ export function StockMovementDialog({
   setDetailYear,
   setHistoryDialogOpen,
   setHistoryPeriod,
-}: {
-  formatAmount: any;
-  historyData: any;
-  historyDialogOpen: any;
-  historyItem: any;
-  historyLoading: any;
-  historyLocation: any;
-  historyPeriod: any;
-  matrixRef: any;
-  navigate: any;
-  setDetailDirection: any;
-  setDetailMonth: any;
-  setDetailMonthName: any;
-  setDetailOpen: any;
-  setDetailYear: any;
-  setHistoryDialogOpen: any;
-  setHistoryPeriod: any;
-}) {
+}: StockMovementDialogProps) {
+  const typedHistoryData = historyData as StockMovementSummaryData | undefined;
+  const monthlyData = typedHistoryData?.monthlyData ?? [];
+  const hasMovement = monthlyData.some(
+    (month) => month.inwardQty > 0 || month.outwardQty > 0 || month.openingQty !== 0 || month.closingQty !== 0
+  );
+  const formatQty = (value: number) =>
+    value === 0
+      ? "—"
+      : value.toLocaleString(undefined, {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 2,
+        });
+  const formatRate = (value: number) =>
+    value === 0
+      ? "—"
+      : value.toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+  const formatValue = (value: number) => (value === 0 ? "—" : formatAmount(value));
+
   return (
     <Dialog
       open={historyDialogOpen}
       onOpenChange={(open) => {
         setHistoryDialogOpen(open);
-        if (!open) {
-          setTimeout(() => matrixRef.current?.focus(), 50);
-        }
+        if (!open) setTimeout(() => matrixRef.current?.focus(), 50);
       }}
     >
       <DialogContent className="max-w-7xl w-[95vw] flex flex-col" style={{ maxHeight: "90vh" }}>
@@ -78,13 +95,11 @@ export function StockMovementDialog({
         <div className="flex-1 overflow-auto min-h-0 border rounded-md">
           {historyLoading ? (
             <div className="space-y-2 p-4">
-              {[1, 2, 3, 4].map((i) => (
-                <Skeleton key={i} className="h-9 w-full" />
+              {[1, 2, 3, 4].map((value) => (
+                <Skeleton key={value} className="h-9 w-full" />
               ))}
             </div>
-          ) : !historyData?.monthlyData?.some(
-              (m: any) => m.inwardQty > 0 || m.outwardQty > 0 || m.openingQty !== 0 || m.closingQty !== 0
-            ) ? (
+          ) : !hasMovement ? (
             <div className="text-center py-12 text-muted-foreground text-sm">No stock movement for this period</div>
           ) : (
             <table className="w-full text-sm border-collapse" style={{ minWidth: "700px" }}>
@@ -134,155 +149,114 @@ export function StockMovementDialog({
                 </tr>
               </thead>
               <tbody>
-                {(historyData?.monthlyData ?? []).map((month: any) => {
-                  const isActive =
+                {monthlyData.map((month) => {
+                  const active =
                     month.inwardQty > 0 || month.outwardQty > 0 || month.openingQty !== 0 || month.closingQty !== 0;
-                  const fmtQty = (n: number) =>
-                    n === 0 ? "—" : n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-                  const fmtRate = (n: number) =>
-                    n === 0 ? "—" : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                  const fmtVal = (n: number) => (n === 0 ? "—" : formatAmount(n));
                   return (
                     <tr
                       key={month.month}
-                      className={`border-b transition-colors ${isActive ? "" : "text-muted-foreground/50"}`}
+                      className={`border-b transition-colors ${active ? "" : "text-muted-foreground/50"}`}
                     >
                       <td className="font-medium px-3 py-2 border-r">{month.monthName}</td>
                       <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">
-                        {fmtQty(month.openingQty)}
+                        {formatQty(month.openingQty)}
                       </td>
                       <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">
-                        {fmtRate(month.openingRate)}
+                        {formatRate(month.openingRate)}
                       </td>
                       <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">
-                        {fmtVal(month.openingValue)}
+                        {formatValue(month.openingValue)}
                       </td>
                       <td
                         className={`text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400 font-medium ${month.inwardQty > 0 ? "cursor-pointer underline underline-offset-2 decoration-dotted hover:text-green-900 dark:hover:text-green-200" : ""}`}
                         onClick={() => {
-                          if (month.inwardQty > 0) {
-                            setDetailYear(parseInt(historyPeriod.fromDate.slice(0, 4)));
-                            setDetailMonth(month.month);
-                            setDetailMonthName(month.monthName);
-                            setDetailDirection("in");
-                            setDetailOpen(true);
-                          }
+                          if (month.inwardQty <= 0) return;
+                          setDetailYear(parseInt(historyPeriod.fromDate.slice(0, 4)));
+                          setDetailMonth(month.month);
+                          setDetailMonthName(month.monthName);
+                          setDetailDirection("in");
+                          setDetailOpen(true);
                         }}
                         title={month.inwardQty > 0 ? "Click to see individual transactions" : undefined}
                       >
-                        {fmtQty(month.inwardQty)}
+                        {formatQty(month.inwardQty)}
                       </td>
                       <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">
-                        {fmtRate(month.inwardRate)}
+                        {formatRate(month.inwardRate)}
                       </td>
                       <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">
-                        {fmtVal(month.inwardValue)}
+                        {formatValue(month.inwardValue)}
                       </td>
                       <td
                         className={`text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400 font-medium ${month.outwardQty > 0 ? "cursor-pointer underline underline-offset-2 decoration-dotted hover:text-red-900 dark:hover:text-red-200" : ""}`}
                         onClick={() => {
-                          if (month.outwardQty > 0) {
-                            setDetailYear(parseInt(historyPeriod.fromDate.slice(0, 4)));
-                            setDetailMonth(month.month);
-                            setDetailMonthName(month.monthName);
-                            setDetailDirection("out");
-                            setDetailOpen(true);
-                          }
+                          if (month.outwardQty <= 0) return;
+                          setDetailYear(parseInt(historyPeriod.fromDate.slice(0, 4)));
+                          setDetailMonth(month.month);
+                          setDetailMonthName(month.monthName);
+                          setDetailDirection("out");
+                          setDetailOpen(true);
                         }}
                         title={month.outwardQty > 0 ? "Click to see individual transactions" : undefined}
                       >
-                        {fmtQty(month.outwardQty)}
+                        {formatQty(month.outwardQty)}
                       </td>
                       <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">
-                        {fmtRate(month.outwardRate)}
+                        {formatRate(month.outwardRate)}
                       </td>
                       <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">
-                        {fmtVal(month.outwardValue)}
+                        {formatValue(month.outwardValue)}
                       </td>
                       <td className="text-right px-3 py-2 tabular-nums font-semibold text-foreground">
-                        {fmtQty(month.closingQty)}
+                        {formatQty(month.closingQty)}
                       </td>
-                      <td className="text-right px-3 py-2 tabular-nums font-medium">{fmtRate(month.closingRate)}</td>
-                      <td className="text-right px-3 py-2 tabular-nums font-medium">{fmtVal(month.closingValue)}</td>
+                      <td className="text-right px-3 py-2 tabular-nums font-medium">{formatRate(month.closingRate)}</td>
+                      <td className="text-right px-3 py-2 tabular-nums font-medium">
+                        {formatValue(month.closingValue)}
+                      </td>
                     </tr>
                   );
                 })}
               </tbody>
-              {historyData?.grandTotal && (
+              {typedHistoryData?.grandTotal && (
                 <tfoot className="sticky bottom-0 z-10">
                   <tr className="bg-muted font-bold border-t-2">
                     <td className="px-3 py-2 border-r">Total</td>
                     <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">
-                      {historyData.grandTotal.openingQty === 0
-                        ? "—"
-                        : historyData.grandTotal.openingQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      {formatQty(typedHistoryData.grandTotal.openingQty)}
                     </td>
                     <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">
-                      {historyData.grandTotal.openingRate === 0
-                        ? "—"
-                        : historyData.grandTotal.openingRate.toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
+                      {formatRate(typedHistoryData.grandTotal.openingRate)}
                     </td>
                     <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">
-                      {historyData.grandTotal.openingValue === 0
-                        ? "—"
-                        : formatAmount(historyData.grandTotal.openingValue)}
+                      {formatValue(typedHistoryData.grandTotal.openingValue)}
                     </td>
                     <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">
-                      {historyData.grandTotal.inwardQty === 0
-                        ? "—"
-                        : historyData.grandTotal.inwardQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      {formatQty(typedHistoryData.grandTotal.inwardQty)}
                     </td>
                     <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">
-                      {historyData.grandTotal.inwardRate === 0
-                        ? "—"
-                        : historyData.grandTotal.inwardRate.toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
+                      {formatRate(typedHistoryData.grandTotal.inwardRate)}
                     </td>
                     <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">
-                      {historyData.grandTotal.inwardValue === 0
-                        ? "—"
-                        : formatAmount(historyData.grandTotal.inwardValue)}
+                      {formatValue(typedHistoryData.grandTotal.inwardValue)}
                     </td>
                     <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">
-                      {historyData.grandTotal.outwardQty === 0
-                        ? "—"
-                        : historyData.grandTotal.outwardQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      {formatQty(typedHistoryData.grandTotal.outwardQty)}
                     </td>
                     <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">
-                      {historyData.grandTotal.outwardRate === 0
-                        ? "—"
-                        : historyData.grandTotal.outwardRate.toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
+                      {formatRate(typedHistoryData.grandTotal.outwardRate)}
                     </td>
                     <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">
-                      {historyData.grandTotal.outwardValue === 0
-                        ? "—"
-                        : formatAmount(historyData.grandTotal.outwardValue)}
+                      {formatValue(typedHistoryData.grandTotal.outwardValue)}
                     </td>
                     <td className="text-right px-3 py-2 tabular-nums text-foreground">
-                      {historyData.grandTotal.closingQty === 0
-                        ? "—"
-                        : historyData.grandTotal.closingQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      {formatQty(typedHistoryData.grandTotal.closingQty)}
                     </td>
                     <td className="text-right px-3 py-2 tabular-nums">
-                      {historyData.grandTotal.closingRate === 0
-                        ? "—"
-                        : historyData.grandTotal.closingRate.toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
+                      {formatRate(typedHistoryData.grandTotal.closingRate)}
                     </td>
                     <td className="text-right px-3 py-2 tabular-nums">
-                      {historyData.grandTotal.closingValue === 0
-                        ? "—"
-                        : formatAmount(historyData.grandTotal.closingValue)}
+                      {formatValue(typedHistoryData.grandTotal.closingValue)}
                     </td>
                   </tr>
                 </tfoot>

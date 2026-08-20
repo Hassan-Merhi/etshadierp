@@ -1,14 +1,24 @@
-/**
- * ImportDialog — extracted from StockTransferOrder.tsx during the Phase 4 split.
- *
- * Props are the parent-scope bindings the block referenced; they were
- * discovered from compiler errors rather than guessed.
- */
+import type { Dispatch, RefObject, SetStateAction } from "react";
+import { AlertCircle, Check, FileDown, FileSpreadsheet, TrendingDown, TrendingUp, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Check, AlertCircle, FileDown, Upload, FileSpreadsheet, TrendingUp, TrendingDown } from "lucide-react";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { formatNumber } from "@/lib/formatNumber";
+import type { ImportPreviewRow } from "../../stocktransferorder/types";
+
+type ImportDialogProps = {
+  applyImport: () => void;
+  downloadImportTemplate: () => void | Promise<void>;
+  exportPreviewExcel: () => void | Promise<void>;
+  exportPreviewPDF: () => void | Promise<void>;
+  handleImportFile: (file: File) => void | Promise<void>;
+  importDialogOpen: boolean;
+  importFileRef: RefObject<HTMLInputElement | null>;
+  importLoading: boolean;
+  importPreview: ImportPreviewRow[];
+  setImportDialogOpen: Dispatch<SetStateAction<boolean>>;
+  setImportPreview: Dispatch<SetStateAction<ImportPreviewRow[]>>;
+};
 
 export function ImportDialog({
   applyImport,
@@ -22,25 +32,17 @@ export function ImportDialog({
   importPreview,
   setImportDialogOpen,
   setImportPreview,
-}: {
-  applyImport: any;
-  downloadImportTemplate: any;
-  exportPreviewExcel: any;
-  exportPreviewPDF: any;
-  handleImportFile: any;
-  importDialogOpen: any;
-  importFileRef: any;
-  importLoading: any;
-  importPreview: any;
-  setImportDialogOpen: any;
-  setImportPreview: any;
-}) {
+}: ImportDialogProps) {
+  const updateCount = importPreview.filter((row) => row.status === "ok" || row.status === "new_item").length;
+  const removeCount = importPreview.filter((row) => row.status === "remove").length;
+  const unmatchedCount = importPreview.filter((row) => row.status === "not_found").length;
+
   return (
     <Dialog
       open={importDialogOpen}
-      onOpenChange={(o) => {
-        setImportDialogOpen(o);
-        if (!o) setImportPreview([]);
+      onOpenChange={(open) => {
+        setImportDialogOpen(open);
+        if (!open) setImportPreview([]);
       }}
     >
       <DialogContent className="sm:max-w-[680px]">
@@ -72,11 +74,11 @@ export function ImportDialog({
               <label
                 className="flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-md p-8 cursor-pointer hover-elevate text-muted-foreground"
                 data-testid="label-import-dropzone"
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const f = e.dataTransfer.files[0];
-                  if (f) handleImportFile(f);
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  const file = event.dataTransfer.files[0];
+                  if (file) handleImportFile(file);
                 }}
               >
                 <input
@@ -85,10 +87,10 @@ export function ImportDialog({
                   accept=".xlsx,.xls"
                   className="hidden"
                   data-testid="input-import-file"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) handleImportFile(f);
-                    e.target.value = "";
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) handleImportFile(file);
+                    event.target.value = "";
                   }}
                 />
                 <Upload className="h-8 w-8 opacity-40" />
@@ -103,19 +105,9 @@ export function ImportDialog({
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex gap-2 text-xs">
-                  <span className="text-emerald-600 dark:text-emerald-400 font-medium">
-                    {importPreview.filter((r: any) => r.status === "ok" || r.status === "new_item").length} to update
-                  </span>
-                  {importPreview.filter((r: any) => r.status === "remove").length > 0 && (
-                    <span className="text-destructive font-medium">
-                      {importPreview.filter((r: any) => r.status === "remove").length} to remove
-                    </span>
-                  )}
-                  {importPreview.filter((r: any) => r.status === "not_found").length > 0 && (
-                    <span className="text-muted-foreground">
-                      {importPreview.filter((r: any) => r.status === "not_found").length} unmatched
-                    </span>
-                  )}
+                  <span className="text-emerald-600 dark:text-emerald-400 font-medium">{updateCount} to update</span>
+                  {removeCount > 0 && <span className="text-destructive font-medium">{removeCount} to remove</span>}
+                  {unmatchedCount > 0 && <span className="text-muted-foreground">{unmatchedCount} unmatched</span>}
                 </div>
                 <div className="flex gap-2">
                   <Button
@@ -163,8 +155,8 @@ export function ImportDialog({
                       </tr>
                     </thead>
                     <tbody>
-                      {importPreview.map((row: any, idx: any) => (
-                        <tr key={idx} className={cn("border-t", row.status === "not_found" && "opacity-50")}>
+                      {importPreview.map((row, index) => (
+                        <tr key={index} className={cn("border-t", row.status === "not_found" && "opacity-50")}>
                           <td className="p-2">
                             <p className="font-medium truncate max-w-[220px]">{row.stockItemName}</p>
                             {row.status === "new_item" && (
@@ -237,7 +229,7 @@ export function ImportDialog({
           {importPreview.length > 0 && (
             <Button
               onClick={applyImport}
-              disabled={importPreview.every((r: any) => r.status === "not_found")}
+              disabled={importPreview.every((row) => row.status === "not_found")}
               data-testid="button-apply-import"
             >
               Apply to Order

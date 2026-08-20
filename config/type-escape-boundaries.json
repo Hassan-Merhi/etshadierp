@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "One-way ratchet on type escapes, counted from the TypeScript AST by scripts/audit-type-escapes.mjs. Every file carrying escapes is frozen at its current count in scan.baseline as [explicitAny, asAny, suppressions]: counts may fall freely, any increase fails, and a file with no entry must introduce none. totals.typeEscapeCeiling is the backlog as a single number and may only fall. Lower a baseline in the same change that removes the escapes — leaving headroom lets it refill silently. The god-file Waves 5-9 merge moved page bodies into split modules: each retired god file had its baseline dropped to its measured count and the escapes that travelled with the code are recorded against the module that now owns them, so the repository total did not rise.",
+  "description": "One-way ratchet on type escapes, counted from the TypeScript AST by scripts/audit-type-escapes.mjs. Every file carrying escapes is frozen at its current count in scan.baseline as [explicitAny, asAny, suppressions]: counts may fall freely, any increase fails, and a file with no entry must introduce none. totals.typeEscapeCeiling is the backlog as a single number and may only fall. Lower a baseline in the same change that removes the escapes — leaving headroom lets it refill silently. The god-file Waves 5-9 merge moved page bodies into split modules: each retired god file had its baseline dropped to its measured count and the escapes that travelled with the code are recorded against the module that now owns them, so the repository total did not rise. The God Files recovery merge repeats that move for DataToolsTab, FactorySuppliers, StockTransferOrder, SupplierProfitCheck and JournalForm: their baselines fall to the measured count and the relocated escapes are recorded against the extracted modules (datatoolstab/, factorysettings/, stock-transfer-order/dialogs/, daybook/VoucherDetailsDialog). No escape is new — the ceiling falls from 3296 to 3230.",
   "scan": {
     "roots": [
       "server",
@@ -344,16 +344,6 @@
         0,
         0
       ],
-      "client/src/pages/StockTransferOrder.tsx": [
-        3,
-        0,
-        0
-      ],
-      "client/src/pages/SupplierProfitCheck.tsx": [
-        7,
-        0,
-        0
-      ],
       "client/src/pages/SupplierProformas.tsx": [
         2,
         0,
@@ -500,6 +490,11 @@
         0
       ],
       "client/src/pages/daybook/DaybookTable.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/daybook/VoucherDetailsDialog.tsx": [
         1,
         0,
         0
@@ -681,11 +676,6 @@
       ],
       "client/src/pages/factory/FactorySupplierStatement.tsx": [
         12,
-        0,
-        0
-      ],
-      "client/src/pages/factory/FactorySuppliers.tsx": [
-        8,
         0,
         0
       ],
@@ -1067,6 +1057,11 @@
       "client/src/pages/factory/factorypos/useFactoryPosModel.ts": [
         7,
         0,
+        0
+      ],
+      "client/src/pages/factory/factorysettings/useFactorySettingsModel.ts": [
+        0,
+        1,
         0
       ],
       "client/src/pages/factory/factorysheetsandsacks/components/ItemFormDialog.tsx": [
@@ -1494,11 +1489,6 @@
         0,
         0
       ],
-      "client/src/pages/settings/DataToolsTab.tsx": [
-        11,
-        0,
-        0
-      ],
       "client/src/pages/settings/DiagnosticsSection.tsx": [
         2,
         0,
@@ -1599,6 +1589,21 @@
         0,
         0
       ],
+      "client/src/pages/settings/datatoolstab/SilentProductionDialog.tsx": [
+        3,
+        0,
+        0
+      ],
+      "client/src/pages/settings/datatoolstab/SilentTransferDialog.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/settings/datatoolstab/useDataToolsModel.ts": [
+        15,
+        0,
+        0
+      ],
       "client/src/pages/settings/users/AdvancedRestrictions.tsx": [
         1,
         0,
@@ -1689,28 +1694,8 @@
         0,
         0
       ],
-      "client/src/pages/stock-transfer-order/dialogs/DetailDialog.tsx": [
-        13,
-        0,
-        0
-      ],
-      "client/src/pages/stock-transfer-order/dialogs/ImportDialog.tsx": [
-        19,
-        0,
-        0
-      ],
-      "client/src/pages/stock-transfer-order/dialogs/QuantityPickerDialog.tsx": [
-        7,
-        0,
-        0
-      ],
       "client/src/pages/stock-transfer-order/dialogs/RevisionDialog.tsx": [
         1,
-        0,
-        0
-      ],
-      "client/src/pages/stock-transfer-order/dialogs/StockMovementDialog.tsx": [
-        18,
         0,
         0
       ],
@@ -1805,11 +1790,6 @@
         0
       ],
       "client/src/pages/vouchers/ApproveRevisionDialog.tsx": [
-        4,
-        0,
-        0
-      ],
-      "client/src/pages/vouchers/JournalForm.tsx": [
         4,
         0,
         0
@@ -4027,6 +4007,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 3296
+    "typeEscapeCeiling": 3230
   }
 }

@@ -1,15 +1,21 @@
-/**
- * QuantityPickerDialog — extracted from StockTransferOrder.tsx during the Phase 4 split.
- *
- * Props are the parent-scope bindings the block referenced; they were
- * discovered from compiler errors rather than guessed.
- */
+import type { Dispatch, RefObject, SetStateAction } from "react";
+import { AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { AlertCircle } from "lucide-react";
 import { formatNumber } from "@/lib/formatNumber";
+import type { QuantityPickerState } from "../../stocktransferorder/types";
+
+type QuantityPickerDialogProps = {
+  editVoucherId: number | null;
+  handleAddToOrder: () => void | Promise<void>;
+  pickerQuantity: string;
+  quantityInputRef: RefObject<HTMLInputElement | null>;
+  quantityPicker: QuantityPickerState;
+  setPickerQuantity: Dispatch<SetStateAction<string>>;
+  setQuantityPicker: Dispatch<SetStateAction<QuantityPickerState>>;
+};
 
 export function QuantityPickerDialog({
   editVoucherId,
@@ -19,15 +25,7 @@ export function QuantityPickerDialog({
   quantityPicker,
   setPickerQuantity,
   setQuantityPicker,
-}: {
-  editVoucherId: any;
-  handleAddToOrder: any;
-  pickerQuantity: any;
-  quantityInputRef: any;
-  quantityPicker: any;
-  setPickerQuantity: any;
-  setQuantityPicker: any;
-}) {
+}: QuantityPickerDialogProps) {
   return (
     <Dialog open={quantityPicker.open} onOpenChange={(open) => setQuantityPicker({ ...quantityPicker, open })}>
       <DialogContent className="sm:max-w-[400px]">
@@ -59,12 +57,10 @@ export function QuantityPickerDialog({
               type="number"
               step="0.001"
               value={pickerQuantity}
-              onChange={(e) => setPickerQuantity(e.target.value)}
+              onChange={(event) => setPickerQuantity(event.target.value)}
               placeholder={editVoucherId ? "e.g. -1 to reduce" : "Enter quantity"}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  handleAddToOrder();
-                }
+              onKeyDown={(event) => {
+                if (event.key === "Enter") handleAddToOrder();
               }}
               data-testid="input-picker-quantity"
             />

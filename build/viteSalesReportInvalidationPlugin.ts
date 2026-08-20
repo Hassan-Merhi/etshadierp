@@ -1,7 +1,7 @@
 import type { Plugin } from "vite";
 
 const ORPHANED_RECORDS_SUFFIX = "/client/src/pages/OrphanedRecords.tsx";
-const DATA_TOOLS_SUFFIX = "/client/src/pages/settings/DataToolsTab.tsx";
+const DATA_TOOLS_SUFFIX = "/client/src/pages/settings/datatoolstab/useDataToolsModel.ts";
 
 const LEGACY_INVALIDATION = `queryClient.invalidateQueries({ queryKey: ["/api/sales-report"] });`;
 const BANDWIDTH_SAFE_INVALIDATION = `queryClient.invalidateQueries({
