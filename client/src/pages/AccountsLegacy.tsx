@@ -139,9 +139,9 @@ export default function Accounts() {
               toggleSelectAll={model.toggleSelectAll}
               setShowBulkDeleteConfirm={model.setShowBulkDeleteConfirm}
               filterCurrency={model.filterCurrency}
-              setFilterCurrency={model.setFilterCurrency as any}
+              setFilterCurrency={(model.setFilterCurrency)}
               showDeletedVouchers={model.showDeletedVouchers}
-              setShowDeletedVouchers={model.setShowDeletedVouchers as any}
+              setShowDeletedVouchers={(model.setShowDeletedVouchers)}
               currentUser={model.currentUser}
               formatAmount={(amt) => model.formatAmountForAccount(amt, selectedAccount?.type)}
               hideBalances={model.hideBalances}
