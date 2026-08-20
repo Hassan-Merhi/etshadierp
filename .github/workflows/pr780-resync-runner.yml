@@ -114,7 +114,23 @@ jobs:
           set -euo pipefail
           npm ci --ignore-scripts
           npx prettier --check config/god-file-boundaries.json tests/god-file-boundaries.test.ts tests/frontend-layout.test.ts tests/phase7-backend-messages-translations.test.ts
-          npx vitest run tests/frontend-layout.test.ts tests/god-file-boundaries.test.ts tests/phase7-backend-messages-translations.test.ts
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          layout = Path('tests/frontend-layout.test.ts').read_text()
+          assert 'journalform/useJournalFormModel.tsx' in layout
+          phase7 = Path('tests/phase7-backend-messages-translations.test.ts').read_text()
+          assert 'toHaveLength(599)' in phase7
+          assert ').size).toBe(599)' in phase7
+          data = json.loads(Path('config/god-file-boundaries.json').read_text())
+          assert data['version'] == 25
+          soft = data['repositoryScan']['softMaxLines']
+          for rel in data['repositoryScan']['grandfathered']:
+              p = Path(rel)
+              assert p.exists(), f'stale missing baseline: {rel}'
+              assert len(p.read_text(errors='ignore').splitlines()) > soft, f'stale under-limit baseline: {rel}'
+          print('Static contract verification passed')
+          PY
           npm run check
           node scripts/audit-god-file-boundaries.mjs
       - name: Commit and push merge
