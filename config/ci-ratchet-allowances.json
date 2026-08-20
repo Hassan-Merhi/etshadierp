@@ -10,7 +10,9 @@
     "client/src/pages/vouchers/StockTransferForm.tsx": 2388
   },
   "routeManifestAdditions": [],
-  "routeManifestMountAdditions": [],
+  "routeManifestMountAdditions": [
+    "USE /api/factory/v5/stock-allocation [<anonymous>]"
+  ],
   "sourceTextAssertionDelta": {
     "additionalSourceCoupledTests": [
       "tests/factory-post-offload-phase5-reconciliation.test.ts",

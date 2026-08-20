@@ -47,6 +47,7 @@ export function ApplicationLanguageProvider({ children }: { children: ReactNode 
   const [language, setLanguageState] = useState<ApplicationLanguage>(readLocalPreference);
   const [announcement, setAnnouncement] = useState("");
   const announcedLanguageRef = useRef(language);
+  const browserPreferenceChangedRef = useRef(false);
 
   const preferenceQuery = useQuery<LanguagePreferenceResponse>({
     queryKey: ["/api/language-preference"],
@@ -56,7 +57,7 @@ export function ApplicationLanguageProvider({ children }: { children: ReactNode 
 
   useEffect(() => {
     const serverLanguage = preferenceQuery.data?.preferredLanguage;
-    if (!serverLanguage) return;
+    if (!serverLanguage || browserPreferenceChangedRef.current) return;
     const normalized = parseApplicationLanguage(serverLanguage);
     setLanguageState(normalized);
     persistBrowserPreference(normalized);
@@ -75,6 +76,7 @@ export function ApplicationLanguageProvider({ children }: { children: ReactNode 
   const setLanguage = useCallback(
     (next: ApplicationLanguage) => {
       const normalized = parseApplicationLanguage(next);
+      browserPreferenceChangedRef.current = true;
       persistBrowserPreference(normalized);
       applyApplicationLanguageToDocument(normalized);
       setLanguageState(normalized);
@@ -98,9 +100,11 @@ export function ApplicationLanguageProvider({ children }: { children: ReactNode 
   useEffect(() => {
     const handleStorage = (event: StorageEvent) => {
       if (event.key !== APPLICATION_LANGUAGE_STORAGE_KEY) return;
+      browserPreferenceChangedRef.current = true;
       setLanguageState(parseApplicationLanguage(event.newValue));
     };
     const handleLanguageEvent = (event: Event) => {
+      browserPreferenceChangedRef.current = true;
       setLanguageState(parseApplicationLanguage((event as CustomEvent<ApplicationLanguage>).detail));
     };
     window.addEventListener("storage", handleStorage);

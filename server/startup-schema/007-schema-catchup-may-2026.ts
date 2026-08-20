@@ -17,10 +17,17 @@ export const schemaCatchupMay2026: string[] = [
   // forced to be remediated before deploy completes.
   `DO $$ BEGIN ALTER TABLE chat_messages VALIDATE CONSTRAINT chat_messages_company_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
   `DO $$ BEGIN ALTER TABLE container_offloads VALIDATE CONSTRAINT container_offloads_location_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
-  `DO $$ BEGIN ALTER TABLE factory_container_commissions VALIDATE CONSTRAINT factory_container_commissions_container_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
-  `DO $$ BEGIN ALTER TABLE factory_fx_allocations VALIDATE CONSTRAINT factory_fx_allocations_container_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
-  `DO $$ BEGIN ALTER TABLE factory_raw_stock VALIDATE CONSTRAINT factory_raw_stock_container_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
   `DO $$ BEGIN ALTER TABLE import_logs VALIDATE CONSTRAINT import_logs_container_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
+  // factory_container_commissions, factory_fx_allocations and factory_raw_stock
+  // are deliberately absent from this list. Part 006 creates their
+  // *_container_id_fkey against `containers`, but part 009 later drops each one
+  // and recreates it against `factory_containers` — the table those columns
+  // actually reference. Validating the 006 form here compares the data against
+  // the wrong parent table, so it raised foreign_key_violation on every boot of
+  // any database holding factory rows: a false alarm that made the real orphan
+  // signal below untrustworthy. Part 009 adds the corrected constraints without
+  // NOT VALID, so Postgres validates them in full against the right table and
+  // the orphan check is stronger than the one removed here.
   `DO $$ BEGIN ALTER TABLE inventory VALIDATE CONSTRAINT inventory_location_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
   `DO $$ BEGIN ALTER TABLE stock_adjustment_vouchers VALIDATE CONSTRAINT stock_adjustment_vouchers_location_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
   `DO $$ BEGIN ALTER TABLE stock_transfer_items VALIDATE CONSTRAINT stock_transfer_items_source_location_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,

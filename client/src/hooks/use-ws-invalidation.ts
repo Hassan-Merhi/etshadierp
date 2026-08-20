@@ -9,6 +9,7 @@ const STABLE_QUERY_PREFIXES = [
   "/api/stats/net-profit", // full balance-sheet computation; user refreshes manually
   "/api/reports/net-profit-statement", // P&L report; heavy computation
   "/api/balance-sheet", // balance sheet; heavy computation
+  "/api/factory/v5/stock-allocation", // ~543 KB response; refresh explicitly after allocation-affecting mutations/manual refresh
 ];
 
 // A burst of writes — an import, a POS rush, a bulk edit — used to produce a

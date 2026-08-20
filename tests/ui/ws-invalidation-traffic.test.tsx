@@ -1,5 +1,5 @@
 import { renderHook } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, type Query } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { useWsInvalidation } from "@/hooks/use-ws-invalidation";
 
@@ -39,6 +39,10 @@ describe("WebSocket invalidation traffic", () => {
     return ({ children }: { children: ReactNode }) => (
       <QueryClientProvider client={client}>{children}</QueryClientProvider>
     );
+  }
+
+  function queryWithKey(key: string): Query {
+    return { queryKey: [key] } as unknown as Query;
   }
 
   beforeEach(() => {
@@ -110,5 +114,22 @@ describe("WebSocket invalidation traffic", () => {
     vi.advanceTimersByTime(3_000);
 
     expect(invalidate).toHaveBeenCalledWith(expect.anything(), { cancelRefetch: false });
+  });
+
+  it("keeps heavy stock allocation out of blanket websocket refetches", () => {
+    const client = new QueryClient();
+    const invalidate = vi.spyOn(client, "invalidateQueries").mockResolvedValue();
+    renderHook(() => useWsInvalidation(), { wrapper: wrapper(client) });
+
+    sockets[0].receiveInvalidate();
+    vi.advanceTimersByTime(3_000);
+
+    const options = invalidate.mock.calls[0]?.[0];
+    expect(options?.predicate).toBeTypeOf("function");
+    const predicate = options!.predicate!;
+
+    expect(predicate(queryWithKey("/api/factory/v5/stock-allocation"))).toBe(false);
+    expect(predicate(queryWithKey("/api/factory/v5/stock-allocation?pagination=1&page=2&limit=50"))).toBe(false);
+    expect(predicate(queryWithKey("/api/factory/customer-orders?status=LOADING"))).toBe(true);
   });
 });
