@@ -1,0 +1,162 @@
+name: PR 780 Type Escape Repair
+
+on:
+  push:
+    branches:
+      - agent/god-files-recovery-latest-main
+    paths:
+      - .github/workflows/pr780-type-escape-repair.yml
+
+permissions:
+  contents: write
+
+env:
+  CI: true
+  NODE_OPTIONS: --max-old-space-size=6144
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: agent/god-files-recovery-latest-main
+          fetch-depth: 0
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "22.14.0"
+          cache: npm
+      - run: npm ci
+      - name: Remove inherited type escapes without weakening ratchets
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          cat >/tmp/pr780-targets.txt <<'EOF'
+          client/src/pages/accountslegacy/EditAccountDialog.tsx
+          client/src/pages/accountslegacy/useAccountsLegacyModel.ts
+          client/src/pages/containerloadingscan/useContainerLoadingScanModel.ts
+          client/src/pages/daybook/voucherdetailsdialog/LedgerVoucherEntries.tsx
+          client/src/pages/daybook/voucherdetailsdialog/PurchaseVoucherEntries.tsx
+          client/src/pages/daybook/voucherdetailsdialog/SalesVoucherEntries.tsx
+          client/src/pages/daybook/voucherdetailsdialog/VoucherRevisionHistory.tsx
+          client/src/pages/factory/daybook/useFactoryDaybookModel.ts
+          client/src/pages/factory/factorycontainerloadingscan/ProformaProgressPanel.tsx
+          client/src/pages/factory/factorycontainerloadingscan/scanFeedback.ts
+          client/src/pages/factory/factorycontainerloadingscan/useFactoryContainerLoadingScanModel.ts
+          client/src/pages/factory/factorypos/FactoryPosCartTable.tsx
+          client/src/pages/factory/factorypos/FactoryPosHistoryAndDialogs.tsx
+          client/src/pages/factory/factorypos/FactoryPosPrintTemplate.tsx
+          client/src/pages/factory/factorypos/FactoryPosToolbar.tsx
+          client/src/pages/factory/factorypos/useFactoryPosModel.ts
+          client/src/pages/factory/factorysettings/useFactorySettingsModel.ts
+          client/src/pages/pos/posimport/PosImportPrintTemplate.tsx
+          client/src/pages/pos/posimport/PosImportResults.tsx
+          client/src/pages/pos/posimport/usePosImportModel.ts
+          client/src/pages/pos/pospricelist/PriceListTable.tsx
+          client/src/pages/pos/pospricelist/usePosPriceListModel.ts
+          client/src/pages/settings/datatoolstab/DataToolsView.tsx
+          client/src/pages/settings/datatoolstab/SilentProductionDialog.tsx
+          client/src/pages/settings/datatoolstab/SilentTransferDialog.tsx
+          client/src/pages/settings/datatoolstab/useDataToolsModel.ts
+          client/src/pages/transactionjournal/components/detail/PaymentReceiptPanel.tsx
+          client/src/pages/transactionjournal/components/detail/PurchasePanel.tsx
+          client/src/pages/transactionjournal/components/detail/SalesPanel.tsx
+          client/src/pages/transactionjournal/components/detail/StockMovementPanel.tsx
+          client/src/pages/transactionjournal/components/detail/panelTypes.ts
+          client/src/pages/transactionjournal/useTransactionJournalModel.ts
+          client/src/pages/vouchers/stock-adjustment-form/useStockAdjustmentFormModel.ts
+          client/src/pages/vouchers/stock-transfer-form/StockTransferDesktopQuantityCells.tsx
+          client/src/pages/vouchers/stock-transfer-form/StockTransferFooterAndDialogs.tsx
+          client/src/pages/vouchers/stock-transfer-form/StockTransferHeader.tsx
+          client/src/pages/vouchers/stock-transfer-form/StockTransferMobileEntries.tsx
+          client/src/pages/vouchers/stock-transfer-form/StockTransferSidebars.tsx
+          client/src/pages/vouchers/stock-transfer-form/useStockTransferFormModel.ts
+          EOF
+
+          npm run check
+          count(){ set +e; node scripts/audit-type-escapes.mjs --json >/tmp/count.json 2>/dev/null; set -e; node -e "const r=require('/tmp/count.json');process.stdout.write(String(r.summary.typeEscapeTotal))"; }
+          current=$(count)
+          echo "START_TYPE_ESCAPES=$current"
+
+          for mode in safe param array generic property union cast unknown; do
+            : >/tmp/pr780-blocked.txt
+            for round in $(seq 1 12); do
+              base=$(git rev-parse HEAD)
+              PHASE18_MODE="$mode" PHASE18_BLOCKLIST=/tmp/pr780-blocked.txt node scripts/phase18-wave2-propose.cjs
+
+              # This repair is strictly limited to the 39 extracted files that violated the PR ratchet.
+              while IFS= read -r changed; do
+                [ -n "$changed" ] || continue
+                if ! grep -Fxq "$changed" /tmp/pr780-targets.txt; then
+                  git checkout "$base" -- "$changed"
+                fi
+              done < <(git diff --name-only "$base" -- client/src server shared)
+
+              if git diff --quiet "$base" -- client/src server shared; then
+                echo "MODE_EXHAUSTED mode=$mode round=$round"
+                break
+              fi
+
+              green=0
+              for attempt in $(seq 1 48); do
+                set +e; npm run check >/tmp/check.log 2>&1; rc=$?; set -e
+                if [ "$rc" -eq 0 ]; then green=1; break; fi
+                reverted=0
+                while IFS= read -r f; do
+                  [ -n "$f" ] || continue
+                  if ! grep -Fxq "$f" /tmp/pr780-targets.txt; then continue; fi
+                  if git diff --quiet "$base" -- "$f"; then continue; fi
+                  git checkout "$base" -- "$f"
+                  echo "$f" >>/tmp/pr780-blocked.txt
+                  reverted=$((reverted+1))
+                done < <(sed -nE 's#^([^ (]+\.(ts|tsx))\([0-9]+,[0-9]+\): error TS[0-9]+:.*#\1#p' /tmp/check.log | sort -u)
+                if [ "$reverted" -gt 0 ]; then continue; fi
+                first=$(git diff --name-only "$base" -- client/src server shared | while read -r f; do grep -Fxq "$f" /tmp/pr780-targets.txt && { echo "$f"; break; }; done)
+                [ -n "$first" ] || break
+                git checkout "$base" -- "$first"
+                echo "$first" >>/tmp/pr780-blocked.txt
+              done
+
+              if [ "$green" -ne 1 ]; then
+                git reset --hard "$base"
+                echo "MODE_BLOCKED mode=$mode round=$round"
+                break
+              fi
+
+              next=$(count)
+              if [ "$next" -ge "$current" ]; then
+                git reset --hard "$base"
+                echo "NO_REDUCTION mode=$mode current=$current next=$next"
+                break
+              fi
+
+              git add $(cat /tmp/pr780-targets.txt)
+              git commit -m "refactor: remove PR 780 inherited type escapes ($mode $round) [skip ci]"
+              git push origin HEAD:agent/god-files-recovery-latest-main
+              echo "ACCEPTED mode=$mode $current->$next"
+              current="$next"
+            done
+          done
+
+          npm run check
+          node scripts/audit-type-escapes.mjs --json >/tmp/final.json || true
+          node - <<'NODE'
+          const fs = require('fs');
+          const r = JSON.parse(fs.readFileSync('/tmp/final.json','utf8'));
+          console.log(`FINAL_TYPE_ESCAPES=${r.summary.typeEscapeTotal}`);
+          if (r.failures?.length) {
+            console.error(JSON.stringify(r.failures, null, 2));
+            process.exit(1);
+          }
+          NODE
+      - name: Remove one-shot repair workflow
+        shell: bash
+        run: |
+          git pull --ff-only origin agent/god-files-recovery-latest-main
+          git rm .github/workflows/pr780-type-escape-repair.yml
+          git commit -m "chore: remove completed PR 780 type escape repair"
+          git push origin HEAD:agent/god-files-recovery-latest-main
