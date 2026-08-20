@@ -5,14 +5,12 @@
     "server/services/rental/rentalPaymentPostingService.ts": 958,
     "client/src/pages/ContainerLoadingScan.tsx": 1133,
     "client/src/pages/daybook/VoucherDetailsDialog.tsx": 984,
-    "client/src/pages/factory/CustomerLoading.tsx": 1008,
+    "client/src/pages/factory/CustomerLoading.tsx": 1014,
     "client/src/pages/factory/FactoryContainerLoadingScan.tsx": 1906,
     "client/src/pages/factory/WasteDispatchOptimized.tsx": 987,
     "client/src/pages/vouchers/StockTransferForm.tsx": 2388
   },
-  "routeManifestAdditions": [
-    "DELETE /api/locations/:locationId [requireAuth > <anonymous>]"
-  ],
+  "routeManifestAdditions": [],
   "routeManifestMountAdditions": [],
   "sourceTextAssertionDelta": {
     "additionalSourceCoupledTests": [
