@@ -14,9 +14,8 @@ executors:
       NODE_OPTIONS: --max-old-space-size=4096
       PORT: "5000"
 
-jobs:
-  publish-wave1-split:
-    executor: node22
+commands:
+  install:
     steps:
       - checkout
       - run:
@@ -27,32 +26,30 @@ jobs:
             git clean -ffdx
             sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
             npm ci --no-audit --bin-links=true
+
+jobs:
+  wave1-generate-only:
+    executor: node22
+    steps:
+      - install
       - run:
-          name: Generate Wave 1 split
+          name: Generate and verify split
           command: |
             node scripts/god-files-wave1-split.mjs
             npm run audit:god-files
             npm run audit:doc-index
             npm run check
+            git diff --check
+  wave1-push-probe:
+    executor: node22
+    steps:
+      - checkout
       - run:
-          name: Publish clean Wave 1 branch
-          command: |
-            git fetch --no-tags origin "+refs/heads/${CIRCLE_BRANCH}:refs/remotes/origin/${CIRCLE_BRANCH}"
-            remote_head="$(git rev-parse refs/remotes/origin/${CIRCLE_BRANCH})"
-            if [ "${remote_head}" != "${CIRCLE_SHA1}" ]; then
-              echo "Branch advanced to ${remote_head}; newer run owns publication."
-              exit 0
-            fi
-            git show a1b3e57f63af1c4847e8851027868dc067bf68e8:.circleci/config.yml > .circleci/config.yml
-            rm -f .github/workflows/god-files-wave1-test-split.yml scripts/god-files-wave1-split.mjs
-            git config user.name "CircleCI Wave 1"
-            git config user.email "circleci-wave1@users.noreply.github.com"
-            git add -A
-            git diff --cached --check
-            git commit -m "refactor(god-files): split oversized Wave 1 test suites"
-            git push origin HEAD:${CIRCLE_BRANCH}
+          name: Probe branch write permission without changing it
+          command: git push origin HEAD:${CIRCLE_BRANCH}
 
 workflows:
-  wave1-publication:
+  wave1-publication-diagnosis:
     jobs:
-      - publish-wave1-split
+      - wave1-generate-only
+      - wave1-push-probe
