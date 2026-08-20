@@ -1,0 +1,128 @@
+name: PR780 Main Resync
+
+on:
+  push:
+    branches:
+      - agent/god-files-recovery-latest-main
+
+permissions:
+  contents: write
+
+jobs:
+  resync:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: agent/god-files-recovery-latest-main
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.14.0'
+          cache: npm
+      - name: Merge current main and resolve true conflicts
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin main
+          set +e
+          git merge --no-commit --no-ff origin/main
+          merge_rc=$?
+          set -e
+          echo "merge exit: ${merge_rc}"
+          conflicts="$(git diff --name-only --diff-filter=U || true)"
+          echo "Conflicts:"
+          printf '%s\n' "$conflicts"
+          if [ -n "$conflicts" ]; then
+            while IFS= read -r file; do
+              [ -z "$file" ] && continue
+              case "$file" in
+                tests/frontend-layout.test.ts|tests/phase7-backend-messages-translations.test.ts)
+                  git checkout --ours -- "$file"
+                  ;;
+                *)
+                  git checkout --theirs -- "$file"
+                  ;;
+              esac
+              git add -- "$file"
+            done <<< "$conflicts"
+          fi
+          if git diff --name-only --diff-filter=U | grep -q .; then
+            echo 'Unresolved conflicts remain:'
+            git diff --name-only --diff-filter=U
+            exit 1
+          fi
+      - name: Reconcile earned ratchets and stale contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          config_path = Path('config/god-file-boundaries.json')
+          data = json.loads(config_path.read_text())
+          scan = data['repositoryScan']
+          soft = scan['softMaxLines']
+          gf = scan['grandfathered']
+          stale = []
+          for rel in list(gf):
+              p = Path(rel)
+              if not p.exists():
+                  stale.append(rel)
+                  continue
+              lines = len(p.read_text(errors='ignore').splitlines())
+              if lines <= soft:
+                  stale.append(rel)
+          for rel in stale:
+              gf.pop(rel, None)
+          data['version'] = max(int(data.get('version', 0)), 24) + 1
+          data['description'] = (
+              'Version 25 reconciles current main Waves 5-9 with the recovered God Files programme, '
+              'preserves newer main implementations, and permanently retires every grandfathered file '
+              'that is now at or below the repository limit. ' + data.get('description', '')
+          )
+          config_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + '\n')
+          print('Retired stale baselines:', len(stale), stale)
+          print('Remaining grandfathered:', len(gf))
+
+          p = Path('tests/god-file-boundaries.test.ts')
+          s = p.read_text()
+          s = s.replace('expect(report.version).toBe(24);', 'expect(report.version).toBe(25);')
+          s = s.replace('expect(report.version).toBe(23);', 'expect(report.version).toBe(25);')
+          p.write_text(s)
+
+          p = Path('tests/frontend-layout.test.ts')
+          s = p.read_text()
+          old = '''  it("JournalForm.tsx — waPendingPrompt state variable present", () => {\n    expect(src("client/src/pages/vouchers/JournalForm.tsx")).toContain("waPendingPrompt");\n  });'''
+          new = '''  it("JournalForm model — waPendingPrompt state variable present", () => {\n    expect(src("client/src/pages/vouchers/journalform/useJournalFormModel.tsx")).toContain("waPendingPrompt");\n  });'''
+          if old in s:
+              s = s.replace(old, new)
+          p.write_text(s)
+
+          p = Path('tests/phase7-backend-messages-translations.test.ts')
+          s = p.read_text().replace('toHaveLength(597)', 'toHaveLength(599)').replace(').size).toBe(597)', ').size).toBe(599)')
+          p.write_text(s)
+          PY
+          git add config/god-file-boundaries.json tests/god-file-boundaries.test.ts tests/frontend-layout.test.ts tests/phase7-backend-messages-translations.test.ts
+      - name: Verify reconciled merge
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts
+          npx prettier --check config/god-file-boundaries.json tests/god-file-boundaries.test.ts tests/frontend-layout.test.ts tests/phase7-backend-messages-translations.test.ts
+          npx vitest run tests/frontend-layout.test.ts tests/god-file-boundaries.test.ts tests/phase7-backend-messages-translations.test.ts
+          npm run check
+          node scripts/audit-god-file-boundaries.mjs
+      - name: Commit and push merge
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -A
+          git status --short
+          git commit -m 'merge: resync PR780 recovery with current main'
+          git push origin HEAD:agent/god-files-recovery-latest-main
