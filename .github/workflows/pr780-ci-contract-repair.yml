@@ -1,4 +1,4 @@
-# retry: exact same scoped contract repair
+# retry: execute exact same scoped contract repair
 name: PR 780 CI contract repair
 
 on:
