@@ -1,3 +1,4 @@
+# retry: exact same scoped contract repair
 name: PR 780 CI contract repair
 
 on:
@@ -29,7 +30,6 @@ jobs:
           python3 <<'PY'
           from pathlib import Path
           import json
-          import re
 
           stale = {
             "client/src/components/StockItemDetailsDialog.tsx",
@@ -108,8 +108,6 @@ jobs:
             raise SystemExit("Phase 7 translation count marker not found")
           p.write_text(s.replace("toHaveLength(597)", "toHaveLength(599)", 1))
 
-          # Customer Loading crossed the 900-line hard boundary when column controls landed on main.
-          # Move only declarations/pure helpers into a focused module; runtime behavior stays unchanged.
           p = Path("client/src/pages/factory/CustomerLoading.tsx")
           s = p.read_text()
           start_marker = "interface CustomerOption {"
