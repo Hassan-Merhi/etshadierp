@@ -5,6 +5,8 @@
  * first-match, so that order is behaviour.
  */
 import type { Express, Request, Response } from "express";
+import { PassThrough } from "stream";
+import { finished } from "stream/promises";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { db } from "../../../db";
@@ -79,139 +81,144 @@ export function registerShippingZipPackageRoutes(app: Express) {
 
       const zipFilename = buildZipFilename([row.containerNumber, row.clientName, row.destination], "zip");
 
-      // Build the entire ZIP in memory before touching the response.
-      // This prevents ERR_INVALID_RESPONSE: if we pipe archiver to res immediately
-      // and then something fails mid-stream, the response is unrecoverably corrupted.
-      const zipBuffer = await new Promise<Buffer>((resolve, reject) => {
-        const archive = archiver("zip", { zlib: { level: 6 } });
-        const chunks: Buffer[] = [];
+      const docIdNumbers = fileIds
+        .filter((f) => f.startsWith("doc_"))
+        .map((f) => parseInt(f.slice(4)))
+        .filter((n) => !isNaN(n));
 
-        archive.on("data", (chunk: Buffer) => chunks.push(chunk));
-        archive.on("end", () => resolve(Buffer.concat(chunks)));
-        archive.on("error", (err) => reject(err));
+      // Resolve every selected source before creating the archive. This keeps the
+      // HTTP response clean if a generated export or uploaded document is broken.
+      const [excelBuf, pdfBuf, docs] = await Promise.all([
+        fileIds.includes("invoice_excel")
+          ? fetchInternalBuffer(req, `/api/factory/customer-orders/${row.customerOrderId}/export-excel`)
+          : Promise.resolve(null),
+        fileIds.includes("statement_pdf") && row.customerId
+          ? fetchInternalBuffer(req, `/api/factory/customers/${row.customerId}/statement/export-pdf`)
+          : Promise.resolve(null),
+        docIdNumbers.length > 0
+          ? db
+              .select({
+                id: factoryShippingContainerDocuments.id,
+                fileName: factoryShippingContainerDocuments.fileName,
+                originalName: factoryShippingContainerDocuments.originalName,
+                displayName: factoryShippingContainerDocuments.displayName,
+                fileData: factoryShippingContainerDocuments.fileData,
+              })
+              .from(factoryShippingContainerDocuments)
+              .where(
+                and(
+                  inArray(factoryShippingContainerDocuments.id, docIdNumbers),
+                  eq(factoryShippingContainerDocuments.scrId, id),
+                  eq(factoryShippingContainerDocuments.companyId, companyId)
+                )
+              )
+          : Promise.resolve(
+              [] as Array<{
+                id: number;
+                fileName: string | null;
+                originalName: string | null;
+                displayName: string | null;
+                fileData: string | null;
+              }>
+            ),
+      ]);
 
-        // Fetch generated files and stored documents in parallel. Every selected
-        // item must resolve to non-empty bytes; otherwise we fail instead of
-        // returning a valid-looking ZIP with no files inside it.
-        (async () => {
-          try {
-            const docIdNumbers = fileIds
-              .filter((f) => f.startsWith("doc_"))
-              .map((f) => parseInt(f.slice(4)))
-              .filter((n) => !isNaN(n));
+      const missingFiles: string[] = [];
+      const entries: Array<{ name: string; data: Buffer }> = [];
 
-            const [excelBuf, pdfBuf, docs] = await Promise.all([
-              fileIds.includes("invoice_excel")
-                ? fetchInternalBuffer(req, `/api/factory/customer-orders/${row.customerOrderId}/export-excel`)
-                : Promise.resolve(null),
-              fileIds.includes("statement_pdf") && row.customerId
-                ? fetchInternalBuffer(req, `/api/factory/customers/${row.customerId}/statement/export-pdf`)
-                : Promise.resolve(null),
-              docIdNumbers.length > 0
-                ? db
-                    .select({
-                      id: factoryShippingContainerDocuments.id,
-                      fileName: factoryShippingContainerDocuments.fileName,
-                      originalName: factoryShippingContainerDocuments.originalName,
-                      displayName: factoryShippingContainerDocuments.displayName,
-                      fileData: factoryShippingContainerDocuments.fileData,
-                    })
-                    .from(factoryShippingContainerDocuments)
-                    .where(
-                      and(
-                        inArray(factoryShippingContainerDocuments.id, docIdNumbers),
-                        eq(factoryShippingContainerDocuments.scrId, id),
-                        eq(factoryShippingContainerDocuments.companyId, companyId)
-                      )
-                    )
-                : Promise.resolve(
-                    [] as Array<{
-                      id: number;
-                      fileName: string | null;
-                      originalName: string | null;
-                      displayName: string | null;
-                      fileData: string | null;
-                    }>
-                  ),
-            ]);
+      if (fileIds.includes("invoice_excel")) {
+        if (excelBuf && excelBuf.length > 0) {
+          entries.push({
+            name: buildZipFilename([row.containerNumber, row.clientName, row.destination], "xlsx"),
+            data: excelBuf,
+          });
+        } else {
+          missingFiles.push("Commercial Invoice");
+        }
+      }
 
-            const missingFiles: string[] = [];
-            let appendedEntries = 0;
+      if (fileIds.includes("statement_pdf")) {
+        if (pdfBuf && pdfBuf.length > 0) {
+          const safeClient = (row.clientName || "client").replace(/[^\w-]/g, "_");
+          entries.push({ name: `Customer_Statement_${safeClient}.pdf`, data: pdfBuf });
+        } else {
+          missingFiles.push("Customer Statement");
+        }
+      }
 
-            if (fileIds.includes("invoice_excel")) {
-              if (excelBuf && excelBuf.length > 0) {
-                const excelName = buildZipFilename([row.containerNumber, row.clientName, row.destination], "xlsx");
-                archive.append(excelBuf, { name: excelName });
-                appendedEntries += 1;
-              } else {
-                missingFiles.push("Commercial Invoice");
-              }
-            }
+      const docsById = new Map(docs.map((doc) => [doc.id, doc]));
+      for (const docId of docIdNumbers) {
+        const doc = docsById.get(docId);
+        if (!doc) {
+          missingFiles.push(`Uploaded document ${docId}`);
+          continue;
+        }
 
-            if (fileIds.includes("statement_pdf")) {
-              if (pdfBuf && pdfBuf.length > 0) {
-                const safeClient = (row.clientName || "client").replace(/[^\w-]/g, "_");
-                archive.append(pdfBuf, { name: `Customer_Statement_${safeClient}.pdf` });
-                appendedEntries += 1;
-              } else {
-                missingFiles.push("Customer Statement");
-              }
-            }
+        const entryName = safeZipEntryName(
+          doc.originalName?.trim() || doc.displayName?.trim() || doc.fileName?.trim(),
+          `document_${doc.id}`
+        );
 
-            const docsById = new Map(docs.map((doc) => [doc.id, doc]));
-            for (const docId of docIdNumbers) {
-              const doc = docsById.get(docId);
-              if (!doc) {
-                missingFiles.push(`Uploaded document ${docId}`);
-                continue;
-              }
+        let fileBuffer: Buffer | null = null;
+        if (doc.fileData?.trim()) {
+          const decoded = Buffer.from(doc.fileData, "base64");
+          if (decoded.length > 0) fileBuffer = decoded;
+        }
 
-              const entryName = safeZipEntryName(
-                doc.originalName?.trim() || doc.displayName?.trim() || doc.fileName?.trim(),
-                `document_${doc.id}`
-              );
-
-              let fileBuffer: Buffer | null = null;
-              if (doc.fileData?.trim()) {
-                const decoded = Buffer.from(doc.fileData, "base64");
-                if (decoded.length > 0) fileBuffer = decoded;
-              }
-
-              // Disk is only a cache in production, but keeping this fallback lets
-              // older rows still download if their cache happens to be present.
-              if (!fileBuffer && doc.fileName?.trim()) {
-                const diskPath = path.join(process.cwd(), "uploads", "shipping-container-docs", doc.fileName);
-                if (fs.existsSync(diskPath)) {
-                  const diskBuffer = fs.readFileSync(diskPath);
-                  if (diskBuffer.length > 0) fileBuffer = diskBuffer;
-                }
-              }
-
-              if (!fileBuffer) {
-                missingFiles.push(entryName);
-                continue;
-              }
-
-              archive.append(fileBuffer, { name: entryName });
-              appendedEntries += 1;
-            }
-
-            if (missingFiles.length > 0) {
-              throw new Error(
-                `Selected files are unavailable or empty: ${missingFiles.join(", ")}. Refresh the file list and re-upload any broken documents.`
-              );
-            }
-            if (appendedEntries === 0) {
-              throw new Error("No selected files contained downloadable data. Refresh the file list and try again.");
-            }
-
-            await archive.finalize();
-          } catch (innerErr) {
-            archive.abort();
-            reject(innerErr);
+        // Disk is only a cache in production, but keeping this fallback lets
+        // older rows still download if their cache happens to be present.
+        if (!fileBuffer && doc.fileName?.trim()) {
+          const diskPath = path.join(process.cwd(), "uploads", "shipping-container-docs", doc.fileName);
+          if (fs.existsSync(diskPath)) {
+            const diskBuffer = fs.readFileSync(diskPath);
+            if (diskBuffer.length > 0) fileBuffer = diskBuffer;
           }
-        })();
+        }
+
+        if (!fileBuffer) {
+          missingFiles.push(entryName);
+          continue;
+        }
+
+        entries.push({ name: entryName, data: fileBuffer });
+      }
+
+      if (missingFiles.length > 0) {
+        return res.status(409).json({
+          message: `Selected files are unavailable or empty: ${missingFiles.join(", ")}. Re-upload any broken documents and try again.`,
+        });
+      }
+      if (entries.length === 0) {
+        return res.status(409).json({ message: "No selected files contained downloadable data." });
+      }
+
+      // Pipe Archiver into a real writable stream and wait for that stream to
+      // finish. Listening for Archiver's readable-side `end` event directly can
+      // race or yield an empty buffer in production. The PassThrough gives us a
+      // deterministic completion signal after all ZIP bytes have been emitted.
+      const archive = archiver("zip", { zlib: { level: 6 } });
+      const output = new PassThrough();
+      const chunks: Buffer[] = [];
+
+      output.on("data", (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
+      archive.on("warning", (warning) => {
+        logger.warn("Warning while generating shipping ZIP package", { warning });
       });
+      archive.on("error", (archiveError) => output.destroy(archiveError));
+      archive.pipe(output);
+
+      for (const entry of entries) {
+        archive.append(entry.data, { name: entry.name });
+      }
+
+      const outputFinished = finished(output);
+      await archive.finalize();
+      await outputFinished;
+
+      const zipBuffer = Buffer.concat(chunks);
+      if (zipBuffer.length === 0) {
+        throw new Error("ZIP generation completed without producing any bytes");
+      }
 
       // Only send response after the ZIP is fully built — clean, no partial writes.
       res.setHeader("Content-Type", "application/zip");
