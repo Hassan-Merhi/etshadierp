@@ -177,6 +177,38 @@ function matchesReferenceQuery(queryPath: string, queryKey: readonly unknown[]):
   return queryPathname(queryKey) === queryPath;
 }
 
+async function refreshStockTransferEditorQueries(options: {
+  client: QueryClient;
+  method: string;
+  pathname: string;
+  response: Response;
+}): Promise<boolean> {
+  if (!/^\/api\/stock-transfers\/\d+$/.test(options.pathname) || !["PUT", "PATCH"].includes(options.method)) {
+    return false;
+  }
+
+  const payload = await options.response
+    .clone()
+    .json()
+    .catch(() => null);
+  if (!isRecord(payload)) return false;
+
+  const transfer = isRecord(payload.transfer) ? payload.transfer : null;
+  const lifecycle = isRecord(payload.lifecycle) ? payload.lifecycle : null;
+  const voucherId = Number(transfer?.voucherId ?? lifecycle?.voucherId ?? payload.voucherId);
+  if (!Number.isInteger(voucherId) || voucherId <= 0) return false;
+
+  // The stock-transfer editor keeps form state locally, while both Normal View and
+  // Transfer Order share these detail caches. Resetting them after a successful save
+  // makes active editors refetch immediately and leaves inactive queries empty, so a
+  // later mount must fetch instead of reusing the pre-save narration/items snapshot.
+  await Promise.all([
+    options.client.resetQueries({ queryKey: ["/api/stock-transfers", voucherId], exact: true }),
+    options.client.resetQueries({ queryKey: ["/api/vouchers", voucherId], exact: true }),
+  ]);
+  return true;
+}
+
 export async function applyReferenceMutationResponse(options: {
   client: QueryClient;
   method: string;
@@ -187,6 +219,8 @@ export async function applyReferenceMutationResponse(options: {
   if (!["POST", "PUT", "PATCH", "DELETE"].includes(method) || !options.response.ok) return false;
 
   const pathname = options.pathname.split("?", 1)[0].replace(/\/+$/, "") || "/";
+  if (await refreshStockTransferEditorQueries({ ...options, method, pathname })) return true;
+
   const rule = REFERENCE_MUTATION_RULES.find((candidate) => candidate.path.test(pathname));
   if (!rule) return false;
 

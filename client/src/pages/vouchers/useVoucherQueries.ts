@@ -1,7 +1,7 @@
 const PAY_FROM_LEDGER_TYPES = new Set(["Cash", "Bank", "Loans"]);
 
 import { useState, useEffect, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { stockItemKeys } from "@/lib/queryKeys";
 import type {
   BankAccount,
@@ -38,6 +38,7 @@ export function useVoucherQueries({
   isPOS,
   posLocationId,
 }: UseVoucherQueriesProps) {
+  const queryClient = useQueryClient();
   const [liveAccountSearch, setLiveAccountSearch] = useState("");
   const [debouncedAccountSearch, setDebouncedAccountSearch] = useState("");
 
@@ -46,12 +47,36 @@ export function useVoucherQueries({
     return () => clearTimeout(timer);
   }, [liveAccountSearch]);
 
-  const needsStockData =
-    isPOS || activeTab === "transfer" || activeTab === "transferorder" || activeTab === "adjustment";
+  const isNormalStockTransfer = activeTab === "transfer";
+  const isStockTransferEditor = isNormalStockTransfer || activeTab === "transferorder";
+  const loadVoucherAccountData = !isNormalStockTransfer;
+
+  // Both transfer editors reuse the same detail keys. Always refresh those two small
+  // records when entering/switching transfer views so a just-saved narration, rows,
+  // date, destination, or optional flag can never be replaced by an old React Query
+  // snapshot. This also repairs the old global refetchOnMount:false behaviour for
+  // these editor transitions without broad cache churn elsewhere in Vouchers.
+  useEffect(() => {
+    if (!isStockTransferEditor || !voucherIdToEdit) return;
+    void queryClient.invalidateQueries({
+      queryKey: ["/api/stock-transfers", voucherIdToEdit],
+      exact: true,
+      refetchType: "active",
+    });
+    void queryClient.invalidateQueries({
+      queryKey: ["/api/vouchers", voucherIdToEdit],
+      exact: true,
+      refetchType: "active",
+    });
+  }, [activeTab, isStockTransferEditor, queryClient, voucherIdToEdit]);
+
+  // Normal Stock Transfer owns its own lightweight stock/location queries inside
+  // StockTransferForm. Do not fetch a second copy in the Vouchers shell.
+  const needsStockData = isPOS || activeTab === "transferorder" || activeTab === "adjustment";
 
   const { data: bankAccounts = [], isFetched: bankAccountsFetched } = useQuery<BankAccount[]>({
     queryKey: ["/api/bank-accounts", selectedCompany?.id],
-    enabled: !!selectedCompany?.id,
+    enabled: loadVoucherAccountData && !!selectedCompany?.id,
   });
 
   const { data: ledgerAccounts = [], isFetched: ledgerAccountsFetched } = useQuery<LedgerAccount[]>({
@@ -59,23 +84,23 @@ export function useVoucherQueries({
     // companyId is embedded in the URL so the server uses the explicit company rather than relying
     // on the session (which may not have updated yet on a company switch).
     queryKey: [`/api/ledger-accounts?includeHidden=true&companyId=${selectedCompany?.id}`, selectedCompany?.id],
-    enabled: !!selectedCompany?.id,
+    enabled: loadVoucherAccountData && !!selectedCompany?.id,
   });
 
   const { data: suppliers = [], isFetched: suppliersFetched } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers", selectedCompany?.id],
-    enabled: accountPickersNeeded && !!selectedCompany && !isPropertiesCompany,
+    enabled: loadVoucherAccountData && accountPickersNeeded && !!selectedCompany && !isPropertiesCompany,
     staleTime: 5 * 60 * 1000,
   });
 
   const { data: factorySuppliersList = [] } = useQuery<FactorySupplierBasic[]>({
     queryKey: ["/api/factory/suppliers", selectedCompany?.id],
-    enabled: isFactoryCompany,
+    enabled: loadVoucherAccountData && isFactoryCompany,
   });
 
   const { data: customers = [], isFetched: customersFetched } = useQuery<Customer[]>({
     queryKey: ["/api/customers", selectedCompany?.id],
-    enabled: accountPickersNeeded && !!selectedCompany,
+    enabled: loadVoucherAccountData && accountPickersNeeded && !!selectedCompany,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -107,17 +132,18 @@ export function useVoucherQueries({
 
   const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ["/api/employees", selectedCompany?.id],
-    enabled: !!selectedCompany?.id,
+    enabled: loadVoucherAccountData && !!selectedCompany?.id,
   });
 
   const { data: fixedAssets = [] } = useQuery<FixedAsset[]>({
     queryKey: ["/api/fixed-assets", selectedCompany?.id],
-    enabled: !!selectedCompany?.id,
+    enabled: loadVoucherAccountData && !!selectedCompany?.id,
   });
 
   const { data: supplierSearchResults = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers", "live-search", debouncedAccountSearch, selectedCompany?.id],
-    enabled: debouncedAccountSearch.length >= 2 && !!selectedCompany && !isPropertiesCompany,
+    enabled:
+      loadVoucherAccountData && debouncedAccountSearch.length >= 2 && !!selectedCompany && !isPropertiesCompany,
     staleTime: 30 * 1000,
     queryFn: async () => {
       const res = await fetch(`/api/suppliers?search=${encodeURIComponent(debouncedAccountSearch)}&limit=50`, {
@@ -130,7 +156,7 @@ export function useVoucherQueries({
 
   const { data: customerSearchResults = [] } = useQuery<Customer[]>({
     queryKey: ["/api/customers", "live-search", debouncedAccountSearch, selectedCompany?.id],
-    enabled: debouncedAccountSearch.length >= 2 && !!selectedCompany,
+    enabled: loadVoucherAccountData && debouncedAccountSearch.length >= 2 && !!selectedCompany,
     staleTime: 30 * 1000,
     queryFn: async () => {
       const res = await fetch(`/api/customers?search=${encodeURIComponent(debouncedAccountSearch)}&limit=50`, {
@@ -143,12 +169,12 @@ export function useVoucherQueries({
 
   const { data: sidebarAccounts = [] } = useQuery<Account[]>({
     queryKey: ["/api/accounts/voucher-sidebar", selectedCompany?.id],
-    enabled: !!selectedCompany?.id,
+    enabled: loadVoucherAccountData && !!selectedCompany?.id,
   });
 
   const { data: voucherToEdit, isLoading: loadingVoucher } = useQuery({
     queryKey: ["/api/vouchers", voucherIdToEdit],
-    enabled: !!voucherIdToEdit,
+    enabled: loadVoucherAccountData && !!voucherIdToEdit,
     queryFn: async () => {
       const res = await fetch(`/api/vouchers/${voucherIdToEdit}`);
       if (!res.ok) throw new Error("Failed to fetch voucher");
