@@ -1,0 +1,46 @@
+name: Wave H exact formatter
+
+on:
+  push:
+    branches:
+      - wave-i/convergence-automation
+    paths:
+      - .github/workflows/wave-h-format.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: wave-i/convergence-automation
+          fetch-depth: 0
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      - name: Format Wave H files
+        run: >-
+          node node_modules/prettier/bin/prettier.cjs --write
+          tests/scheduled-convergence-reconciliation.test.ts
+          tests/ui/helpers.tsx
+          tests/ui/wave-h-populated-core-pages.test.tsx
+          tests/ui/wave-h-production-bales-behavior.test.tsx
+      - name: Commit formatting
+        run: |
+          if git diff --quiet; then
+            echo "No formatting changes needed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- tests/scheduled-convergence-reconciliation.test.ts tests/ui/helpers.tsx tests/ui/wave-h-populated-core-pages.test.tsx tests/ui/wave-h-production-bales-behavior.test.tsx
+          git commit -m "style(wave-h): apply repository formatter"
+          git push origin HEAD:wave-i/convergence-automation
