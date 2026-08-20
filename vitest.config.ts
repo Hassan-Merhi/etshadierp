@@ -12,8 +12,11 @@ const { backend } = JSON.parse(
 // backend run, but it is real authenticated behavior across the read surface.
 // When coverage is being measured, include it so code executed by that contract
 // is not reported as uncovered merely because the liveness suite has its own
-// standalone invocation in Release Verification.
-const measuringCoverage = process.argv.includes("--coverage");
+// standalone invocation in Release Verification. Vitest does not guarantee the
+// CLI --coverage flag remains in process.argv while loading config, so also use
+// npm's lifecycle marker from the canonical coverage script.
+const measuringCoverage =
+  process.argv.includes("--coverage") || process.env.npm_lifecycle_event === "test:backend:coverage";
 
 export default defineConfig({
   test: {
