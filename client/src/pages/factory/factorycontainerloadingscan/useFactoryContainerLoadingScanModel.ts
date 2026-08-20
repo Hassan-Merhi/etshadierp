@@ -199,7 +199,7 @@ export function useFactoryContainerLoadingScanModel() {
       setTimeout(() => scannerRef.current?.focus(), 100);
     },
     onError: (error: Error) => {
-      if ((error)?._handledGlobally) return;
+      if (error?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
@@ -251,7 +251,7 @@ export function useFactoryContainerLoadingScanModel() {
       setScanCode("");
     },
     onError: (error: Error, variables: any) => {
-      if ((error)?._handledGlobally) return;
+      if (error?._handledGlobally) return;
       // Overload and not-in-proforma are soft rejections: arm a bypass so the
       // same code scanned a second time goes through.
       if ((error as any).overloaded) {
@@ -317,7 +317,7 @@ export function useFactoryContainerLoadingScanModel() {
       toast({ title: "Bale removed" });
     },
     onError: (error: Error) => {
-      if ((error)?._handledGlobally) return;
+      if (error?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
@@ -359,7 +359,7 @@ export function useFactoryContainerLoadingScanModel() {
       setTimeout(() => scannerRef.current?.focus(), 100);
     },
     onError: (error: Error) => {
-      if ((error)?._handledGlobally) return;
+      if (error?._handledGlobally) return;
       toast({ title: "Import failed", description: error.message, variant: "destructive" });
     },
   });
@@ -383,7 +383,7 @@ export function useFactoryContainerLoadingScanModel() {
     onError: (error: Error) => {
       if (error?._handledGlobally) return;
       setShowFinalizeDialog(false);
-      if ((error)?._handledGlobally) return;
+      if (error?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
@@ -404,7 +404,7 @@ export function useFactoryContainerLoadingScanModel() {
       toast({ title: "Note saved" });
     },
     onError: (error: Error) => {
-      if ((error)?._handledGlobally) return;
+      if (error?._handledGlobally) return;
       toast({ title: "Failed to save note", description: error.message, variant: "destructive" });
     },
   });
