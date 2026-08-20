@@ -1,14 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  STATUS_ACTIVE,
-  calcDelayDays,
-  ccySym,
-  containerCost,
-  fmtAmt,
-  fmtDate,
-  isOverdue,
-  num,
-} from "./utils";
+import { STATUS_ACTIVE, calcDelayDays, ccySym, containerCost, fmtAmt, fmtDate, isOverdue, num } from "./utils";
 
 describe("factory OTW tracking helpers", () => {
   it("normalizes currency symbols and numeric values", () => {
