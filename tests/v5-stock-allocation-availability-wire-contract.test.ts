@@ -19,13 +19,10 @@ describe("V5 stock allocation availability wire contract", () => {
     expect(compactIndex).toBeLessThan(canonicalIndex);
   });
 
-  it(
-    "keeps Customer Loading on the same canonical query key while requesting the availability view over the wire",
-    () => {
-      const source = read("client/src/pages/factory/customerLoadingAvailability.ts");
-      expect(source).toContain('const STOCK_ALLOCATION_ENDPOINT = "/api/factory/v5/stock-allocation"');
-      expect(source).toContain('`${STOCK_ALLOCATION_ENDPOINT}?view=availability`');
-      expect(source).toContain("pathname !== CUSTOMER_LOADING_ROUTE");
-    }
-  );
+  it("keeps Customer Loading query key while requesting the compact availability view", () => {
+    const source = read("client/src/pages/factory/customerLoadingAvailability.ts");
+    expect(source).toContain('const STOCK_ALLOCATION_ENDPOINT = "/api/factory/v5/stock-allocation"');
+    expect(source).toContain('`${STOCK_ALLOCATION_ENDPOINT}?view=availability`');
+    expect(source).toContain("pathname !== CUSTOMER_LOADING_ROUTE");
+  });
 });
