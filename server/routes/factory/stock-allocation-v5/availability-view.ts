@@ -40,11 +40,7 @@ export function projectV5AllocationAvailabilityPayload(payload: unknown): unknow
  */
 export function registerV5AllocationAvailabilityView(app: Express): void {
   app.use(STOCK_ALLOCATION_PATH, (req: Request, res: Response, next) => {
-    if (
-      req.method !== "GET" ||
-      req.path !== "/" ||
-      req.query.view !== V5_ALLOCATION_AVAILABILITY_VIEW
-    ) {
+    if (req.method !== "GET" || req.path !== "/" || req.query.view !== V5_ALLOCATION_AVAILABILITY_VIEW) {
       next();
       return;
     }
