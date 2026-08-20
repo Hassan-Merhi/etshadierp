@@ -60,3 +60,9 @@ export interface LinkDialogState {
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
+
+export interface PendingDelete {
+  type: "row" | "col" | "page";
+  idx: number;
+  label: string;
+}

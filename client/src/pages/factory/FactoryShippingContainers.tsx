@@ -39,11 +39,10 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useLocation } from "wouter";
 
-import type { DisplayRow, ShippingColId, ShippingRow, TrackingRow } from "./factoryshippingcontainers/types";
+import type { DisplayRow, ShippingRow, TrackingRow } from "./factoryshippingcontainers/types";
 import {
   CLI_LEFT,
   CTR_LEFT,
-  DEFAULT_COL_VIS,
   INV_LEFT,
   LIST_KEY,
   SHIPPING_COLS,
@@ -60,6 +59,7 @@ import { DateCellInput } from "./factoryshippingcontainers/components/DateCellIn
 import { DocumentsModal } from "./factoryshippingcontainers/components/DocumentsModal";
 import { WhatsAppModal } from "./factoryshippingcontainers/components/WhatsAppModal";
 import { ShippingAvailabilityTable } from "./factoryshippingcontainers/components/ShippingAvailabilityTable";
+import { useShippingColumnVisibility } from "./factoryshippingcontainers/hooks/useShippingColumnVisibility";
 
 export default function FactoryShippingContainers() {
   const { toast } = useToast();
@@ -79,28 +79,7 @@ export default function FactoryShippingContainers() {
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
 
   const { data: me } = useQuery<any>({ queryKey: ["/api/auth/me"] });
-  const [colVis, setColVis] = useState<Record<ShippingColId, boolean>>(DEFAULT_COL_VIS);
-  useEffect(() => {
-    if (!me?.id) return;
-    try {
-      const saved = localStorage.getItem(`fsc_col_vis_${me.id}`);
-      if (saved) setColVis({ ...DEFAULT_COL_VIS, ...JSON.parse(saved) });
-    } catch {
-      /* intentionally empty */
-    }
-  }, [me?.id]);
-  function toggleCol(id: ShippingColId) {
-    setColVis((prev) => {
-      const next = { ...prev, [id]: !prev[id] };
-      try {
-        if (me?.id) localStorage.setItem(`fsc_col_vis_${me.id}`, JSON.stringify(next));
-      } catch {
-        /* intentionally empty */
-      }
-      return next;
-    });
-  }
-  const hiddenCount = SHIPPING_COLS.filter((c) => !colVis[c.id]).length;
+  const { colVis, toggleCol, hiddenCount } = useShippingColumnVisibility(me?.id);
 
   // ── Data ──────────────────────────────────────────────────────────────────────
   const { data: activeRows = [], isLoading } = useQuery<ShippingRow[]>({
