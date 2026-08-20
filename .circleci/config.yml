@@ -120,8 +120,6 @@ jobs:
           command: npm run lint
       - run:
           name: Lint warning ratchet
-          # Per-rule half of the gate the Lint step enforces in total. Reads the
-          # report that run wrote, so it adds no second lint pass.
           when: always
           command: npm run audit:lint-ratchet
       - run:
@@ -221,13 +219,81 @@ jobs:
           name: Final production readiness contract
           command: npm run verify:final-production-readiness
 
+  wave1-publisher:
+    executor: node22-postgres
+    steps:
+      - install_dependencies
+      - wait_for_postgres
+      - run:
+          name: Prepare disposable database schema
+          command: node node_modules/drizzle-kit/bin.cjs push --force
+      - run:
+          name: Apply Wave 1 split
+          command: node scripts/god-files-wave1-split.mjs
+      - run:
+          name: Verify God-file and documentation ratchets
+          command: |
+            npm run audit:god-files
+            npm run audit:doc-index
+            npm run check
+      - run:
+          name: Run all resulting Wave 1 suites serially
+          command: |
+            node node_modules/vitest/vitest.mjs run \
+              tests/xlsx-export.test.ts \
+              tests/xlsx-export-sp-sales-form.test.ts \
+              tests/workflow.test.ts \
+              tests/workflow-daybook-isolation.test.ts \
+              tests/inventory.test.ts \
+              tests/inventory-reconciliation.test.ts \
+              tests/excel-export-v2.test.ts \
+              tests/excel-export-v2-totals-cash.test.ts \
+              tests/excel-export-v2-historical-cash.test.ts \
+              --maxWorkers=1 \
+              --no-file-parallelism
+      - run:
+          name: Publish certified Wave 1 split
+          command: |
+            git fetch --no-tags origin "+refs/heads/${CIRCLE_BRANCH}:refs/remotes/origin/${CIRCLE_BRANCH}"
+            remote_head="$(git rev-parse refs/remotes/origin/${CIRCLE_BRANCH})"
+            if [ "${remote_head}" != "${CIRCLE_SHA1}" ]; then
+              echo "Branch advanced while publisher was running (${remote_head}); leaving publication to the newer run."
+              exit 0
+            fi
+            git show a1b3e57f63af1c4847e8851027868dc067bf68e8:.circleci/config.yml > .circleci/config.yml
+            rm -f .github/workflows/god-files-wave1-test-split.yml scripts/god-files-wave1-split.mjs
+            git config user.name "CircleCI Wave 1"
+            git config user.email "circleci-wave1@users.noreply.github.com"
+            git add -- \
+              .circleci/config.yml \
+              .github/workflows/god-files-wave1-test-split.yml \
+              scripts/god-files-wave1-split.mjs \
+              tests/xlsx-export.test.ts \
+              tests/xlsx-export-sp-sales-form.test.ts \
+              tests/workflow.test.ts \
+              tests/workflow-daybook-isolation.test.ts \
+              tests/inventory.test.ts \
+              tests/inventory-reconciliation.test.ts \
+              tests/excel-export-v2.test.ts \
+              tests/excel-export-v2-totals-cash.test.ts \
+              tests/excel-export-v2-historical-cash.test.ts \
+              config/god-file-boundaries.json \
+              tests/god-file-boundaries.test.ts \
+              docs/god-file-split-program.md \
+              docs/system-quality-program.md
+            git diff --cached --check
+            git commit -m "refactor(god-files): split oversized Wave 1 test suites"
+            git push origin HEAD:${CIRCLE_BRANCH}
+
 workflows:
   full-erp-verification:
-    # This is the canonical CircleCI path for pull-request branches and main.
-    # Verification jobs are independent so CircleCI can run them in parallel.
     jobs:
       - static-build
       - postgres-regression
       - backend-core-regression
       - frontend-regression
       - security-readiness
+      - wave1-publisher:
+          filters:
+            branches:
+              only: agent/god-files-final-wave1-tests
