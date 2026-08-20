@@ -66,9 +66,9 @@ try {
     execFileSync(process.execPath, ["node_modules/prettier/bin/prettier.cjs", "--write", FORMAT_DIAGNOSTIC_FILE], {
       stdio: "ignore",
     });
-    console.error("\n---BEGIN-PRETTIER-CUSTOMER-LOADING---");
-    console.error(readFileSync(FORMAT_DIAGNOSTIC_FILE, "utf8"));
-    console.error("---END-PRETTIER-CUSTOMER-LOADING---");
+    console.log("\n---BEGIN-PRETTIER-CUSTOMER-LOADING---");
+    console.log(readFileSync(FORMAT_DIAGNOSTIC_FILE, "utf8"));
+    console.log("---END-PRETTIER-CUSTOMER-LOADING---");
   }
   console.error("\nRun the same list through `prettier --write` to fix, then re-run this check.");
   process.exit(1);
