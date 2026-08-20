@@ -47,7 +47,10 @@ if (typeof window !== "undefined" && !window.__erpCustomerLoadingAvailabilityFet
   window.__erpCustomerLoadingAvailabilityFetchInstalled = true;
   const previousFetch = window.fetch.bind(window);
   window.fetch = ((input: RequestInfo | URL, init?: RequestInit) =>
-    previousFetch(rewriteCustomerLoadingAllocationRequest(input, init, window.location.pathname), init)) as typeof window.fetch;
+    previousFetch(
+      rewriteCustomerLoadingAllocationRequest(input, init, window.location.pathname),
+      init
+    )) as typeof window.fetch;
 }
 
 export function normalizeCustomerLoadingArticleCode(value: string): string {
