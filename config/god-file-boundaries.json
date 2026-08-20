@@ -1,6 +1,6 @@
 {
-  "version": 21,
-  "description": "Repository-wide god-file architecture boundaries plus a one-way size ratchet. Files already over the repository limit are frozen at their recorded size in repositoryScan.grandfathered: they may shrink but never grow, and any new file crossing the limit fails until it is split or explicitly baselined. Version 21 completes Wave 9 by permanently retiring ContainerVerification.tsx and FactoryInvoiceLoadingScan.tsx from the grandfathered backlog: splitting out their card and dialog seams brought both below the 900-line repository limit.",
+  "version": 22,
+  "description": "Repository-wide god-file architecture boundaries plus a one-way size ratchet. Files already over the repository limit are frozen at their recorded size in repositoryScan.grandfathered: they may shrink but never grow, and any new file crossing the limit fails until it is split or explicitly baselined. Version 22 records the newly delivered Customer Loading surface at the next 25-line ratchet bucket (1025) so it cannot grow further while its Phase 3 extraction is completed; Version 21 completed Wave 9 by permanently retiring ContainerVerification.tsx and FactoryInvoiceLoadingScan.tsx from the grandfathered backlog.",
   "retiredFiles": [
     "server/routesLegacy.ts",
     "server/routes/reportsRoutesLegacy.ts",
@@ -146,6 +146,7 @@
       "client/src/pages/daybook/VoucherDetailsDialog.tsx": 1000,
       "client/src/pages/factory/BalesHistory.tsx": 1725,
       "client/src/pages/factory/CreateProformaV5Drawer.tsx": 1125,
+      "client/src/pages/factory/CustomerLoading.tsx": 1025,
       "client/src/pages/factory/FactoryContainerLoadingScan.tsx": 1906,
       "client/src/pages/factory/FactoryDaybook.tsx": 1500,
       "client/src/pages/factory/FactoryDispatchBatchDetail.tsx": 925,
