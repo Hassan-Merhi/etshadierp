@@ -56,6 +56,12 @@ commands:
               sleep 1
             done
             exit 1
+  prepare_db:
+    steps:
+      - wait_for_postgres
+      - run:
+          name: Prepare disposable database schema
+          command: node node_modules/drizzle-kit/bin.cjs push --force
   split:
     steps:
       - run:
@@ -84,39 +90,68 @@ jobs:
           name: TypeScript
           command: npm run check
 
-  wave1-targeted-tests:
+  wave1-xlsx-tests:
     executor: node22-postgres
     steps:
       - install
-      - wait_for_postgres
-      - run:
-          name: Prepare disposable database schema
-          command: node node_modules/drizzle-kit/bin.cjs push --force
+      - prepare_db
       - split
       - run:
-          name: Wave 1 suites
+          name: XLSX export split suites
           command: |
             node node_modules/vitest/vitest.mjs run \
               tests/xlsx-export.test.ts \
               tests/xlsx-export-sp-sales-form.test.ts \
+              --maxWorkers=1 --no-file-parallelism
+
+  wave1-workflow-tests:
+    executor: node22-postgres
+    steps:
+      - install
+      - prepare_db
+      - split
+      - run:
+          name: Workflow split suites
+          command: |
+            node node_modules/vitest/vitest.mjs run \
               tests/workflow.test.ts \
               tests/workflow-daybook-isolation.test.ts \
+              --maxWorkers=1 --no-file-parallelism
+
+  wave1-inventory-tests:
+    executor: node22-postgres
+    steps:
+      - install
+      - prepare_db
+      - split
+      - run:
+          name: Inventory split suites
+          command: |
+            node node_modules/vitest/vitest.mjs run \
               tests/inventory.test.ts \
               tests/inventory-reconciliation.test.ts \
+              --maxWorkers=1 --no-file-parallelism
+
+  wave1-excel-v2-tests:
+    executor: node22-postgres
+    steps:
+      - install
+      - prepare_db
+      - split
+      - run:
+          name: Excel V2 split suites
+          command: |
+            node node_modules/vitest/vitest.mjs run \
               tests/excel-export-v2.test.ts \
               tests/excel-export-v2-totals-cash.test.ts \
               tests/excel-export-v2-historical-cash.test.ts \
-              --maxWorkers=1 \
-              --no-file-parallelism
+              --maxWorkers=1 --no-file-parallelism
 
   wave1-publisher:
     executor: node22-postgres
     steps:
       - install
-      - wait_for_postgres
-      - run:
-          name: Prepare disposable database schema
-          command: node node_modules/drizzle-kit/bin.cjs push --force
+      - prepare_db
       - split
       - run:
           name: Reconfirm audits and TypeScript
@@ -178,9 +213,15 @@ workflows:
     jobs:
       - wave1-transform-audit
       - wave1-typecheck
-      - wave1-targeted-tests
+      - wave1-xlsx-tests
+      - wave1-workflow-tests
+      - wave1-inventory-tests
+      - wave1-excel-v2-tests
       - wave1-publisher:
           requires:
             - wave1-transform-audit
             - wave1-typecheck
-            - wave1-targeted-tests
+            - wave1-xlsx-tests
+            - wave1-workflow-tests
+            - wave1-inventory-tests
+            - wave1-excel-v2-tests
