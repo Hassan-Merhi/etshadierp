@@ -1,9 +1,9 @@
 name: Temporary Customer Loading Format Capture
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/fix-i18n-customer-loading-columns
+      - main
 
 permissions:
   contents: read
