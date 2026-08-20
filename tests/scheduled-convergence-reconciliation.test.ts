@@ -4,9 +4,7 @@ import {
   ConvergenceReconciliationError,
   type ConvergenceReconciliationResult,
 } from "../server/services/accounting/convergenceReconciliation";
-import {
-  runScheduledConvergenceReconciliation,
-} from "../server/services/accounting/scheduledConvergenceReconciliation";
+import { runScheduledConvergenceReconciliation } from "../server/services/accounting/scheduledConvergenceReconciliation";
 
 function cleanResult(companyId: number): ConvergenceReconciliationResult {
   return {

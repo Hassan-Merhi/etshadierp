@@ -33,43 +33,52 @@ function renderProductionBales() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity }, mutations: { retry: false } },
   });
-  client.setQueryData(["/api/factory/pressing-batches"], [
-    {
-      id: 44,
-      status: "PARTIALLY_FINALIZED",
-      createdAt: "2026-08-20",
-      pendingCount: 2,
-      finalizedCount: 1,
-      bales: [
-        {
-          id: 101,
-          pressingBatchId: 44,
-          referenceNumber: "BAL-101",
-          articleCode: "A101",
-          productName: "White Bale",
-          weightKg: "25",
-          status: "PENDING_PRESSING",
-        },
-        {
-          id: 102,
-          pressingBatchId: 44,
-          referenceNumber: "BAL-102",
-          articleCode: "A102",
-          productName: "Blue Bale",
-          weightKg: "30",
-          status: "PENDING_PRESSING",
-        },
-      ],
-    },
-  ]);
-  client.setQueryData(["/api/locations"], [
-    { id: 7, code: "WH", name: "Warehouse", active: true },
-    { id: 8, code: "OLD", name: "Inactive", active: false },
-  ]);
-  client.setQueryData(["/api/factory/mix-batches"], [
-    { id: 9, batchCode: "MIX-9", name: "Daily Mix", totalWeightKg: "100", usedKg: "20", status: "ACTIVE" },
-    { id: 10, batchCode: "MIX-10", name: "Closed Mix", totalWeightKg: "100", usedKg: "100", status: "CLOSED" },
-  ]);
+  client.setQueryData(
+    ["/api/factory/pressing-batches"],
+    [
+      {
+        id: 44,
+        status: "PARTIALLY_FINALIZED",
+        createdAt: "2026-08-20",
+        pendingCount: 2,
+        finalizedCount: 1,
+        bales: [
+          {
+            id: 101,
+            pressingBatchId: 44,
+            referenceNumber: "BAL-101",
+            articleCode: "A101",
+            productName: "White Bale",
+            weightKg: "25",
+            status: "PENDING_PRESSING",
+          },
+          {
+            id: 102,
+            pressingBatchId: 44,
+            referenceNumber: "BAL-102",
+            articleCode: "A102",
+            productName: "Blue Bale",
+            weightKg: "30",
+            status: "PENDING_PRESSING",
+          },
+        ],
+      },
+    ]
+  );
+  client.setQueryData(
+    ["/api/locations"],
+    [
+      { id: 7, code: "WH", name: "Warehouse", active: true },
+      { id: 8, code: "OLD", name: "Inactive", active: false },
+    ]
+  );
+  client.setQueryData(
+    ["/api/factory/mix-batches"],
+    [
+      { id: 9, batchCode: "MIX-9", name: "Daily Mix", totalWeightKg: "100", usedKg: "20", status: "ACTIVE" },
+      { id: 10, batchCode: "MIX-10", name: "Closed Mix", totalWeightKg: "100", usedKg: "100", status: "CLOSED" },
+    ]
+  );
 
   return render(
     <QueryClientProvider client={client}>

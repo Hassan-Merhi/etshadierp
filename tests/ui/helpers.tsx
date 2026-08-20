@@ -28,10 +28,7 @@ function makeTestClient(seedQueries: readonly SeededQuery[] = []): QueryClient {
   return client;
 }
 
-export function renderWithProviders(
-  ui: React.ReactElement,
-  options: RenderWithProvidersOptions = {}
-): RenderResult {
+export function renderWithProviders(ui: React.ReactElement, options: RenderWithProvidersOptions = {}): RenderResult {
   const client = makeTestClient(options.seedQueries);
   return render(
     <QueryClientProvider client={client}>

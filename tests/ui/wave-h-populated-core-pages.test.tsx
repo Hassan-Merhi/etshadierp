@@ -133,7 +133,10 @@ describe("Wave H populated core-page behavior", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();
-    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse([])));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse([]))
+    );
   });
 
   it("combines OTW and in-hand inventory, promotes legacy name matches, and drills into a stock group", async () => {
@@ -403,7 +406,9 @@ describe("Wave H populated core-page behavior", () => {
 
     expect(await screen.findByTestId("text-agent-account-name")).toHaveTextContent("Alpha Agent");
     expect(screen.getByTestId("text-agent-balance")).toHaveTextContent("$75.00");
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/transactions"), expect.anything()));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/transactions"), expect.anything())
+    );
     await waitFor(() => expect(screen.getByTestId("button-export-excel")).toBeEnabled());
     expect(await screen.findByText("JV-91")).toBeInTheDocument();
 
