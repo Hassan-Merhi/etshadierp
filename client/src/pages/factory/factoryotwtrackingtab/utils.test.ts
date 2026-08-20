@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
+import type { ContainerWithSupplier } from "./types";
 import { STATUS_ACTIVE, calcDelayDays, ccySym, containerCost, fmtAmt, fmtDate, isOverdue, num } from "./utils";
+
+// These helpers read only the handful of fields set per case, so each fixture
+// is a partial container widened once here rather than at every call site.
+const container = (fields: Partial<ContainerWithSupplier>) => fields as ContainerWithSupplier;
 
 describe("factory OTW tracking helpers", () => {
   it("normalizes currency symbols and numeric values", () => {
@@ -21,21 +26,21 @@ describe("factory OTW tracking helpers", () => {
 
   it("uses final payable amount when present and otherwise rate times weight", () => {
     expect(
-      containerCost({ currencyCode: "EUR", finalPayableAmount: "125", ratePerKg: "2", totalKg: "50" } as any)
+      containerCost(container({ currencyCode: "EUR", finalPayableAmount: "125", ratePerKg: "2", totalKg: "50" }))
     ).toEqual({ symbol: "€", amount: 125 });
     expect(
-      containerCost({ currencyCode: "USD", finalPayableAmount: "0", ratePerKg: "2.5", totalKg: "40" } as any)
+      containerCost(container({ currencyCode: "USD", finalPayableAmount: "0", ratePerKg: "2.5", totalKg: "40" }))
     ).toEqual({ symbol: "$", amount: 100 });
   });
 
   it("calculates delay only for past valid ETAs", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 7, 20, 12));
-    expect(calcDelayDays({ arrivalDate: "2026-08-18" } as any)).toBe(2);
-    expect(isOverdue({ arrivalDate: "2026-08-18" } as any)).toBe(true);
-    expect(calcDelayDays({ arrivalDate: "2026-08-21" } as any)).toBe(0);
-    expect(calcDelayDays({ arrivalDate: null } as any)).toBe(0);
-    expect(calcDelayDays({ arrivalDate: "invalid" } as any)).toBe(0);
+    expect(calcDelayDays(container({ arrivalDate: "2026-08-18" }))).toBe(2);
+    expect(isOverdue(container({ arrivalDate: "2026-08-18" }))).toBe(true);
+    expect(calcDelayDays(container({ arrivalDate: "2026-08-21" }))).toBe(0);
+    expect(calcDelayDays(container({ arrivalDate: null }))).toBe(0);
+    expect(calcDelayDays(container({ arrivalDate: "invalid" }))).toBe(0);
     vi.useRealTimers();
   });
 
