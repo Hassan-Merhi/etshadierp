@@ -1,0 +1,40 @@
+name: Wave H Populated Factory Diagnostic
+
+on:
+  push:
+    branches: [wave-i/convergence-automation]
+    paths:
+      - .github/workflows/wave-h-populated-factory-diagnostic.yml
+
+permissions:
+  contents: write
+
+jobs:
+  focused:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NODE_ENV: test
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - uses: actions/checkout@v7
+        with: { ref: wave-i/convergence-automation }
+      - uses: actions/setup-node@v6
+        with: { node-version: "22.14.0", cache: npm }
+      - run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+      - run: npm ci --no-audit --bin-links=true
+      - name: Run populated factory tests
+        id: test
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts tests/ui/wave-h-populated-factory-surfaces.test.tsx --maxWorkers=1 --no-file-parallelism 2>&1 | tee phase2-populated-factory-diagnostic.txt
+      - name: Record diagnostic and self-remove
+        run: |
+          printf '\nFocused outcome: %s\n' '${{ steps.test.outcome }}' >> phase2-populated-factory-diagnostic.txt
+          rm -f .github/workflows/wave-h-populated-factory-diagnostic.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add phase2-populated-factory-diagnostic.txt .github/workflows/wave-h-populated-factory-diagnostic.yml
+          git commit -m "test: record populated Wave H factory diagnostic"
+          git push origin HEAD:wave-i/convergence-automation
