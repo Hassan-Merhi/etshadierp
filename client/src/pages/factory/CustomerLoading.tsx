@@ -1,20 +1,11 @@
 import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, ExternalLink, Loader2, Search, ShoppingCart, UsersRound } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Search, ShoppingCart, UsersRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -25,92 +16,23 @@ import {
   shouldIncludeAvailableStock,
 } from "./customerLoadingAvailability";
 import { CustomerLoadingSummaryCards } from "./CustomerLoadingSummaryCards";
-
-interface CustomerOption {
-  id: number;
-  legalName: string;
-  code?: string | null;
-}
-interface CustomerLoadingProduct {
-  id: number;
-  code: string;
-  articleCode: string | null;
-  name: string;
-  nameAr: string | null;
-  categoryId: number | null;
-  categoryName: string | null;
-  categoryNameAr: string | null;
-  weightPerBaleKg: string | null;
-  sellingPrice: string | null;
-  productionPrice: string | null;
-  active: boolean;
-  totalBalesLoaded: number;
-  totalKgLoaded: number;
-  loadingCount: number;
-  lastLoadedAt: string | null;
-  loadingStatus: "LOADED" | "NEVER_LOADED";
-}
-interface CustomerLoadingResponse {
-  customer: { id: number; legalName: string };
-  summary: {
-    totalProducts: number;
-    loadedProducts: number;
-    neverLoadedProducts: number;
-    productCoveragePct: number;
-    totalBalesLoaded: number;
-    totalKgLoaded: number;
-  };
-  products: CustomerLoadingProduct[];
-}
-interface HistoryRow {
-  sessionId: number;
-  invoiceId: number;
-  status: string;
-  truckNo: string | null;
-  driverName: string | null;
-  startedAt: string | null;
-  completedAt: string | null;
-  balesLoaded: number;
-  kgLoaded: number;
-  lastScanAt: string | null;
-}
-interface HistoryResponse {
-  customer: { id: number; legalName: string };
-  product: { id: number; code: string; articleCode: string | null; name: string };
-  history: HistoryRow[];
-}
-type LoadingFilter = "ALL" | "LOADED" | "NEVER_LOADED";
-type AvailableZeroFilter = "SHOW_ZERO" | "HIDE_ZERO";
-type AvailableNegativeFilter = "SHOW_NEGATIVE" | "HIDE_NEGATIVE";
-type ColumnKey =
-  | "articleCode"
-  | "product"
-  | "arabicName"
-  | "category"
-  | "weight"
-  | "sellPrice"
-  | "availableStock"
-  | "status"
-  | "totalLoaded"
-  | "totalKg"
-  | "lastLoaded"
-  | "qty";
+import { CustomerLoadingColumnsDialog } from "./CustomerLoadingColumnsDialog";
+import { CustomerLoadingProformaDialog } from "./CustomerLoadingProformaDialog";
+import { CustomerLoadingHistoryDialog } from "./CustomerLoadingHistoryDialog";
+import { formatDate, formatMoney, formatNumber } from "./customerLoadingFormat";
+import {
+  COLUMN_OPTIONS,
+  type AvailableNegativeFilter,
+  type AvailableZeroFilter,
+  type ColumnKey,
+  type CustomerLoadingProduct,
+  type CustomerLoadingResponse,
+  type CustomerOption,
+  type HistoryResponse,
+  type LoadingFilter,
+} from "./customerLoadingTypes";
 
 const PAGE_SIZE = 75;
-const COLUMN_OPTIONS: Array<{ key: ColumnKey; label: string }> = [
-  { key: "articleCode", label: "Article Code" },
-  { key: "product", label: "Product" },
-  { key: "arabicName", label: "Arabic Name" },
-  { key: "category", label: "Category" },
-  { key: "weight", label: "Wt/Bale" },
-  { key: "sellPrice", label: "Sell Price" },
-  { key: "availableStock", label: "Available Stock" },
-  { key: "status", label: "Status" },
-  { key: "totalLoaded", label: "Total Loaded" },
-  { key: "totalKg", label: "Total KG" },
-  { key: "lastLoaded", label: "Last Loaded" },
-  { key: "qty", label: "Qty" },
-];
 
 async function readJson<T>(url: string): Promise<T> {
   const response = await fetch(url, { credentials: "include" });
@@ -118,33 +40,6 @@ async function readJson<T>(url: string): Promise<T> {
   if (!response.ok) throw new Error(payload?.message || "Request failed");
   return payload as T;
 }
-function formatNumber(value: number, maximumFractionDigits = 0) {
-  return new Intl.NumberFormat(undefined, { maximumFractionDigits }).format(value || 0);
-}
-function formatMoney(value: number | string | null) {
-  const amount = Number(value ?? 0);
-  if (!Number.isFinite(amount)) return "—";
-  return new Intl.NumberFormat(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(amount);
-}
-function formatDate(value: string | null) {
-  if (!value) return "Never";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  return new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "2-digit" }).format(date);
-}
-function formatDateTime(value: string | null) {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  return new Intl.DateTimeFormat(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
-
 export default function CustomerLoading() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -832,182 +727,35 @@ export default function CustomerLoading() {
         </div>
       )}
 
-      <Dialog open={columnsOpen} onOpenChange={setColumnsOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Visible Columns</DialogTitle>
-            <DialogDescription>Turn columns on or off for the Customer Loading table.</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-3 py-2 sm:grid-cols-2">
-            {COLUMN_OPTIONS.map((column) => (
-              <label key={column.key} className="flex cursor-pointer items-center gap-2 rounded-md border p-3 text-sm">
-                <Checkbox
-                  checked={visibleColumns.has(column.key)}
-                  onCheckedChange={(checked) => toggleColumn(column.key, Boolean(checked))}
-                />
-                <span>{column.label}</span>
-              </label>
-            ))}
-          </div>
-          <DialogFooter className="gap-2 sm:justify-between">
-            <Button
-              variant="outline"
-              onClick={() => setVisibleColumns(new Set(COLUMN_OPTIONS.map((column) => column.key)))}
-            >
-              Show All
-            </Button>
-            <Button onClick={() => setColumnsOpen(false)}>Done</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CustomerLoadingColumnsDialog
+        open={columnsOpen}
+        onOpenChange={setColumnsOpen}
+        visibleColumns={visibleColumns}
+        onToggleColumn={toggleColumn}
+        onShowAll={() => setVisibleColumns(new Set(COLUMN_OPTIONS.map((column) => column.key)))}
+      />
 
-      <Dialog open={previewOpen} onOpenChange={(open) => !createProformaMutation.isPending && setPreviewOpen(open)}>
-        <DialogContent className="max-h-[90vh] max-w-5xl overflow-hidden p-0">
-          <DialogHeader className="border-b px-6 py-4">
-            <DialogTitle>Review Proforma</DialogTitle>
-            <DialogDescription>
-              Creating this proforma does not mark any bale as loaded. Loading history only changes when bales are
-              scanned into a loading session.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 overflow-auto px-6 py-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <Label>Customer</Label>
-                <div className="mt-1 rounded-md border bg-muted/30 px-3 py-2 text-sm font-medium">
-                  {loadingQuery.data?.customer.legalName}
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="customer-loading-proforma-name">Proforma Name</Label>
-                <Input
-                  id="customer-loading-proforma-name"
-                  value={proformaName}
-                  onChange={(e) => setProformaName(e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="overflow-auto rounded-md border">
-              <table className="w-full min-w-[720px] text-sm">
-                <thead className="bg-muted">
-                  <tr>
-                    <th className="px-3 py-2 text-left">Product</th>
-                    <th className="px-3 py-2 text-right">Qty</th>
-                    <th className="px-3 py-2 text-right">KG</th>
-                    <th className="px-3 py-2 text-right">Price</th>
-                    <th className="px-3 py-2 text-right">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {validSelectedLines.map((line) => (
-                    <tr key={line.product.id} className="border-t">
-                      <td className="px-3 py-2">
-                        <div className="font-medium">{line.product.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {line.product.articleCode || line.product.code}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums">{line.quantity}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{formatNumber(line.totalKg, 1)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{formatMoney(line.pricePerBale)}</td>
-                      <td className="px-3 py-2 text-right font-medium tabular-nums">{formatMoney(line.lineTotal)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t bg-muted/40 font-semibold">
-                    <td className="px-3 py-2">Grand Total</td>
-                    <td className="px-3 py-2 text-right">{formatNumber(selectedTotals.quantity)}</td>
-                    <td className="px-3 py-2 text-right">{formatNumber(selectedTotals.kg, 1)}</td>
-                    <td></td>
-                    <td className="px-3 py-2 text-right">{formatMoney(selectedTotals.amount)}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
-          <DialogFooter className="border-t px-6 py-4">
-            <Button variant="outline" onClick={() => setPreviewOpen(false)} disabled={createProformaMutation.isPending}>
-              Back
-            </Button>
-            <Button
-              onClick={() => createProformaMutation.mutate()}
-              disabled={createProformaMutation.isPending || !proformaName.trim()}
-            >
-              {createProformaMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Create Proforma
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CustomerLoadingProformaDialog
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        customerName={loadingQuery.data?.customer.legalName}
+        proformaName={proformaName}
+        onProformaNameChange={setProformaName}
+        lines={validSelectedLines}
+        totals={selectedTotals}
+        isPending={createProformaMutation.isPending}
+        onCreate={() => createProformaMutation.mutate()}
+      />
 
-      <Dialog
-        open={Boolean(historyProduct)}
-        onOpenChange={(open) => {
-          if (!open) setHistoryProduct(null);
-        }}
-      >
-        <DialogContent className="max-h-[85vh] max-w-4xl overflow-hidden p-0">
-          <DialogHeader className="border-b px-6 py-4">
-            <DialogTitle>{historyProduct?.name} · Loading History</DialogTitle>
-            <DialogDescription>
-              {loadingQuery.data?.customer.legalName} · source loading sessions for this product
-            </DialogDescription>
-          </DialogHeader>
-          <div className="overflow-auto p-6">
-            {historyQuery.isLoading ? (
-              <div className="flex min-h-[180px] items-center justify-center">
-                <Loader2 className="h-6 w-6 animate-spin" />
-              </div>
-            ) : historyQuery.isError ? (
-              <div className="text-sm text-destructive">{(historyQuery.error as Error).message}</div>
-            ) : historyQuery.data?.history.length ? (
-              <table className="w-full min-w-[760px] text-sm">
-                <thead className="bg-muted">
-                  <tr>
-                    <th className="px-3 py-2 text-left">Date</th>
-                    <th className="px-3 py-2 text-left">Invoice</th>
-                    <th className="px-3 py-2 text-left">Truck / Driver</th>
-                    <th className="px-3 py-2 text-right">Bales</th>
-                    <th className="px-3 py-2 text-right">KG</th>
-                    <th className="px-3 py-2 text-left">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {historyQuery.data.history.map((row) => (
-                    <tr key={`${row.sessionId}-${row.invoiceId}`} className="border-b">
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        {formatDateTime(row.lastScanAt || row.completedAt || row.startedAt)}
-                      </td>
-                      <td className="px-3 py-2">
-                        <a
-                          href={`/factory/sales/invoices/${row.invoiceId}`}
-                          className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
-                        >
-                          Invoice #{row.invoiceId}
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </a>
-                      </td>
-                      <td className="px-3 py-2">
-                        <div>{row.truckNo || "—"}</div>
-                        <div className="text-xs text-muted-foreground">{row.driverName || ""}</div>
-                      </td>
-                      <td className="px-3 py-2 text-right font-medium tabular-nums">{formatNumber(row.balesLoaded)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{formatNumber(row.kgLoaded, 1)}</td>
-                      <td className="px-3 py-2">
-                        <Badge variant="outline">{row.status}</Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <div className="py-10 text-center text-sm text-muted-foreground">
-                No non-cancelled loading history found.
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <CustomerLoadingHistoryDialog
+        product={historyProduct}
+        onClose={() => setHistoryProduct(null)}
+        customerName={loadingQuery.data?.customer.legalName}
+        isLoading={historyQuery.isLoading}
+        isError={historyQuery.isError}
+        error={historyQuery.error as Error | null}
+        data={historyQuery.data}
+      />
     </div>
   );
 }

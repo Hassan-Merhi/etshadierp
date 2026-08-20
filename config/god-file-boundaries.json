@@ -1,6 +1,6 @@
 {
-  "version": 22,
-  "description": "Repository-wide god-file architecture boundaries plus a one-way size ratchet. Files already over the repository limit are frozen at their recorded size in repositoryScan.grandfathered: they may shrink but never grow, and any new file crossing the limit fails until it is split or explicitly reviewed. Version 22 records the newly delivered Customer Loading surface as an exact reviewed-growth allowance so the existing grandfathered split backlog does not increase while its Phase 3 extraction is completed; Version 21 completed Wave 9 by permanently retiring ContainerVerification.tsx and FactoryInvoiceLoadingScan.tsx from the grandfathered backlog.",
+  "version": 23,
+  "description": "Repository-wide god-file architecture boundaries plus a one-way size ratchet. Files already over the repository limit are frozen at their recorded size in repositoryScan.grandfathered: they may shrink but never grow, and any new file crossing the limit fails until it is split or explicitly reviewed. Version 23 completes the Customer Loading Phase 3 extraction that Version 22 recorded as a temporary reviewed-growth allowance: the column-visibility, proforma-preview and loading-history dialogs now live in their own components, bringing CustomerLoading.tsx back under the 900-line repository limit and retiring its allowance entirely; Version 21 completed Wave 9 by permanently retiring ContainerVerification.tsx and FactoryInvoiceLoadingScan.tsx from the grandfathered backlog.",
   "retiredFiles": [
     "server/routesLegacy.ts",
     "server/routes/reportsRoutesLegacy.ts",

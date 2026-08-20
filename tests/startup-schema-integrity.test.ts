@@ -24,7 +24,7 @@ import { describe, expect, it } from "vitest";
 import { startupMigrations } from "../server/startup-schema";
 
 /** Statement count of the reviewed composed array. */
-const EXPECTED_STATEMENT_COUNT = 1288;
+const EXPECTED_STATEMENT_COUNT = 1285;
 
 /**
  * sha256 of JSON.stringify(startupMigrations) for the reviewed composed array.
@@ -49,8 +49,17 @@ const EXPECTED_STATEMENT_COUNT = 1288;
  * the three journal tables and their indexes, taking the count from 1280 to
  * 1288. They are appended last because they reference companies, stock_items
  * and locations, so nothing before them moved.
+ *
+ * Re-pinned again when three VALIDATE statements were removed from
+ * 007-schema-catchup-may-2026.ts, taking the count from 1288 to 1285. They
+ * validated factory_raw_stock, factory_fx_allocations and
+ * factory_container_commissions *_container_id_fkey while those constraints
+ * still pointed at `containers`; part 009 drops each one and recreates it
+ * against factory_containers, so the validation compared rows against the wrong
+ * parent table and raised foreign_key_violation on every boot of a database
+ * holding factory rows. Only those three were deleted and no statement moved.
  */
-const EXPECTED_CONTENT_HASH = "2755f40b21ff4532d765157f0b26126c57263c6b3a7d54533630b9db9d8ff96c";
+const EXPECTED_CONTENT_HASH = "0be36f4cd7fe626b9bdc065d21ddd2ea075c6163093bfc48a821b839c7101d5e";
 
 function contentHash(statements: string[]): string {
   return crypto.createHash("sha256").update(JSON.stringify(statements)).digest("hex");
