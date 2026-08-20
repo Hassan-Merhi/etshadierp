@@ -155,14 +155,25 @@ export default function AccountSidebar({
     return currentBalance + adjustment;
   };
 
-  // Scroll highlighted item into view
+  // Keep keyboard highlighting visible without asking the browser to scroll every
+  // ancestor. Element.scrollIntoView() can move the whole vouchers page when the
+  // highlighted account is far down the 200+ account list, which makes the active
+  // row/search input appear to disappear while typing. Only adjust this list's own
+  // scrollTop instead.
   useEffect(() => {
-    const highlightedElement = listRef.current?.querySelector(`[data-index="${highlightedIndex}"]`);
-    if (highlightedElement) {
-      highlightedElement.scrollIntoView({
-        block: "nearest",
-        behavior: "smooth",
-      });
+    const list = listRef.current;
+    if (!list || highlightedIndex < 0) return;
+
+    const highlightedElement = list.querySelector<HTMLElement>(`[data-index="${highlightedIndex}"]`);
+    if (!highlightedElement) return;
+
+    const listRect = list.getBoundingClientRect();
+    const itemRect = highlightedElement.getBoundingClientRect();
+
+    if (itemRect.top < listRect.top) {
+      list.scrollTop -= listRect.top - itemRect.top;
+    } else if (itemRect.bottom > listRect.bottom) {
+      list.scrollTop += itemRect.bottom - listRect.bottom;
     }
   }, [highlightedIndex]);
 
