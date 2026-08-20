@@ -25,10 +25,10 @@ describe("Phase 3 shared interface translations", () => {
     // detector does not flag at all; they are translated regardless, because a
     // screen that is half Arabic is a defect whether or not a ratchet noticed.
     // +12: reviewed Customer Loading column/filter copy added by the current repair
-    // branch. These entries are real translations, so the exact uniqueness contract
-    // advances with the translation table rather than treating them as audit backlog.
-    expect(phase3SharedUiTranslations).toHaveLength(595);
-    expect(new Set(phase3SharedUiTranslations.map((entry) => entry.en)).size).toBe(595);
+    // branch. One phrase overlaps existing reviewed copy, so the exact unique table
+    // contains 594 entries after deduplication rather than counting that overlap twice.
+    expect(phase3SharedUiTranslations).toHaveLength(594);
+    expect(new Set(phase3SharedUiTranslations.map((entry) => entry.en)).size).toBe(594);
 
     for (const entry of phase3SharedUiTranslations) {
       expect(entry.en.trim()).not.toBe("");
