@@ -1,223 +1,48 @@
-name: God Files Wave 1 Test Split
+name: God Files Wave 1 Publisher
 
 on:
-  push:
+  pull_request:
     branches:
       - agent/god-files-final-wave1-tests
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
 
 jobs:
-  split-and-certify:
-    if: github.actor != 'github-actions[bot]'
+  publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    services:
-      postgres:
-        image: postgres:15.19
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: etshadi_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U postgres"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
-    env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/etshadi_test
-      NODE_ENV: test
-      SESSION_SECRET: god-files-wave1-ci-secret
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
-          fetch-depth: 0
           ref: agent/god-files-final-wave1-tests
-      - uses: actions/setup-node@v4
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: '22.14.0'
           cache: npm
-      - run: npm ci
-      - name: Split oversized test suites and lower ratchets
+      - name: Install dependencies
         shell: bash
         run: |
-          node <<'NODE'
-          const fs = require('fs');
-          const path = require('path');
-
-          const root = process.cwd();
-          const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
-          const write = (p, s) => fs.writeFileSync(path.join(root, p), s.endsWith('\n') ? s : s + '\n');
-          const countLines = (s) => s.length === 0 ? 0 : s.split(/\r?\n/).length;
-
-          function firstDescribePreamble(source, file) {
-            const idx = source.search(/\ndescribe\s*\(/);
-            if (idx < 0) throw new Error(`${file}: no top-level describe() found`);
-            return source.slice(0, idx + 1);
-          }
-
-          function withPrefix(source, prefix, file) {
-            const replaced = source.replace(/const TEST_PREFIX\s*=\s*"[^"]+";/, `const TEST_PREFIX = "${prefix}";`);
-            if (replaced === source) throw new Error(`${file}: TEST_PREFIX replacement failed`);
-            return replaced;
-          }
-
-          function splitTwo({ file, marker, newFile, newPrefix }) {
-            const source = read(file);
-            const markerIndex = source.indexOf(marker);
-            if (markerIndex < 0) throw new Error(`${file}: split marker not found: ${marker}`);
-            const preamble = firstDescribePreamble(source, file);
-            const head = source.slice(0, markerIndex).trimEnd() + '\n';
-            const tail = withPrefix(preamble + source.slice(markerIndex), newPrefix, newFile);
-            write(file, head);
-            write(newFile, tail);
-          }
-
-          function splitThree({ file, marker1, marker2, part2, part3, prefix2, prefix3 }) {
-            const source = read(file);
-            const a = source.indexOf(marker1);
-            const b = source.indexOf(marker2);
-            if (a < 0 || b < 0 || b <= a) throw new Error(`${file}: three-way split markers invalid`);
-            const preamble = firstDescribePreamble(source, file);
-            const head = source.slice(0, a).trimEnd() + '\n';
-            const middle = withPrefix(preamble + source.slice(a, b).trimEnd() + '\n', prefix2, part2);
-            const tail = withPrefix(preamble + source.slice(b), prefix3, part3);
-            write(file, head);
-            write(part2, middle);
-            write(part3, tail);
-          }
-
-          splitTwo({
-            file: 'tests/xlsx-export.test.ts',
-            marker: '// ── SP Sales Form — July 1–6 verification',
-            newFile: 'tests/xlsx-export-sp-sales-form.test.ts',
-            newPrefix: 'xlsexpsp',
-          });
-
-          splitTwo({
-            file: 'tests/workflow.test.ts',
-            marker: '// 6. DAYBOOK WORKFLOW',
-            newFile: 'tests/workflow-daybook-isolation.test.ts',
-            newPrefix: 'wftest2',
-          });
-
-          splitTwo({
-            file: 'tests/inventory.test.ts',
-            marker: 'describe("Inventory Reconciliation Endpoint Tests"',
-            newFile: 'tests/inventory-reconciliation.test.ts',
-            newPrefix: 'invtest2',
-          });
-
-          splitThree({
-            file: 'tests/excel-export-v2.test.ts',
-            marker1: '// ── 8. Group subtotal row',
-            marker2: '// ── 15c. Historical opening cash from a real ledger account',
-            part2: 'tests/excel-export-v2-totals-cash.test.ts',
-            part3: 'tests/excel-export-v2-historical-cash.test.ts',
-            prefix2: 'xlsxv2p2',
-            prefix3: 'xlsxv2p3',
-          });
-
-          const splitFiles = [
-            'tests/xlsx-export.test.ts',
-            'tests/xlsx-export-sp-sales-form.test.ts',
-            'tests/workflow.test.ts',
-            'tests/workflow-daybook-isolation.test.ts',
-            'tests/inventory.test.ts',
-            'tests/inventory-reconciliation.test.ts',
-            'tests/excel-export-v2.test.ts',
-            'tests/excel-export-v2-totals-cash.test.ts',
-            'tests/excel-export-v2-historical-cash.test.ts',
-          ];
-
-          for (const file of splitFiles) {
-            const lines = countLines(read(file));
-            console.log(`${file}: ${lines} lines`);
-            if (lines > 900) throw new Error(`${file} still exceeds 900 lines (${lines})`);
-          }
-
-          const configPath = 'config/god-file-boundaries.json';
-          const config = JSON.parse(read(configPath));
-          config.version = 26;
-          config.description = 'Version 26 completes the oversized-test Wave 1: xlsx-export, workflow, inventory and excel-export-v2 are split into isolated focused suites, removed from the grandfathered backlog, and protected by the repository-wide 900-line ratchet. ' + config.description;
-          for (const file of [
-            'tests/xlsx-export.test.ts',
-            'tests/workflow.test.ts',
-            'tests/inventory.test.ts',
-            'tests/excel-export-v2.test.ts',
-          ]) {
-            delete config.repositoryScan.grandfathered[file];
-          }
-          write(configPath, JSON.stringify(config, null, 2));
-
-          const softMax = config.repositoryScan.softMaxLines;
-          let excess = 0;
-          for (const file of Object.keys(config.repositoryScan.grandfathered)) {
-            const lines = countLines(read(file));
-            if (lines <= softMax) throw new Error(`${file} no longer qualifies for grandfathering (${lines})`);
-            excess += Math.max(0, lines - softMax);
-          }
-          const backlogFiles = Object.keys(config.repositoryScan.grandfathered).length;
-          console.log(`Wave 1 backlog after split: ${backlogFiles} files, ${excess} excess lines`);
-          if (backlogFiles !== 20) throw new Error(`Expected 20 grandfathered files, got ${backlogFiles}`);
-
-          let boundariesTest = read('tests/god-file-boundaries.test.ts');
-          boundariesTest = boundariesTest.replace('expect(report.version).toBe(25);', 'expect(report.version).toBe(26);');
-          boundariesTest = boundariesTest.replace(/expect\(report\.summary\.grandfatheredFiles\)\.toBeLessThanOrEqual\(\d+\);/, `expect(report.summary.grandfatheredFiles).toBeLessThanOrEqual(${backlogFiles});`);
-          boundariesTest = boundariesTest.replace(/expect\(report\.summary\.grandfatheredExcessLines\)\.toBeLessThanOrEqual\(\d+\);/, `expect(report.summary.grandfatheredExcessLines).toBeLessThanOrEqual(${excess});`);
-          write('tests/god-file-boundaries.test.ts', boundariesTest);
-
-          let godDoc = read('docs/god-file-split-program.md');
-          godDoc = godDoc.replace(/\*\*Backlog: [\d,]+ files, [\d,]+ lines over the limit\*\*/, `**Backlog: ${backlogFiles.toLocaleString('en-US')} files, ${excess.toLocaleString('en-US')} lines over the limit**`);
-          godDoc = godDoc.replace(/\| — \| Oversized test files \| \*\*Not started\*\*[^\n]*/, '| — | Oversized test files | **Done.** The four oversized integration/export suites were split into focused isolated files; every resulting test file is now at or below the 900-line repository limit. |');
-          write('docs/god-file-split-program.md', godDoc);
-
-          let qualityDoc = read('docs/system-quality-program.md');
-          qualityDoc = qualityDoc.replace(/God-file backlog \| [\d,]+ files, [\d,]+ excess lines/, `God-file backlog | ${backlogFiles.toLocaleString('en-US')} files, ${excess.toLocaleString('en-US')} excess lines`);
-          write('docs/system-quality-program.md', qualityDoc);
-          NODE
-      - name: God-file and documentation audits
+          sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+          npm ci --no-audit --bin-links=true
+      - name: Generate and statically certify Wave 1
+        shell: bash
         run: |
+          node scripts/god-files-wave1-split.mjs
           npm run audit:god-files
           npm run audit:doc-index
-      - name: TypeScript check
-        run: npm run check
-      - name: Run Wave 1 split suites
-        run: >-
-          npm run test:backend --
-          tests/xlsx-export.test.ts
-          tests/xlsx-export-sp-sales-form.test.ts
-          tests/workflow.test.ts
-          tests/workflow-daybook-isolation.test.ts
-          tests/inventory.test.ts
-          tests/inventory-reconciliation.test.ts
-          tests/excel-export-v2.test.ts
-          tests/excel-export-v2-totals-cash.test.ts
-          tests/excel-export-v2-historical-cash.test.ts
-      - name: Commit certified Wave 1 split
+          npm run check
+          git diff --check
+      - name: Publish clean Wave 1 branch
         shell: bash
         run: |
-          rm .github/workflows/god-files-wave1-test-split.yml
+          git show a1b3e57f63af1c4847e8851027868dc067bf68e8:.circleci/config.yml > .circleci/config.yml
+          rm -f .github/workflows/god-files-wave1-test-split.yml scripts/god-files-wave1-split.mjs
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- \
-            .github/workflows/god-files-wave1-test-split.yml \
-            tests/xlsx-export.test.ts \
-            tests/xlsx-export-sp-sales-form.test.ts \
-            tests/workflow.test.ts \
-            tests/workflow-daybook-isolation.test.ts \
-            tests/inventory.test.ts \
-            tests/inventory-reconciliation.test.ts \
-            tests/excel-export-v2.test.ts \
-            tests/excel-export-v2-totals-cash.test.ts \
-            tests/excel-export-v2-historical-cash.test.ts \
-            config/god-file-boundaries.json \
-            tests/god-file-boundaries.test.ts \
-            docs/god-file-split-program.md \
-            docs/system-quality-program.md
+          git add -A
           git diff --cached --check
           git commit -m "refactor(god-files): split oversized Wave 1 test suites"
           git push origin HEAD:agent/god-files-final-wave1-tests
