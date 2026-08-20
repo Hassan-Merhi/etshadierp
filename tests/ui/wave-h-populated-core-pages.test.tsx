@@ -402,14 +402,31 @@ describe("Wave H populated core-page behavior", () => {
         [
           ["/api/accounts/customer/101/transactions", { startDate: "2026-08-20", endDate: "2026-08-20" }],
           [
-            { entryId: 1, voucherId: 91, debitAmount: "30", creditAmount: "0", narration: "Sale line", voucherNumber: "JV-91", voucherType: "Journal", voucherDate: "2026-08-20", voucherDescription: "Agent sale" },
-            { entryId: 2, voucherId: 91, debitAmount: "0", creditAmount: "5", narration: "Discount line", voucherNumber: "JV-91", voucherType: "Journal", voucherDate: "2026-08-20", voucherDescription: "Agent sale" },
+            {
+              entryId: 1,
+              voucherId: 91,
+              debitAmount: "30",
+              creditAmount: "0",
+              narration: "Sale line",
+              voucherNumber: "JV-91",
+              voucherType: "Journal",
+              voucherDate: "2026-08-20",
+              voucherDescription: "Agent sale",
+            },
+            {
+              entryId: 2,
+              voucherId: 91,
+              debitAmount: "0",
+              creditAmount: "5",
+              narration: "Discount line",
+              voucherNumber: "JV-91",
+              voucherType: "Journal",
+              voucherDate: "2026-08-20",
+              voucherDescription: "Agent sale",
+            },
           ],
         ],
-        [
-          ["/api/accounts/customer/101/pre-period-balance", { endDate: "2026-08-20" }],
-          { balance: 25 },
-        ],
+        [["/api/accounts/customer/101/pre-period-balance", { endDate: "2026-08-20" }], { balance: 25 }],
       ],
     });
 
