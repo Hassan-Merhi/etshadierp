@@ -13,7 +13,18 @@ export interface RenderWithProvidersOptions {
 function makeTestClient(seedQueries: readonly SeededQuery[] = []): QueryClient {
   const client = new QueryClient({
     defaultOptions: {
-      queries: { retry: false, staleTime: Infinity },
+      queries: {
+        retry: false,
+        staleTime: Infinity,
+        queryFn: async ({ queryKey, signal }) => {
+          const response = await fetch(String(queryKey[0]), {
+            credentials: "include",
+            signal,
+          });
+          if (!response.ok) throw new Error(`GET ${String(queryKey[0])} failed with ${response.status}`);
+          return response.json();
+        },
+      },
       mutations: { retry: false },
     },
   });
