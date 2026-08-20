@@ -476,48 +476,4 @@ export function registerLocationCrudRoutes(app: Express) {
       }
     }
   );
-
-  // Delete location
-  app.delete("/api/locations/:locationId", requireAuth, async (req, res) => {
-    try {
-      const locationId = parseInt(req.params.locationId);
-      if (isNaN(locationId)) {
-        return res.status(400).json({ message: "Invalid location ID" });
-      }
-
-      const location = await storage.getLocationById(locationId);
-      if (!location) {
-        return res.status(404).json({ message: "Location not found" });
-      }
-
-      // Verify location belongs to current company
-      if (location.companyId !== req.session.currentCompanyId) {
-        return res.status(403).json({
-          message: "Access denied: Location belongs to a different company",
-        });
-      }
-
-      await storage.deleteLocation(locationId);
-      try {
-        await logAudit({
-          userId: req.session.userId!,
-          username: req.session.username || "unknown",
-          companyId: req.session.currentCompanyId!,
-          action: "delete",
-          tableName: "locations",
-          recordId: location.id,
-          recordIdentifier: location.name,
-          changes: {
-            name: { old: location.name, new: null },
-            code: { old: location.code, new: null },
-          },
-        });
-      } catch {
-        /* non-fatal */
-      }
-      res.json({ message: "Location deleted successfully" });
-    } catch (error: unknown) {
-      res.status(500).json({ message: getErrorMessage(error) });
-    }
-  });
 }

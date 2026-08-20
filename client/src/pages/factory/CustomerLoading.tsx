@@ -575,7 +575,11 @@ export default function CustomerLoading() {
                     <SelectItem value="HIDE_NEGATIVE">Hide Negative</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button variant="outline" onClick={() => setColumnsOpen(true)} data-testid="customer-loading-columns-button">
+                <Button
+                  variant="outline"
+                  onClick={() => setColumnsOpen(true)}
+                  data-testid="customer-loading-columns-button"
+                >
                   Columns
                 </Button>
               </div>
@@ -717,7 +721,9 @@ export default function CustomerLoading() {
                           </td>
                         )}
                         {isColumnVisible("totalKg") && (
-                          <td className="px-4 py-3 text-right tabular-nums">{formatNumber(product.totalKgLoaded, 1)}</td>
+                          <td className="px-4 py-3 text-right tabular-nums">
+                            {formatNumber(product.totalKgLoaded, 1)}
+                          </td>
                         )}
                         {isColumnVisible("lastLoaded") && (
                           <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
