@@ -14,6 +14,7 @@ import * as schema from "@shared/schema";
 import type { StockTransferItem, StockAdjustmentItem } from "@shared/schema";
 import { createDatabaseStockMovementAdapter } from "../../services/inventory/databaseStockMovementAdapter";
 import { postStockMovementTx } from "../../services/inventory/stockMovementIntegrityService";
+import { shouldInsertAdjustmentVoucherEntry } from "./adjustmentVoucherEntryGuard";
 
 const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
@@ -415,7 +416,7 @@ export async function createStockAdjustment(
     }
 
     if (!isOptional) {
-      if (totalProductionValue.isPositive() && productionAccountId) {
+      if (shouldInsertAdjustmentVoucherEntry(totalProductionValue, productionAccountId)) {
         await tx.insert(schema.voucherEntries).values({
           voucherId,
           ledgerAccountId: productionAccountId,
@@ -424,7 +425,7 @@ export async function createStockAdjustment(
           narration: `Production adjustment - ${adjustmentType} voucher`,
         });
       }
-      if (totalConsumptionValue.isPositive() && consumptionAccountId) {
+      if (shouldInsertAdjustmentVoucherEntry(totalConsumptionValue, consumptionAccountId)) {
         await tx.insert(schema.voucherEntries).values({
           voucherId,
           ledgerAccountId: consumptionAccountId,

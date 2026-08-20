@@ -311,11 +311,32 @@ jobs:
       # partly applied schema. This checks the failures the endpoint now reports
       # against config/startup-migration-baseline.json: the known set is frozen,
       # the count may only fall, and an unrecorded failure fails the build.
+      #
+      # Both boots are checked, because each one is blind to what the other
+      # catches. The first boot is the only one that meets fresh schema, so it
+      # alone can see a statement that fails against a database no migration has
+      # touched yet; it is read from the response the step above saved, since
+      # that application has already exited. The second boot below re-runs the
+      # same statements against the schema the first boot produced, which is the
+      # only way to catch one that is not idempotent.
+      #
+      # Measured, not assumed: on a database holding factory_raw_stock rows, the
+      # three VALIDATE statements removed from 007 failed on boot one and passed
+      # on boot two, because a later part had re-pointed the constraint at the
+      # right parent table in between. Against that same database the gate
+      # reported "0 failure(s) ... ceiling 0" when it read only boot two. A CI
+      # database is empty at boot one, so those statements had nothing to
+      # validate and the miss never showed up here — which is the point: the
+      # gate agreed with the ceiling for a reason that had nothing to do with
+      # the migrations being sound.
       - name: Startup migration ratchet
         id: startup_migration_ratchet
         if: always() && steps.runtime_migrations.outcome == 'success'
         run: |
           set -o pipefail
+          HEALTH_REPORT=health-db-ci.json HEALTH_LABEL='first boot, fresh schema' \
+            npm run verify:startup-migrations
+
           node dist/index.js > startup-migrations-verify.txt 2>&1 &
           app_pid=$!
           cleanup() {
@@ -336,7 +357,8 @@ jobs:
             sleep 1
           done
 
-          HEALTH_URL=http://127.0.0.1:${PORT} npm run verify:startup-migrations
+          HEALTH_URL="http://127.0.0.1:${PORT}" HEALTH_LABEL='second boot, schema already applied' \
+            npm run verify:startup-migrations
 
       - name: Upload startup migration ratchet log
         if: always() && steps.startup_migration_ratchet.outcome == 'failure'

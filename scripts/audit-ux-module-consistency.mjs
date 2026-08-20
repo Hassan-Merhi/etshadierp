@@ -91,19 +91,19 @@ const protectedFilterModules = [
     controls: "client/src/pages/daybook/DaybookFilters.tsx",
   },
   {
-    file: "client/src/pages/TransactionJournal.tsx",
+    file: "client/src/pages/transactionjournal/useTransactionJournalModel.ts",
     token: "usePaginatedFilterState",
-    controls: "client/src/pages/transactionjournal/components/TransactionJournalFilterControls.tsx",
+    controls: "client/src/pages/transactionjournal/components/JournalFilters.tsx",
   },
   {
-    file: "client/src/pages/factory/FactoryDaybook.tsx",
+    file: "client/src/pages/factory/daybook/useFactoryDaybookModel.ts",
     token: "loadFactoryDaybookState",
-    controls: "client/src/pages/factory/FactoryDaybook.tsx",
+    controls: "client/src/pages/factory/daybook/FactoryDaybookFilters.tsx",
   },
   {
-    file: "client/src/pages/StockItems.tsx",
+    file: "client/src/pages/stockitems/useStockItems.ts",
     token: "useStockItemsFilters",
-    controls: "client/src/pages/StockItems.tsx",
+    controls: "client/src/pages/stockitems/StockItemsView.tsx",
   },
   {
     file: "client/src/pages/Customers.tsx",

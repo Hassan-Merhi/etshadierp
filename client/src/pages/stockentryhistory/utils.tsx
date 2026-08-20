@@ -121,3 +121,12 @@ export function formatDailyNum(val: number): string {
   if (val === 0) return "0";
   return val % 1 === 0 ? val.toFixed(0) : parseFloat(val.toFixed(3)).toString();
 }
+
+export function formatHistoryTime(iso: string | null): string {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "—";
+  }
+}
