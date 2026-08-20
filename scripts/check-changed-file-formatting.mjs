@@ -16,11 +16,9 @@
  * Usage: npm run format:check:changed [-- --base <ref>]
  */
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
 
 const DIRECTORIES = ["client/src", "server", "shared", "tests", "scripts"];
 const EXTENSIONS = /\.(ts|tsx|css|mjs)$/;
-const FORMAT_DIAGNOSTIC_FILE = "client/src/pages/factory/CustomerLoading.tsx";
 
 function git(args) {
   return execFileSync("git", args, { encoding: "utf8" });
@@ -62,14 +60,6 @@ try {
     stdio: "inherit",
   });
 } catch {
-  if (changed.includes(FORMAT_DIAGNOSTIC_FILE)) {
-    execFileSync(process.execPath, ["node_modules/prettier/bin/prettier.cjs", "--write", FORMAT_DIAGNOSTIC_FILE], {
-      stdio: "ignore",
-    });
-    console.log("\n---BEGIN-PRETTIER-CUSTOMER-LOADING---");
-    console.log(readFileSync(FORMAT_DIAGNOSTIC_FILE, "utf8"));
-    console.log("---END-PRETTIER-CUSTOMER-LOADING---");
-  }
   console.error("\nRun the same list through `prettier --write` to fix, then re-run this check.");
   process.exit(1);
 }
