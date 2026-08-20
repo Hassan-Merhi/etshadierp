@@ -1,9 +1,9 @@
 name: Wave H Frontend Diagnostic
 
 on:
-  push:
+  pull_request:
     branches:
-      - wave-i/convergence-automation
+      - main
 
 jobs:
   wave-h-frontend:
