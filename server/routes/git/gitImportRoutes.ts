@@ -5,7 +5,7 @@
  * Express resolves first-match, so that order is behaviour.
  */
 import type { Express, Request, Response, NextFunction } from "express";
-import XLSX from "xlsx";
+import XLSX from "xlsx-js-style";
 import ExcelJS from "exceljs";
 import { randomUUID } from "crypto";
 import { getErrorMessage } from "../../lib/httpHandlers";

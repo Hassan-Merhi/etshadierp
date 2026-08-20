@@ -16,7 +16,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/PageHeader";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 
 interface CustomerInfo {
   id: number;
@@ -639,7 +639,10 @@ export default function FactoryCustomerStatement() {
                           <input
                             type="text"
                             value={rowNotes[entry.id] ?? ""}
-                            onChange={(e) => typeof entry.id === "number" && setRowNotes((prev) => ({ ...prev, [entry.id]: e.target.value }))}
+                            onChange={(e) =>
+                              typeof entry.id === "number" &&
+                              setRowNotes((prev) => ({ ...prev, [entry.id]: e.target.value }))
+                            }
                             onBlur={() => saveRowNote(entry.id, rowNotes[entry.id] ?? "")}
                             placeholder={typeof entry.id === "string" ? "—" : "Add note…"}
                             disabled={savingRowNote === entry.id || typeof entry.id === "string"}

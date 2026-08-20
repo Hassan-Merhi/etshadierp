@@ -78,3 +78,4 @@
 - [Pre-push typecheck OOM](pre-push-typecheck-oom.md) — confirmed branch-only remote operations may need SKIP_TSC_CHECK=1 when the whole-project hook exhausts Node heap; verify remote refs afterward.
 - [POS transfer assigned-location routing](pos-transfer-assigned-location-routing.md) — POS transfer WhatsApp notifications use the active POS assignment, never the transfer destination; missing assignment skips safely.
 - [Heavy-endpoint guard queues not rejects](endpoint-busy-queue.md) — ENDPOINT_BUSY 429s come from the prod-only runtime guard (never loads in dev); busy slots now queue briefly, only overflow sheds.
+- [Spreadsheet security dependency boundary](spreadsheet-security-dependency-boundary.md) — root spreadsheet APIs use xlsx-js-style; Electron's extract-zip remains an upstream-only advisory with no fixed release.

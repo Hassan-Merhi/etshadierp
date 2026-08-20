@@ -235,7 +235,7 @@ export function useSupplierProfitCheckModel() {
   const handleExcelFile = useCallback(
     async (file: File) => {
       try {
-        const XLSX = await import("xlsx");
+        const XLSX = await import("xlsx-js-style");
         const data = await file.arrayBuffer();
         const workbook = XLSX.read(data, { type: "array" });
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];

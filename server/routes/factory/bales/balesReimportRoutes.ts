@@ -415,7 +415,7 @@ export function registerBalesReimportRoutes(app: Express) {
         const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-        const { read: readXlsx, utils } = await import("xlsx");
+        const { read: readXlsx, utils } = await import("xlsx-js-style");
         const wb = readXlsx(req.file.buffer, { type: "buffer" });
         const sheet = wb.Sheets[wb.SheetNames[0]];
         const rows: any[] = utils.sheet_to_json(sheet, { defval: "" });

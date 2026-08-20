@@ -157,7 +157,7 @@ export function registerFactoryFrenchTranslationRoutes(app: Express) {
       if (!req.file) return res.status(400).json({ message: "Excel file is required" });
       await ensureFrenchColumns();
       const workbook = new ExcelJS.Workbook();
-      await workbook.xlsx.load(req.file.buffer as unknown as Buffer);
+      await workbook.xlsx.load(req.file.buffer as unknown as ArrayBuffer);
       const sheet = workbook.worksheets[0];
       if (!sheet) return res.status(400).json({ message: "Workbook has no worksheet" });
       const headers = new Map<string, number>();

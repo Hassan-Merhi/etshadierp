@@ -1,5 +1,5 @@
 import { useReactToPrint } from "react-to-print";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import type { SaleRow, APIInventoryItem, Location } from "../pos-components/posTypes";
 
 interface PosInvoiceActionsParams {
