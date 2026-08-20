@@ -26,11 +26,21 @@ export function GcLshiMigrationDialogs({ model }: { model: MigrationModel }) {
           <div className="space-y-3 py-2">
             <div className="space-y-1">
               <Label>Company Name</Label>
-              <Input value={model.createName} onChange={(event) => model.setCreateName(event.target.value)} placeholder="GC-LSHI" data-testid="input-create-company-name" />
+              <Input
+                value={model.createName}
+                onChange={(event) => model.setCreateName(event.target.value)}
+                placeholder="GC-LSHI"
+                data-testid="input-create-company-name"
+              />
             </div>
             <div className="space-y-1">
               <Label>Company Code (unique)</Label>
-              <Input value={model.createCode} onChange={(event) => model.setCreateCode(event.target.value)} placeholder="GC-LSHI-SP" data-testid="input-create-company-code" />
+              <Input
+                value={model.createCode}
+                onChange={(event) => model.setCreateCode(event.target.value)}
+                placeholder="GC-LSHI-SP"
+                data-testid="input-create-company-code"
+              />
             </div>
           </div>
           <AlertDialogFooter>
@@ -46,12 +56,18 @@ export function GcLshiMigrationDialogs({ model }: { model: MigrationModel }) {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={!!model.rollbackRunId} onOpenChange={(open) => { if (!open) model.setRollbackRunId(null); }}>
+      <AlertDialog
+        open={!!model.rollbackRunId}
+        onOpenChange={(open) => {
+          if (!open) model.setRollbackRunId(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Rollback Run {model.rollbackRunId?.slice(0, 8)}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete all rows created by this migration run from the target company. The source ERP company will not be touched. This action cannot be undone.
+              This will permanently delete all rows created by this migration run from the target company. The source
+              ERP company will not be touched. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

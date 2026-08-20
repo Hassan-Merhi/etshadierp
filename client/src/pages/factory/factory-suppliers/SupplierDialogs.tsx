@@ -22,8 +22,26 @@ interface SupplierDialogsProps {
   setCreateOpen: (val: boolean) => void;
   editingSupplier: FactorySupplier | null;
   setEditingSupplier: (val: FactorySupplier | null) => void;
-  formData: { name: string; contactPerson: string; phone: string; email: string; address: string; notes: string; parentId: number | null; };
-  setFormData: React.Dispatch<React.SetStateAction<{ name: string; contactPerson: string; phone: string; email: string; address: string; notes: string; parentId: number | null; }>>;
+  formData: {
+    name: string;
+    contactPerson: string;
+    phone: string;
+    email: string;
+    address: string;
+    notes: string;
+    parentId: number | null;
+  };
+  setFormData: React.Dispatch<
+    React.SetStateAction<{
+      name: string;
+      contactPerson: string;
+      phone: string;
+      email: string;
+      address: string;
+      notes: string;
+      parentId: number | null;
+    }>
+  >;
   formRole: "broker" | "standalone" | "linked";
   setFormRole: (val: "broker" | "standalone" | "linked") => void;
   allSuppliers: SupplierWithBalance[];
@@ -35,9 +53,29 @@ interface SupplierDialogsProps {
 
   paymentDialogSupplier: SupplierWithBalance | null;
   setPaymentDialogSupplier: (val: SupplierWithBalance | null) => void;
-  paymentForm: { supplierId: number; date: string; amount: string; currencyCode: string; fxRateToUsd: string; paidFromAccountId: string; notes: string; effectiveDate: string; };
-  setPaymentForm: React.Dispatch<React.SetStateAction<{ supplierId: number; date: string; amount: string; currencyCode: string; fxRateToUsd: string; paidFromAccountId: string; notes: string; effectiveDate: string; }>>;
-  ledgerAccounts: NoInfer<{ id: number; name: string; code: string; }[]> | undefined;
+  paymentForm: {
+    supplierId: number;
+    date: string;
+    amount: string;
+    currencyCode: string;
+    fxRateToUsd: string;
+    paidFromAccountId: string;
+    notes: string;
+    effectiveDate: string;
+  };
+  setPaymentForm: React.Dispatch<
+    React.SetStateAction<{
+      supplierId: number;
+      date: string;
+      amount: string;
+      currencyCode: string;
+      fxRateToUsd: string;
+      paidFromAccountId: string;
+      notes: string;
+      effectiveDate: string;
+    }>
+  >;
+  ledgerAccounts: NoInfer<{ id: number; name: string; code: string }[]> | undefined;
   paymentMutation: UseMutationResult<any, any, any>;
   paymentAmtUsd: number;
   paymentBalanceUsd: number;
@@ -46,8 +84,34 @@ interface SupplierDialogsProps {
 
   fxConversionOpen: boolean;
   setFxConversionOpen: (val: boolean) => void;
-  fxConversionForm: { fromSupplierId: number; toSupplierId: number; selectedCurrency: string; amount: string; availableBalance: string; supplierBalance: string; commissionBalance: string; fxRateToUsd: string; date: string; notes: string; effectiveDate: string; };
-  setFxConversionForm: React.Dispatch<React.SetStateAction<{ fromSupplierId: number; toSupplierId: number; selectedCurrency: string; amount: string; availableBalance: string; supplierBalance: string; commissionBalance: string; fxRateToUsd: string; date: string; notes: string; effectiveDate: string; }>>;
+  fxConversionForm: {
+    fromSupplierId: number;
+    toSupplierId: number;
+    selectedCurrency: string;
+    amount: string;
+    availableBalance: string;
+    supplierBalance: string;
+    commissionBalance: string;
+    fxRateToUsd: string;
+    date: string;
+    notes: string;
+    effectiveDate: string;
+  };
+  setFxConversionForm: React.Dispatch<
+    React.SetStateAction<{
+      fromSupplierId: number;
+      toSupplierId: number;
+      selectedCurrency: string;
+      amount: string;
+      availableBalance: string;
+      supplierBalance: string;
+      commissionBalance: string;
+      fxRateToUsd: string;
+      date: string;
+      notes: string;
+      effectiveDate: string;
+    }>
+  >;
   fxSourceType: "supplier" | "commission" | "both";
   setFxSourceType: (val: "supplier" | "commission" | "both") => void;
   fxConversionMutation: UseMutationResult<any, any, any>;
@@ -57,28 +121,50 @@ interface SupplierDialogsProps {
   setBulkFxOpen: (val: boolean) => void;
   bulkFxBrokerId: number | null;
   bulkFxBrokerName: string;
-  bulkFxForm: { fromCurrencyCode: string; totalAmount: string; fxRateToUsd: string; date: string; notes: string; order: "oldest" | "newest"; };
-  setBulkFxForm: React.Dispatch<React.SetStateAction<{ fromCurrencyCode: string; totalAmount: string; fxRateToUsd: string; date: string; notes: string; order: "oldest" | "newest"; }>>;
+  bulkFxForm: {
+    fromCurrencyCode: string;
+    totalAmount: string;
+    fxRateToUsd: string;
+    date: string;
+    notes: string;
+    order: "oldest" | "newest";
+  };
+  setBulkFxForm: React.Dispatch<
+    React.SetStateAction<{
+      fromCurrencyCode: string;
+      totalAmount: string;
+      fxRateToUsd: string;
+      date: string;
+      notes: string;
+      order: "oldest" | "newest";
+    }>
+  >;
   bulkFxPreview: BulkFxPreview | null;
   setBulkFxPreview: (val: BulkFxPreview | null) => void;
   bulkFxPreviewMutation: UseMutationResult<BulkFxPreview, Error, void, unknown>;
   bulkFxMutation: UseMutationResult<any, any, any>;
 
   obEditSupplier: { id: number; name: string; currentBalance: string } | null;
-  setObEditSupplier: React.Dispatch<React.SetStateAction<{ id: number; name: string; currentBalance: string; } | null>>;
+  setObEditSupplier: React.Dispatch<React.SetStateAction<{ id: number; name: string; currentBalance: string } | null>>;
   obEditValue: string;
   setObEditValue: (val: string) => void;
   obEditMutation: UseMutationResult<any, any, any>;
 
   dueDialogSupplier: { name: string; containers: unknown[] } | null;
-  setDueDialogSupplier: React.Dispatch<
-    React.SetStateAction<{ name: string; containers: unknown[] } | null>
-  >;
+  setDueDialogSupplier: React.Dispatch<React.SetStateAction<{ name: string; containers: unknown[] } | null>>;
   formatDate: (val: string) => string;
   formatNum: (val: string) => string;
 
   editObComm: null | { rawStockId: number; amount: string; currencyCode: string; personName: string; notes: string };
-  setEditObComm: React.Dispatch<React.SetStateAction<{ rawStockId: number; amount: string; currencyCode: string; personName: string; notes: string; } | null>>;
+  setEditObComm: React.Dispatch<
+    React.SetStateAction<{
+      rawStockId: number;
+      amount: string;
+      currencyCode: string;
+      personName: string;
+      notes: string;
+    } | null>
+  >;
   updateObCommissionMutation: UseMutationResult<any, any, any>;
 }
 
@@ -238,41 +324,41 @@ export function SupplierDialogs({
                       allocated: string;
                       toAmountUsd: string;
                     }) => {
-                    const overpaid = parseFloat(t.overpayment || "0") > 0.01;
-                    return (
-                      <div key={t.supplierId} className="flex justify-between items-center px-3 py-2">
-                        <div>
-                          <div className="font-medium">{t.supplierName}</div>
-                          {overpaid && (
-                            <div className="text-xs text-amber-600 dark:text-amber-400">
-                              incl. {bulkFxForm.fromCurrencyCode}{" "}
-                              {parseFloat(t.overpayment || "0").toLocaleString(undefined, {
+                      const overpaid = parseFloat(t.overpayment || "0") > 0.01;
+                      return (
+                        <div key={t.supplierId} className="flex justify-between items-center px-3 py-2">
+                          <div>
+                            <div className="font-medium">{t.supplierName}</div>
+                            {overpaid && (
+                              <div className="text-xs text-amber-600 dark:text-amber-400">
+                                incl. {bulkFxForm.fromCurrencyCode}{" "}
+                                {parseFloat(t.overpayment || "0").toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}{" "}
+                                overpayment (will show as CR)
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-right space-y-0.5">
+                            <div className="tabular-nums font-medium">
+                              {bulkFxForm.fromCurrencyCode}{" "}
+                              {parseFloat(t.allocated).toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              ≈ $
+                              {parseFloat(t.toAmountUsd).toLocaleString(undefined, {
                                 minimumFractionDigits: 2,
                                 maximumFractionDigits: 2,
                               })}{" "}
-                              overpayment (will show as CR)
+                              USD
                             </div>
-                          )}
-                        </div>
-                        <div className="text-right space-y-0.5">
-                          <div className="tabular-nums font-medium">
-                            {bulkFxForm.fromCurrencyCode}{" "}
-                            {parseFloat(t.allocated).toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            ≈ $
-                            {parseFloat(t.toAmountUsd).toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}{" "}
-                            USD
                           </div>
                         </div>
-                      </div>
-                    );
+                      );
                     }
                   )}
                 </div>
@@ -298,7 +384,16 @@ export function SupplierDialogs({
                   <Input
                     value={bulkFxForm.fromCurrencyCode}
                     onChange={(e) =>
-                      setBulkFxForm((f: { fromCurrencyCode: string; totalAmount: string; fxRateToUsd: string; date: string; notes: string; order: "oldest" | "newest"; }) => ({ ...f, fromCurrencyCode: e.target.value.toUpperCase() }))
+                      setBulkFxForm(
+                        (f: {
+                          fromCurrencyCode: string;
+                          totalAmount: string;
+                          fxRateToUsd: string;
+                          date: string;
+                          notes: string;
+                          order: "oldest" | "newest";
+                        }) => ({ ...f, fromCurrencyCode: e.target.value.toUpperCase() })
+                      )
                     }
                     maxLength={10}
                     placeholder="EUR"
@@ -310,7 +405,18 @@ export function SupplierDialogs({
                     type="number"
                     step="0.01"
                     value={bulkFxForm.totalAmount}
-                    onChange={(e) => setBulkFxForm((f: { fromCurrencyCode: string; totalAmount: string; fxRateToUsd: string; date: string; notes: string; order: "oldest" | "newest"; }) => ({ ...f, totalAmount: e.target.value }))}
+                    onChange={(e) =>
+                      setBulkFxForm(
+                        (f: {
+                          fromCurrencyCode: string;
+                          totalAmount: string;
+                          fxRateToUsd: string;
+                          date: string;
+                          notes: string;
+                          order: "oldest" | "newest";
+                        }) => ({ ...f, totalAmount: e.target.value })
+                      )
+                    }
                     placeholder="e.g. 50000"
                   />
                 </div>
@@ -322,7 +428,18 @@ export function SupplierDialogs({
                     type="number"
                     step="0.0001"
                     value={bulkFxForm.fxRateToUsd}
-                    onChange={(e) => setBulkFxForm((f: { fromCurrencyCode: string; totalAmount: string; fxRateToUsd: string; date: string; notes: string; order: "oldest" | "newest"; }) => ({ ...f, fxRateToUsd: e.target.value }))}
+                    onChange={(e) =>
+                      setBulkFxForm(
+                        (f: {
+                          fromCurrencyCode: string;
+                          totalAmount: string;
+                          fxRateToUsd: string;
+                          date: string;
+                          notes: string;
+                          order: "oldest" | "newest";
+                        }) => ({ ...f, fxRateToUsd: e.target.value })
+                      )
+                    }
                     placeholder="e.g. 1.08"
                   />
                 </div>
@@ -331,7 +448,18 @@ export function SupplierDialogs({
                   <Input
                     type="date"
                     value={bulkFxForm.date}
-                    onChange={(e) => setBulkFxForm((f: { fromCurrencyCode: string; totalAmount: string; fxRateToUsd: string; date: string; notes: string; order: "oldest" | "newest"; }) => ({ ...f, date: e.target.value }))}
+                    onChange={(e) =>
+                      setBulkFxForm(
+                        (f: {
+                          fromCurrencyCode: string;
+                          totalAmount: string;
+                          fxRateToUsd: string;
+                          date: string;
+                          notes: string;
+                          order: "oldest" | "newest";
+                        }) => ({ ...f, date: e.target.value })
+                      )
+                    }
                   />
                 </div>
               </div>

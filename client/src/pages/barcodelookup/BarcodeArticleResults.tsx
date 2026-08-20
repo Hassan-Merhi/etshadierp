@@ -82,8 +82,12 @@ export function BarcodeArticleResults({
               <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                 Printed At
               </TableHead>
-              <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</TableHead>
-              <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Scanned</TableHead>
+              <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Status
+              </TableHead>
+              <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Scanned
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -101,7 +105,9 @@ export function BarcodeArticleResults({
                     lookupReference(labelPrint.referenceNumber);
                   }}
                 >
-                  <TableCell className={`font-mono font-medium ${isDeleted ? "text-muted-foreground line-through" : ""}`}>
+                  <TableCell
+                    className={`font-mono font-medium ${isDeleted ? "text-muted-foreground line-through" : ""}`}
+                  >
                     {labelPrint.referenceNumber}
                   </TableCell>
                   <TableCell className="font-mono">{smartNum(labelPrint.approxWeightKg)}</TableCell>

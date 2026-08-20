@@ -113,9 +113,7 @@ export function StockTransferHeader({ model }: { model: StockTransferFormModel }
                       ? field.value
                       : ""
                 }
-                onChange={(e) =>
-                  field.onChange(e.target.value ? new Date(e.target.value + "T00:00:00") : new Date())
-                }
+                onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value + "T00:00:00") : new Date())}
                 className="w-full sm:w-[160px]"
                 data-testid="input-transfer-date"
               />

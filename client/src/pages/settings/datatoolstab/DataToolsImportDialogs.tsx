@@ -90,7 +90,9 @@ export function DataToolsImportDialogs({ model }: Props) {
               </Button>
               <Button
                 onClick={handleStockImport}
-                disabled={stockPreview.length === 0 || stockErrors.length > 0 || isImportingStock || stockImportComplete}
+                disabled={
+                  stockPreview.length === 0 || stockErrors.length > 0 || isImportingStock || stockImportComplete
+                }
                 data-testid="button-submit-stock-import"
               >
                 {isImportingStock ? "Importing..." : "Import Stock"}

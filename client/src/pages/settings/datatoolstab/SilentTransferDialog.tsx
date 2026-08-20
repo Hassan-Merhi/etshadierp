@@ -1,6 +1,13 @@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -220,7 +227,9 @@ export function SilentTransferDialog({ model }: Props) {
                           <TableBody>
                             {silentErrorLines.map((errorLine: any, index: number) => (
                               <TableRow key={index} className="bg-red-50/60 dark:bg-red-950/20">
-                                <TableCell className="text-xs py-1.5 text-muted-foreground">{errorLine.rowNum}</TableCell>
+                                <TableCell className="text-xs py-1.5 text-muted-foreground">
+                                  {errorLine.rowNum}
+                                </TableCell>
                                 <TableCell className="text-xs py-1.5 font-mono">{errorLine.barcode || "—"}</TableCell>
                                 <TableCell className="text-xs py-1.5 text-destructive">{errorLine.reason}</TableCell>
                               </TableRow>
@@ -274,7 +283,9 @@ export function SilentTransferDialog({ model }: Props) {
                                   <div className="text-xs font-medium">{item.stockItemName}</div>
                                   <div className="text-xs text-muted-foreground font-mono">{item.barcode}</div>
                                 </TableCell>
-                                <TableCell className="text-right text-xs py-1.5">{formatNumber(item.quantity)}</TableCell>
+                                <TableCell className="text-right text-xs py-1.5">
+                                  {formatNumber(item.quantity)}
+                                </TableCell>
                                 <TableCell className="text-right text-xs py-1.5 text-destructive font-medium">
                                   {formatNumber(item.currentStock)}
                                 </TableCell>
@@ -312,8 +323,12 @@ export function SilentTransferDialog({ model }: Props) {
                                   <div className="text-xs font-medium">{item.stockItemName}</div>
                                   <div className="text-xs text-muted-foreground font-mono">{item.barcode}</div>
                                 </TableCell>
-                                <TableCell className="text-right text-xs py-1.5">{formatNumber(item.quantity)}</TableCell>
-                                <TableCell className="text-right text-xs py-1.5">{formatNumber(item.currentStock)}</TableCell>
+                                <TableCell className="text-right text-xs py-1.5">
+                                  {formatNumber(item.quantity)}
+                                </TableCell>
+                                <TableCell className="text-right text-xs py-1.5">
+                                  {formatNumber(item.currentStock)}
+                                </TableCell>
                                 <TableCell className="text-right text-xs py-1.5 text-green-700 dark:text-green-400 font-medium">
                                   {formatNumber(item.afterTransfer)}
                                 </TableCell>

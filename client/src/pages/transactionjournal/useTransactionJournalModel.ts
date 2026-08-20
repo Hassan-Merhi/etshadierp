@@ -38,13 +38,21 @@ export function useTransactionJournalModel() {
   const { formatCashAmount } = useCurrencyContext();
 
   // ── Filter state ──
-  const { filters: journalFilters, page, setPage, setFilter, resetFilters, hasActiveFilters } =
-    usePaginatedFilterState<TransactionJournalFilters>({
-      createInitialFilters: createTransactionJournalFilters,
-      storageKey: "erp-transaction-journal-filters-v1",
-    });
-  const { periodFilter, selectedCos, voucherType, currency, optionalFilter, includeFactory, searchInput, search } = journalFilters;
-  const setPeriodFilter = (value: PeriodFilterValue | ((current: PeriodFilterValue) => PeriodFilterValue)) => setFilter("periodFilter", value);
+  const {
+    filters: journalFilters,
+    page,
+    setPage,
+    setFilter,
+    resetFilters,
+    hasActiveFilters,
+  } = usePaginatedFilterState<TransactionJournalFilters>({
+    createInitialFilters: createTransactionJournalFilters,
+    storageKey: "erp-transaction-journal-filters-v1",
+  });
+  const { periodFilter, selectedCos, voucherType, currency, optionalFilter, includeFactory, searchInput, search } =
+    journalFilters;
+  const setPeriodFilter = (value: PeriodFilterValue | ((current: PeriodFilterValue) => PeriodFilterValue)) =>
+    setFilter("periodFilter", value);
   const setSelectedCos = (value: number[] | ((current: number[]) => number[])) => setFilter("selectedCos", value);
   const setVoucherType = (value: string) => setFilter("voucherType", value);
   const setCurrency = (value: string) => setFilter("currency", value);
@@ -102,7 +110,7 @@ export function useTransactionJournalModel() {
       ...(selectedCos.length ? { companyIds: selectedCos.join(",") } : {}),
     });
     return p.toString();
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- God Files extraction preserves pre-split behavior.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- God Files extraction preserves pre-split behavior.
   }, [periodFilter, voucherType, currency, optionalFilter, includeFactory, page, search, selectedCos]);
 
   const { data, isLoading, isFetching, refetch } = useQuery<JournalResponse>({
@@ -191,7 +199,7 @@ export function useTransactionJournalModel() {
   const handleSearch = useCallback(() => {
     setSearch(searchInput);
     setPage(1);
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- God Files extraction preserves pre-split behavior.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- God Files extraction preserves pre-split behavior.
   }, [searchInput]);
 
   const clearSearch = () => {
@@ -261,7 +269,7 @@ export function useTransactionJournalModel() {
     };
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- God Files extraction preserves pre-split behavior.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- God Files extraction preserves pre-split behavior.
   }, []);
 
   // ── Summary aggregation ──

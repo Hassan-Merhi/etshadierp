@@ -124,8 +124,7 @@ export function StockTransferOrderMatrix({ model }: { model: Model }) {
                             {selectedLocations.map((location, colIndex) => {
                               const quantity = item.locationData[location.id]?.quantity || 0;
                               const hasStock = quantity > 0;
-                              const isFocused =
-                                focusedCell?.row === flatRowIndex && focusedCell?.col === colIndex;
+                              const isFocused = focusedCell?.row === flatRowIndex && focusedCell?.col === colIndex;
                               return (
                                 <td
                                   key={location.id}

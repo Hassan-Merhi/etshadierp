@@ -42,7 +42,14 @@ export default function TransactionJournal() {
         </Button>
       </div>
 
-      <TransactionJournalFilterControls filters={model.journalFilters} availableCompanies={model.availableCompanies} voucherTypes={model.voucherTypes} setFilter={model.setFilter} resetFilters={model.resetFilters} hasActiveFilters={model.hasActiveFilters} />
+      <TransactionJournalFilterControls
+        filters={model.journalFilters}
+        availableCompanies={model.availableCompanies}
+        voucherTypes={model.voucherTypes}
+        setFilter={model.setFilter}
+        resetFilters={model.resetFilters}
+        hasActiveFilters={model.hasActiveFilters}
+      />
       <JournalSummaryCards model={model} />
       <JournalVoucherList model={model} />
       <JournalDetailDialog model={model} />

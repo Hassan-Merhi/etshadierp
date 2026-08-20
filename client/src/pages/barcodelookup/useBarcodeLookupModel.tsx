@@ -66,7 +66,11 @@ export function useBarcodeLookupModel() {
     },
     onError: (error: unknown) => {
       if (isGloballyHandledError(error)) return;
-      toast({ title: "Not Found", description: error instanceof Error ? error.message : "Request failed", variant: "destructive" });
+      toast({
+        title: "Not Found",
+        description: error instanceof Error ? error.message : "Request failed",
+        variant: "destructive",
+      });
       setReferenceResult(null);
     },
   });
@@ -83,7 +87,11 @@ export function useBarcodeLookupModel() {
     },
     onError: (error: unknown) => {
       if (isGloballyHandledError(error)) return;
-      toast({ title: "Not Found", description: error instanceof Error ? error.message : "Request failed", variant: "destructive" });
+      toast({
+        title: "Not Found",
+        description: error instanceof Error ? error.message : "Request failed",
+        variant: "destructive",
+      });
       setArticleResult(null);
     },
   });
@@ -116,7 +124,11 @@ export function useBarcodeLookupModel() {
     },
     onError: (error: unknown) => {
       if (isGloballyHandledError(error)) return;
-      toast({ title: "Error", description: error instanceof Error ? error.message : "Request failed", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Request failed",
+        variant: "destructive",
+      });
     },
   });
 
@@ -155,7 +167,11 @@ export function useBarcodeLookupModel() {
       toast({ title: "Deleted", description: "Bale has been deleted from all linked records." });
     },
     onError: (error: Error) => {
-      toast({ title: "Error", description: error instanceof Error ? error.message : "Request failed", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Request failed",
+        variant: "destructive",
+      });
     },
   });
 
@@ -177,7 +193,11 @@ export function useBarcodeLookupModel() {
       toast({ title: "Updated", description: "Bale product changed successfully." });
     },
     onError: (error: Error) => {
-      toast({ title: "Error", description: error instanceof Error ? error.message : "Request failed", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Request failed",
+        variant: "destructive",
+      });
     },
   });
 
@@ -193,7 +213,11 @@ export function useBarcodeLookupModel() {
       toast({ title: "Returned to Stock", description: "Bale status set back to In Stock." });
     },
     onError: (error: Error) => {
-      toast({ title: "Error", description: error instanceof Error ? error.message : "Request failed", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Request failed",
+        variant: "destructive",
+      });
     },
   });
 
@@ -231,7 +255,11 @@ export function useBarcodeLookupModel() {
     },
     onError: (error: unknown) => {
       if (isGloballyHandledError(error)) return;
-      toast({ title: "Error", description: error instanceof Error ? error.message : "Request failed", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Request failed",
+        variant: "destructive",
+      });
     },
   });
 
@@ -259,7 +287,11 @@ export function useBarcodeLookupModel() {
     onError: (error: unknown) => {
       if (isGloballyHandledError(error)) return;
       setSwapPreview(null);
-      toast({ title: "Lookup Failed", description: error instanceof Error ? error.message : "Request failed", variant: "destructive" });
+      toast({
+        title: "Lookup Failed",
+        description: error instanceof Error ? error.message : "Request failed",
+        variant: "destructive",
+      });
     },
   });
 
@@ -291,7 +323,11 @@ export function useBarcodeLookupModel() {
     },
     onError: (error: unknown) => {
       if (isGloballyHandledError(error)) return;
-      toast({ title: "Swap Failed", description: error instanceof Error ? error.message : "Request failed", variant: "destructive" });
+      toast({
+        title: "Swap Failed",
+        description: error instanceof Error ? error.message : "Request failed",
+        variant: "destructive",
+      });
     },
   });
 

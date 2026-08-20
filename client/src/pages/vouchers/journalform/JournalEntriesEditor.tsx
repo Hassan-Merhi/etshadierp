@@ -253,10 +253,18 @@ export function JournalEntriesEditor({ model }: { model: Model }) {
         <table className="w-full min-w-[500px]">
           <thead className="bg-muted/40">
             <tr className="h-9">
-              <th className="text-left px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-[10%]">DR/CR</th>
-              <th className="text-left px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-[35%]">Account</th>
-              <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-[20%]">Amount</th>
-              <th className="text-left px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-[28%]">Narration</th>
+              <th className="text-left px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-[10%]">
+                DR/CR
+              </th>
+              <th className="text-left px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-[35%]">
+                Account
+              </th>
+              <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-[20%]">
+                Amount
+              </th>
+              <th className="text-left px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-[28%]">
+                Narration
+              </th>
               <th className="w-[7%]"></th>
             </tr>
           </thead>
@@ -567,7 +575,11 @@ export function JournalEntriesEditor({ model }: { model: Model }) {
           render={({ field }) => (
             <FormItem className="flex flex-row items-center gap-2.5 space-y-0">
               <FormControl>
-                <Checkbox checked={field.value} onCheckedChange={field.onChange} data-testid="checkbox-journal-optional" />
+                <Checkbox
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                  data-testid="checkbox-journal-optional"
+                />
               </FormControl>
               <FormLabel className="text-sm font-normal cursor-pointer">Mark as Optional</FormLabel>
             </FormItem>
@@ -579,7 +591,9 @@ export function JournalEntriesEditor({ model }: { model: Model }) {
               <Button
                 type="button"
                 variant="outline"
-                disabled={journalEntries.filter((entry) => entry.accountId > 0 && parseFloat(entry.amount) > 0).length === 0}
+                disabled={
+                  journalEntries.filter((entry) => entry.accountId > 0 && parseFloat(entry.amount) > 0).length === 0
+                }
                 data-testid="button-export-journal-voucher"
               >
                 <FileDown className="h-4 w-4 mr-2" />

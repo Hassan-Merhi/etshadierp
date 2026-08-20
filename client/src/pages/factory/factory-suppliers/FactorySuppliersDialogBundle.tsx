@@ -5,7 +5,13 @@ import type { useFactorySuppliersModel } from "./useFactorySuppliersModel";
 
 type SuppliersModel = ReturnType<typeof useFactorySuppliersModel>;
 
-export function FactorySuppliersDialogBundle({ model, includeDeleteConfirm = false }: { model: SuppliersModel; includeDeleteConfirm?: boolean }) {
+export function FactorySuppliersDialogBundle({
+  model,
+  includeDeleteConfirm = false,
+}: {
+  model: SuppliersModel;
+  includeDeleteConfirm?: boolean;
+}) {
   return (
     <>
       <SupplierDialogs
@@ -68,8 +74,13 @@ export function FactorySuppliersDialogBundle({ model, includeDeleteConfirm = fal
       {includeDeleteConfirm && (
         <DeleteConfirmDialog
           open={!!model.pendingDelete}
-          onOpenChange={(open) => { if (!open) model.setPendingDelete(null); }}
-          onConfirm={() => { model.pendingDelete?.(); model.setPendingDelete(null); }}
+          onOpenChange={(open) => {
+            if (!open) model.setPendingDelete(null);
+          }}
+          onConfirm={() => {
+            model.pendingDelete?.();
+            model.setPendingDelete(null);
+          }}
         />
       )}
       {model.AdminDialog}

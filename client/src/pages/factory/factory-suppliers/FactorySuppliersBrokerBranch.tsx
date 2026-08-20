@@ -18,7 +18,10 @@ export function FactorySuppliersBrokerBranch({ model }: { model: SuppliersModel 
         brokerIncludeOtw={model.brokerIncludeOtw}
         setBrokerIncludeOtw={model.setBrokerIncludeOtw}
         setParentViewSupplierId={model.setParentViewSupplierId}
-        openChildStatement={(id) => { model.setStatementSupplierId(id); model.setStatementReturnToParent(true); }}
+        openChildStatement={(id) => {
+          model.setStatementSupplierId(id);
+          model.setStatementReturnToParent(true);
+        }}
         openPaymentDialog={(supplier) => {
           model.setPaymentDialogSupplier(supplier);
           model.setPaymentForm((previous) => ({ ...previous, supplierId: supplier.id }));
@@ -26,7 +29,19 @@ export function FactorySuppliersBrokerBranch({ model }: { model: SuppliersModel 
         openFxConversionDialog={(supplier, currencyCode, balance) => {
           const toId = supplier.parentId || supplier.id;
           const balanceString = balance.toFixed(2);
-          model.setFxConversionForm({ fromSupplierId: supplier.id, toSupplierId: toId, selectedCurrency: currencyCode, amount: balanceString, availableBalance: balanceString, supplierBalance: balanceString, commissionBalance: "0", fxRateToUsd: "", date: model.today, notes: "", effectiveDate: "" });
+          model.setFxConversionForm({
+            fromSupplierId: supplier.id,
+            toSupplierId: toId,
+            selectedCurrency: currencyCode,
+            amount: balanceString,
+            availableBalance: balanceString,
+            supplierBalance: balanceString,
+            commissionBalance: "0",
+            fxRateToUsd: "",
+            date: model.today,
+            notes: "",
+            effectiveDate: "",
+          });
           model.setFxSourceType("supplier");
           model.setFxConversionOpen(true);
         }}
@@ -39,7 +54,9 @@ export function FactorySuppliersBrokerBranch({ model }: { model: SuppliersModel 
           model.resetForm(model.parentViewSupplierId);
           model.setCreateOpen(true);
         }}
-        onAssignContainersTo={(supplierId, supplierName) => model.setAssignTarget({ id: supplierId, name: supplierName })}
+        onAssignContainersTo={(supplierId, supplierName) =>
+          model.setAssignTarget({ id: supplierId, name: supplierName })
+        }
       />
       <AssignContainersDialog
         open={!!model.assignTarget}
@@ -47,7 +64,8 @@ export function FactorySuppliersBrokerBranch({ model }: { model: SuppliersModel 
         linkedSupplier={model.assignTarget}
         containers={model.directContainers}
         onAssign={(containerIds) => {
-          if (model.assignTarget) model.assignContainersMutation.mutate({ containerIds, targetSupplierId: model.assignTarget.id });
+          if (model.assignTarget)
+            model.assignContainersMutation.mutate({ containerIds, targetSupplierId: model.assignTarget.id });
         }}
         isPending={model.assignContainersMutation.isPending}
       />

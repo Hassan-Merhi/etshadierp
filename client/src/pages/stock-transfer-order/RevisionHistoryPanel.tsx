@@ -60,9 +60,7 @@ export function RevisionHistoryPanel({
               <div key={revision.id} className="border rounded-md overflow-hidden">
                 <div className="flex items-center justify-between gap-3 p-3 bg-muted/40 flex-wrap">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant={revision.optional ? "secondary" : "default"}>
-                      Rev {revision.revisionNumber}
-                    </Badge>
+                    <Badge variant={revision.optional ? "secondary" : "default"}>Rev {revision.revisionNumber}</Badge>
                     {revision.optional && (
                       <Badge variant="outline" className="text-xs">
                         Reference Only
@@ -71,9 +69,7 @@ export function RevisionHistoryPanel({
                     <span className="text-xs text-muted-foreground">
                       {revision.revisionDate ? new Date(revision.revisionDate).toLocaleDateString() : ""}
                     </span>
-                    {revision.note && (
-                      <span className="text-xs italic text-muted-foreground">"{revision.note}"</span>
-                    )}
+                    {revision.note && <span className="text-xs italic text-muted-foreground">"{revision.note}"</span>}
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2 text-xs">
@@ -138,9 +134,7 @@ export function RevisionHistoryPanel({
                               </td>
                               <td
                                 className={`p-2 text-right font-mono font-semibold ${
-                                  delta > 0
-                                    ? "text-emerald-600 dark:text-emerald-400"
-                                    : "text-destructive"
+                                  delta > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"
                                 }`}
                               >
                                 {delta > 0 ? "+" : ""}

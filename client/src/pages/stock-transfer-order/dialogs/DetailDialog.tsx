@@ -9,11 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import type {
-  Location,
-  StockItemData,
-  StockMovementDetailData,
-} from "../../stocktransferorder/types";
+import type { Location, StockItemData, StockMovementDetailData } from "../../stocktransferorder/types";
 
 type DetailDialogProps = {
   detailData: unknown;
@@ -42,20 +38,15 @@ export function DetailDialog({
 }: DetailDialogProps) {
   const typedDetailData = detailData as StockMovementDetailData | undefined;
   const rows =
-    detailDirection === "in"
-      ? (typedDetailData?.inTransactions ?? [])
-      : (typedDetailData?.outTransactions ?? []);
+    detailDirection === "in" ? (typedDetailData?.inTransactions ?? []) : (typedDetailData?.outTransactions ?? []);
 
   const typeBadgeClass = (type: string) => {
     if (type === "Sale") return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
-    if (type.startsWith("Transfer In"))
-      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
+    if (type.startsWith("Transfer In")) return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
     if (type.startsWith("Transfer Out"))
       return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300";
-    if (type.startsWith("Adjustment"))
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
-    if (type === "Credit Note")
-      return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300";
+    if (type.startsWith("Adjustment")) return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+    if (type === "Credit Note") return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300";
     return "bg-muted text-muted-foreground";
   };
 
@@ -117,9 +108,7 @@ export function DetailDialog({
                       </span>
                     </td>
                     <td className="px-3 py-2 text-muted-foreground">{transaction.date}</td>
-                    <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
-                      {transaction.reference}
-                    </td>
+                    <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{transaction.reference}</td>
                     <td className="text-right px-3 py-2 tabular-nums font-medium">
                       {(transaction.qty || 0).toLocaleString(undefined, {
                         maximumFractionDigits: 2,
@@ -131,9 +120,7 @@ export function DetailDialog({
                         maximumFractionDigits: 2,
                       })}
                     </td>
-                    <td className="text-right px-3 py-2 tabular-nums">
-                      {formatAmount(transaction.value || 0)}
-                    </td>
+                    <td className="text-right px-3 py-2 tabular-nums">{formatAmount(transaction.value || 0)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -150,9 +137,7 @@ export function DetailDialog({
                     {totalQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                   </td>
                   <td />
-                  <td className="text-right px-3 py-2 tabular-nums">
-                    {formatAmount(totalValue)}
-                  </td>
+                  <td className="text-right px-3 py-2 tabular-nums">{formatAmount(totalValue)}</td>
                 </tr>
               </tfoot>
             </table>

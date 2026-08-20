@@ -11,11 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { PeriodFilter, type PeriodFilterValue } from "@/components/ui/period-filter";
 import { Skeleton } from "@/components/ui/skeleton";
-import type {
-  Location,
-  StockItemData,
-  StockMovementSummaryData,
-} from "../../stocktransferorder/types";
+import type { Location, StockItemData, StockMovementSummaryData } from "../../stocktransferorder/types";
 
 type StockMovementDialogProps = {
   formatAmount: (amount: number) => string;
@@ -57,11 +53,7 @@ export function StockMovementDialog({
   const typedHistoryData = historyData as StockMovementSummaryData | undefined;
   const monthlyData = typedHistoryData?.monthlyData ?? [];
   const hasMovement = monthlyData.some(
-    (month) =>
-      month.inwardQty > 0 ||
-      month.outwardQty > 0 ||
-      month.openingQty !== 0 ||
-      month.closingQty !== 0
+    (month) => month.inwardQty > 0 || month.outwardQty > 0 || month.openingQty !== 0 || month.closingQty !== 0
   );
   const formatQty = (value: number) =>
     value === 0
@@ -113,19 +105,41 @@ export function StockMovementDialog({
             <table className="w-full text-sm border-collapse" style={{ minWidth: "700px" }}>
               <thead className="sticky top-0 z-10">
                 <tr className="bg-muted border-b">
-                  <th rowSpan={2} className="text-left align-bottom px-3 py-2 border-r font-semibold w-28">Month</th>
-                  <th colSpan={3} className="text-center px-2 py-1.5 border-r font-semibold text-muted-foreground">Opening</th>
-                  <th colSpan={3} className="text-center px-2 py-1.5 border-r font-semibold text-green-700 dark:text-green-400">Stock In</th>
-                  <th colSpan={3} className="text-center px-2 py-1.5 border-r font-semibold text-red-700 dark:text-red-400">Stock Out</th>
-                  <th colSpan={3} className="text-center px-2 py-1.5 font-semibold text-primary">Closing</th>
+                  <th rowSpan={2} className="text-left align-bottom px-3 py-2 border-r font-semibold w-28">
+                    Month
+                  </th>
+                  <th colSpan={3} className="text-center px-2 py-1.5 border-r font-semibold text-muted-foreground">
+                    Opening
+                  </th>
+                  <th
+                    colSpan={3}
+                    className="text-center px-2 py-1.5 border-r font-semibold text-green-700 dark:text-green-400"
+                  >
+                    Stock In
+                  </th>
+                  <th
+                    colSpan={3}
+                    className="text-center px-2 py-1.5 border-r font-semibold text-red-700 dark:text-red-400"
+                  >
+                    Stock Out
+                  </th>
+                  <th colSpan={3} className="text-center px-2 py-1.5 font-semibold text-primary">
+                    Closing
+                  </th>
                 </tr>
                 <tr className="bg-muted/70 border-b text-xs">
                   <th className="text-right px-3 py-1.5 font-medium text-muted-foreground border-r">Qty</th>
                   <th className="text-right px-3 py-1.5 font-medium text-muted-foreground border-r">Rate</th>
                   <th className="text-right px-3 py-1.5 font-medium text-muted-foreground border-r">Value</th>
-                  <th className="text-right px-3 py-1.5 font-medium border-r text-green-700 dark:text-green-400">Qty</th>
-                  <th className="text-right px-3 py-1.5 font-medium border-r text-green-700 dark:text-green-400">Rate</th>
-                  <th className="text-right px-3 py-1.5 font-medium border-r text-green-700 dark:text-green-400">Value</th>
+                  <th className="text-right px-3 py-1.5 font-medium border-r text-green-700 dark:text-green-400">
+                    Qty
+                  </th>
+                  <th className="text-right px-3 py-1.5 font-medium border-r text-green-700 dark:text-green-400">
+                    Rate
+                  </th>
+                  <th className="text-right px-3 py-1.5 font-medium border-r text-green-700 dark:text-green-400">
+                    Value
+                  </th>
                   <th className="text-right px-3 py-1.5 font-medium border-r text-red-700 dark:text-red-400">Qty</th>
                   <th className="text-right px-3 py-1.5 font-medium border-r text-red-700 dark:text-red-400">Rate</th>
                   <th className="text-right px-3 py-1.5 font-medium border-r text-red-700 dark:text-red-400">Value</th>
@@ -136,13 +150,23 @@ export function StockMovementDialog({
               </thead>
               <tbody>
                 {monthlyData.map((month) => {
-                  const active = month.inwardQty > 0 || month.outwardQty > 0 || month.openingQty !== 0 || month.closingQty !== 0;
+                  const active =
+                    month.inwardQty > 0 || month.outwardQty > 0 || month.openingQty !== 0 || month.closingQty !== 0;
                   return (
-                    <tr key={month.month} className={`border-b transition-colors ${active ? "" : "text-muted-foreground/50"}`}>
+                    <tr
+                      key={month.month}
+                      className={`border-b transition-colors ${active ? "" : "text-muted-foreground/50"}`}
+                    >
                       <td className="font-medium px-3 py-2 border-r">{month.monthName}</td>
-                      <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">{formatQty(month.openingQty)}</td>
-                      <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">{formatRate(month.openingRate)}</td>
-                      <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">{formatValue(month.openingValue)}</td>
+                      <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">
+                        {formatQty(month.openingQty)}
+                      </td>
+                      <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">
+                        {formatRate(month.openingRate)}
+                      </td>
+                      <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">
+                        {formatValue(month.openingValue)}
+                      </td>
                       <td
                         className={`text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400 font-medium ${month.inwardQty > 0 ? "cursor-pointer underline underline-offset-2 decoration-dotted hover:text-green-900 dark:hover:text-green-200" : ""}`}
                         onClick={() => {
@@ -157,8 +181,12 @@ export function StockMovementDialog({
                       >
                         {formatQty(month.inwardQty)}
                       </td>
-                      <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">{formatRate(month.inwardRate)}</td>
-                      <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">{formatValue(month.inwardValue)}</td>
+                      <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">
+                        {formatRate(month.inwardRate)}
+                      </td>
+                      <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">
+                        {formatValue(month.inwardValue)}
+                      </td>
                       <td
                         className={`text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400 font-medium ${month.outwardQty > 0 ? "cursor-pointer underline underline-offset-2 decoration-dotted hover:text-red-900 dark:hover:text-red-200" : ""}`}
                         onClick={() => {
@@ -173,11 +201,19 @@ export function StockMovementDialog({
                       >
                         {formatQty(month.outwardQty)}
                       </td>
-                      <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">{formatRate(month.outwardRate)}</td>
-                      <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">{formatValue(month.outwardValue)}</td>
-                      <td className="text-right px-3 py-2 tabular-nums font-semibold text-foreground">{formatQty(month.closingQty)}</td>
+                      <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">
+                        {formatRate(month.outwardRate)}
+                      </td>
+                      <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">
+                        {formatValue(month.outwardValue)}
+                      </td>
+                      <td className="text-right px-3 py-2 tabular-nums font-semibold text-foreground">
+                        {formatQty(month.closingQty)}
+                      </td>
                       <td className="text-right px-3 py-2 tabular-nums font-medium">{formatRate(month.closingRate)}</td>
-                      <td className="text-right px-3 py-2 tabular-nums font-medium">{formatValue(month.closingValue)}</td>
+                      <td className="text-right px-3 py-2 tabular-nums font-medium">
+                        {formatValue(month.closingValue)}
+                      </td>
                     </tr>
                   );
                 })}
@@ -186,18 +222,42 @@ export function StockMovementDialog({
                 <tfoot className="sticky bottom-0 z-10">
                   <tr className="bg-muted font-bold border-t-2">
                     <td className="px-3 py-2 border-r">Total</td>
-                    <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">{formatQty(typedHistoryData.grandTotal.openingQty)}</td>
-                    <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">{formatRate(typedHistoryData.grandTotal.openingRate)}</td>
-                    <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">{formatValue(typedHistoryData.grandTotal.openingValue)}</td>
-                    <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">{formatQty(typedHistoryData.grandTotal.inwardQty)}</td>
-                    <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">{formatRate(typedHistoryData.grandTotal.inwardRate)}</td>
-                    <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">{formatValue(typedHistoryData.grandTotal.inwardValue)}</td>
-                    <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">{formatQty(typedHistoryData.grandTotal.outwardQty)}</td>
-                    <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">{formatRate(typedHistoryData.grandTotal.outwardRate)}</td>
-                    <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">{formatValue(typedHistoryData.grandTotal.outwardValue)}</td>
-                    <td className="text-right px-3 py-2 tabular-nums text-foreground">{formatQty(typedHistoryData.grandTotal.closingQty)}</td>
-                    <td className="text-right px-3 py-2 tabular-nums">{formatRate(typedHistoryData.grandTotal.closingRate)}</td>
-                    <td className="text-right px-3 py-2 tabular-nums">{formatValue(typedHistoryData.grandTotal.closingValue)}</td>
+                    <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">
+                      {formatQty(typedHistoryData.grandTotal.openingQty)}
+                    </td>
+                    <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">
+                      {formatRate(typedHistoryData.grandTotal.openingRate)}
+                    </td>
+                    <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">
+                      {formatValue(typedHistoryData.grandTotal.openingValue)}
+                    </td>
+                    <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">
+                      {formatQty(typedHistoryData.grandTotal.inwardQty)}
+                    </td>
+                    <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">
+                      {formatRate(typedHistoryData.grandTotal.inwardRate)}
+                    </td>
+                    <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">
+                      {formatValue(typedHistoryData.grandTotal.inwardValue)}
+                    </td>
+                    <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">
+                      {formatQty(typedHistoryData.grandTotal.outwardQty)}
+                    </td>
+                    <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">
+                      {formatRate(typedHistoryData.grandTotal.outwardRate)}
+                    </td>
+                    <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">
+                      {formatValue(typedHistoryData.grandTotal.outwardValue)}
+                    </td>
+                    <td className="text-right px-3 py-2 tabular-nums text-foreground">
+                      {formatQty(typedHistoryData.grandTotal.closingQty)}
+                    </td>
+                    <td className="text-right px-3 py-2 tabular-nums">
+                      {formatRate(typedHistoryData.grandTotal.closingRate)}
+                    </td>
+                    <td className="text-right px-3 py-2 tabular-nums">
+                      {formatValue(typedHistoryData.grandTotal.closingValue)}
+                    </td>
                   </tr>
                 </tfoot>
               )}

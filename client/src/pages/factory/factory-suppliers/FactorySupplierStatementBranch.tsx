@@ -33,7 +33,9 @@ interface StatementDisplayRow {
 }
 
 function isVoucherPayment(value: unknown): value is VoucherPayment {
-  return typeof value === "object" && value !== null && "id" in value && "voucherDate" in value && "voucherNumber" in value;
+  return (
+    typeof value === "object" && value !== null && "id" in value && "voucherDate" in value && "voucherNumber" in value
+  );
 }
 
 export function FactorySupplierStatementBranch({ model }: { model: SuppliersModel }) {
@@ -55,7 +57,8 @@ export function FactorySupplierStatementBranch({ model }: { model: SuppliersMode
       amountVal: parseFloat(row.value),
       rowCc: "USD",
       status: row.status,
-      onMove: () => model.setMoveContainerDialog({ open: true, containerId: row.id, containerRef: row.containerNumber }),
+      onMove: () =>
+        model.setMoveContainerDialog({ open: true, containerId: row.id, containerRef: row.containerNumber }),
     });
   }
 
@@ -119,12 +122,25 @@ export function FactorySupplierStatementBranch({ model }: { model: SuppliersMode
       amount: model.formatNum(commission.amount),
       amountVal: parseFloat(commission.amountUsd),
       rowCc: "USD",
-      onEdit: () => model.setEditObComm({ rawStockId: commission.rawStockId, amount: commission.amount, currencyCode: commission.currencyCode, personName: commission.personName, notes: "" }),
-      onDelete: () => model.wrapAdminAction(() => model.deleteObCommissionMutation.mutate(commission.rawStockId), "Delete OB Commission"),
+      onEdit: () =>
+        model.setEditObComm({
+          rawStockId: commission.rawStockId,
+          amount: commission.amount,
+          currencyCode: commission.currencyCode,
+          personName: commission.personName,
+          notes: "",
+        }),
+      onDelete: () =>
+        model.wrapAdminAction(
+          () => model.deleteObCommissionMutation.mutate(commission.rawStockId),
+          "Delete OB Commission"
+        ),
     });
   }
 
-  const sortedForBalance = [...allRows].sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime());
+  const sortedForBalance = [...allRows].sort(
+    (left, right) => new Date(left.date).getTime() - new Date(right.date).getTime()
+  );
   let runningBalance = 0;
   const balanceByKey: Record<string, { bal: number; cc: string }> = {};
   for (const row of sortedForBalance) {
@@ -136,7 +152,11 @@ export function FactorySupplierStatementBranch({ model }: { model: SuppliersMode
   const totalPurchases = allRows.filter((row) => row.type === "purchase").reduce((sum, row) => sum + row.amountVal, 0);
   const totalPayments = allRows.filter((row) => row.type === "payment").reduce((sum, row) => sum + row.amountVal, 0);
   const purchaseCount = allRows.filter((row) => row.type === "purchase").length;
-  const yesterday = (() => { const date = new Date(model.today); date.setDate(date.getDate() - 1); return date.toLocaleDateString("en-CA"); })();
+  const yesterday = (() => {
+    const date = new Date(model.today);
+    date.setDate(date.getDate() - 1);
+    return date.toLocaleDateString("en-CA");
+  })();
   const filteredRows = allRows
     .filter((row) => {
       if (model.statDateFilter === "all") return true;
@@ -149,7 +169,11 @@ export function FactorySupplierStatementBranch({ model }: { model: SuppliersMode
     })
     .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime());
 
-  const typeBadge = (type: string) => <Badge variant="outline" className="text-[10px] uppercase font-bold">{type}</Badge>;
+  const typeBadge = (type: string) => (
+    <Badge variant="outline" className="text-[10px] uppercase font-bold">
+      {type}
+    </Badge>
+  );
 
   return (
     <>
@@ -167,7 +191,19 @@ export function FactorySupplierStatementBranch({ model }: { model: SuppliersMode
         setStatementSupplierId={model.setStatementSupplierId}
         setStatementReturnToParent={model.setStatementReturnToParent}
         openFxConversionDialog={(fromSupplierId, toSupplierId, currencyCode, amount, totalCommission) => {
-          model.setFxConversionForm({ fromSupplierId, toSupplierId, selectedCurrency: currencyCode, amount, availableBalance: amount, supplierBalance: amount, commissionBalance: totalCommission || "0", fxRateToUsd: "", date: model.today, notes: "", effectiveDate: "" });
+          model.setFxConversionForm({
+            fromSupplierId,
+            toSupplierId,
+            selectedCurrency: currencyCode,
+            amount,
+            availableBalance: amount,
+            supplierBalance: amount,
+            commissionBalance: totalCommission || "0",
+            fxRateToUsd: "",
+            date: model.today,
+            notes: "",
+            effectiveDate: "",
+          });
           model.setFxConversionOpen(true);
         }}
         formatNum={model.formatNum}
@@ -201,7 +237,13 @@ export function FactorySupplierStatementBranch({ model }: { model: SuppliersMode
         currencyTotals={{ USD: runningBalance }}
         primaryCc="USD"
         onRenameSupplier={(id, name) => model.renameSupplierMutation.mutate({ id, name })}
-        onDeleteSupplier={(id) => model.wrapAdminAction(() => { model.permanentDeleteMutation.mutate(id); model.setStatementSupplierId(null); if (model.statementReturnToParent) model.setStatementReturnToParent(false); }, "Delete Supplier")}
+        onDeleteSupplier={(id) =>
+          model.wrapAdminAction(() => {
+            model.permanentDeleteMutation.mutate(id);
+            model.setStatementSupplierId(null);
+            if (model.statementReturnToParent) model.setStatementReturnToParent(false);
+          }, "Delete Supplier")
+        }
       />
       <FactorySuppliersMoveContainerDialog model={model} />
     </>

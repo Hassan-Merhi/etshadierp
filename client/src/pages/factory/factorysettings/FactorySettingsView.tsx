@@ -5,16 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import {
-  ArrowRight,
-  CheckCircle,
-  Images,
-  Loader2,
-  MessageCircle,
-  Save,
-  ToggleRight,
-  WifiOff,
-} from "lucide-react";
+import { ArrowRight, CheckCircle, Images, Loader2, MessageCircle, Save, ToggleRight, WifiOff } from "lucide-react";
 import type { FactorySettingsData } from "./types";
 import { FactorySettingsAdminTools } from "./FactorySettingsAdminTools";
 import { MigrateVoucherDescriptionsCard } from "./components/MigrateVoucherDescriptionsCard";
@@ -200,7 +191,9 @@ export function FactorySettingsView({ model }: Props) {
             {toggleItem("Container Profitability tab", "profitabilityTabContainersEnabled")}
             <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">Workers List</p>
             {toggleItem("Categories tab", "workersTabCategoriesEnabled")}
-            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">Worker Profile</p>
+            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">
+              Worker Profile
+            </p>
             {toggleItem("Statement tab", "workerDetailTabStatementEnabled")}
             {toggleItem("Advances tab", "workerDetailTabAdvancesEnabled")}
             {toggleItem("Bales tab", "workerDetailTabBalesEnabled")}

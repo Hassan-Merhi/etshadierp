@@ -348,7 +348,11 @@ export function SilentProductionDialog({ model }: Props) {
                 </div>
 
                 <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => setSilentProdOpen(false)} data-testid="button-silent-prod-cancel">
+                  <Button
+                    variant="outline"
+                    onClick={() => setSilentProdOpen(false)}
+                    data-testid="button-silent-prod-cancel"
+                  >
                     Cancel
                   </Button>
                   <Button
@@ -467,11 +471,21 @@ export function SilentProductionDialog({ model }: Props) {
                         )}
                       </div>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={exportSilentExcel} data-testid="button-export-silent-excel">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={exportSilentExcel}
+                          data-testid="button-export-silent-excel"
+                        >
                           <FileDown className="h-3 w-3 mr-1" />
                           Excel
                         </Button>
-                        <Button variant="outline" size="sm" onClick={exportSilentPDF} data-testid="button-export-silent-pdf">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={exportSilentPDF}
+                          data-testid="button-export-silent-pdf"
+                        >
                           <FileDown className="h-3 w-3 mr-1" />
                           PDF
                         </Button>
@@ -517,9 +531,7 @@ export function SilentProductionDialog({ model }: Props) {
                                 </td>
                                 <td
                                   className={`p-2 text-right font-mono font-semibold ${
-                                    row.change > 0
-                                      ? "text-emerald-600 dark:text-emerald-400"
-                                      : "text-destructive"
+                                    row.change > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"
                                   }`}
                                 >
                                   <span className="inline-flex items-center gap-0.5 justify-end">

@@ -51,7 +51,7 @@ export function usePosPriceListModel({ posUser }: POSPriceListProps) {
       inputRef.current?.focus();
       inputRef.current?.select();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- God Files extraction preserves pre-split behavior.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- God Files extraction preserves pre-split behavior.
   }, [editingItem?.stockItemId, editingItem?.locationId]);
   const lastSavedRef = useRef<{ stockItemId: number; locationId: number } | null>(null);
   const skipBlurSaveRef = useRef(false);
@@ -181,7 +181,7 @@ export function usePosPriceListModel({ posUser }: POSPriceListProps) {
     return Array.from(map.entries())
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- God Files extraction preserves pre-split behavior.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- God Files extraction preserves pre-split behavior.
   }, [locationPricedList, showUnpriced, isAllMode]);
 
   const filteredItems = useMemo(() => {
@@ -198,7 +198,7 @@ export function usePosPriceListModel({ posUser }: POSPriceListProps) {
       const matchesUnpriced = !showUnpriced || isItemUnpriced(item);
       return matchesSearch && matchesGroup && matchesUnpriced;
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- God Files extraction preserves pre-split behavior.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- God Files extraction preserves pre-split behavior.
   }, [locationPricedList, search, groupFilter, showUnpriced, hiddenUnpricedGroups, isAllMode]);
 
   const selectedLocation = locations.find((l) => l.id === selectedLocationId);

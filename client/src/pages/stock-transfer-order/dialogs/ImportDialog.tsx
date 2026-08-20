@@ -1,21 +1,7 @@
 import type { Dispatch, RefObject, SetStateAction } from "react";
-import {
-  AlertCircle,
-  Check,
-  FileDown,
-  FileSpreadsheet,
-  TrendingDown,
-  TrendingUp,
-  Upload,
-} from "lucide-react";
+import { AlertCircle, Check, FileDown, FileSpreadsheet, TrendingDown, TrendingUp, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { formatNumber } from "@/lib/formatNumber";
 import type { ImportPreviewRow } from "../../stocktransferorder/types";
@@ -47,9 +33,7 @@ export function ImportDialog({
   setImportDialogOpen,
   setImportPreview,
 }: ImportDialogProps) {
-  const updateCount = importPreview.filter(
-    (row) => row.status === "ok" || row.status === "new_item"
-  ).length;
+  const updateCount = importPreview.filter((row) => row.status === "ok" || row.status === "new_item").length;
   const removeCount = importPreview.filter((row) => row.status === "remove").length;
   const unmatchedCount = importPreview.filter((row) => row.status === "not_found").length;
 
@@ -126,11 +110,21 @@ export function ImportDialog({
                   {unmatchedCount > 0 && <span className="text-muted-foreground">{unmatchedCount} unmatched</span>}
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={exportPreviewExcel} data-testid="button-export-preview-excel">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={exportPreviewExcel}
+                    data-testid="button-export-preview-excel"
+                  >
                     <FileDown className="h-3 w-3 mr-1" />
                     Excel
                   </Button>
-                  <Button variant="outline" size="sm" onClick={exportPreviewPDF} data-testid="button-export-preview-pdf">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={exportPreviewPDF}
+                    data-testid="button-export-preview-pdf"
+                  >
                     <FileDown className="h-3 w-3 mr-1" />
                     PDF
                   </Button>
@@ -166,12 +160,20 @@ export function ImportDialog({
                           <td className="p-2">
                             <p className="font-medium truncate max-w-[220px]">{row.stockItemName}</p>
                             {row.status === "new_item" && (
-                              <p className="text-xs text-emerald-600 dark:text-emerald-400">New — from {row.sourceLocationName || "?"}</p>
+                              <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                                New — from {row.sourceLocationName || "?"}
+                              </p>
                             )}
-                            {row.status === "not_found" && <p className="text-xs text-destructive">Not found — skipped</p>}
-                            {row.status === "remove" && <p className="text-xs text-destructive">Will be removed from order</p>}
+                            {row.status === "not_found" && (
+                              <p className="text-xs text-destructive">Not found — skipped</p>
+                            )}
+                            {row.status === "remove" && (
+                              <p className="text-xs text-destructive">Will be removed from order</p>
+                            )}
                           </td>
-                          <td className="p-2 text-right font-mono text-muted-foreground">{formatNumber(row.currentQty, 0)}</td>
+                          <td className="p-2 text-right font-mono text-muted-foreground">
+                            {formatNumber(row.currentQty, 0)}
+                          </td>
                           <td
                             className={cn(
                               "p-2 text-right font-mono font-semibold",
@@ -179,7 +181,11 @@ export function ImportDialog({
                             )}
                           >
                             <span className="inline-flex items-center gap-0.5">
-                              {row.change > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                              {row.change > 0 ? (
+                                <TrendingUp className="h-3 w-3" />
+                              ) : (
+                                <TrendingDown className="h-3 w-3" />
+                              )}
                               {row.change > 0 ? "+" : ""}
                               {formatNumber(row.change, 0)}
                             </span>
@@ -190,10 +196,14 @@ export function ImportDialog({
                           <td className="p-2 text-center">
                             {row.status === "ok" && <Check className="h-4 w-4 text-emerald-500 mx-auto" />}
                             {row.status === "new_item" && (
-                              <span className="text-xs bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded-full">+New</span>
+                              <span className="text-xs bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded-full">
+                                +New
+                              </span>
                             )}
                             {row.status === "remove" && <AlertCircle className="h-4 w-4 text-destructive mx-auto" />}
-                            {row.status === "not_found" && <AlertCircle className="h-4 w-4 text-muted-foreground mx-auto" />}
+                            {row.status === "not_found" && (
+                              <AlertCircle className="h-4 w-4 text-muted-foreground mx-auto" />
+                            )}
                           </td>
                         </tr>
                       ))}

@@ -20,9 +20,7 @@ describe("Bandwidth Phase 1 page request policy", () => {
   });
 
   it("does not load the bale-removal history before its dialog opens", () => {
-    const source = read(
-      "client/src/pages/factory/factorycontainerloadingscan/useFactoryContainerLoadingScanModel.ts"
-    );
+    const source = read("client/src/pages/factory/factorycontainerloadingscan/useFactoryContainerLoadingScanModel.ts");
     expect(source).toContain("enabled: !!orderId && showRemovalLog");
   });
 

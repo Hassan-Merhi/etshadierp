@@ -117,10 +117,9 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
     enabled: debouncedAccountSearch.length >= 2 && !!selectedCompany && !isPropertiesCompany,
     staleTime: 30 * 1000,
     queryFn: async () => {
-      const response = await fetch(
-        `/api/suppliers?search=${encodeURIComponent(debouncedAccountSearch)}&limit=50`,
-        { credentials: "include" }
-      );
+      const response = await fetch(`/api/suppliers?search=${encodeURIComponent(debouncedAccountSearch)}&limit=50`, {
+        credentials: "include",
+      });
       if (!response.ok) throw new Error("Failed to search suppliers");
       return response.json();
     },
@@ -130,10 +129,9 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
     enabled: debouncedAccountSearch.length >= 2 && !!selectedCompany,
     staleTime: 30 * 1000,
     queryFn: async () => {
-      const response = await fetch(
-        `/api/customers?search=${encodeURIComponent(debouncedAccountSearch)}&limit=50`,
-        { credentials: "include" }
-      );
+      const response = await fetch(`/api/customers?search=${encodeURIComponent(debouncedAccountSearch)}&limit=50`, {
+        credentials: "include",
+      });
       if (!response.ok) throw new Error("Failed to search customers");
       return response.json();
     },
@@ -233,7 +231,11 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
     resolver: zodResolver(journalFormSchema),
     defaultValues: emptyJournal(),
   });
-  const { fields: journalFields, append: appendJournal, remove: removeJournal } = useFieldArray({
+  const {
+    fields: journalFields,
+    append: appendJournal,
+    remove: removeJournal,
+  } = useFieldArray({
     control: journalForm.control,
     name: "entries",
   });
@@ -247,8 +249,13 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
     0
   );
 
-  const { hasDraft: hasJournalDraft, draftAge: journalDraftAge, draft: journalDraft,
-    scheduleSave: scheduleJournalSave, discardDraft: discardJournalDraft } = useFormDraft({
+  const {
+    hasDraft: hasJournalDraft,
+    draftAge: journalDraftAge,
+    draft: journalDraft,
+    scheduleSave: scheduleJournalSave,
+    discardDraft: discardJournalDraft,
+  } = useFormDraft({
     entityType: "voucher-journal",
     mode: isFactoryMode ? "factory" : "erp",
     companyId: selectedCompany?.id ?? null,
@@ -276,8 +283,7 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
     const term = journalAccountSearchTerm.toLowerCase();
     return allAccounts.filter(
       (account) =>
-        (account.name || "").toLowerCase().includes(term) ||
-        (account.code || "").toLowerCase().includes(term)
+        (account.name || "").toLowerCase().includes(term) || (account.code || "").toLowerCase().includes(term)
     );
   }, [allAccounts, journalAccountSearchTerm]);
 
@@ -306,15 +312,10 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
       const updated = currentEntries.map((entry, entryIndex) =>
         entryIndex === index ? { ...entry, type: newType } : entry
       );
-      const debits = updated.reduce(
-        (sum, entry) => sum + (entry.type === "DR" ? parseFloat(entry.amount) || 0 : 0),
-        0
-      );
+      const debits = updated.reduce((sum, entry) => sum + (entry.type === "DR" ? parseFloat(entry.amount) || 0 : 0), 0);
       const otherCredits = updated.reduce(
         (sum, entry, entryIndex) =>
-          entryIndex !== index && entry.type === "CR"
-            ? sum + (parseFloat(entry.amount) || 0)
-            : sum,
+          entryIndex !== index && entry.type === "CR" ? sum + (parseFloat(entry.amount) || 0) : sum,
         0
       );
       const remaining = debits - otherCredits;
@@ -323,9 +324,7 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
       }
     }
     setTimeout(() => {
-      const input = document.querySelector(
-        `[data-testid="input-journal-account-${index}"]`
-      ) as HTMLInputElement | null;
+      const input = document.querySelector(`[data-testid="input-journal-account-${index}"]`) as HTMLInputElement | null;
       input?.focus();
     }, 50);
   };
@@ -380,7 +379,7 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
         accountType,
         accountId,
         accountName,
-        amount: String(debit > 0 ? entry.debitAmount ?? "" : entry.creditAmount ?? ""),
+        amount: String(debit > 0 ? (entry.debitAmount ?? "") : (entry.creditAmount ?? "")),
         narration: entry.narration || "",
       };
     });
@@ -394,9 +393,22 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
     });
     setJournalEffectiveDate(voucherToEdit.effectiveDate || "");
     hydratedVoucherIdRef.current = voucherToEdit.id;
-  }, [voucherToEdit, allAccounts, bankAccounts, bankAccountsFetched, ledgerAccounts,
-    ledgerAccountsFetched, suppliers, suppliersFetched, employees, fixedAssets, customers,
-    customersFetched, factorySuppliersList, journalForm]);
+  }, [
+    voucherToEdit,
+    allAccounts,
+    bankAccounts,
+    bankAccountsFetched,
+    ledgerAccounts,
+    ledgerAccountsFetched,
+    suppliers,
+    suppliersFetched,
+    employees,
+    fixedAssets,
+    customers,
+    customersFetched,
+    factorySuppliersList,
+    journalForm,
+  ]);
 
   const journalMutation = useMutation({
     mutationFn: async (formData: JournalFormData) => {
@@ -468,9 +480,10 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
 
   const sendWaStatementMutation = useMutation({
     mutationFn: async ({ accountId, month }: { accountId: number; month: string }) => {
-      const url = appMode === "factory"
-        ? `/api/factory/accounts/${accountId}/send-statement-whatsapp`
-        : `/api/accounts/${accountId}/send-statement-whatsapp`;
+      const url =
+        appMode === "factory"
+          ? `/api/factory/accounts/${accountId}/send-statement-whatsapp`
+          : `/api/accounts/${accountId}/send-statement-whatsapp`;
       const response = await modeApiRequest("POST", url, { month });
       const json = (await response.json()) as { message?: string };
       if (!response.ok) throw new Error(json.message || "Failed to send WhatsApp");
@@ -482,7 +495,11 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
     },
     onError: (error: unknown) => {
       if (isGloballyHandled(error)) return;
-      toast({ title: "WhatsApp send failed", description: errorMessage(error, "Failed to send WhatsApp"), variant: "destructive" });
+      toast({
+        title: "WhatsApp send failed",
+        description: errorMessage(error, "Failed to send WhatsApp"),
+        variant: "destructive",
+      });
       setWaPendingPrompt(null);
     },
   });
@@ -494,20 +511,26 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
       : format(new Date(), "yyyy-MM-dd");
     const validEntries = formData.entries.filter((entry) => entry.accountId > 0 && parseFloat(entry.amount) > 0);
     if (!validEntries.length) {
-      toast({ title: "No data to export", description: "Add at least one entry before exporting.", variant: "destructive" });
+      toast({
+        title: "No data to export",
+        description: "Add at least one entry before exporting.",
+        variant: "destructive",
+      });
       return;
     }
     if (detailed) {
-      const worksheet = utils.json_to_sheet(validEntries.map((entry) => ({
-        "Voucher Type": "Journal",
-        Date: voucherDate,
-        "DR/CR": entry.type,
-        Account: entry.accountName || "",
-        "Account Type": entry.accountType || "",
-        Amount: parseFloat(entry.amount).toFixed(2),
-        Notes: formData.notes || "",
-        Optional: formData.optional ? "Yes" : "No",
-      })));
+      const worksheet = utils.json_to_sheet(
+        validEntries.map((entry) => ({
+          "Voucher Type": "Journal",
+          Date: voucherDate,
+          "DR/CR": entry.type,
+          Account: entry.accountName || "",
+          "Account Type": entry.accountType || "",
+          Amount: parseFloat(entry.amount).toFixed(2),
+          Notes: formData.notes || "",
+          Optional: formData.optional ? "Yes" : "No",
+        }))
+      );
       const workbook = utils.book_new();
       utils.book_append_sheet(workbook, worksheet, "Journal Detailed");
       const fileName = `Journal_Voucher_Detailed_${voucherDate}.xlsx`;
@@ -515,19 +538,23 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
       toast({ title: "Export successful", description: `Downloaded ${fileName} with ${validEntries.length} entries.` });
       return;
     }
-    const totalDr = validEntries.filter((entry) => entry.type === "DR")
+    const totalDr = validEntries
+      .filter((entry) => entry.type === "DR")
       .reduce((sum, entry) => sum + (parseFloat(entry.amount) || 0), 0);
-    const totalCr = validEntries.filter((entry) => entry.type === "CR")
+    const totalCr = validEntries
+      .filter((entry) => entry.type === "CR")
       .reduce((sum, entry) => sum + (parseFloat(entry.amount) || 0), 0);
-    const worksheet = utils.json_to_sheet([{
-      "Voucher Type": "Journal",
-      Date: voucherDate,
-      "Total Debit": totalDr.toFixed(2),
-      "Total Credit": totalCr.toFixed(2),
-      "Number of Entries": validEntries.length,
-      Notes: formData.notes || "",
-      Optional: formData.optional ? "Yes" : "No",
-    }]);
+    const worksheet = utils.json_to_sheet([
+      {
+        "Voucher Type": "Journal",
+        Date: voucherDate,
+        "Total Debit": totalDr.toFixed(2),
+        "Total Credit": totalCr.toFixed(2),
+        "Number of Entries": validEntries.length,
+        Notes: formData.notes || "",
+        Optional: formData.optional ? "Yes" : "No",
+      },
+    ]);
     const workbook = utils.book_new();
     utils.book_append_sheet(workbook, worksheet, "Journal Summary");
     const fileName = `Journal_Voucher_Summary_${voucherDate}.xlsx`;
@@ -542,11 +569,19 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
       return;
     }
     if (!validEntries.some((entry) => entry.type === "DR") || !validEntries.some((entry) => entry.type === "CR")) {
-      toast({ title: "Validation Error", description: "Journal must have both DR (debit) and CR (credit) entries", variant: "destructive" });
+      toast({
+        title: "Validation Error",
+        description: "Journal must have both DR (debit) and CR (credit) entries",
+        variant: "destructive",
+      });
       return;
     }
     if (Math.abs(totalDebit - totalCredit) > 0.01) {
-      toast({ title: "Validation Error", description: `Debits (${formatAmount(totalDebit)}) must equal Credits (${formatAmount(totalCredit)})`, variant: "destructive" });
+      toast({
+        title: "Validation Error",
+        description: `Debits (${formatAmount(totalDebit)}) must equal Credits (${formatAmount(totalCredit)})`,
+        variant: "destructive",
+      });
       return;
     }
     journalMutation.mutate(data);
@@ -554,20 +589,38 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
 
   const handleJournalKeyDown = (event: KeyboardEvent, rowIndex: number, fieldName: "type" | "account" | "amount") => {
     const isLastRow = rowIndex === journalFields.length - 1;
-    const focus = (selector: string, select = false, delay = 50) => setTimeout(() => {
-      const element = document.querySelector(selector) as HTMLInputElement | null;
-      element?.focus();
-      if (select) element?.select();
-    }, delay);
+    const focus = (selector: string, select = false, delay = 50) =>
+      setTimeout(() => {
+        const element = document.querySelector(selector) as HTMLInputElement | null;
+        element?.focus();
+        if (select) element?.select();
+      }, delay);
     if (fieldName === "amount") {
-      if (event.key === "ArrowUp") { event.preventDefault(); if (rowIndex > 0) focus(`[data-testid="input-journal-amount-${rowIndex - 1}"]`, true); return; }
-      if (event.key === "ArrowDown") { event.preventDefault(); if (rowIndex < journalFields.length - 1) focus(`[data-testid="input-journal-amount-${rowIndex + 1}"]`, true); return; }
-      if (event.key === "ArrowLeft") { event.preventDefault(); focus(`[data-testid="input-journal-account-${rowIndex}"]`); return; }
-      if (event.key === "ArrowRight") { event.preventDefault(); if (rowIndex < journalFields.length - 1) focus(`[data-testid="input-journal-type-${rowIndex + 1}"]`); return; }
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        if (rowIndex > 0) focus(`[data-testid="input-journal-amount-${rowIndex - 1}"]`, true);
+        return;
+      }
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        if (rowIndex < journalFields.length - 1) focus(`[data-testid="input-journal-amount-${rowIndex + 1}"]`, true);
+        return;
+      }
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        focus(`[data-testid="input-journal-account-${rowIndex}"]`);
+        return;
+      }
+      if (event.key === "ArrowRight") {
+        event.preventDefault();
+        if (rowIndex < journalFields.length - 1) focus(`[data-testid="input-journal-type-${rowIndex + 1}"]`);
+        return;
+      }
     }
     if (fieldName === "amount" && event.key === "Tab" && !event.shiftKey) {
       event.preventDefault();
-      if (isLastRow) appendJournal({ type: "DR", accountType: "ledger", accountId: 0, accountName: "", amount: "", narration: "" });
+      if (isLastRow)
+        appendJournal({ type: "DR", accountType: "ledger", accountId: 0, accountName: "", amount: "", narration: "" });
       focus(`[data-testid="input-journal-type-${rowIndex + 1}"]`, false, 100);
     }
     if (fieldName === "amount" && event.key === "Enter") {
@@ -592,7 +645,9 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
       journalForm.setValue(`entries.${rowIndex}.accountName`, account.name);
       setShowAccountSidebar(false);
       requestAnimationFrame(() => {
-        const element = document.querySelector(`[data-testid="input-journal-amount-${rowIndex}"]`) as HTMLInputElement | null;
+        const element = document.querySelector(
+          `[data-testid="input-journal-amount-${rowIndex}"]`
+        ) as HTMLInputElement | null;
         element?.focus();
         element?.select();
       });
@@ -612,17 +667,55 @@ export function useJournalFormModel({ voucherIdToEdit, isPOS }: JournalFormProps
   };
 
   return {
-    isPOS, voucherIdToEdit, selectedCompany, modeApiRequest, selectedCurrency, convertToUSD,
-    formatAmount, transactionRate, setTransactionRate, journalEffectiveDate, setJournalEffectiveDate,
-    voucherToEdit, journalForm, journalFields, appendJournal, removeJournal, journalEntries,
-    totalDebit, totalCredit, hasJournalDraft, journalDraftAge, discardJournalDraft, restoreJournalDraft,
-    activeJournalRow, setActiveJournalRow, showAccountSidebar, setShowAccountSidebar,
-    journalAccountSearchTerm, setJournalAccountSearchTerm, journalAccountHighlightedIndex,
-    setJournalAccountHighlightedIndex, journalSidebarRef, filteredJournalAccounts,
-    handleJournalAccountSelect, getAccountBalance, handleJournalTypeChange, handleJournalKeyDown,
-    onJournalSubmit, journalMutation, handleExportJournalVoucher, setAccountPickersNeeded,
-    showCreateAccountModal, setShowCreateAccountModal, createAccountContext, setCreateAccountContext,
-    handleOpenCreateAccountModal, handleAccountCreated, waPendingPrompt, setWaPendingPrompt,
+    isPOS,
+    voucherIdToEdit,
+    selectedCompany,
+    modeApiRequest,
+    selectedCurrency,
+    convertToUSD,
+    formatAmount,
+    transactionRate,
+    setTransactionRate,
+    journalEffectiveDate,
+    setJournalEffectiveDate,
+    voucherToEdit,
+    journalForm,
+    journalFields,
+    appendJournal,
+    removeJournal,
+    journalEntries,
+    totalDebit,
+    totalCredit,
+    hasJournalDraft,
+    journalDraftAge,
+    discardJournalDraft,
+    restoreJournalDraft,
+    activeJournalRow,
+    setActiveJournalRow,
+    showAccountSidebar,
+    setShowAccountSidebar,
+    journalAccountSearchTerm,
+    setJournalAccountSearchTerm,
+    journalAccountHighlightedIndex,
+    setJournalAccountHighlightedIndex,
+    journalSidebarRef,
+    filteredJournalAccounts,
+    handleJournalAccountSelect,
+    getAccountBalance,
+    handleJournalTypeChange,
+    handleJournalKeyDown,
+    onJournalSubmit,
+    journalMutation,
+    handleExportJournalVoucher,
+    setAccountPickersNeeded,
+    showCreateAccountModal,
+    setShowCreateAccountModal,
+    createAccountContext,
+    setCreateAccountContext,
+    handleOpenCreateAccountModal,
+    handleAccountCreated,
+    waPendingPrompt,
+    setWaPendingPrompt,
     sendWaStatementMutation,
   };
 }

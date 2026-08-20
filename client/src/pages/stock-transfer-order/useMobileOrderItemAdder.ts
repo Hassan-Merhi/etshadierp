@@ -1,12 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { formatNumber } from "@/lib/formatNumber";
-import type {
-  Location,
-  LocationSummaryResponse,
-  OrderItem,
-  StockItemOption,
-} from "../stocktransferorder/types";
+import type { Location, LocationSummaryResponse, OrderItem, StockItemOption } from "../stocktransferorder/types";
 
 type UseMobileOrderItemAdderInput = {
   mobileSelectedItemId: number | null;
@@ -81,9 +76,7 @@ export function useMobileOrderItemAdder({
     }
 
     const existingIndex = orderItems.findIndex(
-      (item) =>
-        item.stockItemId === mobileSelectedItemId &&
-        item.sourceLocationId === mobileSourceLocationId
+      (item) => item.stockItemId === mobileSelectedItemId && item.sourceLocationId === mobileSourceLocationId
     );
     const currentAllocated = existingIndex >= 0 ? orderItems[existingIndex].quantity : 0;
     const totalAfterAdd = currentAllocated + quantity;
@@ -114,9 +107,7 @@ export function useMobileOrderItemAdder({
       });
     }
 
-    updatedItems.sort((left, right) =>
-      left.sourceLocationName.localeCompare(right.sourceLocationName)
-    );
+    updatedItems.sort((left, right) => left.sourceLocationName.localeCompare(right.sourceLocationName));
     setOrderItems(updatedItems);
     setMobileQty("");
     setMobileSelectedItemId(null);

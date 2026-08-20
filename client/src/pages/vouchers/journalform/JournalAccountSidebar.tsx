@@ -100,8 +100,7 @@ export function JournalAccountSidebar({ model }: { model: Model }) {
             filteredJournalAccounts.map((account, index) => {
               const isHighlighted = index === journalAccountHighlightedIndex && activeJournalRow !== null;
               const selectedEntry = journalEntries[activeJournalRow ?? 0];
-              const isSelected =
-                selectedEntry?.accountId === account.id && selectedEntry?.accountType === account.type;
+              const isSelected = selectedEntry?.accountId === account.id && selectedEntry?.accountType === account.type;
               const balance = getAccountBalance(account.type, account.id);
               return (
                 <button

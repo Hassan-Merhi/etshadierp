@@ -25,8 +25,8 @@ export function BarcodeAdminDialogs({ model }: { model: BarcodeLookupModel }) {
             <DialogTitle>Delete Bale Everywhere</DialogTitle>
             <DialogDescription>
               This will permanently soft-delete the factory bale record for{" "}
-              <span className="font-mono font-semibold">{referenceNumber}</span>. The label print history will remain for
-              audit purposes. This action cannot be undone from here.
+              <span className="font-mono font-semibold">{referenceNumber}</span>. The label print history will remain
+              for audit purposes. This action cannot be undone from here.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 flex-wrap">
@@ -63,8 +63,9 @@ export function BarcodeAdminDialogs({ model }: { model: BarcodeLookupModel }) {
           <DialogHeader>
             <DialogTitle>Change Linked Bale Product</DialogTitle>
             <DialogDescription>
-              Select a new product to link to reference <span className="font-mono font-semibold">{referenceNumber}</span>.
-              This will update the article code, bale code and product name on the bale record and label print.
+              Select a new product to link to reference{" "}
+              <span className="font-mono font-semibold">{referenceNumber}</span>. This will update the article code,
+              bale code and product name on the bale record and label print.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -108,7 +109,10 @@ export function BarcodeAdminDialogs({ model }: { model: BarcodeLookupModel }) {
               disabled={!model.selectedNewProductId || model.changeProductMutation.isPending}
               onClick={() => {
                 if (referenceNumber && model.selectedNewProductId) {
-                  model.changeProductMutation.mutate({ refNum: referenceNumber, newProductId: model.selectedNewProductId });
+                  model.changeProductMutation.mutate({
+                    refNum: referenceNumber,
+                    newProductId: model.selectedNewProductId,
+                  });
                 }
               }}
               data-testid="button-confirm-change-product"
@@ -172,14 +176,34 @@ export function BarcodeAdminDialogs({ model }: { model: BarcodeLookupModel }) {
               <div className="rounded-md border p-3 space-y-2 text-sm">
                 <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">Replacement Bale</p>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-                  <div><p className="text-xs text-muted-foreground">Reference</p><p className="font-mono font-semibold">{model.swapPreview.referenceNumber}</p></div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Reference</p>
+                    <p className="font-mono font-semibold">{model.swapPreview.referenceNumber}</p>
+                  </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Status</p>
-                    <p>{model.swapPreview.status === "IN_STOCK" ? <span className="text-green-600 dark:text-green-400 font-medium">In Stock</span> : <span className="text-destructive font-medium">{model.swapPreview.status}</span>}</p>
+                    <p>
+                      {model.swapPreview.status === "IN_STOCK" ? (
+                        <span className="text-green-600 dark:text-green-400 font-medium">In Stock</span>
+                      ) : (
+                        <span className="text-destructive font-medium">{model.swapPreview.status}</span>
+                      )}
+                    </p>
                   </div>
-                  <div><p className="text-xs text-muted-foreground">Product</p><p>{model.swapPreview.productName ?? "—"}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Weight</p><p>{model.swapPreview.weightKg} KG</p></div>
-                  {model.swapPreview.articleCode && <div><p className="text-xs text-muted-foreground">Article Code</p><p className="font-mono">{model.swapPreview.articleCode}</p></div>}
+                  <div>
+                    <p className="text-xs text-muted-foreground">Product</p>
+                    <p>{model.swapPreview.productName ?? "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Weight</p>
+                    <p>{model.swapPreview.weightKg} KG</p>
+                  </div>
+                  {model.swapPreview.articleCode && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Article Code</p>
+                      <p className="font-mono">{model.swapPreview.articleCode}</p>
+                    </div>
+                  )}
                 </div>
                 {model.swapPreview.status !== "IN_STOCK" && (
                   <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 text-destructive text-xs">
@@ -210,7 +234,10 @@ export function BarcodeAdminDialogs({ model }: { model: BarcodeLookupModel }) {
               disabled={!model.swapPreview || model.swapPreview.status !== "IN_STOCK" || model.swapMutation.isPending}
               onClick={() => {
                 if (!referenceNumber || !model.swapPreview) return;
-                model.swapMutation.mutate({ currentBaleRef: referenceNumber, replacementBaleRef: model.swapPreview.referenceNumber });
+                model.swapMutation.mutate({
+                  currentBaleRef: referenceNumber,
+                  replacementBaleRef: model.swapPreview.referenceNumber,
+                });
               }}
               data-testid="button-confirm-swap"
             >
@@ -244,41 +271,89 @@ export function BarcodeAdminDialogs({ model }: { model: BarcodeLookupModel }) {
             ) : model.returnToStockOrderInfo ? (
               <>
                 <div className="rounded-md border p-3 space-y-1.5 text-sm">
-                  <div className="flex justify-between"><span className="text-muted-foreground">Order status</span><Badge variant="secondary" className="text-xs">{model.returnToStockOrderInfo.status}</Badge></div>
-                  {model.returnToStockOrderInfo.invoiceNumber && <div className="flex justify-between"><span className="text-muted-foreground">Invoice</span><span className="font-mono font-semibold">{model.returnToStockOrderInfo.invoiceNumber}</span></div>}
-                  {model.returnToStockOrderInfo.customerName && <div className="flex justify-between"><span className="text-muted-foreground">Customer</span><span>{model.returnToStockOrderInfo.customerName}</span></div>}
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Order status</span>
+                    <Badge variant="secondary" className="text-xs">
+                      {model.returnToStockOrderInfo.status}
+                    </Badge>
+                  </div>
+                  {model.returnToStockOrderInfo.invoiceNumber && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Invoice</span>
+                      <span className="font-mono font-semibold">{model.returnToStockOrderInfo.invoiceNumber}</span>
+                    </div>
+                  )}
+                  {model.returnToStockOrderInfo.customerName && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Customer</span>
+                      <span>{model.returnToStockOrderInfo.customerName}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Current total</span>
-                    <span className="font-mono">${parseFloat(model.returnToStockOrderInfo.grandTotal || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span className="font-mono">
+                      $
+                      {parseFloat(model.returnToStockOrderInfo.grandTotal || "0").toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </span>
                   </div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Bales in order</span><span>{model.returnToStockOrderInfo.totalBalesInOrder}</span></div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Bales in order</span>
+                    <span>{model.returnToStockOrderInfo.totalBalesInOrder}</span>
+                  </div>
                 </div>
                 {model.returnToStockOrderInfo.totalBalesInOrder <= 1 && (
-                  <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/10 text-destructive text-sm"><AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" /><p>This is the last bale in the order. You must cancel the entire order instead.</p></div>
-                )}
-                {model.returnToStockOrderInfo.status === "FINALIZED" && model.returnToStockOrderInfo.totalBalesInOrder > 1 && (
-                  <div className="flex items-start gap-2 p-3 rounded-md bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 text-sm">
+                  <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
                     <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-                    <p>This order is <strong>finalized</strong>. Removing this bale will reduce invoice <strong>{model.returnToStockOrderInfo.invoiceNumber}</strong> and update the customer's balance. Admin authorisation required.</p>
+                    <p>This is the last bale in the order. You must cancel the entire order instead.</p>
                   </div>
                 )}
-                {model.returnToStockOrderInfo.status !== "FINALIZED" && model.returnToStockOrderInfo.totalBalesInOrder > 1 && (
-                  <p className="text-sm text-muted-foreground">The bale will be removed from this order and returned to stock. Order totals will be recalculated.</p>
-                )}
+                {model.returnToStockOrderInfo.status === "FINALIZED" &&
+                  model.returnToStockOrderInfo.totalBalesInOrder > 1 && (
+                    <div className="flex items-start gap-2 p-3 rounded-md bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 text-sm">
+                      <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                      <p>
+                        This order is <strong>finalized</strong>. Removing this bale will reduce invoice{" "}
+                        <strong>{model.returnToStockOrderInfo.invoiceNumber}</strong> and update the customer's balance.
+                        Admin authorisation required.
+                      </p>
+                    </div>
+                  )}
+                {model.returnToStockOrderInfo.status !== "FINALIZED" &&
+                  model.returnToStockOrderInfo.totalBalesInOrder > 1 && (
+                    <p className="text-sm text-muted-foreground">
+                      The bale will be removed from this order and returned to stock. Order totals will be recalculated.
+                    </p>
+                  )}
               </>
             ) : (
-              <p className="text-sm text-muted-foreground">No order linked to this bale — it will simply be returned to stock.</p>
+              <p className="text-sm text-muted-foreground">
+                No order linked to this bale — it will simply be returned to stock.
+              </p>
             )}
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => model.setShowReturnToStockDialog(false)} data-testid="button-cancel-return-to-stock">Cancel</Button>
             <Button
-              disabled={model.returnToStockMutation.isPending || model.orderInfoLoading || (model.returnToStockOrderInfo?.totalBalesInOrder ?? 0) <= 1}
+              variant="outline"
+              onClick={() => model.setShowReturnToStockDialog(false)}
+              data-testid="button-cancel-return-to-stock"
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={
+                model.returnToStockMutation.isPending ||
+                model.orderInfoLoading ||
+                (model.returnToStockOrderInfo?.totalBalesInOrder ?? 0) <= 1
+              }
               onClick={() => {
                 const baleId = model.referenceResult?.baleInfo?.id;
                 if (!baleId) return;
                 const run = () => model.returnToStockMutation.mutate(baleId);
-                if (model.returnToStockOrderInfo?.status === "FINALIZED") model.wrapAdminAction(run, "Return Bale to Stock (Finalized Order)");
+                if (model.returnToStockOrderInfo?.status === "FINALIZED")
+                  model.wrapAdminAction(run, "Return Bale to Stock (Finalized Order)");
                 else run();
               }}
               data-testid="button-confirm-return-to-stock"

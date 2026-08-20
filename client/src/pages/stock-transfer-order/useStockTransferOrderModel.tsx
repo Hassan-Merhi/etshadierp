@@ -4,10 +4,7 @@ import { format } from "date-fns";
 import { useLocation } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
-import {
-  getDefaultPeriodValue,
-  type PeriodFilterValue,
-} from "@/components/ui/period-filter";
+import { getDefaultPeriodValue, type PeriodFilterValue } from "@/components/ui/period-filter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
@@ -117,9 +114,7 @@ export function useStockTransferOrderModel() {
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [historyItem, setHistoryItem] = useState<StockItemData | null>(null);
   const [historyLocation, setHistoryLocation] = useState<Location | null>(null);
-  const [historyPeriod, setHistoryPeriod] = useState<PeriodFilterValue>(() =>
-    getDefaultPeriodValue("this_year")
-  );
+  const [historyPeriod, setHistoryPeriod] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_year"));
 
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailYear, setDetailYear] = useState(new Date().getFullYear());
@@ -382,19 +377,14 @@ export function useStockTransferOrderModel() {
 
   const toggleLocation = async (locationId: number) => {
     setSelectedLocationIds((previous) =>
-      previous.includes(locationId)
-        ? previous.filter((id) => id !== locationId)
-        : [...previous, locationId]
+      previous.includes(locationId) ? previous.filter((id) => id !== locationId) : [...previous, locationId]
     );
   };
 
   const sortOrderItems = (items: OrderItem[]): OrderItem[] =>
     [...items].sort((left, right) => left.sourceLocationName.localeCompare(right.sourceLocationName));
 
-  const { sortedGroupItems, flatItems, flatRowIndexById } = useMatrixRows(
-    summaryData,
-    expandedGroups
-  );
+  const { sortedGroupItems, flatItems, flatRowIndexById } = useMatrixRows(summaryData, expandedGroups);
 
   const openQuantityPicker = useCallback(
     (item: StockItemData, locationId: number, locationName: string, availableQty: number) => {
@@ -468,12 +458,8 @@ export function useStockTransferOrderModel() {
     [flatItems, selectedLocations, quantityPicker.open, openQuantityPicker, focusedCell]
   );
 
-  const handleCellClick = async (
-    item: StockItemData,
-    locationId: number,
-    locationName: string,
-    availableQty: number
-  ) => openQuantityPicker(item, locationId, locationName, availableQty);
+  const handleCellClick = async (item: StockItemData, locationId: number, locationName: string, availableQty: number) =>
+    openQuantityPicker(item, locationId, locationName, availableQty);
 
   const handleAddToOrder = async () => {
     const quantity = parseFloat(pickerQuantity);

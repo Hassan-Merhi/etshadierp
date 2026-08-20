@@ -166,17 +166,17 @@ export function useFactoryDaybookModel() {
 
   const { data: entries = [], isLoading } = useQuery<DaybookEntry[]>({
     queryKey: [
-          "/api/factory/daybook",
-          startDate,
-          endDate,
-          txTypeFilter,
-          currencyFilter,
-          statusFilter,
-          debouncedSearchQuery,
-          minAmount,
-          maxAmount,
-          sortOrder,
-        ],
+      "/api/factory/daybook",
+      startDate,
+      endDate,
+      txTypeFilter,
+      currencyFilter,
+      statusFilter,
+      debouncedSearchQuery,
+      minAmount,
+      maxAmount,
+      sortOrder,
+    ],
     queryFn: async () => {
       const res = await fetch(`/api/factory/daybook?${queryParams.toString()}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch daybook");
@@ -260,7 +260,17 @@ export function useFactoryDaybookModel() {
       return sortOrder === "desc" ? -dateCmp : dateCmp;
     });
     return result;
-  }, [entries, isAdminOrOwner, currentUser?.role, currentUser.id, statusFilter, debouncedSearchQuery, minAmount, maxAmount, sortOrder]);
+  }, [
+    entries,
+    isAdminOrOwner,
+    currentUser?.role,
+    currentUser.id,
+    statusFilter,
+    debouncedSearchQuery,
+    minAmount,
+    maxAmount,
+    sortOrder,
+  ]);
 
   // ── Condensed grouped rows ────────────────────────────────────────────────
   const condensedRows = useMemo(() => {
@@ -393,52 +403,52 @@ export function useFactoryDaybookModel() {
 
   // ── Excel export: summary ─────────────────────────────────────────────────
   const handleExportToExcel = async () => {
-  let exportEntries: DaybookEntry[];
-  try {
-    exportEntries = (await fetchAllDaybookEntries(new URLSearchParams(queryParams))).filter(
-      (entry) => entry.txType !== "WORKER_EDITED"
-    ) as DaybookEntry[];
-  } catch (error: any) {
-    toast({
-      title: "Export failed",
-      description: error?.message || "The complete filtered daybook could not be loaded.",
-      variant: "destructive",
-    });
-    return;
-  }
-  if (exportEntries.length === 0) {
-    warnNothingToExport();
-    return;
-  }
-  const { fileName, rowCount } = await exportFactoryDaybookSummary(exportEntries, formatDisplayDate);
-  toast({
-    title: "Export successful",
-    description: `Downloaded ${fileName} with ${rowCount} entries.`,
-  });
-};
-
-// ── Excel export: detailed (with voucher debit/credit entries) ────────────
-  const handleExportDetailedToExcel = async () => {
-  setIsExportingDetailed(true);
-  try {
-    const exportEntries = (await fetchAllDaybookEntries(new URLSearchParams(queryParams))).filter(
-      (entry) => entry.txType !== "WORKER_EDITED"
-    ) as DaybookEntry[];
+    let exportEntries: DaybookEntry[];
+    try {
+      exportEntries = (await fetchAllDaybookEntries(new URLSearchParams(queryParams))).filter(
+        (entry) => entry.txType !== "WORKER_EDITED"
+      ) as DaybookEntry[];
+    } catch (error: any) {
+      toast({
+        title: "Export failed",
+        description: error?.message || "The complete filtered daybook could not be loaded.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (exportEntries.length === 0) {
       warnNothingToExport();
       return;
     }
-    const { fileName, rowCount } = await exportFactoryDaybookDetailed(exportEntries, formatDisplayDate);
-    toast({ title: "Export successful", description: `Downloaded ${fileName} with ${rowCount} entries.` });
-  // eslint-disable-next-line unused-imports/no-unused-vars -- God Files extraction preserves pre-split behavior.
-  } catch (error) {
-    toast({ title: "Export failed", description: "An error occurred while exporting.", variant: "destructive" });
-  } finally {
-    setIsExportingDetailed(false);
-  }
-};
+    const { fileName, rowCount } = await exportFactoryDaybookSummary(exportEntries, formatDisplayDate);
+    toast({
+      title: "Export successful",
+      description: `Downloaded ${fileName} with ${rowCount} entries.`,
+    });
+  };
 
-// ── Mutations ─────────────────────────────────────────────────────────────
+  // ── Excel export: detailed (with voucher debit/credit entries) ────────────
+  const handleExportDetailedToExcel = async () => {
+    setIsExportingDetailed(true);
+    try {
+      const exportEntries = (await fetchAllDaybookEntries(new URLSearchParams(queryParams))).filter(
+        (entry) => entry.txType !== "WORKER_EDITED"
+      ) as DaybookEntry[];
+      if (exportEntries.length === 0) {
+        warnNothingToExport();
+        return;
+      }
+      const { fileName, rowCount } = await exportFactoryDaybookDetailed(exportEntries, formatDisplayDate);
+      toast({ title: "Export successful", description: `Downloaded ${fileName} with ${rowCount} entries.` });
+      // eslint-disable-next-line unused-imports/no-unused-vars -- God Files extraction preserves pre-split behavior.
+    } catch (error) {
+      toast({ title: "Export failed", description: "An error occurred while exporting.", variant: "destructive" });
+    } finally {
+      setIsExportingDetailed(false);
+    }
+  };
+
+  // ── Mutations ─────────────────────────────────────────────────────────────
   const editMutation = useMutation({
     mutationFn: async ({ entryId, data }: { entryId: number; data: any }) => {
       const res = await factoryApiRequest("PUT", `/api/factory/daybook/${entryId}`, data);

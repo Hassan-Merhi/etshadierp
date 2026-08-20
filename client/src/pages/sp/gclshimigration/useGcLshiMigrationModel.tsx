@@ -124,10 +124,14 @@ export function useGcLshiMigrationModel() {
   });
 
   const createCompanyMutation = useMutation({
-    mutationFn: (body: { name: string; code: string }) => apiRequest("POST", "/api/sp/migration/create-sp-company", body),
+    mutationFn: (body: { name: string; code: string }) =>
+      apiRequest("POST", "/api/sp/migration/create-sp-company", body),
     onSuccess: async (response) => {
       const result = await readJson<CompanyCreateResult>(response);
-      toast({ title: "Company created", description: `${result.company.name} (${result.company.code}) created successfully.` });
+      toast({
+        title: "Company created",
+        description: `${result.company.name} (${result.company.code}) created successfully.`,
+      });
       setShowCreateDialog(false);
       qc.invalidateQueries({ queryKey: ["/api/companies"] });
       setTargetCompanyId(result.company.id);
@@ -167,13 +171,15 @@ export function useGcLshiMigrationModel() {
       refetchRuns();
       refetchPreview();
     },
-    onError: (error: unknown) => toast({ title: "Rollback failed", description: messageOf(error), variant: "destructive" }),
+    onError: (error: unknown) =>
+      toast({ title: "Rollback failed", description: messageOf(error), variant: "destructive" }),
   });
 
   const sourceComp = erpCompanies.find((company) => company.id === sourceCompanyId);
   const targetComp = spCompanies.find((company) => company.id === targetCompanyId);
   const allRuns = runsData?.runs ?? [];
-  const fmt = (number: number) => number.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmt = (number: number) =>
+    number.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return {
     toast,

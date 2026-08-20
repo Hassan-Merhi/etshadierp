@@ -85,9 +85,7 @@ export function StockTransferOrderPanel({ model }: { model: Model }) {
                           type="button"
                           className={cn(
                             "w-full text-left px-3 py-2 rounded-md text-sm transition-colors",
-                            mobileSelectedItemId === item.id
-                              ? "bg-primary text-primary-foreground"
-                              : "hover:bg-muted"
+                            mobileSelectedItemId === item.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"
                           )}
                           onClick={() => setMobileSelectedItemId(item.id)}
                           data-testid={`mobile-item-option-${item.id}`}
@@ -195,9 +193,7 @@ export function StockTransferOrderPanel({ model }: { model: Model }) {
           {orderItems.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              <p className="text-sm hidden lg:block">
-                Click on quantities or use arrow keys + spacebar to add items
-              </p>
+              <p className="text-sm hidden lg:block">Click on quantities or use arrow keys + spacebar to add items</p>
               <p className="text-sm lg:hidden">Tap "Add Item" above to add items to the order</p>
             </div>
           ) : (

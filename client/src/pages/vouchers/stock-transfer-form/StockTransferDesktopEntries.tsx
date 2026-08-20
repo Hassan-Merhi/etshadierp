@@ -7,7 +7,9 @@ export function StockTransferDesktopEntries({ model }: { model: StockTransferFor
     <div className="hidden sm:block overflow-x-auto">
       <div className="min-w-[400px]">
         <div className="flex bg-muted/50 border-b sticky top-0 z-30">
-          <div className="w-10 sm:w-12 flex items-center justify-center border-r h-9 sm:h-10 font-medium text-xs">#</div>
+          <div className="w-10 sm:w-12 flex items-center justify-center border-r h-9 sm:h-10 font-medium text-xs">
+            #
+          </div>
           {!model.isPOS && (
             <div className="w-28 sm:w-40 flex items-center px-2 sm:px-3 border-r h-9 sm:h-10 font-medium text-xs sm:text-sm">
               Source

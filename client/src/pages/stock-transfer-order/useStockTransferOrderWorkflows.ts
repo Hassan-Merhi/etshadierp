@@ -4,12 +4,7 @@ import { useLocation } from "wouter";
 import { readFile, utils, writeFile } from "@/lib/excelHelper";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type {
-  ImportPreviewRow,
-  Location,
-  LocationSummaryResponse,
-  OrderItem,
-} from "../stocktransferorder/types";
+import type { ImportPreviewRow, Location, LocationSummaryResponse, OrderItem } from "../stocktransferorder/types";
 
 type StockItemOption = {
   id: number;
@@ -179,19 +174,13 @@ export function useStockTransferOrderWorkflows({
 
       const rows = utils.sheet_to_json<ImportSheetRow>(worksheet);
       const preview: ImportPreviewRow[] = rows
-        .filter(
-          (row) =>
-            row.Code !== undefined || row.Name !== undefined || row["Item Name"] !== undefined
-        )
+        .filter((row) => row.Code !== undefined || row.Name !== undefined || row["Item Name"] !== undefined)
         .map((row) => {
           const code = String(row.Code ?? "").trim();
           const name = String(row.Name ?? row["Item Name"] ?? "").trim();
-          const change =
-            parseFloat(String(row["Qty Change"] ?? row.Change ?? row.Qty ?? "0")) || 0;
+          const change = parseFloat(String(row["Qty Change"] ?? row.Change ?? row.Qty ?? "0")) || 0;
 
-          let matched = code
-            ? stockItems.find((item) => item.code?.toLowerCase() === code.toLowerCase())
-            : undefined;
+          let matched = code ? stockItems.find((item) => item.code?.toLowerCase() === code.toLowerCase()) : undefined;
           if (!matched && name) {
             matched = stockItems.find((item) => item.name.toLowerCase() === name.toLowerCase());
           }
@@ -232,15 +221,13 @@ export function useStockTransferOrderWorkflows({
                 if (locationData.quantity > bestQty) {
                   bestQty = locationData.quantity;
                   sourceLocationId = parseInt(locationIdValue);
-                  sourceLocationName =
-                    locations.find((location) => location.id === sourceLocationId)?.name || "";
+                  sourceLocationName = locations.find((location) => location.id === sourceLocationId)?.name || "";
                 }
               }
             }
           }
 
-          const status: ImportPreviewRow["status"] =
-            newQty <= 0 ? "remove" : currentQty === 0 ? "new_item" : "ok";
+          const status: ImportPreviewRow["status"] = newQty <= 0 ? "remove" : currentQty === 0 ? "new_item" : "ok";
           return {
             rawCode: code,
             rawName: name,
@@ -317,9 +304,7 @@ export function useStockTransferOrderWorkflows({
     worksheet.addRow(["Item Name", "Qty"]);
     worksheet.getRow(1).font = { bold: true };
 
-    for (const row of importPreview.filter(
-      (item) => item.newQty > 0 && item.status !== "not_found"
-    )) {
+    for (const row of importPreview.filter((item) => item.newQty > 0 && item.status !== "not_found")) {
       worksheet.addRow([row.stockItemName, row.newQty]);
     }
 

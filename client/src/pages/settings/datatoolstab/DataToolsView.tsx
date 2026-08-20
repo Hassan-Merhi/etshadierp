@@ -2,15 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  ArrowLeftRight,
-  Calculator,
-  Database,
-  Edit,
-  Package,
-  RefreshCw,
-  Upload,
-} from "lucide-react";
+import { ArrowLeftRight, Calculator, Database, Edit, Package, RefreshCw, Upload } from "lucide-react";
 import { Link } from "wouter";
 import { MergeStockItemsLauncher } from "./components/MergeStockItemsLauncher";
 import { ReconcileOTWNamesCard } from "./components/ReconcileOTWNamesCard";
