@@ -1,32 +1,32 @@
 {
   "schemaVersion": 2,
   "detectorVersion": 9,
-  "policyDigest": "c26178dd9bc7d71d34976e5bb87aa946cc5d59e6db54b7415f9e363514809f8f",
+  "policyDigest": "f1c6e5e3ab5cfcb6faeb5c854ae37033676b5782e2858007404e90a861a607c9",
   "reviewedAt": "2026-08-20",
-  "reviewedHead": "claude/god-files-rebase-merge-ylts0b@901b4e7b79c5e26fb962ac3feda38d950a26af85",
-  "description": "Re-pinned after merging the god-file Waves 5-9 split programme. No string was added: total actionable text FELL 12,423 -> 12,000 as the split shells stopped repeating literals. The i18n policy classifies by PATH, so the accounting ceiling rises 1,365 -> 1,381 purely because literals that counted as other-client inside the Daybook, TransactionJournal and AccountsLegacy monoliths now sit under accounting-named modules; other-client falls by exactly the same 16. Every other module ceiling falls or holds.",
-  "maxActionable": 12000,
+  "reviewedHead": "agent/god-files-recovery-latest-main@0ad69d1ceaf3875f59618a86a8d3d71ed51cfcb0",
+  "description": "Reconciled after resyncing the recovered God Files programme with current main. The classified audit now measures 11,977 actionable literals, down from the previous 12,000 ceiling. Module movements are caused by split files landing under path-based module rules and the reviewed supplier-partner path classification; the repository-wide actionable total still falls. Every module is pinned to its exact measured count so future growth remains blocked.",
+  "maxActionable": 11977,
   "modules": {
     "accounting": {
-      "maxActionable": 1381
+      "maxActionable": 1366
     },
     "administration": {
-      "maxActionable": 1121
+      "maxActionable": 1128
     },
     "backend-messages": {
       "maxActionable": 0
     },
     "container-purchasing": {
-      "maxActionable": 833
+      "maxActionable": 819
     },
     "factory": {
-      "maxActionable": 5323
+      "maxActionable": 5319
     },
     "inventory-logistics": {
-      "maxActionable": 1304
+      "maxActionable": 1322
     },
     "other-client": {
-      "maxActionable": 775
+      "maxActionable": 758
     },
     "payroll": {
       "maxActionable": 535
@@ -47,7 +47,7 @@
       "maxActionable": 0
     },
     "supplier-partner": {
-      "maxActionable": 0
+      "maxActionable": 2
     }
   },
   "maxUnclassified": 0
