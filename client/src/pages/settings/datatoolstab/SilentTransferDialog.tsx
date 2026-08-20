@@ -77,7 +77,7 @@ export function SilentTransferDialog({ model }: Props) {
                     <SelectValue placeholder="From location..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {(locations as any[]).map((location: any) => (
+                    {(locations as any[]).map((location) => (
                       <SelectItem key={location.id} value={String(location.id)}>
                         {location.name}
                       </SelectItem>
@@ -93,8 +93,8 @@ export function SilentTransferDialog({ model }: Props) {
                   </SelectTrigger>
                   <SelectContent>
                     {(locations as any[])
-                      .filter((location: any) => String(location.id) !== silentSrcId)
-                      .map((location: any) => (
+                      .filter((location) => String(location.id) !== silentSrcId)
+                      .map((location) => (
                         <SelectItem key={location.id} value={String(location.id)}>
                           {location.name}
                         </SelectItem>
@@ -225,7 +225,7 @@ export function SilentTransferDialog({ model }: Props) {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {silentErrorLines.map((errorLine: any, index: number) => (
+                            {silentErrorLines.map((errorLine, index: number) => (
                               <TableRow key={index} className="bg-red-50/60 dark:bg-red-950/20">
                                 <TableCell className="text-xs py-1.5 text-muted-foreground">
                                   {errorLine.rowNum}
@@ -274,7 +274,7 @@ export function SilentTransferDialog({ model }: Props) {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {silentWarnItems.map((item: any, index: number) => (
+                            {silentWarnItems.map((item, index: number) => (
                               <TableRow
                                 key={index}
                                 className={silentIncludeWarnings ? "bg-yellow-50/60 dark:bg-yellow-950/20" : ""}
@@ -317,7 +317,7 @@ export function SilentTransferDialog({ model }: Props) {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {silentValidItems.map((item: any, index: number) => (
+                            {silentValidItems.map((item, index: number) => (
                               <TableRow key={index} className="bg-green-50/40 dark:bg-green-950/10">
                                 <TableCell className="py-1.5">
                                   <div className="text-xs font-medium">{item.stockItemName}</div>

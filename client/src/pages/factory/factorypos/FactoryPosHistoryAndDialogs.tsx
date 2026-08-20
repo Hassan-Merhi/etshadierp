@@ -51,7 +51,7 @@ export function FactoryPosHistory({ model }: { model: FactoryPosModel }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sales.map((sale: any) => {
+              {sales.map((sale) => {
                 const pfx = sale.currencyCode !== "USD" ? `${sale.currencyCode} ` : "$";
                 return (
                   <TableRow key={sale.id} data-testid={`row-sale-${sale.id}`}>

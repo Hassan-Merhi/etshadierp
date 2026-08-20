@@ -107,7 +107,7 @@ export function DataToolsView({ model }: Props) {
                   <SelectValue placeholder="Choose location..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {locations.map((location: any) => (
+                  {locations.map((location) => (
                     <SelectItem key={location.id} value={String(location.id)}>
                       {location.name}
                     </SelectItem>

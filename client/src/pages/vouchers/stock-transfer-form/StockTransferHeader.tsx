@@ -164,7 +164,7 @@ export function StockTransferFormView({ model }: { model: StockTransferFormModel
               title: "Form Validation Error",
               description:
                 Object.values(errors)
-                  .map((error: any) => error?.message || JSON.stringify(error))
+                  .map((error) => error?.message || JSON.stringify(error))
                   .join(", ") || "Please check all fields",
               variant: "destructive",
             });

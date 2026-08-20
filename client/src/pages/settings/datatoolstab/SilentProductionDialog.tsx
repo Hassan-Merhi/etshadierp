@@ -110,7 +110,7 @@ export function SilentProductionDialog({ model }: Props) {
                   <SelectValue placeholder="Select location..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {(locations as any[]).map((location: any) => (
+                  {(locations as any[]).map((location) => (
                     <SelectItem key={location.id} value={String(location.id)}>
                       {location.name}
                     </SelectItem>
@@ -167,16 +167,16 @@ export function SilentProductionDialog({ model }: Props) {
                             );
                           }
                           const filtered = (allStockItems as any[]).filter(
-                            (stockItem: any) =>
+                            (stockItem) =>
                               stockItem.name.toLowerCase().includes(term) ||
                               (stockItem.code && stockItem.code.toLowerCase().includes(term))
                           );
                           if (filtered.length === 0) {
                             return <div className="text-center text-sm text-muted-foreground py-4">No items found</div>;
                           }
-                          return filtered.map((stockItem: any) => {
+                          return filtered.map((stockItem) => {
                             const locationRow = silentLocInventory.find(
-                              (inventory: any) => inventory.stockItemId === stockItem.id
+                              (inventory) => inventory.stockItemId === stockItem.id
                             );
                             const currentQty = locationRow ? parseFloat(locationRow.quantity || "0") : 0;
                             return (

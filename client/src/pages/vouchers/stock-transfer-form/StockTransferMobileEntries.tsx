@@ -44,25 +44,25 @@ export function StockTransferMobileEntries({ model }: { model: StockTransferForm
         const mobileFilteredItems =
           activeTransferRow === index && activeFieldType === "item"
             ? transferInventory
-                .filter((item: any) => {
+                .filter((item) => {
                   if (!transferSearchTerm.trim()) return true;
                   const term = transferSearchTerm.toLowerCase();
                   return (
                     item.stockItemName?.toLowerCase().includes(term) || item.stockItemCode?.toLowerCase().includes(term)
                   );
                 })
-                .sort((a: any, b: any) => (a.stockItemName || "").localeCompare(b.stockItemName || ""))
+                .sort((a, b) => (a.stockItemName || "").localeCompare(b.stockItemName || ""))
                 .slice(0, 10)
             : [];
         const mobileFilteredLocs =
           activeTransferRow === index && activeFieldType === "source"
             ? locations
-                .filter((loc: any) => {
+                .filter((loc) => {
                   if (!transferSourceSearchTerm.trim()) return true;
                   const term = transferSourceSearchTerm.toLowerCase();
                   return (loc.name || "").toLowerCase().includes(term);
                 })
-                .sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""))
+                .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
                 .slice(0, 8)
             : [];
         return (
@@ -122,7 +122,7 @@ export function StockTransferMobileEntries({ model }: { model: StockTransferForm
                 />
                 {mobileFilteredLocs.length > 0 && (
                   <div className="border rounded-md bg-popover shadow-md max-h-36 overflow-y-auto z-20 relative">
-                    {mobileFilteredLocs.map((loc: any) => (
+                    {mobileFilteredLocs.map((loc) => (
                       <button
                         key={loc.id}
                         type="button"
@@ -189,7 +189,7 @@ export function StockTransferMobileEntries({ model }: { model: StockTransferForm
               />
               {mobileFilteredItems.length > 0 && (
                 <div className="border rounded-md bg-popover shadow-md max-h-40 overflow-y-auto z-20 relative">
-                  {mobileFilteredItems.map((item: any) => (
+                  {mobileFilteredItems.map((item) => (
                     <button
                       key={item.stockItemId}
                       type="button"
@@ -198,7 +198,7 @@ export function StockTransferMobileEntries({ model }: { model: StockTransferForm
                         e.preventDefault();
                         const sourceId = Number(transferInventorySource);
                         if (!(sourceId > 0)) return;
-                        const sourceLocation = locations.find((l: any) => l.id === sourceId);
+                        const sourceLocation = locations.find((l) => l.id === sourceId);
                         stockTransferForm.setValue(`entries.${index}.sourceLocationId`, sourceId, {
                           shouldValidate: true,
                         });

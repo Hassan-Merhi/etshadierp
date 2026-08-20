@@ -15,7 +15,7 @@ import type { FactoryPosModel } from "./useFactoryPosModel";
 
 function CreditSaleSummary({ model }: { model: FactoryPosModel }) {
   const { ccPrefix, total } = model;
-  const custObj = (model.allCustomers || []).find((c: any) => String(c.id) === model.selectedCustomerId);
+  const custObj = (model.allCustomers || []).find((c) => String(c.id) === model.selectedCustomerId);
   const prevBal = custObj ? parseFloat(custObj.balance || "0") : 0;
   const prevBalSide = custObj?.balanceSide || "Dr";
   const prevNet = prevBalSide === "Dr" ? prevBal : -prevBal;
@@ -66,7 +66,7 @@ function ExpenseDeductions({ model }: { model: FactoryPosModel }) {
               <SelectValue placeholder="Expense account" />
             </SelectTrigger>
             <SelectContent>
-              {(model.ledgerAccounts || []).map((a: any) => (
+              {(model.ledgerAccounts || []).map((a) => (
                 <SelectItem key={a.id} value={String(a.id)}>
                   {a.name}
                 </SelectItem>

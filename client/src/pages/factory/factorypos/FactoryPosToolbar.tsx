@@ -26,7 +26,7 @@ export function FactoryPosToolbar({ model }: { model: FactoryPosModel }) {
             <SelectValue placeholder="Select location" />
           </SelectTrigger>
           <SelectContent>
-            {(model.locations || []).map((l: any) => (
+            {(model.locations || []).map((l) => (
               <SelectItem key={l.id} value={String(l.id)}>
                 {l.name}
               </SelectItem>
@@ -70,7 +70,7 @@ export function FactoryPosToolbar({ model }: { model: FactoryPosModel }) {
             <SelectValue placeholder="Cash account" />
           </SelectTrigger>
           <SelectContent>
-            {model.cashAccounts.map((a: any) => (
+            {model.cashAccounts.map((a) => (
               <SelectItem key={a.id} value={String(a.id)}>
                 {a.name}
               </SelectItem>
@@ -126,7 +126,7 @@ export function FactoryPosToolbar({ model }: { model: FactoryPosModel }) {
               <SelectValue placeholder="Select customer *" />
             </SelectTrigger>
             <SelectContent>
-              {(model.allCustomers || []).map((c: any) => (
+              {(model.allCustomers || []).map((c) => (
                 <SelectItem key={c.id} value={String(c.id)}>
                   {c.legalName || c.name || `Customer #${c.id}`}
                 </SelectItem>

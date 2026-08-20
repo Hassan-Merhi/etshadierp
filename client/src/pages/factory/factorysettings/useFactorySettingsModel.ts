@@ -200,7 +200,7 @@ export function useFactorySettingsModel() {
       }
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       setBaleValidationResult(data);
       setBaleImportResult(null);
       if (data.validRows.length === 0) {
@@ -311,7 +311,7 @@ export function useFactorySettingsModel() {
       setWeeklyWaPickerOpen(false);
       toast({ title: "Saved", description: "Weekly report WhatsApp group updated." });
     },
-    onError: (error: any) => {
+    onError: (error) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
@@ -337,7 +337,7 @@ export function useFactorySettingsModel() {
       setProdWaPickerOpen(false);
       toast({ title: "Saved", description: "Production WhatsApp group updated." });
     },
-    onError: (error: any) => {
+    onError: (error) => {
       if (error?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
