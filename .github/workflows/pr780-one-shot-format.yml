@@ -1,0 +1,38 @@
+name: PR780 One-Shot Format
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.event.pull_request.number == 780
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: agent/god-files-recovery-latest-main
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.14.0'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Format exact failing file
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write client/src/pages/factory/factorycontainerloadingscan/useFactoryContainerLoadingScanModel.ts
+          node node_modules/prettier/bin/prettier.cjs --check client/src/pages/factory/factorycontainerloadingscan/useFactoryContainerLoadingScanModel.ts
+          npm run check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if git diff --quiet -- client/src/pages/factory/factorycontainerloadingscan/useFactoryContainerLoadingScanModel.ts; then
+            echo 'No formatting changes needed.'
+            exit 0
+          fi
+          git add -- client/src/pages/factory/factorycontainerloadingscan/useFactoryContainerLoadingScanModel.ts
+          git commit -m 'format: normalize PR780 factory loading model'
+          git push origin HEAD:agent/god-files-recovery-latest-main
