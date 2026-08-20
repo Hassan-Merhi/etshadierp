@@ -22,7 +22,7 @@ export function InvoiceTemplate({
   return (
     <div style={{ position: "fixed", top: 0, left: "-99999px", width: "680px", pointerEvents: "none", zIndex: -1 }}>
       <div
-        ref={printRef}
+        ref={printRef as React.RefObject<HTMLDivElement>}
         style={{
           fontFamily: "Arial, Helvetica, sans-serif",
           fontSize: "8pt",

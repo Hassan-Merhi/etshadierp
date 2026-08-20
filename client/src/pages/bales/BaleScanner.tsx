@@ -58,7 +58,7 @@ export function BaleScanner({
 
         <div className="flex gap-2">
           <Input
-            ref={barcodeInputRef}
+            ref={barcodeInputRef as React.RefObject<HTMLInputElement>}
             placeholder="Scan or enter barcode..."
             value={barcodeInput}
             onChange={(e) => setBarcodeInput(e.target.value)}

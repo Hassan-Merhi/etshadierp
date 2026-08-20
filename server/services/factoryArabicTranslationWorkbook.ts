@@ -24,13 +24,7 @@ export interface TranslationWorkbookRow {
 }
 
 export type TranslationPreviewStatus =
-  | "update"
-  | "unchanged"
-  | "unknown"
-  | "duplicate"
-  | "invalid"
-  | "category-conflict"
-  | "ambiguous";
+  "update" | "unchanged" | "unknown" | "duplicate" | "invalid" | "category-conflict" | "ambiguous";
 
 export interface TranslationPreviewRow extends TranslationWorkbookRow {
   productId?: number;
@@ -85,7 +79,14 @@ export const ARABIC_TRANSLATION_TEMPLATE_HEADERS = [
 const MAX_WORKBOOK_ROWS = 50_000;
 const MAX_TRANSLATION_LENGTH = 2_000;
 
-const CONTROL_CHARACTER_PATTERN = { test(value: string): boolean { return Array.from(value).some((character) => { const code = character.charCodeAt(0); return code <= 8 || code === 11 || code === 12 || (code >= 14 && code <= 31) || code === 127; }); } };
+const CONTROL_CHARACTER_PATTERN = {
+  test(value: string): boolean {
+    return Array.from(value).some((character) => {
+      const code = character.charCodeAt(0);
+      return code <= 8 || code === 11 || code === 12 || (code >= 14 && code <= 31) || code === 127;
+    });
+  },
+};
 const RTL_FROZEN_VIEW: ExcelJS.WorksheetView = {
   state: "frozen",
   xSplit: 0,
@@ -276,7 +277,7 @@ export async function createArabicTranslationTemplate(products: TranslationCatal
 
 export async function parseArabicTranslationWorkbook(buffer: Buffer): Promise<TranslationWorkbookRow[]> {
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer as unknown as Buffer<ArrayBufferLike> & ExcelJS.Buffer);
+  await workbook.xlsx.load(buffer as unknown as Buffer);
   const sheet = workbook.worksheets[0];
   if (!sheet) throw new Error("Workbook does not contain a worksheet");
   if (sheet.actualRowCount > MAX_WORKBOOK_ROWS + 1) {

@@ -106,7 +106,7 @@ export function useLocationSummaryBandwidth({
   const groupQueries = useQueries({
     queries: expandedGroupIds.map((groupId) => ({
       queryKey: ["/api/location-summary", "group", companyId, locationIdsKey, groupId] as const,
-      queryFn: ({ signal }) => {
+      queryFn: ({ signal }: { signal: AbortSignal }) => {
         const params = new URLSearchParams({
           profile: "group",
           locationIds: locationIdsKey,

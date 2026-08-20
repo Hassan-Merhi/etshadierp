@@ -157,7 +157,7 @@ export function registerFactoryFrenchTranslationRoutes(app: Express) {
       if (!req.file) return res.status(400).json({ message: "Excel file is required" });
       await ensureFrenchColumns();
       const workbook = new ExcelJS.Workbook();
-      await workbook.xlsx.load(req.file.buffer as unknown as Buffer<ArrayBufferLike> & ExcelJS.Buffer);
+      await workbook.xlsx.load(req.file.buffer as unknown as Buffer);
       const sheet = workbook.worksheets[0];
       if (!sheet) return res.status(400).json({ message: "Workbook has no worksheet" });
       const headers = new Map<string, number>();
@@ -197,7 +197,7 @@ export function registerFactoryFrenchTranslationRoutes(app: Express) {
             LEFT JOIN factory_categories c ON c.id = p.category_id AND c.company_id = p.company_id
             WHERE p.company_id = ${companyId} AND UPPER(BTRIM(p.article_code)) = ANY(${codes})
           `)
-        : { rows: ([]) };
+        : { rows: [] };
       const byCode = new Map(catalog.rows.map((row: Record<string, unknown>) => [row.articleCode, row]));
       const preview = rows.map((row) => {
         const match = byCode.get(String(row.articleCode));

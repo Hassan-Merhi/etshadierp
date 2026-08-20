@@ -215,7 +215,7 @@ export function FactoryPosPrintTemplate({ printRef, savedSale, printUserName, fm
   return (
     <div className="hidden">
       <div
-        ref={printRef}
+        ref={printRef as React.RefObject<HTMLDivElement>}
         style={{
           fontFamily: "Arial, Helvetica, sans-serif",
           fontSize: "8pt",

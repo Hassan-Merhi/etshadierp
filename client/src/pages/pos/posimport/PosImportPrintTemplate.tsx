@@ -140,7 +140,7 @@ export function PosImportPrintTemplate({
   return (
     <div className="hidden">
       <div
-        ref={printRef}
+        ref={printRef as React.RefObject<HTMLDivElement>}
         style={{
           fontFamily: "Arial, Helvetica, sans-serif",
           fontSize: "11pt",

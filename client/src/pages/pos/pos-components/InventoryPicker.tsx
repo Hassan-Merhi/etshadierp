@@ -78,7 +78,7 @@ export function InventoryPicker({
       </div>
 
       {/* List */}
-      <div className="flex-1 overflow-y-auto" ref={itemListRef}>
+      <div className="flex-1 overflow-y-auto" ref={itemListRef as React.RefObject<HTMLDivElement>}>
         {filteredInventory.map((item, index) => {
           const isOut = item.stock === 0;
           const isLow = !isOut && item.stock < 10;
