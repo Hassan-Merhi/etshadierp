@@ -111,15 +111,11 @@ jobs:
           s = replace_required(s, '  const msg: string = error?.message ?? "";', '  const msg = getErrorDetails(error).optionalMessage ?? "";', 'query network message')
           s = replace_required(
               s,
-              '''      const offlineError: any = new Error(`Saved offline — will sync when connected`);
-              offlineError.name = "OfflineQueued";
-              offlineError.description = description;''',
-              '''      const offlineError = Object.assign(new Error(`Saved offline — will sync when connected`), {
-                name: "OfflineQueued",
-                description,
-              });''',
-              'query offline error'
+              'const offlineError: any = new Error(`Saved offline — will sync when connected`);',
+              'const offlineError = Object.assign(new Error(`Saved offline — will sync when connected`), { description });',
+              'query offline constructor'
           )
+          s = replace_required(s, '      offlineError.description = description;\n', '', 'query offline description assignment')
           p.write_text(s)
           PY
           node node_modules/prettier/bin/prettier.cjs --write client/src/lib/factoryApi.ts client/src/lib/queryClient.ts
