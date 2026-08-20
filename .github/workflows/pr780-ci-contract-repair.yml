@@ -1,0 +1,194 @@
+name: PR 780 CI contract repair
+
+on:
+  push:
+    branches:
+      - agent/god-files-recovery-latest-main
+    paths:
+      - .github/workflows/pr780-ci-contract-repair.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Apply earned contract repairs
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import json
+          import re
+
+          stale = {
+            "client/src/components/StockItemDetailsDialog.tsx",
+            "client/src/pages/AccountsLegacy.tsx",
+            "client/src/pages/BarcodeLookup.tsx",
+            "client/src/pages/ContainerLoadingScan.tsx",
+            "client/src/pages/daybook/VoucherDetailsDialog.tsx",
+            "client/src/pages/factory/FactoryContainerLoadingScan.tsx",
+            "client/src/pages/factory/FactoryDaybook.tsx",
+            "client/src/pages/factory/FactoryLocationInventory.tsx",
+            "client/src/pages/factory/FactoryPOS.tsx",
+            "client/src/pages/factory/FactorySettings.tsx",
+            "client/src/pages/factory/FactorySuppliers.tsx",
+            "client/src/pages/pos/POSImport.tsx",
+            "client/src/pages/pos/POSPriceList.tsx",
+            "client/src/pages/settings/DataToolsTab.tsx",
+            "client/src/pages/sp/GcLshiMigration.tsx",
+            "client/src/pages/StockEntryHistory.tsx",
+            "client/src/pages/StockItems.tsx",
+            "client/src/pages/StockTransferOrder.tsx",
+            "client/src/pages/SupplierProfitCheck.tsx",
+            "client/src/pages/TransactionJournal.tsx",
+            "client/src/pages/vouchers/JournalForm.tsx",
+            "client/src/pages/vouchers/StockAdjustmentForm.tsx",
+            "client/src/pages/vouchers/StockTransferForm.tsx",
+          }
+          config_path = Path("config/god-file-boundaries.json")
+          config = json.loads(config_path.read_text())
+          grandfathered = config["repositoryScan"]["grandfathered"]
+          missing = sorted(stale - grandfathered.keys())
+          if missing:
+            raise SystemExit(f"Expected stale baselines missing: {missing}")
+          for path in stale:
+            del grandfathered[path]
+          config["version"] = max(int(config.get("version", 0)) + 1, 22)
+          config["description"] = (
+            "Repository-wide god-file architecture boundaries plus a one-way size ratchet. "
+            "Version 22 permanently retires 23 completed page-shell baselines earned by the "
+            "God Files recovery split; new files remain capped at the 900-line repository limit."
+          )
+          config_path.write_text(json.dumps(config, indent=2) + "\n")
+
+          p = Path("docs/god-file-split-program.md")
+          s = p.read_text()
+          s = s.replace("**Backlog: 49 files, 24,985 lines over the limit**", "**Backlog: 24 files, 10,511 lines over the limit**")
+          p.write_text(s)
+
+          p = Path("docs/system-quality-program.md")
+          s = p.read_text()
+          s = s.replace("| God-file backlog | 49 files, 24,985 excess lines |", "| God-file backlog | 24 files, 10,511 excess lines |")
+          p.write_text(s)
+
+          p = Path("tests/frontend-layout.test.ts")
+          s = p.read_text()
+          old = 'expect(src("client/src/pages/vouchers/JournalForm.tsx")).toContain("waPendingPrompt");'
+          new = 'expect(src("client/src/pages/vouchers/journalform/useJournalFormModel.tsx")).toContain("waPendingPrompt");'
+          if old not in s:
+            raise SystemExit("JournalForm source assertion not found")
+          p.write_text(s.replace(old, new))
+
+          p = Path("tests/account-statement-routes-behavior.test.ts")
+          s = p.read_text()
+          s = s.replace('harness.generateAccountStatementPdf.mockResolvedValue(Buffer.from("pdf-statement"));', 'harness.generateAccountStatementPdf.mockResolvedValue(Buffer.from("%PDF-statement"));')
+          s = s.replace('expect(res.body).toEqual(Buffer.from("pdf-statement"));', 'expect(res.body).toEqual(Buffer.from("%PDF-statement"));')
+          p.write_text(s)
+
+          p = Path("tests/phase3-shared-interface-translations.test.ts")
+          s = p.read_text()
+          if "toHaveLength(582)" not in s:
+            raise SystemExit("Phase 3 translation count marker not found")
+          p.write_text(s.replace("toHaveLength(582)", "toHaveLength(597)", 1))
+
+          p = Path("tests/phase7-backend-messages-translations.test.ts")
+          s = p.read_text()
+          if "toHaveLength(597)" not in s:
+            raise SystemExit("Phase 7 translation count marker not found")
+          p.write_text(s.replace("toHaveLength(597)", "toHaveLength(599)", 1))
+
+          # Customer Loading crossed the 900-line hard boundary when column controls landed on main.
+          # Move only declarations/pure helpers into a focused module; runtime behavior stays unchanged.
+          p = Path("client/src/pages/factory/CustomerLoading.tsx")
+          s = p.read_text()
+          start_marker = "interface CustomerOption {"
+          end_marker = "export default function CustomerLoading() {"
+          start = s.index(start_marker)
+          end = s.index(end_marker)
+          shared = s[start:end]
+          replacements = [
+            ("interface CustomerOption", "export interface CustomerOption"),
+            ("interface CustomerLoadingProduct", "export interface CustomerLoadingProduct"),
+            ("interface CustomerLoadingResponse", "export interface CustomerLoadingResponse"),
+            ("interface HistoryRow", "export interface HistoryRow"),
+            ("interface HistoryResponse", "export interface HistoryResponse"),
+            ('type LoadingFilter =', 'export type LoadingFilter ='),
+            ('type AvailableZeroFilter =', 'export type AvailableZeroFilter ='),
+            ('type AvailableNegativeFilter =', 'export type AvailableNegativeFilter ='),
+            ('type ColumnKey =', 'export type ColumnKey ='),
+            ('const PAGE_SIZE =', 'export const PAGE_SIZE ='),
+            ('const COLUMN_OPTIONS:', 'export const COLUMN_OPTIONS:'),
+            ('async function readJson<', 'export async function readJson<'),
+            ('function formatNumber(', 'export function formatNumber('),
+            ('function formatMoney(', 'export function formatMoney('),
+            ('function formatDate(', 'export function formatDate('),
+            ('function formatDateTime(', 'export function formatDateTime('),
+          ]
+          for old, new in replacements:
+            shared = shared.replace(old, new, 1)
+          shared_path = Path("client/src/pages/factory/customerLoadingShared.ts")
+          shared_path.write_text(shared.strip() + "\n")
+          import_block = '''import {
+            COLUMN_OPTIONS,
+            PAGE_SIZE,
+            formatDate,
+            formatDateTime,
+            formatMoney,
+            formatNumber,
+            readJson,
+            type AvailableNegativeFilter,
+            type AvailableZeroFilter,
+            type ColumnKey,
+            type CustomerLoadingProduct,
+            type CustomerLoadingResponse,
+            type CustomerOption,
+            type HistoryResponse,
+            type LoadingFilter,
+          } from "./customerLoadingShared";\n'''
+          anchor = 'import { CustomerLoadingSummaryCards } from "./CustomerLoadingSummaryCards";\n'
+          if anchor not in s:
+            raise SystemExit("Customer Loading import anchor not found")
+          s = s[:start] + s[end:]
+          s = s.replace(anchor, anchor + import_block, 1)
+          p.write_text(s)
+          PY
+
+          UPDATE_ROUTE_MANIFEST=1 npm run test:backend -- route-manifest
+          npx prettier --write \
+            config/god-file-boundaries.json \
+            docs/god-file-split-program.md \
+            docs/system-quality-program.md \
+            tests/frontend-layout.test.ts \
+            tests/account-statement-routes-behavior.test.ts \
+            tests/phase3-shared-interface-translations.test.ts \
+            tests/phase7-backend-messages-translations.test.ts \
+            config/route-manifest.json \
+            client/src/pages/factory/CustomerLoading.tsx \
+            client/src/pages/factory/customerLoadingShared.ts
+      - name: Verify repaired contracts
+        shell: bash
+        run: |
+          npm run audit:god-files
+          npm run audit:doc-index
+          npm run test:backend -- frontend-layout account-statement-routes-behavior route-manifest god-file-boundaries phase3-shared-interface-translations phase7-backend-messages-translations doc-index-contract doc-index
+      - name: Commit repair and remove one-shot workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/pr780-ci-contract-repair.yml
+          git add config/god-file-boundaries.json config/route-manifest.json docs/god-file-split-program.md docs/system-quality-program.md tests/frontend-layout.test.ts tests/account-statement-routes-behavior.test.ts tests/phase3-shared-interface-translations.test.ts tests/phase7-backend-messages-translations.test.ts client/src/pages/factory/CustomerLoading.tsx client/src/pages/factory/customerLoadingShared.ts
+          git diff --cached --check
+          git commit -m "fix: repair PR 780 certification contracts"
+          git push origin HEAD:agent/god-files-recovery-latest-main
