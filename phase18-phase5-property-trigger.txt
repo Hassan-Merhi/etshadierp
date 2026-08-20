@@ -1,0 +1,2 @@
+Phase 18 Wave 2 Phase 5 property/index-signature execution trigger.
+Base main: e12d5c6b4f773961f46893191f8342dee5fd276a
