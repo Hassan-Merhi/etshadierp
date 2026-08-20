@@ -104,7 +104,7 @@ export function usePosImportModel() {
       });
     },
     onError: (error: any) => {
-      if (((error))?._handledGlobally) return;
+      if (error?._handledGlobally) return;
       toast({
         title: "Parse error",
         description: error.message,
@@ -139,7 +139,7 @@ export function usePosImportModel() {
       }
     },
     onError: (error: any) => {
-      if (((error))?._handledGlobally) return;
+      if (error?._handledGlobally) return;
       toast({
         title: "Validation error",
         description: error.message,
@@ -183,7 +183,7 @@ export function usePosImportModel() {
       setShowPrintDialog(true);
     },
     onError: (error: any) => {
-      if (((error))?._handledGlobally) return;
+      if (error?._handledGlobally) return;
       toast({
         title: "Import error",
         description: error.message,
@@ -222,7 +222,7 @@ export function usePosImportModel() {
       setShowPrintDialog(true);
     },
     onError: (error: any) => {
-      if (((error))?._handledGlobally) return;
+      if (error?._handledGlobally) return;
       toast({
         title: "Credit Import error",
         description: error.message,

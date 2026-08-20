@@ -514,7 +514,7 @@ export function useAccountsLegacyModel() {
   // Cr opening balances must be negated (convention: positive = Dr, negative = Cr).
   const broughtForwardBalance = useMemo(() => {
     const rawOB = parseFloat(String(selectedAccount?.openingBalance ?? 0)) || 0;
-    const obSide = ((selectedAccount))?.openingBalanceSide || "Dr";
+    const obSide = selectedAccount?.openingBalanceSide || "Dr";
     const storedOB = obSide === "Cr" ? -rawOB : rawOB;
     if (!rawTransactionData || Array.isArray(rawTransactionData)) return storedOB;
     return storedOB + (rawTransactionData.preNetBalance ?? 0);
@@ -640,7 +640,7 @@ export function useAccountsLegacyModel() {
     editForm.reset({
       code: account.code,
       name: account.name,
-      accountType: ((account.accountType || account.type || "")),
+      accountType: account.accountType || account.type || "",
       subType: account.subType || "",
       openingBalance: String(Math.abs(account.openingBalance || 0)),
       openingBalanceSide: (account.openingBalanceSide as "Dr" | "Cr") || "Dr",
