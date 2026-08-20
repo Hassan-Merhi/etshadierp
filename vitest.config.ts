@@ -16,7 +16,8 @@ const { backend } = JSON.parse(
 // CLI --coverage flag remains in process.argv while loading config, so also use
 // npm's lifecycle marker from the canonical coverage script.
 const measuringCoverage =
-  process.argv.includes("--coverage") || process.env.npm_lifecycle_event === "test:backend:coverage";
+  process.argv.includes("--coverage") ||
+  process.env.npm_lifecycle_event === "test:backend:coverage";
 
 export default defineConfig({
   test: {
