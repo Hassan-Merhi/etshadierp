@@ -15,10 +15,10 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { PeriodFilterValue } from "@/components/ui/period-filter";
+import { PeriodFilterValue } from "@/components/ui/period-filter";
 import { usePaginatedFilterState } from "@/hooks/use-paginated-filter-state";
-import { createTransactionJournalFilters, type TransactionJournalFilters } from "./filterState";
 import type { CompanyOption, JournalResponse, VoucherDetail } from "./types";
+import { createTransactionJournalFilters, type TransactionJournalFilters } from "./filterState";
 
 export const JOURNAL_PAGE_LIMIT = 50;
 
@@ -38,6 +38,8 @@ export function useTransactionJournalModel() {
   const { formatCashAmount } = useCurrencyContext();
 
   // ── Filter state ──
+  // Every filter change resets pagination and the whole set persists for the
+  // session, so re-entering the page lands on the same view.
   const {
     filters: journalFilters,
     page,
@@ -51,15 +53,23 @@ export function useTransactionJournalModel() {
   });
   const { periodFilter, selectedCos, voucherType, currency, optionalFilter, includeFactory, searchInput, search } =
     journalFilters;
-  const setPeriodFilter = (value: PeriodFilterValue | ((current: PeriodFilterValue) => PeriodFilterValue)) =>
-    setFilter("periodFilter", value);
-  const setSelectedCos = (value: number[] | ((current: number[]) => number[])) => setFilter("selectedCos", value);
-  const setVoucherType = (value: string) => setFilter("voucherType", value);
-  const setCurrency = (value: string) => setFilter("currency", value);
-  const setOptionalFilter = (value: string) => setFilter("optionalFilter", value);
-  const setIncludeFactory = (value: boolean | ((current: boolean) => boolean)) => setFilter("includeFactory", value);
-  const setSearchInput = (value: string) => setFilter("searchInput", value);
-  const setSearch = (value: string) => setFilter("search", value);
+  const setPeriodFilter = useCallback(
+    (next: PeriodFilterValue | ((current: PeriodFilterValue) => PeriodFilterValue)) => setFilter("periodFilter", next),
+    [setFilter]
+  );
+  const setSelectedCos = useCallback(
+    (next: number[] | ((current: number[]) => number[])) => setFilter("selectedCos", next),
+    [setFilter]
+  );
+  const setVoucherType = useCallback((next: string) => setFilter("voucherType", next), [setFilter]);
+  const setCurrency = useCallback((next: string) => setFilter("currency", next), [setFilter]);
+  const setOptionalFilter = useCallback((next: string) => setFilter("optionalFilter", next), [setFilter]);
+  const setIncludeFactory = useCallback(
+    (next: boolean | ((current: boolean) => boolean)) => setFilter("includeFactory", next),
+    [setFilter]
+  );
+  const setSearchInput = useCallback((next: string) => setFilter("searchInput", next), [setFilter]);
+  const setSearch = useCallback((next: string) => setFilter("search", next), [setFilter]);
   const LIMIT = JOURNAL_PAGE_LIMIT;
 
   // ── Hide amounts toggle (local + user preference) ──
@@ -110,8 +120,7 @@ export function useTransactionJournalModel() {
       ...(selectedCos.length ? { companyIds: selectedCos.join(",") } : {}),
     });
     return p.toString();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- God Files extraction preserves pre-split behavior.
-  }, [periodFilter, voucherType, currency, optionalFilter, includeFactory, page, search, selectedCos]);
+  }, [periodFilter, voucherType, currency, optionalFilter, includeFactory, page, search, selectedCos, LIMIT]);
 
   const { data, isLoading, isFetching, refetch } = useQuery<JournalResponse>({
     queryKey: ["/api/global/transactions", queryParamsStr],
@@ -141,7 +150,7 @@ export function useTransactionJournalModel() {
     enabled: !!detailId,
   });
 
-  const { data: viewEntriesRaw, isLoading: viewEntriesLoading } = useQuery<any>({
+  const { data: viewEntriesRaw, isLoading: viewEntriesLoading } = useQuery({
     queryKey: ["/api/global/transactions", detailId, "view-entries"],
     queryFn: async () => {
       const res = await fetch(`/api/global/transactions/${detailId}/view-entries`);
@@ -153,7 +162,7 @@ export function useTransactionJournalModel() {
 
   // Normalise view-entries response (may be array or { entries, purchaseOrder, items })
   const viewEntries: any[] = Array.isArray(viewEntriesRaw) ? viewEntriesRaw : (viewEntriesRaw?.entries ?? []);
-  const viewPurchaseOrder: unknown | null = viewEntriesRaw?.purchaseOrder ?? null;
+  const viewPurchaseOrder: any | null = viewEntriesRaw?.purchaseOrder ?? null;
   const viewPurchaseItems: any[] = viewEntriesRaw?.items ?? [];
 
   const openDetail = (id: number) => {
@@ -198,9 +207,7 @@ export function useTransactionJournalModel() {
 
   const handleSearch = useCallback(() => {
     setSearch(searchInput);
-    setPage(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- God Files extraction preserves pre-split behavior.
-  }, [searchInput]);
+  }, [searchInput, setSearch]);
 
   const clearSearch = () => {
     setSearchInput("");
@@ -256,7 +263,6 @@ export function useTransactionJournalModel() {
           toDate: prev.toDate ? format(addDays(new Date(prev.toDate), -1), dateFmt) : prev.toDate,
           preset: "custom",
         }));
-        setPage(1);
       } else if (isForward) {
         e.preventDefault();
         setPeriodFilter((prev) => ({
@@ -264,13 +270,11 @@ export function useTransactionJournalModel() {
           toDate: prev.toDate ? format(addDays(new Date(prev.toDate), 1), dateFmt) : prev.toDate,
           preset: "custom",
         }));
-        setPage(1);
       }
     };
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- God Files extraction preserves pre-split behavior.
-  }, []);
+  }, [setPeriodFilter]);
 
   // ── Summary aggregation ──
   const summaryByCompany = (data?.summary || []).reduce<Record<number, CompanySummary>>((acc, row) => {
@@ -295,36 +299,17 @@ export function useTransactionJournalModel() {
   const toggleCompanySelection = (companyId: number) =>
     setSelectedCos((prev) => (prev.includes(companyId) ? prev.filter((x) => x !== companyId) : [...prev, companyId]));
 
-  /** Filter setters that also reset pagination, as the inline handlers did. */
-  const applyPeriodFilter = (value: PeriodFilterValue) => {
-    setPeriodFilter(value);
-    setPage(1);
-  };
-  const applyVoucherType = (value: string) => {
-    setVoucherType(value);
-    setPage(1);
-  };
-  const applyCurrency = (value: string) => {
-    setCurrency(value);
-    setPage(1);
-  };
-  const applyOptionalFilter = (value: string) => {
-    setOptionalFilter(value);
-    setPage(1);
-  };
-  const toggleIncludeFactory = () => {
-    setIncludeFactory((v) => !v);
-    setPage(1);
-  };
+  /** Filter setters kept under their original names; setFilter resets pagination. */
+  const applyPeriodFilter = (value: PeriodFilterValue) => setPeriodFilter(value);
+  const applyVoucherType = (value: string) => setVoucherType(value);
+  const applyCurrency = (value: string) => setCurrency(value);
+  const applyOptionalFilter = (value: string) => setOptionalFilter(value);
+  const toggleIncludeFactory = () => setIncludeFactory((v) => !v);
 
   return {
     // formatting
     formatCashAmount,
     // filters
-    journalFilters,
-    setFilter,
-    resetFilters,
-    hasActiveFilters,
     periodFilter,
     applyPeriodFilter,
     selectedCos,
@@ -345,6 +330,8 @@ export function useTransactionJournalModel() {
     search,
     handleSearch,
     clearSearch,
+    resetFilters,
+    hasActiveFilters,
     voucherTypes,
     // data + paging
     isLoading,

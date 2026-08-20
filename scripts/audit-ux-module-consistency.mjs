@@ -91,20 +91,17 @@ const protectedFilterModules = [
     controls: "client/src/pages/daybook/DaybookFilters.tsx",
   },
   {
-    file: "client/src/pages/TransactionJournal.tsx",
-    contract: "client/src/pages/transactionjournal/useTransactionJournalModel.ts",
+    file: "client/src/pages/transactionjournal/useTransactionJournalModel.ts",
     token: "usePaginatedFilterState",
-    controls: "client/src/pages/transactionjournal/components/TransactionJournalFilterControls.tsx",
+    controls: "client/src/pages/transactionjournal/components/JournalFilters.tsx",
   },
   {
-    file: "client/src/pages/factory/FactoryDaybook.tsx",
-    contract: "client/src/pages/factory/daybook/useFactoryDaybookModel.ts",
+    file: "client/src/pages/factory/daybook/useFactoryDaybookModel.ts",
     token: "loadFactoryDaybookState",
     controls: "client/src/pages/factory/daybook/FactoryDaybookFilters.tsx",
   },
   {
-    file: "client/src/pages/StockItems.tsx",
-    contract: "client/src/pages/stockitems/useStockItems.ts",
+    file: "client/src/pages/stockitems/useStockItems.ts",
     token: "useStockItemsFilters",
     controls: "client/src/pages/stockitems/StockItemsView.tsx",
   },
@@ -139,10 +136,10 @@ const protectedFilterModules = [
     controls: "client/src/pages/factory/factory-containers/ContainerListView.tsx",
   },
 ];
-for (const { file, contract, token, controls } of protectedFilterModules) {
-  const contractSource = await read(contract ?? file);
-  if (!contractSource.includes(token)) failures.push(`${file} lost its persisted filter-state contract (${token})`);
-  const controlSource = controls === (contract ?? file) ? contractSource : await read(controls);
+for (const { file, token, controls } of protectedFilterModules) {
+  const source = await read(file);
+  if (!source.includes(token)) failures.push(`${file} lost its persisted filter-state contract (${token})`);
+  const controlSource = controls === file ? source : await read(controls);
   if (!controlSource.includes("button-clear-filters") && !controlSource.includes("button-reset-filters")) {
     failures.push(`${file} lost its reset-all filter control`);
   }

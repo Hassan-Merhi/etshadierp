@@ -109,6 +109,7 @@ function ItemsSection({ savedSale, fmtPrint, fmtPrintAmt }: Omit<PrintProps, "pr
         </tfoot>
       </table>
 
+      {/* Expense deductions on receipt */}
       {printExpenses.length > 0 && (
         <table
           style={{
@@ -136,6 +137,7 @@ function ItemsSection({ savedSale, fmtPrint, fmtPrintAmt }: Omit<PrintProps, "pr
         </table>
       )}
 
+      {/* Total Paid / Net Cash */}
       {savedSale?.paymentType === "CREDIT" ? (
         <>
           <div
@@ -236,6 +238,7 @@ export function FactoryPosPrintTemplate({ printRef, savedSale, printUserName, fm
           }}
         />
 
+        {/* Title */}
         <div
           style={{
             textAlign: "center",
@@ -248,12 +251,14 @@ export function FactoryPosPrintTemplate({ printRef, savedSale, printUserName, fm
           FACTORY POS INVOICE
         </div>
 
+        {/* Sale # centered */}
         {savedSale?.saleNumber && (
           <div style={{ textAlign: "center", fontSize: "8pt", fontWeight: "700", marginBottom: "3px" }}>
             #{savedSale.saleNumber}
           </div>
         )}
 
+        {/* Date / User row */}
         <div
           style={{
             fontSize: "8pt",
@@ -270,6 +275,7 @@ export function FactoryPosPrintTemplate({ printRef, savedSale, printUserName, fm
           <span>User: {printUserName}</span>
         </div>
 
+        {/* Customer info */}
         {savedSale?.customerName && (
           <div
             style={{
@@ -285,8 +291,10 @@ export function FactoryPosPrintTemplate({ printRef, savedSale, printUserName, fm
           </div>
         )}
 
+        {/* Items table */}
         <ItemsSection savedSale={savedSale} fmtPrint={fmtPrint} fmtPrintAmt={fmtPrintAmt} />
 
+        {/* Notes */}
         {savedSale?.notes && (
           <div
             dir="auto"
@@ -302,6 +310,7 @@ export function FactoryPosPrintTemplate({ printRef, savedSale, printUserName, fm
           </div>
         )}
 
+        {/* Footer */}
         <div
           style={{
             textAlign: "center",

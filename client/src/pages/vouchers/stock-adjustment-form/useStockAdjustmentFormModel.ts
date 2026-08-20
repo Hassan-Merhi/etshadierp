@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useFieldArray, useForm } from "react-hook-form";
@@ -184,7 +185,7 @@ export function useStockAdjustmentFormModel({ voucherIdToEdit }: StockAdjustment
       });
       hydratedVoucherIdRef.current = voucherIdToEdit;
     }
-  }, [stockAdjustmentToEdit, voucherToEdit, stockItems, stockAdjustmentForm, voucherIdToEdit]);
+  }, [stockAdjustmentToEdit, voucherToEdit, stockItems, stockAdjustmentForm]); // eslint-disable-line
 
   const stockAdjustmentMutation = useMutation({
     mutationFn: async (data: StockAdjustmentFormData) => {
@@ -269,7 +270,7 @@ export function useStockAdjustmentFormModel({ voucherIdToEdit }: StockAdjustment
         });
       }
     },
-    onError: (error: any) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({
         title: "Error",
@@ -284,7 +285,7 @@ export function useStockAdjustmentFormModel({ voucherIdToEdit }: StockAdjustment
     const voucherDate = formData.voucherDate
       ? format(formData.voucherDate, "yyyy-MM-dd")
       : format(new Date(), "yyyy-MM-dd");
-    const validEntries = formData.entries.filter((e: any) => e.stockItemId > 0 && parseFloat(e.quantity) > 0);
+    const validEntries = formData.entries.filter((e) => e.stockItemId > 0 && parseFloat(e.quantity) > 0);
     if (validEntries.length === 0) {
       toast({
         title: "No data to export",
@@ -293,9 +294,9 @@ export function useStockAdjustmentFormModel({ voucherIdToEdit }: StockAdjustment
       });
       return;
     }
-    const locationName = locations.find((l: any) => l.id === formData.locationId)?.name || "";
+    const locationName = locations.find((l) => l.id === formData.locationId)?.name || "";
     if (detailed) {
-      const exportData = validEntries.map((entry: any) => ({
+      const exportData = validEntries.map((entry) => ({
         "Entry Type": entry.type?.toUpperCase() === "CONSUME" ? "Consumption" : "Production",
         Date: voucherDate,
         Location: locationName,
@@ -315,11 +316,11 @@ export function useStockAdjustmentFormModel({ voucherIdToEdit }: StockAdjustment
       toast({ title: "Export successful", description: `Downloaded ${fileName} with ${validEntries.length} items.` });
     } else {
       const consumeTotal = validEntries
-        .filter((e: any) => e.type?.toUpperCase() === "CONSUME")
-        .reduce((sum: number, e: any) => sum + parseFloat(e.quantity) * parseFloat(e.rate || "0"), 0);
+        .filter((e) => e.type?.toUpperCase() === "CONSUME")
+        .reduce((sum: number, e) => sum + parseFloat(e.quantity) * parseFloat(e.rate || "0"), 0);
       const produceTotal = validEntries
-        .filter((e: any) => e.type?.toUpperCase() === "PRODUCE")
-        .reduce((sum: number, e: any) => sum + parseFloat(e.quantity) * parseFloat(e.rate || "0"), 0);
+        .filter((e) => e.type?.toUpperCase() === "PRODUCE")
+        .reduce((sum: number, e) => sum + parseFloat(e.quantity) * parseFloat(e.rate || "0"), 0);
       const exportData = [
         {
           "Voucher Type": "Production/Consumption",

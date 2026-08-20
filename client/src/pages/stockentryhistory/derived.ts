@@ -5,6 +5,7 @@ export interface StockEntryWorker {
   active: boolean;
   fullName?: string;
   full_name?: string;
+  name?: string;
 }
 
 export interface WorkerCategory {

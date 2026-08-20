@@ -45,12 +45,7 @@ import { createStockEntryHistoryReports } from "./stockentryhistory/reports";
 import { StockEntryHistoryEditableDateCell } from "./stockentryhistory/EditableDateCell";
 import { DetailedHistoryTable } from "./stockentryhistory/DetailedHistoryTable";
 import { useStockEntryHistoryMutations } from "./stockentryhistory/useStockEntryHistoryMutations";
-import {
-  STATUS_COLORS,
-  STATUS_OPTIONS,
-  fetchAllStockEntryHistoryPages,
-  formatHistoryTime,
-} from "./stockentryhistory/utils";
+import { STATUS_COLORS, STATUS_OPTIONS, fetchAllStockEntryHistoryPages } from "./stockentryhistory/utils";
 
 export default function StockEntryHistory({ onActiveDateChange }: StockEntryHistoryProps = {}) {
   const { formatDisplayDate } = useDateFormat();
@@ -152,8 +147,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     refetchOnReconnect: false,
     placeholderData: (prev) => prev,
   });
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- God Files extraction preserves pre-split behavior.
-  const groups: GroupRow[] = pagedGroups?.items ?? [];
+  const groups: GroupRow[] = useMemo(() => pagedGroups?.items ?? [], [pagedGroups]);
 
   const { data: workers = [] } = useQuery<any[]>({
     queryKey: ["/api/factory/workers"],
@@ -198,8 +192,6 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
       if (group.workerId) gp.set("workerId", String(group.workerId));
       if (group.productId) gp.set("productId", String(group.productId));
       if (group.erpLocationId) gp.set("locationId", String(group.erpLocationId));
-      if (statusFilter.length > 0) gp.set("status", statusFilter.join(","));
-      if (debouncedSearch.trim()) gp.set("search", debouncedSearch.trim());
       return {
         queryKey: ["/api/factory/bales/stock-entry-history/group", gp.toString()],
         queryFn: (): Promise<BaleDetail[]> =>
@@ -272,7 +264,6 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   });
   void handlePrintMatrix;
   void thirtyDaysAgo;
-  void formatHistoryTime;
 
   function EditableDateCell({
     dateStr,
@@ -423,7 +414,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
             <MultiSelectFilter
               options={filteredWorkers.map((w) => ({
                 value: String(w.id),
-                label: w.fullName || w.full_name || (w as typeof w & { name?: string }).name || String(w.id),
+                label: w.fullName || w.full_name || w.name || String(w.id),
               }))}
               selected={workerIdFilter}
               onChange={setWorkerIdFilter}

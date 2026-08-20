@@ -247,7 +247,13 @@ export function StockTransferMobileEntries({ model }: { model: StockTransferForm
                     const delta = parseFloat(raw.startsWith("+") ? raw.slice(1) : raw);
                     if (isNaN(delta)) return;
                     if (voucherIdToEdit && stockTransferToEdit?.items) {
-                      const origItem = (stockTransferToEdit.items as any[]).find(
+                      const origItem = (
+                        stockTransferToEdit.items as {
+                          stockItemId: number;
+                          sourceLocationId: number;
+                          quantity: string;
+                        }[]
+                      ).find(
                         (item) =>
                           item.stockItemId === entry.stockItemId && item.sourceLocationId === entry.sourceLocationId
                       );

@@ -1,7 +1,7 @@
 import { useState, type MouseEvent } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -13,6 +13,8 @@ export function useStockItems() {
   const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
   const hideStockRates = (myErpPages?.hiddenErpCostFields ?? []).includes("stock_rates");
 
+  // Filters persist per company for the session and reset pagination on every
+  // change; the debounce lives inside the hook.
   const { selectedCompany } = useCompany();
   const {
     filters: { searchTerm, selectedGroupFilter, selectedGradeFilter, selectedCategoryFilter },
@@ -126,7 +128,7 @@ export function useStockItems() {
       toast({ title: "Success", description: "Stock items deleted successfully" });
     },
     onError: (error: Error) => {
-      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
+      if (error._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to delete stock items", variant: "destructive" });
     },
   });
@@ -146,7 +148,7 @@ export function useStockItems() {
       toast({ title: "Success", description: "Stock adjusted successfully" });
     },
     onError: (error: Error) => {
-      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
+      if (error._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to adjust stock", variant: "destructive" });
     },
   });
@@ -163,7 +165,7 @@ export function useStockItems() {
       toast({ title: "Success", description: "Category assigned successfully" });
     },
     onError: (error: Error) => {
-      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
+      if (error._handledGlobally) return;
       toast({ title: "Error", description: error.message || "Failed to assign category", variant: "destructive" });
     },
   });
@@ -176,7 +178,7 @@ export function useStockItems() {
       toast({ title: "Grade created" });
     },
     onError: (error: Error) => {
-      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
+      if (error._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -191,7 +193,7 @@ export function useStockItems() {
       toast({ title: "Grade updated" });
     },
     onError: (error: Error) => {
-      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
+      if (error._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -205,7 +207,7 @@ export function useStockItems() {
       toast({ title: "Grade deleted" });
     },
     onError: (error: Error) => {
-      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
+      if (error._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -218,7 +220,7 @@ export function useStockItems() {
       toast({ title: "Category created" });
     },
     onError: (error: Error) => {
-      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
+      if (error._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -233,7 +235,7 @@ export function useStockItems() {
       toast({ title: "Category updated" });
     },
     onError: (error: Error) => {
-      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
+      if (error._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -247,7 +249,7 @@ export function useStockItems() {
       toast({ title: "Category deleted" });
     },
     onError: (error: Error) => {
-      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
+      if (error._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -438,10 +440,10 @@ export function useStockItems() {
     setSelectedGradeFilter,
     selectedCategoryFilter,
     setSelectedCategoryFilter,
-    currentPage,
-    setCurrentPage,
     resetFilters,
     hasActiveFilters,
+    currentPage,
+    setCurrentPage,
     selectedStockItemId,
     selectedStockItemName,
     detailsDialogOpen,

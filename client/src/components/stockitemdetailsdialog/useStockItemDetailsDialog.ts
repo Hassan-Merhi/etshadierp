@@ -1,4 +1,3 @@
-import type { ClientErrorLike } from "@/lib/clientError";
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -129,8 +128,8 @@ export function useStockItemDetailsDialog({
         description: "Stock item details updated successfully",
       });
     },
-    onError: (error: ClientErrorLike) => {
-      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
+    onError: (error: Error) => {
+      if (error._handledGlobally) return;
       toast({
         title: "Update Failed",
         description: error.message || "Failed to update stock item",
@@ -153,8 +152,8 @@ export function useStockItemDetailsDialog({
         description: "Transaction updated successfully",
       });
     },
-    onError: (error: ClientErrorLike) => {
-      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
+    onError: (error: Error) => {
+      if (error._handledGlobally) return;
       toast({
         title: "Update Failed",
         description: error.message || "Failed to update transaction",
@@ -177,8 +176,8 @@ export function useStockItemDetailsDialog({
         description: "Code alias created successfully",
       });
     },
-    onError: (error: ClientErrorLike) => {
-      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
+    onError: (error: Error) => {
+      if (error._handledGlobally) return;
       toast({
         title: "Creation Failed",
         description: error.message || "Failed to create code alias",
@@ -198,8 +197,8 @@ export function useStockItemDetailsDialog({
         description: "Code alias deleted successfully",
       });
     },
-    onError: (error: ClientErrorLike) => {
-      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
+    onError: (error: Error) => {
+      if (error._handledGlobally) return;
       toast({
         title: "Deletion Failed",
         description: error.message || "Failed to delete code alias",
@@ -222,8 +221,8 @@ export function useStockItemDetailsDialog({
         description: "Location price saved successfully",
       });
     },
-    onError: (error: ClientErrorLike) => {
-      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
+    onError: (error: Error) => {
+      if (error._handledGlobally) return;
       toast({
         title: "Failed",
         description: error.message || "Failed to save location price",
@@ -243,8 +242,8 @@ export function useStockItemDetailsDialog({
         description: "Location price deleted successfully",
       });
     },
-    onError: (error: ClientErrorLike) => {
-      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
+    onError: (error: Error) => {
+      if (error._handledGlobally) return;
       toast({
         title: "Deletion Failed",
         description: error.message || "Failed to delete location price",

@@ -21,7 +21,7 @@ interface LedgerVoucherEntriesProps {
   transferDetail: any;
   cashAccountBalance: string;
   entryBalances: Record<number, string>;
-  formatAmount: (amt: any) => string;
+  formatAmount: (amt: number | string | null | undefined) => string;
   resolveEntryName: (entry: ViewVoucherEntry) => string;
   user: any;
 }

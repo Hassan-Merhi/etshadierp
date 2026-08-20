@@ -9,7 +9,9 @@
 
 function createAudioContext(): AudioContext | null {
   try {
-    return new (window.AudioContext || (window as any).webkitAudioContext)();
+    const W = (window as unknown as Window & typeof globalThis & { webkitAudioContext: typeof AudioContext })
+      .webkitAudioContext;
+    return new (window.AudioContext || W)();
   } catch {
     return null; /* no audio support */
   }

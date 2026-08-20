@@ -24,7 +24,7 @@ audit fails instead of allowing the reference to drift.
 | Write routes with no test at all | 0 of 328 | `npm run audit:write-routes` |
 | Write routes covered only by the guard sweep | 0 of 328 | `npm run audit:write-routes` |
 | Registered routes | 1,908 | `config/route-manifest.json` |
-| God-file backlog | 47 files, 10,511 excess lines | `npm run audit:god-files` |
+| God-file backlog | 32 files, 16,108 excess lines | `npm run audit:god-files` |
 
 The schema layer remains the type source of truth. New code is not allowed to
 increase the type-escape ceiling, and sensitive write routes are not allowed to

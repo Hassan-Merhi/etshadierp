@@ -1,6 +1,6 @@
 {
-  "version": 23,
-  "description": "Repository-wide god-file architecture boundaries plus a one-way size ratchet. Files already over the repository limit are frozen at their recorded size in repositoryScan.grandfathered: they may shrink but never grow, and any new file crossing the limit fails until it is split or explicitly reviewed. Version 23 completes the Customer Loading Phase 3 extraction that Version 22 recorded as a temporary reviewed-growth allowance: the column-visibility, proforma-preview and loading-history dialogs now live in their own components, bringing CustomerLoading.tsx back under the 900-line repository limit and retiring its allowance entirely; Version 21 completed Wave 9 by permanently retiring ContainerVerification.tsx and FactoryInvoiceLoadingScan.tsx from the grandfathered backlog.",
+  "version": 25,
+  "description": "Version 25 reconciles current main Waves 5-9 with the recovered God Files programme, preserves newer main implementations, and permanently retires every grandfathered file that is now at or below the repository limit. Repository-wide god-file architecture boundaries plus a one-way size ratchet. Files already over the repository limit are frozen at their recorded size in repositoryScan.grandfathered: they may shrink but never grow, and any new file crossing the limit fails until it is split or explicitly reviewed. Version 24 merges the Waves 5-9 god-file programme into main: StockItemDetailsDialog.tsx, AccountsLegacy.tsx, StockEntryHistory.tsx, StockItems.tsx, TransactionJournal.tsx, daybook/VoucherDetailsDialog.tsx, FactoryDaybook.tsx, FactoryLocationInventory.tsx, FactoryPOS.tsx, POSImport.tsx, POSPriceList.tsx, StockAdjustmentForm.tsx and StockTransferForm.tsx are all permanently retired from the grandfathered backlog after behavior-preserving splits into typed models, focused views and stable original-path composition shells; ContainerVerification.tsx and FactoryInvoiceLoadingScan.tsx were already retired in Version 21.",
   "retiredFiles": [
     "server/routesLegacy.ts",
     "server/routes/reportsRoutesLegacy.ts",
@@ -12,58 +12,130 @@
       "path": "server/routes.ts",
       "owner": "Public route entry point",
       "maxLines": 30,
-      "forbidPatterns": ["app.get(", "app.post(", "app.put(", "app.patch(", "app.delete(", "app.use("]
+      "forbidPatterns": [
+        "app.get(",
+        "app.post(",
+        "app.put(",
+        "app.patch(",
+        "app.delete(",
+        "app.use("
+      ]
     },
     {
       "path": "server/routes/applicationRoutes.ts",
       "owner": "Application route composition",
       "maxLines": 220,
-      "forbidPatterns": ["app.get(", "app.post(", "app.put(", "app.patch(", "app.delete("]
+      "forbidPatterns": [
+        "app.get(",
+        "app.post(",
+        "app.put(",
+        "app.patch(",
+        "app.delete("
+      ]
     },
     {
       "path": "server/storage/factory.ts",
       "owner": "Factory storage compatibility barrel",
       "maxLines": 10,
-      "forbidPatterns": ["drizzle-orm", "../db", "db.select(", "db.insert(", "db.update(", "db.delete("]
+      "forbidPatterns": [
+        "drizzle-orm",
+        "../db",
+        "db.select(",
+        "db.insert(",
+        "db.update(",
+        "db.delete("
+      ]
     },
     {
       "path": "server/storage/pos.ts",
       "owner": "POS storage compatibility barrel",
       "maxLines": 10,
-      "forbidPatterns": ["drizzle-orm", "../db", "db.select(", "db.insert(", "db.update(", "db.delete("]
+      "forbidPatterns": [
+        "drizzle-orm",
+        "../db",
+        "db.select(",
+        "db.insert(",
+        "db.update(",
+        "db.delete("
+      ]
     },
     {
       "path": "client/src/app/AuthenticatedApp.tsx",
       "owner": "Authenticated shell orchestration",
       "maxLines": 150,
-      "forbidPatterns": ["useQuery<", "fetch(\"/api/", "SUPPLIER_PARTNER_PATHS", "computeFactoryGuardRedirect("]
+      "forbidPatterns": [
+        "useQuery<",
+        "fetch(\"/api/",
+        "SUPPLIER_PARTNER_PATHS",
+        "computeFactoryGuardRedirect("
+      ]
     },
     {
       "path": "server/routes/debugRoutes.ts",
       "owner": "Debug route composition",
       "maxLines": 20,
-      "forbidPatterns": ["app.get(", "app.post(", "app.put(", "app.patch(", "app.delete(", "drizzle-orm", "@shared/schema", "../db"]
+      "forbidPatterns": [
+        "app.get(",
+        "app.post(",
+        "app.put(",
+        "app.patch(",
+        "app.delete(",
+        "drizzle-orm",
+        "@shared/schema",
+        "../db"
+      ]
     },
     {
       "path": "server/routes/debug/importCycleDiagnosticFoundation.ts",
       "owner": "Import-cycle diagnostic data collection",
       "maxLines": 650,
-      "forbidPatterns": ["app.get(", "app.post(", "res.json("]
+      "forbidPatterns": [
+        "app.get(",
+        "app.post(",
+        "res.json("
+      ]
     },
     {
       "path": "server/routes/debug/importCycleDiagnosticAnalysis.ts",
       "owner": "Import-cycle reconciliation and response assembly",
       "maxLines": 700,
-      "forbidPatterns": ["app.get(", "app.post(", "requireAuth", "requireRole"]
+      "forbidPatterns": [
+        "app.get(",
+        "app.post(",
+        "requireAuth",
+        "requireRole"
+      ]
     }
   ],
   "repositoryScan": {
-    "roots": ["server", "client/src", "shared", "scripts", "tests"],
-    "extensions": [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"],
+    "roots": [
+      "server",
+      "client/src",
+      "shared",
+      "scripts",
+      "tests"
+    ],
+    "extensions": [
+      ".ts",
+      ".tsx",
+      ".js",
+      ".jsx",
+      ".mjs",
+      ".cjs"
+    ],
     "softMaxLines": 900,
     "ratchetBucketLines": 25,
-    "excludeDirectories": ["node_modules", "dist", "build", "coverage", ".git", "migrations"],
-    "excludeFiles": ["client/src/components/ui/sidebar.tsx"],
+    "excludeDirectories": [
+      "node_modules",
+      "dist",
+      "build",
+      "coverage",
+      ".git",
+      "migrations"
+    ],
+    "excludeFiles": [
+      "client/src/components/ui/sidebar.tsx"
+    ],
     "grandfathered": {
       "client/src/pages/BaleProducts.tsx": 2100,
       "client/src/pages/ContainerDetail.tsx": 1950,

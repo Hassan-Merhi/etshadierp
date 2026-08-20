@@ -34,7 +34,7 @@ export function SalesVoucherEntries({
   entryBalances: Record<number, string>;
   selectedDialogRow: number | null;
   setSelectedDialogRow: (n: number | null) => void;
-  formatAmount: (amt: unknown) => string;
+  formatAmount: (amt: number | string | null | undefined) => string;
 }) {
   const salesItems = viewVoucherEntries.filter((e) => e.isStockItem || e.stockItemId);
   const ledgerEntries = viewVoucherEntries.filter((e) => !e.isStockItem && !e.stockItemId);

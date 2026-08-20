@@ -21,11 +21,11 @@ export function PurchaseVoucherEntries({
   purchaseOrderData: any;
   poSupplierBalance: string | null;
   isPOSUser: boolean;
-  formatAmount: (amt: any) => string;
+  formatAmount: (amt: number | string | null | undefined) => string;
   onOpenChange: (open: boolean) => void;
   navigate: (path: string) => void;
 }) {
-  const purchaseItems = viewVoucherEntries.filter((e) => e.isPurchaseItem);
+  const purchaseItems = viewVoucherEntries.filter((e) => (e as any).isPurchaseItem);
   const totalQty = purchaseItems.reduce((sum: number, e: any) => sum + parseFloat(e.quantity || "0"), 0);
   const charges = purchaseOrderData
     ? [

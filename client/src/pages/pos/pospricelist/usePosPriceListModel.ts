@@ -1,3 +1,4 @@
+import { getErrorDetails } from "@shared/errorUtils";
 /**
  * Controller hook for the POS Price List page.
  *
@@ -9,6 +10,7 @@
 import {
   useState,
   useEffect,
+  useCallback,
   useMemo,
   useRef,
   type ChangeEvent,
@@ -51,12 +53,11 @@ export function usePosPriceListModel({ posUser }: POSPriceListProps) {
       inputRef.current?.focus();
       inputRef.current?.select();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- God Files extraction preserves pre-split behavior.
-  }, [editingItem?.stockItemId, editingItem?.locationId]);
+  }, [editingItem]);
   const lastSavedRef = useRef<{ stockItemId: number; locationId: number } | null>(null);
   const skipBlurSaveRef = useRef(false);
 
-  const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
+  const { data: currentUser } = useQuery<{ role?: string }>({ queryKey: ["/api/auth/me"] });
   const isPrivileged = PRIVILEGED_ROLES.includes(currentUser?.role || "");
 
   const { data: posAssignedLocations = [], isLoading: posLocationsLoading } = useQuery<Location[]>({
@@ -120,10 +121,8 @@ export function usePosPriceListModel({ posUser }: POSPriceListProps) {
     enabled: isAllMode,
   });
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- God Files extraction preserves pre-split behavior.
-  const masters = mastersData?.masters ?? [];
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- God Files extraction preserves pre-split behavior.
-  const masterItems = mastersData?.items ?? [];
+  const masters = useMemo(() => mastersData?.masters ?? [], [mastersData?.masters]);
+  const masterItems = useMemo(() => mastersData?.items ?? [], [mastersData?.items]);
 
   // ── Merged state ────────────────────────────────────────────────────────────
   const isLoading = isAllMode ? mastersLoading : priceListLoading;
@@ -151,22 +150,24 @@ export function usePosPriceListModel({ posUser }: POSPriceListProps) {
     return Array.from(groups).sort();
   }, [locationPricedList]);
 
-  const isItemUnpriced = (item: any): boolean => {
-    if (isAllMode) {
-      const hasBase = item.baseSellingPrice && parseFloat(item.baseSellingPrice) > 0;
-      if (hasBase) return false; // base price covers all locations
-      const allMasterPrices = item.masterPrices ? Object.values(item.masterPrices) : [];
-      if (allMasterPrices.length === 0) return true;
-      const allHavePrice = allMasterPrices.every((p: any) => p && parseFloat(p) > 0);
-      return !allHavePrice; // unpriced until every location has a price
-    }
-    return !item.sellingPrice || parseFloat(item.sellingPrice) === 0;
-  };
+  const isItemUnpriced = useCallback(
+    (item: any): boolean => {
+      if (isAllMode) {
+        const hasBase = item.baseSellingPrice && parseFloat(item.baseSellingPrice) > 0;
+        if (hasBase) return false; // base price covers all locations
+        const allMasterPrices = item.masterPrices ? Object.values(item.masterPrices) : [];
+        if (allMasterPrices.length === 0) return true;
+        const allHavePrice = allMasterPrices.every((p: any) => p && parseFloat(p) > 0);
+        return !allHavePrice; // unpriced until every location has a price
+      }
+      return !item.sellingPrice || parseFloat(item.sellingPrice) === 0;
+    },
+    [isAllMode]
+  );
 
   const unpricedCount = useMemo(
     () => locationPricedList.filter(isItemUnpriced).length,
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- God Files extraction preserves pre-split behavior.
-    [locationPricedList, isAllMode]
+    [locationPricedList, isItemUnpriced]
   );
 
   // Groups that have at least one unpriced item, with their counts — used for the chip picker
@@ -181,12 +182,11 @@ export function usePosPriceListModel({ posUser }: POSPriceListProps) {
     return Array.from(map.entries())
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => a.name.localeCompare(b.name));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- God Files extraction preserves pre-split behavior.
-  }, [locationPricedList, showUnpriced, isAllMode]);
+  }, [showUnpriced, locationPricedList, isItemUnpriced]);
 
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return locationPricedList.filter((item: any) => {
+    return locationPricedList.filter((item) => {
       const matchesSearch =
         !q ||
         item.name.toLowerCase().includes(q) ||
@@ -198,8 +198,7 @@ export function usePosPriceListModel({ posUser }: POSPriceListProps) {
       const matchesUnpriced = !showUnpriced || isItemUnpriced(item);
       return matchesSearch && matchesGroup && matchesUnpriced;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- God Files extraction preserves pre-split behavior.
-  }, [locationPricedList, search, groupFilter, showUnpriced, hiddenUnpricedGroups, isAllMode]);
+  }, [search, locationPricedList, showUnpriced, hiddenUnpricedGroups, groupFilter, isItemUnpriced]);
 
   const selectedLocation = locations.find((l) => l.id === selectedLocationId);
 
@@ -267,7 +266,7 @@ export function usePosPriceListModel({ posUser }: POSPriceListProps) {
     const current = editingItemRef.current;
     if (!current) return;
     const items = filteredItems;
-    const idx = items.findIndex((i: any) => i.stockItemId === current.stockItemId);
+    const idx = items.findIndex((i) => i.stockItemId === current.stockItemId);
     if (idx === -1) return;
     const nextIdx = direction === "up" ? idx - 1 : idx + 1;
     if (nextIdx < 0 || nextIdx >= items.length) return;
@@ -285,7 +284,7 @@ export function usePosPriceListModel({ posUser }: POSPriceListProps) {
       return;
     }
     const items = filteredItems;
-    const idx = items.findIndex((i: any) => i.stockItemId === current.stockItemId);
+    const idx = items.findIndex((i) => i.stockItemId === current.stockItemId);
     if (idx === -1) return;
     const masterIdx = visibleMasters.findIndex((m) => m.id === current.locationId);
     if (masterIdx === -1) return;
@@ -396,7 +395,7 @@ export function usePosPriceListModel({ posUser }: POSPriceListProps) {
     if (!isAllMode || masters.length === 0) return;
     const XLSX = await import("@/lib/excelHelper");
     const rows = masterItems.map((item: MasterItem) => {
-      const row: Record<string, any> = {
+      const row: Record<string, unknown> = {
         Code: item.code || "",
         "Item Name": item.name,
         Group: item.stockGroupName || "",
@@ -471,10 +470,10 @@ export function usePosPriceListModel({ posUser }: POSPriceListProps) {
       }
       setImportPreview(preview);
       setImportDialogOpen(true);
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Could not read file",
-        description: err?.message || "Make sure it is a valid .xlsx file.",
+        description: getErrorDetails(err).optionalMessage || "Make sure it is a valid .xlsx file.",
         variant: "destructive",
       });
     }
@@ -497,8 +496,12 @@ export function usePosPriceListModel({ posUser }: POSPriceListProps) {
       setImportPreview([]);
       queryClient.invalidateQueries({ queryKey: ["/api/pos/price-list-by-masters"] });
       queryClient.invalidateQueries({ queryKey: ["/api/pos/price-list", selectedLocationId] });
-    } catch (err: any) {
-      toast({ title: "Upload failed", description: err.message || "Something went wrong.", variant: "destructive" });
+    } catch (err) {
+      toast({
+        title: "Upload failed",
+        description: getErrorDetails(err).message || "Something went wrong.",
+        variant: "destructive",
+      });
     } finally {
       setImporting(false);
     }
@@ -520,8 +523,8 @@ export function usePosPriceListModel({ posUser }: POSPriceListProps) {
     try {
       const XLSX = await import("@/lib/excelHelper");
 
-      const rows = filteredItems.map((item: any) => {
-        const row: Record<string, any> = {
+      const rows = filteredItems.map((item) => {
+        const row: Record<string, unknown> = {
           Code: item.code || "",
           "Item Name": item.name,
           Group: item.stockGroupName || "",

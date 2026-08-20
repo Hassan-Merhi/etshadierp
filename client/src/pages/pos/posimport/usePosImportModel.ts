@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * Controller hook for the POS Import page.
  *
@@ -62,7 +63,7 @@ export function usePosImportModel() {
     enabled: isCreditSale,
   });
 
-  const { data: authUser } = useQuery<any>({
+  const { data: authUser } = useQuery<{ fullName?: string; name?: string; username?: string; email?: string }>({
     queryKey: ["/api/auth/me"],
   });
   const printUserName = authUser?.fullName || authUser?.name || authUser?.username || authUser?.email || "Import";
@@ -103,8 +104,8 @@ export function usePosImportModel() {
         description: `Found ${data.items.length} item(s) totaling ${formatNumber(data.totalValue)}. Click Validate to check the data.`,
       });
     },
-    onError: (error: any) => {
-      if (error?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Parse error",
         description: error.message,
@@ -114,7 +115,7 @@ export function usePosImportModel() {
   });
 
   const validateMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: unknown) => {
       const res = await apiRequest("POST", "/api/pos-import/validate", data);
       return await res.json();
     },
@@ -138,8 +139,8 @@ export function usePosImportModel() {
         }, 100);
       }
     },
-    onError: (error: any) => {
-      if (error?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Validation error",
         description: error.message,
@@ -158,7 +159,7 @@ export function usePosImportModel() {
   });
 
   const importMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: unknown) => {
       const res = await apiRequest("POST", "/api/pos-import/import", data);
       return await res.json();
     },
@@ -182,8 +183,8 @@ export function usePosImportModel() {
       setPrintTime(new Date().toLocaleTimeString());
       setShowPrintDialog(true);
     },
-    onError: (error: any) => {
-      if (error?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Import error",
         description: error.message,
@@ -193,7 +194,7 @@ export function usePosImportModel() {
   });
 
   const creditImportMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: unknown) => {
       const res = await apiRequest("POST", "/api/credit-sales-import/import", data);
       return await res.json();
     },
@@ -221,8 +222,8 @@ export function usePosImportModel() {
       setPrintTime(new Date().toLocaleTimeString());
       setShowPrintDialog(true);
     },
-    onError: (error: any) => {
-      if (error?._handledGlobally) return;
+    onError: (error: ClientErrorLike) => {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Credit Import error",
         description: error.message,

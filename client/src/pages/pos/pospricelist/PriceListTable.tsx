@@ -227,7 +227,7 @@ function ItemsTable({ model }: { model: PosPriceListModel }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredItems.map((item: any) => (
+            {filteredItems.map((item) => (
               <TableRow
                 key={item.stockItemId}
                 data-testid={`row-price-${item.stockItemId}`}

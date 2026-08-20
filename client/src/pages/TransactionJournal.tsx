@@ -9,8 +9,8 @@
 import { FileText, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTransactionJournalModel } from "./transactionjournal/useTransactionJournalModel";
-import { TransactionJournalFilterControls } from "./transactionjournal/components/TransactionJournalFilterControls";
-import { JournalSummaryCards } from "./transactionjournal/components/JournalOverview";
+import { JournalFilters } from "./transactionjournal/components/JournalFilters";
+import { JournalSummaryCards, JournalTypeChips } from "./transactionjournal/components/JournalOverview";
 import { JournalVoucherList } from "./transactionjournal/components/JournalVoucherList";
 import { JournalDetailDialog } from "./transactionjournal/components/JournalDetailDialog";
 
@@ -29,6 +29,9 @@ export default function TransactionJournal() {
               <RefreshCw className="h-4 w-4 text-muted-foreground animate-spin" data-testid="icon-refreshing" />
             )}
           </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            All vouchers across all companies — filtered and searchable
+          </p>
         </div>
         <Button
           variant="outline"
@@ -42,14 +45,8 @@ export default function TransactionJournal() {
         </Button>
       </div>
 
-      <TransactionJournalFilterControls
-        filters={model.journalFilters}
-        availableCompanies={model.availableCompanies}
-        voucherTypes={model.voucherTypes}
-        setFilter={model.setFilter}
-        resetFilters={model.resetFilters}
-        hasActiveFilters={model.hasActiveFilters}
-      />
+      <JournalFilters model={model} />
+      <JournalTypeChips model={model} />
       <JournalSummaryCards model={model} />
       <JournalVoucherList model={model} />
       <JournalDetailDialog model={model} />

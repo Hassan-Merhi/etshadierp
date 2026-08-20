@@ -48,7 +48,9 @@ export function StockTransferDesktopQuantityCells({ model, index }: { model: Sto
             if (isNaN(delta)) return;
             if (m.voucherIdToEdit && m.stockTransferToEdit?.items) {
               const current = m.stockTransferForm.getValues(`entries.${index}`);
-              const original = (m.stockTransferToEdit.items as any[]).find(
+              const original = (
+                m.stockTransferToEdit.items as { stockItemId: number; sourceLocationId: number; quantity: string }[]
+              ).find(
                 (item) => item.stockItemId === current.stockItemId && item.sourceLocationId === current.sourceLocationId
               );
               const originalQuantity = original ? parseFloat(original.quantity) || 0 : 0;

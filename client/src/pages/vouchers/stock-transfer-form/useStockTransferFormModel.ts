@@ -1,3 +1,5 @@
+import { getErrorDetails } from "@shared/errorUtils";
+import type { ClientErrorLike } from "@/lib/clientError";
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useFieldArray, useForm } from "react-hook-form";
@@ -256,7 +258,7 @@ export function useStockTransferFormModel({ voucherIdToEdit, isPOS, posUser }: S
       queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", voucherIdToEdit] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers/list"] });
     },
-    onError: (err) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Approval failed", description: err.message, variant: "destructive" });
     },
   });
@@ -278,14 +280,14 @@ export function useStockTransferFormModel({ voucherIdToEdit, isPOS, posUser }: S
         description: `Found ${data.items.length} item(s). Click Validate to check the data.`,
       });
     },
-    onError: (error) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Parse error", description: error.message, variant: "destructive" });
     },
   });
 
   const importValidateMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: unknown) => {
       const res = await modeApiRequest("POST", "/api/stock-transfer-import/validate-multi-source", data);
       return res.json();
     },
@@ -305,14 +307,14 @@ export function useStockTransferFormModel({ voucherIdToEdit, isPOS, posUser }: S
         });
       }
     },
-    onError: (error) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Validation error", description: error.message, variant: "destructive" });
     },
   });
 
   const importMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: unknown) => {
       const res = await modeApiRequest("POST", "/api/stock-transfer-import/import-multi-source", data);
       return res.json();
     },
@@ -331,7 +333,7 @@ export function useStockTransferFormModel({ voucherIdToEdit, isPOS, posUser }: S
       setImportDestLocation("");
       setImportNotes("");
     },
-    onError: (error) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       toast({ title: "Import error", description: error.message, variant: "destructive" });
     },
@@ -445,7 +447,7 @@ export function useStockTransferFormModel({ voucherIdToEdit, isPOS, posUser }: S
         });
       }
     },
-    onError: (error) => {
+    onError: (error: ClientErrorLike) => {
       if (error?._handledGlobally) return;
       const isEditMode = !!voucherIdToEdit;
       toast({
@@ -573,11 +575,12 @@ export function useStockTransferFormModel({ voucherIdToEdit, isPOS, posUser }: S
       const refreshedRevisions = queryClient.getQueryData<any[]>(["/api/stock-transfers", transferId, "revisions"]);
       const nextRevNum = refreshedRevisions?.length ?? transferRevisions.length + 1;
       toast({ title: "Revision Saved", description: `Rev ${nextRevNum} recorded and transfer updated` });
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Revision Not Saved",
         description:
-          error.message || "The transfer was updated, but the revision record failed to save. Please try again.",
+          getErrorDetails(error).optionalMessage ||
+          "The transfer was updated, but the revision record failed to save. Please try again.",
         variant: "destructive",
       });
     } finally {

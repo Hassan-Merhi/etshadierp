@@ -10,12 +10,28 @@ import { formatNumber } from "@/lib/formatNumber";
 
 const CENTER_CELL = { textAlign: "center" as const, padding: "4px 3px", verticalAlign: "top", fontWeight: "600" };
 
+interface PrintSaleItem {
+  name?: string;
+  stockItemName?: string;
+  itemCode?: string;
+  quantity?: string;
+  rate?: string;
+}
+
+interface PrintSale {
+  items?: PrintSaleItem[];
+  saleDate?: string;
+  isCreditSale?: boolean;
+  customer?: { name?: string } | null;
+  voucher?: { exchangeRate?: string; description?: string } | null;
+}
+
 interface PrintProps {
   printRef: RefObject<HTMLDivElement | null>;
-  importedSale: any;
+  importedSale: PrintSale | null | undefined;
   printUserName: string;
   printCurrPrefix: string;
-  selectedCompany: any;
+  selectedCompany: { name?: string } | null | undefined;
   exchangeRate: number | null | undefined;
   fmtPrint: (n: number, prefix?: string) => string;
 }
@@ -26,9 +42,9 @@ function ItemsTable({
   fmtPrint,
 }: Pick<PrintProps, "importedSale" | "printCurrPrefix" | "fmtPrint">) {
   const items = importedSale?.items ?? [];
-  const totalQty = items.reduce((sum: number, item: any) => sum + parseFloat(item.quantity || 0), 0);
+  const totalQty = items.reduce((sum: number, item: PrintSaleItem) => sum + parseFloat(item.quantity || "0"), 0);
   const totalAmount = items.reduce(
-    (sum: number, item: any) => sum + parseFloat(item.quantity || 0) * parseFloat(item.rate || 0),
+    (sum: number, item: PrintSaleItem) => sum + parseFloat(item.quantity || "0") * parseFloat(item.rate || "0"),
     0
   );
   return (
@@ -60,9 +76,9 @@ function ItemsTable({
         </tr>
       </thead>
       <tbody>
-        {items.map((item: any, idx: number) => {
-          const rate = parseFloat(item.rate || 0);
-          const qty = parseFloat(item.quantity || 0);
+        {items.map((item: PrintSaleItem, idx: number) => {
+          const rate = parseFloat(item.rate || "0");
+          const qty = parseFloat(item.quantity || "0");
           return (
             <tr
               key={idx}
@@ -115,7 +131,7 @@ export function PosImportPrintTemplate({
 }: PrintProps) {
   const items = importedSale?.items ?? [];
   const totalPaid = items.reduce(
-    (sum: number, item: any) => sum + parseFloat(item.quantity || 0) * parseFloat(item.rate || 0),
+    (sum: number, item: PrintSaleItem) => sum + parseFloat(item.quantity || "0") * parseFloat(item.rate || "0"),
     0
   );
   const showDailyRate =
@@ -147,6 +163,7 @@ export function PosImportPrintTemplate({
           }}
         />
 
+        {/* Title */}
         <div
           style={{
             textAlign: "center",
@@ -159,6 +176,7 @@ export function PosImportPrintTemplate({
           POS INVOICE
         </div>
 
+        {/* Invoice Info */}
         <div
           style={{
             fontSize: "11pt",
@@ -175,6 +193,7 @@ export function PosImportPrintTemplate({
           <span>User: {printUserName}</span>
         </div>
 
+        {/* Daily Exchange Rate - Only for Mali company */}
         {showDailyRate && (
           <div
             style={{
@@ -187,10 +206,11 @@ export function PosImportPrintTemplate({
             }}
           >
             <span style={{ fontWeight: "900" }}>Daily Rate:</span> $1 ={" "}
-            {formatNumber(parseFloat(importedSale?.voucher?.exchangeRate) || exchangeRate || 0)} CFA
+            {formatNumber(parseFloat(importedSale?.voucher?.exchangeRate || "0") || exchangeRate || 0)} CFA
           </div>
         )}
 
+        {/* Credit Sale Customer Info */}
         {importedSale?.isCreditSale && importedSale?.customer && (
           <div
             style={{
@@ -206,8 +226,10 @@ export function PosImportPrintTemplate({
           </div>
         )}
 
+        {/* Items Table */}
         <ItemsTable importedSale={importedSale} printCurrPrefix={printCurrPrefix} fmtPrint={fmtPrint} />
 
+        {/* Total Paid */}
         <div
           style={{
             fontSize: "14pt",
@@ -223,6 +245,7 @@ export function PosImportPrintTemplate({
           <span>{fmtPrint(totalPaid, printCurrPrefix)}</span>
         </div>
 
+        {/* Notes */}
         {importedSale?.voucher?.description && (
           <div
             style={{ fontSize: "9pt", fontWeight: "600", marginTop: "8px", padding: "4px", border: "2px solid black" }}
@@ -231,6 +254,7 @@ export function PosImportPrintTemplate({
           </div>
         )}
 
+        {/* Footer */}
         <div
           style={{
             textAlign: "center",

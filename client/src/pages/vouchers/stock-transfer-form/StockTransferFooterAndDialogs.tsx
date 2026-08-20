@@ -202,7 +202,7 @@ export function StockTransferFooterAndDialogs({ model }: { model: StockTransferF
                   description='Use "Save as Revision" to record tracked changes to this transfer.'
                 />
               ) : (
-                transferRevisions.map((revision: any) => (
+                transferRevisions.map((revision) => (
                   <div key={revision.id} className="border rounded-md overflow-hidden">
                     {revision.optional && (
                       <div className="flex items-center justify-between gap-3 px-3 py-2 status-warning border-b">

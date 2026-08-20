@@ -6,18 +6,18 @@
  * built, kept identical so amounts and quantities render unchanged.
  */
 export interface DetailPanelFormatters {
-  fmt: (v: unknown) => string;
-  fmtNum: (v: unknown) => string;
+  fmt: (v: number | string | null | undefined) => string;
+  fmtNum: (v: number | string | null | undefined) => string;
 }
 
 export function createDetailFormatters(formatCashAmount: (n: number) => string): DetailPanelFormatters {
   return {
-    fmt: (v: any) => {
+    fmt: (v) => {
       const n = typeof v === "number" ? v : parseFloat(v || "0");
       if (isNaN(n)) return "—";
       return formatCashAmount(n);
     },
-    fmtNum: (v: any) => {
+    fmtNum: (v) => {
       const n = typeof v === "number" ? v : parseFloat(v || "0");
       if (isNaN(n)) return "0";
       return Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: 3 });

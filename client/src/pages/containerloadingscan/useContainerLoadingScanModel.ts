@@ -144,13 +144,13 @@ export function useContainerLoadingScanModel() {
       const res = await modeApiRequest("POST", "/api/factory/customer-orders-loading", data);
       return await res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       setOrderId(data.id);
       toast({ title: "Loading order created", description: "You can now start scanning bales" });
       setTimeout(() => scannerRef.current?.focus(), 100);
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -177,7 +177,7 @@ export function useContainerLoadingScanModel() {
       }, 500);
       if (orderId) {
         const scanned = variables.scanCode;
-        const newestForRef = [...(data?.bales || [])].sort((a: any, b: any) => b.id - a.id)[0];
+        const newestForRef = [...(data?.bales || [])].sort((a, b) => b.id - a.id)[0];
         const lastScanned = {
           baleReference: newestForRef?.baleReference || scanned,
           baleName: newestForRef?.baleName || "",
@@ -186,7 +186,7 @@ export function useContainerLoadingScanModel() {
         localStorage.setItem(`lastScannedBale_${orderId}`, JSON.stringify(lastScanned));
         setLastScannedRef(lastScanned);
       }
-      const newest = [...(data?.bales || [])].sort((a: any, b: any) => b.id - a.id)[0];
+      const newest = [...(data?.bales || [])].sort((a, b) => b.id - a.id)[0];
       if (newest?.articleCode) {
         setExpandedGroups((prev) => {
           const next = new Set(prev);
@@ -246,7 +246,7 @@ export function useContainerLoadingScanModel() {
       toast({ title: "Bale removed" });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -265,7 +265,7 @@ export function useContainerLoadingScanModel() {
       navigate("/factory/invoicing?tab=invoices");
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error", description: error.message, variant: "destructive" });
       setShowFinalizeDialog(false);
     },
@@ -292,7 +292,7 @@ export function useContainerLoadingScanModel() {
       );
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Error saving note", description: error.message, variant: "destructive" });
     },
   });

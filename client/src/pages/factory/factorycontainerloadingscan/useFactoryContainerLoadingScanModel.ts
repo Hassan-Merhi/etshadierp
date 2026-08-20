@@ -13,7 +13,18 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, keyStartsWith } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
-import type { BaleRemoval, Customer, Location, OrderBale, OrderDetail, Proforma } from "./types";
+import { getErrorDetails } from "@shared/errorUtils";
+import type {
+  AddLoadingBaleInput,
+  AddLoadingBaleResponse,
+  BaleRemoval,
+  CreateLoadingOrderResponse,
+  Customer,
+  Location,
+  OrderBale,
+  OrderDetail,
+  Proforma,
+} from "./types";
 import {
   SCAN_NOT_IN_PROFORMA_TONE,
   SCAN_OVERLOAD_TONE,
@@ -190,7 +201,7 @@ export function useFactoryContainerLoadingScanModel() {
       const res = await modeApiRequest("POST", "/api/factory/customer-orders-loading", data);
       return await res.json();
     },
-    onSuccess: (data) => {
+    onSuccess: (data: CreateLoadingOrderResponse) => {
       setOrderId(data.id);
       toast({
         title: "Loading order created",
@@ -199,7 +210,7 @@ export function useFactoryContainerLoadingScanModel() {
       setTimeout(() => scannerRef.current?.focus(), 100);
     },
     onError: (error: Error) => {
-      if (error?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
@@ -218,7 +229,7 @@ export function useFactoryContainerLoadingScanModel() {
       const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/bales`, data);
       return await res.json();
     },
-    onSuccess: (data, variables: { scanCode: string }) => {
+    onSuccess: (data: AddLoadingBaleResponse, variables: AddLoadingBaleInput) => {
       setPendingBypassBaleRef(null);
       setPendingBypassOverloadRef(null);
       setScanFlash("success");
@@ -250,11 +261,11 @@ export function useFactoryContainerLoadingScanModel() {
       queryClient.setQueryData<OrderDetail>(["/api/factory/customer-orders", orderId], data);
       setScanCode("");
     },
-    onError: (error: Error, variables: any) => {
-      if (error?._handledGlobally) return;
+    onError: (error: Error, variables: AddLoadingBaleInput) => {
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       // Overload and not-in-proforma are soft rejections: arm a bypass so the
       // same code scanned a second time goes through.
-      if ((error as any).overloaded) {
+      if ((error as unknown as Error & { overloaded: unknown }).overloaded) {
         setPendingBypassOverloadRef(variables.scanCode);
         setPendingBypassBaleRef(null);
         setScanFlash("error");
@@ -263,7 +274,7 @@ export function useFactoryContainerLoadingScanModel() {
         setScanCode("");
         return;
       }
-      if ((error as any).notInProforma) {
+      if ((error as unknown as Error & { notInProforma: unknown }).notInProforma) {
         setPendingBypassBaleRef(variables.scanCode);
         setPendingBypassOverloadRef(null);
         setScanFlash("error");
@@ -317,7 +328,7 @@ export function useFactoryContainerLoadingScanModel() {
       toast({ title: "Bale removed" });
     },
     onError: (error: Error) => {
-      if (error?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
@@ -359,7 +370,7 @@ export function useFactoryContainerLoadingScanModel() {
       setTimeout(() => scannerRef.current?.focus(), 100);
     },
     onError: (error: Error) => {
-      if (error?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Import failed", description: error.message, variant: "destructive" });
     },
   });
@@ -383,7 +394,7 @@ export function useFactoryContainerLoadingScanModel() {
     onError: (error: Error) => {
       if (error?._handledGlobally) return;
       setShowFinalizeDialog(false);
-      if (error?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({
         title: "Error",
         description: error.message,
@@ -404,15 +415,18 @@ export function useFactoryContainerLoadingScanModel() {
       toast({ title: "Note saved" });
     },
     onError: (error: Error) => {
-      if (error?._handledGlobally) return;
+      if ((error as { _handledGlobally?: boolean })?._handledGlobally) return;
       toast({ title: "Failed to save note", description: error.message, variant: "destructive" });
     },
   });
 
-  const chosenProforma = () =>
-    selectedProformaId && selectedProformaId !== "none"
-      ? proformas.find((p) => p.id === parseInt(selectedProformaId)) || null
-      : null;
+  const chosenProforma = useCallback(
+    () =>
+      selectedProformaId && selectedProformaId !== "none"
+        ? proformas.find((p) => p.id === parseInt(selectedProformaId)) || null
+        : null,
+    [selectedProformaId, proformas]
+  );
 
   const handleStartLoading = useCallback(async () => {
     if (!customerId || !selectedLocationId) return;
@@ -426,7 +440,7 @@ export function useFactoryContainerLoadingScanModel() {
         });
         if (res.ok) {
           const allOrders: any[] = await res.json();
-          const pending = allOrders.filter((o) => OPEN_ORDER_STATUSES.includes(o.status));
+          const pending = allOrders.filter((o: { status: string }) => OPEN_ORDER_STATUSES.includes(o.status));
           if (pending.length > 0) {
             setPendingOrders(pending);
             setShowPendingWarning(true);
@@ -445,8 +459,7 @@ export function useFactoryContainerLoadingScanModel() {
       orderDate,
       containerNotes: loadingNote.trim() || undefined,
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- God Files extraction preserves pre-split behavior.
-  }, [customerId, selectedLocationId, selectedProformaId, proformas, orderDate, loadingNote, createOrderMutation]);
+  }, [customerId, selectedLocationId, chosenProforma, orderDate, loadingNote, createOrderMutation]);
 
   /** "Start New Loading" from the pending-orders warning — no note is carried over. */
   const startNewLoadingAnyway = () => {
@@ -568,8 +581,8 @@ export function useFactoryContainerLoadingScanModel() {
             setImportRefNumbers([]);
             setShowImportDialog(true);
           }
-        } catch (err: any) {
-          toast({ title: "Parse error", description: err.message, variant: "destructive" });
+        } catch (err) {
+          toast({ title: "Parse error", description: getErrorDetails(err).message, variant: "destructive" });
         }
       };
       reader.readAsArrayBuffer(file);

@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * Controller hook for the legacy Accounts Overview page.
  *
@@ -152,7 +153,7 @@ export function useAccountsLegacyModel() {
         });
       }
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Delete failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -192,7 +193,7 @@ export function useAccountsLegacyModel() {
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
     },
-    onError: (err) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Cannot delete", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -215,13 +216,13 @@ export function useAccountsLegacyModel() {
       toast({ title: "Account updated successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
     },
-    onError: (err) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Update failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
 
   const updateBankMutation = useMutation({
-    mutationFn: async (data: { id: number; [key: string]: unknown }) => {
+    mutationFn: async (data: { id: number; [key: string]: any }) => {
       const { id, ...rest } = data;
       const res = await apiRequest("PUT", `/api/bank-accounts/${id}`, rest);
       if (!res.ok) {
@@ -237,7 +238,7 @@ export function useAccountsLegacyModel() {
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
     },
-    onError: (err) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Update failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -258,13 +259,13 @@ export function useAccountsLegacyModel() {
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
     },
-    onError: (err) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Delete failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
 
   const createBankMutation = useMutation({
-    mutationFn: async (data: Record<string, any>) => {
+    mutationFn: async (data: Record<string, unknown>) => {
       const res = await apiRequest("POST", "/api/bank-accounts", {
         ...data,
         companyId: selectedCompany?.id,
@@ -282,7 +283,7 @@ export function useAccountsLegacyModel() {
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
     },
-    onError: (err) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Create failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -316,7 +317,7 @@ export function useAccountsLegacyModel() {
         description: `${data.vouchersUpdated ?? 0} voucher(s) updated · ${data.accountsDeleted ?? 0} old account(s) removed · ${(data.salaryAccountsReparented ?? 0) + (data.bonusAccountsReparented ?? 0)} account(s) grouped`,
       });
     },
-    onError: (err) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Fix failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -375,7 +376,7 @@ export function useAccountsLegacyModel() {
       setWaRuleDialogOpen(false);
       queryClient.invalidateQueries({ queryKey: [waRuleBase, selectedAccountId, "whatsapp-rule"] });
     },
-    onError: (err) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Save failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
@@ -393,7 +394,7 @@ export function useAccountsLegacyModel() {
     onSuccess: () => {
       toast({ title: "Statement sent to WhatsApp" });
     },
-    onError: (err) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "WhatsApp send failed", description: err?.message, variant: "destructive" });
     },
   });
@@ -451,7 +452,7 @@ export function useAccountsLegacyModel() {
       if (!res.ok) throw new Error("Failed to fetch ledger accounts");
       return res.json();
     },
-    select: (data: any[]) => {
+    select: (data) => {
       const parentIdSet = new Set<number>();
       data.forEach((a) => {
         if (a.parentId) parentIdSet.add(a.parentId);
@@ -465,7 +466,7 @@ export function useAccountsLegacyModel() {
     data: rawTransactionData,
     isLoading: transactionsLoading,
     error: transactionsQueryError,
-  } = useQuery<any>({
+  } = useQuery({
     queryKey: selectedAccount
       ? [
           "account-statement",
@@ -640,7 +641,7 @@ export function useAccountsLegacyModel() {
     editForm.reset({
       code: account.code,
       name: account.name,
-      accountType: account.accountType || account.type || "",
+      accountType: (account.accountType || account.type || "") as any,
       subType: account.subType || "",
       openingBalance: String(Math.abs(account.openingBalance || 0)),
       openingBalanceSide: (account.openingBalanceSide as "Dr" | "Cr") || "Dr",

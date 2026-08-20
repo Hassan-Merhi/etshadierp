@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * Controller hook for the Factory Daybook page.
  *
@@ -14,7 +15,6 @@ import { useAdminOverride } from "@/hooks/use-admin-override";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { fetchAllDaybookEntries } from "@/lib/daybookPaginationClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
@@ -62,7 +62,7 @@ export function useFactoryDaybookModel() {
   const appMode = useAppMode();
   const routePrefix = appMode === "properties" ? "/properties" : "/factory";
 
-  const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
+  const { data: currentUser } = useQuery<{ id?: number; role?: string }>({ queryKey: ["/api/auth/me"] });
   const isAdminOrOwner =
     currentUser?.role === "Admin" || currentUser?.role === "Owner" || currentUser?.role === "Developer";
 
@@ -84,8 +84,9 @@ export function useFactoryDaybookModel() {
   const [searchQuery, setSearchQuery] = useState(() => initialDaybookStateRef.current?.searchQuery || "");
   const [minAmount, setMinAmount] = useState(() => initialDaybookStateRef.current?.minAmount || "");
   const [maxAmount, setMaxAmount] = useState(() => initialDaybookStateRef.current?.maxAmount || "");
-  // eslint-disable-next-line unused-imports/no-unused-vars -- God Files extraction preserves pre-split behavior.
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">(() => initialDaybookStateRef.current?.sortOrder || "desc");
+  const [sortOrder, _setSortOrder] = useState<"asc" | "desc">(
+    () => initialDaybookStateRef.current?.sortOrder || "desc"
+  );
   // searchQuery filters client-side only (not part of the query key below), but debounce
   // it anyway so rapid typing doesn't thrash the derived filteredEntries memo on large lists.
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery);
@@ -154,29 +155,13 @@ export function useFactoryDaybookModel() {
   // "All Time" preset — so the server can tell "user explicitly wants all time" apart
   // from "caller omitted the params entirely" (e.g. a raw API call) and only applies
   // its own safety-net default in the latter case.
-  queryParams.set("startDate", startDate);
-  queryParams.set("endDate", endDate);
+  queryParams.set("startDate", startDate || "");
+  queryParams.set("endDate", endDate || "");
   if (txTypeFilter !== "ALL") queryParams.set("txType", txTypeFilter);
   if (currencyFilter !== "ALL") queryParams.set("currencyCode", currencyFilter);
-  if (statusFilter !== "all") queryParams.set("optionalStatus", statusFilter);
-  if (debouncedSearchQuery.trim()) queryParams.set("search", debouncedSearchQuery.trim());
-  if (minAmount.trim()) queryParams.set("minAmount", minAmount.trim());
-  if (maxAmount.trim()) queryParams.set("maxAmount", maxAmount.trim());
-  queryParams.set("sortOrder", sortOrder);
 
   const { data: entries = [], isLoading } = useQuery<DaybookEntry[]>({
-    queryKey: [
-      "/api/factory/daybook",
-      startDate,
-      endDate,
-      txTypeFilter,
-      currencyFilter,
-      statusFilter,
-      debouncedSearchQuery,
-      minAmount,
-      maxAmount,
-      sortOrder,
-    ],
+    queryKey: ["/api/factory/daybook", startDate, endDate, txTypeFilter, currencyFilter],
     queryFn: async () => {
       const res = await fetch(`/api/factory/daybook?${queryParams.toString()}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch daybook");
@@ -229,8 +214,9 @@ export function useFactoryDaybookModel() {
     // Always hide worker edit audit entries
     result = result.filter((e) => e.txType !== "WORKER_EDITED");
     // Non-admins only see their own entries (View Only users are observers — they see everything)
-    if (!isAdminOrOwner && currentUser?.role !== "View Only" && currentUser?.id) {
-      result = result.filter((e) => e.createdBy === currentUser.id);
+    const ownEntriesUserId = currentUser?.id;
+    if (!isAdminOrOwner && currentUser?.role !== "View Only" && ownEntriesUserId) {
+      result = result.filter((e) => e.createdBy === ownEntriesUserId);
     }
     if (statusFilter === "exclude") result = result.filter((e) => !e.optional);
     else if (statusFilter === "only") result = result.filter((e) => e.optional);
@@ -264,7 +250,7 @@ export function useFactoryDaybookModel() {
     entries,
     isAdminOrOwner,
     currentUser?.role,
-    currentUser.id,
+    currentUser?.id,
     statusFilter,
     debouncedSearchQuery,
     minAmount,
@@ -403,24 +389,11 @@ export function useFactoryDaybookModel() {
 
   // ── Excel export: summary ─────────────────────────────────────────────────
   const handleExportToExcel = async () => {
-    let exportEntries: DaybookEntry[];
-    try {
-      exportEntries = (await fetchAllDaybookEntries(new URLSearchParams(queryParams))).filter(
-        (entry) => entry.txType !== "WORKER_EDITED"
-      ) as DaybookEntry[];
-    } catch (error: any) {
-      toast({
-        title: "Export failed",
-        description: error?.message || "The complete filtered daybook could not be loaded.",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (exportEntries.length === 0) {
+    if (filteredEntries.length === 0) {
       warnNothingToExport();
       return;
     }
-    const { fileName, rowCount } = await exportFactoryDaybookSummary(exportEntries, formatDisplayDate);
+    const { fileName, rowCount } = await exportFactoryDaybookSummary(filteredEntries, formatDisplayDate);
     toast({
       title: "Export successful",
       description: `Downloaded ${fileName} with ${rowCount} entries.`,
@@ -429,19 +402,15 @@ export function useFactoryDaybookModel() {
 
   // ── Excel export: detailed (with voucher debit/credit entries) ────────────
   const handleExportDetailedToExcel = async () => {
+    if (filteredEntries.length === 0) {
+      warnNothingToExport();
+      return;
+    }
     setIsExportingDetailed(true);
     try {
-      const exportEntries = (await fetchAllDaybookEntries(new URLSearchParams(queryParams))).filter(
-        (entry) => entry.txType !== "WORKER_EDITED"
-      ) as DaybookEntry[];
-      if (exportEntries.length === 0) {
-        warnNothingToExport();
-        return;
-      }
-      const { fileName, rowCount } = await exportFactoryDaybookDetailed(exportEntries, formatDisplayDate);
+      const { fileName, rowCount } = await exportFactoryDaybookDetailed(filteredEntries, formatDisplayDate);
       toast({ title: "Export successful", description: `Downloaded ${fileName} with ${rowCount} entries.` });
-      // eslint-disable-next-line unused-imports/no-unused-vars -- God Files extraction preserves pre-split behavior.
-    } catch (error) {
+    } catch (_error) {
       toast({ title: "Export failed", description: "An error occurred while exporting.", variant: "destructive" });
     } finally {
       setIsExportingDetailed(false);
@@ -463,7 +432,7 @@ export function useFactoryDaybookModel() {
       setEditReason("");
       toast({ title: "Entry updated", description: "Description synced to source record." });
     },
-    onError: (e) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Update failed", description: e.message, variant: "destructive" });
     },
@@ -484,7 +453,7 @@ export function useFactoryDaybookModel() {
       setVoidEntry(null);
       toast({ title: "Voucher voided", description: "All accounting entries have been reversed." });
     },
-    onError: (e) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Void failed", description: e.message, variant: "destructive" });
     },
@@ -500,7 +469,7 @@ export function useFactoryDaybookModel() {
       setDeleteEntry(null);
       toast({ title: "Entry deleted", description: "The daybook entry has been permanently removed." });
     },
-    onError: (e) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Delete failed", description: e.message, variant: "destructive" });
     },
@@ -533,7 +502,7 @@ export function useFactoryDaybookModel() {
       setCostEditReason("");
       toast({ title: "Cost updated", description: data.message || "Container costs recalculated and cascaded." });
     },
-    onError: (e) => {
+    onError: (e: ClientErrorLike) => {
       if (e?._handledGlobally) return;
       toast({ title: "Cost edit failed", description: e.message, variant: "destructive" });
     },

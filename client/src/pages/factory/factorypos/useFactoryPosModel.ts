@@ -1,3 +1,4 @@
+import type { ClientErrorLike } from "@/lib/clientError";
 /**
  * Controller hook for the Factory POS page.
  *
@@ -96,16 +97,18 @@ export function useFactoryPosModel() {
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   });
-  const cashAccounts = (ledgerAccounts || []).filter((a: any) => a.accountType === "Cash");
+  const cashAccounts = (ledgerAccounts || []).filter((a) => a.accountType === "Cash");
   const { data: sales, isLoading: salesLoading } = useQuery<any[]>({
     queryKey: ["/api/factory/pos/sales"],
     enabled: showHistory,
   });
-  const { data: authUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
+  const { data: authUser } = useQuery<{ fullName?: string; name?: string; username?: string; email?: string }>({
+    queryKey: ["/api/auth/me"],
+  });
   const printUserName = authUser?.fullName || authUser?.name || authUser?.username || authUser?.email || "User";
 
   // Fetch existing sale when in edit mode
-  const { data: editSaleData } = useQuery<any>({
+  const { data: editSaleData } = useQuery({
     queryKey: ["/api/factory/pos/sales", editSaleId],
     queryFn: async () => {
       if (!editSaleId) return null;
@@ -341,7 +344,7 @@ export function useFactoryPosModel() {
 
   // ---- Mutations ----
   const saleMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/factory/pos/sale", data),
+    mutationFn: (data: unknown) => apiRequest("POST", "/api/factory/pos/sale", data),
     onSuccess: async (res) => {
       const data = await res.json();
       queryClient.invalidateQueries({ queryKey: ["/api/factory/pos/sales"] });
@@ -349,7 +352,7 @@ export function useFactoryPosModel() {
       const snapshotExpenses = expenseRows
         .map((e) => ({
           ...e,
-          accountName: (ledgerAccounts || []).find((a: any) => String(a.id) === e.accountId)?.name || e.accountId,
+          accountName: (ledgerAccounts || []).find((a) => String(a.id) === e.accountId)?.name || e.accountId,
         }))
         .filter((e) => parseFloat(e.amount) > 0 && e.accountId);
       setSavedSale({
@@ -377,13 +380,13 @@ export function useFactoryPosModel() {
       toast({ title: "Sale recorded", description: `${data.saleNumber} – ${ccPrefix}${formatNum(total)}` });
       setShowPrintDialog(true);
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Error", description: err.message || "Failed to create sale", variant: "destructive" });
     },
   });
 
   const editMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("PUT", `/api/factory/pos/sales/${editSaleId}`, data),
+    mutationFn: (data: unknown) => apiRequest("PUT", `/api/factory/pos/sales/${editSaleId}`, data),
     onSuccess: async (res) => {
       const data = await res.json();
       queryClient.invalidateQueries({ queryKey: ["/api/factory/pos/sales"] });
@@ -393,7 +396,7 @@ export function useFactoryPosModel() {
       toast({ title: "Sale updated", description: `${data.saleNumber || editSaleData?.saleNumber} saved` });
       navigate("/factory/daybook");
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Error", description: err.message || "Failed to update sale", variant: "destructive" });
     },
   });
@@ -406,7 +409,7 @@ export function useFactoryPosModel() {
       setVoidId(null);
       toast({ title: "Sale voided" });
     },
-    onError: (err: any) => {
+    onError: (err: ClientErrorLike) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
