@@ -1,0 +1,24 @@
+name: PR780 Ratchet Diagnostic
+
+on:
+  push:
+    branches:
+      - agent/god-files-recovery-latest-main
+
+jobs:
+  ratchets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Type-escape diagnostic
+        run: node scripts/audit-type-escapes.mjs --json
+        continue-on-error: true
+      - name: Documentation-index diagnostic
+        run: node scripts/audit-doc-index.mjs --json
+        continue-on-error: true
