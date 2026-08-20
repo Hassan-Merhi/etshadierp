@@ -1,0 +1,247 @@
+name: God Files Wave 2 Publisher
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+env:
+  CI: true
+  NODE_OPTIONS: --max-old-space-size=6144
+
+jobs:
+  publish:
+    if: github.event.pull_request.base.ref == 'agent/god-files-final-wave1-tests' && github.event.pull_request.head.ref == 'tmp/god-files-wave2-trigger'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/god-files-final-wave1-tests
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.14.0'
+          cache: npm
+      - name: Install dependencies
+        run: |
+          sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+          npm ci --no-audit --bin-links=true
+      - name: Apply Wave 2 extractions
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const read = (p) => fs.readFileSync(p, 'utf8');
+          const write = (p, s) => { fs.mkdirSync(path.dirname(p), {recursive:true}); fs.writeFileSync(p, s.endsWith('\n') ? s : s + '\n'); };
+          const replaceOnce = (text, from, to, label) => {
+            if (!text.includes(from)) throw new Error(`Missing replacement target: ${label}`);
+            return text.replace(from, to);
+          };
+          const lines = (p) => read(p).split(/\r?\n/).length;
+
+          // 1) FactoryDispatchBatchDetail: move the remaining local audit DTO into its existing types module.
+          {
+            const page = 'client/src/pages/factory/FactoryDispatchBatchDetail.tsx';
+            const types = 'client/src/pages/factory/factorydispatchbatchdetail/types.ts';
+            let src = read(page);
+            src = replaceOnce(src,
+              'import type { BatchDetail, InvoicePreview } from "./factorydispatchbatchdetail/types";',
+              'import type { AuditScan, BatchDetail, InvoicePreview } from "./factorydispatchbatchdetail/types";',
+              'dispatch type import');
+            const start = src.indexOf('  interface AuditScan {');
+            const endMarker = '  const { data: auditScans = [] } = useQuery<AuditScan[]>({';
+            const end = src.indexOf(endMarker);
+            if (start < 0 || end < 0 || end <= start) throw new Error('Dispatch AuditScan block not found');
+            src = src.slice(0, start) + src.slice(end);
+            write(page, src);
+            let t = read(types);
+            if (!t.includes('export interface AuditScan')) {
+              t += `\nexport interface AuditScan {\n  id: number;\n  truckRideId: number;\n  rideNumber: number;\n  baleId: number;\n  baleReference: string;\n  articleCode: string | null;\n  productName: string | null;\n  weightKg: string;\n  priceUsed: string;\n  amount: string;\n  scannedBy: string | null;\n  scannedAt: string;\n  removedAt: string | null;\n  removalReason: string | null;\n}\n`;
+            }
+            write(types, t);
+          }
+
+          // 2) FactoryShippingContainers: extract persisted column-visibility state into a focused hook.
+          {
+            const page = 'client/src/pages/factory/FactoryShippingContainers.tsx';
+            const hook = 'client/src/pages/factory/factoryshippingcontainers/hooks/useShippingColumnVisibility.ts';
+            let src = read(page);
+            src = replaceOnce(src,
+              'import { ShippingAvailabilityTable } from "./factoryshippingcontainers/components/ShippingAvailabilityTable";',
+              'import { ShippingAvailabilityTable } from "./factoryshippingcontainers/components/ShippingAvailabilityTable";\nimport { useShippingColumnVisibility } from "./factoryshippingcontainers/hooks/useShippingColumnVisibility";',
+              'shipping hook import');
+            src = src.replace('  DEFAULT_COL_VIS,\n', '');
+            const start = src.indexOf('  const [colVis, setColVis] = useState<Record<ShippingColId, boolean>>(DEFAULT_COL_VIS);');
+            const endMarker = '  const hiddenCount = SHIPPING_COLS.filter((c) => !colVis[c.id]).length;';
+            const end = src.indexOf(endMarker);
+            if (start < 0 || end < 0 || end <= start) throw new Error('Shipping column visibility block not found');
+            const endPos = end + endMarker.length;
+            src = src.slice(0, start) + '  const { colVis, toggleCol, hiddenCount } = useShippingColumnVisibility(me?.id);' + src.slice(endPos);
+            write(page, src);
+            write(hook, `import { useEffect, useState } from "react";\nimport type { ShippingColId } from "../types";\nimport { DEFAULT_COL_VIS, SHIPPING_COLS } from "../utils";\n\nexport function useShippingColumnVisibility(userId: string | number | null | undefined) {\n  const [colVis, setColVis] = useState<Record<ShippingColId, boolean>>(DEFAULT_COL_VIS);\n\n  useEffect(() => {\n    if (!userId) return;\n    try {\n      const saved = localStorage.getItem(\`fsc_col_vis_\${userId}\`);\n      if (saved) setColVis({ ...DEFAULT_COL_VIS, ...JSON.parse(saved) });\n    } catch {\n      // Local storage can be unavailable in privacy mode.\n    }\n  }, [userId]);\n\n  function toggleCol(id: ShippingColId) {\n    setColVis((prev) => {\n      const next = { ...prev, [id]: !prev[id] };\n      try {\n        if (userId) localStorage.setItem(\`fsc_col_vis_\${userId}\`, JSON.stringify(next));\n      } catch {\n        // Keep the in-memory preference even if persistence is unavailable.\n      }\n      return next;\n    });\n  }\n\n  const hiddenCount = SHIPPING_COLS.filter((column) => !colVis[column.id]).length;\n  return { colVis, toggleCol, hiddenCount };\n}\n`);
+          }
+
+          // 3) WipersReEntry: extract label-data construction and browser-print mechanics.
+          {
+            const page = 'client/src/pages/factory/WipersReEntry.tsx';
+            const helper = 'client/src/pages/factory/wipersreentry/printUtils.ts';
+            let src = read(page);
+            src = src.replace('  generateCombinedLabelsHtml,\n  generateA5LabelsHtml,\n  generateStickerLabelsHtml,\n  prefetchBannersForPrint,\n', '');
+            src = replaceOnce(src,
+              'import { isWipers, isWipersBale } from "./wipersreentry/utils";',
+              'import { isWipers, isWipersBale } from "./wipersreentry/utils";\nimport { buildLabelData, printLabelsInBrowser } from "./wipersreentry/printUtils";',
+              'wipers print helper import');
+            const start = src.indexOf('  const buildLabelData = (bales: CreatedBale[]): LabelData[] =>');
+            const endMarker = '  const handlePrint = async (format: "A4" | "A5" | "sticker") => {';
+            const end = src.indexOf(endMarker);
+            if (start < 0 || end < 0 || end <= start) throw new Error('Wipers print helper block not found');
+            const wrapper = `  const openBrowserPrint = (\n    labels: LabelData[],\n    format: "A4" | "A5" | "sticker",\n    designColor?: A4DesignColor\n  ) => {\n    if (printLabelsInBrowser(labels, format, designColor)) return;\n    setPendingLabels(labels);\n    setDesignPickerOpen(true);\n  };\n\n`;
+            src = src.slice(0, start) + wrapper + src.slice(end);
+            write(page, src);
+            write(helper, `import {\n  generateA5LabelsHtml,\n  generateCombinedLabelsHtml,\n  generateStickerLabelsHtml,\n  prefetchBannersForPrint,\n  type A4DesignColor,\n  type LabelData,\n} from "@/lib/labelHtml";\nimport type { CreatedBale } from "./types";\n\nexport type WipersPrintFormat = "A4" | "A5" | "sticker";\n\nexport function buildLabelData(bales: CreatedBale[]): LabelData[] {\n  return bales.map((bale) => ({\n    referenceNumber: bale.referenceNumber,\n    articleCode: bale.articleCode || "",\n    pieces: 1,\n    approxWeightKg: bale.weightKg || "0",\n    productName: bale.productName || "",\n  }));\n}\n\n/** Returns false only when A4 needs the caller to choose a design color first. */\nexport function printLabelsInBrowser(\n  labels: LabelData[],\n  format: WipersPrintFormat,\n  designColor?: A4DesignColor\n): boolean {\n  prefetchBannersForPrint();\n  if (format === "A4" && !designColor) return false;\n\n  const popup = window.open("", "_blank");\n  if (!popup) return true;\n\n  const html =\n    format === "sticker"\n      ? generateStickerLabelsHtml(labels)\n      : format === "A5"\n        ? generateA5LabelsHtml(labels)\n        : generateCombinedLabelsHtml(labels, designColor!);\n\n  popup.document.write(html);\n  popup.document.close();\n  popup.focus();\n  setTimeout(() => popup.print(), 500);\n  return true;\n}\n`);
+          }
+
+          // 4) FactoryStatusBuilder: extract history presentation and deletion confirmation dialog.
+          {
+            const page = 'client/src/pages/factory/FactoryStatusBuilder.tsx';
+            const types = 'client/src/pages/factory/factorystatusbuilder/types.ts';
+            const historyComponent = 'client/src/pages/factory/factorystatusbuilder/components/StatusHistoryPanel.tsx';
+            const deleteComponent = 'client/src/pages/factory/factorystatusbuilder/components/DeleteConfirmationDialog.tsx';
+            let src = read(page);
+            src = src.replace('import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle} from "@/components/ui/alert-dialog";\n', '');
+            src = src.replace('import {Badge} from "@/components/ui/badge";\n', '');
+            src = replaceOnce(src,
+              'import type {ApiSheet, CellValue, LinkDialogState, StatusBuilderSheet} from "./factorystatusbuilder/types";',
+              'import type {ApiSheet, CellValue, LinkDialogState, PendingDelete, StatusBuilderHistoryEntry, StatusBuilderSheet} from "./factorystatusbuilder/types";',
+              'status types import');
+            src = replaceOnce(src,
+              'import {LinkDialog} from "./factorystatusbuilder/components/LinkDialog";',
+              'import {LinkDialog} from "./factorystatusbuilder/components/LinkDialog";\nimport {StatusHistoryPanel} from "./factorystatusbuilder/components/StatusHistoryPanel";\nimport {DeleteConfirmationDialog} from "./factorystatusbuilder/components/DeleteConfirmationDialog";',
+              'status component imports');
+            src = src.replace('  const [pendingDelete, setPendingDelete] = useState<{\n    type: "row" | "col" | "page";\n    idx: number;\n    label: string;\n  } | null>(null);', '  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);');
+            const queryStart = src.indexOf('  const { data: historyLog, isLoading: historyLoading } = useQuery<');
+            const queryEndMarker = '  }>({\n    queryKey: ["/api/factory/status-builder/log", activeSheet?.id],';
+            const queryEnd = src.indexOf(queryEndMarker, queryStart);
+            if (queryStart < 0 || queryEnd < 0) throw new Error('Status history query type block not found');
+            src = src.slice(0, queryStart) + '  const { data: historyLog, isLoading: historyLoading } = useQuery<StatusBuilderHistoryEntry[]>({\n    queryKey: ["/api/factory/status-builder/log", activeSheet?.id],' + src.slice(queryEnd + queryEndMarker.length);
+
+            const historyStart = src.indexOf('          /* ── History tab ── */');
+            const historyEndMarker = '        ) : (\n          /* ── Spreadsheet grid ── */';
+            const historyEnd = src.indexOf(historyEndMarker, historyStart);
+            if (historyStart < 0 || historyEnd < 0) throw new Error('Status history render block not found');
+            src = src.slice(0, historyStart) + '          <StatusHistoryPanel historyLoading={historyLoading} historyLog={historyLog} />\n' + src.slice(historyEnd);
+
+            const deleteStart = src.indexOf('      {/* Delete confirmation dialog */}');
+            const deleteEnd = src.lastIndexOf('    </>\n  );');
+            if (deleteStart < 0 || deleteEnd < 0 || deleteEnd <= deleteStart) throw new Error('Status delete dialog block not found');
+            const deleteUsage = `      <DeleteConfirmationDialog\n        pendingDelete={pendingDelete}\n        onOpenChange={(isOpen) => {\n          if (!isOpen) setPendingDelete(null);\n        }}\n        onConfirm={(pending) => {\n          if (pending.type === "row") removeRow(pending.idx);\n          else if (pending.type === "col") removeColumn(pending.idx);\n          else {\n            const sheet = localSheets[pending.idx];\n            if (sheet) {\n              if (sheet.id) deleteMutation.mutate(sheet.id);\n              else {\n                setLocalSheets((prev) => prev.filter((_, i) => i !== pending.idx));\n                setActiveIdx((prev) => Math.max(0, prev - 1));\n              }\n            }\n          }\n          setPendingDelete(null);\n        }}\n      />\n`;
+            src = src.slice(0, deleteStart) + deleteUsage + src.slice(deleteEnd);
+            write(page, src);
+
+            let t = read(types);
+            if (!t.includes('export interface StatusBuilderHistoryEntry')) {
+              t += `\nexport interface StatusBuilderHistoryEntry {\n  id: number;\n  sheetId: number;\n  sheetName: string;\n  rowLabel: string;\n  columnLabel: string;\n  oldValue: string | null;\n  newValue: string | null;\n  changedBy: string | null;\n  createdAt: string;\n}\n\nexport interface PendingDelete {\n  type: "row" | "col" | "page";\n  idx: number;\n  label: string;\n}\n`;
+            }
+            write(types, t);
+            write(historyComponent, `import { Badge } from "@/components/ui/badge";\nimport { History as HistoryIcon } from "lucide-react";\nimport type { StatusBuilderHistoryEntry } from "../types";\n\ninterface StatusHistoryPanelProps {\n  historyLoading: boolean;\n  historyLog: StatusBuilderHistoryEntry[] | undefined;\n}\n\nexport function StatusHistoryPanel({ historyLoading, historyLog }: StatusHistoryPanelProps) {\n  return (\n    <div className="flex-1 overflow-auto p-4">\n      {historyLoading ? (\n        <div className="text-center text-sm text-muted-foreground py-8">Loading history…</div>\n      ) : !historyLog || historyLog.length === 0 ? (\n        <div className="text-center text-sm text-muted-foreground py-8">No changes recorded yet for this page.</div>\n      ) : (\n        <div className="space-y-2 max-w-2xl mx-auto">\n          {historyLog.map((entry) => (\n            <div\n              key={entry.id}\n              className="flex items-start gap-3 rounded-md border px-3 py-2 text-sm"\n              data-testid={\`sb-history-entry-\${entry.id}\`}\n            >\n              <HistoryIcon className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />\n              <div className="flex-1 min-w-0">\n                <div className="flex items-center gap-2 flex-wrap">\n                  <span className="font-medium">{entry.rowLabel}</span>\n                  <Badge variant="outline" className="text-[10px]">{entry.columnLabel}</Badge>\n                </div>\n                <div className="text-xs text-muted-foreground mt-0.5">\n                  {entry.oldValue ? \`"\${entry.oldValue}"\` : "(empty)"} → {entry.newValue ? \`"\${entry.newValue}"\` : "(empty)"}\n                </div>\n              </div>\n              <span className="text-xs text-muted-foreground shrink-0">\n                {new Date(entry.createdAt).toLocaleString([], {\n                  month: "short",\n                  day: "numeric",\n                  hour: "2-digit",\n                  minute: "2-digit",\n                })}\n              </span>\n            </div>\n          ))}\n        </div>\n      )}\n    </div>\n  );\n}\n`);
+            write(deleteComponent, `import {\n  AlertDialog,\n  AlertDialogAction,\n  AlertDialogCancel,\n  AlertDialogContent,\n  AlertDialogDescription,\n  AlertDialogFooter,\n  AlertDialogHeader,\n  AlertDialogTitle,\n} from "@/components/ui/alert-dialog";\nimport type { PendingDelete } from "../types";\n\ninterface DeleteConfirmationDialogProps {\n  pendingDelete: PendingDelete | null;\n  onOpenChange: (open: boolean) => void;\n  onConfirm: (pending: PendingDelete) => void;\n}\n\nexport function DeleteConfirmationDialog({\n  pendingDelete,\n  onOpenChange,\n  onConfirm,\n}: DeleteConfirmationDialogProps) {\n  return (\n    <AlertDialog open={!!pendingDelete} onOpenChange={onOpenChange}>\n      <AlertDialogContent>\n        <AlertDialogHeader>\n          <AlertDialogTitle>\n            Delete {pendingDelete?.type === "row" ? "Row" : pendingDelete?.type === "col" ? "Column" : "Page"}?\n          </AlertDialogTitle>\n          <AlertDialogDescription>\n            Are you sure you want to delete <span className="font-medium">"{pendingDelete?.label}"</span>?\n            {pendingDelete?.type === "row"\n              ? " All data in this row will be lost."\n              : pendingDelete?.type === "col"\n                ? " All data in this column will be lost."\n                : " This page and all its data will be permanently deleted."}\n          </AlertDialogDescription>\n        </AlertDialogHeader>\n        <AlertDialogFooter>\n          <AlertDialogCancel>Cancel</AlertDialogCancel>\n          <AlertDialogAction\n            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"\n            onClick={() => pendingDelete && onConfirm(pendingDelete)}\n          >\n            Delete\n          </AlertDialogAction>\n        </AlertDialogFooter>\n      </AlertDialogContent>\n    </AlertDialog>\n  );\n}\n`);
+          }
+
+          // Wave 2 ratchet/doc updates are derived from the transformed tree, never guessed.
+          const configPath = 'config/god-file-boundaries.json';
+          const config = JSON.parse(read(configPath));
+          const retired = [
+            'client/src/pages/factory/FactoryDispatchBatchDetail.tsx',
+            'client/src/pages/factory/FactoryShippingContainers.tsx',
+            'client/src/pages/factory/WipersReEntry.tsx',
+            'client/src/pages/factory/FactoryStatusBuilder.tsx',
+          ];
+          config.version = 27;
+          config.description = 'Version 27 completes cumulative God Files Wave 2 by retiring four small factory UI grandfathered files through focused type, hook, print, history and dialog extractions. ' + config.description;
+          for (const file of retired) delete config.repositoryScan.grandfathered[file];
+          write(configPath, JSON.stringify(config, null, 2));
+
+          const softMax = config.repositoryScan.softMaxLines;
+          for (const file of retired) {
+            const count = lines(file);
+            console.log(`RETIRED ${file}: ${count}`);
+            if (count > softMax) throw new Error(`${file} still exceeds ${softMax} lines (${count})`);
+          }
+          const newFiles = [
+            'client/src/pages/factory/factoryshippingcontainers/hooks/useShippingColumnVisibility.ts',
+            'client/src/pages/factory/wipersreentry/printUtils.ts',
+            'client/src/pages/factory/factorystatusbuilder/components/StatusHistoryPanel.tsx',
+            'client/src/pages/factory/factorystatusbuilder/components/DeleteConfirmationDialog.tsx',
+          ];
+          for (const file of newFiles) {
+            const count = lines(file);
+            if (count > softMax) throw new Error(`${file} exceeds ${softMax} lines (${count})`);
+          }
+
+          const remaining = Object.keys(config.repositoryScan.grandfathered);
+          let excess = 0;
+          for (const file of remaining) {
+            const count = lines(file);
+            if (count <= softMax) throw new Error(`${file} is stale grandfathering at ${count} lines`);
+            excess += count - softMax;
+          }
+          const backlogFiles = remaining.length;
+          console.log(`WAVE2_BACKLOG files=${backlogFiles} excess=${excess}`);
+          if (backlogFiles !== 16) throw new Error(`Expected 16 remaining God Files, got ${backlogFiles}`);
+
+          let boundaryTest = read('tests/god-file-boundaries.test.ts');
+          boundaryTest = boundaryTest.replace('expect(report.version).toBe(26);', 'expect(report.version).toBe(27);');
+          boundaryTest = boundaryTest.replace(/expect\(report\.summary\.grandfatheredFiles\)\.toBeLessThanOrEqual\(\d+\);/, `expect(report.summary.grandfatheredFiles).toBeLessThanOrEqual(${backlogFiles});`);
+          boundaryTest = boundaryTest.replace(/expect\(report\.summary\.grandfatheredExcessLines\)\.toBeLessThanOrEqual\(\d+\);/, `expect(report.summary.grandfatheredExcessLines).toBeLessThanOrEqual(${excess});`);
+          write('tests/god-file-boundaries.test.ts', boundaryTest);
+
+          let godDoc = read('docs/god-file-split-program.md');
+          godDoc = godDoc.replace(/\*\*Backlog: [\d,]+ files, [\d,]+ lines over the limit\*\*/, `**Backlog: ${backlogFiles.toLocaleString('en-US')} files, ${excess.toLocaleString('en-US')} lines over the limit**`);
+          write('docs/god-file-split-program.md', godDoc);
+
+          let qualityDoc = read('docs/system-quality-program.md');
+          qualityDoc = qualityDoc.replace(/God-file backlog \| [\d,]+ files, [\d,]+ excess lines/, `God-file backlog | ${backlogFiles.toLocaleString('en-US')} files, ${excess.toLocaleString('en-US')} excess lines`);
+          write('docs/system-quality-program.md', qualityDoc);
+          NODE
+      - name: Format and certify Wave 2
+        shell: bash
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            client/src/pages/factory/FactoryDispatchBatchDetail.tsx \
+            client/src/pages/factory/factorydispatchbatchdetail/types.ts \
+            client/src/pages/factory/FactoryShippingContainers.tsx \
+            client/src/pages/factory/factoryshippingcontainers/hooks/useShippingColumnVisibility.ts \
+            client/src/pages/factory/WipersReEntry.tsx \
+            client/src/pages/factory/wipersreentry/printUtils.ts \
+            client/src/pages/factory/FactoryStatusBuilder.tsx \
+            client/src/pages/factory/factorystatusbuilder/types.ts \
+            client/src/pages/factory/factorystatusbuilder/components/StatusHistoryPanel.tsx \
+            client/src/pages/factory/factorystatusbuilder/components/DeleteConfirmationDialog.tsx \
+            config/god-file-boundaries.json \
+            tests/god-file-boundaries.test.ts \
+            docs/god-file-split-program.md \
+            docs/system-quality-program.md
+          npm run audit:god-files
+          npm run audit:doc-index
+          npm run check
+          node node_modules/prettier/bin/prettier.cjs --check \
+            client/src/pages/factory/FactoryDispatchBatchDetail.tsx \
+            client/src/pages/factory/FactoryShippingContainers.tsx \
+            client/src/pages/factory/WipersReEntry.tsx \
+            client/src/pages/factory/FactoryStatusBuilder.tsx
+      - name: Publish cumulative Wave 2 branch and self-remove
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/god-files-wave2-publisher.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'refactor(god-files): complete cumulative Wave 2 factory UI splits'
+          git push origin HEAD:agent/god-files-final-wave1-tests
+          git push origin --delete tmp/god-files-wave2-trigger || true
