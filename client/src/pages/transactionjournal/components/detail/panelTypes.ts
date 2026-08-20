@@ -6,8 +6,8 @@
  * built, kept identical so amounts and quantities render unchanged.
  */
 export interface DetailPanelFormatters {
-  fmt: (v: any) => string;
-  fmtNum: (v: any) => string;
+  fmt: (v: unknown) => string;
+  fmtNum: (v: unknown) => string;
 }
 
 export function createDetailFormatters(formatCashAmount: (n: number) => string): DetailPanelFormatters {

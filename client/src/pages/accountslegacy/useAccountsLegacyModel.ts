@@ -221,7 +221,7 @@ export function useAccountsLegacyModel() {
   });
 
   const updateBankMutation = useMutation({
-    mutationFn: async (data: { id: number; [key: string]: any }) => {
+    mutationFn: async (data: { id: number; [key: string]: unknown }) => {
       const { id, ...rest } = data;
       const res = await apiRequest("PUT", `/api/bank-accounts/${id}`, rest);
       if (!res.ok) {
