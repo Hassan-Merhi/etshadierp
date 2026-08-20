@@ -21,7 +21,7 @@ describe("Phase 6 post-offload safety and repair", () => {
   });
 
   it("binds a short-lived approval to company, user, release, algorithm, state, scope, and row count", () => {
-    const service = read("server/services/factory/postOffloadPhase6Safety.ts");
+    const service = read("server/services/factory/postOffloadPhase6SafetyImpl.ts");
 
     for (const field of [
       "companyId",
@@ -45,7 +45,7 @@ describe("Phase 6 post-offload safety and repair", () => {
   });
 
   it("uses the existing exact replay engine with one-use token, exact undo, and atomic apply audit", () => {
-    const service = read("server/services/factory/postOffloadPhase6Safety.ts");
+    const service = read("server/services/factory/postOffloadPhase6SafetyImpl.ts");
     const exactApply = read("server/services/factory/historical-replay/exactApplyFinal.ts");
 
     expect(service).toContain("applyHistoricalCostReplay({");
@@ -80,7 +80,7 @@ describe("Phase 6 post-offload safety and repair", () => {
   });
 
   it("includes completed batches but always excludes finalized and sold bales from automatic repair", () => {
-    const service = read("server/services/factory/postOffloadPhase6Safety.ts");
+    const service = read("server/services/factory/postOffloadPhase6SafetyImpl.ts");
 
     expect(service).toContain("const INCLUDE_COMPLETED_BATCHES = true");
     expect(service).toContain("const INCLUDE_FINALIZED_BALES = false");
@@ -90,7 +90,7 @@ describe("Phase 6 post-offload safety and repair", () => {
   });
 
   it("diagnoses accounting, FX, reversal, raw-stock, safety, schema, and production control state", () => {
-    const service = read("server/services/factory/postOffloadPhase6Safety.ts");
+    const service = read("server/services/factory/postOffloadPhase6SafetyImpl.ts");
 
     expect(service).toContain("unresolved_fx_charges");
     expect(service).toContain("missing_daybook_links");
@@ -107,7 +107,7 @@ describe("Phase 6 post-offload safety and repair", () => {
   });
 
   it("does not introduce quantity, payment, customer balance, or finalized-bale writes", () => {
-    const service = read("server/services/factory/postOffloadPhase6Safety.ts");
+    const service = read("server/services/factory/postOffloadPhase6SafetyImpl.ts");
 
     expect(service).not.toMatch(/SET\s+received_kg\s*=/i);
     expect(service).not.toMatch(/SET\s+used_kg\s*=/i);
