@@ -48,6 +48,20 @@ jobs:
           base=$(git rev-parse HEAD)
           python3 - <<'PY'
           from pathlib import Path
+
+          declaration = Path('server/types/bwip-js.d.ts')
+          declaration.parent.mkdir(parents=True, exist_ok=True)
+          declaration.write_text('''declare module "bwip-js" {
+            export interface ToBufferOptions {
+              bcid: string;
+              text: string;
+              [key: string]: string | number | boolean | undefined;
+            }
+
+            export function toBuffer(options: ToBufferOptions): Promise<Buffer>;
+          }
+          ''')
+
           for name in ['server/routes/baleRoutes.ts','server/routes/productionBaleRoutes.ts']:
               p=Path(name); s=p.read_text()
               s=s.replace('let _bwipjs: null = null;\nasync function getBwipjs(): Promise<unknown> {', 'type BwipJsModule = typeof import("bwip-js");\nlet _bwipjs: BwipJsModule | null = null;\nasync function getBwipjs(): Promise<BwipJsModule> {')
@@ -55,6 +69,7 @@ jobs:
               s=s.replace('    // @ts-ignore - bwip-js types are incomplete\n', '')
               p.write_text(s)
           PY
+          node node_modules/prettier/bin/prettier.cjs --write server/routes/baleRoutes.ts server/routes/productionBaleRoutes.ts server/types/bwip-js.d.ts
           set +e; npm run check >/tmp/check.log 2>&1; rc=$?; set -e
           if [ "$rc" -ne 0 ]; then
             cat /tmp/check.log
@@ -70,7 +85,7 @@ jobs:
             echo "Phase 8 did not improve safely: suppressions $before_sup->$after_sup total $before_total->$after_total"
             exit 1
           fi
-          git add server/routes/baleRoutes.ts server/routes/productionBaleRoutes.ts
+          git add server/routes/baleRoutes.ts server/routes/productionBaleRoutes.ts server/types/bwip-js.d.ts
           git commit -m 'refactor: remove Phase 8 bwip-js suppressions [phase18-phase8] [skip ci]'
           git push origin HEAD:agent/phase18-wave2-remaining-current
           audit /tmp/final.json
