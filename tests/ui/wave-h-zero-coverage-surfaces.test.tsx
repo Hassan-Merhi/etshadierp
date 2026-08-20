@@ -135,12 +135,7 @@ describe("Wave H zero-coverage production surfaces", () => {
     ];
 
     renderWithProviders(
-      <CreateProformaV5Drawer
-        open
-        onClose={vi.fn()}
-        onSuccess={vi.fn()}
-        articleRows={articleRows}
-      />
+      <CreateProformaV5Drawer open onClose={vi.fn()} onSuccess={vi.fn()} articleRows={articleRows} />
     );
 
     expect(await screen.findByTestId("dialog-create-proforma-v5")).toBeInTheDocument();
