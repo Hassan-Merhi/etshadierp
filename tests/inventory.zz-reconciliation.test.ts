@@ -24,14 +24,10 @@ async function loginAsTestUser() {
   });
 
   if (loginRes.status !== 200) {
-    throw new Error(
-      `Login failed: ${loginRes.status} ${JSON.stringify(loginRes.body)}`,
-    );
+    throw new Error(`Login failed: ${loginRes.status} ${JSON.stringify(loginRes.body)}`);
   }
 
-  const switchRes = await agent
-    .post("/api/auth/set-company")
-    .send({ companyId: ctx.companyId });
+  const switchRes = await agent.post("/api/auth/set-company").send({ companyId: ctx.companyId });
 
   if (switchRes.status !== 200) {
     console.warn("Switch company response:", switchRes.status, switchRes.body);
@@ -107,9 +103,7 @@ describe("Inventory Reconciliation Endpoint Tests", () => {
     expect(res.body.summary).toBeDefined();
     expect(res.body.summary.totalRecords).toBeGreaterThan(0);
 
-    const criticalOrError = res.body.issues.filter(
-      (i: any) => i.severity === "critical" || i.severity === "error",
-    );
+    const criticalOrError = res.body.issues.filter((i: any) => i.severity === "critical" || i.severity === "error");
     expect(criticalOrError.length).toBe(0);
   });
 
@@ -118,18 +112,13 @@ describe("Inventory Reconciliation Endpoint Tests", () => {
       .update(schema.inventory)
       .set({ totalValue: "9999.99" })
       .where(
-        and(
-          eq(schema.inventory.locationId, ctx.locationId),
-          eq(schema.inventory.stockItemId, ctx.stockItemIds[0]),
-        ),
+        and(eq(schema.inventory.locationId, ctx.locationId), eq(schema.inventory.stockItemId, ctx.stockItemIds[0]))
       );
 
     const res = await agent.get("/api/inventory/reconcile");
 
     expect(res.status).toBe(200);
-    const valueMismatches = res.body.issues.filter(
-      (i: any) => i.type === "value_mismatch",
-    );
+    const valueMismatches = res.body.issues.filter((i: any) => i.type === "value_mismatch");
     expect(valueMismatches.length).toBeGreaterThan(0);
     expect(valueMismatches[0].severity).toBe("error");
   });
@@ -139,18 +128,13 @@ describe("Inventory Reconciliation Endpoint Tests", () => {
       .update(schema.inventory)
       .set({ quantity: "-10.000", totalValue: "-100.00" })
       .where(
-        and(
-          eq(schema.inventory.locationId, ctx.locationId),
-          eq(schema.inventory.stockItemId, ctx.stockItemIds[0]),
-        ),
+        and(eq(schema.inventory.locationId, ctx.locationId), eq(schema.inventory.stockItemId, ctx.stockItemIds[0]))
       );
 
     const res = await agent.get("/api/inventory/reconcile");
 
     expect(res.status).toBe(200);
-    const negIssues = res.body.issues.filter(
-      (i: any) => i.type === "negative_inventory",
-    );
+    const negIssues = res.body.issues.filter((i: any) => i.type === "negative_inventory");
     expect(negIssues.length).toBeGreaterThan(0);
     expect(negIssues[0].severity).toBe("info");
   });
@@ -160,18 +144,13 @@ describe("Inventory Reconciliation Endpoint Tests", () => {
       .update(schema.inventory)
       .set({ quantity: "0.000", totalValue: "50.00" })
       .where(
-        and(
-          eq(schema.inventory.locationId, ctx.locationId),
-          eq(schema.inventory.stockItemId, ctx.stockItemIds[1]),
-        ),
+        and(eq(schema.inventory.locationId, ctx.locationId), eq(schema.inventory.stockItemId, ctx.stockItemIds[1]))
       );
 
     const res = await agent.get("/api/inventory/reconcile");
 
     expect(res.status).toBe(200);
-    const zeroQtyIssues = res.body.issues.filter(
-      (i: any) => i.type === "zero_qty_nonzero_value",
-    );
+    const zeroQtyIssues = res.body.issues.filter((i: any) => i.type === "zero_qty_nonzero_value");
     expect(zeroQtyIssues.length).toBeGreaterThan(0);
   });
 
@@ -194,9 +173,7 @@ describe("POS Sale Edit Tests", () => {
   it("should reverse old sale and apply new quantities when editing", async () => {
     const saleRes = await agent.post("/api/pos/sales").send({
       locationId: ctx.locationId,
-      items: [
-        { stockItemId: ctx.stockItemIds[0], quantity: 5, rate: 15 },
-      ],
+      items: [{ stockItemId: ctx.stockItemIds[0], quantity: 5, rate: 15 }],
       paymentAccountType: "ledger",
       paymentAccountId: ctx.cashAccountId,
       voucherDate: new Date().toISOString().split("T")[0],
@@ -212,9 +189,7 @@ describe("POS Sale Edit Tests", () => {
     expect(voucherId).toBeDefined();
 
     const editRes = await agent.put(`/api/vouchers/${voucherId}/sales`).send({
-      items: [
-        { stockItemId: ctx.stockItemIds[0], quantity: 3, sellingPrice: 20 },
-      ],
+      items: [{ stockItemId: ctx.stockItemIds[0], quantity: 3, sellingPrice: 20 }],
       paymentAccountType: "ledger",
       paymentAccountId: ctx.cashAccountId,
       voucherDate: new Date().toISOString().split("T")[0],
@@ -230,9 +205,7 @@ describe("POS Sale Edit Tests", () => {
   it("should handle item swap during sale edit", async () => {
     const saleRes = await agent.post("/api/pos/sales").send({
       locationId: ctx.locationId,
-      items: [
-        { stockItemId: ctx.stockItemIds[0], quantity: 5, rate: 15 },
-      ],
+      items: [{ stockItemId: ctx.stockItemIds[0], quantity: 5, rate: 15 }],
       paymentAccountType: "ledger",
       paymentAccountId: ctx.cashAccountId,
       voucherDate: new Date().toISOString().split("T")[0],
@@ -248,9 +221,7 @@ describe("POS Sale Edit Tests", () => {
     expect(afterSaleQty0).toBe(95);
 
     const editRes = await agent.put(`/api/vouchers/${voucherId}/sales`).send({
-      items: [
-        { stockItemId: ctx.stockItemIds[1], quantity: 3, sellingPrice: 20 },
-      ],
+      items: [{ stockItemId: ctx.stockItemIds[1], quantity: 3, sellingPrice: 20 }],
       paymentAccountType: "ledger",
       paymentAccountId: ctx.cashAccountId,
       voucherDate: new Date().toISOString().split("T")[0],
@@ -306,9 +277,7 @@ describe("Stock Transfer Edit Tests", () => {
 
     const itemId = transferItems[0].id;
 
-    const patchRes = await agent
-      .patch(`/api/stock-transfer-items/${itemId}`)
-      .send({ quantity: "15" });
+    const patchRes = await agent.patch(`/api/stock-transfer-items/${itemId}`).send({ quantity: "15" });
 
     expect(patchRes.status).toBeLessThan(500);
   });
@@ -316,33 +285,25 @@ describe("Stock Transfer Edit Tests", () => {
 
 describe("Edit Transaction Endpoint Tests", () => {
   it("should validate numeric fields in stock transfer item patch", async () => {
-    const res = await agent
-      .patch("/api/stock-transfer-items/99999")
-      .send({ quantity: "abc" });
+    const res = await agent.patch("/api/stock-transfer-items/99999").send({ quantity: "abc" });
 
     expect(res.status).toBe(400);
   });
 
   it("should validate numeric fields in stock adjustment item patch", async () => {
-    const res = await agent
-      .patch("/api/stock-adjustment-items/99999")
-      .send({ quantity: "abc" });
+    const res = await agent.patch("/api/stock-adjustment-items/99999").send({ quantity: "abc" });
 
     expect(res.status).toBe(400);
   });
 
   it("should reject invalid item ID in transfer item patch", async () => {
-    const res = await agent
-      .patch("/api/stock-transfer-items/notanumber")
-      .send({ quantity: "10" });
+    const res = await agent.patch("/api/stock-transfer-items/notanumber").send({ quantity: "10" });
 
     expect(res.status).toBe(400);
   });
 
   it("should reject invalid item ID in adjustment item patch", async () => {
-    const res = await agent
-      .patch("/api/stock-adjustment-items/notanumber")
-      .send({ quantity: "10" });
+    const res = await agent.patch("/api/stock-adjustment-items/notanumber").send({ quantity: "10" });
 
     expect(res.status).toBe(400);
   });
@@ -417,39 +378,27 @@ describe("Container Offload Inventory Tests", () => {
     await db
       .delete(schema.containerOffloadItems)
       .where(
-        sql`${schema.containerOffloadItems.offloadId} IN (SELECT id FROM container_offloads WHERE container_id = ${data.container.id})`,
+        sql`${schema.containerOffloadItems.offloadId} IN (SELECT id FROM container_offloads WHERE container_id = ${data.container.id})`
       );
-    await db
-      .delete(schema.containerOffloads)
-      .where(eq(schema.containerOffloads.containerId, data.container.id));
-    await db
-      .delete(schema.poLineItems)
-      .where(eq(schema.poLineItems.poId, data.po.id));
-    await db
-      .delete(schema.purchaseOrders)
-      .where(eq(schema.purchaseOrders.id, data.po.id));
-    await db
-      .delete(schema.containers)
-      .where(eq(schema.containers.id, data.container.id));
-    await db
-      .delete(schema.suppliers)
-      .where(eq(schema.suppliers.id, data.supplier.id));
+    await db.delete(schema.containerOffloads).where(eq(schema.containerOffloads.containerId, data.container.id));
+    await db.delete(schema.poLineItems).where(eq(schema.poLineItems.poId, data.po.id));
+    await db.delete(schema.purchaseOrders).where(eq(schema.purchaseOrders.id, data.po.id));
+    await db.delete(schema.containers).where(eq(schema.containers.id, data.container.id));
+    await db.delete(schema.suppliers).where(eq(schema.suppliers.id, data.supplier.id));
   }
 
   it("should add inventory when offloading a container", async () => {
     const containerData = await setupContainerData();
 
     try {
-      const res = await agent
-        .post(`/api/containers/${containerData.container.id}/offload`)
-        .send({
-          locationId: ctx.locationId,
-          offloadDate: "2026-02-06",
-          duties: "0",
-          officeCharges: "0",
-          transferCharges: "0",
-          transportFees: "0",
-        });
+      const res = await agent.post(`/api/containers/${containerData.container.id}/offload`).send({
+        locationId: ctx.locationId,
+        offloadDate: "2026-02-06",
+        duties: "0",
+        officeCharges: "0",
+        transferCharges: "0",
+        transportFees: "0",
+      });
 
       expect(res.status).toBeGreaterThanOrEqual(200);
       expect(res.status).toBeLessThan(300);
@@ -467,16 +416,14 @@ describe("Container Offload Inventory Tests", () => {
     const containerData = await setupContainerData();
 
     try {
-      const offloadRes = await agent
-        .post(`/api/containers/${containerData.container.id}/offload`)
-        .send({
-          locationId: ctx.locationId,
-          offloadDate: "2026-02-06",
-          duties: "0",
-          officeCharges: "0",
-          transferCharges: "0",
-          transportFees: "0",
-        });
+      const offloadRes = await agent.post(`/api/containers/${containerData.container.id}/offload`).send({
+        locationId: ctx.locationId,
+        offloadDate: "2026-02-06",
+        duties: "0",
+        officeCharges: "0",
+        transferCharges: "0",
+        transportFees: "0",
+      });
 
       expect(offloadRes.status).toBeGreaterThanOrEqual(200);
       expect(offloadRes.status).toBeLessThan(300);
@@ -484,16 +431,14 @@ describe("Container Offload Inventory Tests", () => {
       const qty0AfterFirstOffload = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
       expect(qty0AfterFirstOffload).toBe(120);
 
-      const reOffloadRes = await agent
-        .post(`/api/containers/${containerData.container.id}/offload`)
-        .send({
-          locationId: ctx.location2Id,
-          offloadDate: "2026-02-06",
-          duties: "0",
-          officeCharges: "0",
-          transferCharges: "0",
-          transportFees: "0",
-        });
+      const reOffloadRes = await agent.post(`/api/containers/${containerData.container.id}/offload`).send({
+        locationId: ctx.location2Id,
+        offloadDate: "2026-02-06",
+        duties: "0",
+        officeCharges: "0",
+        transferCharges: "0",
+        transportFees: "0",
+      });
 
       expect(reOffloadRes.status).toBeLessThan(500);
 
@@ -527,19 +472,15 @@ describe("Concurrency Tests", () => {
     const concurrentSales = Array.from({ length: NUM_CONCURRENT }, () =>
       agent.post("/api/pos/sales").send({
         locationId: ctx.locationId,
-        items: [
-          { stockItemId: ctx.stockItemIds[0], quantity: QTY_PER_SALE, rate: 15 },
-        ],
+        items: [{ stockItemId: ctx.stockItemIds[0], quantity: QTY_PER_SALE, rate: 15 }],
         paymentAccountType: "ledger",
         paymentAccountId: ctx.cashAccountId,
         voucherDate: new Date().toISOString().split("T")[0],
-      }),
+      })
     );
 
     const results = await Promise.all(concurrentSales);
-    const successCount = results.filter(
-      (r) => r.status === 200 || r.status === 201,
-    ).length;
+    const successCount = results.filter((r) => r.status === 200 || r.status === 201).length;
 
     expect(successCount).toBe(NUM_CONCURRENT);
 
@@ -567,7 +508,7 @@ describe("Concurrency Tests", () => {
         locationId: ctx.locationId,
         quantity: QTY_PER_ADJUST,
         type: "add",
-      }),
+      })
     );
 
     const results = await Promise.all(concurrentAdjustments);

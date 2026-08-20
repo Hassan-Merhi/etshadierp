@@ -28,63 +28,58 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import ExcelJS from "exceljs";
-import {
-  seedTestData,
-  cleanupTestData,
-  closeTestServer,
-  type TestContext,
-} from "./setup";
+import { seedTestData, cleanupTestData, closeTestServer, type TestContext } from "./setup";
 import { pool } from "../server/db";
 import { generateSpSalesFormExcelV2 } from "../server/services/spSalesFormExportV2";
 import { calculateHistoricalLocationInventory } from "../server/routes/helpers/inventoryHistoryHelpers";
 
 const TEST_PREFIX = "xlsxv2p3";
-const FROM  = "2026-07-01";
-const TO    = "2026-07-07";
+const FROM = "2026-07-01";
+const TO = "2026-07-07";
 const DAY_COUNT = 7; // Jul 1–7
 
 // ENTRY sheet constants (mirrors spSalesFormExportV2.ts)
 // A=RowNum, B=Group, C=ItemName, D=Code, E=OpenQty, F=Cost/Bag
-const FIXED_LEFT   = 6;  // cols 1-6: RowNum, Group, Name, Code, OpenQty, Cost/Bag
+const FIXED_LEFT = 6; // cols 1-6: RowNum, Group, Name, Code, OpenQty, Cost/Bag
 const COLS_PER_DAY = 3;
-const E_GROUP_COL     = 2;  // B
-const E_ITEM_NAME_COL = 3;  // C
-const E_ITEM_CODE_COL = 4;  // D
-const E_OPEN_QTY_COL  = 5;  // E
-const E_COST_BAG_COL  = 6;  // F
-const E_DATE_START    = FIXED_LEFT + 1;  // 7 — first Qty column for day 0
-const CLOSE_QTY_COL   = FIXED_LEFT + 1 + DAY_COUNT * COLS_PER_DAY; // 28
-const CLOSE_VAL_COL   = CLOSE_QTY_COL + 1; // 29
+const E_GROUP_COL = 2; // B
+const E_ITEM_NAME_COL = 3; // C
+const E_ITEM_CODE_COL = 4; // D
+const E_OPEN_QTY_COL = 5; // E
+const E_COST_BAG_COL = 6; // F
+const E_DATE_START = FIXED_LEFT + 1; // 7 — first Qty column for day 0
+const CLOSE_QTY_COL = FIXED_LEFT + 1 + DAY_COUNT * COLS_PER_DAY; // 28
+const CLOSE_VAL_COL = CLOSE_QTY_COL + 1; // 29
 
 // With 3 items + 1 group, the row layout is:
 // Row 4: item1, Row 5: item2, Row 6: item3
 // Row 7: subtotal, Row 8: TOTAL
 const E_DATA_ROW_START = 4;
-const ITEM_COUNT       = 3;
-const E_SUBTOTAL_ROW   = E_DATA_ROW_START + ITEM_COUNT;      // 7
-const E_TOTAL_ROW      = E_SUBTOTAL_ROW + 1;                  // 8
+const ITEM_COUNT = 3;
+const E_SUBTOTAL_ROW = E_DATA_ROW_START + ITEM_COUNT; // 7
+const E_TOTAL_ROW = E_SUBTOTAL_ROW + 1; // 8
 // Cash section (totalRow + 2 gap)
-const E_CASH_HDR_ROW   = E_TOTAL_ROW + 2;                     // 10
-const E_CASH_SUBHDR    = E_CASH_HDR_ROW + 1;                  // 11
-const E_OPEN_CASH_ROW  = E_CASH_SUBHDR + 1;                   // 12
-const E_DEPOSIT_ROW    = E_OPEN_CASH_ROW + 1;                 // 13
-const E_RECEIPT_ROW    = E_DEPOSIT_ROW + 1;                    // 14
-const E_PAYMENTS_ROW   = E_RECEIPT_ROW + 2;                   // 16
+const E_CASH_HDR_ROW = E_TOTAL_ROW + 2; // 10
+const E_CASH_SUBHDR = E_CASH_HDR_ROW + 1; // 11
+const E_OPEN_CASH_ROW = E_CASH_SUBHDR + 1; // 12
+const E_DEPOSIT_ROW = E_OPEN_CASH_ROW + 1; // 13
+const E_RECEIPT_ROW = E_DEPOSIT_ROW + 1; // 14
+const E_PAYMENTS_ROW = E_RECEIPT_ROW + 2; // 16
 const NUM_PAYMENT_ROWS = 10;
-const E_PAY_FIRST_ROW  = E_PAYMENTS_ROW + 1;                  // 17
-const E_PAY_LAST_ROW   = E_PAYMENTS_ROW + NUM_PAYMENT_ROWS;   // 26
-const E_TOTAL_PAY_ROW  = E_PAY_LAST_ROW + 1;                  // 27
-const E_BALANCE_ROW    = E_TOTAL_PAY_ROW + 1;                 // 28
+const E_PAY_FIRST_ROW = E_PAYMENTS_ROW + 1; // 17
+const E_PAY_LAST_ROW = E_PAYMENTS_ROW + NUM_PAYMENT_ROWS; // 26
+const E_TOTAL_PAY_ROW = E_PAY_LAST_ROW + 1; // 27
+const E_BALANCE_ROW = E_TOTAL_PAY_ROW + 1; // 28
 
 // Sales sheet constants
 const S_ITEM_NAME_COL = 3;
-const S_DATE_START    = 4;
+const S_DATE_START = 4;
 
 let ctx: TestContext;
 let buf: Buffer;
-let wb:  ExcelJS.Workbook;
+let wb: ExcelJS.Workbook;
 
-let expectedOpenQtyItem1  = 0;
+let expectedOpenQtyItem1 = 0;
 let expectedCloseQtyItem1 = 0;
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -151,79 +146,87 @@ beforeAll(async () => {
   const [item1Id, item2Id, item3Id] = stockItemIds;
 
   // 1. Valid Sales voucher: Jul 3, item1, qty=10, totalSales=120, totalCost=100
-  const { rows: [v1] } = await pool.query<{ id: number }>(
+  const {
+    rows: [v1],
+  } = await pool.query<{ id: number }>(
     `INSERT INTO vouchers
        (company_id, location_id, voucher_type, voucher_date, description,
         optional, voucher_number, total_amount)
      VALUES ($1, $2, 'Sales', '2026-07-03', 'V2 test valid sale',
              false, 'V2-001', 120.00)
      RETURNING id`,
-    [companyId, locationId],
+    [companyId, locationId]
   );
   await pool.query(
     `INSERT INTO sales_items
        (voucher_id, stock_item_id, quantity, selling_price, cost_price, total_sales, total_cost, profit)
      VALUES ($1, $2, 10, 12.00, 10.00, 120.00, 100.00, 20.00)`,
-    [v1.id, item1Id],
+    [v1.id, item1Id]
   );
 
   // 2. Deleted Sales voucher: Jul 2, item2, qty=5 → must be excluded
-  const { rows: [v2] } = await pool.query<{ id: number }>(
+  const {
+    rows: [v2],
+  } = await pool.query<{ id: number }>(
     `INSERT INTO vouchers
        (company_id, location_id, voucher_type, voucher_date, description,
         optional, voucher_number, total_amount, deleted_at)
      VALUES ($1, $2, 'Sales', '2026-07-02', 'V2 test deleted sale',
              false, 'V2-002', 60.00, NOW())
      RETURNING id`,
-    [companyId, locationId],
+    [companyId, locationId]
   );
   await pool.query(
     `INSERT INTO sales_items
        (voucher_id, stock_item_id, quantity, selling_price, cost_price, total_sales, total_cost, profit)
      VALUES ($1, $2, 5, 12.00, 10.00, 60.00, 50.00, 10.00)`,
-    [v2.id, item2Id],
+    [v2.id, item2Id]
   );
 
   // 3. Optional Sales voucher: Jul 4, item2, qty=7 → must be excluded
-  const { rows: [v3] } = await pool.query<{ id: number }>(
+  const {
+    rows: [v3],
+  } = await pool.query<{ id: number }>(
     `INSERT INTO vouchers
        (company_id, location_id, voucher_type, voucher_date, description,
         optional, voucher_number, total_amount)
      VALUES ($1, $2, 'Sales', '2026-07-04', 'V2 test optional sale',
              true, 'V2-003', 84.00)
      RETURNING id`,
-    [companyId, locationId],
+    [companyId, locationId]
   );
   await pool.query(
     `INSERT INTO sales_items
        (voucher_id, stock_item_id, quantity, selling_price, cost_price, total_sales, total_cost, profit)
      VALUES ($1, $2, 7, 12.00, 10.00, 84.00, 70.00, 14.00)`,
-    [v3.id, item2Id],
+    [v3.id, item2Id]
   );
 
   // 4. Wrong-type (Journal) voucher: Jul 5, item3, qty=3 → must be excluded
-  const { rows: [v4] } = await pool.query<{ id: number }>(
+  const {
+    rows: [v4],
+  } = await pool.query<{ id: number }>(
     `INSERT INTO vouchers
        (company_id, location_id, voucher_type, voucher_date, description,
         optional, voucher_number, total_amount)
      VALUES ($1, $2, 'Journal', '2026-07-05', 'V2 test journal',
              false, 'V2-004', 36.00)
      RETURNING id`,
-    [companyId, locationId],
+    [companyId, locationId]
   );
   await pool.query(
     `INSERT INTO sales_items
        (voucher_id, stock_item_id, quantity, selling_price, cost_price, total_sales, total_cost, profit)
      VALUES ($1, $2, 3, 12.00, 10.00, 36.00, 30.00, 6.00)`,
-    [v4.id, item3Id],
+    [v4.id, item3Id]
   );
 
   // Derive expected opening/closing from inventory helper
-  const openRows  = await calculateHistoricalLocationInventory(locationId, companyId, "2026-06-30");
+  const openRows = await calculateHistoricalLocationInventory(locationId, companyId, "2026-06-30");
   const closeRows = await calculateHistoricalLocationInventory(locationId, companyId, TO);
-  const openEntry  = openRows.find((r) => r.stockItemId === item1Id);
+  const openEntry = openRows.find((r) => r.stockItemId === item1Id);
   const closeEntry = closeRows.find((r) => r.stockItemId === item1Id);
-  expectedOpenQtyItem1  = openEntry  ? parseFloat(String(openEntry.quantity  ?? "0")) : 0;
+  expectedOpenQtyItem1 = openEntry ? parseFloat(String(openEntry.quantity ?? "0")) : 0;
   expectedCloseQtyItem1 = closeEntry ? parseFloat(String(closeEntry.quantity ?? "0")) : 0;
 
   // Generate workbook
@@ -231,7 +234,7 @@ beforeAll(async () => {
     companyId,
     locationId,
     fromDate: FROM,
-    toDate:   TO,
+    toDate: TO,
     locationName: "Test Warehouse",
     supplierName: "V2 Export Test",
   });
@@ -243,12 +246,13 @@ beforeAll(async () => {
 
 afterAll(async () => {
   try {
-    await pool.query(
-      `DELETE FROM sales_items WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = $1)`,
-      [ctx.companyId],
-    );
+    await pool.query(`DELETE FROM sales_items WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = $1)`, [
+      ctx.companyId,
+    ]);
     await pool.query(`DELETE FROM vouchers WHERE company_id = $1`, [ctx.companyId]);
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   await cleanupTestData(TEST_PREFIX);
   closeTestServer();
 }, 30000);
@@ -258,8 +262,8 @@ afterAll(async () => {
 describe("V2 Export — Historical opening cash (cashAccountId)", () => {
   const CASH_PREFIX = "xlsxv2cashtest";
   let cashCtx: TestContext;
-  const BEFORE_BALANCE = 500;  // posted before fromDate (2026-07-01) → must be picked up
-  const AFTER_DELTA    = 9999; // posted after fromDate → must NOT affect opening cash
+  const BEFORE_BALANCE = 500; // posted before fromDate (2026-07-01) → must be picked up
+  const AFTER_DELTA = 9999; // posted after fromDate → must NOT affect opening cash
 
   beforeAll(async () => {
     cashCtx = await seedTestData(CASH_PREFIX);
@@ -267,33 +271,37 @@ describe("V2 Export — Historical opening cash (cashAccountId)", () => {
 
     // Journal dated 2026-06-25 (well before fromDate=2026-07-01): DR cash 500.
     // This must be the balance picked up "as of dayBefore(fromDate)" = Jun 30.
-    const { rows: [vBefore] } = await pool.query<{ id: number }>(
+    const {
+      rows: [vBefore],
+    } = await pool.query<{ id: number }>(
       `INSERT INTO vouchers (company_id, location_id, voucher_type, voucher_date, description, optional, voucher_number, total_amount)
        VALUES ($1, $2, 'Journal', '2026-06-25', 'Cash test: pre-period balance', false, 'CASH-PRE-001', $3)
        RETURNING id`,
-      [companyId, locationId, BEFORE_BALANCE],
+      [companyId, locationId, BEFORE_BALANCE]
     );
     await pool.query(
       `INSERT INTO voucher_entries (voucher_id, ledger_account_id, debit_amount, credit_amount, narration)
        VALUES ($1, $2, $3, 0, 'pre-period'),
               ($1, $4, 0, $3, 'pre-period')`,
-      [vBefore.id, cashAccountId, BEFORE_BALANCE, salesAccountId],
+      [vBefore.id, cashAccountId, BEFORE_BALANCE, salesAccountId]
     );
 
     // Journal dated 2026-07-04 (INSIDE the export range, after fromDate):
     // must be excluded from the opening-cash balance — it should only ever
     // show up rolled into a later day's Balance Cash, never Day-1 Opening Cash.
-    const { rows: [vAfter] } = await pool.query<{ id: number }>(
+    const {
+      rows: [vAfter],
+    } = await pool.query<{ id: number }>(
       `INSERT INTO vouchers (company_id, location_id, voucher_type, voucher_date, description, optional, voucher_number, total_amount)
        VALUES ($1, $2, 'Journal', '2026-07-04', 'Cash test: in-period, must be excluded from opening', false, 'CASH-POST-001', $3)
        RETURNING id`,
-      [companyId, locationId, AFTER_DELTA],
+      [companyId, locationId, AFTER_DELTA]
     );
     await pool.query(
       `INSERT INTO voucher_entries (voucher_id, ledger_account_id, debit_amount, credit_amount, narration)
        VALUES ($1, $2, $3, 0, 'in-period'),
               ($1, $4, 0, $3, 'in-period')`,
-      [vAfter.id, cashAccountId, AFTER_DELTA, salesAccountId],
+      [vAfter.id, cashAccountId, AFTER_DELTA, salesAccountId]
     );
   }, 60000);
 
@@ -301,10 +309,12 @@ describe("V2 Export — Historical opening cash (cashAccountId)", () => {
     try {
       await pool.query(
         `DELETE FROM voucher_entries WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = $1)`,
-        [cashCtx.companyId],
+        [cashCtx.companyId]
       );
       await pool.query(`DELETE FROM vouchers WHERE company_id = $1`, [cashCtx.companyId]);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     await cleanupTestData(CASH_PREFIX);
   }, 30000);
 
@@ -338,7 +348,7 @@ describe("V2 Export — Historical opening cash (cashAccountId)", () => {
 // ── 16. Cell protection ────────────────────────────────────────────────────────
 describe("V2 Export — Cell protection", () => {
   it("ENTRY item name cell (col C) for Test Item 1 is locked (not unlocked)", () => {
-    const ws  = wb.getWorksheet("ENTRY")!;
+    const ws = wb.getWorksheet("ENTRY")!;
     const row = findItemRow(ws, "Test Item 1")!;
     const prot = ws.getRow(row).getCell(E_ITEM_NAME_COL).protection;
     // locked: false is the only "unlocked" signal; undefined or true means locked
@@ -346,39 +356,39 @@ describe("V2 Export — Cell protection", () => {
   });
 
   it("ENTRY Cost/Bag cell (col F) is locked", () => {
-    const ws  = wb.getWorksheet("ENTRY")!;
+    const ws = wb.getWorksheet("ENTRY")!;
     const row = findItemRow(ws, "Test Item 1")!;
     const prot = ws.getRow(row).getCell(E_COST_BAG_COL).protection;
     expect(prot?.locked).not.toBe(false);
   });
 
   it("ENTRY Qty cell for Test Item 1 on Jul 3 is UNLOCKED", () => {
-    const ws     = wb.getWorksheet("ENTRY")!;
-    const row    = findItemRow(ws, "Test Item 1")!;
+    const ws = wb.getWorksheet("ENTRY")!;
+    const row = findItemRow(ws, "Test Item 1")!;
     const qtyCol = E_DATE_START + 2 * COLS_PER_DAY; // day 2 Qty
-    const prot   = ws.getRow(row).getCell(qtyCol).protection;
+    const prot = ws.getRow(row).getCell(qtyCol).protection;
     expect(prot?.locked).toBe(false);
   });
 
   it("ENTRY Sale Price cell for Test Item 1 on Jul 3 is UNLOCKED", () => {
-    const ws       = wb.getWorksheet("ENTRY")!;
-    const row      = findItemRow(ws, "Test Item 1")!;
+    const ws = wb.getWorksheet("ENTRY")!;
+    const row = findItemRow(ws, "Test Item 1")!;
     const priceCol = E_DATE_START + 2 * COLS_PER_DAY + 1; // day 2 Sale Price
-    const prot     = ws.getRow(row).getCell(priceCol).protection;
+    const prot = ws.getRow(row).getCell(priceCol).protection;
     expect(prot?.locked).toBe(false);
   });
 
   it("ENTRY Profit/Bag cell is locked (formula cell)", () => {
-    const ws        = wb.getWorksheet("ENTRY")!;
-    const row       = findItemRow(ws, "Test Item 1")!;
+    const ws = wb.getWorksheet("ENTRY")!;
+    const row = findItemRow(ws, "Test Item 1")!;
     const profitCol = E_DATE_START + 2 * COLS_PER_DAY + 2;
-    const prot      = ws.getRow(row).getCell(profitCol).protection;
+    const prot = ws.getRow(row).getCell(profitCol).protection;
     expect(prot?.locked).not.toBe(false);
   });
 
   it("ENTRY Closing Qty cell is locked (formula cell)", () => {
-    const ws   = wb.getWorksheet("ENTRY")!;
-    const row  = findItemRow(ws, "Test Item 1")!;
+    const ws = wb.getWorksheet("ENTRY")!;
+    const row = findItemRow(ws, "Test Item 1")!;
     const prot = ws.getRow(row).getCell(CLOSE_QTY_COL).protection;
     expect(prot?.locked).not.toBe(false);
   });
@@ -387,10 +397,10 @@ describe("V2 Export — Cell protection", () => {
 // ── 17. Number formats ────────────────────────────────────────────────────────
 describe("V2 Export — Number formats", () => {
   it("ENTRY Qty cell format is #,##0 (whole units — no decimals)", () => {
-    const ws     = wb.getWorksheet("ENTRY")!;
-    const row    = findItemRow(ws, "Test Item 1")!;
+    const ws = wb.getWorksheet("ENTRY")!;
+    const row = findItemRow(ws, "Test Item 1")!;
     const qtyCol = E_DATE_START + 2 * COLS_PER_DAY; // Jul 3 — has a value
-    const fmt    = ws.getRow(row).getCell(qtyCol).numFmt ?? "";
+    const fmt = ws.getRow(row).getCell(qtyCol).numFmt ?? "";
     // Must be the whole-unit format with no decimal places
     expect(fmt).toBe("#,##0");
     expect(fmt).not.toBe("#,##0.00");
@@ -399,7 +409,7 @@ describe("V2 Export — Number formats", () => {
   });
 
   it("ENTRY Cost/Bag cell format includes a dollar sign and no decimals", () => {
-    const ws  = wb.getWorksheet("ENTRY")!;
+    const ws = wb.getWorksheet("ENTRY")!;
     const row = findItemRow(ws, "Test Item 1")!;
     const fmt = ws.getRow(row).getCell(E_COST_BAG_COL).numFmt ?? "";
     expect(fmt).toMatch(/\$/);
@@ -409,10 +419,10 @@ describe("V2 Export — Number formats", () => {
   });
 
   it("ENTRY Sale Price cell format includes a dollar sign and no decimals", () => {
-    const ws       = wb.getWorksheet("ENTRY")!;
-    const row      = findItemRow(ws, "Test Item 1")!;
+    const ws = wb.getWorksheet("ENTRY")!;
+    const row = findItemRow(ws, "Test Item 1")!;
     const priceCol = E_DATE_START + 2 * COLS_PER_DAY + 1;
-    const fmt      = ws.getRow(row).getCell(priceCol).numFmt ?? "";
+    const fmt = ws.getRow(row).getCell(priceCol).numFmt ?? "";
     expect(fmt).toMatch(/\$/);
     expect(fmt).toBe('"$"#,##0');
     expect(fmt).not.toContain(".00");
@@ -420,10 +430,10 @@ describe("V2 Export — Number formats", () => {
   });
 
   it("ENTRY Profit/Bag cell format includes a dollar sign and no decimals", () => {
-    const ws        = wb.getWorksheet("ENTRY")!;
-    const row       = findItemRow(ws, "Test Item 1")!;
+    const ws = wb.getWorksheet("ENTRY")!;
+    const row = findItemRow(ws, "Test Item 1")!;
     const profitCol = E_DATE_START + 2 * COLS_PER_DAY + 2;
-    const fmt       = ws.getRow(row).getCell(profitCol).numFmt ?? "";
+    const fmt = ws.getRow(row).getCell(profitCol).numFmt ?? "";
     expect(fmt).toMatch(/\$/);
     expect(fmt).toBe('"$"#,##0');
     expect(fmt).not.toContain(".00");
@@ -431,7 +441,7 @@ describe("V2 Export — Number formats", () => {
   });
 
   it("ENTRY Close Value cell format includes a dollar sign and no decimals", () => {
-    const ws  = wb.getWorksheet("ENTRY")!;
+    const ws = wb.getWorksheet("ENTRY")!;
     const row = findItemRow(ws, "Test Item 1")!;
     const fmt = ws.getRow(row).getCell(CLOSE_VAL_COL).numFmt ?? "";
     expect(fmt).toMatch(/\$/);
@@ -440,9 +450,9 @@ describe("V2 Export — Number formats", () => {
   });
 
   it("ENTRY Total Sales / Total Profit (TOTAL row) formats have $ and no decimals", () => {
-    const ws       = wb.getWorksheet("ENTRY")!;
+    const ws = wb.getWorksheet("ENTRY")!;
     const salesCol = E_DATE_START + 1;
-    const fmt      = ws.getRow(E_TOTAL_ROW).getCell(salesCol).numFmt ?? "";
+    const fmt = ws.getRow(E_TOTAL_ROW).getCell(salesCol).numFmt ?? "";
     expect(fmt).toMatch(/\$/);
     expect(fmt).not.toContain(".00");
     expect(fmt).not.toContain(".0000");
@@ -481,13 +491,13 @@ describe("V2 Export — ENTRY structural sanity", () => {
 
   it("ENTRY row 3 (sub-header): has 'Qty' label at day-0 qty column (col 6)", () => {
     const ws = wb.getWorksheet("ENTRY")!;
-    const v  = ws.getRow(3).getCell(E_DATE_START).value;
+    const v = ws.getRow(3).getCell(E_DATE_START).value;
     expect(String(v ?? "").toLowerCase()).toContain("qty");
   });
 
   it("ENTRY row 3: has 'Close Qty' label at closeQtyCol", () => {
     const ws = wb.getWorksheet("ENTRY")!;
-    const v  = ws.getRow(3).getCell(CLOSE_QTY_COL).value;
+    const v = ws.getRow(3).getCell(CLOSE_QTY_COL).value;
     expect(String(v ?? "").toLowerCase()).toContain("close");
   });
 });
@@ -495,7 +505,7 @@ describe("V2 Export — ENTRY structural sanity", () => {
 // ── 19. Group column present in item rows (Phase 15) ───────────────────────────
 describe("V2 Export — Group column present in item rows", () => {
   it("ENTRY col B (col 2) for item row contains the group name", () => {
-    const ws  = wb.getWorksheet("ENTRY")!;
+    const ws = wb.getWorksheet("ENTRY")!;
     const row = findItemRow(ws, "Test Item 1");
     expect(row, "Test Item 1 not found").not.toBeNull();
     const colBVal = ws.getRow(row!).getCell(E_GROUP_COL).value;
@@ -504,7 +514,7 @@ describe("V2 Export — Group column present in item rows", () => {
   });
 
   it("ENTRY col C (col 3) for item row contains the item name", () => {
-    const ws  = wb.getWorksheet("ENTRY")!;
+    const ws = wb.getWorksheet("ENTRY")!;
     const row = findItemRow(ws, "Test Item 1");
     expect(row, "Test Item 1 not found").not.toBeNull();
     const colCVal = ws.getRow(row!).getCell(E_ITEM_NAME_COL).value;
@@ -514,23 +524,34 @@ describe("V2 Export — Group column present in item rows", () => {
 
   it("ENTRY row 3 (sub-header): col 2 label is 'Group'", () => {
     const ws = wb.getWorksheet("ENTRY")!;
-    const v  = String(ws.getRow(3).getCell(E_GROUP_COL).value ?? "").toLowerCase().trim();
+    const v = String(ws.getRow(3).getCell(E_GROUP_COL).value ?? "")
+      .toLowerCase()
+      .trim();
     expect(v).toBe("group");
   });
 
   it("ENTRY row 3 (sub-header): col 3 label is 'Item Name'", () => {
     const ws = wb.getWorksheet("ENTRY")!;
-    const v  = String(ws.getRow(3).getCell(E_ITEM_NAME_COL).value ?? "").toLowerCase().trim();
+    const v = String(ws.getRow(3).getCell(E_ITEM_NAME_COL).value ?? "")
+      .toLowerCase()
+      .trim();
     expect(v).toContain("item name");
   });
 });
 
 // ── 20. Ageing sheet (Phase 15) ─────────────────────────────────────────────────
 describe("V2 Export — Ageing sheet", () => {
-  const AGE_GROUP_COL = 1, AGE_CODE_COL = 2, AGE_NAME_COL = 3,
-        AGE_CQTY_COL = 4, AGE_CVAL_COL = 5,
-        AGE_B1_COL = 6, AGE_B2_COL = 7, AGE_B3_COL = 8, AGE_B4_COL = 9, AGE_B5_COL = 10,
-        AGE_BASIS_COL = 11;
+  const AGE_GROUP_COL = 1,
+    AGE_CODE_COL = 2,
+    AGE_NAME_COL = 3,
+    AGE_CQTY_COL = 4,
+    AGE_CVAL_COL = 5,
+    AGE_B1_COL = 6,
+    AGE_B2_COL = 7,
+    AGE_B3_COL = 8,
+    AGE_B4_COL = 9,
+    AGE_B5_COL = 10,
+    AGE_BASIS_COL = 11;
 
   function findAgeingRow(ws: ExcelJS.Worksheet, itemName: string): number | null {
     for (let r = 2; r <= ws.rowCount; r++) {
@@ -549,7 +570,7 @@ describe("V2 Export — Ageing sheet", () => {
   });
 
   it("Test Item 1 (no seeded offload/transfer movement) falls into the 121+ bucket with a documented fallback basis", () => {
-    const ws  = wb.getWorksheet("Ageing")!;
+    const ws = wb.getWorksheet("Ageing")!;
     const row = findAgeingRow(ws, "Test Item 1");
     expect(row, "Test Item 1 not found in Ageing sheet").not.toBeNull();
     const b5 = ws.getRow(row!).getCell(AGE_B5_COL).value;
@@ -581,7 +602,10 @@ describe("V2 Export — Ageing sheet", () => {
     let totalRow: number | null = null;
     for (let r = 2; r <= ws.rowCount; r++) {
       const v = ws.getRow(r).getCell(AGE_GROUP_COL).value;
-      if (typeof v === "string" && v.trim().toUpperCase() === "TOTAL") { totalRow = r; break; }
+      if (typeof v === "string" && v.trim().toUpperCase() === "TOTAL") {
+        totalRow = r;
+        break;
+      }
     }
     expect(totalRow, "TOTAL row not found in Ageing sheet").not.toBeNull();
     const totalB5 = ws.getRow(totalRow!).getCell(AGE_B5_COL).value as number;
@@ -600,7 +624,7 @@ describe("V2 Export — Avg/Mo Sales formula", () => {
   const AVG_MO_COL = CLOSE_QTY_COL + 2;
 
   it("ENTRY Avg/Mo Sales cell for Test Item 1 is a formula (not a static value)", () => {
-    const ws  = wb.getWorksheet("ENTRY")!;
+    const ws = wb.getWorksheet("ENTRY")!;
     const row = findItemRow(ws, "Test Item 1");
     expect(row, "Test Item 1 not found").not.toBeNull();
     const formula = cellFormula(ws, row!, AVG_MO_COL);
@@ -608,7 +632,7 @@ describe("V2 Export — Avg/Mo Sales formula", () => {
   });
 
   it("ENTRY Avg/Mo Sales formula contains SUM of daily qty cells", () => {
-    const ws  = wb.getWorksheet("ENTRY")!;
+    const ws = wb.getWorksheet("ENTRY")!;
     const row = findItemRow(ws, "Test Item 1");
     expect(row, "Test Item 1 not found").not.toBeNull();
     const formula = cellFormula(ws, row!, AVG_MO_COL);
@@ -616,7 +640,7 @@ describe("V2 Export — Avg/Mo Sales formula", () => {
   });
 
   it("ENTRY Avg/Mo Sales formula uses ROUND(...,0) for whole-unit result", () => {
-    const ws  = wb.getWorksheet("ENTRY")!;
+    const ws = wb.getWorksheet("ENTRY")!;
     const row = findItemRow(ws, "Test Item 1");
     expect(row, "Test Item 1 not found").not.toBeNull();
     const formula = cellFormula(ws, row!, AVG_MO_COL);
@@ -624,7 +648,7 @@ describe("V2 Export — Avg/Mo Sales formula", () => {
   });
 
   it("ENTRY Avg/Mo Sales formula result matches expected monthly average", () => {
-    const ws  = wb.getWorksheet("ENTRY")!;
+    const ws = wb.getWorksheet("ENTRY")!;
     const row = findItemRow(ws, "Test Item 1");
     expect(row, "Test Item 1 not found").not.toBeNull();
     // item1 has 10 qty sold over 7 days → avg monthly = 10/7*30 ≈ 42.86
@@ -645,11 +669,10 @@ describe("V2 Export — Historical opening stock excludes after-cutoff stock adj
 
   afterAll(async () => {
     try {
-      await pool.query(
-        `DELETE FROM vouchers WHERE company_id = $1`,
-        [adjCtx.companyId],
-      );
-    } catch { /* ignore */ }
+      await pool.query(`DELETE FROM vouchers WHERE company_id = $1`, [adjCtx.companyId]);
+    } catch {
+      /* ignore */
+    }
     await cleanupTestData(ADJ_PREFIX);
   }, 30000);
 
@@ -665,26 +688,30 @@ describe("V2 Export — Historical opening stock excludes after-cutoff stock adj
     // removes 30 units. Consumption items are persisted with a NEGATIVE
     // signed quantity (see client/src/pages/vouchers/StockAdjustmentForm.tsx
     // and server/storage/stockOps.ts) — the on-hand qty afterwards is 70.
-    const { rows: [v] } = await pool.query<{ id: number }>(
+    const {
+      rows: [v],
+    } = await pool.query<{ id: number }>(
       `INSERT INTO vouchers (company_id, location_id, voucher_type, voucher_date, description, optional, voucher_number, total_amount)
        VALUES ($1, $2, 'Stock Adjustment', '2026-07-07', 'Adj regression: consumption', false, 'ADJ-CONS-001', 300.00)
        RETURNING id`,
-      [companyId, locationId],
+      [companyId, locationId]
     );
-    const { rows: [av] } = await pool.query<{ id: number }>(
+    const {
+      rows: [av],
+    } = await pool.query<{ id: number }>(
       `INSERT INTO stock_adjustment_vouchers (voucher_id, location_id, adjustment_type)
        VALUES ($1, $2, 'Consumption') RETURNING id`,
-      [v.id, locationId],
+      [v.id, locationId]
     );
     await pool.query(
       `INSERT INTO stock_adjustment_items (adjustment_id, stock_item_id, quantity, rate, total_amount)
        VALUES ($1, $2, -30, 10.00, 300.00)`,
-      [av.id, itemId],
+      [av.id, itemId]
     );
     await pool.query(
       `UPDATE inventory SET quantity = quantity - 30, total_value = total_value - 300
        WHERE company_id = $1 AND location_id = $2 AND stock_item_id = $3`,
-      [companyId, locationId, itemId],
+      [companyId, locationId, itemId]
     );
 
     const after = await calculateHistoricalLocationInventory(locationId, companyId, "2026-06-30");
@@ -705,26 +732,30 @@ describe("V2 Export — Historical opening stock excludes after-cutoff stock adj
 
     // A "Mixed" adjustment dated 2026-07-07 adds 20 units via a production
     // line item (POSITIVE signed quantity). Current on-hand becomes 120.
-    const { rows: [v] } = await pool.query<{ id: number }>(
+    const {
+      rows: [v],
+    } = await pool.query<{ id: number }>(
       `INSERT INTO vouchers (company_id, location_id, voucher_type, voucher_date, description, optional, voucher_number, total_amount)
        VALUES ($1, $2, 'Stock Adjustment', '2026-07-07', 'Adj regression: mixed production', false, 'ADJ-MIX-001', 200.00)
        RETURNING id`,
-      [companyId, locationId],
+      [companyId, locationId]
     );
-    const { rows: [av] } = await pool.query<{ id: number }>(
+    const {
+      rows: [av],
+    } = await pool.query<{ id: number }>(
       `INSERT INTO stock_adjustment_vouchers (voucher_id, location_id, adjustment_type)
        VALUES ($1, $2, 'Mixed') RETURNING id`,
-      [v.id, locationId],
+      [v.id, locationId]
     );
     await pool.query(
       `INSERT INTO stock_adjustment_items (adjustment_id, stock_item_id, quantity, rate, total_amount)
        VALUES ($1, $2, 20, 10.00, 200.00)`,
-      [av.id, itemId],
+      [av.id, itemId]
     );
     await pool.query(
       `UPDATE inventory SET quantity = quantity + 20, total_value = total_value + 200
        WHERE company_id = $1 AND location_id = $2 AND stock_item_id = $3`,
-      [companyId, locationId, itemId],
+      [companyId, locationId, itemId]
     );
 
     const after = await calculateHistoricalLocationInventory(locationId, companyId, "2026-06-30");
@@ -741,26 +772,30 @@ describe("V2 Export — Historical opening stock excludes after-cutoff stock adj
     const itemId = stockItemIds[2]; // seeded qty=100, rate=10, untouched by previous tests
 
     // Consumption of 15 units dated inside the export range (Jul 7), after cutoff.
-    const { rows: [v] } = await pool.query<{ id: number }>(
+    const {
+      rows: [v],
+    } = await pool.query<{ id: number }>(
       `INSERT INTO vouchers (company_id, location_id, voucher_type, voucher_date, description, optional, voucher_number, total_amount)
        VALUES ($1, $2, 'Stock Adjustment', '2026-07-07', 'Adj regression: all-locations', false, 'ADJ-ALL-001', 150.00)
        RETURNING id`,
-      [companyId, locationId],
+      [companyId, locationId]
     );
-    const { rows: [av] } = await pool.query<{ id: number }>(
+    const {
+      rows: [av],
+    } = await pool.query<{ id: number }>(
       `INSERT INTO stock_adjustment_vouchers (voucher_id, location_id, adjustment_type)
        VALUES ($1, $2, 'Consumption') RETURNING id`,
-      [v.id, locationId],
+      [v.id, locationId]
     );
     await pool.query(
       `INSERT INTO stock_adjustment_items (adjustment_id, stock_item_id, quantity, rate, total_amount)
        VALUES ($1, $2, -15, 10.00, 150.00)`,
-      [av.id, itemId],
+      [av.id, itemId]
     );
     await pool.query(
       `UPDATE inventory SET quantity = quantity - 15, total_value = total_value - 150
        WHERE company_id = $1 AND location_id = $2 AND stock_item_id = $3`,
-      [companyId, locationId, itemId],
+      [companyId, locationId, itemId]
     );
 
     // Export with locationId omitted → "All Locations" aggregation path.

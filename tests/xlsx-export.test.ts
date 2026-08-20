@@ -28,12 +28,7 @@ import { db, pool } from "../server/db";
 import { eq, sql } from "drizzle-orm";
 import * as schema from "../shared/schema";
 import { factoryBales } from "../shared/schema/factory";
-import {
-  seedTestData,
-  cleanupTestData,
-  closeTestServer,
-  type TestContext,
-} from "./setup";
+import { seedTestData, cleanupTestData, closeTestServer, type TestContext } from "./setup";
 
 const TEST_PREFIX = "xlsexp";
 const BALE_FINALIZED_DATE = "2000-06-15";
@@ -60,29 +55,22 @@ function getBinary(agentOrApp: any, url: string): request.Test {
     typeof agentOrApp.get === "function"
       ? (agentOrApp as request.SuperAgentTest).get(url)
       : request(agentOrApp).get(url);
-  return req
-    .buffer(true)
-    .parse((_res: any, fn: any) => {
-      const chunks: Buffer[] = [];
-      _res.on("data", (c: Buffer) => chunks.push(c));
-      _res.on("end", () => fn(null, Buffer.concat(chunks)));
-    });
+  return req.buffer(true).parse((_res: any, fn: any) => {
+    const chunks: Buffer[] = [];
+    _res.on("data", (c: Buffer) => chunks.push(c));
+    _res.on("end", () => fn(null, Buffer.concat(chunks)));
+  });
 }
 
 async function login() {
   const loginRes = await agent
     .post("/api/auth/login")
     .send({ username: `${TEST_PREFIX}_testuser`, password: "testpassword123" });
-  if (loginRes.status !== 200)
-    throw new Error(`Login failed: ${loginRes.status} — ${JSON.stringify(loginRes.body)}`);
+  if (loginRes.status !== 200) throw new Error(`Login failed: ${loginRes.status} — ${JSON.stringify(loginRes.body)}`);
 
-  const setCoRes = await agent
-    .post("/api/auth/set-company")
-    .send({ companyId: ctx.companyId });
+  const setCoRes = await agent.post("/api/auth/set-company").send({ companyId: ctx.companyId });
   if (setCoRes.status !== 200)
-    throw new Error(
-      `set-company failed: ${setCoRes.status} — ${JSON.stringify(setCoRes.body)}`,
-    );
+    throw new Error(`set-company failed: ${setCoRes.status} — ${JSON.stringify(setCoRes.body)}`);
 }
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
@@ -214,7 +202,7 @@ describe("XLSX Export — Bale Stock Register", () => {
       const val = row.getCell(1).value;
       if (val) refNumbers.push(String(val));
     });
-expect(refNumbers).toContain(`${TEST_PREFIX}-REF-001`);
+    expect(refNumbers).toContain(`${TEST_PREFIX}-REF-001`);
   });
 
   it("export does not contain another company's bale reference", async () => {
@@ -268,10 +256,7 @@ expect(refNumbers).toContain(`${TEST_PREFIX}-REF-001`);
   });
 
   it("unauthenticated request returns 401", async () => {
-    const res = await getBinary(
-      request.agent(ctx.app),
-      "/api/factory/bales/stock-register.xlsx",
-    );
+    const res = await getBinary(request.agent(ctx.app), "/api/factory/bales/stock-register.xlsx");
     expect(res.status).toBe(401);
   });
 });
@@ -280,19 +265,13 @@ expect(refNumbers).toContain(`${TEST_PREFIX}-REF-001`);
 
 describe("XLSX Export — Location Inventory", () => {
   it("GET /api/factory/location-inventory/:id/export/excel returns 200 with Excel content-type", async () => {
-    const res = await getBinary(
-      agent,
-      `/api/factory/location-inventory/${ctx.locationId}/export/excel`,
-    );
+    const res = await getBinary(agent, `/api/factory/location-inventory/${ctx.locationId}/export/excel`);
     expect(res.status).toBe(200);
     expect(res.headers["content-type"] ?? "").toMatch(/spreadsheet|excel|octet-stream/i);
   });
 
   it("returned buffer is valid XLSX (PK magic bytes)", async () => {
-    const res = await getBinary(
-      agent,
-      `/api/factory/location-inventory/${ctx.locationId}/export/excel`,
-    );
+    const res = await getBinary(agent, `/api/factory/location-inventory/${ctx.locationId}/export/excel`);
     expect(res.status).toBe(200);
     const buf = res.body as Buffer;
     expect(buf.length).toBeGreaterThan(1000);
@@ -300,55 +279,37 @@ describe("XLSX Export — Location Inventory", () => {
   });
 
   it("ExcelJS can open the returned buffer without error", async () => {
-    const res = await getBinary(
-      agent,
-      `/api/factory/location-inventory/${ctx.locationId}/export/excel`,
-    );
+    const res = await getBinary(agent, `/api/factory/location-inventory/${ctx.locationId}/export/excel`);
     const wb = await loadWorkbook(res.body as Buffer);
     expect(wb).toBeDefined();
   });
 
   it('contains "Stock Summary" sheet', async () => {
-    const res = await getBinary(
-      agent,
-      `/api/factory/location-inventory/${ctx.locationId}/export/excel`,
-    );
+    const res = await getBinary(agent, `/api/factory/location-inventory/${ctx.locationId}/export/excel`);
     const wb = await loadWorkbook(res.body as Buffer);
     expect(wb.getWorksheet("Stock Summary")).toBeDefined();
   });
 
   it('contains "Bale Details" sheet', async () => {
-    const res = await getBinary(
-      agent,
-      `/api/factory/location-inventory/${ctx.locationId}/export/excel`,
-    );
+    const res = await getBinary(agent, `/api/factory/location-inventory/${ctx.locationId}/export/excel`);
     const wb = await loadWorkbook(res.body as Buffer);
     expect(wb.getWorksheet("Bale Details")).toBeDefined();
   });
 
   it('contains "Wipers & Garbage" sheet', async () => {
-    const res = await getBinary(
-      agent,
-      `/api/factory/location-inventory/${ctx.locationId}/export/excel`,
-    );
+    const res = await getBinary(agent, `/api/factory/location-inventory/${ctx.locationId}/export/excel`);
     const wb = await loadWorkbook(res.body as Buffer);
     expect(wb.getWorksheet("Wipers & Garbage")).toBeDefined();
   });
 
   it('contains "Garbage & Wiper Details" sheet', async () => {
-    const res = await getBinary(
-      agent,
-      `/api/factory/location-inventory/${ctx.locationId}/export/excel`,
-    );
+    const res = await getBinary(agent, `/api/factory/location-inventory/${ctx.locationId}/export/excel`);
     const wb = await loadWorkbook(res.body as Buffer);
     expect(wb.getWorksheet("Garbage & Wiper Details")).toBeDefined();
   });
 
   it('"Stock Summary" sheet has Article Code, Product Name, Total KG headers', async () => {
-    const res = await getBinary(
-      agent,
-      `/api/factory/location-inventory/${ctx.locationId}/export/excel`,
-    );
+    const res = await getBinary(agent, `/api/factory/location-inventory/${ctx.locationId}/export/excel`);
     const wb = await loadWorkbook(res.body as Buffer);
     const ws = wb.getWorksheet("Stock Summary")!;
     const headers: string[] = [];
@@ -368,7 +329,7 @@ describe("XLSX Export — Location Inventory", () => {
   it("unauthenticated request returns 401", async () => {
     const res = await getBinary(
       request.agent(ctx.app),
-      `/api/factory/location-inventory/${ctx.locationId}/export/excel`,
+      `/api/factory/location-inventory/${ctx.locationId}/export/excel`
     );
     expect(res.status).toBe(401);
   });
@@ -418,10 +379,7 @@ describe("XLSX Export — Daily Production Report", () => {
   });
 
   it("unauthenticated request returns 401", async () => {
-    const res = await getBinary(
-      request.agent(ctx.app),
-      "/api/factory/daily-report/export?format=excel",
-    );
+    const res = await getBinary(request.agent(ctx.app), "/api/factory/daily-report/export?format=excel");
     expect(res.status).toBe(401);
   });
 });
@@ -443,18 +401,14 @@ describe("XLSX Export — Bale Full Export (error cases)", () => {
   });
 
   it("unauthenticated request returns 401", async () => {
-    const res = await request(ctx.app)
-      .get(`/api/factory/bales/export-full.xlsx?date=${BALE_FINALIZED_DATE}`);
+    const res = await request(ctx.app).get(`/api/factory/bales/export-full.xlsx?date=${BALE_FINALIZED_DATE}`);
     expect(res.status).toBe(401);
   });
 });
 
 describe("XLSX Export — Bale Full Export (success path)", () => {
   it("with seeded bale date returns 200 with valid XLSX", async () => {
-const res = await getBinary(
-      agent,
-      `/api/factory/bales/export-full.xlsx?date=${BALE_FINALIZED_DATE}`,
-    );
+    const res = await getBinary(agent, `/api/factory/bales/export-full.xlsx?date=${BALE_FINALIZED_DATE}`);
     expect(res.status).toBe(200);
     expect(res.headers["content-type"] ?? "").toMatch(/spreadsheet|excel|octet-stream/i);
     const buf = res.body as Buffer;
@@ -463,28 +417,19 @@ const res = await getBinary(
   });
 
   it("ExcelJS can open the returned buffer without error", async () => {
-const res = await getBinary(
-      agent,
-      `/api/factory/bales/export-full.xlsx?date=${BALE_FINALIZED_DATE}`,
-    );
+    const res = await getBinary(agent, `/api/factory/bales/export-full.xlsx?date=${BALE_FINALIZED_DATE}`);
     const wb = await loadWorkbook(res.body as Buffer);
     expect(wb).toBeDefined();
   });
 
   it('contains "Bales" sheet', async () => {
-const res = await getBinary(
-      agent,
-      `/api/factory/bales/export-full.xlsx?date=${BALE_FINALIZED_DATE}`,
-    );
+    const res = await getBinary(agent, `/api/factory/bales/export-full.xlsx?date=${BALE_FINALIZED_DATE}`);
     const wb = await loadWorkbook(res.body as Buffer);
     expect(wb.getWorksheet("Bales")).toBeDefined();
   });
 
   it('"Bales" sheet contains the seeded bale reference number', async () => {
-const res = await getBinary(
-      agent,
-      `/api/factory/bales/export-full.xlsx?date=${BALE_FINALIZED_DATE}`,
-    );
+    const res = await getBinary(agent, `/api/factory/bales/export-full.xlsx?date=${BALE_FINALIZED_DATE}`);
     const wb = await loadWorkbook(res.body as Buffer);
     const ws = wb.getWorksheet("Bales")!;
     const refNumbers: string[] = [];
@@ -497,10 +442,7 @@ const res = await getBinary(
   });
 
   it('"Bales" sheet has expected column headers (Reference Number, Weight, Status)', async () => {
-const res = await getBinary(
-      agent,
-      `/api/factory/bales/export-full.xlsx?date=${BALE_FINALIZED_DATE}`,
-    );
+    const res = await getBinary(agent, `/api/factory/bales/export-full.xlsx?date=${BALE_FINALIZED_DATE}`);
     const wb = await loadWorkbook(res.body as Buffer);
     const ws = wb.getWorksheet("Bales")!;
     const headers: string[] = [];

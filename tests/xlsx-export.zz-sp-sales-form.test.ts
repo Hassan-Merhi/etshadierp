@@ -28,12 +28,7 @@ import { db, pool } from "../server/db";
 import { eq, sql } from "drizzle-orm";
 import * as schema from "../shared/schema";
 import { factoryBales } from "../shared/schema/factory";
-import {
-  seedTestData,
-  cleanupTestData,
-  closeTestServer,
-  type TestContext,
-} from "./setup";
+import { seedTestData, cleanupTestData, closeTestServer, type TestContext } from "./setup";
 
 const TEST_PREFIX = "xlsexpsp";
 const BALE_FINALIZED_DATE = "2000-06-15";
@@ -60,29 +55,22 @@ function getBinary(agentOrApp: any, url: string): request.Test {
     typeof agentOrApp.get === "function"
       ? (agentOrApp as request.SuperAgentTest).get(url)
       : request(agentOrApp).get(url);
-  return req
-    .buffer(true)
-    .parse((_res: any, fn: any) => {
-      const chunks: Buffer[] = [];
-      _res.on("data", (c: Buffer) => chunks.push(c));
-      _res.on("end", () => fn(null, Buffer.concat(chunks)));
-    });
+  return req.buffer(true).parse((_res: any, fn: any) => {
+    const chunks: Buffer[] = [];
+    _res.on("data", (c: Buffer) => chunks.push(c));
+    _res.on("end", () => fn(null, Buffer.concat(chunks)));
+  });
 }
 
 async function login() {
   const loginRes = await agent
     .post("/api/auth/login")
     .send({ username: `${TEST_PREFIX}_testuser`, password: "testpassword123" });
-  if (loginRes.status !== 200)
-    throw new Error(`Login failed: ${loginRes.status} — ${JSON.stringify(loginRes.body)}`);
+  if (loginRes.status !== 200) throw new Error(`Login failed: ${loginRes.status} — ${JSON.stringify(loginRes.body)}`);
 
-  const setCoRes = await agent
-    .post("/api/auth/set-company")
-    .send({ companyId: ctx.companyId });
+  const setCoRes = await agent.post("/api/auth/set-company").send({ companyId: ctx.companyId });
   if (setCoRes.status !== 200)
-    throw new Error(
-      `set-company failed: ${setCoRes.status} — ${JSON.stringify(setCoRes.body)}`,
-    );
+    throw new Error(`set-company failed: ${setCoRes.status} — ${JSON.stringify(setCoRes.body)}`);
 }
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
@@ -156,28 +144,24 @@ afterAll(async () => {
 // assertions (date clearing, error-freedom) are template-agnostic.
 
 describe("XLSX Export — SP Sales Form (July 1–6 verification)", () => {
-  const FROM      = "2026-07-01";
-  const TO        = "2026-07-06";
-  const ARTICLE   = `${TEST_PREFIX}_SPITM`;
-  const DAY_COUNT = 6;   // 6 days: July 1–6
+  const FROM = "2026-07-01";
+  const TO = "2026-07-06";
+  const ARTICLE = `${TEST_PREFIX}_SPITM`;
+  const DAY_COUNT = 6; // 6 days: July 1–6
   const E_DATE_START = 7;
-  const S_DATE_START = 6;  // F = first date column in Sales sheet
-  const S_NAME_COL = 3;    // C = item name column in Sales sheet
+  const S_DATE_START = 6; // F = first date column in Sales sheet
+  const S_NAME_COL = 3; // C = item name column in Sales sheet
 
-  let spMovId      = 0;
-  let spSaleId     = 0;
+  let spMovId = 0;
+  let spSaleId = 0;
   let spOnDateMovId = 0; // movement created ON fromDate — must appear in opening stock
   // Cache the export buffer so we only hit the DB+template once per test run.
   let exportBuf: Buffer | null = null;
 
   async function getExportBuf(): Promise<Buffer> {
     if (!exportBuf) {
-      const res = await getBinary(
-        agent,
-        `/api/sp/sales-form/export?fromDate=${FROM}&toDate=${TO}`,
-      );
-      if (res.status !== 200)
-        throw new Error(`SP export failed: ${res.status} — ${JSON.stringify(res.body)}`);
+      const res = await getBinary(agent, `/api/sp/sales-form/export?fromDate=${FROM}&toDate=${TO}`);
+      if (res.status !== 200) throw new Error(`SP export failed: ${res.status} — ${JSON.stringify(res.body)}`);
       exportBuf = res.body as Buffer;
     }
     return exportBuf;
@@ -194,7 +178,7 @@ describe("XLSX Export — SP Sales Form (July 1–6 verification)", () => {
           base_unit_cost_usd, landed_unit_cost_usd, final_unit_cost_usd, created_at)
        VALUES ($1, $2, 100, 100, 5.00, 5.00, 5.00, '2026-06-15T00:00:00Z'::timestamptz)
        RETURNING id`,
-      [ctx.companyId, ARTICLE],
+      [ctx.companyId, ARTICLE]
     );
     spMovId = mvRes.rows[0]?.id ?? 0;
 
@@ -205,7 +189,7 @@ describe("XLSX Export — SP Sales Form (July 1–6 verification)", () => {
           total_sale_price_usd, total_base_cost_usd, total_final_cost_usd, gross_profit_usd, status)
        VALUES ($1, '2026-07-03'::date, 'Test SP Customer', 600, 500, 500, 100, 'posted')
        RETURNING id`,
-      [ctx.companyId],
+      [ctx.companyId]
     );
     spSaleId = saleRes.rows[0]?.id ?? 0;
 
@@ -214,7 +198,7 @@ describe("XLSX Export — SP Sales Form (July 1–6 verification)", () => {
          (sale_id, company_id, movement_id, article_code,
           qty_sold, sale_price_per_unit, base_unit_cost_usd, landed_unit_cost_usd, final_unit_cost_usd)
        VALUES ($1, $2, $3, $4, 10, 60, 50, 50, 50)`,
-      [spSaleId, ctx.companyId, spMovId, ARTICLE],
+      [spSaleId, ctx.companyId, spMovId, ARTICLE]
     );
 
     // Second movement created ON fromDate (July 1) — must also appear in opening stock
@@ -225,35 +209,37 @@ describe("XLSX Export — SP Sales Form (July 1–6 verification)", () => {
           base_unit_cost_usd, landed_unit_cost_usd, final_unit_cost_usd, created_at)
        VALUES ($1, $2, 50, 50, 5.00, 5.00, 5.00, '2026-07-01T06:00:00Z'::timestamptz)
        RETURNING id`,
-      [ctx.companyId, ARTICLE],
+      [ctx.companyId, ARTICLE]
     );
     spOnDateMovId = mvOnDateRes.rows[0]?.id ?? 0;
 
     // Assign a real location to spMovId so locationId-filter tests can verify
     // that the filter includes/excludes it based on location.
-    await pool.query(
-      "UPDATE sp_stock_movements SET location_id = $1 WHERE id = $2",
-      [ctx.locationId, spMovId],
-    );
+    await pool.query("UPDATE sp_stock_movements SET location_id = $1 WHERE id = $2", [ctx.locationId, spMovId]);
   }, 30000);
 
   afterAll(async () => {
     exportBuf = null;
     // Best-effort individual deletes so company-type restore always runs.
-    try { await pool.query("DELETE FROM sp_sale_lines WHERE sale_id = $1", [spSaleId]); } catch {}
-    try { await pool.query("DELETE FROM sp_sales WHERE id = $1", [spSaleId]); } catch {}
-    try { await pool.query("DELETE FROM sp_stock_movements WHERE id = $1", [spMovId]); } catch {}
-    try { await pool.query("DELETE FROM sp_stock_movements WHERE id = $1", [spOnDateMovId]); } catch {}
+    try {
+      await pool.query("DELETE FROM sp_sale_lines WHERE sale_id = $1", [spSaleId]);
+    } catch {}
+    try {
+      await pool.query("DELETE FROM sp_sales WHERE id = $1", [spSaleId]);
+    } catch {}
+    try {
+      await pool.query("DELETE FROM sp_stock_movements WHERE id = $1", [spMovId]);
+    } catch {}
+    try {
+      await pool.query("DELETE FROM sp_stock_movements WHERE id = $1", [spOnDateMovId]);
+    } catch {}
     // Restore company type — runs even if deletions above partially fail.
     await pool.query("UPDATE companies SET company_type = 'erp' WHERE id = $1", [ctx.companyId]);
   }, 15000);
 
   // ── 1. Basic shape ───────────────────────────────────────────────────────
   it("returns 200 with valid XLSX magic bytes", async () => {
-    const res = await getBinary(
-      agent,
-      `/api/sp/sales-form/export?fromDate=${FROM}&toDate=${TO}`,
-    );
+    const res = await getBinary(agent, `/api/sp/sales-form/export?fromDate=${FROM}&toDate=${TO}`);
     expect(res.status).toBe(200);
     expect(isValidXlsxMagic(res.body as Buffer)).toBe(true);
   });
@@ -270,7 +256,7 @@ describe("XLSX Export — SP Sales Form (July 1–6 verification)", () => {
     for (let c = firstUnused; c < firstUnused + 15; c++) {
       expect(
         dateRow.getCell(c).value,
-        `ENTRY date-row col ${c} (day ${Math.floor((c - E_DATE_START) / 3)}) should be null`,
+        `ENTRY date-row col ${c} (day ${Math.floor((c - E_DATE_START) / 3)}) should be null`
       ).toBeNull();
     }
   });
@@ -295,8 +281,7 @@ describe("XLSX Export — SP Sales Form (July 1–6 verification)", () => {
         row.eachCell({ includeEmpty: false }, (cell) => {
           const v = cell.value as any;
           const result = v?.result ?? (typeof v === "string" ? v : null);
-          if (typeof result === "string" && result.includes("#DIV/0!"))
-            errors.push(`${name}!${cell.address}`);
+          if (typeof result === "string" && result.includes("#DIV/0!")) errors.push(`${name}!${cell.address}`);
         });
       });
     }
@@ -312,10 +297,7 @@ describe("XLSX Export — SP Sales Form (July 1–6 verification)", () => {
     // Sales uses one column per day; first unused = S_DATE_START + DAY_COUNT = 12
     const firstUnused = S_DATE_START + DAY_COUNT;
     for (let c = firstUnused; c < firstUnused + 15; c++) {
-      expect(
-        dateRow.getCell(c).value,
-        `Sales date-row col ${c} should be null (beyond July 6)`,
-      ).toBeNull();
+      expect(dateRow.getCell(c).value, `Sales date-row col ${c} should be null (beyond July 6)`).toBeNull();
     }
   });
 
@@ -333,7 +315,8 @@ describe("XLSX Export — SP Sales Form (July 1–6 verification)", () => {
     for (let r = 2; r <= ws.rowCount; r++) {
       const row = ws.getRow(r);
       if (!row.getCell(3).value) continue; // skip rows with no item name
-      for (const d of [0, 1, 3, 4, 5]) { // days with no sales
+      for (const d of [0, 1, 3, 4, 5]) {
+        // days with no sales
         const c = S_DATE_START + d;
         const raw = row.getCell(c).value as any;
         // Skip formula cells — the export code intentionally leaves template
@@ -343,14 +326,10 @@ describe("XLSX Export — SP Sales Form (July 1–6 verification)", () => {
           continue;
         }
         // For plain cells: null / 0 / undefined are all acceptable; anything else is a bug
-        if (raw !== null && raw !== 0 && raw !== undefined)
-          staleValues.push(`Sales!r${r}d${d}=${raw}`);
+        if (raw !== null && raw !== 0 && raw !== undefined) staleValues.push(`Sales!r${r}d${d}=${raw}`);
       }
     }
-    expect(
-      staleValues,
-      `Non-null, non-zero qty on no-sale days: ${staleValues.join(", ")}`,
-    ).toHaveLength(0);
+    expect(staleValues, `Non-null, non-zero qty on no-sale days: ${staleValues.join(", ")}`).toHaveLength(0);
   });
 
   // ── 6. Opening stock cutoff ───────────────────────────────────────────────
@@ -372,7 +351,7 @@ describe("XLSX Export — SP Sales Form (July 1–6 verification)", () => {
        FROM   sp_stock_movements sm
        LEFT JOIN sold_before sb ON sb.movement_id = sm.id
        WHERE  sm.id = $2`,
-      [ctx.companyId, spMovId],
+      [ctx.companyId, spMovId]
     );
     const row = result.rows[0];
     expect(row).toBeDefined();
@@ -399,7 +378,7 @@ describe("XLSX Export — SP Sales Form (July 1–6 verification)", () => {
        FROM   sp_stock_movements sm
        LEFT JOIN sold_before sb ON sb.movement_id = sm.id
        WHERE  sm.id = $2`,
-      [ctx.companyId, spMovId],
+      [ctx.companyId, spMovId]
     );
     expect(parseFloat(strictRes.rows[0].opening_qty)).toBe(100); // July 3 sale NOT deducted
 
@@ -417,7 +396,7 @@ describe("XLSX Export — SP Sales Form (July 1–6 verification)", () => {
        FROM   sp_stock_movements sm
        LEFT JOIN sold_on_or_before sob ON sob.movement_id = sm.id
        WHERE  sm.id = $2`,
-      [ctx.companyId, spMovId],
+      [ctx.companyId, spMovId]
     );
     expect(parseFloat(inclRes.rows[0].opening_qty)).toBe(90); // old bug: July 3 sale incorrectly deducted
   });
@@ -431,7 +410,7 @@ describe("XLSX Export — SP Sales Form (July 1–6 verification)", () => {
        FROM   sp_stock_movements sm
        WHERE  sm.id = $1
          AND  sm.created_at::date <= '2026-07-01'::date`,
-      [spOnDateMovId],
+      [spOnDateMovId]
     );
     expect(res.rows.length).toBe(1); // row found — movement IS within the <= cutoff
     expect(parseFloat(res.rows[0].opening_qty)).toBe(50);
@@ -458,10 +437,9 @@ describe("XLSX Export — SP Sales Form (July 1–6 verification)", () => {
         }
       }
     }
-    expect(
-      surviving,
-      `Non-null cells survived beyond toDate in Sales item rows: ${surviving.join(", ")}`,
-    ).toHaveLength(0);
+    expect(surviving, `Non-null cells survived beyond toDate in Sales item rows: ${surviving.join(", ")}`).toHaveLength(
+      0
+    );
   });
 
   // ── 8. locationId filtering ───────────────────────────────────────────────
@@ -477,7 +455,7 @@ describe("XLSX Export — SP Sales Form (July 1–6 verification)", () => {
          AND s.status      = 'posted'
          AND s.sale_date BETWEEN '2026-07-01'::date AND '2026-07-06'::date
          AND mv.location_id = $2`,
-      [ctx.companyId, ctx.locationId],
+      [ctx.companyId, ctx.locationId]
     );
     expect(parseInt(matchRes.rows[0].cnt)).toBeGreaterThanOrEqual(1);
 
@@ -491,7 +469,7 @@ describe("XLSX Export — SP Sales Form (July 1–6 verification)", () => {
          AND s.status      = 'posted'
          AND s.sale_date BETWEEN '2026-07-01'::date AND '2026-07-06'::date
          AND mv.location_id = $2`,
-      [ctx.companyId, ctx.location2Id], // location2 has no SP movements
+      [ctx.companyId, ctx.location2Id] // location2 has no SP movements
     );
     expect(parseInt(noMatchRes.rows[0].cnt)).toBe(0);
   });
@@ -515,7 +493,7 @@ describe("XLSX Export — SP Sales Form (July 1–6 verification)", () => {
        WHERE  sm.company_id     = $1
          AND  sm.created_at::date <= '2026-07-01'::date
          AND  sm.location_id     = $2`,
-      [ctx.companyId, ctx.locationId],
+      [ctx.companyId, ctx.locationId]
     );
     expect(parseFloat(matchRes.rows[0]?.opening_qty ?? "0")).toBeGreaterThan(0);
 
@@ -536,7 +514,7 @@ describe("XLSX Export — SP Sales Form (July 1–6 verification)", () => {
        WHERE  sm.company_id     = $1
          AND  sm.created_at::date <= '2026-07-01'::date
          AND  sm.location_id     = $2`,
-      [ctx.companyId, ctx.location2Id],
+      [ctx.companyId, ctx.location2Id]
     );
     expect(parseFloat(noMatchRes.rows[0]?.opening_qty ?? "0")).toBe(0);
   });
@@ -544,7 +522,7 @@ describe("XLSX Export — SP Sales Form (July 1–6 verification)", () => {
   it("export with locationId param returns valid XLSX (locationId filter does not crash)", async () => {
     const res = await getBinary(
       agent,
-      `/api/sp/sales-form/export?fromDate=${FROM}&toDate=${TO}&locationId=${ctx.locationId}`,
+      `/api/sp/sales-form/export?fromDate=${FROM}&toDate=${TO}&locationId=${ctx.locationId}`
     );
     expect(res.status, `Export with locationId failed: ${JSON.stringify(res.body)}`).toBe(200);
     expect(isValidXlsxMagic(res.body as Buffer)).toBe(true);

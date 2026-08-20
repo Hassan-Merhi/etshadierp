@@ -24,14 +24,10 @@ async function loginAsTestUser() {
   });
 
   if (loginRes.status !== 200) {
-    throw new Error(
-      `Login failed: ${loginRes.status} ${JSON.stringify(loginRes.body)}`,
-    );
+    throw new Error(`Login failed: ${loginRes.status} ${JSON.stringify(loginRes.body)}`);
   }
 
-  const switchRes = await agent
-    .post("/api/auth/set-company")
-    .send({ companyId: ctx.companyId });
+  const switchRes = await agent.post("/api/auth/set-company").send({ companyId: ctx.companyId });
 
   if (switchRes.status !== 200) {
     console.warn("Switch company response:", switchRes.status, switchRes.body);
@@ -101,10 +97,7 @@ describe("POS Sale Inventory Tests", () => {
   });
 
   it("should decrease inventory correctly when creating a sale", async () => {
-    const initialQty = await getInventoryQty(
-      ctx.locationId,
-      ctx.stockItemIds[0],
-    );
+    const initialQty = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
     expect(initialQty).toBe(100);
 
     const res = await agent.post("/api/pos/sales").send({
@@ -124,10 +117,7 @@ describe("POS Sale Inventory Tests", () => {
     expect(res.status).toBeGreaterThanOrEqual(200);
     expect(res.status).toBeLessThan(300);
 
-    const newQty = await getInventoryQty(
-      ctx.locationId,
-      ctx.stockItemIds[0],
-    );
+    const newQty = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
     expect(newQty).toBe(95);
   });
 
@@ -146,14 +136,8 @@ describe("POS Sale Inventory Tests", () => {
     expect(res.status).toBeGreaterThanOrEqual(200);
     expect(res.status).toBeLessThan(300);
 
-    const qty0 = await getInventoryQty(
-      ctx.locationId,
-      ctx.stockItemIds[0],
-    );
-    const qty1 = await getInventoryQty(
-      ctx.locationId,
-      ctx.stockItemIds[1],
-    );
+    const qty0 = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
+    const qty1 = await getInventoryQty(ctx.locationId, ctx.stockItemIds[1]);
     expect(qty0).toBe(97);
     expect(qty1).toBe(93);
   });
@@ -161,9 +145,7 @@ describe("POS Sale Inventory Tests", () => {
   it("should reject sale with invalid stockItemId", async () => {
     const res = await agent.post("/api/pos/sales").send({
       locationId: ctx.locationId,
-      items: [
-        { stockItemId: "invalid", quantity: 5, rate: 15 },
-      ],
+      items: [{ stockItemId: "invalid", quantity: 5, rate: 15 }],
       paymentAccountType: "ledger",
       paymentAccountId: ctx.cashAccountId,
       voucherDate: new Date().toISOString().split("T")[0],
@@ -178,9 +160,7 @@ describe("POS Sale Inventory Tests", () => {
   it("should reject sale with invalid quantity", async () => {
     const res = await agent.post("/api/pos/sales").send({
       locationId: ctx.locationId,
-      items: [
-        { stockItemId: ctx.stockItemIds[0], quantity: "abc", rate: 15 },
-      ],
+      items: [{ stockItemId: ctx.stockItemIds[0], quantity: "abc", rate: 15 }],
       paymentAccountType: "ledger",
       paymentAccountId: ctx.cashAccountId,
       voucherDate: new Date().toISOString().split("T")[0],
@@ -358,9 +338,7 @@ describe("Voucher Delete Inventory Reversal Tests", () => {
   it("should restore inventory when deleting a sales voucher", async () => {
     const saleRes = await agent.post("/api/pos/sales").send({
       locationId: ctx.locationId,
-      items: [
-        { stockItemId: ctx.stockItemIds[0], quantity: 10, rate: 15 },
-      ],
+      items: [{ stockItemId: ctx.stockItemIds[0], quantity: 10, rate: 15 }],
       paymentAccountType: "ledger",
       paymentAccountId: ctx.cashAccountId,
       voucherDate: new Date().toISOString().split("T")[0],
@@ -369,10 +347,7 @@ describe("Voucher Delete Inventory Reversal Tests", () => {
     expect(saleRes.status).toBeGreaterThanOrEqual(200);
     expect(saleRes.status).toBeLessThan(300);
 
-    const afterSaleQty = await getInventoryQty(
-      ctx.locationId,
-      ctx.stockItemIds[0],
-    );
+    const afterSaleQty = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
     expect(afterSaleQty).toBe(90);
 
     const voucherId = saleRes.body.voucher?.id || saleRes.body.voucherId || saleRes.body.id;
@@ -383,10 +358,7 @@ describe("Voucher Delete Inventory Reversal Tests", () => {
     expect(deleteRes.status).toBeGreaterThanOrEqual(200);
     expect(deleteRes.status).toBeLessThan(300);
 
-    const afterDeleteQty = await getInventoryQty(
-      ctx.locationId,
-      ctx.stockItemIds[0],
-    );
+    const afterDeleteQty = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
     expect(afterDeleteQty).toBe(100);
   });
 });
@@ -395,9 +367,7 @@ describe("Input Validation Tests", () => {
   it("should reject POS sale with NaN locationId", async () => {
     const res = await agent.post("/api/pos/sales").send({
       locationId: "notanumber",
-      items: [
-        { stockItemId: ctx.stockItemIds[0], quantity: 5, sellingPrice: 15 },
-      ],
+      items: [{ stockItemId: ctx.stockItemIds[0], quantity: 5, sellingPrice: 15 }],
       paymentAccountType: "ledger",
       paymentAccountId: ctx.cashAccountId,
     });
@@ -438,14 +408,7 @@ describe("adjustInventory Helper Tests", () => {
   it("should handle insert-or-update correctly", async () => {
     const { adjustInventory } = await import("../server/inventoryHelper");
 
-    const result = await adjustInventory(
-      db as any,
-      ctx.locationId,
-      ctx.stockItemIds[0],
-      10,
-      ctx.companyId,
-      12.0,
-    );
+    const result = await adjustInventory(db as any, ctx.locationId, ctx.stockItemIds[0], 10, ctx.companyId, 12.0);
 
     expect(result.previousQuantity).toBe(100);
     expect(result.newQuantity).toBe(110);
@@ -467,36 +430,21 @@ describe("adjustInventory Helper Tests", () => {
       })
       .returning();
 
-    const result = await adjustInventory(
-      db as any,
-      ctx.locationId,
-      newItem.id,
-      25,
-      ctx.companyId,
-      8.0,
-    );
+    const result = await adjustInventory(db as any, ctx.locationId, newItem.id, 25, ctx.companyId, 8.0);
 
     expect(result.previousQuantity).toBe(0);
     expect(result.newQuantity).toBe(25);
     expect(result.created).toBe(true);
     expect(result.averageRate).toBe(8.0);
 
-    await db
-      .delete(schema.inventory)
-      .where(eq(schema.inventory.stockItemId, newItem.id));
+    await db.delete(schema.inventory).where(eq(schema.inventory.stockItemId, newItem.id));
     await db.delete(schema.stockItems).where(eq(schema.stockItems.id, newItem.id));
   });
 
   it("should allow negative inventory", async () => {
     const { adjustInventory } = await import("../server/inventoryHelper");
 
-    const result = await adjustInventory(
-      db as any,
-      ctx.locationId,
-      ctx.stockItemIds[0],
-      -150,
-      ctx.companyId,
-    );
+    const result = await adjustInventory(db as any, ctx.locationId, ctx.stockItemIds[0], -150, ctx.companyId);
 
     expect(result.newQuantity).toBe(-50);
     expect(result.created).toBe(false);
@@ -513,20 +461,10 @@ describe("adjustInventory Helper Tests", () => {
         totalValue: "-5000.00",
       })
       .where(
-        and(
-          eq(schema.inventory.locationId, ctx.locationId),
-          eq(schema.inventory.stockItemId, ctx.stockItemIds[0]),
-        ),
+        and(eq(schema.inventory.locationId, ctx.locationId), eq(schema.inventory.stockItemId, ctx.stockItemIds[0]))
       );
 
-    const result = await adjustInventory(
-      db as any,
-      ctx.locationId,
-      ctx.stockItemIds[0],
-      200,
-      ctx.companyId,
-      1.0,
-    );
+    const result = await adjustInventory(db as any, ctx.locationId, ctx.stockItemIds[0], 200, ctx.companyId, 1.0);
 
     expect(result.newQuantity).toBe(100);
     expect(result.averageRate).toBeGreaterThanOrEqual(0);
@@ -544,19 +482,10 @@ describe("adjustInventory Helper Tests", () => {
         totalValue: "-4800.00",
       })
       .where(
-        and(
-          eq(schema.inventory.locationId, ctx.locationId),
-          eq(schema.inventory.stockItemId, ctx.stockItemIds[0]),
-        ),
+        and(eq(schema.inventory.locationId, ctx.locationId), eq(schema.inventory.stockItemId, ctx.stockItemIds[0]))
       );
 
-    const result = await adjustInventory(
-      db as any,
-      ctx.locationId,
-      ctx.stockItemIds[0],
-      -200,
-      ctx.companyId,
-    );
+    const result = await adjustInventory(db as any, ctx.locationId, ctx.stockItemIds[0], -200, ctx.companyId);
 
     expect(result.newQuantity).toBe(-100);
     expect(result.newTotalValue).toBe(0);
@@ -571,13 +500,7 @@ describe("adjustInventory Helper Tests", () => {
     // Until fixed, the invariant "qty <= 0 → value = 0, rate = 0" is NOT enforced.
     const { adjustInventory } = await import("../server/inventoryHelper");
 
-    const result = await adjustInventory(
-      db as any,
-      ctx.locationId,
-      ctx.stockItemIds[0],
-      -150,
-      ctx.companyId,
-    );
+    const result = await adjustInventory(db as any, ctx.locationId, ctx.stockItemIds[0], -150, ctx.companyId);
 
     expect(result.newQuantity).toBe(-50);
     expect(result.newTotalValue).toBe(0);
@@ -599,19 +522,10 @@ describe("adjustInventory Helper Tests", () => {
         totalValue: "10000.00",
       })
       .where(
-        and(
-          eq(schema.inventory.locationId, ctx.locationId),
-          eq(schema.inventory.stockItemId, ctx.stockItemIds[0]),
-        ),
+        and(eq(schema.inventory.locationId, ctx.locationId), eq(schema.inventory.stockItemId, ctx.stockItemIds[0]))
       );
 
-    const result = await adjustInventory(
-      db as any,
-      ctx.locationId,
-      ctx.stockItemIds[0],
-      -190,
-      ctx.companyId,
-    );
+    const result = await adjustInventory(db as any, ctx.locationId, ctx.stockItemIds[0], -190, ctx.companyId);
 
     expect(result.newQuantity).toBe(10);
     expect(result.newTotalValue).toBeGreaterThanOrEqual(0);
@@ -640,19 +554,10 @@ describe("reverseInventoryByExactValue Tests", () => {
         totalValue: "1056.40",
       })
       .where(
-        and(
-          eq(schema.inventory.locationId, ctx.locationId),
-          eq(schema.inventory.stockItemId, ctx.stockItemIds[0]),
-        ),
+        and(eq(schema.inventory.locationId, ctx.locationId), eq(schema.inventory.stockItemId, ctx.stockItemIds[0]))
       );
 
-    await reverseInventoryByExactValue(
-      db as any,
-      ctx.locationId,
-      ctx.stockItemIds[0],
-      200,
-      500,
-    );
+    await reverseInventoryByExactValue(db as any, ctx.locationId, ctx.stockItemIds[0], 200, 500);
 
     const record = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
     const qty = parseFloat(record!.quantity);
@@ -683,20 +588,10 @@ describe("reverseInventoryByExactValue Tests", () => {
         totalValue: "0.00",
       })
       .where(
-        and(
-          eq(schema.inventory.locationId, ctx.locationId),
-          eq(schema.inventory.stockItemId, ctx.stockItemIds[0]),
-        ),
+        and(eq(schema.inventory.locationId, ctx.locationId), eq(schema.inventory.stockItemId, ctx.stockItemIds[0]))
       );
 
-    await adjustInventory(
-      db as any,
-      ctx.locationId,
-      ctx.stockItemIds[0],
-      offloadQty,
-      ctx.companyId,
-      offloadRate,
-    );
+    await adjustInventory(db as any, ctx.locationId, ctx.stockItemIds[0], offloadQty, ctx.companyId, offloadRate);
 
     const afterFirstOffload = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
     const firstQty = parseFloat(afterFirstOffload!.quantity);
@@ -704,27 +599,14 @@ describe("reverseInventoryByExactValue Tests", () => {
     const firstRate = parseFloat(afterFirstOffload!.averageRate);
 
     for (let cycle = 0; cycle < 3; cycle++) {
-      await reverseInventoryByExactValue(
-        db as any,
-        ctx.locationId,
-        ctx.stockItemIds[0],
-        offloadQty,
-        offloadValue,
-      );
+      await reverseInventoryByExactValue(db as any, ctx.locationId, ctx.stockItemIds[0], offloadQty, offloadValue);
 
       const afterReverse = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
       expect(parseFloat(afterReverse!.quantity)).toBeCloseTo(0, 1);
       expect(parseFloat(afterReverse!.totalValue!)).toBe(0);
       expect(parseFloat(afterReverse!.averageRate)).toBe(0);
 
-      await adjustInventory(
-        db as any,
-        ctx.locationId,
-        ctx.stockItemIds[0],
-        offloadQty,
-        ctx.companyId,
-        offloadRate,
-      );
+      await adjustInventory(db as any, ctx.locationId, ctx.stockItemIds[0], offloadQty, ctx.companyId, offloadRate);
 
       const afterReoffload = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
       expect(parseFloat(afterReoffload!.quantity)).toBeCloseTo(firstQty, 1);
@@ -748,37 +630,21 @@ describe("reverseInventoryByExactValue Tests", () => {
         totalValue: "0.00",
       })
       .where(
-        and(
-          eq(schema.inventory.locationId, ctx.locationId),
-          eq(schema.inventory.stockItemId, ctx.stockItemIds[0]),
-        ),
+        and(eq(schema.inventory.locationId, ctx.locationId), eq(schema.inventory.stockItemId, ctx.stockItemIds[0]))
       );
 
     const offloadQty = 200;
     const offloadRate = 1.0;
     const offloadValue = offloadQty * offloadRate;
 
-    await adjustInventory(
-      db as any,
-      ctx.locationId,
-      ctx.stockItemIds[0],
-      offloadQty,
-      ctx.companyId,
-      offloadRate,
-    );
+    await adjustInventory(db as any, ctx.locationId, ctx.stockItemIds[0], offloadQty, ctx.companyId, offloadRate);
 
     const afterOffload = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
     expect(parseFloat(afterOffload!.quantity)).toBeCloseTo(190, 1);
     expect(parseFloat(afterOffload!.averageRate)).toBeGreaterThanOrEqual(0);
     expect(parseFloat(afterOffload!.totalValue!)).toBeGreaterThanOrEqual(0);
 
-    await reverseInventoryByExactValue(
-      db as any,
-      ctx.locationId,
-      ctx.stockItemIds[0],
-      offloadQty,
-      offloadValue,
-    );
+    await reverseInventoryByExactValue(db as any, ctx.locationId, ctx.stockItemIds[0], offloadQty, offloadValue);
 
     const afterReverse = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
     const reverseQty = parseFloat(afterReverse!.quantity);
@@ -789,14 +655,7 @@ describe("reverseInventoryByExactValue Tests", () => {
     expect(reverseValue).toBe(0);
     expect(reverseRate).toBe(0);
 
-    await adjustInventory(
-      db as any,
-      ctx.locationId,
-      ctx.stockItemIds[0],
-      offloadQty,
-      ctx.companyId,
-      offloadRate,
-    );
+    await adjustInventory(db as any, ctx.locationId, ctx.stockItemIds[0], offloadQty, ctx.companyId, offloadRate);
 
     const afterReoffload = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
     expect(parseFloat(afterReoffload!.quantity)).toBeCloseTo(190, 1);
@@ -836,46 +695,23 @@ describe("reverseInventoryByExactValue Tests", () => {
         totalValue: "0.00",
       })
       .where(
-        and(
-          eq(schema.inventory.locationId, ctx.locationId),
-          eq(schema.inventory.stockItemId, ctx.stockItemIds[0]),
-        ),
+        and(eq(schema.inventory.locationId, ctx.locationId), eq(schema.inventory.stockItemId, ctx.stockItemIds[0]))
       );
 
     const offloadQty = 200;
     const offloadValue = 200;
 
-    await adjustInventory(
-      db as any,
-      ctx.locationId,
-      ctx.stockItemIds[0],
-      offloadQty,
-      ctx.companyId,
-      1.0,
-    );
+    await adjustInventory(db as any, ctx.locationId, ctx.stockItemIds[0], offloadQty, ctx.companyId, 1.0);
 
     let record = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
     assertInvariants(record, "after offload");
 
-    await reverseInventoryByExactValue(
-      db as any,
-      ctx.locationId,
-      ctx.stockItemIds[0],
-      offloadQty,
-      offloadValue,
-    );
+    await reverseInventoryByExactValue(db as any, ctx.locationId, ctx.stockItemIds[0], offloadQty, offloadValue);
 
     record = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
     assertInvariants(record, "after reverse");
 
-    await adjustInventory(
-      db as any,
-      ctx.locationId,
-      ctx.stockItemIds[0],
-      offloadQty,
-      ctx.companyId,
-      1.0,
-    );
+    await adjustInventory(db as any, ctx.locationId, ctx.stockItemIds[0], offloadQty, ctx.companyId, 1.0);
 
     record = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
     assertInvariants(record, "after re-offload");

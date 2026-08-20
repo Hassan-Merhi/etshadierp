@@ -28,63 +28,58 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import ExcelJS from "exceljs";
-import {
-  seedTestData,
-  cleanupTestData,
-  closeTestServer,
-  type TestContext,
-} from "./setup";
+import { seedTestData, cleanupTestData, closeTestServer, type TestContext } from "./setup";
 import { pool } from "../server/db";
 import { generateSpSalesFormExcelV2 } from "../server/services/spSalesFormExportV2";
 import { calculateHistoricalLocationInventory } from "../server/routes/helpers/inventoryHistoryHelpers";
 
 const TEST_PREFIX = "xlsxv2p2";
-const FROM  = "2026-07-01";
-const TO    = "2026-07-07";
+const FROM = "2026-07-01";
+const TO = "2026-07-07";
 const DAY_COUNT = 7; // Jul 1–7
 
 // ENTRY sheet constants (mirrors spSalesFormExportV2.ts)
 // A=RowNum, B=Group, C=ItemName, D=Code, E=OpenQty, F=Cost/Bag
-const FIXED_LEFT   = 6;  // cols 1-6: RowNum, Group, Name, Code, OpenQty, Cost/Bag
+const FIXED_LEFT = 6; // cols 1-6: RowNum, Group, Name, Code, OpenQty, Cost/Bag
 const COLS_PER_DAY = 3;
-const E_GROUP_COL     = 2;  // B
-const E_ITEM_NAME_COL = 3;  // C
-const E_ITEM_CODE_COL = 4;  // D
-const E_OPEN_QTY_COL  = 5;  // E
-const E_COST_BAG_COL  = 6;  // F
-const E_DATE_START    = FIXED_LEFT + 1;  // 7 — first Qty column for day 0
-const CLOSE_QTY_COL   = FIXED_LEFT + 1 + DAY_COUNT * COLS_PER_DAY; // 28
-const CLOSE_VAL_COL   = CLOSE_QTY_COL + 1; // 29
+const E_GROUP_COL = 2; // B
+const E_ITEM_NAME_COL = 3; // C
+const E_ITEM_CODE_COL = 4; // D
+const E_OPEN_QTY_COL = 5; // E
+const E_COST_BAG_COL = 6; // F
+const E_DATE_START = FIXED_LEFT + 1; // 7 — first Qty column for day 0
+const CLOSE_QTY_COL = FIXED_LEFT + 1 + DAY_COUNT * COLS_PER_DAY; // 28
+const CLOSE_VAL_COL = CLOSE_QTY_COL + 1; // 29
 
 // With 3 items + 1 group, the row layout is:
 // Row 4: item1, Row 5: item2, Row 6: item3
 // Row 7: subtotal, Row 8: TOTAL
 const E_DATA_ROW_START = 4;
-const ITEM_COUNT       = 3;
-const E_SUBTOTAL_ROW   = E_DATA_ROW_START + ITEM_COUNT;      // 7
-const E_TOTAL_ROW      = E_SUBTOTAL_ROW + 1;                  // 8
+const ITEM_COUNT = 3;
+const E_SUBTOTAL_ROW = E_DATA_ROW_START + ITEM_COUNT; // 7
+const E_TOTAL_ROW = E_SUBTOTAL_ROW + 1; // 8
 // Cash section (totalRow + 2 gap)
-const E_CASH_HDR_ROW   = E_TOTAL_ROW + 2;                     // 10
-const E_CASH_SUBHDR    = E_CASH_HDR_ROW + 1;                  // 11
-const E_OPEN_CASH_ROW  = E_CASH_SUBHDR + 1;                   // 12
-const E_DEPOSIT_ROW    = E_OPEN_CASH_ROW + 1;                 // 13
-const E_RECEIPT_ROW    = E_DEPOSIT_ROW + 1;                    // 14
-const E_PAYMENTS_ROW   = E_RECEIPT_ROW + 2;                   // 16
+const E_CASH_HDR_ROW = E_TOTAL_ROW + 2; // 10
+const E_CASH_SUBHDR = E_CASH_HDR_ROW + 1; // 11
+const E_OPEN_CASH_ROW = E_CASH_SUBHDR + 1; // 12
+const E_DEPOSIT_ROW = E_OPEN_CASH_ROW + 1; // 13
+const E_RECEIPT_ROW = E_DEPOSIT_ROW + 1; // 14
+const E_PAYMENTS_ROW = E_RECEIPT_ROW + 2; // 16
 const NUM_PAYMENT_ROWS = 10;
-const E_PAY_FIRST_ROW  = E_PAYMENTS_ROW + 1;                  // 17
-const E_PAY_LAST_ROW   = E_PAYMENTS_ROW + NUM_PAYMENT_ROWS;   // 26
-const E_TOTAL_PAY_ROW  = E_PAY_LAST_ROW + 1;                  // 27
-const E_BALANCE_ROW    = E_TOTAL_PAY_ROW + 1;                 // 28
+const E_PAY_FIRST_ROW = E_PAYMENTS_ROW + 1; // 17
+const E_PAY_LAST_ROW = E_PAYMENTS_ROW + NUM_PAYMENT_ROWS; // 26
+const E_TOTAL_PAY_ROW = E_PAY_LAST_ROW + 1; // 27
+const E_BALANCE_ROW = E_TOTAL_PAY_ROW + 1; // 28
 
 // Sales sheet constants
 const S_ITEM_NAME_COL = 3;
-const S_DATE_START    = 4;
+const S_DATE_START = 4;
 
 let ctx: TestContext;
 let buf: Buffer;
-let wb:  ExcelJS.Workbook;
+let wb: ExcelJS.Workbook;
 
-let expectedOpenQtyItem1  = 0;
+let expectedOpenQtyItem1 = 0;
 let expectedCloseQtyItem1 = 0;
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -151,79 +146,87 @@ beforeAll(async () => {
   const [item1Id, item2Id, item3Id] = stockItemIds;
 
   // 1. Valid Sales voucher: Jul 3, item1, qty=10, totalSales=120, totalCost=100
-  const { rows: [v1] } = await pool.query<{ id: number }>(
+  const {
+    rows: [v1],
+  } = await pool.query<{ id: number }>(
     `INSERT INTO vouchers
        (company_id, location_id, voucher_type, voucher_date, description,
         optional, voucher_number, total_amount)
      VALUES ($1, $2, 'Sales', '2026-07-03', 'V2 test valid sale',
              false, 'V2-001', 120.00)
      RETURNING id`,
-    [companyId, locationId],
+    [companyId, locationId]
   );
   await pool.query(
     `INSERT INTO sales_items
        (voucher_id, stock_item_id, quantity, selling_price, cost_price, total_sales, total_cost, profit)
      VALUES ($1, $2, 10, 12.00, 10.00, 120.00, 100.00, 20.00)`,
-    [v1.id, item1Id],
+    [v1.id, item1Id]
   );
 
   // 2. Deleted Sales voucher: Jul 2, item2, qty=5 → must be excluded
-  const { rows: [v2] } = await pool.query<{ id: number }>(
+  const {
+    rows: [v2],
+  } = await pool.query<{ id: number }>(
     `INSERT INTO vouchers
        (company_id, location_id, voucher_type, voucher_date, description,
         optional, voucher_number, total_amount, deleted_at)
      VALUES ($1, $2, 'Sales', '2026-07-02', 'V2 test deleted sale',
              false, 'V2-002', 60.00, NOW())
      RETURNING id`,
-    [companyId, locationId],
+    [companyId, locationId]
   );
   await pool.query(
     `INSERT INTO sales_items
        (voucher_id, stock_item_id, quantity, selling_price, cost_price, total_sales, total_cost, profit)
      VALUES ($1, $2, 5, 12.00, 10.00, 60.00, 50.00, 10.00)`,
-    [v2.id, item2Id],
+    [v2.id, item2Id]
   );
 
   // 3. Optional Sales voucher: Jul 4, item2, qty=7 → must be excluded
-  const { rows: [v3] } = await pool.query<{ id: number }>(
+  const {
+    rows: [v3],
+  } = await pool.query<{ id: number }>(
     `INSERT INTO vouchers
        (company_id, location_id, voucher_type, voucher_date, description,
         optional, voucher_number, total_amount)
      VALUES ($1, $2, 'Sales', '2026-07-04', 'V2 test optional sale',
              true, 'V2-003', 84.00)
      RETURNING id`,
-    [companyId, locationId],
+    [companyId, locationId]
   );
   await pool.query(
     `INSERT INTO sales_items
        (voucher_id, stock_item_id, quantity, selling_price, cost_price, total_sales, total_cost, profit)
      VALUES ($1, $2, 7, 12.00, 10.00, 84.00, 70.00, 14.00)`,
-    [v3.id, item2Id],
+    [v3.id, item2Id]
   );
 
   // 4. Wrong-type (Journal) voucher: Jul 5, item3, qty=3 → must be excluded
-  const { rows: [v4] } = await pool.query<{ id: number }>(
+  const {
+    rows: [v4],
+  } = await pool.query<{ id: number }>(
     `INSERT INTO vouchers
        (company_id, location_id, voucher_type, voucher_date, description,
         optional, voucher_number, total_amount)
      VALUES ($1, $2, 'Journal', '2026-07-05', 'V2 test journal',
              false, 'V2-004', 36.00)
      RETURNING id`,
-    [companyId, locationId],
+    [companyId, locationId]
   );
   await pool.query(
     `INSERT INTO sales_items
        (voucher_id, stock_item_id, quantity, selling_price, cost_price, total_sales, total_cost, profit)
      VALUES ($1, $2, 3, 12.00, 10.00, 36.00, 30.00, 6.00)`,
-    [v4.id, item3Id],
+    [v4.id, item3Id]
   );
 
   // Derive expected opening/closing from inventory helper
-  const openRows  = await calculateHistoricalLocationInventory(locationId, companyId, "2026-06-30");
+  const openRows = await calculateHistoricalLocationInventory(locationId, companyId, "2026-06-30");
   const closeRows = await calculateHistoricalLocationInventory(locationId, companyId, TO);
-  const openEntry  = openRows.find((r) => r.stockItemId === item1Id);
+  const openEntry = openRows.find((r) => r.stockItemId === item1Id);
   const closeEntry = closeRows.find((r) => r.stockItemId === item1Id);
-  expectedOpenQtyItem1  = openEntry  ? parseFloat(String(openEntry.quantity  ?? "0")) : 0;
+  expectedOpenQtyItem1 = openEntry ? parseFloat(String(openEntry.quantity ?? "0")) : 0;
   expectedCloseQtyItem1 = closeEntry ? parseFloat(String(closeEntry.quantity ?? "0")) : 0;
 
   // Generate workbook
@@ -231,7 +234,7 @@ beforeAll(async () => {
     companyId,
     locationId,
     fromDate: FROM,
-    toDate:   TO,
+    toDate: TO,
     locationName: "Test Warehouse",
     supplierName: "V2 Export Test",
   });
@@ -243,12 +246,13 @@ beforeAll(async () => {
 
 afterAll(async () => {
   try {
-    await pool.query(
-      `DELETE FROM sales_items WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = $1)`,
-      [ctx.companyId],
-    );
+    await pool.query(`DELETE FROM sales_items WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = $1)`, [
+      ctx.companyId,
+    ]);
     await pool.query(`DELETE FROM vouchers WHERE company_id = $1`, [ctx.companyId]);
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   await cleanupTestData(TEST_PREFIX);
   closeTestServer();
 }, 30000);
@@ -258,7 +262,7 @@ afterAll(async () => {
 describe("V2 Export — Group subtotal rows", () => {
   it("ENTRY has a subtotal row for the test group at the expected position", () => {
     const ws = wb.getWorksheet("ENTRY")!;
-    const v  = ws.getRow(E_SUBTOTAL_ROW).getCell(1).value;
+    const v = ws.getRow(E_SUBTOTAL_ROW).getCell(1).value;
     expect(typeof v).toBe("string");
     expect((v as string).toLowerCase()).toContain("testgroup");
   });
@@ -273,7 +277,7 @@ describe("V2 Export — Group subtotal rows", () => {
   });
 
   it("Subtotal row Sales for Jul 3 equals total sales for the group", () => {
-    const ws       = wb.getWorksheet("ENTRY")!;
+    const ws = wb.getWorksheet("ENTRY")!;
     const salesCol = E_DATE_START + 2 * COLS_PER_DAY + 1;
     const subtotalSales = cellNum(ws, E_SUBTOTAL_ROW, salesCol);
     expect(subtotalSales).not.toBeNull();
@@ -281,7 +285,7 @@ describe("V2 Export — Group subtotal rows", () => {
   });
 
   it("Subtotal row Profit for Jul 3 equals total profit for the group", () => {
-    const ws        = wb.getWorksheet("ENTRY")!;
+    const ws = wb.getWorksheet("ENTRY")!;
     const profitCol = E_DATE_START + 2 * COLS_PER_DAY + 2;
     const subtotalProfit = cellNum(ws, E_SUBTOTAL_ROW, profitCol);
     expect(subtotalProfit).not.toBeNull();
@@ -289,7 +293,7 @@ describe("V2 Export — Group subtotal rows", () => {
   });
 
   it("Subtotal Qty column is a formula SUM", () => {
-    const ws     = wb.getWorksheet("ENTRY")!;
+    const ws = wb.getWorksheet("ENTRY")!;
     const qtyCol = E_DATE_START + 2 * COLS_PER_DAY;
     const formula = cellFormula(ws, E_SUBTOTAL_ROW, qtyCol);
     expect(formula, "Subtotal Qty should be a SUM formula").not.toBeNull();
@@ -297,46 +301,46 @@ describe("V2 Export — Group subtotal rows", () => {
   });
 
   it("Subtotal Sales column is a live SUMPRODUCT formula (not a cached value)", () => {
-    const ws       = wb.getWorksheet("ENTRY")!;
+    const ws = wb.getWorksheet("ENTRY")!;
     const salesCol = E_DATE_START + 2 * COLS_PER_DAY + 1;
-    const formula  = cellFormula(ws, E_SUBTOTAL_ROW, salesCol);
+    const formula = cellFormula(ws, E_SUBTOTAL_ROW, salesCol);
     expect(formula, "Subtotal Sales should be a SUMPRODUCT formula").not.toBeNull();
     expect(formula!.toUpperCase()).toContain("SUMPRODUCT(");
   });
 
   it("Subtotal Sales formula does NOT use IF(ISNUMBER) — uses plain SUMPRODUCT", () => {
-    const ws       = wb.getWorksheet("ENTRY")!;
+    const ws = wb.getWorksheet("ENTRY")!;
     const salesCol = E_DATE_START + 2 * COLS_PER_DAY + 1;
-    const formula  = cellFormula(ws, E_SUBTOTAL_ROW, salesCol);
+    const formula = cellFormula(ws, E_SUBTOTAL_ROW, salesCol);
     expect(formula!.toUpperCase()).not.toContain("ISNUMBER");
   });
 
   it("Subtotal Profit column is a live SUMPRODUCT formula (not a cached value)", () => {
-    const ws        = wb.getWorksheet("ENTRY")!;
+    const ws = wb.getWorksheet("ENTRY")!;
     const profitCol = E_DATE_START + 2 * COLS_PER_DAY + 2;
-    const formula   = cellFormula(ws, E_SUBTOTAL_ROW, profitCol);
+    const formula = cellFormula(ws, E_SUBTOTAL_ROW, profitCol);
     expect(formula, "Subtotal Profit should be a SUMPRODUCT formula").not.toBeNull();
     expect(formula!.toUpperCase()).toContain("SUMPRODUCT(");
   });
 
   it("Subtotal Profit formula does NOT use IF(ISNUMBER) — uses plain SUMPRODUCT", () => {
-    const ws        = wb.getWorksheet("ENTRY")!;
+    const ws = wb.getWorksheet("ENTRY")!;
     const profitCol = E_DATE_START + 2 * COLS_PER_DAY + 2;
-    const formula   = cellFormula(ws, E_SUBTOTAL_ROW, profitCol);
+    const formula = cellFormula(ws, E_SUBTOTAL_ROW, profitCol);
     expect(formula!.toUpperCase()).not.toContain("ISNUMBER");
   });
 
   it("Subtotal Sale Price column (Total Sales) is money formatted", () => {
-    const ws       = wb.getWorksheet("ENTRY")!;
+    const ws = wb.getWorksheet("ENTRY")!;
     const salesCol = E_DATE_START + 2 * COLS_PER_DAY + 1;
-    const fmt      = ws.getRow(E_SUBTOTAL_ROW).getCell(salesCol).numFmt ?? "";
+    const fmt = ws.getRow(E_SUBTOTAL_ROW).getCell(salesCol).numFmt ?? "";
     expect(fmt).toMatch(/\$/);
   });
 
   it("Subtotal Profit/Bag column (Total Profit) is money formatted", () => {
-    const ws        = wb.getWorksheet("ENTRY")!;
+    const ws = wb.getWorksheet("ENTRY")!;
     const profitCol = E_DATE_START + 2 * COLS_PER_DAY + 2;
-    const fmt       = ws.getRow(E_SUBTOTAL_ROW).getCell(profitCol).numFmt ?? "";
+    const fmt = ws.getRow(E_SUBTOTAL_ROW).getCell(profitCol).numFmt ?? "";
     expect(fmt).toMatch(/\$/);
   });
 });
@@ -345,13 +349,13 @@ describe("V2 Export — Group subtotal rows", () => {
 describe("V2 Export — Grand TOTAL row", () => {
   it("TOTAL row exists at the expected position and contains 'TOTAL'", () => {
     const ws = wb.getWorksheet("ENTRY")!;
-    const v  = ws.getRow(E_TOTAL_ROW).getCell(1).value;
+    const v = ws.getRow(E_TOTAL_ROW).getCell(1).value;
     expect(typeof v).toBe("string");
     expect((v as string).trim()).toBe("TOTAL");
   });
 
   it("TOTAL row Qty for Jul 3 matches sum of all items", () => {
-    const ws     = wb.getWorksheet("ENTRY")!;
+    const ws = wb.getWorksheet("ENTRY")!;
     const qtyCol = E_DATE_START + 2 * COLS_PER_DAY;
     const totalQty = cellNum(ws, E_TOTAL_ROW, qtyCol);
     expect(totalQty).not.toBeNull();
@@ -359,7 +363,7 @@ describe("V2 Export — Grand TOTAL row", () => {
   });
 
   it("TOTAL row Sales for Jul 3 matches total sales", () => {
-    const ws       = wb.getWorksheet("ENTRY")!;
+    const ws = wb.getWorksheet("ENTRY")!;
     const salesCol = E_DATE_START + 2 * COLS_PER_DAY + 1;
     const totalSales = cellNum(ws, E_TOTAL_ROW, salesCol);
     expect(totalSales).not.toBeNull();
@@ -367,7 +371,7 @@ describe("V2 Export — Grand TOTAL row", () => {
   });
 
   it("TOTAL row Profit for Jul 3 matches total profit", () => {
-    const ws        = wb.getWorksheet("ENTRY")!;
+    const ws = wb.getWorksheet("ENTRY")!;
     const profitCol = E_DATE_START + 2 * COLS_PER_DAY + 2;
     const totalProfit = cellNum(ws, E_TOTAL_ROW, profitCol);
     expect(totalProfit).not.toBeNull();
@@ -375,17 +379,17 @@ describe("V2 Export — Grand TOTAL row", () => {
   });
 
   it("TOTAL row Sales column is a SUM formula over subtotal rows", () => {
-    const ws       = wb.getWorksheet("ENTRY")!;
+    const ws = wb.getWorksheet("ENTRY")!;
     const salesCol = E_DATE_START + 2 * COLS_PER_DAY + 1;
-    const formula  = cellFormula(ws, E_TOTAL_ROW, salesCol);
+    const formula = cellFormula(ws, E_TOTAL_ROW, salesCol);
     expect(formula, "TOTAL Sales should be a SUM formula").not.toBeNull();
     expect(formula!.toUpperCase()).toContain("SUM(");
   });
 
   it("TOTAL row Profit column is a SUM formula over subtotal rows", () => {
-    const ws        = wb.getWorksheet("ENTRY")!;
+    const ws = wb.getWorksheet("ENTRY")!;
     const profitCol = E_DATE_START + 2 * COLS_PER_DAY + 2;
-    const formula   = cellFormula(ws, E_TOTAL_ROW, profitCol);
+    const formula = cellFormula(ws, E_TOTAL_ROW, profitCol);
     expect(formula, "TOTAL Profit should be a SUM formula").not.toBeNull();
     expect(formula!.toUpperCase()).toContain("SUM(");
   });
@@ -422,12 +426,12 @@ describe("V2 Export — No dates beyond toDate in ENTRY", () => {
 
 // ── 11. No sale values on no-sale days ────────────────────────────────────────
 describe("V2 Export — No sale values on no-sale days (item1)", () => {
-  const NO_SALE_DAYS  = [0, 1, 3, 4, 5, 6];
-  const NO_SALE_LABELS = ["Jul 1","Jul 2","Jul 4","Jul 5","Jul 6","Jul 7"];
+  const NO_SALE_DAYS = [0, 1, 3, 4, 5, 6];
+  const NO_SALE_LABELS = ["Jul 1", "Jul 2", "Jul 4", "Jul 5", "Jul 6", "Jul 7"];
 
   NO_SALE_DAYS.forEach((d, i) => {
     it(`ENTRY Test Item 1: Qty and Sale Price are null on ${NO_SALE_LABELS[i]} (day ${d})`, () => {
-      const ws  = wb.getWorksheet("ENTRY")!;
+      const ws = wb.getWorksheet("ENTRY")!;
       const row = findItemRow(ws, "Test Item 1");
       expect(row, "Test Item 1 row not found").not.toBeNull();
       const baseCol = E_DATE_START + d * COLS_PER_DAY;
@@ -437,7 +441,7 @@ describe("V2 Export — No sale values on no-sale days (item1)", () => {
   });
 
   it("ENTRY Test Item 1: Qty on Jul 3 (day 2) = 10", () => {
-    const ws  = wb.getWorksheet("ENTRY")!;
+    const ws = wb.getWorksheet("ENTRY")!;
     const row = findItemRow(ws, "Test Item 1");
     expect(row, "Test Item 1 row not found").not.toBeNull();
     const qtyCol = E_DATE_START + 2 * COLS_PER_DAY;
@@ -448,7 +452,7 @@ describe("V2 Export — No sale values on no-sale days (item1)", () => {
 // ── 12. Sales query filters ────────────────────────────────────────────────────
 describe("V2 Export — Sales query filters", () => {
   it("ENTRY Test Item 2: no Qty on Jul 2 (deleted Sales voucher excluded)", () => {
-    const ws  = wb.getWorksheet("ENTRY")!;
+    const ws = wb.getWorksheet("ENTRY")!;
     const row = findItemRow(ws, "Test Item 2");
     if (!row) return;
     const qtyCol = E_DATE_START + 1 * COLS_PER_DAY;
@@ -456,7 +460,7 @@ describe("V2 Export — Sales query filters", () => {
   });
 
   it("ENTRY Test Item 2: no Qty on Jul 4 (optional Sales voucher excluded)", () => {
-    const ws  = wb.getWorksheet("ENTRY")!;
+    const ws = wb.getWorksheet("ENTRY")!;
     const row = findItemRow(ws, "Test Item 2");
     if (!row) return;
     const qtyCol = E_DATE_START + 3 * COLS_PER_DAY;
@@ -464,7 +468,7 @@ describe("V2 Export — Sales query filters", () => {
   });
 
   it("ENTRY Test Item 3: no Qty on Jul 5 (wrong voucher_type excluded)", () => {
-    const ws  = wb.getWorksheet("ENTRY")!;
+    const ws = wb.getWorksheet("ENTRY")!;
     const row = findItemRow(ws, "Test Item 3");
     if (!row) return;
     const qtyCol = E_DATE_START + 4 * COLS_PER_DAY;
@@ -482,7 +486,7 @@ describe("V2 Export — Sales query filters", () => {
           AND v.optional     = false
           AND v.voucher_date BETWEEN '2026-07-01'::date AND '2026-07-07'::date
           AND v.location_id  = $2`,
-      [ctx.companyId, ctx.locationId],
+      [ctx.companyId, ctx.locationId]
     );
     expect(parseInt(rows[0].cnt, 10)).toBe(1);
   });
@@ -493,7 +497,7 @@ describe("V2 Export — Sales query filters", () => {
          FROM sales_items si
          JOIN vouchers v ON v.id = si.voucher_id
         WHERE v.company_id = $1`,
-      [ctx.companyId],
+      [ctx.companyId]
     );
     expect(parseInt(rows[0].cnt, 10)).toBe(4);
   });
@@ -530,7 +534,7 @@ describe("V2 Export — Sales sheet date range", () => {
 describe("V2 Export — Cash & Bank section", () => {
   it("ENTRY has 'CASH & BANK SUMMARY' header below TOTAL row", () => {
     const ws = wb.getWorksheet("ENTRY")!;
-    const v  = ws.getRow(E_CASH_HDR_ROW).getCell(1).value;
+    const v = ws.getRow(E_CASH_HDR_ROW).getCell(1).value;
     expect(typeof v).toBe("string");
     expect((v as string).toLowerCase()).toContain("cash");
     expect((v as string).toLowerCase()).toContain("bank");
@@ -538,31 +542,31 @@ describe("V2 Export — Cash & Bank section", () => {
 
   it("ENTRY has CASH sub-header for day 0 at cashSubHdrRow", () => {
     const ws = wb.getWorksheet("ENTRY")!;
-    const v  = ws.getRow(E_CASH_SUBHDR).getCell(E_DATE_START).value;
+    const v = ws.getRow(E_CASH_SUBHDR).getCell(E_DATE_START).value;
     expect(String(v ?? "").toLowerCase()).toContain("cash");
   });
 
   it("ENTRY has BANK sub-header for day 0 at cashSubHdrRow", () => {
     const ws = wb.getWorksheet("ENTRY")!;
-    const v  = ws.getRow(E_CASH_SUBHDR).getCell(E_DATE_START + 1).value;
+    const v = ws.getRow(E_CASH_SUBHDR).getCell(E_DATE_START + 1).value;
     expect(String(v ?? "").toLowerCase()).toContain("bank");
   });
 
   it("ENTRY has 'Opening Cash' row", () => {
     const ws = wb.getWorksheet("ENTRY")!;
-    const v  = ws.getRow(E_OPEN_CASH_ROW).getCell(1).value;
+    const v = ws.getRow(E_OPEN_CASH_ROW).getCell(1).value;
     expect(String(v ?? "").toLowerCase()).toContain("opening cash");
   });
 
   it("ENTRY has 'Cash deposit in Bank' row", () => {
     const ws = wb.getWorksheet("ENTRY")!;
-    const v  = ws.getRow(E_DEPOSIT_ROW).getCell(1).value;
+    const v = ws.getRow(E_DEPOSIT_ROW).getCell(1).value;
     expect(String(v ?? "").toLowerCase()).toContain("cash deposit");
   });
 
   it("ENTRY has 'Receipt from Credit Sales' row", () => {
     const ws = wb.getWorksheet("ENTRY")!;
-    const v  = ws.getRow(E_RECEIPT_ROW).getCell(1).value;
+    const v = ws.getRow(E_RECEIPT_ROW).getCell(1).value;
     expect(String(v ?? "").toLowerCase()).toContain("receipt");
   });
 });
@@ -571,7 +575,7 @@ describe("V2 Export — Cash & Bank section", () => {
 describe("V2 Export — Payments section", () => {
   it("ENTRY has 'PAYMENTS' header row", () => {
     const ws = wb.getWorksheet("ENTRY")!;
-    const v  = ws.getRow(E_PAYMENTS_ROW).getCell(1).value;
+    const v = ws.getRow(E_PAYMENTS_ROW).getCell(1).value;
     expect(String(v ?? "").toLowerCase()).toContain("payment");
   });
 
@@ -598,7 +602,7 @@ describe("V2 Export — Payments section", () => {
     expect(label.toLowerCase()).toContain("total payments");
 
     const cashCell = ws.getRow(E_TOTAL_PAY_ROW).getCell(E_DATE_START);
-    const formula  = (cashCell.value as any)?.formula ?? "";
+    const formula = (cashCell.value as any)?.formula ?? "";
     expect(formula).toContain("SUM(");
     expect(cashCell.protection?.locked).not.toBe(false);
 
@@ -624,8 +628,8 @@ describe("V2 Export — Cash/Bank roll-forward formulas", () => {
     const ws = wb.getWorksheet("ENTRY")!;
     const nextCashCell = ws.getRow(E_OPEN_CASH_ROW).getCell(E_DATE_START + COLS_PER_DAY);
     const nextBankCell = ws.getRow(E_OPEN_CASH_ROW).getCell(E_DATE_START + COLS_PER_DAY + 1);
-    const cashFormula  = (nextCashCell.value as any)?.formula ?? "";
-    const bankFormula  = (nextBankCell.value as any)?.formula ?? "";
+    const cashFormula = (nextCashCell.value as any)?.formula ?? "";
+    const bankFormula = (nextBankCell.value as any)?.formula ?? "";
     expect(cashFormula).toContain(String(E_BALANCE_ROW));
     expect(bankFormula).toContain(String(E_BALANCE_ROW));
     expect(nextCashCell.protection?.locked).not.toBe(false);
@@ -639,8 +643,8 @@ describe("V2 Export — Cash/Bank roll-forward formulas", () => {
     const ws = wb.getWorksheet("ENTRY")!;
     const day3CashCell = ws.getRow(E_OPEN_CASH_ROW).getCell(E_DATE_START + COLS_PER_DAY * 2);
     const day3BankCell = ws.getRow(E_OPEN_CASH_ROW).getCell(E_DATE_START + COLS_PER_DAY * 2 + 1);
-    const cashFormula  = (day3CashCell.value as any)?.formula ?? "";
-    const bankFormula  = (day3BankCell.value as any)?.formula ?? "";
+    const cashFormula = (day3CashCell.value as any)?.formula ?? "";
+    const bankFormula = (day3BankCell.value as any)?.formula ?? "";
     expect(cashFormula).toContain(String(E_BALANCE_ROW));
     expect(bankFormula).toContain(String(E_BALANCE_ROW));
     // And it must reference Day 2's column (one day-block to the left of Day 3's own column)
@@ -674,7 +678,7 @@ describe("V2 Export — Cash/Bank roll-forward formulas", () => {
   it("Balance Cash formula includes Opening Cash + Total Sales - Deposit + Receipt - Total Payments references", () => {
     const ws = wb.getWorksheet("ENTRY")!;
     const cashCell = ws.getRow(E_BALANCE_ROW).getCell(E_DATE_START);
-    const formula  = (cashCell.value as any)?.formula ?? "";
+    const formula = (cashCell.value as any)?.formula ?? "";
     expect(formula).toContain(String(E_OPEN_CASH_ROW));
     expect(formula).toContain(String(E_TOTAL_ROW));
     expect(formula).toContain(String(E_DEPOSIT_ROW));
@@ -685,7 +689,7 @@ describe("V2 Export — Cash/Bank roll-forward formulas", () => {
   it("Balance Bank formula includes Opening Bank + Deposit - Total Bank Payments references", () => {
     const ws = wb.getWorksheet("ENTRY")!;
     const bankCell = ws.getRow(E_BALANCE_ROW).getCell(E_DATE_START + 1);
-    const formula  = (bankCell.value as any)?.formula ?? "";
+    const formula = (bankCell.value as any)?.formula ?? "";
     expect(formula).toContain(String(E_OPEN_CASH_ROW));
     expect(formula).toContain(String(E_DEPOSIT_ROW));
     expect(formula).toContain(String(E_TOTAL_PAY_ROW));
