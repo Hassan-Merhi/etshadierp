@@ -1,8 +1,8 @@
 {
-  "measuredAtSha": "cf2ed28a22d85f7ba535f6b0c0bc3d03255f79de",
+  "measuredAtSha": "583cf70e9ec46e6e6e39818b80d79c87627952a9",
   "backendLinesPct": null,
   "backendTargetPct": 35,
-  "frontendLinesPct": 18.92,
+  "frontendLinesPct": 18.96,
   "frontendTargetPct": 20,
   "backendStep": "failure",
   "frontendStep": "success",
