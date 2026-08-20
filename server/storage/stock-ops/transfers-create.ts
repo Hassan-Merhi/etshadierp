@@ -415,7 +415,11 @@ export async function createStockAdjustment(
     }
 
     if (!isOptional) {
-      if (totalProductionValue.isPositive() && productionAccountId) {
+      // Decimal.js treats +0 as "positive", so isPositive() is not a strict
+      // greater-than-zero check. A zero-value adjustment (for example producing
+      // quantity at rate 0) must not create a 0/0 voucher entry because the
+      // voucher-entry normalization trigger correctly rejects such rows.
+      if (totalProductionValue.gt(0) && productionAccountId) {
         await tx.insert(schema.voucherEntries).values({
           voucherId,
           ledgerAccountId: productionAccountId,
@@ -424,7 +428,7 @@ export async function createStockAdjustment(
           narration: `Production adjustment - ${adjustmentType} voucher`,
         });
       }
-      if (totalConsumptionValue.isPositive() && consumptionAccountId) {
+      if (totalConsumptionValue.gt(0) && consumptionAccountId) {
         await tx.insert(schema.voucherEntries).values({
           voucherId,
           ledgerAccountId: consumptionAccountId,
