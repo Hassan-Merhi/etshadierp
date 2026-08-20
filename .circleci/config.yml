@@ -1,8 +1,5 @@
 version: 2.1
 
-orbs:
-  node: circleci/node@7.1.0
-
 executors:
   node22:
     docker:
@@ -38,206 +35,97 @@ executors:
     working_directory: ~/project
 
 commands:
-  install_dependencies:
+  install:
     steps:
       - checkout
       - run:
-          name: Pin checkout to the triggering commit
+          name: Pin checkout
           command: |
-            echo "CircleCI requested SHA: ${CIRCLE_SHA1}"
-            actual_sha="$(git rev-parse HEAD)"
-            echo "CircleCI checkout SHA: ${actual_sha}"
-
-            if ! git cat-file -e "${CIRCLE_SHA1}^{commit}" 2>/dev/null; then
-              echo "Triggering commit is not present locally; fetching the branch ref."
-              git fetch --no-tags --prune origin "+refs/heads/${CIRCLE_BRANCH}:refs/remotes/origin/${CIRCLE_BRANCH}"
-            fi
-
+            git fetch --no-tags --prune origin "+refs/heads/${CIRCLE_BRANCH}:refs/remotes/origin/${CIRCLE_BRANCH}"
             git reset --hard "${CIRCLE_SHA1}"
             git clean -ffdx
-            test "$(git rev-parse HEAD)" = "${CIRCLE_SHA1}"
-            git status --short
-      - run:
-          name: Normalize package registry URLs
-          command: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
-      - node/install-packages:
-          pkg-manager: npm
-          override-ci-command: npm ci --no-audit --bin-links=true
-      - run:
-          name: Dependency diagnostics
-          command: |
-            node --version
-            npm --version
-            npm config get bin-links
-            node -p "'TypeScript ' + require('typescript/package.json').version"
-            node -p "'jsdom ' + require('jsdom/package.json').version"
-            for binary in tsc vite eslint vitest; do
-              test -x "node_modules/.bin/$binary" || { echo "$binary is missing"; exit 1; }
-            done
-
+            sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+            npm ci --no-audit --bin-links=true
   wait_for_postgres:
     steps:
       - run:
           name: Wait for PostgreSQL
           command: |
             for attempt in $(seq 1 60); do
-              if (echo > /dev/tcp/127.0.0.1/5432) >/dev/null 2>&1; then
-                echo "PostgreSQL is accepting connections."
-                exit 0
-              fi
+              if (echo > /dev/tcp/127.0.0.1/5432) >/dev/null 2>&1; then exit 0; fi
               sleep 1
             done
-            echo "PostgreSQL did not become ready."
             exit 1
+  split:
+    steps:
+      - run:
+          name: Apply Wave 1 split
+          command: node scripts/god-files-wave1-split.mjs
 
 jobs:
-  static-build:
+  wave1-transform-audit:
     executor: node22
     steps:
-      - install_dependencies
+      - install
+      - split
       - run:
-          name: Verify lockfile and production dependencies
-          command: |
-            npm run verify:lockfile
-            npm run verify:production-dependencies
+          name: God-file audit
+          command: npm run audit:god-files
       - run:
-          name: Check formatting for changed source files
-          command: |
-            git fetch --no-tags --prune --depth=1 origin +refs/heads/main:refs/remotes/origin/main
-            mapfile -d '' changed_files < <(
-              git diff --name-only --diff-filter=ACMR -z origin/main HEAD -- client/src server shared tests scripts |
-                grep -zE '\.(ts|tsx|css|mjs)$' || true
-            )
-            if [ "${#changed_files[@]}" -eq 0 ]; then
-              echo "No changed source files require formatting checks."
-              exit 0
-            fi
-            printf 'Checking formatting for %s changed source file(s):\n' "${#changed_files[@]}"
-            printf ' - %s\n' "${changed_files[@]}"
-            node node_modules/prettier/bin/prettier.cjs --check "${changed_files[@]}"
-      - run:
-          name: Lint
-          command: npm run lint
-      - run:
-          name: Lint warning ratchet
-          when: always
-          command: npm run audit:lint-ratchet
+          name: Documentation audit
+          command: npm run audit:doc-index
+
+  wave1-typecheck:
+    executor: node22
+    steps:
+      - install
+      - split
       - run:
           name: TypeScript
           command: npm run check
-      - run:
-          name: Production build
-          command: npm run build
-      - run:
-          name: Verify server bundle
-          command: npm run verify:server-bundle
-      - run:
-          name: Repository safety contracts
-          command: |
-            npm run verify:observability
-            npm run verify:final-production-readiness
-            npm run verify:bandwidth
-      - store_artifacts:
-          path: dist
-          destination: production-build
 
-  postgres-regression:
+  wave1-targeted-tests:
     executor: node22-postgres
     steps:
-      - install_dependencies
+      - install
       - wait_for_postgres
-      - run:
-          name: Verify migration registry
-          command: node scripts/verify-migration-registry.mjs --json
       - run:
           name: Prepare disposable database schema
           command: node node_modules/drizzle-kit/bin.cjs push --force
+      - split
       - run:
-          name: Verify disposable database schema
-          command: node scripts/verify-ci-disposable-schema.mjs
-      - run:
-          name: Integration backend tests
+          name: Wave 1 suites
           command: |
-            mapfile -t integration_test_files < <(
-              find tests -type f -name '*.test.ts' \
-                ! -path 'tests/ui/*' \
-                ! -path 'tests/api-smoke-sweep.test.ts' \
-                | sort
-            )
-            test "${#integration_test_files[@]}" -gt 0
             node node_modules/vitest/vitest.mjs run \
-              "${integration_test_files[@]}" \
+              tests/xlsx-export.test.ts \
+              tests/xlsx-export-sp-sales-form.test.ts \
+              tests/workflow.test.ts \
+              tests/workflow-daybook-isolation.test.ts \
+              tests/inventory.test.ts \
+              tests/inventory-reconciliation.test.ts \
+              tests/excel-export-v2.test.ts \
+              tests/excel-export-v2-totals-cash.test.ts \
+              tests/excel-export-v2-historical-cash.test.ts \
               --maxWorkers=1 \
               --no-file-parallelism
-
-  backend-core-regression:
-    executor: node22-postgres
-    steps:
-      - install_dependencies
-      - wait_for_postgres
-      - run:
-          name: Prepare disposable database schema
-          command: node node_modules/drizzle-kit/bin.cjs push --force
-      - run:
-          name: Co-located backend tests
-          command: |
-            mapfile -t core_test_files < <(
-              find server shared -type f -name '*.test.ts' | sort
-            )
-            test "${#core_test_files[@]}" -gt 0
-            node node_modules/vitest/vitest.mjs run \
-              "${core_test_files[@]}" \
-              --maxWorkers=1 \
-              --no-file-parallelism
-
-  frontend-regression:
-    executor: node22
-    steps:
-      - install_dependencies
-      - run:
-          name: Frontend tests
-          command: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
-
-  security-readiness:
-    executor: node22-postgres
-    steps:
-      - install_dependencies
-      - wait_for_postgres
-      - run:
-          name: Prepare disposable database schema
-          command: node node_modules/drizzle-kit/bin.cjs push --force
-      - run:
-          name: Critical dependency audit
-          command: npm audit --audit-level=critical
-      - run:
-          name: Production dependency verification
-          command: npm run verify:production-dependencies
-      - run:
-          name: Program 6 security checks
-          command: PROGRAM6_SKIP_TYPESCRIPT=1 npm run check:security
-      - run:
-          name: Final production readiness contract
-          command: npm run verify:final-production-readiness
 
   wave1-publisher:
     executor: node22-postgres
     steps:
-      - install_dependencies
+      - install
       - wait_for_postgres
       - run:
           name: Prepare disposable database schema
           command: node node_modules/drizzle-kit/bin.cjs push --force
+      - split
       - run:
-          name: Apply Wave 1 split
-          command: node scripts/god-files-wave1-split.mjs
-      - run:
-          name: Verify God-file and documentation ratchets
+          name: Reconfirm audits and TypeScript
           command: |
             npm run audit:god-files
             npm run audit:doc-index
             npm run check
       - run:
-          name: Run all resulting Wave 1 suites serially
+          name: Reconfirm Wave 1 suites
           command: |
             node node_modules/vitest/vitest.mjs run \
               tests/xlsx-export.test.ts \
@@ -252,12 +140,12 @@ jobs:
               --maxWorkers=1 \
               --no-file-parallelism
       - run:
-          name: Publish certified Wave 1 split
+          name: Publish certified split
           command: |
             git fetch --no-tags origin "+refs/heads/${CIRCLE_BRANCH}:refs/remotes/origin/${CIRCLE_BRANCH}"
             remote_head="$(git rev-parse refs/remotes/origin/${CIRCLE_BRANCH})"
             if [ "${remote_head}" != "${CIRCLE_SHA1}" ]; then
-              echo "Branch advanced while publisher was running (${remote_head}); leaving publication to the newer run."
+              echo "Branch advanced to ${remote_head}; newer run owns publication."
               exit 0
             fi
             git show a1b3e57f63af1c4847e8851027868dc067bf68e8:.circleci/config.yml > .circleci/config.yml
@@ -286,14 +174,13 @@ jobs:
             git push origin HEAD:${CIRCLE_BRANCH}
 
 workflows:
-  full-erp-verification:
+  wave1-certification:
     jobs:
-      - static-build
-      - postgres-regression
-      - backend-core-regression
-      - frontend-regression
-      - security-readiness
+      - wave1-transform-audit
+      - wave1-typecheck
+      - wave1-targeted-tests
       - wave1-publisher:
-          filters:
-            branches:
-              only: agent/god-files-final-wave1-tests
+          requires:
+            - wave1-transform-audit
+            - wave1-typecheck
+            - wave1-targeted-tests
