@@ -884,20 +884,23 @@ export async function applyPostOffloadPhase6Repair(params: {
       supplierIds: payload.supplierIds,
     });
   } catch (error) {
-    throw Object.assign(
-      new Error(
-        `Phase 6 repair committed with undo log ${undoLogId}, but post-commit verification failed: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      ),
-      {
-        code: "POST_OFFLOAD_PHASE6_POST_COMMIT_VERIFICATION_FAILED",
-        repairCommitted: true,
-        undoLogId,
-        applied,
-        cause: error,
-      }
-    );
+    const verificationError = new Error(
+      `Phase 6 repair committed with undo log ${undoLogId}, but post-commit verification failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    ) as Error & {
+      code: string;
+      repairCommitted: boolean;
+      undoLogId: number;
+      applied: typeof applied;
+      cause: unknown;
+    };
+    verificationError.code = "POST_OFFLOAD_PHASE6_POST_COMMIT_VERIFICATION_FAILED";
+    verificationError.repairCommitted = true;
+    verificationError.undoLogId = undoLogId;
+    verificationError.applied = applied;
+    verificationError.cause = error;
+    throw verificationError;
   }
 
   return {
