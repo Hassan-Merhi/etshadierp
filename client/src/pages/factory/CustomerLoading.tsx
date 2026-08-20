@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, ExternalLink, Loader2, Search, ShoppingCart, UsersRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,6 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import type { V5Data } from "./factorystockallocationv5/types";
 import {
   buildAvailableStockMap,
   resolveAvailableStock,
@@ -31,17 +30,14 @@ import {
   formatDateTime,
   formatMoney,
   formatNumber,
-  readJson,
   type AvailableNegativeFilter,
   type AvailableZeroFilter,
   type ColumnKey,
   type CustomerLoadingProduct,
-  type CustomerLoadingResponse,
-  type CustomerOption,
-  type HistoryResponse,
   type LoadingFilter,
 } from "./customerLoadingPageModel";
 import { CustomerLoadingSummaryCards } from "./CustomerLoadingSummaryCards";
+import { useCustomerLoadingQueries } from "./useCustomerLoadingQueries";
 
 export default function CustomerLoading() {
   const { toast } = useToast();
@@ -66,39 +62,10 @@ export default function CustomerLoading() {
   const [page, setPage] = useState(1);
   const qtyRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
-  const customersQuery = useQuery<CustomerOption[]>({
-    queryKey: ["/api/factory/customers", "customer-loading-picker"],
-    queryFn: () => readJson<CustomerOption[]>("/api/factory/customers"),
-    staleTime: 60_000,
-  });
-  const loadingQuery = useQuery<CustomerLoadingResponse>({
-    queryKey: ["/api/factory/customer-loading/products", customerId],
-    queryFn: () =>
-      readJson<CustomerLoadingResponse>(
-        `/api/factory/customer-loading/products?customerId=${encodeURIComponent(customerId)}`
-      ),
-    enabled: Boolean(customerId),
-    staleTime: 30_000,
-  });
-  const stockAllocationQuery = useQuery<V5Data>({
-    queryKey: ["/api/factory/v5/stock-allocation", "customer-loading"],
-    queryFn: () => readJson<V5Data>("/api/factory/v5/stock-allocation"),
-    enabled: Boolean(customerId),
-    retry: 1,
-    staleTime: 2 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-  });
-  const historyQuery = useQuery<HistoryResponse>({
-    queryKey: ["/api/factory/customer-loading/history", customerId, historyProduct?.id],
-    queryFn: () =>
-      readJson<HistoryResponse>(
-        `/api/factory/customer-loading/history?customerId=${encodeURIComponent(customerId)}&productId=${historyProduct!.id}`
-      ),
-    enabled: Boolean(customerId && historyProduct),
-    staleTime: 30_000,
-  });
+  const { customersQuery, loadingQuery, stockAllocationQuery, historyQuery } = useCustomerLoadingQueries(
+    customerId,
+    historyProduct
+  );
 
   const products = useMemo(() => loadingQuery.data?.products ?? [], [loadingQuery.data?.products]);
   const availableStockByCode = useMemo(
