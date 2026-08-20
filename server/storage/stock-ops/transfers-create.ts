@@ -14,6 +14,7 @@ import * as schema from "@shared/schema";
 import type { StockTransferItem, StockAdjustmentItem } from "@shared/schema";
 import { createDatabaseStockMovementAdapter } from "../../services/inventory/databaseStockMovementAdapter";
 import { postStockMovementTx } from "../../services/inventory/stockMovementIntegrityService";
+import { shouldInsertAdjustmentVoucherEntry } from "./adjustmentVoucherEntryGuard";
 
 const canonicalStockMovementAdapter = createDatabaseStockMovementAdapter();
 
@@ -415,11 +416,7 @@ export async function createStockAdjustment(
     }
 
     if (!isOptional) {
-      // Decimal.js treats +0 as "positive", so isPositive() is not a strict
-      // greater-than-zero check. A zero-value adjustment (for example producing
-      // quantity at rate 0) must not create a 0/0 voucher entry because the
-      // voucher-entry normalization trigger correctly rejects such rows.
-      if (totalProductionValue.gt(0) && productionAccountId) {
+      if (shouldInsertAdjustmentVoucherEntry(totalProductionValue, productionAccountId)) {
         await tx.insert(schema.voucherEntries).values({
           voucherId,
           ledgerAccountId: productionAccountId,
@@ -428,7 +425,7 @@ export async function createStockAdjustment(
           narration: `Production adjustment - ${adjustmentType} voucher`,
         });
       }
-      if (totalConsumptionValue.gt(0) && consumptionAccountId) {
+      if (shouldInsertAdjustmentVoucherEntry(totalConsumptionValue, consumptionAccountId)) {
         await tx.insert(schema.voucherEntries).values({
           voucherId,
           ledgerAccountId: consumptionAccountId,
