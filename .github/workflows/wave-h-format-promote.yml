@@ -1,0 +1,36 @@
+name: Wave H Format Promote
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  format-promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: wave-i/convergence-automation
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+      - run: npm ci --no-audit --bin-links=true
+      - name: Format Wave H test files
+        run: node node_modules/prettier/bin/prettier.cjs --write tests/ui/helpers.tsx tests/ui/wave-h-populated-core-pages.test.tsx tests/ui/wave-h-production-bales-behavior.test.tsx
+      - name: Verify Wave H frontend behavior
+        run: node node_modules/vitest/vitest.mjs run tests/ui/wave-h-populated-core-pages.test.tsx tests/ui/wave-h-production-bales-behavior.test.tsx --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
+      - name: Commit formatted tests and remove formatter
+        run: |
+          rm .github/workflows/wave-h-format-promote.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tests/ui/helpers.tsx tests/ui/wave-h-populated-core-pages.test.tsx tests/ui/wave-h-production-bales-behavior.test.tsx .github/workflows/wave-h-format-promote.yml
+          git diff --cached --check
+          git commit -m "style(wave-h): format frontend behavior tests"
+          git push origin HEAD:wave-i/convergence-automation
