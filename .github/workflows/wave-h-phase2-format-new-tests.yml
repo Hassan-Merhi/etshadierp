@@ -1,0 +1,36 @@
+name: Wave H Phase 2 Format New Tests
+
+on:
+  push:
+    branches: [wave-i/convergence-automation]
+    paths:
+      - .github/workflows/wave-h-phase2-format-new-tests.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with: { ref: wave-i/convergence-automation }
+      - uses: actions/setup-node@v6
+        with: { node-version: "22.14.0", cache: npm }
+      - run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+      - run: npm ci --no-audit --bin-links=true
+      - name: Format new Phase 2 tests
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            tests/ui/wave-h-populated-factory-surfaces.test.tsx \
+            client/src/lib/phase4BandwidthFetch.test.ts \
+            client/src/pages/factory/factoryotwtrackingtab/utils.test.ts
+      - name: Commit formatting and self-remove
+        run: |
+          rm -f .github/workflows/wave-h-phase2-format-new-tests.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tests/ui/wave-h-populated-factory-surfaces.test.tsx client/src/lib/phase4BandwidthFetch.test.ts client/src/pages/factory/factoryotwtrackingtab/utils.test.ts .github/workflows/wave-h-phase2-format-new-tests.yml
+          git commit -m "style: format Wave H Phase 2 coverage tests" || true
+          git push origin HEAD:wave-i/convergence-automation
