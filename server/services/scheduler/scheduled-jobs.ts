@@ -3,6 +3,7 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { pool } from "../../db";
 import { ensureMonthlyForCompany, postRentAccrualForCompany } from "../../routes/rental/shared";
+import { runScheduledConvergenceReconciliation } from "../accounting/scheduledConvergenceReconciliation";
 import { hasTodayExportSucceeded, isTodayExportRunning, runDailyExport } from "./daily-export";
 import { createSchedulerTick } from "./schedulerTickGuard";
 
@@ -127,6 +128,20 @@ export function startScheduler() {
     }
   );
 
+  // Wave I: every day at 3:30 AM ET, reconcile accounting/inventory evidence
+  // for every company. The runner is read-only and reports mismatches; it never
+  // mutates or auto-repairs accounting or inventory data. Each company is read
+  // from one repeatable-read snapshot so live posting cannot create false drift.
+  cron.schedule(
+    "30 3 * * *",
+    createSchedulerTick("convergenceReconciliation", async () => {
+      await runScheduledConvergenceReconciliation();
+    }),
+    {
+      timezone: "America/New_York",
+    }
+  );
+
   // Overdue customer payment reminder — runs every day at 9:00 AM EST
   cron.schedule("0 9 * * *", createSchedulerTick("overdueCheck", checkOverdueCustomers), {
     timezone: "America/New_York",
@@ -168,6 +183,7 @@ export function startScheduler() {
       "monthlyNetPositionWhatsApp(1st 07:00 EST)",
       "monthlyRentalAccrual(2nd 06:00 EST)",
       "hourlyChecks(stock/export/containers)",
+      "convergenceReconciliation(daily 03:30 ET)",
       "overdueCustomers(daily 09:00 EST)",
       "softDeletePurge(daily 02:00 EST)",
       "containerTracking(every 6h EST)",
