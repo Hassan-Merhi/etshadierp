@@ -3,10 +3,7 @@ import Decimal from "decimal.js";
 import fs from "node:fs";
 import path from "node:path";
 
-const source = fs.readFileSync(
-  path.resolve(process.cwd(), "server/storage/stock-ops/transfers-create.ts"),
-  "utf8"
-);
+const source = fs.readFileSync(path.resolve(process.cwd(), "server/storage/stock-ops/transfers-create.ts"), "utf8");
 
 describe("stock adjustment zero-value accounting guard", () => {
   it("documents why Decimal.isPositive cannot guard voucher-entry inserts", () => {
