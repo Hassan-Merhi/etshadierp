@@ -1,5 +1,8 @@
 version: 2.1
 
+orbs:
+  node: circleci/node@7.1.0
+
 executors:
   node22:
     docker:
@@ -14,42 +17,217 @@ executors:
       NODE_OPTIONS: --max-old-space-size=4096
       PORT: "5000"
 
+  node22-postgres:
+    docker:
+      - image: cimg/node:22.14.0
+        environment:
+          NODE_ENV: test
+          SESSION_SECRET: circleci-session-secret
+          CSRF_ENFORCE: "0"
+          ENABLE_SCHEDULERS: "false"
+          NODE_OPTIONS: --max-old-space-size=2048
+          PORT: "5000"
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
+          PGSSLMODE: disable
+      - image: cimg/postgres:15.19
+        environment:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: heliumdb
+    resource_class: medium+
+    working_directory: ~/project
+
 commands:
-  install:
+  install_dependencies:
     steps:
       - checkout
       - run:
-          name: Pin checkout and install
+          name: Pin checkout to the triggering commit
           command: |
-            git fetch --no-tags --prune origin "+refs/heads/${CIRCLE_BRANCH}:refs/remotes/origin/${CIRCLE_BRANCH}"
+            echo "CircleCI requested SHA: ${CIRCLE_SHA1}"
+            actual_sha="$(git rev-parse HEAD)"
+            echo "CircleCI checkout SHA: ${actual_sha}"
+
+            if ! git cat-file -e "${CIRCLE_SHA1}^{commit}" 2>/dev/null; then
+              echo "Triggering commit is not present locally; fetching the branch ref."
+              git fetch --no-tags --prune origin "+refs/heads/${CIRCLE_BRANCH}:refs/remotes/origin/${CIRCLE_BRANCH}"
+            fi
+
             git reset --hard "${CIRCLE_SHA1}"
             git clean -ffdx
-            sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
-            npm ci --no-audit --bin-links=true
+            test "$(git rev-parse HEAD)" = "${CIRCLE_SHA1}"
+            git status --short
+      - run:
+          name: Normalize package registry URLs
+          command: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+      - node/install-packages:
+          pkg-manager: npm
+          override-ci-command: npm ci --no-audit --bin-links=true
+      - run:
+          name: Dependency diagnostics
+          command: |
+            node --version
+            npm --version
+            npm config get bin-links
+            node -p "'TypeScript ' + require('typescript/package.json').version"
+            node -p "'jsdom ' + require('jsdom/package.json').version"
+            for binary in tsc vite eslint vitest; do
+              test -x "node_modules/.bin/$binary" || { echo "$binary is missing"; exit 1; }
+            done
+
+  wait_for_postgres:
+    steps:
+      - run:
+          name: Wait for PostgreSQL
+          command: |
+            for attempt in $(seq 1 60); do
+              if (echo > /dev/tcp/127.0.0.1/5432) >/dev/null 2>&1; then
+                echo "PostgreSQL is accepting connections."
+                exit 0
+              fi
+              sleep 1
+            done
+            echo "PostgreSQL did not become ready."
+            exit 1
 
 jobs:
-  wave1-generate-only:
+  static-build:
     executor: node22
     steps:
-      - install
+      - install_dependencies
       - run:
-          name: Generate and verify split
+          name: Verify lockfile and production dependencies
           command: |
-            node scripts/god-files-wave1-split.mjs
-            npm run audit:god-files
-            npm run audit:doc-index
-            npm run check
-            git diff --check
-  wave1-push-probe:
+            npm run verify:lockfile
+            npm run verify:production-dependencies
+      - run:
+          name: Check formatting for changed source files
+          command: |
+            git fetch --no-tags --prune --depth=1 origin +refs/heads/main:refs/remotes/origin/main
+            mapfile -d '' changed_files < <(
+              git diff --name-only --diff-filter=ACMR -z origin/main HEAD -- client/src server shared tests scripts |
+                grep -zE '\.(ts|tsx|css|mjs)$' || true
+            )
+            if [ "${#changed_files[@]}" -eq 0 ]; then
+              echo "No changed source files require formatting checks."
+              exit 0
+            fi
+            printf 'Checking formatting for %s changed source file(s):\n' "${#changed_files[@]}"
+            printf ' - %s\n' "${changed_files[@]}"
+            node node_modules/prettier/bin/prettier.cjs --check "${changed_files[@]}"
+      - run:
+          name: Lint
+          command: npm run lint
+      - run:
+          name: Lint warning ratchet
+          # Per-rule half of the gate the Lint step enforces in total. Reads the
+          # report that run wrote, so it adds no second lint pass.
+          when: always
+          command: npm run audit:lint-ratchet
+      - run:
+          name: TypeScript
+          command: npm run check
+      - run:
+          name: Production build
+          command: npm run build
+      - run:
+          name: Verify server bundle
+          command: npm run verify:server-bundle
+      - run:
+          name: Repository safety contracts
+          command: |
+            npm run verify:observability
+            npm run verify:final-production-readiness
+            npm run verify:bandwidth
+      - store_artifacts:
+          path: dist
+          destination: production-build
+
+  postgres-regression:
+    executor: node22-postgres
+    steps:
+      - install_dependencies
+      - wait_for_postgres
+      - run:
+          name: Verify migration registry
+          command: node scripts/verify-migration-registry.mjs --json
+      - run:
+          name: Prepare disposable database schema
+          command: node node_modules/drizzle-kit/bin.cjs push --force
+      - run:
+          name: Verify disposable database schema
+          command: node scripts/verify-ci-disposable-schema.mjs
+      - run:
+          name: Integration backend tests
+          command: |
+            mapfile -t integration_test_files < <(
+              find tests -type f -name '*.test.ts' \
+                ! -path 'tests/ui/*' \
+                ! -path 'tests/api-smoke-sweep.test.ts' \
+                | sort
+            )
+            test "${#integration_test_files[@]}" -gt 0
+            node node_modules/vitest/vitest.mjs run \
+              "${integration_test_files[@]}" \
+              --maxWorkers=1 \
+              --no-file-parallelism
+
+  backend-core-regression:
+    executor: node22-postgres
+    steps:
+      - install_dependencies
+      - wait_for_postgres
+      - run:
+          name: Prepare disposable database schema
+          command: node node_modules/drizzle-kit/bin.cjs push --force
+      - run:
+          name: Co-located backend tests
+          command: |
+            mapfile -t core_test_files < <(
+              find server shared -type f -name '*.test.ts' | sort
+            )
+            test "${#core_test_files[@]}" -gt 0
+            node node_modules/vitest/vitest.mjs run \
+              "${core_test_files[@]}" \
+              --maxWorkers=1 \
+              --no-file-parallelism
+
+  frontend-regression:
     executor: node22
     steps:
-      - checkout
+      - install_dependencies
       - run:
-          name: Probe branch write permission without changing it
-          command: git push origin HEAD:${CIRCLE_BRANCH}
+          name: Frontend tests
+          command: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
+
+  security-readiness:
+    executor: node22-postgres
+    steps:
+      - install_dependencies
+      - wait_for_postgres
+      - run:
+          name: Prepare disposable database schema
+          command: node node_modules/drizzle-kit/bin.cjs push --force
+      - run:
+          name: Critical dependency audit
+          command: npm audit --audit-level=critical
+      - run:
+          name: Production dependency verification
+          command: npm run verify:production-dependencies
+      - run:
+          name: Program 6 security checks
+          command: PROGRAM6_SKIP_TYPESCRIPT=1 npm run check:security
+      - run:
+          name: Final production readiness contract
+          command: npm run verify:final-production-readiness
 
 workflows:
-  wave1-publication-diagnosis:
+  full-erp-verification:
+    # This is the canonical CircleCI path for pull-request branches and main.
+    # Verification jobs are independent so CircleCI can run them in parallel.
     jobs:
-      - wave1-generate-only
-      - wave1-push-probe
+      - static-build
+      - postgres-regression
+      - backend-core-regression
+      - frontend-regression
+      - security-readiness
