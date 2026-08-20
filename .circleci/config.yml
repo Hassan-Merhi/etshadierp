@@ -192,6 +192,4 @@ workflows:
     jobs:
       - static-build
       - postgres-regression
-      - security-readiness:
-          requires:
-            - static-build
+      - security-readiness
