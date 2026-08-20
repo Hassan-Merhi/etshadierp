@@ -1,0 +1,87 @@
+name: Wave H Phase 2 Finalize
+
+on:
+  push:
+    branches: [wave-i/convergence-automation]
+    paths:
+      - .github/workflows/wave-h-phase2-finalize.yml
+
+permissions:
+  contents: write
+
+jobs:
+  certify-phase2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: heliumdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
+      PGSSLMODE: disable
+      NODE_ENV: test
+      SESSION_SECRET: phase2-final-certification-secret
+      CSRF_ENFORCE: "0"
+      ENABLE_SCHEDULERS: "false"
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: wave-i/convergence-automation
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22.14.0"
+          cache: npm
+      - run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+      - run: npm ci --no-audit --bin-links=true
+      - name: Focused Wave H frontend behavior
+        run: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts tests/ui/wave-h-zero-coverage-surfaces.test.tsx --maxWorkers=1 --no-file-parallelism
+      - name: Prepare database
+        run: node node_modules/drizzle-kit/bin.cjs push --force
+      - name: Backend coverage
+        run: npm run test:backend:coverage
+      - name: Frontend coverage
+        run: npm run test:frontend:coverage
+      - name: Enforce Phase 2 targets
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const backend = JSON.parse(fs.readFileSync('coverage/backend/coverage-summary.json','utf8')).total.lines.pct;
+          const frontend = JSON.parse(fs.readFileSync('coverage/frontend/coverage-summary.json','utf8')).total.lines.pct;
+          const result = {
+            certifiedAt: new Date().toISOString(),
+            backendLinesPct: backend,
+            backendTargetPct: 35,
+            frontendLinesPct: frontend,
+            frontendTargetPct: 20,
+            backendPassed: backend >= 35,
+            frontendPassed: frontend >= 20,
+            passed: backend >= 35 && frontend >= 20
+          };
+          fs.writeFileSync('phase2-measurement-result.json', JSON.stringify(result, null, 2) + '\n');
+          console.log(result);
+          if (!result.passed) process.exit(1);
+          NODE
+      - name: Commit certification result and clean temporary workflows
+        if: success()
+        run: |
+          rm -f .github/workflows/wave-h-phase2-finalize.yml
+          rm -f .github/workflows/wave-h-phase2-measure.yml
+          rm -f .github/workflows/wave-h-phase2-frontend-diagnostic.yml
+          rm -f phase2-frontend-diagnostic.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- phase2-measurement-result.json .github/workflows/wave-h-phase2-finalize.yml .github/workflows/wave-h-phase2-measure.yml .github/workflows/wave-h-phase2-frontend-diagnostic.yml phase2-frontend-diagnostic.txt
+          git commit -m "test: certify Wave H Phase 2 coverage targets"
+          git push origin HEAD:wave-i/convergence-automation
