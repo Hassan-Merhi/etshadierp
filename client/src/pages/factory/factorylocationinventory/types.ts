@@ -21,6 +21,7 @@ export interface FactoryBaleProduct {
   productId: number;
   articleCode: string;
   productName: string;
+  productNameAr?: string | null;
   category: string | null;
   categoryId: number | null;
   quantity: number;
@@ -70,4 +71,24 @@ export interface StatCardProps {
   value: string;
   sub?: string;
   accent?: string;
+}
+
+export interface FactoryProformaLine {
+  articleCode: string;
+  quantity: number;
+  pricePerBale: string;
+  productName?: string;
+}
+
+export interface CustomerProformaRecord {
+  id: number;
+  lines?: FactoryProformaLine[];
+}
+
+export interface ProformaMutationResult {
+  id: number;
+}
+
+export interface RemoveBalesResult {
+  removed: number;
 }

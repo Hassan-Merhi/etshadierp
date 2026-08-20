@@ -1,8 +1,10 @@
 import type { Plugin } from "vite";
 
+import { heavyListPaginationPlugin as legacyHeavyListPaginationPlugin } from "./viteHeavyListPaginationPluginLegacy";
+
 const STOCK_ENTRY_SUFFIX = "/client/src/pages/StockEntryHistory.tsx";
-const V5_ALLOCATION_SUFFIX = "/client/src/pages/factory/FactoryStockAllocationV5.tsx";
-const FACTORY_DAYBOOK_SUFFIX = "/client/src/pages/factory/FactoryDaybook.tsx";
+const FACTORY_DAYBOOK_SHELL_SUFFIX = "/client/src/pages/factory/FactoryDaybook.tsx";
+const FACTORY_DAYBOOK_MODEL_SUFFIX = "/client/src/pages/factory/daybook/useFactoryDaybookModel.ts";
 
 function replaceExactly(source: string, before: string, after: string, label: string): string {
   const first = source.indexOf(before);
@@ -13,137 +15,24 @@ function replaceExactly(source: string, before: string, after: string, label: st
   return source.slice(0, first) + after + source.slice(first + before.length);
 }
 
-function transformStockEntry(source: string): string {
-  let code = source;
-
-  code = replaceExactly(
-    code,
-    `      if (group.erpLocationId) gp.set("locationId", String(group.erpLocationId));\n      return {`,
-    `      if (group.erpLocationId) gp.set("locationId", String(group.erpLocationId));\n      if (statusFilter.length > 0) gp.set("status", statusFilter.join(","));\n      if (debouncedSearch.trim()) gp.set("search", debouncedSearch.trim());\n      return {`,
-    "stock-entry lazy expanded group filters"
-  );
-
-  code = replaceExactly(
-    code,
-    `    if (g.erpLocationId) gp.set("locationId", String(g.erpLocationId));\n\n    const rows = await qc.fetchQuery<GroupRow[]>({`,
-    `    if (g.erpLocationId) gp.set("locationId", String(g.erpLocationId));\n    if (statusFilter.length > 0) gp.set("status", statusFilter.join(","));\n    if (debouncedSearch.trim()) gp.set("search", debouncedSearch.trim());\n\n    const rows = await qc.fetchQuery<GroupRow[]>({`,
-    "stock-entry on-demand group action filters"
-  );
-
-  code = replaceExactly(
-    code,
-    `  async function exportExcel() {\n    const wb = XLSX.utils.book_new();\n\n    const summaryRows = filteredGroups.map((g) => ({`,
-    `  async function exportExcel() {\n    const wb = XLSX.utils.book_new();\n\n    // The screen is paged in condensed mode, so exports must resolve the complete\n    // filtered result before building any sheet, including the summary sheet.\n    const groupsWithBales = await fetchGroupsWithBales();\n\n    const summaryRows = groupsWithBales.map((g) => ({`,
-    "stock-entry export summary source"
-  );
-
-  code = replaceExactly(
-    code,
-    `\n    // In lite mode, we need to fetch full bale data for the detail and matrix sheets.\n    const groupsWithBales = await fetchGroupsWithBales();\n\n    const detailRows = groupsWithBales.flatMap((g) =>`,
-    `\n    const detailRows = groupsWithBales.flatMap((g) =>`,
-    "stock-entry duplicate full-data fetch"
-  );
-  return code;
+function transformStockEntryShell(source: string): string {
+  const before = `      if (group.erpLocationId) gp.set("locationId", String(group.erpLocationId));\n      return {`;
+  const after = `      if (group.erpLocationId) gp.set("locationId", String(group.erpLocationId));\n      if (statusFilter.length > 0) gp.set("status", statusFilter.join(","));\n      if (debouncedSearch.trim()) gp.set("search", debouncedSearch.trim());\n      return {`;
+  return replaceExactly(source, before, after, "stock-entry lazy expanded group filters");
 }
 
-function transformV5Allocation(source: string): string {
-  let code = source;
-
-  code = replaceExactly(
-    code,
-    `import { apiRequest, queryClient } from "@/lib/queryClient";`,
-    `import { apiRequest, queryClient } from "@/lib/queryClient";\nimport { fetchAllV5AllocationData } from "@/lib/v5AllocationPaginationClient";`,
-    "V5 full-data helper import"
-  );
-
-  code = replaceExactly(
-    code,
-    `  const [exportDialogOpen, setExportDialogOpen] = useState(false);\n  const [exportIncludePositive, setExportIncludePositive] = useState(true);\n  const [exportIncludeNegative, setExportIncludeNegative] = useState(true);\n  const [exportIncludeZero, setExportIncludeZero] = useState(false);`,
-    `  const [exportDialogOpen, setExportDialogOpen] = useState(false);\n  const [exportIncludePositive, setExportIncludePositive] = useState(true);\n  const [exportIncludeNegative, setExportIncludeNegative] = useState(true);\n  const [exportIncludeZero, setExportIncludeZero] = useState(false);\n  const [actionRows, setActionRows] = useState<V5Row[] | null>(null);\n  const [isLoadingActionRows, setIsLoadingActionRows] = useState(false);\n\n  const loadAllActionRows = useCallback(async (): Promise<V5Row[]> => {\n    if (actionRows) return actionRows;\n    setIsLoadingActionRows(true);\n    try {\n      // Drawers must receive the complete catalog, independent of the table's\n      // hide-zero/search/page state, so users can add or edit any article.\n      const data = await fetchAllV5AllocationData(new URLSearchParams());\n      const completeRows = data.rows as V5Row[];\n      setActionRows(completeRows);\n      return completeRows;\n    } catch (error: any) {\n      toast({\n        title: "Unable to load all products",\n        description: error?.message || "The complete stock allocation list could not be loaded.",\n        variant: "destructive",\n      });\n      return [];\n    } finally {\n      setIsLoadingActionRows(false);\n    }\n  }, [actionRows, toast]);\n\n  const openCreateDrawerWithAllRows = useCallback(async () => {\n    const completeRows = await loadAllActionRows();\n    if (completeRows.length > 0) setCreateDrawerOpen(true);\n  }, [loadAllActionRows]);\n\n  const openEditDrawerWithAllRows = useCallback(\n    async (proformaId: number) => {\n      const completeRows = await loadAllActionRows();\n      if (completeRows.length > 0) setEditDrawerProformaId(proformaId);\n    },\n    [loadAllActionRows]\n  );`,
-    "V5 full-data action state"
-  );
-
-  code = replaceExactly(
-    code,
-    `  function openEditDraft(proformaId: number, proformaName: string, currentRows: V5Row[]) {\n    const articles: EditDraftArticle[] = [];`,
-    `  async function openEditDraft(proformaId: number, proformaName: string, _currentRows: V5Row[]) {\n    const currentRows = actionRows ?? (await loadAllActionRows());\n    if (currentRows.length === 0) return;\n    const articles: EditDraftArticle[] = [];`,
-    "V5 draft quantity full rows"
-  );
-
-  code = replaceExactly(
-    code,
-    `      setEditDraftDialog(null);\n      queryClient.invalidateQueries({ queryKey: ["/api/factory/v5/stock-allocation"] });`,
-    `      setEditDraftDialog(null);\n      setActionRows(null);\n      queryClient.invalidateQueries({ queryKey: ["/api/factory/v5/stock-allocation"] });`,
-    "V5 draft save cleanup"
-  );
-
-  code = replaceExactly(
-    code,
-    `    editOpenedRef.current = true;\n    setEditDrawerProformaId(focusProformaId);`,
-    `    editOpenedRef.current = true;\n    void openEditDrawerWithAllRows(focusProformaId);`,
-    "V5 focused proforma edit drawer"
-  );
-
-  code = replaceExactly(
-    code,
-    `    const filtered = rows.filter((r) => {`,
-    `    const exportParams = new URLSearchParams();\n    if (hideZero) exportParams.set("hideZero", "true");\n    if (debouncedSearch.trim()) exportParams.set("search", debouncedSearch.trim());\n\n    let exportRows: V5Row[];\n    try {\n      const complete = await fetchAllV5AllocationData(exportParams);\n      exportRows = complete.rows as V5Row[];\n    } catch (error: any) {\n      toast({\n        title: "Export failed",\n        description: error?.message || "The complete filtered allocation could not be loaded.",\n        variant: "destructive",\n      });\n      return;\n    }\n\n    if (!showGarbageWipers) exportRows = exportRows.filter((row) => !isGarbageOrWipers(row));\n    if (showNegativeOnly) exportRows = exportRows.filter((row) => row.freeToPromise < 0);\n\n    const filtered = exportRows.filter((r) => {`,
-    "V5 complete Excel export rows"
-  );
-
-  code = replaceExactly(
-    code,
-    `  const drawerRows = useMemo(\n    () =>\n      allRows.map((r) => ({`,
-    `  const drawerRows = useMemo(\n    () =>\n      (actionRows ?? allRows).map((r) => ({`,
-    "V5 drawer full row source"
-  );
-
-  code = replaceExactly(
-    code,
-    `    [allRows]\n  );`,
-    `    [actionRows, allRows]\n  );`,
-    "V5 drawer row dependencies"
-  );
-
-  code = replaceExactly(
-    code,
-    `          <Button size="sm" onClick={() => setCreateDrawerOpen(true)} data-testid="button-v5-open-create-proforma">`,
-    `          <Button\n            size="sm"\n            onClick={() => void openCreateDrawerWithAllRows()}\n            disabled={isLoadingActionRows}\n            data-testid="button-v5-open-create-proforma"\n          >`,
-    "V5 create drawer full-data opener"
-  );
-
-  code = replaceExactly(
-    code,
-    `                                    onClick={() => setEditDrawerProformaId(proforma.proformaId)}`,
-    `                                    onClick={() => void openEditDrawerWithAllRows(proforma.proformaId)}`,
-    "V5 edit drawer full-data opener"
-  );
-
-  code = replaceExactly(
-    code,
-    `        onClose={() => setCreateDrawerOpen(false)}\n        articleRows={drawerRows}\n        onSuccess={() => query.refetch()}`,
-    `        onClose={() => {\n          setCreateDrawerOpen(false);\n          setActionRows(null);\n        }}\n        articleRows={drawerRows}\n        onSuccess={() => {\n          setActionRows(null);\n          query.refetch();\n        }}`,
-    "V5 create drawer cleanup"
-  );
-
-  code = replaceExactly(
-    code,
-    `          onClose={() => setEditDrawerProformaId(null)}\n          proformaId={editDrawerProformaId}\n          articleRows={drawerRows}\n          onSuccess={() => query.refetch()}`,
-    `          onClose={() => {\n            setEditDrawerProformaId(null);\n            setActionRows(null);\n          }}\n          proformaId={editDrawerProformaId}\n          articleRows={drawerRows}\n          onSuccess={() => {\n            setActionRows(null);\n            query.refetch();\n          }}`,
-    "V5 edit drawer cleanup"
-  );
-
-  code = replaceExactly(
-    code,
-    `        onOpenChange={(open) => {\n          if (!open) setEditDraftDialog(null);\n        }}`,
-    `        onOpenChange={(open) => {\n          if (!open) {\n            setEditDraftDialog(null);\n            setActionRows(null);\n          }\n        }}`,
-    "V5 draft dialog cleanup"
-  );
-
-  return code;
-}
-
-function transformFactoryDaybook(source: string): string {
+/**
+ * Factory Daybook pagination, re-anchored onto the split controller hook.
+ *
+ * The legacy plugin patched these same call sites inside FactoryDaybook.tsx
+ * when that page was a single 1,492-line file. The Wave 7 split moved the query
+ * assembly and both Excel exports into useFactoryDaybookModel.ts, and moved the
+ * row mapping itself behind exportFactoryDaybookSummary/Detailed — so the
+ * export patches now swap the entries handed to those helpers rather than the
+ * mapping code. The server-side filter push and the paged query key are
+ * unchanged from the legacy transform.
+ */
+function transformFactoryDaybookModel(source: string): string {
   let code = source;
 
   code = replaceExactly(
@@ -176,51 +65,44 @@ function transformFactoryDaybook(source: string): string {
 
   code = replaceExactly(
     code,
-    `  const handleExportToExcel = async () => {\n    if (filteredEntries.length === 0) {\n      toast({\n        title: "No data to export",\n        description: "No entries found for the current filters.",\n        variant: "destructive",\n      });\n      return;\n    }\n    const exportData = filteredEntries.map((e) => ({`,
-    `  const handleExportToExcel = async () => {\n    let exportEntries: DaybookEntry[];\n    try {\n      exportEntries = (await fetchAllDaybookEntries(new URLSearchParams(queryParams))).filter(\n        (entry) => entry.txType !== "WORKER_EDITED"\n      ) as DaybookEntry[];\n    } catch (error: any) {\n      toast({\n        title: "Export failed",\n        description: error?.message || "The complete filtered daybook could not be loaded.",\n        variant: "destructive",\n      });\n      return;\n    }\n    if (exportEntries.length === 0) {\n      toast({\n        title: "No data to export",\n        description: "No entries found for the current filters.",\n        variant: "destructive",\n      });\n      return;\n    }\n    const exportData = exportEntries.map((e) => ({`,
+    `  const handleExportToExcel = async () => {\n    if (filteredEntries.length === 0) {\n      warnNothingToExport();\n      return;\n    }\n    const { fileName, rowCount } = await exportFactoryDaybookSummary(filteredEntries, formatDisplayDate);`,
+    `  const handleExportToExcel = async () => {\n    let exportEntries: DaybookEntry[];\n    try {\n      exportEntries = (await fetchAllDaybookEntries(new URLSearchParams(queryParams))).filter(\n        (entry) => entry.txType !== "WORKER_EDITED"\n      ) as DaybookEntry[];\n    } catch (error) {\n      toast({\n        title: "Export failed",\n        description:\n          error instanceof Error ? error.message : "The complete filtered daybook could not be loaded.",\n        variant: "destructive",\n      });\n      return;\n    }\n    if (exportEntries.length === 0) {\n      warnNothingToExport();\n      return;\n    }\n    const { fileName, rowCount } = await exportFactoryDaybookSummary(exportEntries, formatDisplayDate);`,
     "Factory Daybook complete summary export"
   );
 
   code = replaceExactly(
     code,
-    `      description: \`Downloaded \${fileName} with \${filteredEntries.length} entries.\`,`,
-    `      description: \`Downloaded \${fileName} with \${exportEntries.length} entries.\`,`,
-    "Factory Daybook summary export count"
-  );
-
-  code = replaceExactly(
-    code,
-    `  const handleExportDetailedToExcel = async () => {\n    if (filteredEntries.length === 0) {\n      toast({\n        title: "No data to export",\n        description: "No entries found for the current filters.",\n        variant: "destructive",\n      });\n      return;\n    }\n    setIsExportingDetailed(true);\n    try {\n      type DetailRow = {`,
-    `  const handleExportDetailedToExcel = async () => {\n    setIsExportingDetailed(true);\n    try {\n      const exportEntries = (await fetchAllDaybookEntries(new URLSearchParams(queryParams))).filter(\n        (entry) => entry.txType !== "WORKER_EDITED"\n      ) as DaybookEntry[];\n      if (exportEntries.length === 0) {\n        toast({\n          title: "No data to export",\n          description: "No entries found for the current filters.",\n          variant: "destructive",\n        });\n        return;\n      }\n      type DetailRow = {`,
+    `  const handleExportDetailedToExcel = async () => {\n    if (filteredEntries.length === 0) {\n      warnNothingToExport();\n      return;\n    }\n    setIsExportingDetailed(true);\n    try {\n      const { fileName, rowCount } = await exportFactoryDaybookDetailed(filteredEntries, formatDisplayDate);`,
+    `  const handleExportDetailedToExcel = async () => {\n    setIsExportingDetailed(true);\n    try {\n      const exportEntries = (await fetchAllDaybookEntries(new URLSearchParams(queryParams))).filter(\n        (entry) => entry.txType !== "WORKER_EDITED"\n      ) as DaybookEntry[];\n      if (exportEntries.length === 0) {\n        warnNothingToExport();\n        return;\n      }\n      const { fileName, rowCount } = await exportFactoryDaybookDetailed(exportEntries, formatDisplayDate);`,
     "Factory Daybook complete detailed export"
-  );
-
-  code = replaceExactly(
-    code,
-    `      for (const entry of filteredEntries) {`,
-    `      for (const entry of exportEntries) {`,
-    "Factory Daybook detailed export iteration"
   );
 
   return code;
 }
 
 export function heavyListPaginationPlugin(): Plugin {
+  const legacy = legacyHeavyListPaginationPlugin();
+  const legacyTransform = legacy.transform;
+
   return {
-    name: "erp-heavy-list-pagination",
-    enforce: "pre",
+    ...legacy,
     transform(source, id) {
       const normalizedId = id.replaceAll("\\", "/").split("?")[0];
       if (normalizedId.endsWith(STOCK_ENTRY_SUFFIX)) {
-        return { code: transformStockEntry(source), map: null };
+        return { code: transformStockEntryShell(source), map: null };
       }
-      if (normalizedId.endsWith(V5_ALLOCATION_SUFFIX)) {
-        return { code: transformV5Allocation(source), map: null };
+      if (normalizedId.endsWith(FACTORY_DAYBOOK_MODEL_SUFFIX)) {
+        return { code: transformFactoryDaybookModel(source), map: null };
       }
-      if (normalizedId.endsWith(FACTORY_DAYBOOK_SUFFIX)) {
-        return { code: transformFactoryDaybook(source), map: null };
+      // The page itself is a composition shell now; the legacy transform would
+      // fail looking for query and export code that no longer lives there.
+      if (normalizedId.endsWith(FACTORY_DAYBOOK_SHELL_SUFFIX)) {
+        return null;
       }
-      return null;
+      if (typeof legacyTransform !== "function") {
+        throw new Error("[heavy-list-pagination] Expected legacy transform hook to be callable");
+      }
+      return legacyTransform.call(this, source, id);
     },
   };
 }

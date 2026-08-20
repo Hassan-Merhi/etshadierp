@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "One-way ratchet on type escapes, counted from the TypeScript AST by scripts/audit-type-escapes.mjs. Every file carrying escapes is frozen at its current count in scan.baseline as [explicitAny, asAny, suppressions]: counts may fall freely, any increase fails, and a file with no entry must introduce none. totals.typeEscapeCeiling is the backlog as a single number and may only fall. Lower a baseline in the same change that removes the escapes — leaving headroom lets it refill silently.",
+  "description": "One-way ratchet on type escapes, counted from the TypeScript AST by scripts/audit-type-escapes.mjs. Every file carrying escapes is frozen at its current count in scan.baseline as [explicitAny, asAny, suppressions]: counts may fall freely, any increase fails, and a file with no entry must introduce none. totals.typeEscapeCeiling is the backlog as a single number and may only fall. Lower a baseline in the same change that removes the escapes — leaving headroom lets it refill silently. The god-file Waves 5-9 merge moved page bodies into split modules: each retired god file had its baseline dropped to its measured count and the escapes that travelled with the code are recorded against the module that now owns them, so the repository total did not rise.",
   "scan": {
     "roots": [
       "server",
@@ -55,11 +55,6 @@
         0
       ],
       "client/src/components/StockItemCreateDialog.tsx": [
-        2,
-        0,
-        0
-      ],
-      "client/src/components/StockItemDetailsDialog.tsx": [
         2,
         0,
         0
@@ -175,8 +170,8 @@
         0
       ],
       "client/src/pages/AccountsLegacy.tsx": [
-        7,
         0,
+        2,
         0
       ],
       "client/src/pages/Agents.tsx": [
@@ -340,12 +335,7 @@
         0
       ],
       "client/src/pages/StockEntryHistory.tsx": [
-        5,
-        0,
-        0
-      ],
-      "client/src/pages/StockItems.tsx": [
-        3,
+        4,
         0,
         0
       ],
@@ -371,11 +361,6 @@
       ],
       "client/src/pages/Suppliers.tsx": [
         7,
-        0,
-        0
-      ],
-      "client/src/pages/TransactionJournal.tsx": [
-        3,
         0,
         0
       ],
@@ -434,6 +419,16 @@
         0,
         0
       ],
+      "client/src/pages/accountslegacy/EditAccountDialog.tsx": [
+        0,
+        1,
+        0
+      ],
+      "client/src/pages/accountslegacy/useAccountsLegacyModel.ts": [
+        6,
+        1,
+        0
+      ],
       "client/src/pages/analytics/ContainerReportPanel.tsx": [
         4,
         0,
@@ -467,6 +462,11 @@
       "client/src/pages/barcodelookup/components/BaleStatusBadge.tsx": [
         1,
         0,
+        0
+      ],
+      "client/src/pages/containerloadingscan/useContainerLoadingScanModel.ts": [
+        2,
+        2,
         0
       ],
       "client/src/pages/containers/ContainerSpView.tsx": [
@@ -504,13 +504,23 @@
         0,
         0
       ],
-      "client/src/pages/daybook/VoucherDetailsDialog.tsx": [
+      "client/src/pages/daybook/VoucherEditDialog.tsx": [
         2,
         0,
         0
       ],
-      "client/src/pages/daybook/VoucherEditDialog.tsx": [
+      "client/src/pages/daybook/voucherdetailsdialog/LedgerVoucherEntries.tsx": [
         2,
+        1,
+        0
+      ],
+      "client/src/pages/daybook/voucherdetailsdialog/PurchaseVoucherEntries.tsx": [
+        2,
+        1,
+        0
+      ],
+      "client/src/pages/daybook/voucherdetailsdialog/VoucherRevisionHistory.tsx": [
+        3,
         0,
         0
       ],
@@ -569,22 +579,12 @@
         0,
         0
       ],
-      "client/src/pages/factory/FactoryContainerLoadingScan.tsx": [
-        3,
-        0,
-        0
-      ],
       "client/src/pages/factory/FactoryContainers.tsx": [
         5,
         0,
         0
       ],
       "client/src/pages/factory/FactoryCustomerStatement.tsx": [
-        1,
-        0,
-        0
-      ],
-      "client/src/pages/factory/FactoryDaybook.tsx": [
         1,
         0,
         0
@@ -624,11 +624,6 @@
         0,
         0
       ],
-      "client/src/pages/factory/FactoryLocationInventory.tsx": [
-        6,
-        0,
-        0
-      ],
       "client/src/pages/factory/FactoryNetPosition.tsx": [
         1,
         0,
@@ -646,11 +641,6 @@
       ],
       "client/src/pages/factory/FactoryOtwTrackingTab.tsx": [
         1,
-        0,
-        0
-      ],
-      "client/src/pages/factory/FactoryPOS.tsx": [
-        11,
         0,
         0
       ],
@@ -1014,6 +1004,16 @@
         0,
         0
       ],
+      "client/src/pages/factory/factorycontainerloadingscan/ProformaProgressPanel.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factorycontainerloadingscan/useFactoryContainerLoadingScanModel.ts": [
+        3,
+        0,
+        0
+      ],
       "client/src/pages/factory/factoryfinancialsnapshot/components/KpiCard.tsx": [
         1,
         0,
@@ -1056,6 +1056,16 @@
       ],
       "client/src/pages/factory/factorypendinginvoiceverify/types.ts": [
         1,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factorypos/FactoryPosPrintTemplate.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/factory/factorypos/useFactoryPosModel.ts": [
+        7,
         0,
         0
       ],
@@ -1314,16 +1324,6 @@
         0,
         0
       ],
-      "client/src/pages/pos/POSImport.tsx": [
-        15,
-        0,
-        0
-      ],
-      "client/src/pages/pos/POSPriceList.tsx": [
-        4,
-        0,
-        0
-      ],
       "client/src/pages/pos/hooks/usePosCheckout.ts": [
         6,
         0,
@@ -1381,6 +1381,26 @@
       ],
       "client/src/pages/pos/pos-components/SaleGrid.tsx": [
         2,
+        0,
+        0
+      ],
+      "client/src/pages/pos/posimport/PosImportResults.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/pos/posimport/usePosImportModel.ts": [
+        5,
+        0,
+        0
+      ],
+      "client/src/pages/pos/pospricelist/PriceListTable.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/pos/pospricelist/usePosPriceListModel.ts": [
+        4,
         0,
         0
       ],
@@ -1699,6 +1719,31 @@
         0,
         0
       ],
+      "client/src/pages/transactionjournal/components/detail/PaymentReceiptPanel.tsx": [
+        1,
+        0,
+        0
+      ],
+      "client/src/pages/transactionjournal/components/detail/PurchasePanel.tsx": [
+        4,
+        0,
+        0
+      ],
+      "client/src/pages/transactionjournal/components/detail/SalesPanel.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/transactionjournal/components/detail/StockMovementPanel.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/transactionjournal/useTransactionJournalModel.ts": [
+        3,
+        0,
+        0
+      ],
       "client/src/pages/voucher-edit/AdjustmentEditForm.tsx": [
         3,
         0,
@@ -1774,16 +1819,6 @@
         0,
         0
       ],
-      "client/src/pages/vouchers/StockAdjustmentForm.tsx": [
-        2,
-        0,
-        0
-      ],
-      "client/src/pages/vouchers/StockTransferForm.tsx": [
-        18,
-        0,
-        0
-      ],
       "client/src/pages/vouchers/StockTransferImportDialog.tsx": [
         6,
         0,
@@ -1819,6 +1854,21 @@
         0,
         0
       ],
+      "client/src/pages/vouchers/stock-adjustment-form/useStockAdjustmentFormModel.ts": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/vouchers/stock-transfer-form/StockTransferFooterAndDialogs.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/vouchers/stock-transfer-form/StockTransferSidebars.tsx": [
+        1,
+        0,
+        0
+      ],
       "client/src/pages/vouchers/stock-transfer-form/dialogs/ApproveRevisionDialog.tsx": [
         6,
         0,
@@ -1831,6 +1881,11 @@
       ],
       "client/src/pages/vouchers/stock-transfer-form/dialogs/SaveAsRevisionDialog.tsx": [
         1,
+        0,
+        0
+      ],
+      "client/src/pages/vouchers/stock-transfer-form/useStockTransferFormModel.ts": [
+        12,
         0,
         0
       ],
