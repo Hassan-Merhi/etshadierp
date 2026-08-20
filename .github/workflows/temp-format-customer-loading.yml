@@ -1,0 +1,43 @@
+name: Temporary Customer Loading Format Capture
+
+on:
+  push:
+    branches:
+      - agent/fix-i18n-customer-loading-columns
+
+permissions:
+  contents: read
+
+jobs:
+  format-capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Normalize Replit registry URLs for CI
+        run: sed -i 's#https://packages\\.replit\\.com/npm/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Format Customer Loading exactly
+        run: node node_modules/prettier/bin/prettier.cjs --write client/src/pages/factory/CustomerLoading.tsx
+
+      - name: Verify formatted file
+        run: node node_modules/prettier/bin/prettier.cjs --check client/src/pages/factory/CustomerLoading.tsx
+
+      - name: Upload formatted Customer Loading
+        uses: actions/upload-artifact@v4
+        with:
+          name: formatted-customer-loading
+          path: client/src/pages/factory/CustomerLoading.tsx
+          if-no-files-found: error
+          retention-days: 1
