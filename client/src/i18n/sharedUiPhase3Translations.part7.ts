@@ -12,7 +12,6 @@ export const phase3SharedUiTranslationsPart7: readonly Phase3SharedUiEntry[] = [
     fr: "Activez ou désactivez les colonnes du tableau de chargement client.",
   },
   { en: "Show All", ar: "إظهار الكل", fr: "Tout afficher" },
-  { en: "Done", ar: "تم", fr: "Terminé" },
   { en: "Article Code", ar: "رمز الصنف", fr: "Code article" },
   { en: "Arabic Name", ar: "الاسم بالعربية", fr: "Nom arabe" },
   { en: "Wt/Bale", ar: "الوزن/بالة", fr: "Poids/balle" },
