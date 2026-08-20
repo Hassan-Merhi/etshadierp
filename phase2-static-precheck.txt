@@ -1,0 +1,19 @@
+===== formatting =====
+exit=1
+Checking formatting...
+[[33mwarn[39m] client/src/pages/AccountsLegacy.tsx
+[[33mwarn[39m] client/src/pages/factory/FactoryDaybook.tsx
+[[33mwarn[39m] client/src/pages/factory/FactoryLocationInventory.tsx
+[[33mwarn[39m] client/src/pages/pos/POSPriceList.tsx
+[[33mwarn[39m] client/src/pages/stockentryhistory/utils.tsx
+[[33mwarn[39m] client/src/pages/vouchers/StockAdjustmentForm.tsx
+[[33mwarn[39m] Code style issues found in 6 files. Run Prettier with --write to fix.
+
+===== lint-ratchet =====
+exit=0
+
+> rest-express@1.0.0 audit:lint-ratchet
+> node scripts/audit-lint-warnings.mjs
+
+Lint ratchet verified across 2774 files: 3 warning(s) against a ceiling of 3, 2 rule(s) at or under their own.
+0 of the 500-warning step earned toward the next tightening.
