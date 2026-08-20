@@ -8,6 +8,17 @@ const { backend } = JSON.parse(
   readFileSync(path.resolve(__dirname, "config/coverage-thresholds.json"), "utf8")
 );
 
+// The API smoke sweep is deliberately a separate signal during an ordinary
+// backend run, but it is real authenticated behavior across the read surface.
+// When coverage is being measured, include it so code executed by that contract
+// is not reported as uncovered merely because the liveness suite has its own
+// standalone invocation in Release Verification. Vitest does not guarantee the
+// CLI --coverage flag remains in process.argv while loading config, so also use
+// npm's lifecycle marker from the canonical coverage script.
+const measuringCoverage =
+  process.argv.includes("--coverage") ||
+  process.env.npm_lifecycle_event === "test:backend:coverage";
+
 export default defineConfig({
   test: {
     globals: true,
@@ -22,9 +33,11 @@ export default defineConfig({
     // from the initial import but no config matched them, so 78 tests never ran
     // anywhere - including the audit-coverage guards that had silently gone stale.
     include: ["tests/**/*.test.ts", "server/**/*.test.ts", "shared/**/*.test.ts"],
-    // The smoke sweep runs as its own invocation so that "an endpoint stopped
-    // responding" is a separate CI signal: npm run test:smoke-sweep
-    exclude: ["tests/ui/**", "tests/api-smoke-sweep.test.ts"],
+    // The smoke sweep remains separate for ordinary test runs so "an endpoint
+    // stopped responding" is its own signal. Coverage runs include it because
+    // its authenticated GET requests execute production handlers and therefore
+    // legitimately contribute to measured backend coverage.
+    exclude: ["tests/ui/**", ...(measuringCoverage ? [] : ["tests/api-smoke-sweep.test.ts"])],
     pool: "forks",
     // Backend suites share one database and several process-global settings
     // (notably system_settings.parentCompanyId), so files run serially: in
