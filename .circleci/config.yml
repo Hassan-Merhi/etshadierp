@@ -13,7 +13,6 @@ executors:
       ENABLE_SCHEDULERS: "false"
       NODE_OPTIONS: --max-old-space-size=4096
       PORT: "5000"
-
   node22-postgres:
     docker:
       - image: cimg/node:22.14.0
@@ -39,7 +38,7 @@ commands:
     steps:
       - checkout
       - run:
-          name: Pin checkout
+          name: Pin checkout and install
           command: |
             git fetch --no-tags --prune origin "+refs/heads/${CIRCLE_BRANCH}:refs/remotes/origin/${CIRCLE_BRANCH}"
             git reset --hard "${CIRCLE_SHA1}"
@@ -66,100 +65,48 @@ commands:
           command: node scripts/god-files-wave1-split.mjs
 
 jobs:
-  wave1-transform-audit:
+  transform-audit:
     executor: node22
     steps:
       - install
       - split
       - run:
-          name: Audits
+          name: Audit + typecheck
           command: |
             npm run audit:god-files
             npm run audit:doc-index
-  wave1-typecheck:
-    executor: node22
+            npm run check
+  pg-schema-only:
+    executor: node22-postgres
     steps:
       - install
+      - prepare_db
+      - run:
+          name: Confirm schema setup
+          command: node scripts/verify-ci-disposable-schema.mjs
+  pg-unsplit-xlsx:
+    executor: node22-postgres
+    steps:
+      - install
+      - prepare_db
+      - run:
+          name: Current-main XLSX file without split
+          command: node node_modules/vitest/vitest.mjs run tests/xlsx-export.test.ts --maxWorkers=1 --no-file-parallelism
+  pg-split-xlsx:
+    executor: node22-postgres
+    steps:
+      - install
+      - prepare_db
       - split
       - run:
-          name: TypeScript
-          command: npm run check
-
-  test-xlsx-core:
-    executor: node22-postgres
-    steps:
-      - install
-      - prepare_db
-      - split
-      - run: { name: xlsx-export.test.ts, command: "node node_modules/vitest/vitest.mjs run tests/xlsx-export.test.ts --maxWorkers=1 --no-file-parallelism" }
-  test-xlsx-sp:
-    executor: node22-postgres
-    steps:
-      - install
-      - prepare_db
-      - split
-      - run: { name: xlsx-export-sp-sales-form.test.ts, command: "node node_modules/vitest/vitest.mjs run tests/xlsx-export-sp-sales-form.test.ts --maxWorkers=1 --no-file-parallelism" }
-  test-workflow-core:
-    executor: node22-postgres
-    steps:
-      - install
-      - prepare_db
-      - split
-      - run: { name: workflow.test.ts, command: "node node_modules/vitest/vitest.mjs run tests/workflow.test.ts --maxWorkers=1 --no-file-parallelism" }
-  test-workflow-daybook:
-    executor: node22-postgres
-    steps:
-      - install
-      - prepare_db
-      - split
-      - run: { name: workflow-daybook-isolation.test.ts, command: "node node_modules/vitest/vitest.mjs run tests/workflow-daybook-isolation.test.ts --maxWorkers=1 --no-file-parallelism" }
-  test-inventory-core:
-    executor: node22-postgres
-    steps:
-      - install
-      - prepare_db
-      - split
-      - run: { name: inventory.test.ts, command: "node node_modules/vitest/vitest.mjs run tests/inventory.test.ts --maxWorkers=1 --no-file-parallelism" }
-  test-inventory-reconcile:
-    executor: node22-postgres
-    steps:
-      - install
-      - prepare_db
-      - split
-      - run: { name: inventory-reconciliation.test.ts, command: "node node_modules/vitest/vitest.mjs run tests/inventory-reconciliation.test.ts --maxWorkers=1 --no-file-parallelism" }
-  test-excel-v2-core:
-    executor: node22-postgres
-    steps:
-      - install
-      - prepare_db
-      - split
-      - run: { name: excel-export-v2.test.ts, command: "node node_modules/vitest/vitest.mjs run tests/excel-export-v2.test.ts --maxWorkers=1 --no-file-parallelism" }
-  test-excel-v2-totals:
-    executor: node22-postgres
-    steps:
-      - install
-      - prepare_db
-      - split
-      - run: { name: excel-export-v2-totals-cash.test.ts, command: "node node_modules/vitest/vitest.mjs run tests/excel-export-v2-totals-cash.test.ts --maxWorkers=1 --no-file-parallelism" }
-  test-excel-v2-historical:
-    executor: node22-postgres
-    steps:
-      - install
-      - prepare_db
-      - split
-      - run: { name: excel-export-v2-historical-cash.test.ts, command: "node node_modules/vitest/vitest.mjs run tests/excel-export-v2-historical-cash.test.ts --maxWorkers=1 --no-file-parallelism" }
+          name: XLSX after split
+          command: |
+            node node_modules/vitest/vitest.mjs run tests/xlsx-export.test.ts tests/xlsx-export-sp-sales-form.test.ts --maxWorkers=1 --no-file-parallelism
 
 workflows:
-  wave1-diagnosis:
+  wave1-harness-diagnosis:
     jobs:
-      - wave1-transform-audit
-      - wave1-typecheck
-      - test-xlsx-core
-      - test-xlsx-sp
-      - test-workflow-core
-      - test-workflow-daybook
-      - test-inventory-core
-      - test-inventory-reconcile
-      - test-excel-v2-core
-      - test-excel-v2-totals
-      - test-excel-v2-historical
+      - transform-audit
+      - pg-schema-only
+      - pg-unsplit-xlsx
+      - pg-split-xlsx
