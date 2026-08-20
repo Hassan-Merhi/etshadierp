@@ -32,15 +32,12 @@ import {
   readHistoricalReplayProductionControl,
 } from "./historical-replay/productionReadinessV8";
 import { POST_OFFLOAD_REPORT_QUERY_KEYS } from "./postOffloadReconciliation";
-
 const PHASE6_TOKEN_KIND = "POST_OFFLOAD_PHASE6_REPAIR_V1" as const;
 const PHASE6_TOKEN_VERSION = 1 as const;
 const EXACT_UNDO_KIND = "HISTORICAL_REPLAY_EXACT_V1" as const;
 const INCLUDE_COMPLETED_BATCHES = true;
 const INCLUDE_FINALIZED_BALES = false;
-
 export type PostOffloadPhase6Status = "ready" | "repair_required" | "blocked";
-
 export interface PostOffloadPhase6Integrity {
   activeCharges: number;
   deletedCharges: number;
@@ -53,7 +50,6 @@ export interface PostOffloadPhase6Integrity {
   maxRawStockCostDriftUsdPerKg: string;
   issueCount: number;
 }
-
 export interface PostOffloadPhase6ScopeCounts {
   suppliers: number;
   containers: number;
@@ -67,7 +63,6 @@ export interface PostOffloadPhase6ScopeCounts {
   actualChangeRows: number;
   totalWritableRows: number;
 }
-
 export interface PostOffloadPhase6Readiness {
   phase: 6;
   generatedAt: string;
@@ -99,7 +94,6 @@ export interface PostOffloadPhase6Readiness {
   blockers: string[];
   reportQueryKeys: readonly string[];
 }
-
 export interface PreparedPostOffloadPhase6Repair {
   dryRun: true;
   status: PostOffloadPhase6Status;
@@ -113,7 +107,6 @@ export interface PreparedPostOffloadPhase6Repair {
   };
   instructions: string;
 }
-
 interface PostOffloadPhase6TokenPayload {
   kind: typeof PHASE6_TOKEN_KIND;
   version: typeof PHASE6_TOKEN_VERSION;
@@ -133,7 +126,6 @@ interface PostOffloadPhase6TokenPayload {
   issuedAt: number;
   expiresAt: number;
 }
-
 interface ExactReplayUndoEnvelope {
   kind: typeof EXACT_UNDO_KIND;
   algorithmVersion: string;
@@ -145,7 +137,6 @@ interface ExactReplayUndoEnvelope {
   before: ExactReplaySnapshot;
   after: ExactReplaySnapshot;
 }
-
 interface IntegrityRow {
   active_charges: string;
   deleted_charges: string;
@@ -157,7 +148,6 @@ interface IntegrityRow {
   raw_stock_cost_drift_rows: string;
   max_raw_stock_cost_drift: string | null;
 }
-
 interface LatestUndoRow {
   id: number;
   algorithm_version: string | null;
@@ -165,45 +155,36 @@ interface LatestUndoRow {
   applied_at: Date | string;
   undone_at: Date | string | null;
 }
-
 interface Phase6Snapshot {
   readiness: PostOffloadPhase6Readiness;
   preview: HistoricalReplayPreviewResult | null;
   scope: ReplayWriteScope;
 }
-
 export class InvalidPostOffloadPhase6TokenError extends Error {
   readonly code = "POST_OFFLOAD_PHASE6_TOKEN_INVALID";
   readonly statusCode = 400;
-
   constructor(message: string) {
     super(message);
     this.name = "InvalidPostOffloadPhase6TokenError";
   }
 }
-
 export class StalePostOffloadPhase6TokenError extends Error {
   readonly code = "POST_OFFLOAD_PHASE6_TOKEN_STALE";
   readonly statusCode = 409;
-
   constructor(message = "Post-offload repair state changed after preview. Re-run the dry-run plan.") {
     super(message);
     this.name = "StalePostOffloadPhase6TokenError";
   }
 }
-
 function sha256(value: string): string {
   return crypto.createHash("sha256").update(value, "utf8").digest("hex");
 }
-
 function stableHash(value: unknown): string {
   return sha256(JSON.stringify(value));
 }
-
 function uniqueSortedNumbers(values: number[]): number[] {
   return [...new Set(values)].sort((left, right) => left - right);
 }
-
 function requestedSupplierIds(value: unknown): number[] {
   if (value == null) return [];
   if (!Array.isArray(value)) {
@@ -215,7 +196,6 @@ function requestedSupplierIds(value: unknown): number[] {
   }
   return uniqueSortedNumbers(parsed);
 }
-
 function emptyScope(): ReplayWriteScope {
   return {
     supplierIds: [],
@@ -228,12 +208,10 @@ function emptyScope(): ReplayWriteScope {
     blockedBatches: [],
   };
 }
-
 function count(value: string | number | null | undefined): number {
   const parsed = Number.parseInt(String(value ?? "0"), 10);
   return Number.isFinite(parsed) ? parsed : 0;
 }
-
 function decimal(value: string | number | null | undefined): Decimal {
   try {
     const parsed = new Decimal(value ?? 0);
@@ -242,7 +220,6 @@ function decimal(value: string | number | null | undefined): Decimal {
     return new Decimal(0);
   }
 }
-
 function scopeCounts(scope: ReplayWriteScope, supplierRateChanges = 0): PostOffloadPhase6ScopeCounts {
   const nonSupplierChangeRows =
     scope.containerIdsToUpdate.length +
@@ -257,7 +234,6 @@ function scopeCounts(scope: ReplayWriteScope, supplierRateChanges = 0): PostOffl
     scope.batchIdsToUpdate.length +
     scope.availableBaleIdsToUpdate.length +
     scope.supplierIds.length;
-
   return {
     suppliers: scope.supplierIds.length,
     containers: scope.containerIdsToUpdate.length,
@@ -272,14 +248,12 @@ function scopeCounts(scope: ReplayWriteScope, supplierRateChanges = 0): PostOffl
     totalWritableRows,
   };
 }
-
 function parseNumberArray(value: unknown): number[] | null {
   if (!Array.isArray(value)) return null;
   const values = value.map((item) => Number(item));
   if (values.some((item) => !Number.isInteger(item) || item <= 0)) return null;
   return uniqueSortedNumbers(values);
 }
-
 function parseReplayScope(value: unknown): ReplayWriteScope | null {
   if (!value || typeof value !== "object") return null;
   const input = value as Record<string, unknown>;
@@ -302,7 +276,6 @@ function parseReplayScope(value: unknown): ReplayWriteScope | null {
   ) {
     return null;
   }
-
   const blockedBatches: ReplayWriteScope["blockedBatches"] = [];
   for (const raw of input.blockedBatches) {
     if (!raw || typeof raw !== "object") return null;
@@ -322,7 +295,6 @@ function parseReplayScope(value: unknown): ReplayWriteScope | null {
       reasons: [...new Set(row.reasons as string[])].sort(),
     });
   }
-
   return normalizeReplayWriteScope({
     supplierIds,
     containerIdsToUpdate,
@@ -334,7 +306,6 @@ function parseReplayScope(value: unknown): ReplayWriteScope | null {
     blockedBatches,
   });
 }
-
 async function loadIntegrity(executor: ReplayQueryExecutor, companyId: number): Promise<PostOffloadPhase6Integrity> {
   const result = await executor.query<IntegrityRow>(
     `WITH charge_integrity AS (
@@ -403,7 +374,6 @@ async function loadIntegrity(executor: ReplayQueryExecutor, companyId: number): 
      FROM charge_integrity CROSS JOIN raw_drift`,
     [companyId]
   );
-
   const row = result.rows[0];
   const integrity: PostOffloadPhase6Integrity = {
     activeCharges: count(row?.active_charges),
@@ -426,7 +396,6 @@ async function loadIntegrity(executor: ReplayQueryExecutor, companyId: number): 
     integrity.rawStockCostDriftRows;
   return integrity;
 }
-
 async function loadPostOffloadSupplierIds(executor: ReplayQueryExecutor, companyId: number): Promise<number[]> {
   const result = await executor.query<{ supplier_id: number }>(
     `SELECT DISTINCT container.supplier_id
@@ -442,7 +411,6 @@ async function loadPostOffloadSupplierIds(executor: ReplayQueryExecutor, company
   );
   return uniqueSortedNumbers(result.rows.map((row) => Number(row.supplier_id)));
 }
-
 async function loadLatestUndo(
   executor: ReplayQueryExecutor,
   companyId: number
@@ -466,7 +434,6 @@ async function loadLatestUndo(
     undoneAt: row.undone_at ? new Date(row.undone_at).toISOString() : null,
   };
 }
-
 function buildBlockers(params: {
   control: ReturnType<typeof readHistoricalReplayProductionControl>;
   schema: Awaited<ReturnType<typeof inspectHistoricalReplayProductionSchema>>;
@@ -493,7 +460,6 @@ function buildBlockers(params: {
   }
   return [...new Set(blockers)].sort();
 }
-
 function classifyStatus(params: {
   integrityIssueCount: number;
   actualChangeRows: number;
@@ -503,21 +469,17 @@ function classifyStatus(params: {
   if (params.integrityIssueCount > 0 || params.actualChangeRows > 0) return "repair_required";
   return "ready";
 }
-
 async function buildSnapshot(params: { companyId: number; requestedSupplierIds?: unknown }): Promise<Phase6Snapshot> {
   const requestedIds = requestedSupplierIds(params.requestedSupplierIds);
   const control = readHistoricalReplayProductionControl();
   const client = await pool.connect();
   const executor = client as unknown as ReplayQueryExecutor;
-
   try {
     await client.query("BEGIN");
     await client.query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
-
     const schema = await inspectHistoricalReplayProductionSchema(executor);
     const integrity = await loadIntegrity(executor, params.companyId);
     const postOffloadSupplierIds = await loadPostOffloadSupplierIds(executor, params.companyId);
-
     let preview: HistoricalReplayPreviewResult | null = null;
     let scope = emptyScope();
     let safety: ReturnType<typeof evaluateHistoricalReplaySafetyReadiness> = {
@@ -526,7 +488,6 @@ async function buildSnapshot(params: { companyId: number; requestedSupplierIds?:
       applicableChangeCount: 0,
       blockers: [{ gate: "schemaNotReady", count: 1 }],
     };
-
     if (schema.ready) {
       preview = await previewHistoricalCostReplayWithExecutor(executor, params.companyId);
       safety = evaluateHistoricalReplaySafetyReadiness(preview);
@@ -535,7 +496,6 @@ async function buildSnapshot(params: { companyId: number; requestedSupplierIds?:
         .map((supplier) => supplier.supplierId);
       const selectedSupplierIds =
         requestedIds.length > 0 ? requestedIds.filter((id) => safePostOffloadIds.includes(id)) : safePostOffloadIds;
-
       if (selectedSupplierIds.length > 0) {
         const internalScope = await buildHistoricalReplayScopeInternal({
           companyId: params.companyId,
@@ -549,7 +509,6 @@ async function buildSnapshot(params: { companyId: number; requestedSupplierIds?:
         preview = internalScope._fullPreview;
       }
     }
-
     const selectedSupplierIds = scope.supplierIds;
     const supplierRateChanges = preview
       ? preview.supplierRows.filter(
@@ -601,7 +560,6 @@ async function buildSnapshot(params: { companyId: number; requestedSupplierIds?:
       actualChangeRows: counts.actualChangeRows,
       blockers,
     });
-
     await client.query("COMMIT");
     return {
       preview,
@@ -639,7 +597,6 @@ async function buildSnapshot(params: { companyId: number; requestedSupplierIds?:
     client.release();
   }
 }
-
 export async function inspectPostOffloadPhase6Readiness(params: {
   companyId: number;
   supplierIds?: unknown;
@@ -651,7 +608,6 @@ export async function inspectPostOffloadPhase6Readiness(params: {
     })
   ).readiness;
 }
-
 export async function preparePostOffloadPhase6Repair(params: {
   companyId: number;
   userId: string;
@@ -662,7 +618,6 @@ export async function preparePostOffloadPhase6Repair(params: {
     requestedSupplierIds: params.supplierIds,
   });
   const readiness = snapshot.readiness;
-
   if (!readiness.automaticRepairEligible || !readiness.productionControl.releaseId || !readiness.fingerprint) {
     return {
       dryRun: true,
@@ -683,7 +638,6 @@ export async function preparePostOffloadPhase6Repair(params: {
             : "Repair is still required, but no automatic historical cost scope is eligible. Repair the reported charge, accounting, reversal, or raw-stock integrity issues and run readiness again.",
     };
   }
-
   const issuedAt = Date.now();
   const payload: PostOffloadPhase6TokenPayload = {
     kind: PHASE6_TOKEN_KIND,
@@ -704,7 +658,6 @@ export async function preparePostOffloadPhase6Repair(params: {
     issuedAt,
     expiresAt: issuedAt + REPAIR_TOKEN_TTL_MS,
   };
-
   return {
     dryRun: true,
     status: readiness.status,
@@ -720,7 +673,6 @@ export async function preparePostOffloadPhase6Repair(params: {
       "Review the exact supplier/container/raw-stock/source/batch/bale scope, then apply before the token expires. Finalized or sold bales remain excluded.",
   };
 }
-
 function parseToken(value: unknown): PostOffloadPhase6TokenPayload {
   let payload: PostOffloadPhase6TokenPayload;
   try {
@@ -734,7 +686,6 @@ function parseToken(value: unknown): PostOffloadPhase6TokenPayload {
     }
     throw error;
   }
-
   if (
     payload.kind !== PHASE6_TOKEN_KIND ||
     payload.version !== PHASE6_TOKEN_VERSION ||
@@ -744,7 +695,6 @@ function parseToken(value: unknown): PostOffloadPhase6TokenPayload {
   }
   return payload;
 }
-
 export async function applyPostOffloadPhase6Repair(params: {
   companyId: number;
   userId: string;
@@ -777,7 +727,6 @@ export async function applyPostOffloadPhase6Repair(params: {
       "Repair approval does not match this user, company, algorithm, options, or exact scope."
     );
   }
-
   const fresh = await buildSnapshot({
     companyId: params.companyId,
     requestedSupplierIds: payload.supplierIds,
@@ -793,11 +742,9 @@ export async function applyPostOffloadPhase6Repair(params: {
   ) {
     throw new StalePostOffloadPhase6TokenError();
   }
-
   const tokenHash = sha256(String(params.confirmationToken));
   const baleIds = replayBaleIdsForScope(signedScope, false);
   let undoLogId = 0;
-
   const applied = await applyHistoricalCostReplay({
     companyId: params.companyId,
     supplierIds: signedScope.supplierIds,
@@ -844,7 +791,6 @@ export async function applyPostOffloadPhase6Repair(params: {
       if (!undoLogId) {
         throw new Error("Phase 6 repair could not persist its exact undo log. Rolling back.");
       }
-
       await executor.query(
         `INSERT INTO audit_log
            (user_id, username, company_id, action, table_name, record_id,
@@ -872,11 +818,9 @@ export async function applyPostOffloadPhase6Repair(params: {
       );
     },
   });
-
   if (!undoLogId) {
     throw new Error("Phase 6 repair completed without an exact undo identifier.");
   }
-
   let readiness: PostOffloadPhase6Readiness;
   try {
     readiness = await inspectPostOffloadPhase6Readiness({
@@ -902,7 +846,6 @@ export async function applyPostOffloadPhase6Repair(params: {
     verificationError.cause = error;
     throw verificationError;
   }
-
   return {
     success: true,
     status: readiness.status,
@@ -912,7 +855,6 @@ export async function applyPostOffloadPhase6Repair(params: {
     reportQueryKeys: POST_OFFLOAD_REPORT_QUERY_KEYS,
   };
 }
-
 export function phase6ErrorStatus(error: unknown): number {
   if (
     error instanceof StalePostOffloadPhase6TokenError ||
