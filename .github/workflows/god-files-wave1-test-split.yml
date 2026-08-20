@@ -38,6 +38,7 @@ jobs:
       - name: Publish clean Wave 1 branch
         shell: bash
         run: |
+          trigger_branch="${GITHUB_HEAD_REF}"
           git show a1b3e57f63af1c4847e8851027868dc067bf68e8:.circleci/config.yml > .circleci/config.yml
           rm -f .github/workflows/god-files-wave1-test-split.yml scripts/god-files-wave1-split.mjs
           git config user.name "github-actions[bot]"
@@ -46,3 +47,6 @@ jobs:
           git diff --cached --check
           git commit -m "refactor(god-files): split oversized Wave 1 test suites"
           git push origin HEAD:agent/god-files-final-wave1-tests
+          if [ -n "${trigger_branch}" ]; then
+            git push origin --delete "${trigger_branch}" || true
+          fi
