@@ -118,13 +118,16 @@ describe("Wave H production finalize behavior", () => {
     expect(await screen.findByTestId("badge-finalize-mode")).toHaveTextContent("FINALIZE MODE");
     expect(screen.getByTestId("batch-card-44")).toHaveTextContent("2 pending");
     expect(screen.getByTestId("batch-card-44")).toHaveTextContent("1 finalized");
-    expect(screen.getByTestId("batch-card-44")).toHaveTextContent("2x");
+    expect(screen.getByTestId("batch-card-44")).toHaveTextContent("1x White Bale");
+    expect(screen.getByTestId("batch-card-44")).toHaveTextContent("1x Blue Bale");
 
     fireEvent.click(screen.getByTestId("batch-card-44"));
     expect(await screen.findByTestId("text-batch-title")).toHaveTextContent("Batch #44");
     expect(screen.getByTestId("text-expected-count")).toHaveTextContent("2");
-    expect(screen.getByText("Daily Mix")).toBeInTheDocument();
-    expect(screen.queryByText("Closed Mix")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("select-finalize-mix-batch"));
+    expect(await screen.findByText(/Daily Mix/)).toBeInTheDocument();
+    expect(screen.queryByText(/Closed Mix/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText(/Daily Mix/));
 
     const scan = screen.getByTestId("input-finalize-scan");
     fireEvent.change(scan, { target: { value: "BAL-101" } });

@@ -208,16 +208,16 @@ describe("Wave H populated core-page behavior", () => {
     expect(screen.getByTestId("stat-otw")).toHaveTextContent("6");
     expect(screen.getByTestId("stat-inhand")).toHaveTextContent("9");
     expect(screen.getByTestId("stat-total")).toHaveTextContent("15");
-    expect(screen.getByText("$50.00")).toBeInTheDocument();
+    expect(screen.getByTestId("total-combined-value")).toHaveTextContent("$50.00");
 
     fireEvent.click(screen.getByTestId("row-group-3"));
     expect(await screen.findByTestId("button-back-to-groups")).toBeInTheDocument();
-    expect(screen.getByText("Alpha Bale")).toBeInTheDocument();
-    expect(screen.getByText("Legacy Bale")).toBeInTheDocument();
+    expect(screen.getAllByText("Alpha Bale").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Legacy Bale").length).toBeGreaterThan(0);
 
     fireEvent.change(screen.getByTestId("input-search-combined"), { target: { value: "Alpha" } });
-    expect(screen.getByText("Alpha Bale")).toBeInTheDocument();
-    expect(screen.queryByText("Legacy Bale")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Alpha Bale").length).toBeGreaterThan(0);
+    expect(screen.queryAllByText("Legacy Bale")).toHaveLength(0);
   });
 
   it("renders supplier portfolio totals and opens a populated ledger with purchase orders", async () => {
@@ -318,7 +318,8 @@ describe("Wave H populated core-page behavior", () => {
     expect(screen.queryByTestId("row-supplier-2")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("row-supplier-1"));
-    expect(await screen.findByText("Alpha Supplier")).toBeInTheDocument();
+    const supplierDialog = await screen.findByRole("dialog");
+    expect(within(supplierDialog).getByRole("heading", { name: "Alpha Supplier" })).toBeInTheDocument();
     const purchasesKpi = screen.getByText("Total Purchases").parentElement;
     const paymentsKpi = screen.getByText("Total Payments").parentElement;
     expect(purchasesKpi && within(purchasesKpi).getByText("$50.00")).toBeTruthy();
@@ -398,6 +399,17 @@ describe("Wave H populated core-page behavior", () => {
           ["/api/agent-accounts"],
           [{ id: 1, companyId: 1, accountId: "agent-1", accountType: "customer", accountName: "Alpha Agent" }],
         ],
+        [
+          ["/api/accounts/customer/101/transactions", { startDate: "2026-08-20", endDate: "2026-08-20" }],
+          [
+            { entryId: 1, voucherId: 91, debitAmount: "30", creditAmount: "0", narration: "Sale line", voucherNumber: "JV-91", voucherType: "Journal", voucherDate: "2026-08-20", voucherDescription: "Agent sale" },
+            { entryId: 2, voucherId: 91, debitAmount: "0", creditAmount: "5", narration: "Discount line", voucherNumber: "JV-91", voucherType: "Journal", voucherDate: "2026-08-20", voucherDescription: "Agent sale" },
+          ],
+        ],
+        [
+          ["/api/accounts/customer/101/pre-period-balance", { endDate: "2026-08-20" }],
+          { balance: 25 },
+        ],
       ],
     });
 
@@ -406,11 +418,12 @@ describe("Wave H populated core-page behavior", () => {
 
     expect(await screen.findByTestId("text-agent-account-name")).toHaveTextContent("Alpha Agent");
     expect(screen.getByTestId("text-agent-balance")).toHaveTextContent("$75.00");
-    await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/transactions"), expect.anything())
-    );
     await waitFor(() => expect(screen.getByTestId("button-export-excel")).toBeEnabled());
-    expect(await screen.findByText("JV-91")).toBeInTheDocument();
+    const voucherRow = screen.getByTestId("row-voucher-91");
+    expect(voucherRow).toHaveTextContent("Journal");
+    expect(voucherRow).toHaveTextContent("Agent sale");
+    expect(voucherRow).toHaveTextContent("$30.00");
+    expect(voucherRow).toHaveTextContent("$5.00");
 
     fireEvent.click(screen.getByTestId("button-add-agent"));
     expect(await screen.findByText("Available Account")).toBeInTheDocument();
@@ -468,8 +481,8 @@ describe("Wave H populated core-page behavior", () => {
     expect(firstRate.value).toBe("10");
     expect(secondType.value).toBe("Produce");
     expect(secondQty.value).toBe("2");
-    expect(screen.getByDisplayValue("Alpha Bale")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Beta Bale")).toBeInTheDocument();
+    expect(screen.getByTestId("input-adjustment-item-0")).toHaveValue("Alpha Bale");
+    expect(screen.getByTestId("input-adjustment-item-1")).toHaveValue("Beta Bale");
 
     fireEvent.focus(screen.getByTestId("input-adjustment-item-0"));
     fireEvent.change(screen.getByTestId("input-adjustment-item-0"), { target: { value: "Beta" } });
