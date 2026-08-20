@@ -46,7 +46,7 @@ commands:
             git clean -ffdx
             sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
             npm ci --no-audit --bin-links=true
-  wait_for_postgres:
+  prepare_db:
     steps:
       - run:
           name: Wait for PostgreSQL
@@ -56,9 +56,6 @@ commands:
               sleep 1
             done
             exit 1
-  prepare_db:
-    steps:
-      - wait_for_postgres
       - run:
           name: Prepare disposable database schema
           command: node node_modules/drizzle-kit/bin.cjs push --force
@@ -75,12 +72,10 @@ jobs:
       - install
       - split
       - run:
-          name: God-file audit
-          command: npm run audit:god-files
-      - run:
-          name: Documentation audit
-          command: npm run audit:doc-index
-
+          name: Audits
+          command: |
+            npm run audit:god-files
+            npm run audit:doc-index
   wave1-typecheck:
     executor: node22
     steps:
@@ -90,138 +85,81 @@ jobs:
           name: TypeScript
           command: npm run check
 
-  wave1-xlsx-tests:
+  test-xlsx-core:
     executor: node22-postgres
     steps:
       - install
       - prepare_db
       - split
-      - run:
-          name: XLSX export split suites
-          command: |
-            node node_modules/vitest/vitest.mjs run \
-              tests/xlsx-export.test.ts \
-              tests/xlsx-export-sp-sales-form.test.ts \
-              --maxWorkers=1 --no-file-parallelism
-
-  wave1-workflow-tests:
+      - run: { name: xlsx-export.test.ts, command: "node node_modules/vitest/vitest.mjs run tests/xlsx-export.test.ts --maxWorkers=1 --no-file-parallelism" }
+  test-xlsx-sp:
     executor: node22-postgres
     steps:
       - install
       - prepare_db
       - split
-      - run:
-          name: Workflow split suites
-          command: |
-            node node_modules/vitest/vitest.mjs run \
-              tests/workflow.test.ts \
-              tests/workflow-daybook-isolation.test.ts \
-              --maxWorkers=1 --no-file-parallelism
-
-  wave1-inventory-tests:
+      - run: { name: xlsx-export-sp-sales-form.test.ts, command: "node node_modules/vitest/vitest.mjs run tests/xlsx-export-sp-sales-form.test.ts --maxWorkers=1 --no-file-parallelism" }
+  test-workflow-core:
     executor: node22-postgres
     steps:
       - install
       - prepare_db
       - split
-      - run:
-          name: Inventory split suites
-          command: |
-            node node_modules/vitest/vitest.mjs run \
-              tests/inventory.test.ts \
-              tests/inventory-reconciliation.test.ts \
-              --maxWorkers=1 --no-file-parallelism
-
-  wave1-excel-v2-tests:
+      - run: { name: workflow.test.ts, command: "node node_modules/vitest/vitest.mjs run tests/workflow.test.ts --maxWorkers=1 --no-file-parallelism" }
+  test-workflow-daybook:
     executor: node22-postgres
     steps:
       - install
       - prepare_db
       - split
-      - run:
-          name: Excel V2 split suites
-          command: |
-            node node_modules/vitest/vitest.mjs run \
-              tests/excel-export-v2.test.ts \
-              tests/excel-export-v2-totals-cash.test.ts \
-              tests/excel-export-v2-historical-cash.test.ts \
-              --maxWorkers=1 --no-file-parallelism
-
-  wave1-publisher:
+      - run: { name: workflow-daybook-isolation.test.ts, command: "node node_modules/vitest/vitest.mjs run tests/workflow-daybook-isolation.test.ts --maxWorkers=1 --no-file-parallelism" }
+  test-inventory-core:
     executor: node22-postgres
     steps:
       - install
       - prepare_db
       - split
-      - run:
-          name: Reconfirm audits and TypeScript
-          command: |
-            npm run audit:god-files
-            npm run audit:doc-index
-            npm run check
-      - run:
-          name: Reconfirm Wave 1 suites
-          command: |
-            node node_modules/vitest/vitest.mjs run \
-              tests/xlsx-export.test.ts \
-              tests/xlsx-export-sp-sales-form.test.ts \
-              tests/workflow.test.ts \
-              tests/workflow-daybook-isolation.test.ts \
-              tests/inventory.test.ts \
-              tests/inventory-reconciliation.test.ts \
-              tests/excel-export-v2.test.ts \
-              tests/excel-export-v2-totals-cash.test.ts \
-              tests/excel-export-v2-historical-cash.test.ts \
-              --maxWorkers=1 \
-              --no-file-parallelism
-      - run:
-          name: Publish certified split
-          command: |
-            git fetch --no-tags origin "+refs/heads/${CIRCLE_BRANCH}:refs/remotes/origin/${CIRCLE_BRANCH}"
-            remote_head="$(git rev-parse refs/remotes/origin/${CIRCLE_BRANCH})"
-            if [ "${remote_head}" != "${CIRCLE_SHA1}" ]; then
-              echo "Branch advanced to ${remote_head}; newer run owns publication."
-              exit 0
-            fi
-            git show a1b3e57f63af1c4847e8851027868dc067bf68e8:.circleci/config.yml > .circleci/config.yml
-            rm -f .github/workflows/god-files-wave1-test-split.yml scripts/god-files-wave1-split.mjs
-            git config user.name "CircleCI Wave 1"
-            git config user.email "circleci-wave1@users.noreply.github.com"
-            git add -- \
-              .circleci/config.yml \
-              .github/workflows/god-files-wave1-test-split.yml \
-              scripts/god-files-wave1-split.mjs \
-              tests/xlsx-export.test.ts \
-              tests/xlsx-export-sp-sales-form.test.ts \
-              tests/workflow.test.ts \
-              tests/workflow-daybook-isolation.test.ts \
-              tests/inventory.test.ts \
-              tests/inventory-reconciliation.test.ts \
-              tests/excel-export-v2.test.ts \
-              tests/excel-export-v2-totals-cash.test.ts \
-              tests/excel-export-v2-historical-cash.test.ts \
-              config/god-file-boundaries.json \
-              tests/god-file-boundaries.test.ts \
-              docs/god-file-split-program.md \
-              docs/system-quality-program.md
-            git diff --cached --check
-            git commit -m "refactor(god-files): split oversized Wave 1 test suites"
-            git push origin HEAD:${CIRCLE_BRANCH}
+      - run: { name: inventory.test.ts, command: "node node_modules/vitest/vitest.mjs run tests/inventory.test.ts --maxWorkers=1 --no-file-parallelism" }
+  test-inventory-reconcile:
+    executor: node22-postgres
+    steps:
+      - install
+      - prepare_db
+      - split
+      - run: { name: inventory-reconciliation.test.ts, command: "node node_modules/vitest/vitest.mjs run tests/inventory-reconciliation.test.ts --maxWorkers=1 --no-file-parallelism" }
+  test-excel-v2-core:
+    executor: node22-postgres
+    steps:
+      - install
+      - prepare_db
+      - split
+      - run: { name: excel-export-v2.test.ts, command: "node node_modules/vitest/vitest.mjs run tests/excel-export-v2.test.ts --maxWorkers=1 --no-file-parallelism" }
+  test-excel-v2-totals:
+    executor: node22-postgres
+    steps:
+      - install
+      - prepare_db
+      - split
+      - run: { name: excel-export-v2-totals-cash.test.ts, command: "node node_modules/vitest/vitest.mjs run tests/excel-export-v2-totals-cash.test.ts --maxWorkers=1 --no-file-parallelism" }
+  test-excel-v2-historical:
+    executor: node22-postgres
+    steps:
+      - install
+      - prepare_db
+      - split
+      - run: { name: excel-export-v2-historical-cash.test.ts, command: "node node_modules/vitest/vitest.mjs run tests/excel-export-v2-historical-cash.test.ts --maxWorkers=1 --no-file-parallelism" }
 
 workflows:
-  wave1-certification:
+  wave1-diagnosis:
     jobs:
       - wave1-transform-audit
       - wave1-typecheck
-      - wave1-xlsx-tests
-      - wave1-workflow-tests
-      - wave1-inventory-tests
-      - wave1-excel-v2-tests
-      - wave1-publisher:
-          requires:
-            - wave1-transform-audit
-            - wave1-typecheck
-            - wave1-xlsx-tests
-            - wave1-workflow-tests
-            - wave1-inventory-tests
-            - wave1-excel-v2-tests
+      - test-xlsx-core
+      - test-xlsx-sp
+      - test-workflow-core
+      - test-workflow-daybook
+      - test-inventory-core
+      - test-inventory-reconcile
+      - test-excel-v2-core
+      - test-excel-v2-totals
+      - test-excel-v2-historical
