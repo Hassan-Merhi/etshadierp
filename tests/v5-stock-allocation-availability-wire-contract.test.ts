@@ -22,7 +22,7 @@ describe("V5 stock allocation availability wire contract", () => {
   it("keeps Customer Loading query key while requesting the compact availability view", () => {
     const source = read("client/src/pages/factory/customerLoadingAvailability.ts");
     expect(source).toContain('const STOCK_ALLOCATION_ENDPOINT = "/api/factory/v5/stock-allocation"');
-    expect(source).toContain('`${STOCK_ALLOCATION_ENDPOINT}?view=availability`');
+    expect(source).toContain("`${STOCK_ALLOCATION_ENDPOINT}?view=availability`");
     expect(source).toContain("pathname !== CUSTOMER_LOADING_ROUTE");
   });
 });
