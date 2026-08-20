@@ -1,0 +1,60 @@
+name: Wave H Static Tail 2
+
+on:
+  push:
+    branches: [wave-i/convergence-automation]
+    paths:
+      - .github/workflows/wave-h-static-tail2.yml
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NODE_ENV: test
+      SESSION_SECRET: phase2-static-tail2
+      CSRF_ENFORCE: "0"
+      ENABLE_SCHEDULERS: "false"
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - uses: actions/checkout@v7
+        with: { ref: wave-i/convergence-automation }
+      - uses: actions/setup-node@v6
+        with: { node-version: "22.14.0", cache: npm }
+      - run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+      - run: npm ci --no-audit --bin-links=true
+      - name: Run static tail
+        shell: bash
+        run: |
+          set +e
+          : > phase2-static-tail2.txt
+          run_step() {
+            label="$1"; shift
+            echo "===== ${label} =====" >> phase2-static-tail2.txt
+            "$@" > phase2-step.log 2>&1
+            code=$?
+            echo "exit=${code}" >> phase2-static-tail2.txt
+            tail -n 140 phase2-step.log >> phase2-static-tail2.txt
+            echo >> phase2-static-tail2.txt
+          }
+          run_step verify_lockfile npm run verify:lockfile
+          run_step verify_production_dependencies npm run verify:production-dependencies
+          run_step lint npm run lint
+          run_step lint_ratchet npm run audit:lint-ratchet
+          run_step typescript npm run check
+          run_step build npm run build
+          run_step verify_server_bundle npm run verify:server-bundle
+          run_step verify_observability npm run verify:observability
+          run_step verify_final_readiness npm run verify:final-production-readiness
+          run_step verify_bandwidth npm run verify:bandwidth
+      - name: Commit result and self-remove
+        run: |
+          rm -f .github/workflows/wave-h-static-tail2.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add phase2-static-tail2.txt .github/workflows/wave-h-static-tail2.yml
+          git commit -m "test: record post-format static diagnostic"
+          git push origin HEAD:wave-i/convergence-automation
